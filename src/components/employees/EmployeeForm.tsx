@@ -1,126 +1,60 @@
-'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Employee } from '@/types/employee';
-import { supabase } from '@/integrations/supabase/client';
 import PhotoUpload from './PhotoUpload';
 import FormField from './FormField';
 import FormActions from './FormActions';
 
 interface EmployeeFormProps {
-  employee?: Employee;
+  employee?: Employee | null;
   onClose: () => void;
   onSave: (employee: Employee) => void;
 }
 
 export default function EmployeeForm({ employee, onClose, onSave }: EmployeeFormProps) {
   const [formData, setFormData] = useState<Partial<Employee>>({
-    first_name: '',
-    last_name: '',
-    email: '',
-    department_id: 0,
-    position_id: null,
-    card_number: '',
-    is_active: true,
-    photo_url: null,
-    tc_no: '',
-    shift: null,
-    company_id: null,
+    first_name: employee?.first_name || '',
+    last_name: employee?.last_name || '',
+    email: employee?.email || '',
+    tc_no: employee?.tc_no || '',
+    card_number: employee?.card_number || '',
+    photo_url: employee?.photo_url || null,
+    is_active: employee?.is_active ?? true,
+    department_id: employee?.department_id || 0,
+    position_id: employee?.position_id || null,
+    company_id: employee?.company_id || null,
+    shift_id: employee?.shift_id || null,
+    shift: employee?.shift || null,
+    notes: employee?.notes || ''
   });
 
-  const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
-  const [companies, setCompanies] = useState<{ id: number; name: string }[]>([]);
-  const [shifts, setShifts] = useState<{ id: number; name: string }[]>([]);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(employee?.photo_url || null);
   const [isLoading, setIsLoading] = useState(false);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (employee) {
-      setFormData({
-        ...employee,
-        is_active: employee.is_active ?? true,
-      });
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
       
-      if (employee.photo_url) {
-        setPhotoPreview(employee.photo_url);
-      }
-    }
-    fetchDepartments();
-    fetchCompanies();
-    fetchShifts();
-  }, [employee]);
-
-  const fetchDepartments = async () => {
-    const { data, error } = await supabase.from('departments').select('id, name');
-    if (!error && data) {
-      setDepartments(data);
-    }
-  };
-  
-  const fetchCompanies = async () => {
-    const { data, error } = await supabase.from('companies').select('id, name');
-    if (!error && data) {
-      setCompanies(data);
-    } else {
-      // Eğer şirket tablosu yoksa boş bir array ile devam et
-      setCompanies([]);
-    }
-  };
-  
-  const fetchShifts = async () => {
-    const { data, error } = await supabase.from('shifts').select('id, name');
-    if (!error && data) {
-      setShifts(data);
-    } else {
-      // Eğer vardiya tablosu yoksa boş bir array ile devam et
-      setShifts([]);
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+        // You'll need to implement file upload logic here
+        // setFormData(prev => ({ ...prev, photo_url: uploaded_url }));
+      };
+      
+      reader.readAsDataURL(file);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
+    
     try {
-      const employeeData = {
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        email: formData.email,
-        tc_no: formData.tc_no,
-        card_number: formData.card_number,
-        photo_url: formData.photo_url,
-        is_active: formData.is_active,
-        company_id: formData.company_id,
-        department_id: formData.department_id,
-        position_id: formData.position_id,
-        shift_id: formData.shift_id,
-        shift: formData.shift,
-      };
-
-      if (employee) {
-        const { data, error } = await supabase
-          .from('employees')
-          .update(employeeData)
-          .eq('id', employee.id)
-          .select()
-          .single();
-
-        if (error) throw error;
-        onSave(data);
-      } else {
-        const { data, error } = await supabase
-          .from('employees')
-          .insert([employeeData])
-          .select()
-          .single();
-
-        if (error) throw error;
-        onSave(data);
-      }
+      await onSave(formData as Employee);
       onClose();
     } catch (error) {
-      console.error('Personel kaydedilirken hata:', error);
-      alert('Personel kaydedilemedi: ' + (error.message || 'Bilinmeyen hata'));
+      console.error('Error saving employee:', error);
     } finally {
       setIsLoading(false);
     }
@@ -161,6 +95,25 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
           title="TC Kimlik No 11 haneli rakamlardan oluşmalıdır"
           required
         />
+
+        <FormField
+          label="Kart No"
+          id="card_number"
+          value={formData.card_number || ''}
+          onChange={e => setFormData({ ...formData, card_number: e.target.value })}
+          required
+        />
+
+        <div className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            id="is_active"
+            checked={formData.is_active}
+            onChange={e => setFormData({ ...formData, is_active: e.target.checked })}
+            className="rounded border-gray-300"
+          />
+          <label htmlFor="is_active" className="text-sm">Aktif</label>
+        </div>
       </div>
 
       <FormActions isLoading={isLoading} onClose={onClose} />
