@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Input } from '@/components/ui/input';
@@ -53,18 +52,18 @@ export default function AccessGroups() {
         .from('access_groups')
         .select(`
           *,
-          group_members(count),
-          group_devices(count)
+          group_members:group_members(count),
+          group_devices:group_devices(count)
         `)
         .order('name');
 
       if (error) throw error;
 
-      const formattedGroups = data?.map(group => ({
+      const formattedGroups = (data || []).map(group => ({
         ...group,
-        employee_count: group.group_members.count,
-        device_count: group.group_devices.count
-      })) || [];
+        employee_count: group.group_members[0]?.count || 0,
+        device_count: group.group_devices[0]?.count || 0
+      }));
 
       setGroups(formattedGroups);
     } catch (error) {
