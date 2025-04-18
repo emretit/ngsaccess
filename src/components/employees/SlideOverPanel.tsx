@@ -9,7 +9,7 @@ interface SlideOverPanelProps {
   isOpen: boolean;
   onClose: () => void;
   employee: Employee | null;
-  onSave: (employee: any) => void;
+  onSave: (employee: Employee) => void;
 }
 
 export default function SlideOverPanel({ 
@@ -18,6 +18,15 @@ export default function SlideOverPanel({
   employee, 
   onSave 
 }: SlideOverPanelProps) {
+  const mapEmployeeToFormData = (emp: Employee | null) => {
+    if (!emp) return null;
+    return {
+      ...emp,
+      department: emp.departments?.name || '',
+      position: emp.positions?.name || ''
+    };
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={open => !open && onClose()}>
       <SheetContent>
@@ -29,7 +38,7 @@ export default function SlideOverPanel({
         
         <div className="mt-6">
           <EmployeeForm
-            employee={employee}
+            employee={mapEmployeeToFormData(employee)}
             onClose={onClose}
             onSave={onSave}
           />
