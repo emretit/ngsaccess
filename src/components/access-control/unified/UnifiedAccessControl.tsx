@@ -1,19 +1,23 @@
 
-import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
+import UnifiedRuleTable from "./UnifiedRuleTable";
 
 const UnifiedAccessControl = () => {
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">Erişim Yönetimi</h2>
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Erişim Matrisi</h3>
-          <p className="text-muted-foreground">Erişim yetkilendirmelerini görüntüle ve düzenle</p>
-        </Card>
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Erişim Kuralları</h3>
-          <p className="text-muted-foreground">Erişim kurallarını yönet</p>
-        </Card>
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Erişim Yönetimi</h2>
+        <Button>
+          <Plus className="w-4 h-4 mr-2" />
+          Yeni Erişim Kuralı
+        </Button>
+      </div>
+
+      <div className="bg-card rounded-lg border shadow-sm">
+        <div className="p-6">
+          <UnifiedRuleTable />
+        </div>
       </div>
     </div>
   );
