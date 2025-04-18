@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Pencil, UserPlus } from "lucide-react";
 import type { Employee } from '@/types/employee';
-import DashboardHeader from '@/components/DashboardHeader';
 
 export default function Employees() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -97,7 +96,6 @@ export default function Employees() {
 
         if (error) throw error;
 
-        // Başarılı silme işleminden sonra listeyi güncelle
         const updatedEmployees = employees.filter(emp => !selectedEmployees.includes(emp.id));
         setEmployees(updatedEmployees);
         setFilteredEmployees(updatedEmployees);
@@ -127,7 +125,6 @@ export default function Employees() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <DashboardHeader />
       <div className="flex flex-1">
         <aside className="w-64 border-r border-border bg-card p-4">
           <DepartmentTree onSelectDepartment={setSelectedDepartment} />

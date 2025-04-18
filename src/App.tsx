@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Layout from "./components/Layout";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AccessControl from "./pages/AccessControl";
@@ -19,14 +20,16 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/employees" element={<Employees />} />
-          <Route path="/devices" element={<Devices />} />
-          <Route path="/access-control" element={<AccessControl />} />
-          <Route path="/pdks-records" element={<PDKSRecords />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/employees" element={<Employees />} />
+            <Route path="/devices" element={<Devices />} />
+            <Route path="/access-control" element={<AccessControl />} />
+            <Route path="/pdks-records" element={<PDKSRecords />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Layout>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
