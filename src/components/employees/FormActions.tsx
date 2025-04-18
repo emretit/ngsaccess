@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { ReloadIcon } from "@radix-ui/react-icons";
+import { Loader2 } from "lucide-react";
 
 interface FormActionsProps {
   isLoading: boolean;
@@ -16,7 +16,7 @@ export default function FormActions({ isLoading, onClose }: FormActionsProps) {
       <Button type="submit" disabled={isLoading}>
         {isLoading ? (
           <>
-            <ReloadIcon className="mr-2 h-3 w-3 animate-spin" />
+            <Loader2 className="mr-2 h-3 w-3 animate-spin" />
             Kaydediliyor
           </>
         ) : (
