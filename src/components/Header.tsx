@@ -8,7 +8,6 @@ const navigation = [
   { name: 'Kişiler', href: '/employees' },
   { name: 'Cihazlar', href: '/devices' },
   { name: 'Geçiş Kontrol', href: '/access-control' },
-  { name: 'Erişim Grupları', href: '/access-groups' },
   { name: 'PDKS', href: '/pdks-records' },
   { name: 'Ayarlar', href: '/settings' },
 ];
