@@ -9,7 +9,6 @@ import {
   TableHeader,
   TableRow 
 } from "@/components/ui/table";
-import DashboardHeader from '@/components/DashboardHeader';
 
 interface PDKSRecord {
   id: number;
@@ -46,52 +45,49 @@ export default function PDKSRecords() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <DashboardHeader />
-      <main className="flex-1 p-6 bg-gray-50">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">PDKS Kayıtları</h1>
-        </div>
+    <main className="flex-1 p-6 bg-gray-50">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold text-gray-900">PDKS Kayıtları</h1>
+      </div>
 
-        <div className="bg-white rounded-lg shadow">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Ad Soyad</TableHead>
-                <TableHead>Tarih</TableHead>
-                <TableHead>Giriş Saati</TableHead>
-                <TableHead>Çıkış Saati</TableHead>
-                <TableHead>Durum</TableHead>
+      <div className="bg-white rounded-lg shadow">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Ad Soyad</TableHead>
+              <TableHead>Tarih</TableHead>
+              <TableHead>Giriş Saati</TableHead>
+              <TableHead>Çıkış Saati</TableHead>
+              <TableHead>Durum</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {records.map((record) => (
+              <TableRow key={record.id}>
+                <TableCell>
+                  {record.employee_first_name} {record.employee_last_name}
+                </TableCell>
+                <TableCell>{new Date(record.date).toLocaleDateString('tr-TR')}</TableCell>
+                <TableCell>{record.entry_time}</TableCell>
+                <TableCell>{record.exit_time}</TableCell>
+                <TableCell>
+                  <span className={`px-2 py-1 rounded-full text-xs ${
+                    record.status === 'present' 
+                      ? 'bg-green-100 text-green-800'
+                      : record.status === 'late'
+                      ? 'bg-yellow-100 text-yellow-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {record.status === 'present' ? 'Mevcut' 
+                     : record.status === 'late' ? 'Geç' 
+                     : 'Yok'}
+                  </span>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {records.map((record) => (
-                <TableRow key={record.id}>
-                  <TableCell>
-                    {record.employee_first_name} {record.employee_last_name}
-                  </TableCell>
-                  <TableCell>{new Date(record.date).toLocaleDateString('tr-TR')}</TableCell>
-                  <TableCell>{record.entry_time}</TableCell>
-                  <TableCell>{record.exit_time}</TableCell>
-                  <TableCell>
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      record.status === 'present' 
-                        ? 'bg-green-100 text-green-800'
-                        : record.status === 'late'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {record.status === 'present' ? 'Mevcut' 
-                       : record.status === 'late' ? 'Geç' 
-                       : 'Yok'}
-                    </span>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </main>
-    </div>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </main>
   );
 }

@@ -16,6 +16,7 @@ export interface Employee {
     created_at: string;
     updated_at: string;
     is_active: boolean;
+    notes?: string;
     departments?: {
         id: number;
         name: string;
