@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Clock, MapPin, Shield } from 'lucide-react';
-import UnifiedAccess from '@/components/access-control/UnifiedAccess';
+import UnifiedAccessControl from '@/components/access-control/unified/UnifiedAccessControl';
 import TemporaryAccess from '@/components/access-control/TemporaryAccess';
 import ZonesAndDoors from '@/components/access-control/ZonesAndDoors';
 
@@ -59,7 +59,7 @@ const AccessControl = () => {
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
         <div className="p-8">
-          {activeTab === 'unified' && <UnifiedAccess />}
+          {activeTab === 'unified' && <UnifiedAccessControl />}
           {activeTab === 'temporary' && <TemporaryAccess />}
           {activeTab === 'zones' && <ZonesAndDoors />}
         </div>
