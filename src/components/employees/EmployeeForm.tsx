@@ -24,8 +24,7 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
     position_id: employee?.position_id || null,
     company_id: employee?.company_id || null,
     shift_id: employee?.shift_id || null,
-    shift: employee?.shift || null,
-    notes: employee?.notes || ''
+    shift: employee?.shift || null
   });
 
   const [photoPreview, setPhotoPreview] = useState<string | null>(employee?.photo_url || null);
