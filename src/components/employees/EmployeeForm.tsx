@@ -18,15 +18,14 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
     first_name: '',
     last_name: '',
     email: '',
-    department: '',
-    position: '',
-    card_no: '',
-    status: 'active',
-    photo_url: '',
+    department_id: 0,
+    position_id: null,
+    card_number: '',
+    is_active: true,
+    photo_url: null,
     tc_no: '',
-    shift: '',
-    company_id: '',
-    notes: '',
+    shift: null,
+    company_id: null,
   });
 
   const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
@@ -37,26 +36,9 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
 
   useEffect(() => {
     if (employee) {
-      console.log("Yüklenen çalışan verisi:", employee); // Veriyi kontrol için log
-      
-      // Eğer first_name/last_name yoksa name'den ayıklama yapalım
-      let firstName = employee.first_name || '';
-      let lastName = employee.last_name || '';
-      
-      if ((!firstName || !lastName) && (employee.name)) {
-        const nameParts = employee.name.split(' ');
-        firstName = firstName || nameParts[0] || '';
-        lastName = lastName || nameParts.slice(1).join(' ') || '';
-      }
-      
       setFormData({
         ...employee,
-        first_name: firstName,
-        last_name: lastName,
-        tc_no: employee.tc_no || '',
-        shift: employee.shift || '',
-        company_id: employee.company_id?.toString() || '',
-        notes: employee.notes || '',
+        is_active: employee.is_active ?? true,
       });
       
       if (employee.photo_url) {
@@ -95,76 +77,27 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Dosya boyutu kontrolü (5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Dosya boyutu 5MB\'dan küçük olmalıdır');
-      return;
-    }
-
-    // Ön izleme için
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setPhotoPreview(event.target?.result as string);
-    };
-    reader.readAsDataURL(file);
-
-    // Supabase storage'a yükleme işlemi
-    try {
-      setIsLoading(true);
-      const fileName = `${Date.now()}_${file.name}`;
-      const { data, error } = await supabase.storage
-        .from('employee-photos')
-        .upload(fileName, file);
-
-      if (error) throw error;
-
-      // Yüklenen dosyanın public URL'ini al
-      const { data: urlData } = supabase.storage
-        .from('employee-photos')
-        .getPublicUrl(fileName);
-
-      setFormData({ ...formData, photo_url: urlData.publicUrl });
-    } catch (error) {
-      console.error('Fotoğraf yüklenirken hata:', error);
-      alert('Fotoğraf yüklenemedi. Lütfen daha sonra tekrar deneyiniz.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // Form verilerini veritabanı kolonlarıyla eşleştir
       const employeeData = {
         first_name: formData.first_name,
         last_name: formData.last_name,
         email: formData.email,
         tc_no: formData.tc_no,
-        card_number: formData.card_no, // card_no yerine card_number
+        card_number: formData.card_number,
         photo_url: formData.photo_url,
-        is_active: formData.status === 'active', // status yerine is_active (boolean)
-        notes: formData.notes,
-        company_id: formData.company_id ? parseInt(formData.company_id.toString()) : null,
-        shift: formData.shift
+        is_active: formData.is_active,
+        company_id: formData.company_id,
+        department_id: formData.department_id,
+        position_id: formData.position_id,
+        shift_id: formData.shift_id,
+        shift: formData.shift,
       };
 
-      // Departman ve pozisyon için id değerlerini bulma
-      if (formData.department) {
-        const selectedDept = departments.find(d => d.name === formData.department);
-        if (selectedDept) {
-          employeeData.department_id = selectedDept.id;
-        }
-      }
-
       if (employee) {
-        // Güncelleme
         const { data, error } = await supabase
           .from('employees')
           .update(employeeData)
@@ -175,7 +108,6 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
         if (error) throw error;
         onSave(data);
       } else {
-        // Yeni kayıt
         const { data, error } = await supabase
           .from('employees')
           .insert([employeeData])
@@ -228,76 +160,6 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
           pattern="[0-9]{11}"
           title="TC Kimlik No 11 haneli rakamlardan oluşmalıdır"
           required
-        />
-
-        <FormField
-          label="E-posta"
-          id="email"
-          type="email"
-          value={formData.email || ''}
-          onChange={e => setFormData({ ...formData, email: e.target.value })}
-          required
-        />
-
-        <FormField
-          label="Şirket"
-          id="company_id"
-          value={formData.company_id?.toString() || ''}
-          onChange={e => setFormData({ ...formData, company_id: e.target.value })}
-          options={companies}
-        />
-
-        <FormField
-          label="Departman"
-          id="department"
-          value={formData.department || ''}
-          onChange={e => setFormData({ ...formData, department: e.target.value })}
-          options={departments}
-          required
-        />
-
-        <FormField
-          label="Pozisyon"
-          id="position"
-          value={formData.position || ''}
-          onChange={e => setFormData({ ...formData, position: e.target.value })}
-          required
-        />
-
-        <FormField
-          label="Vardiya"
-          id="shift"
-          value={formData.shift || ''}
-          onChange={e => setFormData({ ...formData, shift: e.target.value })}
-          options={shifts}
-        />
-
-        <FormField
-          label="Kart No"
-          id="card_no"
-          value={formData.card_no || ''}
-          onChange={e => setFormData({ ...formData, card_no: e.target.value })}
-          required
-        />
-
-        <FormField
-          label="Durum"
-          id="status"
-          value={formData.status || 'active'}
-          onChange={e => setFormData({ ...formData, status: e.target.value as 'active' | 'inactive' })}
-          options={[
-            { id: 'active', name: 'Aktif' },
-            { id: 'inactive', name: 'Pasif' }
-          ]}
-          required
-        />
-
-        <FormField
-          label="Açıklama / Notlar"
-          id="notes"
-          value={formData.notes || ''}
-          onChange={e => setFormData({ ...formData, notes: e.target.value })}
-          isTextarea
         />
       </div>
 
