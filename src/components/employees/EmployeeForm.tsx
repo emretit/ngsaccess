@@ -12,7 +12,11 @@ interface EmployeeFormProps {
 }
 
 export default function EmployeeForm({ employee, onClose, onSave }: EmployeeFormProps) {
-  const [formData, setFormData] = useState<Partial<Employee>>({
+  const [formData, setFormData] = useState<Partial<Employee> & {
+    department?: string;
+    position?: string;
+    notes?: string;
+  }>({
     first_name: '',
     last_name: '',
     email: '',
@@ -35,25 +39,16 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
 
   useEffect(() => {
     if (employee) {
-      console.log("Yüklenen çalışan verisi:", employee); // Veriyi kontrol için log
+      console.log("Yüklenen çalışan verisi:", employee);
 
-      // Eğer first_name/last_name yoksa name'den ayıklama yapalım
-      let firstName = employee.first_name || '';
-      let lastName = employee.last_name || '';
-
-      if ((!firstName || !lastName) && (employee.name)) {
-        const nameParts = employee.name.split(' ');
-        firstName = firstName || nameParts[0] || '';
-        lastName = lastName || nameParts.slice(1).join(' ') || '';
-      }
+      // Get department and position names
+      const departmentName = employee.departments?.name || '';
+      const positionName = employee.positions?.name || '';
 
       setFormData({
         ...employee,
-        first_name: firstName,
-        last_name: lastName,
-        tc_no: employee.tc_no || '',
-        shift: employee.shift || '',
-        company_id: employee.company_id?.toString() || '',
+        department: departmentName,
+        position: positionName,
         notes: employee.notes || '',
       });
 
@@ -78,7 +73,6 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
     if (!error && data) {
       setCompanies(data);
     } else {
-      // Eğer şirket tablosu yoksa boş bir array ile devam et
       setCompanies([]);
     }
   };
@@ -88,7 +82,6 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
     if (!error && data) {
       setShifts(data);
     } else {
-      // Eğer vardiya tablosu yoksa boş bir array ile devam et
       setShifts([]);
     }
   };
@@ -140,16 +133,16 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
 
     try {
       // Form verilerini veritabanı kolonlarıyla eşleştir
-      const employeeData = {
+      const employeeData: any = {
         first_name: formData.first_name,
         last_name: formData.last_name,
         email: formData.email,
         tc_no: formData.tc_no,
-        card_number: formData.card_number, // card_no yerine card_number
+        card_number: formData.card_number,
         photo_url: formData.photo_url,
-        is_active: formData.is_active, // status yerine is_active (boolean)
+        is_active: formData.is_active,
         notes: formData.notes,
-        company_id: formData.company_id ? parseInt(formData.company_id.toString()) : null,
+        company_id: formData.company_id ? Number(formData.company_id) : null,
         shift: formData.shift
       };
 
