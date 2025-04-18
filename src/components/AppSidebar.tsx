@@ -1,5 +1,5 @@
 
-import { Home, Users, Calendar, Clock, Settings } from 'lucide-react';
+import { Home, Users, Calendar, Clock, Shield } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -16,7 +16,7 @@ const menuItems = [
   { title: "Employees", icon: Users, url: "/employees" },
   { title: "Attendance", icon: Calendar, url: "/attendance" },
   { title: "Time Tracking", icon: Clock, url: "/time-tracking" },
-  { title: "Settings", icon: Settings, url: "/settings" },
+  { title: "Access Control", icon: Shield, url: "/access-control" },
 ];
 
 export function AppSidebar() {
