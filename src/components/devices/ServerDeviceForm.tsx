@@ -30,7 +30,7 @@ export function ServerDeviceForm({
   const [deviceModel, setDeviceModel] = useState<"QR Reader" | "Fingerprint Reader" | "RFID Reader" | "Access Control Terminal" | "Other">(
     (device?.device_model_enum as any) || "QR Reader"
   );
-  const [projectId, setProjectId] = useState(device?.project_id?.toString() || '');
+  const [projectId, setProjectId] = useState(device?.project_id ? device.project_id.toString() : '');
   const [expiryDate, setExpiryDate] = useState(
     device?.expiry_date ? format(new Date(device.expiry_date), 'yyyy-MM-dd') : ''
   );

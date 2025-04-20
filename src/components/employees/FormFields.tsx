@@ -47,12 +47,17 @@ export function FormTextField({
   );
 }
 
+type SelectOption = {
+  id: string | number;
+  name: string;
+};
+
 type SelectFieldProps = {
   label: string;
   name: string;
   value: string;
   onChange: (value: string) => void;
-  options: { id: number; name: string }[];
+  options: SelectOption[];
   required?: boolean;
   placeholder?: string;
 };
@@ -76,8 +81,8 @@ export function FormSelectField({
         <SelectContent>
           {options.map(option => (
             <SelectItem 
-              key={option.id} 
-              value={option.id.toString() || `option-${option.id}`}
+              key={typeof option.id === 'string' ? option.id : option.id.toString()} 
+              value={typeof option.id === 'string' ? option.id : option.id.toString()}
             >
               {option.name || `Option ${option.id}`}
             </SelectItem>
