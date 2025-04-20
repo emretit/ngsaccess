@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -58,7 +57,6 @@ export default function PDKSRecords() {
     }
   }
 
-  // Filtreleme fonksiyonu
   const filteredRecords = records.filter(record => {
     const fullName = `${record.employee_first_name} ${record.employee_last_name}`.toLowerCase();
     const matchesSearch = searchTerm === "" || fullName.includes(searchTerm.toLowerCase());
@@ -67,12 +65,10 @@ export default function PDKSRecords() {
     return matchesSearch && matchesStatus;
   });
 
-  // Kayıtları yenileme
   const handleRefresh = () => {
     fetchRecords();
   };
 
-  // CSV olarak indirme fonksiyonu
   const handleExportCSV = () => {
     const headers = ["Ad Soyad", "Tarih", "Giriş Saati", "Çıkış Saati", "Durum"];
     
@@ -127,7 +123,7 @@ export default function PDKSRecords() {
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="">Tümü</SelectItem>
+                  <SelectItem value="all">Tümü</SelectItem>
                   <SelectItem value="present">Mevcut</SelectItem>
                   <SelectItem value="late">Geç</SelectItem>
                   <SelectItem value="absent">Yok</SelectItem>

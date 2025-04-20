@@ -74,10 +74,12 @@ export function FormSelectField({
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {/* Remove the empty value SelectItem and rely on the placeholder instead */}
           {options.map(option => (
-            <SelectItem key={option.id} value={option.name || `option-${option.id}`}>
-              {option.name}
+            <SelectItem 
+              key={option.id} 
+              value={option.name || `option-${option.id}`} // Ensure value is never empty
+            >
+              {option.name || `Option ${option.id}`}
             </SelectItem>
           ))}
         </SelectContent>
