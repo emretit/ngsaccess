@@ -1,128 +1,112 @@
 
 import { useState } from 'react';
-import { Plus } from "lucide-react";
 import { format } from 'date-fns';
-import { 
+import { Search } from "lucide-react";
+import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
-  TableRow 
+  TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from "@/integrations/supabase/client";
-import { useDevices } from '@/hooks/useDevices';
-import { Device, Project } from '@/types/device';
-import { DeviceForm } from '@/components/devices/DeviceForm';
+import { useDevices } from "@/hooks/useDevices";
+import { DeviceForm } from "@/components/devices/DeviceForm";
+import { ServerDevice } from "@/types/device";
+
+// For demo purposes, we're using a hardcoded project ID
+// In a real application, this would come from authentication context
+const DEMO_PROJECT_ID = 1;
 
 export default function Devices() {
-  const [selectedProject, setSelectedProject] = useState<number | null>(null);
-  const [showAddDevice, setShowAddDevice] = useState(false);
-  const [editDevice, setEditDevice] = useState<Device | undefined>();
+  const [searchTerm, setSearchTerm] = useState('');
+  const { devices, isLoading, addDevice, isAddingDevice } = useDevices(DEMO_PROJECT_ID);
 
-  const { data: devices, isLoading } = useDevices(selectedProject);
-  const { data: projects = [] } = useQuery({
-    queryKey: ['projects'],
-    queryFn: async () => {
-      const { data } = await supabase.from('projects').select('*');
-      return (data || []) as Project[];
-    },
+  // Filter devices based on search term
+  const filteredDevices = devices.filter((device: ServerDevice) => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      device.name?.toLowerCase().includes(searchLower) ||
+      device.serial_number?.toLowerCase().includes(searchLower) ||
+      device.device_model_enum?.toLowerCase().includes(searchLower)
+    );
   });
 
-  const getStatusBadge = (device: Device) => {
-    const isOnline = device.last_used_at && 
-      new Date(device.last_used_at) > new Date(Date.now() - 5 * 60 * 1000);
-    
-    return (
-      <Badge variant={isOnline ? "success" : "destructive"}>
-        {isOnline ? 'Online' : 'Offline'}
-      </Badge>
-    );
-  };
-
-  const formatLastSeen = (date: string | null) => {
-    if (!date) return 'Never';
-    return format(new Date(date), 'MMM d, yyyy HH:mm');
+  // Function to render status badge with appropriate color
+  const renderStatusBadge = (status?: string) => {
+    if (status === 'online') {
+      return <Badge className="bg-green-500">Online</Badge>;
+    } else if (status === 'expired') {
+      return <Badge variant="destructive">Expired</Badge>;
+    } else {
+      return <Badge variant="outline" className="bg-gray-200 text-gray-700">Offline</Badge>;
+    }
   };
 
   return (
-    <main className="flex-1 p-6">
+    <main className="p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-semibold">Devices</h1>
-          
-          <div className="flex gap-4">
-            <Select
-              value={selectedProject?.toString() || 'all'}
-              onValueChange={(value) => setSelectedProject(value === 'all' ? null : parseInt(value))}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="All Projects" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Projects</SelectItem>
-                {projects.map(project => (
-                  <SelectItem key={project.id} value={project.id.toString()}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Button
-              onClick={() => setShowAddDevice(true)}
-              className="bg-burgundy hover:bg-burgundy/90"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Device
-            </Button>
-          </div>
+          <h1 className="text-2xl font-semibold">Project Devices</h1>
+          <DeviceForm onAddDevice={addDevice} isLoading={isAddingDevice} />
+        </div>
+
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
+          <Input
+            placeholder="Search by name, serial number or model..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
         </div>
 
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Serial</TableHead>
                 <TableHead>Name</TableHead>
+                <TableHead>Serial Number</TableHead>
                 <TableHead>Model</TableHead>
-                <TableHead>Project</TableHead>
-                <TableHead>Last Seen</TableHead>
+                <TableHead>Date Added</TableHead>
+                <TableHead>Expiry Date</TableHead>
                 <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    Loading...
+                  <TableCell colSpan={6} className="text-center py-6">
+                    Loading devices...
                   </TableCell>
                 </TableRow>
-              ) : devices?.length === 0 ? (
+              ) : filteredDevices.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                    No devices found
+                  <TableCell colSpan={6} className="text-center py-6 text-gray-500">
+                    {searchTerm
+                      ? "No devices match your search criteria"
+                      : "No devices found in this project. Add your first device!"}
                   </TableCell>
                 </TableRow>
               ) : (
-                devices?.map((device) => (
-                  <TableRow
-                    key={device.id}
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => setEditDevice(device)}
-                  >
+                filteredDevices.map((device: ServerDevice) => (
+                  <TableRow key={device.id}>
+                    <TableCell className="font-medium">{device.name}</TableCell>
                     <TableCell className="font-mono">{device.serial_number}</TableCell>
-                    <TableCell>{device.name}</TableCell>
-                    <TableCell>{device.device_model}</TableCell>
+                    <TableCell>{device.device_model_enum}</TableCell>
                     <TableCell>
-                      {projects.find(p => p.id === device.project_id)?.name || '-'}
+                      {device.date_added
+                        ? format(new Date(device.date_added), 'MMM d, yyyy')
+                        : 'N/A'}
                     </TableCell>
-                    <TableCell>{formatLastSeen(device.last_used_at)}</TableCell>
-                    <TableCell>{getStatusBadge(device)}</TableCell>
+                    <TableCell>
+                      {device.expiry_date
+                        ? format(new Date(device.expiry_date), 'MMM d, yyyy')
+                        : 'N/A'}
+                    </TableCell>
+                    <TableCell>{renderStatusBadge(device.status)}</TableCell>
                   </TableRow>
                 ))
               )}
@@ -130,20 +114,6 @@ export default function Devices() {
           </Table>
         </div>
       </div>
-
-      <DeviceForm
-        open={showAddDevice || !!editDevice}
-        onClose={() => {
-          setShowAddDevice(false);
-          setEditDevice(undefined);
-        }}
-        device={editDevice}
-        projects={projects}
-        onSuccess={() => {
-          setShowAddDevice(false);
-          setEditDevice(undefined);
-        }}
-      />
     </main>
   );
 }

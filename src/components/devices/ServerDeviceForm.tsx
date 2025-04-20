@@ -27,7 +27,9 @@ export function ServerDeviceForm({
 }: ServerDeviceFormProps) {
   const [name, setName] = useState(device?.name || '');
   const [serialNumber, setSerialNumber] = useState(device?.serial_number || '');
-  const [deviceModel, setDeviceModel] = useState(device?.device_model_enum || '');
+  const [deviceModel, setDeviceModel] = useState<"QR Reader" | "Fingerprint Reader" | "RFID Reader" | "Access Control Terminal" | "Other">(
+    (device?.device_model_enum as any) || "QR Reader"
+  );
   const [projectId, setProjectId] = useState(device?.project_id?.toString() || '');
   const [expiryDate, setExpiryDate] = useState(
     device?.expiry_date ? format(new Date(device.expiry_date), 'yyyy-MM-dd') : ''
@@ -62,7 +64,7 @@ export function ServerDeviceForm({
       queryClient.invalidateQueries({ queryKey: ['server-devices'] });
       toast({
         title: `Device ${device ? 'updated' : 'added'} successfully`,
-        variant: 'success'
+        variant: 'default'
       });
       onSuccess();
     } catch (error) {
@@ -104,13 +106,13 @@ export function ServerDeviceForm({
             label="Device Model"
             name="device_model"
             value={deviceModel}
-            onChange={setDeviceModel}
+            onChange={(value) => setDeviceModel(value as "QR Reader" | "Fingerprint Reader" | "RFID Reader" | "Access Control Terminal" | "Other")}
             options={[
-              { id: 1, name: 'QR Reader' },
-              { id: 2, name: 'Fingerprint Reader' },
-              { id: 3, name: 'RFID Reader' },
-              { id: 4, name: 'Access Control Terminal' },
-              { id: 5, name: 'Other' }
+              { id: "QR Reader", name: "QR Reader" },
+              { id: "Fingerprint Reader", name: "Fingerprint Reader" },
+              { id: "RFID Reader", name: "RFID Reader" },
+              { id: "Access Control Terminal", name: "Access Control Terminal" },
+              { id: "Other", name: "Other" }
             ]}
             required
           />

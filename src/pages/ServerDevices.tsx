@@ -20,6 +20,7 @@ import { ServerDeviceForm } from '@/components/devices/ServerDeviceForm';
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 
 const PAGE_SIZE = 10;
+const DEVICE_MODEL_TYPES = ["QR Reader", "Fingerprint Reader", "RFID Reader", "Access Control Terminal", "Other"];
 
 export default function ServerDevices() {
   const [search, setSearch] = useState('');
@@ -33,14 +34,6 @@ export default function ServerDevices() {
     queryKey: ['projects'],
     queryFn: async () => {
       const { data } = await supabase.from('projects').select('*');
-      return data || [];
-    },
-  });
-
-  const { data: deviceModels = [] } = useQuery({
-    queryKey: ['device-models'],
-    queryFn: async () => {
-      const { data } = await supabase.rpc('get_device_model_types');
       return data || [];
     },
   });
@@ -126,7 +119,7 @@ export default function ServerDevices() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Models</SelectItem>
-              {deviceModels.map(model => (
+              {DEVICE_MODEL_TYPES.map(model => (
                 <SelectItem key={model} value={model}>
                   {model}
                 </SelectItem>

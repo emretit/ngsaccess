@@ -1,3 +1,4 @@
+
 export interface Device {
   id: string;
   name: string;
@@ -17,11 +18,12 @@ export interface ServerDevice {
   id: string;
   name: string;
   serial_number: string;
-  device_model_enum?: string;
+  device_model_enum: "QR Reader" | "Fingerprint Reader" | "RFID Reader" | "Access Control Terminal" | "Other";
   project_id?: number;
   date_added: string;
   expiry_date?: string;
   projects?: {
     name: string;
   };
+  status?: 'online' | 'offline' | 'expired';
 }
