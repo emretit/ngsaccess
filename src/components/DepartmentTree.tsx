@@ -1,6 +1,16 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { FolderTree } from 'lucide-react';
+import { 
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from '@/components/ui/sidebar';
+import { cn } from '@/lib/utils';
 
 interface Department {
   id: number;
@@ -43,24 +53,29 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
   };
 
   return (
-    <div className="space-y-2">
-      <h2 className="text-lg font-semibold mb-4">Departmanlar</h2>
-      <div className="space-y-1">
-        {departments.map((dept) => (
-          <button
-            key={dept.id}
-            onClick={() => handleDepartmentClick(dept.id)}
-            className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-              selectedDepartment === dept.id
-                ? 'bg-primary text-white'
-                : 'hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
-            style={{ marginLeft: `${dept.level * 12}px` }}
-          >
-            {dept.name}
-          </button>
-        ))}
-      </div>
-    </div>
+    <SidebarGroup>
+      <SidebarGroupLabel className="flex items-center gap-2">
+        <FolderTree className="h-4 w-4" />
+        Departmanlar
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {departments.map((dept) => (
+            <SidebarMenuItem key={dept.id}>
+              <SidebarMenuButton
+                onClick={() => handleDepartmentClick(dept.id)}
+                className={cn(
+                  'w-full',
+                  selectedDepartment === dept.id && 'bg-burgundy/10 text-burgundy'
+                )}
+                style={{ marginLeft: `${dept.level * 12}px` }}
+              >
+                {dept.name}
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
   );
 }
