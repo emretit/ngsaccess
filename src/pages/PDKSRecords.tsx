@@ -42,7 +42,7 @@ export default function PDKSRecords() {
   const [records, setRecords] = useState<PDKSRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [showAiPanel, setShowAiPanel] = useState(false);
   const { insight, isLoadingInsight, fetchInsight } = usePdksAi();
   const isMobile = useMedia("(max-width: 768px)");
@@ -72,7 +72,7 @@ export default function PDKSRecords() {
   const filteredRecords = records.filter(record => {
     const fullName = `${record.employee_first_name} ${record.employee_last_name}`.toLowerCase();
     const matchesSearch = searchTerm === "" || fullName.includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "" || record.status === statusFilter;
+    const matchesStatus = statusFilter === "all" || record.status === statusFilter;
     
     return matchesSearch && matchesStatus;
   });
@@ -135,7 +135,7 @@ export default function PDKSRecords() {
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="">Tümü</SelectItem>
+                  <SelectItem value="all">Tümü</SelectItem>
                   <SelectItem value="present">Mevcut</SelectItem>
                   <SelectItem value="late">Geç</SelectItem>
                   <SelectItem value="absent">Yok</SelectItem>
@@ -160,7 +160,7 @@ export default function PDKSRecords() {
                   <MessageSquare size={16} />
                 </Button>
               )}
-              {isMobile && <AiDrawer />}
+              {isMobile && <AiDrawer filters={{ statusFilter }} />}
             </div>
           </div>
         </div>
@@ -206,7 +206,7 @@ export default function PDKSRecords() {
                           {filteredRecords.length === 0 ? (
                             <TableRow>
                               <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                                {searchTerm || statusFilter 
+                                {searchTerm || statusFilter !== "all" 
                                   ? "Arama kriterlerine uygun kayıt bulunamadı" 
                                   : "Henüz kayıt bulunmuyor"}
                               </TableCell>
