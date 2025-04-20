@@ -1,0 +1,118 @@
+
+import { useState } from "react";
+import { ChevronRight, FolderOpen, Plus, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Department } from "@/types/department";
+
+interface DepartmentTreeItemProps {
+  department: Department;
+  children?: React.ReactNode;
+  level: number;
+  isSelected: boolean;
+  onSelect: (id: number) => void;
+  onAddSubDepartment: (parentId: number) => void;
+  onDelete: (id: number) => void;
+  hasChildren: boolean;
+}
+
+export function DepartmentTreeItem({
+  department,
+  children,
+  level,
+  isSelected,
+  onSelect,
+  onAddSubDepartment,
+  onDelete,
+  hasChildren,
+}: DepartmentTreeItemProps) {
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    switch (e.key) {
+      case "Enter":
+        onSelect(department.id);
+        break;
+      case "ArrowRight":
+        setIsExpanded(true);
+        break;
+      case "ArrowLeft":
+        setIsExpanded(false);
+        break;
+    }
+  };
+
+  return (
+    <li role="treeitem" aria-expanded={isExpanded}>
+      <div
+        className={cn(
+          "group flex items-center gap-1 rounded-md p-1 transition-colors hover:bg-burgundy/10",
+          isSelected && "border-l-2 border-burgundy bg-burgundy/10 pl-[7px] font-medium text-burgundy",
+          level === 0 ? "mt-0" : "mt-1"
+        )}
+        style={{ paddingLeft: `${level * 12 + 4}px` }}
+        onClick={() => onSelect(department.id)}
+        onKeyDown={handleKeyDown}
+        tabIndex={0}
+      >
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-4 w-4 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsExpanded(!isExpanded);
+          }}
+        >
+          <ChevronRight
+            className={cn(
+              "h-3 w-3 shrink-0 transition-transform",
+              isExpanded && "rotate-90"
+            )}
+          />
+        </Button>
+
+        <FolderOpen className="h-4 w-4 shrink-0 text-burgundy" />
+        <span className="flex-1 truncate">{department.name}</span>
+
+        <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddSubDepartment(department.id);
+            }}
+          >
+            <Plus className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            disabled={hasChildren}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(department.id);
+            }}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+
+      {children && (
+        <ul
+          role="group"
+          className={cn(
+            "overflow-hidden transition-all duration-200",
+            isExpanded ? "max-h-[1000px]" : "max-h-0"
+          )}
+        >
+          {children}
+        </ul>
+      )}
+    </li>
+  );
+}

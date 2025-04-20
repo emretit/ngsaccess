@@ -1,17 +1,16 @@
-
 import { useState, useMemo, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
-import { Users, UserPlus, Edit2 } from "lucide-react"; // Added Edit2 import
+import { Users, UserPlus, Edit2 } from "lucide-react";
 import {
   SidebarProvider,
   Sidebar,
   SidebarContent,
   SidebarInset
 } from "@/components/ui/sidebar";
-import DepartmentTree from '@/components/DepartmentTree';
+import DepartmentTree from '@/components/departments/DepartmentTree';
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button"; // Added Button import
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Pagination,
