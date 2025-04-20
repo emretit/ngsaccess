@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { DepartmentTreeItem } from "./DepartmentTreeItem";
 import { Department } from "@/types/department";
-import { FolderTree } from "lucide-react";
+import { Building2 } from "lucide-react";
 
 interface DepartmentTreeProps {
   onSelectDepartment: (id: number | null) => void;
@@ -17,10 +17,29 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [newDepartmentName, setNewDepartmentName] = useState("");
   const [addingToParentId, setAddingToParentId] = useState<number | null>(null);
+  const [projectName, setProjectName] = useState("Ana Proje");
 
   useEffect(() => {
     fetchDepartments();
+    fetchProjectName();
   }, []);
+
+  const fetchProjectName = async () => {
+    const { data, error } = await supabase
+      .from("projects")
+      .select("name")
+      .eq("is_active", true)
+      .single();
+
+    if (error) {
+      console.error("Error fetching project name:", error);
+      return;
+    }
+
+    if (data) {
+      setProjectName(data.name);
+    }
+  };
 
   const fetchDepartments = async () => {
     const { data, error } = await supabase
@@ -116,9 +135,12 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
 
   return (
     <div className="h-full w-[280px] overflow-auto bg-card p-4 rounded-2xl border shadow-lg">
-      <div className="mb-4 flex items-center gap-2 border-b pb-3">
-        <FolderTree className="h-5 w-5 text-burgundy" />
-        <h2 className="text-lg font-semibold">Departments</h2>
+      <div className="mb-4 space-y-3 border-b pb-3">
+        <div className="flex items-center gap-2">
+          <Building2 className="h-5 w-5 text-burgundy" />
+          <h2 className="text-lg font-semibold text-burgundy">{projectName}</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">Departmanlar</p>
       </div>
       
       <ul role="tree" className="space-y-0.5">
