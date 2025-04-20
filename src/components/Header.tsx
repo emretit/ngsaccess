@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Users, Devices, Shield, FileText, Settings, Bell, User, Menu, X } from 'lucide-react';
+import { Users, Dices, Shield, FileText, Settings, Bell, User, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -14,7 +14,7 @@ import {
 
 const navigation = [
   { name: 'Kişiler', href: '/employees', icon: Users },
-  { name: 'Cihazlar', href: '/devices', icon: Devices },
+  { name: 'Cihazlar', href: '/devices', icon: Dices }, // Changed from Devices to Dices
   { name: 'Geçiş Kontrol', href: '/access-control', icon: Shield },
   { name: 'PDKS Kayıtları', href: '/pdks-records', icon: FileText },
   { name: 'Ayarlar', href: '/settings', icon: Settings },
