@@ -64,13 +64,13 @@ export default function ServerDevices() {
     <main className="flex-1 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-semibold">Server Devices Management</h1>
+          <h1 className="text-2xl font-semibold">Server Cihaz Yönetimi</h1>
           <Button
             onClick={() => setShowAddDevice(true)}
             className="bg-burgundy hover:bg-burgundy/90"
           >
             <Plus className="mr-2 h-4 w-4" />
-            Add Device
+            Cihaz Ekle
           </Button>
         </div>
 
@@ -80,7 +80,7 @@ export default function ServerDevices() {
           selectedProject={selectedProject}
           onProjectChange={(value) => setSelectedProject(value === 'all' ? null : parseInt(value))}
           selectedModel={selectedModel}
-          onModelChange={(value) => setSelectedModel(value === 'all' ? null : value as typeof selectedModel)}
+          onModelChange={(value) => setSelectedModel(value === 'all' ? null : value as typeof DEVICE_MODEL_TYPES[number])}
           projects={projects}
           deviceModels={DEVICE_MODEL_TYPES}
         />
@@ -100,7 +100,7 @@ export default function ServerDevices() {
               />
             </PaginationItem>
             <PaginationItem>
-              Page {page} of {totalPages}
+              Sayfa {page} / {totalPages}
             </PaginationItem>
             <PaginationItem>
               <PaginationNext

@@ -30,7 +30,7 @@ export function ServerDeviceFilters({
       <div className="relative flex-1">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
         <Input
-          placeholder="Search by serial number or name..."
+          placeholder="Seri numarası veya isim ile ara..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           className="pl-10"
@@ -42,10 +42,10 @@ export function ServerDeviceFilters({
         onValueChange={onProjectChange}
       >
         <SelectTrigger className="w-[200px]">
-          <SelectValue placeholder="All Projects" />
+          <SelectValue placeholder="Tüm Projeler" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Projects</SelectItem>
+          <SelectItem value="all">Tüm Projeler</SelectItem>
           {projects.map(project => (
             <SelectItem key={project.id} value={project.id.toString()}>
               {project.name}
@@ -59,10 +59,10 @@ export function ServerDeviceFilters({
         onValueChange={onModelChange}
       >
         <SelectTrigger className="w-[200px]">
-          <SelectValue placeholder="All Models" />
+          <SelectValue placeholder="Tüm Modeller" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Models</SelectItem>
+          <SelectItem value="all">Tüm Modeller</SelectItem>
           {deviceModels.map(model => (
             <SelectItem key={model} value={model}>
               {model}
