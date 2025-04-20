@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { ChevronRight, FolderTree, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, Grid, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Department } from "@/types/department";
@@ -73,7 +73,7 @@ export function DepartmentTreeItem({
           />
         </Button>
 
-        <FolderTree className="h-4 w-4 shrink-0 text-burgundy" /> {/* Changed from FolderOpen to FolderTree */}
+        <Grid className="h-4 w-4 shrink-0 text-burgundy" /> {/* Changed from FolderTree to Grid */}
         <span className="flex-1 truncate text-sm">{department.name}</span>
 
         <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
