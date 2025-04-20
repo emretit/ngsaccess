@@ -1,21 +1,13 @@
+
 import { useState } from 'react';
-import { ChevronDown, Plus, Search } from "lucide-react";
-import { format } from 'date-fns';
-import { 
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow 
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { ServerDevice } from '@/types/device';
 import { ServerDeviceForm } from '@/components/devices/ServerDeviceForm';
+import { ServerDeviceTable } from '@/components/devices/ServerDeviceTable';
+import { ServerDeviceFilters } from '@/components/devices/ServerDeviceFilters';
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 
 const PAGE_SIZE = 10;
@@ -81,101 +73,22 @@ export default function ServerDevices() {
           </Button>
         </div>
 
-        <div className="flex gap-4 items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-            <Input
-              placeholder="Search by serial number or name..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+        <ServerDeviceFilters
+          search={search}
+          onSearchChange={setSearch}
+          selectedProject={selectedProject}
+          onProjectChange={(value) => setSelectedProject(value === 'all' ? null : parseInt(value))}
+          selectedModel={selectedModel}
+          onModelChange={(value) => setSelectedModel(value === 'all' ? null : value as typeof selectedModel)}
+          projects={projects}
+          deviceModels={DEVICE_MODEL_TYPES}
+        />
 
-          <Select
-            value={selectedProject?.toString() || 'all'}
-            onValueChange={(value) => setSelectedProject(value === 'all' ? null : parseInt(value))}
-          >
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="All Projects" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Projects</SelectItem>
-              {projects.map(project => (
-                <SelectItem key={project.id} value={project.id.toString()}>
-                  {project.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={selectedModel || 'all'}
-            onValueChange={(value) => setSelectedModel(value === 'all' ? null : value as "QR Reader" | "Fingerprint Reader" | "RFID Reader" | "Access Control Terminal" | "Other")}
-          >
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="All Models" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Models</SelectItem>
-              {DEVICE_MODEL_TYPES.map(model => (
-                <SelectItem key={model} value={model}>
-                  {model}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Serial Number</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Model</TableHead>
-                <TableHead>Project</TableHead>
-                <TableHead>Date Added</TableHead>
-                <TableHead>Expiry Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    Loading...
-                  </TableCell>
-                </TableRow>
-              ) : devices?.data.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                    No devices found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                devices?.data.map((device) => (
-                  <TableRow
-                    key={device.id}
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => setEditDevice(device)}
-                  >
-                    <TableCell className="font-mono">{device.serial_number}</TableCell>
-                    <TableCell>{device.name}</TableCell>
-                    <TableCell>{device.device_model_enum}</TableCell>
-                    <TableCell>{device.projects?.name || '-'}</TableCell>
-                    <TableCell>{format(new Date(device.date_added), 'MMM d, yyyy')}</TableCell>
-                    <TableCell>
-                      {device.expiry_date 
-                        ? format(new Date(device.expiry_date), 'MMM d, yyyy')
-                        : '-'
-                      }
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        <ServerDeviceTable
+          devices={devices?.data || []}
+          isLoading={isLoading}
+          onDeviceClick={setEditDevice}
+        />
 
         <Pagination>
           <PaginationContent>
