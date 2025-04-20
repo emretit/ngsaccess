@@ -1,7 +1,11 @@
 
-import { useState } from 'react';
+import { useEffect } from 'react';
+import { Plus } from "lucide-react";
 import { format } from 'date-fns';
-import { Search } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { DeviceForm } from "@/components/devices/DeviceForm";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Table,
   TableBody,
@@ -10,105 +14,77 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useDevices } from "@/hooks/useDevices";
-import { DeviceForm } from "@/components/devices/DeviceForm";
-import { ServerDevice } from "@/types/device";
-
-// For demo purposes, we're using a hardcoded project ID
-// In a real application, this would come from authentication context
-const DEMO_PROJECT_ID = 1;
 
 export default function Devices() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const { devices, isLoading, addDevice, isAddingDevice } = useDevices(DEMO_PROJECT_ID);
-
-  // Filter devices based on search term
-  const filteredDevices = devices.filter((device: ServerDevice) => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      device.name?.toLowerCase().includes(searchLower) ||
-      device.serial_number?.toLowerCase().includes(searchLower) ||
-      device.device_model_enum?.toLowerCase().includes(searchLower)
-    );
-  });
-
-  // Function to render status badge with appropriate color
-  const renderStatusBadge = (status?: string) => {
-    if (status === 'online') {
-      return <Badge className="bg-green-500">Online</Badge>;
-    } else if (status === 'expired') {
-      return <Badge variant="destructive">Expired</Badge>;
-    } else {
-      return <Badge variant="outline" className="bg-gray-200 text-gray-700">Offline</Badge>;
+  const { data: devices, isLoading } = useQuery({
+    queryKey: ['devices'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('devices')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data || [];
     }
-  };
+  });
 
   return (
     <main className="p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-semibold">Project Devices</h1>
-          <DeviceForm onAddDevice={addDevice} isLoading={isAddingDevice} />
-        </div>
-
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-          <Input
-            placeholder="Search by name, serial number or model..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
+          <h1 className="text-2xl font-semibold">Cihazlar</h1>
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Yeni Cihaz Ekle
+          </Button>
         </div>
 
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Serial Number</TableHead>
-                <TableHead>Model</TableHead>
-                <TableHead>Date Added</TableHead>
-                <TableHead>Expiry Date</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>İsim</TableHead>
+                <TableHead>Seri No</TableHead>
+                <TableHead>Konum</TableHead>
+                <TableHead>Tip</TableHead>
+                <TableHead>Durum</TableHead>
+                <TableHead>Son Görülme</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-6">
-                    Loading devices...
+                  <TableCell colSpan={6} className="text-center py-8">
+                    Yükleniyor...
                   </TableCell>
                 </TableRow>
-              ) : filteredDevices.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-6 text-gray-500">
-                    {searchTerm
-                      ? "No devices match your search criteria"
-                      : "No devices found in this project. Add your first device!"}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredDevices.map((device: ServerDevice) => (
+              ) : devices && devices.length > 0 ? (
+                devices.map((device) => (
                   <TableRow key={device.id}>
                     <TableCell className="font-medium">{device.name}</TableCell>
                     <TableCell className="font-mono">{device.serial_number}</TableCell>
-                    <TableCell>{device.device_model_enum}</TableCell>
+                    <TableCell>{device.location || '-'}</TableCell>
+                    <TableCell>{device.device_type || '-'}</TableCell>
                     <TableCell>
-                      {device.date_added
-                        ? format(new Date(device.date_added), 'MMM d, yyyy')
-                        : 'N/A'}
+                      <Badge 
+                        variant={device.status === 'active' ? 'default' : 'secondary'}
+                      >
+                        {device.status === 'active' ? 'Aktif' : 'Pasif'}
+                      </Badge>
                     </TableCell>
                     <TableCell>
-                      {device.expiry_date
-                        ? format(new Date(device.expiry_date), 'MMM d, yyyy')
-                        : 'N/A'}
+                      {device.last_seen ? format(new Date(device.last_seen), 'dd.MM.yyyy HH:mm') : '-'}
                     </TableCell>
-                    <TableCell>{renderStatusBadge(device.status)}</TableCell>
                   </TableRow>
                 ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                    Henüz cihaz bulunmuyor
+                  </TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>
