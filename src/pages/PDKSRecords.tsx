@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -18,7 +19,14 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, Download, RefreshCcw } from "lucide-react";
+import { Search, Filter, Download, RefreshCcw, MessageSquare } from "lucide-react";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { AiChatPanel } from "@/components/pdks/AiChatPanel";
+import { AiDrawer } from "@/components/pdks/AiDrawer";
+import { AiInsightsCard } from "@/components/pdks/AiInsightsCard";
+import { usePdksAi } from "@/hooks/usePdksAi";
+import { useMedia } from "@/hooks/use-mobile";
 
 interface PDKSRecord {
   id: number;
@@ -35,9 +43,13 @@ export default function PDKSRecords() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [showAiPanel, setShowAiPanel] = useState(false);
+  const { insight, isLoadingInsight, fetchInsight } = usePdksAi();
+  const isMobile = useMedia("(max-width: 768px)");
 
   useEffect(() => {
     fetchRecords();
+    fetchInsight({});
   }, []);
 
   async function fetchRecords() {
@@ -123,7 +135,7 @@ export default function PDKSRecords() {
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="all">Tümü</SelectItem>
+                  <SelectItem value="">Tümü</SelectItem>
                   <SelectItem value="present">Mevcut</SelectItem>
                   <SelectItem value="late">Geç</SelectItem>
                   <SelectItem value="absent">Yok</SelectItem>
@@ -138,70 +150,127 @@ export default function PDKSRecords() {
               <Button variant="outline" size="icon" onClick={handleExportCSV} title="CSV İndir">
                 <Download size={16} />
               </Button>
+              {!isMobile && (
+                <Button 
+                  variant={showAiPanel ? "default" : "outline"} 
+                  size="icon" 
+                  onClick={() => setShowAiPanel(!showAiPanel)}
+                  title="AI Asistan"
+                >
+                  <MessageSquare size={16} />
+                </Button>
+              )}
+              {isMobile && <AiDrawer />}
             </div>
           </div>
         </div>
 
-        <div className="glass-card overflow-hidden">
-          {loading ? (
-            <div className="flex justify-center items-center py-12">
-              <div className="flex space-x-2">
-                <div className="w-3 h-3 bg-primary rounded-full animate-bounce"></div>
-                <div className="w-3 h-3 bg-primary rounded-full animate-bounce animation-delay-200"></div>
-                <div className="w-3 h-3 bg-primary rounded-full animate-bounce animation-delay-400"></div>
-              </div>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-muted/50">
-                  <TableRow>
-                    <TableHead className="font-semibold">Ad Soyad</TableHead>
-                    <TableHead className="font-semibold">Tarih</TableHead>
-                    <TableHead className="font-semibold">Giriş Saati</TableHead>
-                    <TableHead className="font-semibold">Çıkış Saati</TableHead>
-                    <TableHead className="font-semibold">Durum</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredRecords.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                        {searchTerm || statusFilter 
-                          ? "Arama kriterlerine uygun kayıt bulunamadı" 
-                          : "Henüz kayıt bulunmuyor"}
-                      </TableCell>
-                    </TableRow>
+        <ResizablePanelGroup direction="horizontal" className="min-h-[calc(100vh-12rem)]">
+          <ResizablePanel defaultSize={showAiPanel ? 60 : 100} minSize={40}>
+            <Tabs defaultValue="summary" className="w-full">
+              <TabsList className="grid grid-cols-4 w-full">
+                <TabsTrigger value="summary">Özet</TabsTrigger>
+                <TabsTrigger value="attendance">Devam Tablosu</TabsTrigger>
+                <TabsTrigger value="department">Departman</TabsTrigger>
+                <TabsTrigger value="detailed">Detaylı</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="summary" className="mt-4 space-y-4">
+                <AiInsightsCard insight={insight} isLoading={isLoadingInsight} />
+                {/* Add other summary cards/stats here */}
+              </TabsContent>
+              
+              <TabsContent value="attendance" className="mt-4">
+                <div className="glass-card overflow-hidden">
+                  {loading ? (
+                    <div className="flex justify-center items-center py-12">
+                      <div className="flex space-x-2">
+                        <div className="w-3 h-3 bg-primary rounded-full animate-bounce"></div>
+                        <div className="w-3 h-3 bg-primary rounded-full animate-bounce animation-delay-200"></div>
+                        <div className="w-3 h-3 bg-primary rounded-full animate-bounce animation-delay-400"></div>
+                      </div>
+                    </div>
                   ) : (
-                    filteredRecords.map((record) => (
-                      <TableRow key={record.id} className="hover:bg-muted/30 transition-colors">
-                        <TableCell className="font-medium">
-                          {record.employee_first_name} {record.employee_last_name}
-                        </TableCell>
-                        <TableCell>{new Date(record.date).toLocaleDateString('tr-TR')}</TableCell>
-                        <TableCell>{record.entry_time}</TableCell>
-                        <TableCell>{record.exit_time}</TableCell>
-                        <TableCell>
-                          <span className={`pill-badge ${
-                            record.status === 'present' 
-                              ? 'bg-green-100 text-green-800'
-                              : record.status === 'late'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {record.status === 'present' ? 'Mevcut' 
-                             : record.status === 'late' ? 'Geç' 
-                             : 'Yok'}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader className="bg-muted/50">
+                          <TableRow>
+                            <TableHead className="font-semibold">Ad Soyad</TableHead>
+                            <TableHead className="font-semibold">Tarih</TableHead>
+                            <TableHead className="font-semibold">Giriş Saati</TableHead>
+                            <TableHead className="font-semibold">Çıkış Saati</TableHead>
+                            <TableHead className="font-semibold">Durum</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredRecords.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                                {searchTerm || statusFilter 
+                                  ? "Arama kriterlerine uygun kayıt bulunamadı" 
+                                  : "Henüz kayıt bulunmuyor"}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredRecords.map((record) => (
+                              <TableRow key={record.id} className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="font-medium">
+                                  {record.employee_first_name} {record.employee_last_name}
+                                </TableCell>
+                                <TableCell>{new Date(record.date).toLocaleDateString('tr-TR')}</TableCell>
+                                <TableCell>{record.entry_time}</TableCell>
+                                <TableCell>{record.exit_time}</TableCell>
+                                <TableCell>
+                                  <span className={`pill-badge ${
+                                    record.status === 'present' 
+                                      ? 'bg-green-100 text-green-800'
+                                      : record.status === 'late'
+                                      ? 'bg-yellow-100 text-yellow-800'
+                                      : 'bg-red-100 text-red-800'
+                                  }`}>
+                                    {record.status === 'present' ? 'Mevcut' 
+                                     : record.status === 'late' ? 'Geç' 
+                                     : 'Yok'}
+                                  </span>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
                   )}
-                </TableBody>
-              </Table>
-            </div>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="department" className="mt-4">
+                <div className="glass-card p-6">
+                  <h3 className="font-medium text-lg mb-4">Departman Raporları</h3>
+                  <p className="text-gray-500">Bu özellik henüz geliştirilmektedir.</p>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="detailed" className="mt-4">
+                <div className="glass-card p-6">
+                  <h3 className="font-medium text-lg mb-4">Detaylı Raporlar</h3>
+                  <p className="text-gray-500">Bu özellik henüz geliştirilmektedir.</p>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </ResizablePanel>
+          
+          {showAiPanel && !isMobile && (
+            <>
+              <ResizableHandle withHandle className="border-l border-r border-gray-200" />
+              <ResizablePanel defaultSize={40} minSize={30}>
+                <AiChatPanel 
+                  onClose={() => setShowAiPanel(false)}
+                  filters={{ statusFilter }}
+                />
+              </ResizablePanel>
+            </>
           )}
-        </div>
+        </ResizablePanelGroup>
       </div>
     </main>
   );
