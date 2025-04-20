@@ -122,7 +122,10 @@ export function ServerDeviceForm({
             name="project"
             value={projectId}
             onChange={setProjectId}
-            options={projects}
+            options={projects.map(project => ({
+              id: project.id.toString(),
+              name: project.name
+            }))}
             placeholder="Select Project"
           />
 
