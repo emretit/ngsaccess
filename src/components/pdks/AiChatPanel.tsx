@@ -18,6 +18,7 @@ interface AiChatPanelProps {
     dateRange?: { from: Date; to: Date };
     department?: string;
     shift?: string;
+    statusFilter?: string;  // Add statusFilter to the interface
   };
 }
 

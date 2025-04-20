@@ -24,3 +24,8 @@ export function useMedia(query: string): boolean {
 
   return matches;
 }
+
+// Add the missing useIsMobile hook
+export function useIsMobile(): boolean {
+  return useMedia("(max-width: 768px)");
+}
