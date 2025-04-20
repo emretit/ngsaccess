@@ -1,23 +1,46 @@
-import { useEffect, useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
-import DepartmentTree from '@/components/DepartmentTree';
-import SlideOverPanel from '@/components/employees/SlideOverPanel';
+import { Users, UserPlus, Edit2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, UserPlus } from "lucide-react";
-import type { Employee } from '@/types/employee';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious
+} from "@/components/ui/pagination";
+import SlideOverPanel from '@/components/employees/SlideOverPanel';
+import { Employee } from '@/types/employee';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
 
 export default function Employees() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+
+  const ITEMS_PER_PAGE = 10;
+
+  const employeeStats = useMemo(() => ({
+    total: employees.length,
+    active: employees.filter(emp => emp.is_active).length,
+    inactive: employees.filter(emp => !emp.is_active).length
+  }), [employees]);
 
   useEffect(() => {
     fetchEmployees();
@@ -48,13 +71,9 @@ export default function Employees() {
   useEffect(() => {
     let filtered = employees;
 
-    if (selectedDepartment !== null) {
-      filtered = filtered.filter(emp => emp.department_id === selectedDepartment);
-    }
-
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(emp => 
+      filtered = filtered.filter(emp =>
         emp.first_name.toLowerCase().includes(query) ||
         emp.last_name.toLowerCase().includes(query) ||
         emp.email.toLowerCase().includes(query) ||
@@ -64,48 +83,15 @@ export default function Employees() {
     }
 
     setFilteredEmployees(filtered);
-  }, [selectedDepartment, employees, searchQuery]);
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [employees, searchQuery]);
 
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
-      setSelectedEmployees(filteredEmployees.map(emp => emp.id));
-    } else {
-      setSelectedEmployees([]);
-    }
-  };
+  const paginatedEmployees = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredEmployees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredEmployees, currentPage]);
 
-  const handleSelectEmployee = (employeeId: number) => {
-    setSelectedEmployees(prev => {
-      if (prev.includes(employeeId)) {
-        return prev.filter(id => id !== employeeId);
-      } else {
-        return [...prev, employeeId];
-      }
-    });
-  };
-
-  const handleBulkDelete = async () => {
-    if (!selectedEmployees.length) return;
-    
-    if (window.confirm(`${selectedEmployees.length} personeli silmek istediğinizden emin misiniz?`)) {
-      try {
-        const { error } = await supabase
-          .from('employees')
-          .delete()
-          .in('id', selectedEmployees);
-
-        if (error) throw error;
-
-        const updatedEmployees = employees.filter(emp => !selectedEmployees.includes(emp.id));
-        setEmployees(updatedEmployees);
-        setFilteredEmployees(updatedEmployees);
-        setSelectedEmployees([]);
-      } catch (err) {
-        console.error('Toplu silme işlemi sırasında hata:', err);
-        alert('Personeller silinirken bir hata oluştu');
-      }
-    }
-  };
+  const totalPages = Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE);
 
   if (loading) {
     return (
@@ -124,80 +110,148 @@ export default function Employees() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <div className="flex flex-1">
-        <aside className="w-64 border-r border-border bg-card p-4">
-          <DepartmentTree onSelectDepartment={setSelectedDepartment} />
-        </aside>
-
-        <main className="flex-1 p-6">
-          <div className="mb-6 flex items-center justify-between">
-            <h1 className="text-2xl font-semibold">Personel Listesi</h1>
-            <div className="flex gap-4">
-              <Input
-                type="search"
-                placeholder="Personel ara..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-64"
-              />
-              <Button onClick={() => {
-                setEditingEmployee(null);
-                setIsPanelOpen(true);
-              }}>
-                <UserPlus className="mr-2 h-4 w-4" />
-                Yeni Personel
-              </Button>
-            </div>
-          </div>
-
-          <div className="rounded-lg border bg-card">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="border-b bg-muted/50">
-                  <tr>
-                    <th className="p-4 text-left font-medium">Ad Soyad</th>
-                    <th className="p-4 text-left font-medium">TC No</th>
-                    <th className="p-4 text-left font-medium">E-posta</th>
-                    <th className="p-4 text-left font-medium">Departman</th>
-                    <th className="p-4 text-left font-medium">Kart No</th>
-                    <th className="p-4 text-left font-medium">Durum</th>
-                    <th className="p-4 text-left font-medium">İşlemler</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredEmployees.map((employee) => (
-                    <tr key={employee.id} className="border-b">
-                      <td className="p-4">{employee.first_name} {employee.last_name}</td>
-                      <td className="p-4">{employee.tc_no}</td>
-                      <td className="p-4">{employee.email}</td>
-                      <td className="p-4">{employee.departments?.name || '-'}</td>
-                      <td className="p-4">{employee.card_number}</td>
-                      <td className="p-4">
-                        <Badge variant={employee.is_active ? "success" : "secondary"}>
-                          {employee.is_active ? 'Aktif' : 'Pasif'}
-                        </Badge>
-                      </td>
-                      <td className="p-4">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEditingEmployee(employee);
-                            setIsPanelOpen(true);
-                          }}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </main>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Personel Listesi</h1>
+        <div className="flex gap-4">
+          <Input
+            type="search"
+            placeholder="Personel ara..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-64"
+          />
+          <Button 
+            onClick={() => {
+              setEditingEmployee(null);
+              setIsPanelOpen(true);
+            }}
+          >
+            <UserPlus className="mr-2 h-4 w-4" />
+            Yeni Personel
+          </Button>
+        </div>
       </div>
+
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="bg-card rounded-lg p-4 shadow-md">
+          <div className="flex items-center justify-between">
+            <Users className="h-6 w-6 text-primary" />
+            <div>
+              <p className="text-sm text-muted-foreground">Toplam Personel</p>
+              <p className="text-2xl font-bold">{employeeStats.total}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-card rounded-lg p-4 shadow-md">
+          <div className="flex items-center justify-between">
+            <Users className="h-6 w-6 text-green-500" />
+            <div>
+              <p className="text-sm text-muted-foreground">Aktif Personel</p>
+              <p className="text-2xl font-bold">{employeeStats.active}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-card rounded-lg p-4 shadow-md">
+          <div className="flex items-center justify-between">
+            <Users className="h-6 w-6 text-red-500" />
+            <div>
+              <p className="text-sm text-muted-foreground">Pasif Personel</p>
+              <p className="text-2xl font-bold">{employeeStats.inactive}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-card rounded-lg border shadow-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Fotoğraf</TableHead>
+              <TableHead>Ad Soyad</TableHead>
+              <TableHead>E-posta</TableHead>
+              <TableHead>Departman</TableHead>
+              <TableHead>Vardiya</TableHead>
+              <TableHead>Kart No</TableHead>
+              <TableHead>Durum</TableHead>
+              <TableHead className="text-right">İşlemler</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paginatedEmployees.map((employee) => (
+              <TableRow key={employee.id}>
+                <TableCell>
+                  <Avatar>
+                    <AvatarImage src={employee.photo_url || ''} alt={`${employee.first_name} ${employee.last_name}`} />
+                    <AvatarFallback>{employee.first_name?.[0]}{employee.last_name?.[0]}</AvatarFallback>
+                  </Avatar>
+                </TableCell>
+                <TableCell>{employee.first_name} {employee.last_name}</TableCell>
+                <TableCell>{employee.email}</TableCell>
+                <TableCell>{employee.departments?.name || '-'}</TableCell>
+                <TableCell>{employee.shift || '-'}</TableCell>
+                <TableCell>{employee.card_number}</TableCell>
+                <TableCell>
+                  <Badge variant={employee.is_active ? 'success' : 'secondary'}>
+                    {employee.is_active ? 'Aktif' : 'Pasif'}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => {
+                      setEditingEmployee(employee);
+                      setIsPanelOpen(true);
+                    }}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <Pagination>
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                if (currentPage > 1) setCurrentPage(currentPage - 1);
+              }}
+              isActive={currentPage > 1}
+            />
+          </PaginationItem>
+          {[...Array(totalPages)].map((_, index) => (
+            <PaginationItem key={index}>
+              <PaginationLink
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setCurrentPage(index + 1);
+                }}
+                isActive={currentPage === index + 1}
+              >
+                {index + 1}
+              </PaginationLink>
+            </PaginationItem>
+          ))}
+          <PaginationItem>
+            <PaginationNext
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+              }}
+              isActive={currentPage < totalPages}
+            />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>
 
       <SlideOverPanel
         isOpen={isPanelOpen}
