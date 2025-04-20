@@ -32,11 +32,11 @@ export function useDevices(projectId: number | null) {
       if (error) throw error;
       
       // Process the data to determine status
-      return (data || []).map((device: ServerDevice) => {
+      return (data || []).map((serverDevice: any): ServerDevice => {
         let status: 'online' | 'offline' | 'expired' = 'offline';
         
         // Check if device has expired
-        if (device.expiry_date && new Date(device.expiry_date) < new Date()) {
+        if (serverDevice.expiry_date && new Date(serverDevice.expiry_date) < new Date()) {
           status = 'expired';
         } 
         // For demonstration, we'll randomly set some devices as online
@@ -44,8 +44,11 @@ export function useDevices(projectId: number | null) {
           status = 'online';
         }
         
-        return { ...device, status };
-      }) as ServerDevice[];
+        return { 
+          ...serverDevice,
+          status
+        };
+      });
     },
     enabled: !!projectId,
   });

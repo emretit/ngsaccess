@@ -197,7 +197,7 @@ export default function Employees() {
                   <TableCell>{employee.shift || '-'}</TableCell>
                   <TableCell>{employee.card_number}</TableCell>
                   <TableCell>
-                    <Badge variant={employee.is_active ? 'success' : 'secondary'}>
+                    <Badge variant={employee.is_active ? "success" : "secondary"}>
                       {employee.is_active ? 'Aktif' : 'Pasif'}
                     </Badge>
                   </TableCell>

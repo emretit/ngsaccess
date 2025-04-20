@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { ChevronDown, Plus, Search } from "lucide-react";
 import { format } from 'date-fns';
@@ -20,13 +19,15 @@ import { ServerDeviceForm } from '@/components/devices/ServerDeviceForm';
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 
 const PAGE_SIZE = 10;
-const DEVICE_MODEL_TYPES = ["QR Reader", "Fingerprint Reader", "RFID Reader", "Access Control Terminal", "Other"];
+const DEVICE_MODEL_TYPES: ("QR Reader" | "Fingerprint Reader" | "RFID Reader" | "Access Control Terminal" | "Other")[] = [
+  "QR Reader", "Fingerprint Reader", "RFID Reader", "Access Control Terminal", "Other"
+];
 
 export default function ServerDevices() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
-  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<"QR Reader" | "Fingerprint Reader" | "RFID Reader" | "Access Control Terminal" | "Other" | null>(null);
   const [showAddDevice, setShowAddDevice] = useState(false);
   const [editDevice, setEditDevice] = useState<ServerDevice | null>(null);
 
@@ -45,7 +46,6 @@ export default function ServerDevices() {
         .from('server_devices')
         .select('*, projects(name)', { count: 'exact' });
 
-      // Apply filters
       if (search) {
         query = query.or(`serial_number.ilike.%${search}%,name.ilike.%${search}%`);
       }
@@ -56,7 +56,6 @@ export default function ServerDevices() {
         query = query.eq('device_model_enum', selectedModel);
       }
 
-      // Apply pagination
       const start = (page - 1) * PAGE_SIZE;
       query = query.range(start, start + PAGE_SIZE - 1);
 
@@ -112,7 +111,7 @@ export default function ServerDevices() {
 
           <Select
             value={selectedModel || 'all'}
-            onValueChange={(value) => setSelectedModel(value === 'all' ? null : value)}
+            onValueChange={(value) => setSelectedModel(value === 'all' ? null : value as "QR Reader" | "Fingerprint Reader" | "RFID Reader" | "Access Control Terminal" | "Other")}
           >
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="All Models" />

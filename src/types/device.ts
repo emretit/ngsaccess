@@ -26,4 +26,10 @@ export interface ServerDevice {
     name: string;
   };
   status?: 'online' | 'offline' | 'expired';
+  created_at?: string;
+  device_type?: string;
+  device_model?: string;
+  device_status?: string;
+  last_used_at?: string;
+  updated_at?: string;
 }
