@@ -15,30 +15,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { useDevices } from "@/hooks/useDevices";
 
 export default function Devices() {
-  const { data: devices, isLoading } = useQuery({
-    queryKey: ['devices'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('devices')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data || [];
-    }
-  });
+  // Use the custom hook to fetch and manage devices
+  const { 
+    devices, 
+    isLoading, 
+    addDevice, 
+    isAddingDevice 
+  } = useDevices(1); // Assuming project ID 1 for now
 
   return (
     <main className="p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-semibold">Cihazlar</h1>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Yeni Cihaz Ekle
-          </Button>
+          <DeviceForm onAddDevice={addDevice} isLoading={isAddingDevice} />
         </div>
 
         <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -69,9 +62,9 @@ export default function Devices() {
                     <TableCell>{device.device_type || '-'}</TableCell>
                     <TableCell>
                       <Badge 
-                        variant={device.status === 'active' ? 'default' : 'secondary'}
+                        variant={device.status === 'online' ? 'success' : 'secondary'}
                       >
-                        {device.status === 'active' ? 'Aktif' : 'Pasif'}
+                        {device.status === 'online' ? 'Aktif' : 'Pasif'}
                       </Badge>
                     </TableCell>
                     <TableCell>

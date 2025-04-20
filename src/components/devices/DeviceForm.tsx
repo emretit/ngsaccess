@@ -32,37 +32,37 @@ export function DeviceForm({ onAddDevice, isLoading }: DeviceFormProps) {
   return (
     <>
       <Button onClick={() => setOpen(true)}>
-        <Plus className="mr-2 h-4 w-4" /> Add Device
+        <Plus className="mr-2 h-4 w-4" /> Yeni Cihaz Ekle
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add New Device</DialogTitle>
+            <DialogTitle>Yeni Cihaz Ekle</DialogTitle>
             <DialogDescription>
-              Enter the serial number of the device you want to add to your project.
+              Projenize eklemek istediğiniz cihazın seri numarasını girin.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit}>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="serialNumber">Serial Number</Label>
+                <Label htmlFor="serialNumber">Seri Numarası</Label>
                 <Input
                   id="serialNumber"
                   value={serialNumber}
                   onChange={(e) => setSerialNumber(e.target.value)}
-                  placeholder="Enter device serial number"
+                  placeholder="Cihaz seri numarasını girin"
                   required
                 />
               </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Cancel
+                İptal
               </Button>
               <Button type="submit" disabled={isLoading || !serialNumber}>
-                {isLoading ? "Adding..." : "Add Device"}
+                {isLoading ? "Ekleniyor..." : "Cihazı Ekle"}
               </Button>
             </DialogFooter>
           </form>
