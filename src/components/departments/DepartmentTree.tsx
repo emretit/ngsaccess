@@ -105,6 +105,11 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
     onSelectDepartment(id);
   };
 
+  const handleProjectHeaderClick = () => {
+    setSelectedDepartment(null);
+    onSelectDepartment(null);
+  };
+
   const renderDepartmentTree = (parentId: number | null = null): React.ReactNode => {
     const children = departments.filter(dept => dept.parent_id === parentId);
     
@@ -136,7 +141,10 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
   return (
     <div className="h-full w-[280px] overflow-auto bg-card p-4 rounded-2xl border shadow-lg">
       <div className="mb-4 space-y-3 border-b pb-3">
-        <div className="flex items-center gap-2">
+        <div 
+          className="flex items-center gap-2 cursor-pointer hover:text-burgundy transition-colors"
+          onClick={handleProjectHeaderClick}
+        >
           <Building2 className="h-5 w-5 text-burgundy" />
           <h2 className="text-lg font-semibold text-burgundy">{projectName}</h2>
         </div>
