@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
@@ -6,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { DepartmentTreeItem } from "./DepartmentTreeItem";
 import { Department } from "@/types/department";
+import { FolderTree } from "lucide-react";
 
 interface DepartmentTreeProps {
   onSelectDepartment: (id: number | null) => void;
@@ -115,18 +115,23 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
   };
 
   return (
-    <div className="h-full w-[280px] overflow-auto rounded-2xl bg-card p-4">
+    <div className="h-full w-[280px] overflow-auto bg-card p-4 rounded-2xl border shadow-lg">
+      <div className="mb-4 flex items-center gap-2 border-b pb-3">
+        <FolderTree className="h-5 w-5 text-burgundy" />
+        <h2 className="text-lg font-semibold">Departments</h2>
+      </div>
+      
       <ul role="tree" className="space-y-0.5">
         {renderDepartmentTree()}
       </ul>
 
       <AlertDialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="sm:max-w-[425px]">
           <AlertDialogHeader>
             <AlertDialogTitle>Yeni Departman Ekle</AlertDialogTitle>
             <AlertDialogDescription>
               {addingToParentId
-                ? `Alt departmanın adını girin`
+                ? "Alt departmanın adını girin"
                 : "Yeni departmanın adını girin"}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -134,6 +139,7 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
             value={newDepartmentName}
             onChange={(e) => setNewDepartmentName(e.target.value)}
             placeholder="Departman adı"
+            className="my-4"
           />
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => {
