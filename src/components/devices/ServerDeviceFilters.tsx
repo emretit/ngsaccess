@@ -12,7 +12,7 @@ interface ServerDeviceFiltersProps {
   selectedModel: "QR Reader" | "Fingerprint Reader" | "RFID Reader" | "Access Control Terminal" | "Other" | null;
   onModelChange: (value: string) => void;
   projects: Project[];
-  deviceModels: ("QR Reader" | "Fingerprint Reader" | "RFID Reader" | "Access Control Terminal" | "Other")[];
+  deviceModels: readonly ("QR Reader" | "Fingerprint Reader" | "RFID Reader" | "Access Control Terminal" | "Other")[];
 }
 
 export function ServerDeviceFilters({
