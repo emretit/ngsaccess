@@ -1,6 +1,5 @@
-
 import { useState } from "react";
-import { ChevronRight, Grid, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, Grid, Plus, Trash2, MousePointerClick } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Department } from "@/types/department";
@@ -27,6 +26,7 @@ export function DepartmentTreeItem({
   hasChildren,
 }: DepartmentTreeItemProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [showClickIcon, setShowClickIcon] = useState(false);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     switch (e.key) {
@@ -46,7 +46,7 @@ export function DepartmentTreeItem({
     <li role="treeitem" aria-expanded={isExpanded}>
       <div
         className={cn(
-          "group flex items-center gap-1 rounded-md p-2 transition-all",
+          "group flex items-center gap-1 rounded-md p-2 transition-all relative",
           "hover:bg-accent hover:text-accent-foreground",
           isSelected && "bg-accent/80 text-accent-foreground font-medium",
           level === 0 ? "mt-0" : "mt-0.5"
@@ -54,6 +54,8 @@ export function DepartmentTreeItem({
         style={{ paddingLeft: `${level * 12 + 8}px` }}
         onClick={() => onSelect(department.id)}
         onKeyDown={handleKeyDown}
+        onMouseEnter={() => setShowClickIcon(true)}
+        onMouseLeave={() => setShowClickIcon(false)}
         tabIndex={0}
       >
         <Button
@@ -75,6 +77,10 @@ export function DepartmentTreeItem({
 
         <Grid className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="flex-1 truncate text-sm">{department.name}</span>
+        
+        {showClickIcon && (
+          <MousePointerClick className="h-3 w-3 text-muted-foreground/70 absolute right-20" />
+        )}
 
         <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
           <Button
