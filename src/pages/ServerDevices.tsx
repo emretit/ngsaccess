@@ -11,18 +11,19 @@ import { ServerDeviceFilters } from '@/components/devices/ServerDeviceFilters';
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 
 const PAGE_SIZE = 10;
-const DEVICE_MODEL_TYPES: ("QR Reader" | "Fingerprint Reader" | "RFID Reader" | "Access Control Terminal" | "Other")[] = [
+const DEVICE_MODEL_TYPES = [
   "QR Reader", "Fingerprint Reader", "RFID Reader", "Access Control Terminal", "Other"
-];
+] as const;
 
 export default function ServerDevices() {
-  const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
   const [selectedProject, setSelectedProject] = useState<number | null>(null);
-  const [selectedModel, setSelectedModel] = useState<"QR Reader" | "Fingerprint Reader" | "RFID Reader" | "Access Control Terminal" | "Other" | null>(null);
+  const [selectedModel, setSelectedModel] = useState<typeof DEVICE_MODEL_TYPES[number] | null>(null);
   const [showAddDevice, setShowAddDevice] = useState(false);
   const [editDevice, setEditDevice] = useState<ServerDevice | null>(null);
 
+  // Fetch projects for filter
   const { data: projects = [] } = useQuery({
     queryKey: ['projects'],
     queryFn: async () => {
@@ -31,6 +32,7 @@ export default function ServerDevices() {
     },
   });
 
+  // Fetch devices with filters
   const { data: devices, isLoading } = useQuery({
     queryKey: ['server-devices', page, search, selectedProject, selectedModel],
     queryFn: async () => {
@@ -63,7 +65,6 @@ export default function ServerDevices() {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-semibold">Server Devices Management</h1>
-          
           <Button
             onClick={() => setShowAddDevice(true)}
             className="bg-burgundy hover:bg-burgundy/90"
