@@ -1015,8 +1015,13 @@ export type Database = {
       server_devices: {
         Row: {
           created_at: string | null
+          date_added: string | null
           device_model: string | null
+          device_model_enum:
+            | Database["public"]["Enums"]["device_model_type"]
+            | null
           device_type: string | null
+          expiry_date: string | null
           id: string
           last_used_at: string | null
           name: string
@@ -1027,8 +1032,13 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          date_added?: string | null
           device_model?: string | null
+          device_model_enum?:
+            | Database["public"]["Enums"]["device_model_type"]
+            | null
           device_type?: string | null
+          expiry_date?: string | null
           id?: string
           last_used_at?: string | null
           name: string
@@ -1039,8 +1049,13 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          date_added?: string | null
           device_model?: string | null
+          device_model_enum?:
+            | Database["public"]["Enums"]["device_model_type"]
+            | null
           device_type?: string | null
+          expiry_date?: string | null
           id?: string
           last_used_at?: string | null
           name?: string
@@ -1261,13 +1276,22 @@ export type Database = {
         Args: { last_seen: string }
         Returns: boolean
       }
+      is_superadmin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       validate_report_query: {
         Args: { query_text: string }
         Returns: Json
       }
     }
     Enums: {
-      [_ in never]: never
+      device_model_type:
+        | "QR Reader"
+        | "Fingerprint Reader"
+        | "RFID Reader"
+        | "Access Control Terminal"
+        | "Other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1382,6 +1406,14 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      device_model_type: [
+        "QR Reader",
+        "Fingerprint Reader",
+        "RFID Reader",
+        "Access Control Terminal",
+        "Other",
+      ],
+    },
   },
 } as const
