@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
@@ -139,21 +140,23 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
   };
 
   return (
-    <div className="h-full w-[280px] overflow-auto bg-card p-4 rounded-2xl border shadow-lg">
-      <div className="mb-4 space-y-3 border-b pb-3">
+    <div className="h-full w-[280px] bg-card rounded-lg border shadow">
+      <div className="p-4 border-b space-y-1.5">
         <div 
-          className="flex items-center gap-2 cursor-pointer hover:text-burgundy transition-colors"
+          className="flex items-center gap-2 cursor-pointer hover:text-primary/90 transition-colors"
           onClick={handleProjectHeaderClick}
         >
-          <Building2 className="h-5 w-5 text-burgundy" />
-          <h2 className="text-lg font-semibold text-burgundy">{projectName}</h2>
+          <Building2 className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold text-primary">{projectName}</h2>
         </div>
         <p className="text-sm text-muted-foreground">Departmanlar</p>
       </div>
       
-      <ul role="tree" className="space-y-0.5">
-        {renderDepartmentTree()}
-      </ul>
+      <div className="p-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
+        <ul role="tree" className="space-y-0.5">
+          {renderDepartmentTree()}
+        </ul>
+      </div>
 
       <AlertDialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <AlertDialogContent className="sm:max-w-[425px]">

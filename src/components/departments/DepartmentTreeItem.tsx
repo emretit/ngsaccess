@@ -46,10 +46,10 @@ export function DepartmentTreeItem({
     <li role="treeitem" aria-expanded={isExpanded}>
       <div
         className={cn(
-          "group flex items-center gap-1 rounded-md p-2 transition-all duration-200",
-          "hover:bg-burgundy/10 hover:text-burgundy",
-          isSelected && "border-l-2 border-burgundy bg-burgundy/10 pl-[calc(0.5rem-2px)] font-medium text-burgundy",
-          level === 0 ? "mt-0" : "mt-1"
+          "group flex items-center gap-1 rounded-md p-2 transition-all",
+          "hover:bg-accent hover:text-accent-foreground",
+          isSelected && "bg-accent/80 text-accent-foreground font-medium",
+          level === 0 ? "mt-0" : "mt-0.5"
         )}
         style={{ paddingLeft: `${level * 12 + 8}px` }}
         onClick={() => onSelect(department.id)}
@@ -67,20 +67,20 @@ export function DepartmentTreeItem({
         >
           <ChevronRight
             className={cn(
-              "h-4 w-4 shrink-0 transition-transform duration-200",
+              "h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200",
               isExpanded && "rotate-90"
             )}
           />
         </Button>
 
-        <Grid className="h-4 w-4 shrink-0 text-burgundy" /> {/* Changed from FolderTree to Grid */}
+        <Grid className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="flex-1 truncate text-sm">{department.name}</span>
 
         <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 hover:bg-burgundy/20"
+            className="h-6 w-6 hover:bg-accent/80"
             onClick={(e) => {
               e.stopPropagation();
               onAddSubDepartment(department.id);
@@ -91,7 +91,7 @@ export function DepartmentTreeItem({
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 hover:bg-burgundy/20"
+            className="h-6 w-6 hover:bg-accent/80"
             disabled={hasChildren}
             onClick={(e) => {
               e.stopPropagation();
