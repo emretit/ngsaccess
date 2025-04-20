@@ -77,7 +77,7 @@ export function FormSelectField({
           {options.map(option => (
             <SelectItem 
               key={option.id} 
-              value={option.name || `option-${option.id}`} // Ensure value is never empty
+              value={option.id.toString() || `option-${option.id}`}
             >
               {option.name || `Option ${option.id}`}
             </SelectItem>

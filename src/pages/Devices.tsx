@@ -57,14 +57,14 @@ export default function Devices() {
           
           <div className="flex gap-4">
             <Select
-              value={selectedProject?.toString() || ''}
-              onValueChange={(value) => setSelectedProject(value ? parseInt(value) : null)}
+              value={selectedProject?.toString() || 'all'}
+              onValueChange={(value) => setSelectedProject(value === 'all' ? null : parseInt(value))}
             >
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="All Projects" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Projects</SelectItem>
+                <SelectItem value="all">All Projects</SelectItem>
                 {projects.map(project => (
                   <SelectItem key={project.id} value={project.id.toString()}>
                     {project.name}
