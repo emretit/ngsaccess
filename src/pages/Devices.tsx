@@ -58,7 +58,7 @@ export default function Devices() {
                   <TableRow key={device.id}>
                     <TableCell className="font-medium">{device.name}</TableCell>
                     <TableCell className="font-mono">{device.serial_number}</TableCell>
-                    <TableCell>{device.location || '-'}</TableCell>
+                    <TableCell>{device.device_location || '-'}</TableCell>
                     <TableCell>{device.device_type || '-'}</TableCell>
                     <TableCell>
                       <Badge 
@@ -68,7 +68,7 @@ export default function Devices() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {device.last_seen ? format(new Date(device.last_seen), 'dd.MM.yyyy HH:mm') : '-'}
+                      {device.created_at ? format(new Date(device.created_at), 'dd.MM.yyyy HH:mm') : '-'}
                     </TableCell>
                   </TableRow>
                 ))
