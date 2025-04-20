@@ -1257,6 +1257,10 @@ export type Database = {
           days: string[]
         }[]
       }
+      is_device_online: {
+        Args: { last_seen: string }
+        Returns: boolean
+      }
       validate_report_query: {
         Args: { query_text: string }
         Returns: Json

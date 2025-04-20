@@ -1,0 +1,8 @@
+
+@tailwind base;
+
+@layer base {
+  :root {
+    --burgundy: 139, 28, 38;
+  }
+}
