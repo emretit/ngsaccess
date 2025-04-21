@@ -23,8 +23,8 @@ export function useDevices(projectId: number | null) {
     queryKey: ['devices', projectId],
     queryFn: async () => {
       let query = supabase
-        .from('server_devices')
-        .select('*, projects(name)')
+        .from('devices')
+        .select('*')
         .eq('project_id', projectId);
       
       const { data, error } = await query;
@@ -32,20 +32,16 @@ export function useDevices(projectId: number | null) {
       if (error) throw error;
       
       // Process the data to determine status
-      return (data || []).map((serverDevice: any): ServerDevice => {
+      return (data || []).map((device: any): Device => {
         let status: 'online' | 'offline' | 'expired' = 'offline';
         
-        // Check if device has expired
-        if (serverDevice.expiry_date && new Date(serverDevice.expiry_date) < new Date()) {
-          status = 'expired';
-        } 
         // For demonstration, we'll randomly set some devices as online
-        else if (Math.random() > 0.5) {
+        if (Math.random() > 0.5) {
           status = 'online';
         }
         
         return { 
-          ...serverDevice,
+          ...device,
           status
         };
       });

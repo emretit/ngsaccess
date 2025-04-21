@@ -19,12 +19,15 @@ import { useDevices } from "@/hooks/useDevices";
 
 export default function Devices() {
   // Use the custom hook to fetch and manage devices
+  // Changed from projectId 1 to null for testing - will display all devices
   const { 
     devices, 
     isLoading, 
     addDevice, 
     isAddingDevice 
-  } = useDevices(1); // Assuming project ID 1 for now
+  } = useDevices(null); 
+
+  console.log("Devices data:", devices); // Add logging to debug
 
   return (
     <main className="p-6">
