@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Department } from "@/types/department";
@@ -90,20 +89,44 @@ export default function DepartmentEmployeeSelector({
     return !!value.find(v => v.type === "employee" && v.id === emp.id);
   }
 
+  // Bir departmandaki tüm employee id'lerini, alt departmanlar dahil almak için yardımcı fonksiyon
+  function collectAllEmployees(dept: TreeDepartment): Employee[] {
+    let emps = [...dept.employees];
+    // Alt departmanlara da bak
+    for (const child of dept.children) {
+      emps = emps.concat(collectAllEmployees(child));
+    }
+    return emps;
+  }
+
   function handleDeptToggle(dept: TreeDepartment) {
     let newValue: DepartmentEmployeeSelection[];
+    const deptEmployees = collectAllEmployees(dept);
     if (isDeptChecked(dept)) {
-      // kaldır: departman ve onun tüm çalışanları selection'dan çıkar
+      // kaldır: departman ve onun altındaki tüm çalışanları selection'dan çıkar
       newValue = value.filter(
         v =>
           !(
             (v.type === "department" && v.id === dept.id) ||
-            (v.type === "employee" && dept.employees.some(e => e.id === v.id))
+            (v.type === "employee" && deptEmployees.some(e => e.id === v.id))
           )
       );
     } else {
-      // ekle: departmanı ekle, çalışanları ekleme (kullanıcı isterse ayrıca işaretler)
-      newValue = [...value, { type: "department", id: dept.id, name: dept.name }];
+      // ekle: departmanı ekle ve altındaki bütün çalışanları da ekle (ikili önlem: zaten seçili olan tekrarlanmasın)
+      const alreadySelectedEmployeeIds = value.filter(v => v.type === "employee").map(v => v.id);
+      const deptEmpsToAdd = deptEmployees
+        .filter(e => !alreadySelectedEmployeeIds.includes(e.id))
+        .map(e => ({
+          type: "employee" as const,
+          id: e.id,
+          name: e.first_name + " " + e.last_name,
+        }));
+
+      newValue = [
+        ...value,
+        { type: "department", id: dept.id, name: dept.name },
+        ...deptEmpsToAdd,
+      ];
     }
     onChange(newValue);
   }
@@ -165,9 +188,8 @@ export default function DepartmentEmployeeSelector({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-3 max-w-md max-h-[350px] overflow-y-auto text-sm">
+    <div className="bg-white rounded-lg shadow p-3 max-w-xs max-h-[300px] overflow-y-auto text-xs">
       {renderTree(tree)}
     </div>
   );
 }
-
