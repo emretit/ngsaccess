@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -137,18 +136,17 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
         ruleType = 'mixed';
       }
 
-      const { data, error } = await supabase
-        .call('create_access_rule', {
-          p_type: ruleType,
-          p_employee_id: employeeId,
-          p_device_id: doors[0], // primary device
-          p_days: days,
-          p_start_time: startTime,
-          p_end_time: endTime,
-          p_department_ids: departmentIds.length > 0 ? departmentIds : null,
-          p_user_ids: userIds.length > 0 ? userIds : null,
-          p_door_ids: doors.length > 1 ? doors.slice(1) : null // additional doors
-        });
+      const { data, error } = await supabase.rpc('create_access_rule', {
+        p_type: ruleType,
+        p_employee_id: employeeId,
+        p_device_id: doors[0], // primary device
+        p_days: days,
+        p_start_time: startTime,
+        p_end_time: endTime,
+        p_department_ids: departmentIds.length > 0 ? departmentIds : null,
+        p_user_ids: userIds.length > 0 ? userIds : null,
+        p_door_ids: doors.length > 1 ? doors.slice(1) : null // additional doors
+      });
 
       if (error) throw error;
       
