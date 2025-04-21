@@ -131,28 +131,28 @@ export default function DepartmentEmployeeSelector({
     return nodes.map(node => (
       <div key={`dept-${node.id}`}>
         <div className={cn(
-          "flex items-center gap-2 py-2",
-          level === 0 ? "font-semibold text-lg" : "font-semibold text-base"
+          "flex items-center gap-2 py-1.5",
+          level === 0 ? "font-semibold text-sm" : "font-semibold text-xs"
         )}>
           <Checkbox
             checked={isDeptChecked(node)}
             onCheckedChange={() => handleDeptToggle(node)}
             id={`dept-checkbox-${node.id}`}
           />
-          <label htmlFor={`dept-checkbox-${node.id}`} className="cursor-pointer">
+          <label htmlFor={`dept-checkbox-${node.id}`} className="cursor-pointer select-none">
             {node.name}
           </label>
         </div>
-        <div className="pl-7">
+        <div className="pl-6">
           {node.employees.map((emp) => (
-            <div key={`emp-${emp.id}`} className="flex items-center gap-2 py-1">
-              <div className="border-l h-full mr-3" style={{ minHeight: "18px" }} />
+            <div key={`emp-${emp.id}`} className="flex items-center gap-2 py-0.5">
+              <div className="border-l h-full mr-2" style={{ minHeight: "14px" }} />
               <Checkbox
                 checked={isEmployeeChecked(emp)}
                 onCheckedChange={() => handleEmployeeToggle(emp, node)}
                 id={`emp-checkbox-${emp.id}`}
               />
-              <label htmlFor={`emp-checkbox-${emp.id}`} className="cursor-pointer">
+              <label htmlFor={`emp-checkbox-${emp.id}`} className="cursor-pointer select-none text-xs">
                 {emp.first_name} {emp.last_name}
               </label>
             </div>
@@ -165,7 +165,7 @@ export default function DepartmentEmployeeSelector({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-4 max-w-md max-h-[400px] overflow-y-auto">
+    <div className="bg-white rounded-lg shadow p-3 max-w-md max-h-[350px] overflow-y-auto text-sm">
       {renderTree(tree)}
     </div>
   );
