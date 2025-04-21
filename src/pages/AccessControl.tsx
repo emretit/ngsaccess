@@ -9,22 +9,21 @@ const AccessControl = () => {
   const [activeTab, setActiveTab] = useState('unified');
 
   return (
-    <div className="flex h-full bg-gray-50">
-      {/* Sidebar */}
-      <AccessControlSidebar
-        selected={activeTab}
-        onSelect={setActiveTab}
-      />
-
-      {/* Main Content */}
-      <div className="flex-1 overflow-auto">
-        <div className="p-8">
-          {activeTab === 'unified' && <UnifiedAccessControl />}
-          {activeTab === 'temporary' && <TemporaryAccess />}
-          {activeTab === 'zones' && <ZonesAndDoors />}
+    <main className="flex-1 p-0 bg-gray-50 flex flex-col min-h-[calc(100vh-4rem)]">
+      <div className="flex flex-1 min-h-0">
+        <AccessControlSidebar
+          selected={activeTab}
+          onSelect={setActiveTab}
+        />
+        <div className="flex-1 overflow-auto">
+          <div className="p-8">
+            {activeTab === 'unified' && <UnifiedAccessControl />}
+            {activeTab === 'temporary' && <TemporaryAccess />}
+            {activeTab === 'zones' && <ZonesAndDoors />}
+          </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 };
 
