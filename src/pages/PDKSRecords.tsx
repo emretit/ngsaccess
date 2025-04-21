@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { usePdksAi } from "@/hooks/usePdksAi";
@@ -6,7 +7,7 @@ import { PDKSHeader } from "@/components/pdks/PDKSHeader";
 import { PDKSRecordsSidebar } from '@/components/pdks/PDKSRecordsSidebar';
 import { PDKSRecordsContent } from '@/components/pdks/PDKSRecordsContent';
 import { AiDrawer } from "@/components/pdks/AiDrawer";
-import { PDKSAiChat } from "@/components/pdks/PDKSAiChat";  // Update import to match correct file name
+import { PDKSAiChat } from "@/components/pdks/PDKSAiChat";  // Fixed import to use correct casing
 
 interface PDKSRecord {
   id: number;
@@ -121,7 +122,7 @@ export default function PDKSRecords() {
         </div>
         {showAiPanel && !isMobile && (
           <div className="w-96">
-            <PDKSAiChat />  // Use the correct component name
+            <PDKSAiChat />
           </div>
         )}
       </div>
