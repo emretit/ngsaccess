@@ -1,3 +1,4 @@
+
 import { AiInsightsCard } from "@/components/pdks/AiInsightsCard";
 import { PDKSTable } from "./PDKSTable";
 import { PDKSAiChat } from "./PDKSAiChat";
@@ -37,7 +38,6 @@ export function PDKSRecordsContent({
     return (
       <div className="p-6">
         <AiInsightsCard insight={insight} isLoading={isLoadingInsight} />
-        {/* Diğer özet kartları eklenebilir */}
       </div>
     );
   }
