@@ -1,14 +1,12 @@
-
 export interface Device {
   id: string;
   name: string;
   serial_number: string;
-  device_model: string;
-  project_id: number;
-  device_type?: string;
+  device_model?: string;
   device_location?: string;
-  created_at?: string;
+  device_type?: string;
   status: 'online' | 'offline' | 'expired';
+  created_at?: string;
   last_used_at?: string | null;
 }
 

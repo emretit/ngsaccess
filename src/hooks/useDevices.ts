@@ -1,33 +1,30 @@
 
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Device, ServerDevice } from "@/types/device";
+import { Device } from "@/types/device";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 
-export function useDevices(projectId: number | null) {
+export function useDevices() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   // Setup a regular refresh for the device status
   useEffect(() => {
     const timer = setInterval(() => {
-      queryClient.invalidateQueries({ queryKey: ['devices', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['devices'] });
     }, 5 * 60 * 1000); // Refresh every 5 minutes
 
     return () => clearInterval(timer);
-  }, [queryClient, projectId]);
+  }, [queryClient]);
 
-  // Main query to get devices for the current project
+  // Main query to get all devices
   const devicesQuery = useQuery({
-    queryKey: ['devices', projectId],
+    queryKey: ['devices'],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from('devices')
-        .select('*')
-        .eq('project_id', projectId);
-      
-      const { data, error } = await query;
+        .select('*');
       
       if (error) throw error;
       
@@ -45,8 +42,7 @@ export function useDevices(projectId: number | null) {
           status
         };
       });
-    },
-    enabled: !!projectId,
+    }
   });
 
   // Function to validate and add a device by serial number
@@ -63,19 +59,16 @@ export function useDevices(projectId: number | null) {
         throw new Error("Device not found. Please check serial number or contact support.");
       }
 
-      // Check if it's already assigned to a project
-      if (existingDevice.project_id) {
-        throw new Error("Device already assigned. Contact support.");
-      }
+      // If it exists, add it to devices table
+      const { error: insertError } = await supabase
+        .from('devices')
+        .insert({ 
+          name: existingDevice.name, 
+          serial_number: existingDevice.serial_number 
+        });
 
-      // If it exists and is unassigned, update it with the current project_id
-      const { error: updateError } = await supabase
-        .from('server_devices')
-        .update({ project_id: projectId })
-        .eq('id', existingDevice.id);
-
-      if (updateError) {
-        throw new Error("Failed to assign device. Please try again.");
+      if (insertError) {
+        throw new Error("Failed to add device. Please try again.");
       }
 
       return existingDevice;
@@ -85,7 +78,7 @@ export function useDevices(projectId: number | null) {
       queryClient.invalidateQueries({ queryKey: ['devices'] });
       toast({
         title: "Device added successfully",
-        description: "The device has been added to your project",
+        description: "The device has been added",
         variant: "default"
       });
     },

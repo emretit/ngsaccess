@@ -1,11 +1,8 @@
 
-import { useEffect } from 'react';
-import { Plus } from "lucide-react";
 import { format } from 'date-fns';
-import { useQuery } from "@tanstack/react-query";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DeviceForm } from "@/components/devices/DeviceForm";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Table,
   TableBody,
@@ -19,13 +16,12 @@ import { useDevices } from "@/hooks/useDevices";
 
 export default function Devices() {
   // Use the custom hook to fetch and manage devices
-  // Changed from projectId 1 to null for testing - will display all devices
   const { 
     devices, 
     isLoading, 
     addDevice, 
     isAddingDevice 
-  } = useDevices(null); 
+  } = useDevices(); 
 
   console.log("Devices data:", devices); // Add logging to debug
 
