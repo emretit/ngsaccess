@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,6 +11,7 @@ import Employees from "./pages/Employees";
 import Devices from "./pages/Devices";
 import PDKSRecords from "./pages/PDKSRecords";
 import ServerDevices from "./pages/ServerDevices";
+import AiReport from "./pages/AiReport";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +29,7 @@ const App = () => (
             <Route path="/access-control" element={<AccessControl />} />
             <Route path="/pdks-records" element={<PDKSRecords />} />
             <Route path="/server-devices" element={<ServerDevices />} />
+            <Route path="/ai-report" element={<AiReport />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>
