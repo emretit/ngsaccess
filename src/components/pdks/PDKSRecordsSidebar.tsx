@@ -1,5 +1,5 @@
 
-import { Users, Table, Building2, List, MessageSquare } from "lucide-react";
+import { Users, Table, Building2, List, MessageSquare, FileText } from "lucide-react";
 
 interface PDKSRecordsSidebarProps {
   selected: string;
