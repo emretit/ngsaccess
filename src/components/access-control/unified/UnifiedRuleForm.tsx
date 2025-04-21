@@ -8,10 +8,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Save, X, Clock } from "lucide-react";
+import DepartmentEmployeeSelector from "./DepartmentEmployeeSelector";
 
 interface UnifiedRuleFormProps {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+}
+
+interface DepartmentEmployeeSelection {
+  type: "department" | "employee";
+  id: number;
+  name: string;
 }
 
 const DAYS = [
@@ -20,13 +27,13 @@ const DAYS = [
   { key: "çar", label: "Çar" },
   { key: "per", label: "Per" },
   { key: "cum", label: "Cum" },
-  { key: "cmt", label: "Cum" },
-  { key: "pzr", label: "Paz" },
+  { key: "cmt", label: "Cmt" },
+  { key: "pzr", label: "Pzr" },
 ];
 
 export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
   const [name, setName] = useState("");
-  const [departmentOrPerson, setDepartmentOrPerson] = useState("");
+  const [selection, setSelection] = useState<DepartmentEmployeeSelection | null>(null);
   const [doors, setDoors] = useState<string[]>([]);
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("18:00");
@@ -38,6 +45,10 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
       d.includes(day) ? d.filter((x) => x !== day) : [...d, day]
     );
   }
+
+  const handleSelectionChange = (newSelection: DepartmentEmployeeSelection | null) => {
+    setSelection(newSelection);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -68,15 +79,10 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
             </div>
             <div className="flex flex-col gap-2">
               <label className="font-medium text-sm">Departman ve Kişi Seçimi</label>
-              <Button
-                variant="outline"
-                type="button"
-                className="justify-between"
-                // Placeholder for department/person picker
-              >
-                <span className="text-muted-foreground">{departmentOrPerson || "Seçim yapın"}</span>
-                <span />
-              </Button>
+              <DepartmentEmployeeSelector
+                value={selection}
+                onChange={handleSelectionChange}
+              />
             </div>
           </div>
           <div className="flex flex-col gap-2">
@@ -126,49 +132,17 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
           <div>
             <label className="font-medium text-sm mb-1 block">Günler</label>
             <div className="flex gap-2 flex-wrap">
-              {/* Days as pill buttons */}
-              <Button
-                type="button"
-                variant={days.includes("paz") ? "default" : "outline"}
-                onClick={() => handleToggleDay("paz")}
-                className="rounded-full min-w-12"
-              >Paz</Button>
-              <Button
-                type="button"
-                variant={days.includes("sal") ? "default" : "outline"}
-                onClick={() => handleToggleDay("sal")}
-                className="rounded-full min-w-12"
-              >Sal</Button>
-              <Button
-                type="button"
-                variant={days.includes("çar") ? "default" : "outline"}
-                onClick={() => handleToggleDay("çar")}
-                className="rounded-full min-w-12"
-              >Çar</Button>
-              <Button
-                type="button"
-                variant={days.includes("per") ? "default" : "outline"}
-                onClick={() => handleToggleDay("per")}
-                className="rounded-full min-w-12"
-              >Per</Button>
-              <Button
-                type="button"
-                variant={days.includes("cum") ? "default" : "outline"}
-                onClick={() => handleToggleDay("cum")}
-                className="rounded-full min-w-12"
-              >Cum</Button>
-              <Button
-                type="button"
-                variant={days.includes("cmt") ? "default" : "outline"}
-                onClick={() => handleToggleDay("cmt")}
-                className="rounded-full min-w-12"
-              >Cmt</Button>
-              <Button
-                type="button"
-                variant={days.includes("pzr") ? "default" : "outline"}
-                onClick={() => handleToggleDay("pzr")}
-                className="rounded-full min-w-12"
-              >Paz</Button>
+              {DAYS.map((day) => (
+                <Button
+                  key={day.key}
+                  type="button"
+                  variant={days.includes(day.key) ? "default" : "outline"}
+                  onClick={() => handleToggleDay(day.key)}
+                  className="rounded-full min-w-12"
+                >
+                  {day.label}
+                </Button>
+              ))}
             </div>
           </div>
 
