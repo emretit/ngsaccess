@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
@@ -71,11 +70,11 @@ export function AttendanceTable({ dateRange, department, shift }: AttendanceTabl
         .lte('date', dateRange.end);
 
       if (department) {
-        query = query.eq('employees.department_id', department);
+        query = query.eq('employees.department_id', parseInt(department, 10));
       }
 
       if (shift) {
-        query = query.eq('employees.shift_id', shift);
+        query = query.eq('employees.shift_id', parseInt(shift, 10));
       }
 
       const { data, error } = await query;
