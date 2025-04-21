@@ -5,8 +5,11 @@ export interface Device {
   serial_number: string;
   device_model: string;
   project_id: number;
-  last_used_at: string | null;
-  status: 'active' | 'inactive';
+  device_type?: string;
+  device_location?: string;
+  created_at?: string;
+  status: 'online' | 'offline' | 'expired';
+  last_used_at?: string | null;
 }
 
 export interface Project {
@@ -32,5 +35,5 @@ export interface ServerDevice {
   device_status?: string;
   last_used_at?: string;
   updated_at?: string;
-  device_location?: string;  // Added this line
+  device_location?: string;
 }
