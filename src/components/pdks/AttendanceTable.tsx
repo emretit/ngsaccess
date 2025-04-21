@@ -23,7 +23,7 @@ interface AttendanceTableProps {
 interface AttendanceRecord {
   id: number;
   date: string;
-  entry_time: string;
+  entry_time: string | null;
   exit_time: string | null;
   status: 'present' | 'absent' | 'late';
   employee_first_name: string;
@@ -82,7 +82,15 @@ export function AttendanceTable({ dateRange, department, shift }: AttendanceTabl
 
       if (error) throw error;
 
-      const sortedData = [...(data || [])].sort((a, b) => {
+      // Ensure the status is one of the allowed types
+      const typedData: AttendanceRecord[] = (data || []).map(item => ({
+        ...item,
+        status: (item.status === 'present' || item.status === 'absent' || item.status === 'late') 
+          ? item.status as 'present' | 'absent' | 'late'
+          : 'absent' // Default to 'absent' for any unrecognized status
+      }));
+
+      const sortedData = [...typedData].sort((a, b) => {
         switch (sortField) {
           case 'employee':
             const nameA = `${a.employee_first_name} ${a.employee_last_name}`;
