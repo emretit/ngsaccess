@@ -6,7 +6,7 @@ import { PDKSHeader } from "@/components/pdks/PDKSHeader";
 import { PDKSRecordsSidebar } from '@/components/pdks/PDKSRecordsSidebar';
 import { PDKSRecordsContent } from '@/components/pdks/PDKSRecordsContent';
 import { AiDrawer } from "@/components/pdks/AiDrawer";
-import { PdksAiChat } from "@/components/pdks/PdksAiChat";
+import { PDKSAiChat } from "@/components/pdks/PDKSAiChat";  // Update import to match correct file name
 
 interface PDKSRecord {
   id: number;
@@ -121,7 +121,7 @@ export default function PDKSRecords() {
         </div>
         {showAiPanel && !isMobile && (
           <div className="w-96">
-            <PdksAiChat />
+            <PDKSAiChat />  // Use the correct component name
           </div>
         )}
       </div>
