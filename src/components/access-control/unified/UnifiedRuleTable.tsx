@@ -11,8 +11,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
+import { Switch } from "@/components/ui/switch";
+import { Edit, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const UnifiedRuleTable = () => {
   const { data: rules, isLoading } = useQuery({
@@ -43,50 +44,81 @@ const UnifiedRuleTable = () => {
   if (isLoading) return <div>Yükleniyor...</div>;
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Kural Tipi</TableHead>
-          <TableHead>Çalışan</TableHead>
-          <TableHead>Cihaz</TableHead>
-          <TableHead>Günler</TableHead>
-          <TableHead>Saat Aralığı</TableHead>
-          <TableHead>Durum</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rules?.map((rule) => (
-          <TableRow key={rule.id}>
-            <TableCell className="font-medium">{rule.type}</TableCell>
-            <TableCell>
-              {rule.employees 
-                ? `${rule.employees.first_name} ${rule.employees.last_name}`
-                : '-'}
-            </TableCell>
-            <TableCell>{rule.devices?.name || '-'}</TableCell>
-            <TableCell>
-              <div className="flex gap-1 flex-wrap">
-                {rule.days.map((day) => (
-                  <Badge key={day} variant="outline">
-                    {day}
-                  </Badge>
-                ))}
-              </div>
-            </TableCell>
-            <TableCell>
-              {rule.start_time} - {rule.end_time}
-            </TableCell>
-            <TableCell>
-              <Badge 
-                variant={rule.is_active ? "success" : "secondary"}
-              >
-                {rule.is_active ? 'Aktif' : 'Pasif'}
-              </Badge>
-            </TableCell>
+    <div className="bg-white rounded-lg shadow-sm border">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-gray-50/50">
+            <TableHead className="font-semibold">Kural Adı</TableHead>
+            <TableHead className="font-semibold">Kapsam</TableHead>
+            <TableHead className="font-semibold">Erişim Noktaları</TableHead>
+            <TableHead className="font-semibold">Saatler</TableHead>
+            <TableHead className="font-semibold">Günler</TableHead>
+            <TableHead className="font-semibold">Durum</TableHead>
+            <TableHead className="font-semibold text-right">İşlemler</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {rules?.map((rule) => (
+            <TableRow key={rule.id} className="group">
+              <TableCell className="font-medium">{rule.type}</TableCell>
+              <TableCell>
+                {rule.employees ? (
+                  <Badge variant="outline" className="bg-blue-100 text-blue-800 hover:bg-blue-200">
+                    Tüm Personel
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="bg-green-100 text-green-800 hover:bg-green-200">
+                    Departman
+                  </Badge>
+                )}
+              </TableCell>
+              <TableCell>
+                <Badge 
+                  variant="outline" 
+                  className="bg-orange-100 text-orange-800 hover:bg-orange-200"
+                >
+                  {rule.devices?.name || '2 Kapı / 1 Bölge'}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                {rule.start_time} - {rule.end_time}
+              </TableCell>
+              <TableCell>
+                <div className="flex gap-1 flex-wrap">
+                  {rule.days.map((day) => (
+                    <Badge key={day} variant="outline" className="bg-gray-100">
+                      {day}
+                    </Badge>
+                  ))}
+                </div>
+              </TableCell>
+              <TableCell>
+                <Switch 
+                  checked={rule.is_active} 
+                  className="data-[state=checked]:bg-green-500"
+                />
+              </TableCell>
+              <TableCell className="text-right space-x-2">
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="h-8 w-8 text-gray-500 hover:text-gray-700"
+                >
+                  <Edit className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  className="h-8 w-8 text-gray-500 hover:text-red-600"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 };
 
