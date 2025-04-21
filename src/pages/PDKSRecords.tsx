@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { usePdksAi } from "@/hooks/usePdksAi";
 import { useMedia } from "@/hooks/use-mobile";
 import { PDKSHeader } from "@/components/pdks/PDKSHeader";
 import { PDKSRecordsSidebar } from '@/components/pdks/PDKSRecordsSidebar';
+import { PDKSRecordsContent } from '@/components/pdks/PDKSRecordsContent';
 
 interface PDKSRecord {
   id: number;
