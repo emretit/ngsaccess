@@ -3,14 +3,19 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send } from "lucide-react";
+import { Send, Server } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
 
 interface Message {
   id: string;
   type: 'user' | 'assistant';
   content: string;
 }
+
+// Configuration for local Llama model
+const LOCAL_LLAMA_ENDPOINT = "http://localhost:8000/generate"; // Default local Llama server endpoint
+const LOCAL_MODEL_ENABLED = true; // Flag to control whether to use local model
 
 export function PDKSAiChat() {
   const [messages, setMessages] = useState<Message[]>([{
@@ -20,6 +25,36 @@ export function PDKSAiChat() {
   }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isLocalModelConnected, setIsLocalModelConnected] = useState(false);
+  const { toast } = useToast();
+
+  // Function to check if local model is available
+  const checkLocalModelStatus = async () => {
+    if (!LOCAL_MODEL_ENABLED) return;
+    
+    try {
+      const response = await fetch(`${LOCAL_LLAMA_ENDPOINT}/status`, { 
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (response.ok) {
+        setIsLocalModelConnected(true);
+        toast({
+          title: "Yerel AI modeline bağlanıldı",
+          description: "PDKS AI asistanı şimdi yerel Llama modelinizi kullanarak çalışıyor.",
+        });
+      }
+    } catch (error) {
+      console.error("Yerel model bağlantı hatası:", error);
+      setIsLocalModelConnected(false);
+    }
+  };
+
+  // Check local model status on component mount
+  useState(() => {
+    checkLocalModelStatus();
+  }, []);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,26 +70,61 @@ export function PDKSAiChat() {
     setIsLoading(true);
 
     try {
-      // Simulated response for now
-      setTimeout(() => {
-        const aiMessage: Message = {
-          id: `response-${userMessage.id}`,
-          type: 'assistant',
-          content: 'Bu özellik henüz geliştirme aşamasındadır. Yakında AI destekli yanıtlar alabileceksiniz.'
-        };
-        setMessages(prev => [...prev, aiMessage]);
-        setIsLoading(false);
-      }, 1000);
+      let aiResponse;
+      
+      if (LOCAL_MODEL_ENABLED && isLocalModelConnected) {
+        // Use local Llama model
+        const response = await fetch(LOCAL_LLAMA_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: input,
+            max_tokens: 500,
+            temperature: 0.7
+          })
+        });
+        
+        if (!response.ok) throw new Error('Yerel model yanıt hatası');
+        const data = await response.json();
+        aiResponse = data.response || data.generated_text;
+      } else {
+        // Fallback to simulated response if local model is not available
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        aiResponse = 'Bu özellik için yerel Llama modelinin çalışır durumda olması gerekiyor. Lütfen yerel Llama sunucunuzun çalıştığından emin olun.';
+      }
+
+      const aiMessage: Message = {
+        id: `response-${userMessage.id}`,
+        type: 'assistant',
+        content: aiResponse
+      };
+      setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
       console.error('Error:', error);
+      const errorMessage: Message = {
+        id: `error-${userMessage.id}`,
+        type: 'assistant',
+        content: 'Üzgünüm, bir hata oluştu. Yerel AI modeliyle bağlantı kurulamadı.'
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
     }
   };
 
   return (
     <Card className="w-full h-[calc(100vh-12rem)] shadow-lg">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg font-medium">PDKS AI Asistan</CardTitle>
+        {LOCAL_MODEL_ENABLED && (
+          <div className="flex items-center gap-2">
+            <div className={`h-2 w-2 rounded-full ${isLocalModelConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+            <span className="text-xs text-gray-500 flex items-center gap-1">
+              <Server size={12} /> 
+              {isLocalModelConnected ? 'Yerel Model Aktif' : 'Yerel Model Bağlantısı Yok'}
+            </span>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -95,7 +165,11 @@ export function PDKSAiChat() {
               disabled={isLoading}
               className="flex-1"
             />
-            <Button type="submit" disabled={!input.trim() || isLoading}>
+            <Button 
+              type="submit" 
+              disabled={!input.trim() || isLoading}
+              title={!isLocalModelConnected && LOCAL_MODEL_ENABLED ? "Yerel model bağlantısı yok" : "Gönder"}
+            >
               <Send className="h-4 w-4" />
             </Button>
           </form>
