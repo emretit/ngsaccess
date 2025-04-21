@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Users, Dices, Shield, FileText, Settings, Bell, Bot, X, Menu } from 'lucide-react';
+import { Users, Dices, Shield, FileText, Settings, Bell, User, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -14,10 +14,9 @@ import {
 
 const navigation = [
   { name: 'Kişiler', href: '/employees', icon: Users },
-  { name: 'Cihazlar', href: '/devices', icon: Dices },
+  { name: 'Cihazlar', href: '/devices', icon: Dices }, // Changed from Devices to Dices
   { name: 'Geçiş Kontrol', href: '/access-control', icon: Shield },
   { name: 'PDKS Kayıtları', href: '/pdks-records', icon: FileText },
-  { name: 'AI Rapor', href: '/ai-report', icon: Bot },
   { name: 'Ayarlar', href: '/settings', icon: Settings },
 ];
 
@@ -26,10 +25,12 @@ export default function Header() {
   const location = useLocation();
   const profileRef = useRef<HTMLDivElement>(null);
 
+  // Close mobile menu when route changes
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
+  // Mock user data - in a real app, this would come from authentication
   const user = {
     name: "Admin User",
     email: "admin@example.com",
@@ -48,6 +49,7 @@ export default function Header() {
               <span className="ml-2 text-xl font-semibold text-gray-900 dark:text-gray-100">PDKS</span>
             </Link>
             
+            {/* Desktop Navigation */}
             <nav className="hidden md:flex space-x-4 lg:space-x-6">
               {navigation.map(item => {
                 const IconComponent = item.icon;
@@ -75,6 +77,7 @@ export default function Header() {
               <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
             </Button>
             
+            {/* User Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="flex items-center space-x-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
@@ -110,6 +113,7 @@ export default function Header() {
               </DropdownMenuContent>
             </DropdownMenu>
             
+            {/* Mobile Menu Button */}
             <div className="md:hidden">
               <Button 
                 variant="ghost" 
@@ -124,6 +128,7 @@ export default function Header() {
           </div>
         </div>
         
+        {/* Mobile Navigation Menu */}
         {isMobileMenuOpen && (
           <nav className="md:hidden py-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex flex-col space-y-1">

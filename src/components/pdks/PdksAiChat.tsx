@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Send } from "lucide-react";
@@ -47,7 +48,7 @@ export function PdksAiChat() {
       const aiMessage: Message = {
         id: `response-${userMessage.id}`,
         type: 'assistant',
-        content: data.answer || "Üzgünüm, yanıt oluşturulamadı. Lütfen tekrar deneyin."
+        content: data.answer
       };
       setMessages(prev => [...prev, aiMessage]);
 
@@ -58,59 +59,58 @@ export function PdksAiChat() {
         description: "AI yanıt verirken bir hata oluştu. Lütfen tekrar deneyin.",
         variant: "destructive"
       });
-      
-      // Add error message for the user
-      setMessages(prev => [...prev, {
-        id: `error-${Date.now()}`,
-        type: 'assistant',
-        content: "Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin."
-      }]);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto bg-white/50 rounded-lg p-4 mb-4" style={{ minHeight: "400px" }}>
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} mb-2`}
-          >
-            <div
-              className={`rounded-lg px-4 py-2 max-w-[80%] ${
-                message.type === 'user'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-muted'
-              }`}
-            >
-              {message.content}
-            </div>
+    <Card className="w-full shadow-lg">
+      <CardHeader>
+        <CardTitle className="text-lg font-medium">PDKS AI Asistan</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          <div className="h-[300px] overflow-auto space-y-4 p-4">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`rounded-lg px-4 py-2 max-w-[80%] ${
+                    message.type === 'user'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted'
+                  }`}
+                >
+                  {message.content}
+                </div>
+              </div>
+            ))}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-muted rounded-lg px-4 py-2 flex space-x-2">
+                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
+                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce delay-100" />
+                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce delay-200" />
+                </div>
+              </div>
+            )}
           </div>
-        ))}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-muted rounded-lg px-4 py-2 flex space-x-2">
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce delay-100" />
-              <div className="w-2 h-2 bg-primary rounded-full animate-bounce delay-200" />
-            </div>
-          </div>
-        )}
-      </div>
-      <form onSubmit={handleSendMessage} className="flex gap-2">
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="PDKS kayıtları hakkında bir soru sorun..."
-          disabled={isLoading}
-          className="flex-1"
-        />
-        <Button type="submit" disabled={!input.trim() || isLoading}>
-          <Send className="h-4 w-4" />
-        </Button>
-      </form>
-    </div>
+          <form onSubmit={handleSendMessage} className="flex gap-2">
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="PDKS kayıtları hakkında bir soru sorun..."
+              disabled={isLoading}
+            />
+            <Button type="submit" disabled={!input.trim() || isLoading}>
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

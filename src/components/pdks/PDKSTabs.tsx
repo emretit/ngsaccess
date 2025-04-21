@@ -1,3 +1,4 @@
+
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AiInsightsCard } from "@/components/pdks/AiInsightsCard";
 import { PDKSTable } from "./PDKSTable";
@@ -40,10 +41,9 @@ export function PDKSTabs({
         <TabsTrigger value="detailed">Detaylı</TabsTrigger>
       </TabsList>
       
-      <TabsContent value="summary" className="mt-4">
-        <div className="glass-card p-4">
-          <AiInsightsCard insight={insight} isLoading={isLoadingInsight} />
-        </div>
+      <TabsContent value="summary" className="mt-4 space-y-4">
+        <AiInsightsCard insight={insight} isLoading={isLoadingInsight} />
+        {/* Add other summary cards/stats here */}
       </TabsContent>
       
       <TabsContent value="attendance" className="mt-4">
