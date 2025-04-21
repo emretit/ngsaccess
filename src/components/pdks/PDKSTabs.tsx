@@ -2,6 +2,7 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AiInsightsCard } from "@/components/pdks/AiInsightsCard";
 import { PDKSTable } from "./PDKSTable";
+import { PdksAiChat } from "./PdksAiChat";
 
 interface PDKSRecord {
   id: number;
@@ -42,8 +43,15 @@ export function PDKSTabs({
       </TabsList>
       
       <TabsContent value="summary" className="mt-4 space-y-4">
-        <AiInsightsCard insight={insight} isLoading={isLoadingInsight} />
-        {/* Add other summary cards/stats here */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2">
+            <AiInsightsCard insight={insight} isLoading={isLoadingInsight} />
+            {/* Add other summary cards/stats here */}
+          </div>
+          <div className="md:col-span-1">
+            <PdksAiChat />
+          </div>
+        </div>
       </TabsContent>
       
       <TabsContent value="attendance" className="mt-4">
