@@ -43,14 +43,14 @@ export function PDKSTabs({
       </TabsList>
       
       <TabsContent value="summary" className="mt-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="flex flex-col gap-6">
           <div className="glass-card p-4">
             <AiInsightsCard insight={insight} isLoading={isLoadingInsight} />
-            {/* Add other summary cards/stats here */}
           </div>
-          <div className="glass-card p-4 h-[500px]">
-            <h3 className="font-medium text-lg mb-4">PDKS AI Asistan</h3>
-            <PdksAiChat />
+          <div className="glass-card p-4">
+            <div className="h-[600px]">
+              <PdksAiChat />
+            </div>
           </div>
         </div>
       </TabsContent>
