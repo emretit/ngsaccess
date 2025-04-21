@@ -1,6 +1,5 @@
 
 import { format } from 'date-fns';
-import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DeviceForm } from "@/components/devices/DeviceForm";
 import {
@@ -23,7 +22,7 @@ export default function Devices() {
     isAddingDevice 
   } = useDevices(); 
 
-  console.log("Devices data:", devices); // Add logging to debug
+  console.log("Devices data:", devices); // Keep logging to debug
 
   return (
     <main className="p-6">
@@ -55,8 +54,8 @@ export default function Devices() {
               ) : devices && devices.length > 0 ? (
                 devices.map((device) => (
                   <TableRow key={device.id}>
-                    <TableCell className="font-medium">{device.name}</TableCell>
-                    <TableCell className="font-mono">{device.serial_number}</TableCell>
+                    <TableCell className="font-medium">{device.device_name || device.name}</TableCell>
+                    <TableCell className="font-mono">{device.device_serial || device.serial_number}</TableCell>
                     <TableCell>{device.device_location || '-'}</TableCell>
                     <TableCell>{device.device_type || '-'}</TableCell>
                     <TableCell>

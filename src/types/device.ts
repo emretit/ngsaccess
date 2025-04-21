@@ -1,7 +1,10 @@
+
 export interface Device {
   id: string;
-  name: string;
-  serial_number: string;
+  device_name?: string;
+  name?: string; // For compatibility with existing code
+  device_serial?: string;
+  serial_number?: string; // For compatibility with existing code
   device_model?: string;
   device_location?: string;
   device_type?: string;
