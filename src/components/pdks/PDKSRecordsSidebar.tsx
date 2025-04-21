@@ -28,6 +28,11 @@ const sidebarItems = [
     icon: Users
   },
   {
+    key: "reports",
+    label: "Raporlar",
+    icon: FileText
+  },
+  {
     key: "ai-report",
     label: "AI Rapor",
     icon: MessageSquare
