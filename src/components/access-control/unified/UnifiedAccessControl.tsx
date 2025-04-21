@@ -2,17 +2,23 @@
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import UnifiedRuleTable from "./UnifiedRuleTable";
+import { useState } from "react";
+import { UnifiedRuleForm } from "./UnifiedRuleForm";
 
 const UnifiedAccessControl = () => {
+  const [open, setOpen] = useState(false);
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Erişim Yönetimi</h2>
-        <Button>
+      {/* Removed outer "Erişim Kuralları" title, as requested! */}
+      <div className="flex justify-end items-center">
+        <Button onClick={() => setOpen(true)}>
           <Plus className="w-4 h-4 mr-2" />
-          Yeni Erişim Kuralı
+          Yeni Kural
         </Button>
       </div>
+      {/* Modal Form */}
+      <UnifiedRuleForm open={open} onOpenChange={setOpen} />
 
       <div className="bg-card rounded-lg border shadow-sm">
         <div className="p-6">
