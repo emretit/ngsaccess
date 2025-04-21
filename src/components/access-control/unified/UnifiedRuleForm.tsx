@@ -55,105 +55,156 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl p-0 overflow-visible">
-        <div className="flex justify-between items-center pl-8 pr-8 pt-8 pb-0">
-          <span className="text-xl font-semibold">Yeni Kural Ekle</span>
+        <div className="flex justify-between items-center px-8 pt-8 pb-2">
+          <h2 className="text-2xl font-semibold">Yeni Kural Ekle</h2>
           <Button
             variant="ghost"
             size="icon"
-            className="rounded-full"
+            className="rounded-full hover:bg-red-600 hover:text-white"
             type="button"
+            aria-label="Close"
             onClick={() => onOpenChange(false)}
           >
             <X className="w-6 h-6" />
           </Button>
         </div>
         {/* Form */}
-        <form className="px-8 pt-2 pb-6 space-y-7">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <form className="px-8 pt-3 pb-8 space-y-8" autoComplete="off">
+          {/* Rule Name and Selection */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="flex flex-col gap-2">
-              <label className="font-medium text-sm">Kural Adı</label>
+              <label htmlFor="ruleName" className="font-medium text-sm">
+                Kural Adı <span className="text-muted-foreground">(örneğin: Mesai Saatleri)</span>
+              </label>
               <Input
-                placeholder="Örn: Mesai Saatleri"
+                id="ruleName"
+                placeholder="Kural adını girin"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="bg-white"
+                autoFocus
+                required
               />
             </div>
             <div className="flex flex-col gap-2">
-              <label className="font-medium text-sm">Departman ve Kişi Seçimi</label>
+              <label className="font-medium text-sm">
+                Departman ve Kişi Seçimi
+              </label>
               <DepartmentEmployeeSelector
                 value={selection}
                 onChange={handleSelectionChange}
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                İzin vermek istediğiniz departman ve personeli seçin. (Çoklu seçim desteklenir)
+              </p>
             </div>
           </div>
+          {/* Door Selection */}
           <div className="flex flex-col gap-2">
-            <label className="font-medium text-sm">Kapı ve Bölge Seçimi</label>
+            <label className="font-medium text-sm">
+              Kapı ve Bölge Seçimi
+            </label>
             <Button
               variant="outline"
-              className="justify-between"
+              className="justify-between max-w-md text-sm"
               type="button"
-              // Placeholder for door picker
+              // Placeholder - no actual picker logic in given code
             >
-              <span className="text-muted-foreground">Erişim verilecek kapıları seçin</span>
+              <span className={doors.length > 0 ? '' : 'text-muted-foreground'}>
+                {doors.length > 0 
+                  ? `${doors.length} kapı seçildi`
+                  : 'Erişim verilecek kapıları seçin'}
+              </span>
             </Button>
+            <p className="text-xs text-muted-foreground mt-1 max-w-md">
+              Erişim izni verilmek istenen kapıları seçin.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-            <div className="flex flex-col gap-2">
-              <label className="font-medium text-sm">Başlangıç Saati</label>
-              <div className="flex items-center">
+          {/* Time and Status */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-end">
+            <div className="flex flex-col gap-2 max-w-xs">
+              <label htmlFor="startTime" className="font-medium text-sm">
+                Başlangıç Saati
+              </label>
+              <div className="flex items-center border border-gray-300 rounded-md px-3 py-2 bg-white">
                 <Input
+                  id="startTime"
                   type="time"
-                  className="bg-white"
                   value={startTime}
                   onChange={(e) => setStartTime(e.target.value)}
+                  className="border-none p-0 bg-transparent"
+                  required
                 />
                 <Clock className="ml-2 w-4 h-4 text-muted-foreground" />
               </div>
             </div>
-            <div className="flex flex-col gap-2">
-              <label className="font-medium text-sm">Bitiş Saati</label>
-              <div className="flex items-center">
+            <div className="flex flex-col gap-2 max-w-xs">
+              <label htmlFor="endTime" className="font-medium text-sm">
+                Bitiş Saati
+              </label>
+              <div className="flex items-center border border-gray-300 rounded-md px-3 py-2 bg-white">
                 <Input
+                  id="endTime"
                   type="time"
-                  className="bg-white"
                   value={endTime}
                   onChange={(e) => setEndTime(e.target.value)}
+                  className="border-none p-0 bg-transparent"
+                  required
                 />
                 <Clock className="ml-2 w-4 h-4 text-muted-foreground" />
               </div>
             </div>
-            <div className="flex items-center gap-2 mt-[22px]">
-              <label className="font-medium text-sm mr-2">Durum</label>
-              <Switch checked={isActive} onCheckedChange={setIsActive} />
-              <span className="ml-1">{isActive ? "Aktif" : "Pasif"}</span>
+            <div className="flex items-center gap-2 mt-4 sm:mt-6">
+              <label className="font-medium text-sm" htmlFor="statusSwitch">
+                Durum
+              </label>
+              <Switch
+                id="statusSwitch"
+                checked={isActive}
+                onCheckedChange={setIsActive}
+              />
+              <span className="ml-1 font-semibold text-sm">
+                {isActive ? "Aktif" : "Pasif"}
+              </span>
             </div>
           </div>
 
+          {/* Days */}
           <div>
-            <label className="font-medium text-sm mb-1 block">Günler</label>
-            <div className="flex gap-2 flex-wrap">
+            <label className="font-medium text-sm mb-2 block">Günler</label>
+            <div className="flex gap-3 flex-wrap">
               {DAYS.map((day) => (
                 <Button
                   key={day.key}
                   type="button"
                   variant={days.includes(day.key) ? "default" : "outline"}
                   onClick={() => handleToggleDay(day.key)}
-                  className="rounded-full min-w-12"
+                  className="rounded-full min-w-[48px] px-3 py-1 text-base"
                 >
                   {day.label}
                 </Button>
               ))}
             </div>
+            <p className="text-xs text-muted-foreground mt-1 max-w-md">
+              Erişim izni verilecek günleri seçin.
+            </p>
           </div>
 
-          <div className="flex items-center justify-end gap-3 mt-4">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-4 mt-6">
+            <Button 
+              type="button"
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+            >
               İptal
             </Button>
-            <Button type="submit" className="flex gap-2 items-center">
-              <Save className="w-4 h-4 mr-1" />
+            <Button 
+              type="submit" 
+              className="flex gap-2 items-center"
+            >
+              <Save className="w-4 h-4" />
               Kaydet
             </Button>
           </div>
@@ -162,3 +213,4 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
     </Dialog>
   );
 }
+
