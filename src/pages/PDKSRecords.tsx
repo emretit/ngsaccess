@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { usePdksAi } from "@/hooks/usePdksAi";
@@ -87,7 +88,8 @@ export default function PDKSRecords() {
   };
 
   return (
-    <main className="flex-1 p-0 bg-gray-50 flex flex-col min-h-[calc(100vh-4rem)]">
+    <main className="flex-1 p-6 bg-gray-50 flex flex-col min-h-[calc(100vh-4rem)]">
+      <h1 className="text-2xl font-semibold text-gray-900 mb-6">PDKS Kayıtları</h1>
       <PDKSHeader
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
@@ -99,7 +101,7 @@ export default function PDKSRecords() {
         showAiPanel={showAiPanel}
         isMobile={isMobile}
       />
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 mt-2">
         <PDKSRecordsSidebar 
           selected={selectedSection}
           onSelect={setSelectedSection}
