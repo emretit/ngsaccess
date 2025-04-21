@@ -56,8 +56,8 @@ export default function Devices() {
                   <TableRow key={device.id}>
                     <TableCell className="font-medium">{device.device_name || device.name}</TableCell>
                     <TableCell className="font-mono">{device.device_serial || device.serial_number}</TableCell>
-                    <TableCell>{device.device_location || '-'}</TableCell>
-                    <TableCell>{device.device_type || '-'}</TableCell>
+                    <TableCell>{device.device_location || device.location || '-'}</TableCell>
+                    <TableCell>{device.device_type || device.type || '-'}</TableCell>
                     <TableCell>
                       <Badge 
                         variant={device.status === 'online' ? 'success' : 'secondary'}

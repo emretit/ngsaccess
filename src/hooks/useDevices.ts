@@ -60,14 +60,18 @@ export function useDevices() {
       }
 
       // If it exists, add it to devices table
-      // Make sure to use the correct field names according to the database schema
+      // Using fields that match the database schema
       const { error: insertError } = await supabase
         .from('devices')
         .insert({ 
-          device_name: existingDevice.name,
+          name: existingDevice.name,
+          serial_number: existingDevice.serial_number,
+          location: "",  // Required field based on schema
+          type: "",      // Required field based on schema
+          device_model: existingDevice.device_model || "",
+          device_type: existingDevice.device_type || "",
           device_serial: existingDevice.serial_number,
-          device_location: "",  // Providing empty default values for required fields
-          device_type: ""       // Providing empty default values for required fields
+          device_location: ""
         });
 
       if (insertError) {
