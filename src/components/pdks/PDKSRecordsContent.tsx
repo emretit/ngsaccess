@@ -1,8 +1,6 @@
-
 import { AiInsightsCard } from "@/components/pdks/AiInsightsCard";
 import { PDKSTable } from "./PDKSTable";
 import { PDKSAiChat } from "./PDKSAiChat";
-import { AttendanceTable } from "./AttendanceTable";
 
 interface PDKSRecord {
   id: number;
@@ -39,19 +37,22 @@ export function PDKSRecordsContent({
     return (
       <div className="p-6">
         <AiInsightsCard insight={insight} isLoading={isLoadingInsight} />
+        {/* Diğer özet kartları eklenebilir */}
       </div>
     );
   }
 
   if (section === "attendance") {
     return (
-      <div className="p-6">
-        <AttendanceTable 
-          dateRange={{
-            start: new Date().toISOString().split('T')[0],
-            end: new Date().toISOString().split('T')[0]
-          }}
-        />
+      <div className="p-0">
+        <div className="glass-card overflow-hidden mt-6 mx-6">
+          <PDKSTable
+            records={filteredRecords}
+            loading={loading}
+            searchTerm={searchTerm}
+            statusFilter={statusFilter}
+          />
+        </div>
       </div>
     );
   }
