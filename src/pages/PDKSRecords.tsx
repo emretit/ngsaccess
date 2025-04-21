@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { usePdksAi } from "@/hooks/usePdksAi";
@@ -6,6 +5,8 @@ import { useMedia } from "@/hooks/use-mobile";
 import { PDKSHeader } from "@/components/pdks/PDKSHeader";
 import { PDKSRecordsSidebar } from '@/components/pdks/PDKSRecordsSidebar';
 import { PDKSRecordsContent } from '@/components/pdks/PDKSRecordsContent';
+import { AiDrawer } from "@/components/pdks/AiDrawer";
+import { PdksAiChat } from "@/components/pdks/PdksAiChat";
 
 interface PDKSRecord {
   id: number;
@@ -99,8 +100,9 @@ export default function PDKSRecords() {
         onAiPanelToggle={() => setShowAiPanel(!showAiPanel)}
         showAiPanel={showAiPanel}
         isMobile={isMobile}
+        AiDrawer={<AiDrawer filters={{ statusFilter }} />}
       />
-      <div className="flex flex-1 min-h-0 mt-2">
+      <div className="flex flex-1 min-h-0 mt-2 gap-4">
         <PDKSRecordsSidebar 
           selected={selectedSection}
           onSelect={setSelectedSection}
@@ -117,6 +119,11 @@ export default function PDKSRecords() {
             isLoadingInsight={isLoadingInsight}
           />
         </div>
+        {showAiPanel && !isMobile && (
+          <div className="w-96">
+            <PdksAiChat />
+          </div>
+        )}
       </div>
     </main>
   );
