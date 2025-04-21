@@ -89,7 +89,6 @@ export default function PDKSRecords() {
 
   return (
     <main className="flex-1 p-6 bg-gray-50 flex flex-col min-h-[calc(100vh-4rem)]">
-      <h1 className="text-2xl font-semibold text-gray-900 mb-6">PDKS Kayıtları</h1>
       <PDKSHeader
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
