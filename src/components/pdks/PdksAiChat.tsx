@@ -72,7 +72,7 @@ export function PdksAiChat() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-auto bg-white/50 rounded-lg p-4 mb-4 h-[380px]">
+      <div className="flex-1 overflow-auto bg-white/50 rounded-lg p-4 mb-4" style={{ minHeight: "400px" }}>
         {messages.map((message) => (
           <div
             key={message.id}

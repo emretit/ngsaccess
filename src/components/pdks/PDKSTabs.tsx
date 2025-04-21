@@ -42,13 +42,13 @@ export function PDKSTabs({
         <TabsTrigger value="detailed">Detaylı</TabsTrigger>
       </TabsList>
       
-      <TabsContent value="summary" className="mt-4">
-        <div className="glass-card p-4 mb-4">
+      <TabsContent value="summary" className="mt-4 flex flex-col space-y-4">
+        <div className="glass-card p-4">
           <AiInsightsCard insight={insight} isLoading={isLoadingInsight} />
         </div>
-        <div className="glass-card p-4">
+        <div className="glass-card p-4 flex-1 flex flex-col" style={{ minHeight: "60vh" }}>
           <h3 className="font-medium text-lg mb-4">PDKS AI Asistan</h3>
-          <div className="h-[500px]">
+          <div className="flex-1" style={{ height: "calc(100% - 2rem)" }}>
             <PdksAiChat />
           </div>
         </div>
