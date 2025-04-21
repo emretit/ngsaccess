@@ -165,8 +165,9 @@ export default function DepartmentEmployeeSelector({
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-4 max-w-md">
+    <div className="bg-white rounded-lg shadow p-4 max-w-md max-h-[400px] overflow-y-auto">
       {renderTree(tree)}
     </div>
   );
 }
+
