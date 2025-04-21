@@ -33,7 +33,6 @@ const DAYS = [
 
 export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
   const [name, setName] = useState("");
-  // Çoklu seçim olacak şekilde güncellendi:
   const [selection, setSelection] = useState<DepartmentEmployeeSelection[]>([]);
   const [doors, setDoors] = useState<string[]>([]);
   const [startTime, setStartTime] = useState("08:00");
@@ -47,7 +46,6 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
     );
   }
 
-  // onChange fonksiyonu artık dizi ile çalışıyor:
   const handleSelectionChange = (newSelection: DepartmentEmployeeSelection[]) => {
     setSelection(newSelection);
   };
@@ -55,157 +53,160 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-xl w-full rounded-2xl p-0 bg-white shadow-2xl border-0"
+        className="w-full max-w-lg p-0 border-0 bg-transparent shadow-none"
         style={{
           minWidth: 380,
           maxWidth: 520,
-          margin: 0,
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)"
         }}
       >
-        {/* HEADER */}
-        <div className="flex justify-between items-center px-7 py-5 border-b">
-          <h2 className="text-xl font-bold tracking-tight">Yeni Kural Oluştur</h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full hover:bg-red-500/90 focus-visible:ring-2 focus-visible:ring-primary"
-            type="button"
-            aria-label="Close"
-            onClick={() => onOpenChange(false)}
-          >
-            <X className="w-5 h-5" />
-          </Button>
-        </div>
-        {/* FORM */}
-        <form className="px-7 py-6 space-y-7 text-[15px]" autoComplete="off">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Rule Name */}
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="ruleName" className="text-sm font-medium">
-                Kural Adı <span className="text-muted-foreground">(örn: Mesai Saatleri)</span>
-              </label>
-              <Input
-                id="ruleName"
-                placeholder="Kural adını girin"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="bg-background text-base"
-                autoFocus
-                required
-              />
-            </div>
-            {/* Department & Employee Select */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium">Departman ve Personel</label>
-              <DepartmentEmployeeSelector
-                value={selection}
-                onChange={handleSelectionChange}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                İzin vermek istediğiniz departman ve/veya personeli seçin
-              </p>
-            </div>
-          </div>
-          {/* DOOR SELECTION */}
-          <div>
-            <label className="text-sm font-medium">Kapı ve Bölge</label>
+        <div className="glass-card relative rounded-3xl w-full p-0 overflow-hidden shadow-xl border border-gray-200 dark:border-gray-700">
+          {/* HEADER */}
+          <div className="bg-gradient-to-r from-[#FAE8E8] to-[#F1F0FB] dark:from-[#28213c] dark:to-[#260F19] px-8 py-5 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-2xl font-bold tracking-tight text-gray-800 dark:text-white">Yeni Kural Oluştur</h2>
             <Button
-              variant="outline"
-              className="justify-between gap-2 w-full max-w-md text-base mt-1"
+              variant="ghost"
+              size="icon"
+              className="rounded-full hover:bg-red-500/90 focus-visible:ring-2 focus-visible:ring-primary"
               type="button"
-            >
-              <span className={doors.length > 0 ? '' : 'text-muted-foreground'}>
-                {doors.length > 0 ? `${doors.length} kapı seçildi` : 'Erişim verilecek kapıları seçin'}
-              </span>
-            </Button>
-            <p className="text-xs text-muted-foreground mt-1">
-              Erişim izni verilecek kapı/bölgeleri seçin.
-            </p>
-          </div>
-          {/* TIME & STATUS */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-            <div className="space-y-1.5">
-              <label htmlFor="startTime" className="text-sm font-medium">Başlangıç</label>
-              <div className="flex items-center border rounded-lg px-3 py-2 bg-white gap-1 focus-within:ring-2 focus-within:ring-accent">
-                <Input
-                  id="startTime"
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  className="border-none bg-transparent outline-none px-0 py-0 text-base"
-                  required
-                />
-                <Clock className="ml-2 w-4 h-4 text-muted-foreground" />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <label htmlFor="endTime" className="text-sm font-medium">Bitiş</label>
-              <div className="flex items-center border rounded-lg px-3 py-2 bg-white gap-1 focus-within:ring-2 focus-within:ring-accent">
-                <Input
-                  id="endTime"
-                  type="time"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  className="border-none bg-transparent outline-none px-0 py-0 text-base"
-                  required
-                />
-                <Clock className="ml-2 w-4 h-4 text-muted-foreground" />
-              </div>
-            </div>
-            {/* STATUS TOGGLE */}
-            <div className="flex items-center gap-2 h-full mt-3 md:mt-6">
-              <label className="font-medium text-sm" htmlFor="statusSwitch">
-                Durum
-              </label>
-              <Switch
-                id="statusSwitch"
-                checked={isActive}
-                onCheckedChange={setIsActive}
-              />
-              <span className="font-semibold text-xs ml-1">{isActive ? "Aktif" : "Pasif"}</span>
-            </div>
-          </div>
-          {/* DAYS */}
-          <div>
-            <label className="text-sm font-medium mb-2 block">Günler</label>
-            <div className="flex gap-2 flex-wrap mb-2">
-              {DAYS.map((day) => (
-                <Button
-                  key={day.key}
-                  type="button"
-                  variant={days.includes(day.key) ? "default" : "outline"}
-                  onClick={() => handleToggleDay(day.key)}
-                  className="rounded-full min-w-[38px] px-3 py-1 text-sm"
-                >
-                  {day.label}
-                </Button>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Hangi günler erişim izni verileceğini seçiniz.
-            </p>
-          </div>
-          {/* ACTION BUTTONS */}
-          <div className="flex items-center justify-end gap-4 pt-3 border-t mt-6">
-            <Button 
-              type="button"
-              variant="outline" 
+              aria-label="Kapat"
               onClick={() => onOpenChange(false)}
             >
-              İptal
-            </Button>
-            <Button 
-              type="submit" 
-              className="flex gap-2 items-center"
-            >
-              <Save className="w-4 h-4" />
-              Kaydet
+              <X className="w-5 h-5" />
             </Button>
           </div>
-        </form>
+          <form
+            className="px-8 py-7 md:py-8 space-y-7 text-[15px] bg-white/80 dark:bg-[#1A1F2C]/60"
+            autoComplete="off"
+          >
+            {/* Kural Adı ve Departman/Personel */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="flex flex-col gap-2">
+                <label htmlFor="ruleName" className="text-xs font-semibold text-gray-500 dark:text-gray-300">
+                  Kural Adı <span className="text-muted-foreground">(örn: Mesai Saatleri)</span>
+                </label>
+                <Input
+                  id="ruleName"
+                  placeholder="Kural adını girin"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="bg-background text-base shadow-sm"
+                  autoFocus
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-gray-500 dark:text-gray-300">Departman & Personel</label>
+                <div className="rounded-xl border border-gray-100 dark:border-gray-800 bg-white/80 dark:bg-gray-900/40 px-2 py-1.5">
+                  <DepartmentEmployeeSelector
+                    value={selection}
+                    onChange={handleSelectionChange}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  İzin vermek istediğiniz departman ve/veya personeli seçin
+                </p>
+              </div>
+            </div>
+            {/* Kapı/Bölge Seçimi */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-semibold text-gray-500 dark:text-gray-300">Kapı & Bölge</label>
+              <Button
+                variant="outline"
+                className="justify-between gap-2 w-full max-w-md text-base mt-1 bg-white/90 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700"
+                type="button"
+              >
+                <span className={doors.length > 0 ? "" : "text-muted-foreground"}>
+                  {doors.length > 0 ? `${doors.length} kapı seçildi` : "Erişim verilecek kapıları seçin"}
+                </span>
+              </Button>
+              <p className="text-xs text-muted-foreground mt-1">
+                Erişim izni verilecek kapı/bölgeleri seçin.
+              </p>
+            </div>
+            {/* Saat aralığı, durum */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+              <div className="space-y-2">
+                <label htmlFor="startTime" className="text-xs font-semibold text-gray-500 dark:text-gray-300">Başlangıç</label>
+                <div className="flex items-center border rounded-lg px-3 py-2 bg-white/80 dark:bg-gray-900/40 gap-1 transition-all">
+                  <Input
+                    id="startTime"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="border-none bg-transparent outline-none px-0 py-0 text-base"
+                    required
+                  />
+                  <Clock className="ml-2 w-4 h-4 text-muted-foreground" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="endTime" className="text-xs font-semibold text-gray-500 dark:text-gray-300">Bitiş</label>
+                <div className="flex items-center border rounded-lg px-3 py-2 bg-white/80 dark:bg-gray-900/40 gap-1 transition-all">
+                  <Input
+                    id="endTime"
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="border-none bg-transparent outline-none px-0 py-0 text-base"
+                    required
+                  />
+                  <Clock className="ml-2 w-4 h-4 text-muted-foreground" />
+                </div>
+              </div>
+              <div className="flex items-center gap-2 h-full mt-2 md:mt-7">
+                <label className="font-semibold text-xs text-gray-500 dark:text-gray-300" htmlFor="statusSwitch">
+                  Durum
+                </label>
+                <Switch
+                  id="statusSwitch"
+                  checked={isActive}
+                  onCheckedChange={setIsActive}
+                />
+                <span className="font-semibold text-xs ml-1">{isActive ? "Aktif" : "Pasif"}</span>
+              </div>
+            </div>
+            {/* Günler */}
+            <div>
+              <label className="text-xs font-semibold text-gray-500 dark:text-gray-300 mb-2 block">Günler</label>
+              <div className="flex gap-2 flex-wrap mb-1">
+                {DAYS.map((day) => (
+                  <Button
+                    key={day.key}
+                    type="button"
+                    variant={days.includes(day.key) ? "default" : "outline"}
+                    onClick={() => handleToggleDay(day.key)}
+                    className={`rounded-full min-w-[38px] px-3 py-1 text-sm transition-all ${
+                      days.includes(day.key) ? "bg-primary text-white shadow" : ""
+                    }`}
+                  >
+                    {day.label}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Hangi günler erişim izni verileceğini seçiniz.
+              </p>
+            </div>
+            {/* Action Buttons */}
+            <div className="flex flex-col-reverse md:flex-row items-center justify-end gap-4 pt-6 mt-2 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full md:w-auto"
+                onClick={() => onOpenChange(false)}
+              >
+                İptal
+              </Button>
+              <Button
+                type="submit"
+                className="flex gap-2 items-center w-full md:w-auto"
+              >
+                <Save className="w-4 h-4" />
+                Kaydet
+              </Button>
+            </div>
+          </form>
+        </div>
       </DialogContent>
     </Dialog>
   );
