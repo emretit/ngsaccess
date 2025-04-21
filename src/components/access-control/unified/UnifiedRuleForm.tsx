@@ -33,7 +33,8 @@ const DAYS = [
 
 export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
   const [name, setName] = useState("");
-  const [selection, setSelection] = useState<DepartmentEmployeeSelection | null>(null);
+  // Çoklu seçim olacak şekilde güncellendi:
+  const [selection, setSelection] = useState<DepartmentEmployeeSelection[]>([]);
   const [doors, setDoors] = useState<string[]>([]);
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("18:00");
@@ -46,7 +47,8 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
     );
   }
 
-  const handleSelectionChange = (newSelection: DepartmentEmployeeSelection | null) => {
+  // onChange fonksiyonu artık dizi ile çalışıyor:
+  const handleSelectionChange = (newSelection: DepartmentEmployeeSelection[]) => {
     setSelection(newSelection);
   };
 
