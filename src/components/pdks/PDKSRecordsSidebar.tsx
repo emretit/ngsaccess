@@ -1,5 +1,5 @@
 
-import { Users, Table, Building2, List, MessageSquare, FileText } from "lucide-react";
+import { Users, Table, Building2, List, MessageSquare } from "lucide-react";
 
 interface PDKSRecordsSidebarProps {
   selected: string;
@@ -26,11 +26,6 @@ const sidebarItems = [
     key: "detailed",
     label: "Detaylı",
     icon: Users
-  },
-  {
-    key: "reports",
-    label: "Raporlar",
-    icon: FileText
   },
   {
     key: "ai-report",

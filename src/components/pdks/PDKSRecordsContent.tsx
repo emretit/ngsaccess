@@ -75,15 +75,6 @@ export function PDKSRecordsContent({
     );
   }
 
-  if (section === "reports") {
-    return (
-      <div className="glass-card p-6 m-6">
-        <h3 className="font-medium text-lg mb-4">Raporlar</h3>
-        <p className="text-gray-500">Bu özellik henüz geliştirilmektedir.</p>
-      </div>
-    );
-  }
-
   if (section === "ai-report") {
     return (
       <div className="p-6">
