@@ -5,6 +5,7 @@ import { WorkScheduleSettings } from "./sections/WorkScheduleSettings";
 import { NotificationSettings } from "./sections/NotificationSettings";
 import { CompanySettings } from "./sections/CompanySettings";
 import { MailSettings } from "./sections/MailSettings";
+import { UserManagement } from "./sections/UserManagement";
 
 interface SettingsTabsProps {
   activeTab: string;
@@ -17,6 +18,7 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
       <TabsList className="hidden">
         <TabsTrigger value="company">Şirket</TabsTrigger>
         <TabsTrigger value="general">Genel</TabsTrigger>
+        <TabsTrigger value="users">Kullanıcı Yönetimi</TabsTrigger>
         <TabsTrigger value="schedule">Çalışma Saatleri</TabsTrigger>
         <TabsTrigger value="mail">Mail Ayarları</TabsTrigger>
         <TabsTrigger value="notifications">Bildirimler</TabsTrigger>
@@ -28,6 +30,10 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
       
       <TabsContent value="general">
         <GeneralSettings />
+      </TabsContent>
+
+      <TabsContent value="users">
+        <UserManagement />
       </TabsContent>
       
       <TabsContent value="schedule">
