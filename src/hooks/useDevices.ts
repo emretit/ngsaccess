@@ -71,7 +71,10 @@ export function useDevices() {
           device_model: existingDevice.device_model || "",
           device_type: existingDevice.device_type || "",
           device_serial: existingDevice.serial_number,
-          device_location: ""
+          device_location: "",
+          // Add zone_id and door_id for location display
+          zone_id: existingDevice.zone_id,
+          door_id: existingDevice.door_id
         });
 
       if (insertError) {

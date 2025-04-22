@@ -22,6 +22,7 @@ import {
 import { useState } from "react";
 import { Download } from "lucide-react";
 import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
+import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 
 export default function Devices() {
   const { 
@@ -35,6 +36,8 @@ export default function Devices() {
     serial: string;
     name: string;
   } | null>(null);
+
+  const { zones, doors } = useZonesAndDoors();
 
   const handleQRClick = (device: any) => {
     setSelectedQR({
@@ -54,6 +57,19 @@ export default function Devices() {
     link.href = canvas.toDataURL('image/png');
     link.click();
   };
+
+  // Helper function to get location display string
+  function getLocationString(device: any) {
+    // Find ids as string or number; handle cases where id might be undefined
+    const zone = zones.find(z => String(z.id) === String(device.zone_id));
+    const door = doors.find(d => String(d.id) === String(device.door_id));
+    
+    if (zone && door) return `${zone.name} / ${door.name}`;
+    if (zone) return zone.name;
+    if (door) return door.name;
+    
+    return device.device_location || device.location || '-';
+  }
 
   return (
     <main className="p-0">
@@ -103,7 +119,7 @@ export default function Devices() {
                       </TableCell>
                       <TableCell className="font-medium">{device.device_name || device.name}</TableCell>
                       <TableCell className="font-mono">{device.device_serial || device.serial_number}</TableCell>
-                      <TableCell>{device.device_location || device.location || '-'}</TableCell>
+                      <TableCell>{getLocationString(device)}</TableCell>
                       <TableCell>{device.device_type || device.type || '-'}</TableCell>
                       <TableCell>
                         <Badge 

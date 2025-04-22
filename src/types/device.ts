@@ -14,6 +14,9 @@ export interface Device {
   // Added required fields from DB schema
   location?: string;
   type?: string;
+  // Add zone_id and door_id for location display
+  zone_id?: number;
+  door_id?: number;
 }
 
 export interface Project {
@@ -40,4 +43,6 @@ export interface ServerDevice {
   last_used_at?: string;
   updated_at?: string;
   device_location?: string;
+  zone_id?: number;
+  door_id?: number;
 }
