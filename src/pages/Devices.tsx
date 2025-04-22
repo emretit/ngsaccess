@@ -1,4 +1,3 @@
-
 import { format } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { DeviceForm } from "@/components/devices/DeviceForm";
@@ -21,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { useState } from "react";
 import { Download } from "lucide-react";
-import { ZoneDoorTree } from "@/components/access-control/ZoneDoorTree";
+import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
 
 export default function Devices() {
   const { 
@@ -58,7 +57,7 @@ export default function Devices() {
   return (
     <main className="p-0">
       <div className="max-w-7xl mx-auto flex gap-6">
-        <ZoneDoorTree />
+        <ZoneDoorTreePanel />
         <div className="flex-1 space-y-6 p-6">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-semibold">Cihazlar</h1>
