@@ -1,9 +1,12 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronRight, SquarePlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Modern DepartmentTree'ye stil ve yapı uyumlu bir zone/door tree.
+ */
 interface Zone {
   id: number;
   name: string;
@@ -49,23 +52,7 @@ export const ZoneDoorTree = ({
     setDoors(doorsData || []);
   }
 
-  const handleZoneClick = (zoneId: number) => {
-    setSelectedZone(zoneId === selectedZone ? null : zoneId);
-    setSelectedDoor(null);
-    onSelectZone?.(zoneId === selectedZone ? null : zoneId);
-    // expand/collapse mantığı
-    setExpandedZones((prev) =>
-      prev.includes(zoneId)
-        ? prev.filter((z) => z !== zoneId)
-        : [...prev, zoneId]
-    );
-  };
-
-  const handleDoorClick = (doorId: number) => {
-    setSelectedDoor(doorId);
-    onSelectDoor?.(doorId);
-  };
-
+  // Tree UI modernize edildi (ikoncuklar, spacing, hover, select: department tree gibi)
   return (
     <ul role="tree" className="space-y-0.5">
       {zones.map((zone) => {
@@ -80,11 +67,23 @@ export const ZoneDoorTree = ({
                 "hover:bg-accent hover:text-accent-foreground",
                 selectedZone === zone.id && "bg-accent/80 text-accent-foreground font-medium"
               )}
-              onClick={() => handleZoneClick(zone.id)}
+              style={{ paddingLeft: "12px" }}
+              onClick={() => {
+                setSelectedZone(zone.id === selectedZone ? null : zone.id);
+                setSelectedDoor(null);
+                onSelectZone?.(zone.id === selectedZone ? null : zone.id);
+                setExpandedZones((prev) =>
+                  prev.includes(zone.id)
+                    ? prev.filter((z) => z !== zone.id)
+                    : [...prev, zone.id]
+                );
+              }}
+              tabIndex={0}
             >
+              {/* Açma/kapatma ikoncuk */}
               <button
                 type="button"
-                className="h-5 w-5 p-1 flex items-center justify-center rounded hover:bg-accent/40 focus:outline-none mr-1"
+                className="h-5 w-5 p-0 flex items-center justify-center rounded hover:bg-accent/40 focus:outline-none mr-1"
                 tabIndex={-1}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -97,36 +96,44 @@ export const ZoneDoorTree = ({
                 aria-label={isExpanded ? "Kapat" : "Aç"}
               >
                 {isExpanded ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground/70" />
+                  <ChevronDown className="h-4 w-4 text-muted-foreground/70 transition-transform" />
                 ) : (
-                  <ChevronUp className="h-4 w-4 text-muted-foreground/70" />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/70 transition-transform" />
                 )}
               </button>
               <span className="flex-1 truncate text-sm">{zone.name}</span>
             </div>
-            {/* Doors */}
-            {isExpanded && (
-              <ul role="group" className="pl-6">
-                {zoneDoors.length === 0 ? (
-                  <div className="text-xs text-muted-foreground pl-2 pb-2">Kapı yok</div>
-                ) : (
-                  zoneDoors.map((door) => (
-                    <li key={door.id}>
-                      <div
-                        className={cn(
-                          "flex items-center rounded-md px-2 py-1.5 ml-2 cursor-pointer text-sm",
-                          "hover:bg-primary/10 hover:text-primary",
-                          selectedDoor === door.id && "bg-primary/10 text-primary font-medium"
-                        )}
-                        onClick={() => handleDoorClick(door.id)}
-                      >
-                        <span className="ml-3">⎯ {door.name}</span>
-                      </div>
-                    </li>
-                  ))
-                )}
-              </ul>
-            )}
+            {/* Kapılar */}
+            <ul
+              role="group"
+              className={cn(
+                "overflow-hidden transition-all duration-200 pl-8",
+                isExpanded ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
+              )}
+            >
+              {zoneDoors.length === 0 ? (
+                <li className="text-xs text-muted-foreground pl-2 pb-2">Kapı yok</li>
+              ) : (
+                zoneDoors.map((door) => (
+                  <li key={door.id}>
+                    <div
+                      className={cn(
+                        "flex items-center rounded-md px-2 py-1.5 ml-2 cursor-pointer text-sm",
+                        "hover:bg-primary/10 hover:text-primary",
+                        selectedDoor === door.id && "bg-primary/10 text-primary font-medium"
+                      )}
+                      onClick={() => {
+                        setSelectedDoor(door.id);
+                        onSelectDoor?.(door.id);
+                      }}
+                      style={{ paddingLeft: "16px" }}
+                    >
+                      <span className="ml-1">⎯ {door.name}</span>
+                    </div>
+                  </li>
+                ))
+              )}
+            </ul>
           </li>
         );
       })}
