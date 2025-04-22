@@ -1,34 +1,25 @@
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SettingsTabs } from "@/components/settings/SettingsTabs";
 import { Badge } from "@/components/ui/badge";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SettingsTabs } from "@/components/settings/SettingsTabs";
 import { SettingsSidebar } from "@/components/settings/SettingsSidebar";
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("company");
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Ayarlar</h1>
-          <p className="text-muted-foreground">
-            Sistem ayarlarını buradan yönetebilirsiniz.
-          </p>
-        </div>
-        <Badge variant="outline">Yönetici</Badge>
-      </div>
-
-      <div className="flex w-full gap-6">
-        <SidebarProvider defaultOpen>
-          <SettingsSidebar activeTab={activeTab} onTabChange={setActiveTab} />
-          <div className="flex-1">
+    <main className="flex-1 p-6 bg-gray-50 flex flex-col min-h-[calc(100vh-4rem)]">
+      <div className="flex flex-1 min-h-0">
+        <SettingsSidebar
+          selected={activeTab}
+          onSelect={setActiveTab}
+        />
+        <div className="flex-1 overflow-auto">
+          <div className="p-4 md:p-8">
             <SettingsTabs activeTab={activeTab} onTabChange={setActiveTab} />
           </div>
-        </SidebarProvider>
+        </div>
       </div>
-    </div>
+    </main>
   );
 }
