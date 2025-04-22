@@ -1,7 +1,8 @@
-
+import { useEffect, useState } from "react";
 import { AiInsightsCard } from "@/components/pdks/AiInsightsCard";
 import { PDKSTable } from "./PDKSTable";
 import { PDKSAiChat } from "./PDKSAiChat";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PDKSRecord {
   id: number;
@@ -34,57 +35,40 @@ export function PDKSRecordsContent({
   insight,
   isLoadingInsight
 }: PDKSRecordsContentProps) {
-  // Sample data for demo purposes if no records are available
-  const demoRecords = [
-    {
-      id: 1,
-      employee_first_name: "Ahmet",
-      employee_last_name: "Yılmaz",
-      date: "2025-04-22",
-      entry_time: "08:15",
-      exit_time: "17:30",
-      status: "present"
-    },
-    {
-      id: 2,
-      employee_first_name: "Ayşe",
-      employee_last_name: "Kaya",
-      date: "2025-04-22",
-      entry_time: "08:45",
-      exit_time: "17:20",
-      status: "late"
-    },
-    {
-      id: 3,
-      employee_first_name: "Mehmet",
-      employee_last_name: "Demir",
-      date: "2025-04-22",
-      entry_time: "",
-      exit_time: "",
-      status: "absent"
-    },
-    {
-      id: 4,
-      employee_first_name: "Fatma",
-      employee_last_name: "Şahin",
-      date: "2025-04-21",
-      entry_time: "08:05",
-      exit_time: "17:00",
-      status: "present"
-    },
-    {
-      id: 5,
-      employee_first_name: "Ali",
-      employee_last_name: "Öztürk",
-      date: "2025-04-21",
-      entry_time: "09:10",
-      exit_time: "18:00",
-      status: "late"
-    }
-  ];
+  const [employees, setEmployees] = useState<PDKSRecord[]>([]);
+  const [employeesLoading, setEmployeesLoading] = useState(true);
 
-  // Use actual data if available, otherwise use demo data
-  const recordsToDisplay = filteredRecords.length > 0 ? filteredRecords : (records.length > 0 ? records : demoRecords);
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
+
+  async function fetchEmployees() {
+    try {
+      const { data, error } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('is_active', true);
+
+      if (error) throw error;
+
+      // Convert employee data to PDKSRecord format
+      const formattedRecords = data.map(emp => ({
+        id: emp.id,
+        employee_first_name: emp.first_name,
+        employee_last_name: emp.last_name,
+        date: new Date().toISOString().split('T')[0],
+        entry_time: "",  // These will be empty for new employees
+        exit_time: "",   // These will be empty for new employees
+        status: "present" // Default status
+      }));
+
+      setEmployees(formattedRecords);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+    } finally {
+      setEmployeesLoading(false);
+    }
+  }
 
   if (section === "summary") {
     return (
@@ -95,12 +79,14 @@ export function PDKSRecordsContent({
   }
 
   if (section === "attendance") {
+    const displayRecords = employees;
+    
     return (
       <div className="p-0">
         <div className="glass-card overflow-hidden mt-6 mx-6">
           <PDKSTable
-            records={recordsToDisplay}
-            loading={loading}
+            records={displayRecords}
+            loading={employeesLoading}
             searchTerm={searchTerm}
             statusFilter={statusFilter}
           />
