@@ -12,6 +12,7 @@ import Devices from "./pages/Devices";
 import PDKSRecords from "./pages/PDKSRecords";
 import ServerDevices from "./pages/ServerDevices";
 import Settings from "./pages/Settings";
+import VirtualReaders from "./pages/VirtualReaders";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/pdks-records" element={<PDKSRecords />} />
             <Route path="/server-devices" element={<ServerDevices />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/virtual-readers" element={<VirtualReaders />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Layout>
