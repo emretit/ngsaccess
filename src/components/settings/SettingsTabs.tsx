@@ -5,10 +5,15 @@ import { WorkScheduleSettings } from "./sections/WorkScheduleSettings";
 import { NotificationSettings } from "./sections/NotificationSettings";
 import { CompanySettings } from "./sections/CompanySettings";
 
-export function SettingsTabs() {
+interface SettingsTabsProps {
+  activeTab: string;
+  onTabChange: (value: string) => void;
+}
+
+export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
   return (
-    <Tabs defaultValue="company" className="w-full">
-      <TabsList className="grid w-full grid-cols-4">
+    <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
+      <TabsList className="hidden">
         <TabsTrigger value="company">Şirket</TabsTrigger>
         <TabsTrigger value="general">Genel</TabsTrigger>
         <TabsTrigger value="schedule">Çalışma Saatleri</TabsTrigger>
