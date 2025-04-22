@@ -1,4 +1,3 @@
-
 import { format } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { DeviceForm } from "@/components/devices/DeviceForm";
@@ -13,17 +12,46 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useDevices } from "@/hooks/useDevices";
 import QRCode from 'qrcode.react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useState } from "react";
+import { Download } from "lucide-react";
 
 export default function Devices() {
-  // Use the custom hook to fetch and manage devices
   const { 
     devices, 
     isLoading, 
     addDevice, 
     isAddingDevice 
-  } = useDevices(); 
+  } = useDevices();
+  
+  const [selectedQR, setSelectedQR] = useState<{
+    serial: string;
+    name: string;
+  } | null>(null);
 
-  console.log("Devices data:", devices); // Keep logging to debug
+  const handleQRClick = (device: any) => {
+    setSelectedQR({
+      serial: device.device_serial || device.serial_number || '',
+      name: device.device_name || device.name || 'Device QR'
+    });
+  };
+
+  const handleDownloadQR = () => {
+    if (!selectedQR) return;
+    
+    const canvas = document.querySelector('#qr-large') as HTMLCanvasElement;
+    if (!canvas) return;
+
+    const link = document.createElement('a');
+    link.download = `qr-${selectedQR.name.toLowerCase().replace(/\s+/g, '-')}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
 
   return (
     <main className="p-6">
@@ -57,12 +85,17 @@ export default function Devices() {
                 devices.map((device) => (
                   <TableRow key={device.id}>
                     <TableCell>
-                      <QRCode
-                        value={device.device_serial || device.serial_number || ''}
-                        size={64}
-                        level="H"
-                        className="rounded"
-                      />
+                      <div 
+                        className="cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => handleQRClick(device)}
+                      >
+                        <QRCode
+                          value={device.device_serial || device.serial_number || ''}
+                          size={64}
+                          level="H"
+                          className="rounded"
+                        />
+                      </div>
                     </TableCell>
                     <TableCell className="font-medium">{device.device_name || device.name}</TableCell>
                     <TableCell className="font-mono">{device.device_serial || device.serial_number}</TableCell>
@@ -90,6 +123,34 @@ export default function Devices() {
             </TableBody>
           </Table>
         </div>
+
+        <Dialog open={!!selectedQR} onOpenChange={() => setSelectedQR(null)}>
+          <DialogContent className="sm:max-w-md flex flex-col items-center">
+            <DialogHeader>
+              <DialogTitle className="text-center">
+                {selectedQR?.name} QR Kodu
+              </DialogTitle>
+            </DialogHeader>
+            {selectedQR && (
+              <div className="space-y-4">
+                <QRCode
+                  id="qr-large"
+                  value={selectedQR.serial}
+                  size={256}
+                  level="H"
+                  className="rounded"
+                />
+                <Button 
+                  className="w-full" 
+                  onClick={handleDownloadQR}
+                >
+                  <Download className="mr-2" />
+                  QR Kodunu İndir
+                </Button>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </main>
   );
