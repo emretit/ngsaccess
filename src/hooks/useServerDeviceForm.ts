@@ -15,6 +15,8 @@ export function useServerDeviceForm(device: ServerDevice | null, onSuccess: () =
   const [expiryDate, setExpiryDate] = useState(
     device?.expiry_date ? new Date(device.expiry_date).toISOString().split('T')[0] : ''
   );
+  const [zoneId, setZoneId] = useState(device?.["zone_id"] ? String(device["zone_id"]) : '');
+  const [doorId, setDoorId] = useState(device?.["door_id"] ? String(device["door_id"]) : '');
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -22,12 +24,14 @@ export function useServerDeviceForm(device: ServerDevice | null, onSuccess: () =
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const deviceData = {
+    const deviceData: any = {
       name,
       serial_number: serialNumber,
       device_model_enum: deviceModel,
       project_id: projectId ? parseInt(projectId) : null,
-      expiry_date: expiryDate || null
+      expiry_date: expiryDate || null,
+      zone_id: zoneId ? parseInt(zoneId) : null,
+      door_id: doorId ? parseInt(doorId) : null,
     };
 
     try {
@@ -68,6 +72,10 @@ export function useServerDeviceForm(device: ServerDevice | null, onSuccess: () =
     setProjectId,
     expiryDate,
     setExpiryDate,
+    zoneId,
+    setZoneId,
+    doorId,
+    setDoorId,
     handleSubmit
   };
 }

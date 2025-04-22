@@ -31,6 +31,10 @@ export function ServerDeviceForm({
     setProjectId,
     expiryDate,
     setExpiryDate,
+    zoneId,
+    setZoneId,
+    doorId,
+    setDoorId,
     handleSubmit
   } = useServerDeviceForm(device || null, onSuccess);
 
@@ -56,6 +60,10 @@ export function ServerDeviceForm({
             expiryDate={expiryDate}
             onExpiryDateChange={setExpiryDate}
             projects={projects}
+            zoneId={zoneId}
+            onZoneChange={setZoneId}
+            doorId={doorId}
+            onDoorChange={setDoorId}
           />
 
           <div className="flex justify-end gap-4">

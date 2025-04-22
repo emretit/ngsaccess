@@ -2,6 +2,7 @@
 import { FormSelectField, FormTextField } from "@/components/employees/FormFields";
 import { Project } from "@/types/device";
 import { Input } from "../ui/input";
+import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 
 interface ServerDeviceFormFieldsProps {
   name: string;
@@ -15,6 +16,10 @@ interface ServerDeviceFormFieldsProps {
   expiryDate: string;
   onExpiryDateChange: (value: string) => void;
   projects: Project[];
+  zoneId: string;
+  onZoneChange: (value: string) => void;
+  doorId: string;
+  onDoorChange: (value: string) => void;
 }
 
 export function ServerDeviceFormFields({
@@ -29,7 +34,16 @@ export function ServerDeviceFormFields({
   expiryDate,
   onExpiryDateChange,
   projects,
+  zoneId,
+  onZoneChange,
+  doorId,
+  onDoorChange,
 }: ServerDeviceFormFieldsProps) {
+  const { zones, doors, loading } = useZonesAndDoors();
+
+  // Kapı listesini seçili bölgeye göre filtrele
+  const filteredDoors = doors.filter(door => String(door.zone_id) === zoneId);
+
   return (
     <div className="space-y-4">
       <FormTextField
@@ -73,6 +87,33 @@ export function ServerDeviceFormFields({
           name: project.name
         }))}
         placeholder="Select Project"
+      />
+
+      <FormSelectField
+        label="Bölge"
+        name="zone"
+        value={zoneId}
+        onChange={onZoneChange}
+        options={zones.map(zone => ({
+          id: String(zone.id),
+          name: zone.name
+        }))}
+        placeholder="Bölge Seçiniz"
+        required
+      />
+
+      <FormSelectField
+        label="Kapı"
+        name="door"
+        value={doorId}
+        onChange={onDoorChange}
+        options={filteredDoors.map(door => ({
+          id: String(door.id),
+          name: door.name
+        }))}
+        placeholder={zoneId ? (filteredDoors.length === 0 ? "Seçili bölgede kapı yok" : "Kapı Seçiniz") : "Önce bölge seçiniz"}
+        required
+        disabled={!zoneId}
       />
 
       <div className="space-y-1">
