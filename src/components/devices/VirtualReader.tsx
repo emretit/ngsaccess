@@ -8,9 +8,15 @@ interface VirtualReaderProps {
   id: string;
   label?: string;
   size?: number;
+  deviceSerial?: string;
 }
 
-const VirtualReader = ({ id, label, size = 128 }: VirtualReaderProps) => {
+const VirtualReader = ({ 
+  id, 
+  label, 
+  size = 128, 
+  deviceSerial = 'VQR-001' 
+}: VirtualReaderProps) => {
   const handleClick = async () => {
     try {
       const response = await fetch('/api/check-access', {
@@ -18,7 +24,10 @@ const VirtualReader = ({ id, label, size = 128 }: VirtualReaderProps) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ readerId: id }),
+        body: JSON.stringify({ 
+          readerId: id,
+          deviceSerial: deviceSerial 
+        }),
       });
 
       if (!response.ok) {
@@ -26,14 +35,13 @@ const VirtualReader = ({ id, label, size = 128 }: VirtualReaderProps) => {
       }
 
       const data = await response.json();
-      toast(data.hasAccess ? "Access granted" : "Access denied", {
-        description: `Reader ${label || id} at ${new Date().toLocaleTimeString()}`,
+      toast(data.hasAccess ? "Giriş İzni Var" : "Giriş İzni Yok", {
+        description: `Okuyucu ${label || id} - ${new Date().toLocaleTimeString()}`,
       });
     } catch (error) {
-      console.error('Error checking access:', error);
-      toast("Error", {
-        description: "Failed to check access",
-        variant: "destructive",
+      console.error('Erişim kontrolünde hata:', error);
+      toast("Hata", {
+        description: "Erişim kontrolü başarısız",
       });
     }
   };
