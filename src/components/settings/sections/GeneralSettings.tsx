@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -11,34 +11,55 @@ import { Clock, Globe, Mail, Phone, Building2, CreditCard, Calendar, Sun } from 
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
+// Create a settings interface that matches our database schema
+interface GeneralSettings {
+  id?: string;
+  company_name: string;
+  tax_number?: string;
+  address?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  system_language?: string;
+  timezone?: string;
+  date_format?: string;
+  currency?: string;
+  dark_mode?: boolean;
+  notifications_enabled?: boolean;
+  working_hours_start?: string;
+  working_hours_end?: string;
+}
+
 export function GeneralSettings() {
   const { toast } = useToast();
+  const [settings, setSettings] = useState<GeneralSettings | null>(null);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
-    const settings = {
-      company_name: formData.get('companyName'),
-      tax_number: formData.get('taxNumber'),
-      address: formData.get('address'),
-      email: formData.get('email'),
-      phone: formData.get('phone'),
-      website: formData.get('website'),
-      system_language: formData.get('language'),
-      timezone: formData.get('timezone'),
-      date_format: formData.get('dateFormat'),
-      currency: formData.get('currency'),
+    // Convert FormData values to appropriate types for our schema
+    const settingsData: GeneralSettings = {
+      company_name: formData.get('companyName') as string,
+      tax_number: formData.get('taxNumber') as string,
+      address: formData.get('address') as string,
+      email: formData.get('email') as string,
+      phone: formData.get('phone') as string,
+      website: formData.get('website') as string,
+      system_language: formData.get('language') as string,
+      timezone: formData.get('timezone') as string,
+      date_format: formData.get('dateFormat') as string,
+      currency: formData.get('currency') as string,
       dark_mode: formData.get('darkMode') === 'on',
       notifications_enabled: formData.get('notifications') === 'on',
-      working_hours_start: formData.get('workingHoursStart'),
-      working_hours_end: formData.get('workingHoursEnd'),
+      working_hours_start: formData.get('workingHoursStart') as string,
+      working_hours_end: formData.get('workingHoursEnd') as string,
     };
 
     try {
       const { error } = await supabase
         .from('general_settings')
-        .upsert(settings);
+        .upsert(settingsData);
 
       if (error) throw error;
 
@@ -68,14 +89,34 @@ export function GeneralSettings() {
       }
 
       if (data) {
+        setSettings(data);
+        
+        // Map database fields to form fields
+        const formElements = {
+          companyName: data.company_name,
+          taxNumber: data.tax_number || '',
+          address: data.address || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          website: data.website || '',
+          language: data.system_language || 'tr',
+          timezone: data.timezone || 'Europe/Istanbul',
+          dateFormat: data.date_format || 'DD.MM.YYYY',
+          currency: data.currency || 'TRY',
+          darkMode: data.dark_mode || false,
+          notifications: data.notifications_enabled || false,
+          workingHoursStart: data.working_hours_start || '09:00',
+          workingHoursEnd: data.working_hours_end || '18:00',
+        };
+
         // Set form values
-        Object.entries(data).forEach(([key, value]) => {
-          const element = document.getElementsByName(key)[0] as HTMLInputElement;
+        Object.entries(formElements).forEach(([key, value]) => {
+          const element = document.querySelector(`[name="${key}"]`) as HTMLInputElement | null;
           if (element) {
             if (typeof value === 'boolean') {
               element.checked = value;
-            } else {
-              element.value = value || '';
+            } else if (value !== null && value !== undefined) {
+              element.value = String(value);
             }
           }
         });
