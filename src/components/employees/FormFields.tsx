@@ -60,6 +60,7 @@ type SelectFieldProps = {
   options: SelectOption[];
   required?: boolean;
   placeholder?: string;
+  disabled?: boolean; // Add the disabled property here
 };
 
 export function FormSelectField({
@@ -69,12 +70,13 @@ export function FormSelectField({
   onChange,
   options,
   required,
-  placeholder = "Seçiniz"
+  placeholder = "Seçiniz",
+  disabled // Destructure the disabled property
 }: SelectFieldProps) {
   return (
     <div className="space-y-1">
       <Label htmlFor={name}>{label}</Label>
-      <Select value={value} onValueChange={onChange} required={required}>
+      <Select value={value} onValueChange={onChange} required={required} disabled={disabled}>
         <SelectTrigger id={name}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
