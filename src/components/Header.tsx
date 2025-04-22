@@ -14,7 +14,7 @@ import {
 
 const navigation = [
   { name: 'Kişiler', href: '/employees', icon: Users },
-  { name: 'Cihazlar', href: '/devices', icon: Dices }, // Changed from Devices to Dices
+  { name: 'Cihazlar', href: '/devices', icon: Dices },
   { name: 'Geçiş Kontrol', href: '/access-control', icon: Shield },
   { name: 'PDKS Kayıtları', href: '/pdks-records', icon: FileText },
   { name: 'Ayarlar', href: '/settings', icon: Settings },
