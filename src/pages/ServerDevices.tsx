@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Plus } from "lucide-react";
 import { useQuery } from '@tanstack/react-query';
@@ -9,6 +8,7 @@ import { ServerDeviceForm } from '@/components/devices/ServerDeviceForm';
 import { ServerDeviceTable } from '@/components/devices/ServerDeviceTable';
 import { ServerDeviceFilters } from '@/components/devices/ServerDeviceFilters';
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 
 const PAGE_SIZE = 10;
 const DEVICE_MODEL_TYPES = [
@@ -60,6 +60,9 @@ export default function ServerDevices() {
 
   const totalPages = Math.ceil((devices?.count || 0) / PAGE_SIZE);
 
+  // Add: get zones and doors data
+  const { zones, doors } = useZonesAndDoors();
+
   return (
     <main className="flex-1 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -89,6 +92,8 @@ export default function ServerDevices() {
           devices={devices?.data || []}
           isLoading={isLoading}
           onDeviceClick={setEditDevice}
+          zones={zones}
+          doors={doors}
         />
 
         <Pagination>
