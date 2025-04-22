@@ -1,5 +1,5 @@
 
-import { Settings, Building2, Clock, Bell } from "lucide-react";
+import { Settings, Building2, Clock, Bell, Mail } from "lucide-react";
 
 interface SettingsSidebarProps {
   selected: string;
@@ -21,6 +21,11 @@ const sidebarItems = [
     key: "schedule",
     label: "Çalışma Saatleri", 
     icon: Clock
+  },
+  {
+    key: "mail",
+    label: "Mail Ayarları",
+    icon: Mail
   },
   {
     key: "notifications",
