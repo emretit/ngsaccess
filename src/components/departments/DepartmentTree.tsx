@@ -1,12 +1,15 @@
 
-import { useEffect, useState } from "react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { DepartmentTreeItem } from "./DepartmentTreeItem";
-import { Department } from "@/types/department";
-import { Building2 } from "lucide-react";
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Building2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface Department {
+  id: number;
+  name: string;
+  parent_id: number | null;
+  level: number;
+}
 
 interface DepartmentTreeProps {
   onSelectDepartment: (id: number | null) => void;
@@ -15,9 +18,6 @@ interface DepartmentTreeProps {
 export default function DepartmentTree({ onSelectDepartment }: DepartmentTreeProps) {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [newDepartmentName, setNewDepartmentName] = useState("");
-  const [addingToParentId, setAddingToParentId] = useState<number | null>(null);
   const [projectName, setProjectName] = useState("Ana Proje");
 
   useEffect(() => {
@@ -25,168 +25,66 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
     fetchProjectName();
   }, []);
 
-  const fetchProjectName = async () => {
+  async function fetchDepartments() {
+    try {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('*')
+        .order('level', { ascending: true })
+        .order('name', { ascending: true });
+      if (error) throw error;
+      setDepartments(data || []);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+    }
+  }
+
+  async function fetchProjectName() {
     const { data, error } = await supabase
       .from("projects")
       .select("name")
       .eq("is_active", true)
-      .single();
+      .maybeSingle();
 
-    if (error) {
-      console.error("Error fetching project name:", error);
-      return;
-    }
+    if (!error && data?.name) setProjectName(data.name);
+  }
 
-    if (data) {
-      setProjectName(data.name);
-    }
-  };
-
-  const fetchDepartments = async () => {
-    const { data, error } = await supabase
-      .from("departments")
-      .select("*")
-      .order("level", { ascending: true })
-      .order("name", { ascending: true });
-
-    if (error) {
-      toast.error("Departman listesi alınamadı");
-      return;
-    }
-
-    setDepartments(data || []);
-  };
-
-  const handleAddDepartment = async () => {
-    if (!newDepartmentName.trim()) return;
-
-    const newDepartment = {
-      name: newDepartmentName.trim(),
-      parent_id: addingToParentId,
-      level: addingToParentId ? 
-        (departments.find(d => d.id === addingToParentId)?.level || 0) + 1 : 0
-    };
-
-    const { error } = await supabase
-      .from("departments")
-      .insert(newDepartment);
-
-    if (error) {
-      toast.error("Departman eklenirken bir hata oluştu");
-      return;
-    }
-
-    toast.success("Departman başarıyla eklendi");
-    setNewDepartmentName("");
-    setShowAddDialog(false);
-    fetchDepartments();
-  };
-
-  const handleDeleteDepartment = async (id: number) => {
-    const { error } = await supabase
-      .from("departments")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      toast.error("Departman silinirken bir hata oluştu");
-      return;
-    }
-
-    toast.success("Departman başarıyla silindi");
-    if (selectedDepartment === id) {
-      setSelectedDepartment(null);
-      onSelectDepartment(null);
-    }
-    fetchDepartments();
-  };
-
-  const handleSelectDepartment = (id: number) => {
-    setSelectedDepartment(id);
-    onSelectDepartment(id);
-  };
-
-  const handleProjectHeaderClick = () => {
-    setSelectedDepartment(null);
-    onSelectDepartment(null);
-  };
-
-  const renderDepartmentTree = (parentId: number | null = null): React.ReactNode => {
-    const children = departments.filter(dept => dept.parent_id === parentId);
-    
-    if (!children.length) return null;
-
-    return children.map(department => {
-      const hasChildren = departments.some(dept => dept.parent_id === department.id);
-      
-      return (
-        <DepartmentTreeItem
-          key={department.id}
-          department={department}
-          level={department.level}
-          isSelected={selectedDepartment === department.id}
-          onSelect={handleSelectDepartment}
-          onAddSubDepartment={(parentId) => {
-            setAddingToParentId(parentId);
-            setShowAddDialog(true);
-          }}
-          onDelete={handleDeleteDepartment}
-          hasChildren={hasChildren}
-        >
-          {renderDepartmentTree(department.id)}
-        </DepartmentTreeItem>
-      );
-    });
+  const handleDepartmentClick = (id: number) => {
+    const newSelectedId = selectedDepartment === id ? null : id;
+    setSelectedDepartment(newSelectedId);
+    onSelectDepartment(newSelectedId);
   };
 
   return (
     <div className="h-full w-[280px] bg-card rounded-lg border shadow">
       <div className="p-4 border-b space-y-1.5">
-        <div 
-          className="flex items-center gap-2 cursor-pointer hover:text-primary/90 transition-colors"
-          onClick={handleProjectHeaderClick}
-        >
+        <div className="flex items-center gap-2 cursor-pointer hover:text-primary/90 transition-colors">
           <Building2 className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-semibold text-primary">{projectName}</h2>
         </div>
         <p className="text-sm text-muted-foreground">Departmanlar</p>
       </div>
-      
       <div className="p-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
         <ul role="tree" className="space-y-0.5">
-          {renderDepartmentTree()}
+          {departments.map((dept) => (
+            <li role="treeitem" key={dept.id}>
+              <div
+                className={cn(
+                  "group flex items-center gap-2 rounded-md p-2 transition-all",
+                  "hover:bg-accent hover:text-accent-foreground",
+                  selectedDepartment === dept.id && "bg-accent/80 text-accent-foreground font-medium"
+                )}
+                style={{ paddingLeft: `${16 + dept.level * 16}px` }}
+                onClick={() => handleDepartmentClick(dept.id)}
+                tabIndex={0}
+                aria-selected={selectedDepartment === dept.id}
+              >
+                <span className="flex-1 truncate text-sm">{dept.name}</span>
+              </div>
+            </li>
+          ))}
         </ul>
       </div>
-
-      <AlertDialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <AlertDialogContent className="sm:max-w-[425px]">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Yeni Departman Ekle</AlertDialogTitle>
-            <AlertDialogDescription>
-              {addingToParentId
-                ? "Alt departmanın adını girin"
-                : "Yeni departmanın adını girin"}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <Input
-            value={newDepartmentName}
-            onChange={(e) => setNewDepartmentName(e.target.value)}
-            placeholder="Departman adı"
-            className="my-4"
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setNewDepartmentName("");
-              setShowAddDialog(false);
-            }}>
-              İptal
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleAddDepartment}>
-              Ekle
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

@@ -1,4 +1,3 @@
-
 import { format } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { DeviceForm } from "@/components/devices/DeviceForm";
@@ -21,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { useState } from "react";
 import { Download } from "lucide-react";
-import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
+import ZoneDoorTreePanel from "@/components/access-control/ZoneDoorTreePanel";
 
 export default function Devices() {
   const { 

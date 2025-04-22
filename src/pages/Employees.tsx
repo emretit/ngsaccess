@@ -120,7 +120,6 @@ export default function Employees() {
   return (
     <div className="flex min-h-[calc(100vh-4rem)] gap-6 p-6">
       <DepartmentTree onSelectDepartment={setSelectedDepartment} />
-
       <div className="flex-1 space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Personel Listesi</h1>
