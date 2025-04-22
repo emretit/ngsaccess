@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useDevices } from "@/hooks/useDevices";
+import QRCode from 'qrcode.react';
 
 export default function Devices() {
   // Use the custom hook to fetch and manage devices
@@ -36,6 +37,7 @@ export default function Devices() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>QR Kod</TableHead>
                 <TableHead>İsim</TableHead>
                 <TableHead>Seri No</TableHead>
                 <TableHead>Konum</TableHead>
@@ -47,13 +49,21 @@ export default function Devices() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
+                  <TableCell colSpan={7} className="text-center py-8">
                     Yükleniyor...
                   </TableCell>
                 </TableRow>
               ) : devices && devices.length > 0 ? (
                 devices.map((device) => (
                   <TableRow key={device.id}>
+                    <TableCell>
+                      <QRCode
+                        value={device.device_serial || device.serial_number || ''}
+                        size={64}
+                        level="H"
+                        className="rounded"
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{device.device_name || device.name}</TableCell>
                     <TableCell className="font-mono">{device.device_serial || device.serial_number}</TableCell>
                     <TableCell>{device.device_location || device.location || '-'}</TableCell>
@@ -72,7 +82,7 @@ export default function Devices() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                     Henüz cihaz bulunmuyor
                   </TableCell>
                 </TableRow>
