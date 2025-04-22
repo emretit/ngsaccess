@@ -1,7 +1,15 @@
 
 import { useEffect, useState } from "react";
-import { ChevronRight, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
+import { ListTree } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Zone {
@@ -26,8 +34,8 @@ export const ZoneDoorTree = ({
 }: ZoneDoorTreeProps) => {
   const [zones, setZones] = useState<Zone[]>([]);
   const [doors, setDoors] = useState<Door[]>([]);
-  const [expandedZones, setExpandedZones] = useState<{ [key: number]: boolean }>({});
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedZone, setSelectedZone] = useState<number | null>(null);
+  const [selectedDoor, setSelectedDoor] = useState<number | null>(null);
 
   useEffect(() => {
     fetchZonesAndDoors();
@@ -49,66 +57,61 @@ export const ZoneDoorTree = ({
   }
 
   const handleZoneClick = (zoneId: number) => {
-    setExpandedZones(prev => ({
-      ...prev,
-      [zoneId]: !prev[zoneId]
-    }));
-    setSelectedId(`zone-${zoneId}`);
-    onSelectZone?.(zoneId);
+    setSelectedZone(zoneId === selectedZone ? null : zoneId);
+    setSelectedDoor(null);
+    onSelectZone?.(zoneId === selectedZone ? null : zoneId);
   };
 
   const handleDoorClick = (doorId: number) => {
-    setSelectedId(`door-${doorId}`);
+    setSelectedDoor(doorId);
     onSelectDoor?.(doorId);
   };
 
   return (
-    <aside className="w-64 min-w-[220px] max-w-xs border-r bg-card h-full p-2 overflow-y-auto rounded-xl shadow-sm">
-      <h3 className="text-lg font-semibold px-2 mb-2">Bölgeler &amp; Kapılar</h3>
-      <ul>
-        {zones.map(zone => (
-          <li key={zone.id} className="mb-1">
-            <div
-              role="button"
-              className={cn(
-                "flex items-center gap-2 font-medium px-2 py-1 rounded cursor-pointer select-none hover:bg-accent transition",
-                selectedId === `zone-${zone.id}` && "bg-accent"
-              )}
-              onClick={() => handleZoneClick(zone.id)}
-            >
-              {expandedZones[zone.id] ? (
-                <ChevronDown size={16} />
-              ) : (
-                <ChevronRight size={16} />
-              )}
-              <span>{zone.name}</span>
-            </div>
-            {expandedZones[zone.id] &&
-              <ul className="ml-7 mt-1">
-                {doors
-                  .filter(door => door.zone_id === zone.id)
-                  .map(door => (
-                    <li key={door.id}>
-                      <div
-                        role="button"
-                        className={cn(
-                          "flex items-center gap-2 px-2 py-1 text-sm rounded hover:bg-primary/10 cursor-pointer transition",
-                          selectedId === `door-${door.id}` && "bg-primary/10"
-                        )}
-                        onClick={() => handleDoorClick(door.id)}
-                      >
-                        <span>⎯ {door.name}</span>
-                      </div>
-                    </li>
-                  ))}
-                {doors.filter(door => door.zone_id === zone.id).length === 0 && (
-                  <div className="pl-2 text-xs text-muted-foreground">Kapı yok</div>
+    <SidebarGroup>
+      <SidebarGroupLabel className="flex items-center gap-2">
+        <ListTree className="h-4 w-4" />
+        Bölgeler &amp; Kapılar
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {zones.map((zone) => (
+            <SidebarMenuItem key={zone.id}>
+              <SidebarMenuButton
+                onClick={() => handleZoneClick(zone.id)}
+                className={cn(
+                  "font-medium",
+                  selectedZone === zone.id && "bg-burgundy/10 text-burgundy"
                 )}
-              </ul>
-            }
-          </li>
-        ))}
-      </ul>
-    </aside>
+              >
+                {zone.name}
+              </SidebarMenuButton>
+              {selectedZone === zone.id && (
+                <div className="ml-4 mt-1 w-full">
+                  {doors.filter((door) => door.zone_id === zone.id).length === 0 ? (
+                    <div className="text-xs text-muted-foreground pl-2">Kapı yok</div>
+                  ) : (
+                    doors
+                      .filter((door) => door.zone_id === zone.id)
+                      .map((door) => (
+                        <SidebarMenuButton
+                          key={door.id}
+                          onClick={() => handleDoorClick(door.id)}
+                          className={cn(
+                            "text-sm ml-6 mt-1",
+                            selectedDoor === door.id && "bg-primary/10 text-primary"
+                          )}
+                        >
+                          ⎯ {door.name}
+                        </SidebarMenuButton>
+                      ))
+                  )}
+                </div>
+              )}
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
   );
 };
