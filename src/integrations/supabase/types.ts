@@ -681,6 +681,75 @@ export type Database = {
           },
         ]
       }
+      general_settings: {
+        Row: {
+          address: string | null
+          company_name: string
+          created_at: string | null
+          currency: string | null
+          dark_mode: boolean | null
+          date_format: string | null
+          email: string | null
+          id: string
+          logo_url: string | null
+          notifications_enabled: boolean | null
+          phone: string | null
+          project_id: number | null
+          system_language: string | null
+          tax_number: string | null
+          timezone: string | null
+          updated_at: string | null
+          website: string | null
+          working_days: string[] | null
+          working_hours_end: string | null
+          working_hours_start: string | null
+        }
+        Insert: {
+          address?: string | null
+          company_name: string
+          created_at?: string | null
+          currency?: string | null
+          dark_mode?: boolean | null
+          date_format?: string | null
+          email?: string | null
+          id?: string
+          logo_url?: string | null
+          notifications_enabled?: boolean | null
+          phone?: string | null
+          project_id?: number | null
+          system_language?: string | null
+          tax_number?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          website?: string | null
+          working_days?: string[] | null
+          working_hours_end?: string | null
+          working_hours_start?: string | null
+        }
+        Update: {
+          address?: string | null
+          company_name?: string
+          created_at?: string | null
+          currency?: string | null
+          dark_mode?: boolean | null
+          date_format?: string | null
+          email?: string | null
+          id?: string
+          logo_url?: string | null
+          notifications_enabled?: boolean | null
+          phone?: string | null
+          project_id?: number | null
+          system_language?: string | null
+          tax_number?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          website?: string | null
+          working_days?: string[] | null
+          working_hours_end?: string | null
+          working_hours_start?: string | null
+        }
+        Relationships: []
+      }
       group_devices: {
         Row: {
           created_at: string
