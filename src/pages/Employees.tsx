@@ -1,21 +1,13 @@
+
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, UserPlus, Edit2 } from "lucide-react";
+import { Users, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import DepartmentTree from "@/components/departments/DepartmentTree";
 import SlideOverPanel from "@/components/employees/SlideOverPanel";
 import { Employee } from "@/types/employee";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import EmployeeTable from "@/components/employees/EmployeeTable";
 import {
   Pagination,
   PaginationContent,
@@ -101,6 +93,24 @@ export default function Employees() {
 
   const totalPages = Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE);
 
+  const handleEditEmployee = (employee: Employee) => {
+    setEditingEmployee(employee);
+    setIsPanelOpen(true);
+  };
+
+  const handleDeleteEmployee = (employee: Employee) => {
+    // Single employee delete functionality
+    if (window.confirm(`Personeli silmek istediğinize emin misiniz: ${employee.first_name} ${employee.last_name}?`)) {
+      supabase
+        .from('employees')
+        .delete()
+        .eq('id', employee.id)
+        .then(() => {
+          fetchEmployees();
+        });
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -169,54 +179,12 @@ export default function Employees() {
         </div>
 
         <div className="glass-card overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fotoğraf</TableHead>
-                <TableHead>Ad Soyad</TableHead>
-                <TableHead>E-posta</TableHead>
-                <TableHead>Departman</TableHead>
-                <TableHead>Vardiya</TableHead>
-                <TableHead>Kart No</TableHead>
-                <TableHead>Durum</TableHead>
-                <TableHead className="text-right">İşlemler</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedEmployees.map((employee) => (
-                <TableRow key={employee.id}>
-                  <TableCell>
-                    <Avatar>
-                      <AvatarImage src={employee.photo_url || ''} alt={`${employee.first_name} ${employee.last_name}`} />
-                      <AvatarFallback>{employee.first_name?.[0]}{employee.last_name?.[0]}</AvatarFallback>
-                    </Avatar>
-                  </TableCell>
-                  <TableCell>{employee.first_name} {employee.last_name}</TableCell>
-                  <TableCell>{employee.email}</TableCell>
-                  <TableCell>{employee.departments?.name || '-'}</TableCell>
-                  <TableCell>{employee.shift || '-'}</TableCell>
-                  <TableCell>{employee.card_number}</TableCell>
-                  <TableCell>
-                    <Badge variant={employee.is_active ? "success" : "secondary"}>
-                      {employee.is_active ? 'Aktif' : 'Pasif'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => {
-                        setEditingEmployee(employee);
-                        setIsPanelOpen(true);
-                      }}
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          {/* Replace the old table with our new EmployeeTable component */}
+          <EmployeeTable 
+            employees={paginatedEmployees} 
+            onEdit={handleEditEmployee} 
+            onDelete={handleDeleteEmployee} 
+          />
         </div>
 
         <Pagination>
