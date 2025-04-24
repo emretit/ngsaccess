@@ -57,8 +57,8 @@ export function AssignLocationForm({ device }: AssignLocationFormProps) {
     const { error } = await supabase
       .from("devices")
       .update({
-        zone_id: values.zoneId,
-        door_id: values.doorId,
+        zone_id: values.zoneId, // Now correctly typed as number
+        door_id: values.doorId,  // Now correctly typed as number
       })
       .eq("id", device.id);
 
