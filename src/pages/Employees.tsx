@@ -1,22 +1,12 @@
-
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Users, UserPlus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DepartmentTree from "@/components/departments/DepartmentTree";
 import SlideOverPanel from "@/components/employees/SlideOverPanel";
 import { Employee } from "@/types/employee";
 import EmployeeTable from "@/components/employees/EmployeeTable";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
+import { EmployeeStats } from "@/components/employees/EmployeeStats";
+import { EmployeeFilters } from "@/components/employees/EmployeeFilters";
+import { EmployeePagination } from "@/components/employees/EmployeePagination";
 
 export default function Employees() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -28,8 +18,6 @@ export default function Employees() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
-
-  const PAGE_SIZE_OPTIONS = [10, 50, 100];
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const employeeStats = useMemo(() => ({
@@ -101,7 +89,6 @@ export default function Employees() {
   };
 
   const handleDeleteEmployee = (employee: Employee) => {
-    // Single employee delete functionality
     if (window.confirm(`Personeli silmek istediğinize emin misiniz: ${employee.first_name} ${employee.last_name}?`)) {
       supabase
         .from('employees')
@@ -134,76 +121,23 @@ export default function Employees() {
       <DepartmentTree onSelectDepartment={setSelectedDepartment} />
 
       <div className="flex-1 space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Personel Listesi</h1>
-          <div className="flex gap-4">
-            {/* Existing search input */}
-            <Input
-              type="search"
-              placeholder="Personel ara..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-64"
-            />
+        <EmployeeFilters
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          itemsPerPage={itemsPerPage}
+          onItemsPerPageChange={(value) => {
+            setItemsPerPage(value);
+            setCurrentPage(1);
+          }}
+          onNewEmployee={() => {
+            setEditingEmployee(null);
+            setIsPanelOpen(true);
+          }}
+        />
 
-            {/* Page size selector */}
-            <Select 
-              value={String(itemsPerPage)} 
-              onValueChange={(value) => {
-                setItemsPerPage(Number(value));
-                setCurrentPage(1); // Reset to first page when changing page size
-              }}
-            >
-              <SelectTrigger className="w-[100px]">
-                <SelectValue placeholder="Sayfa Boyutu" />
-              </SelectTrigger>
-              <SelectContent>
-                {PAGE_SIZE_OPTIONS.map((size) => (
-                  <SelectItem key={size} value={String(size)}>
-                    {size} Kayıt
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Button
-              onClick={() => {
-                setEditingEmployee(null);
-                setIsPanelOpen(true);
-              }}
-            >
-              <UserPlus className="mr-2 h-4 w-4" />
-              Yeni Personel
-            </Button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4">
-          <div className="glass-card flex items-center justify-between p-6">
-            <Users className="h-8 w-8 text-burgundy opacity-75" />
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">Toplam Personel</p>
-              <p className="text-2xl font-bold">{employeeStats.total}</p>
-            </div>
-          </div>
-          <div className="glass-card flex items-center justify-between p-6">
-            <Users className="h-8 w-8 text-green-500 opacity-75" />
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">Aktif Personel</p>
-              <p className="text-2xl font-bold">{employeeStats.active}</p>
-            </div>
-          </div>
-          <div className="glass-card flex items-center justify-between p-6">
-            <Users className="h-8 w-8 text-red-500 opacity-75" />
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">Pasif Personel</p>
-              <p className="text-2xl font-bold">{employeeStats.inactive}</p>
-            </div>
-          </div>
-        </div>
+        <EmployeeStats employees={employees} />
 
         <div className="glass-card overflow-hidden">
-          {/* Using the EmployeeTable component that includes multi-select functionality */}
           <EmployeeTable 
             employees={paginatedEmployees} 
             onEdit={handleEditEmployee} 
@@ -211,44 +145,11 @@ export default function Employees() {
           />
         </div>
 
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (currentPage > 1) setCurrentPage(currentPage - 1);
-                }}
-                isActive={currentPage > 1}
-              />
-            </PaginationItem>
-            {[...Array(totalPages)].map((_, index) => (
-              <PaginationItem key={index}>
-                <PaginationLink
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setCurrentPage(index + 1);
-                  }}
-                  isActive={currentPage === index + 1}
-                >
-                  {index + 1}
-                </PaginationLink>
-              </PaginationItem>
-            ))}
-            <PaginationItem>
-              <PaginationNext
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  if (currentPage < totalPages) setCurrentPage(currentPage + 1);
-                }}
-                isActive={currentPage < totalPages}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
+        <EmployeePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
 
         <SlideOverPanel
           isOpen={isPanelOpen}
