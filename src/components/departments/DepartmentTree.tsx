@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
@@ -6,7 +5,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { DepartmentTreeItem } from "./DepartmentTreeItem";
 import { Department } from "@/types/department";
-import { Building2 } from "lucide-react";
+import { Building2, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface DepartmentTreeProps {
   onSelectDepartment: (id: number | null) => void;
@@ -19,6 +19,8 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
   const [newDepartmentName, setNewDepartmentName] = useState("");
   const [addingToParentId, setAddingToParentId] = useState<number | null>(null);
   const [projectName, setProjectName] = useState("Ana Proje");
+  const [showAddTopLevelDepartmentDialog, setShowAddTopLevelDepartmentDialog] = useState(false);
+  const [newTopLevelDepartmentName, setNewTopLevelDepartmentName] = useState("");
 
   useEffect(() => {
     fetchDepartments();
@@ -139,6 +141,30 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
     });
   };
 
+  const handleAddTopLevelDepartment = async () => {
+    if (!newTopLevelDepartmentName.trim()) return;
+
+    const newDepartment = {
+      name: newTopLevelDepartmentName.trim(),
+      parent_id: null,
+      level: 0
+    };
+
+    const { error } = await supabase
+      .from("departments")
+      .insert(newDepartment);
+
+    if (error) {
+      toast.error("Departman eklenirken bir hata oluştu");
+      return;
+    }
+
+    toast.success("Departman başarıyla eklendi");
+    setNewTopLevelDepartmentName("");
+    setShowAddTopLevelDepartmentDialog(false);
+    fetchDepartments();
+  };
+
   return (
     <div className="h-full w-[280px] bg-card rounded-lg border shadow">
       <div className="p-4 border-b space-y-1.5">
@@ -147,7 +173,15 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
           onClick={handleProjectHeaderClick}
         >
           <Building2 className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold text-primary">{projectName}</h2>
+          <h2 className="text-lg font-semibold text-primary flex-1">{projectName}</h2>
+          <Button 
+            size="icon" 
+            variant="ghost" 
+            className="h-8 w-8"
+            onClick={() => setShowAddTopLevelDepartmentDialog(true)}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
         </div>
         <p className="text-sm text-muted-foreground">Departmanlar</p>
       </div>
@@ -182,6 +216,34 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
               İptal
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleAddDepartment}>
+              Ekle
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showAddTopLevelDepartmentDialog} onOpenChange={setShowAddTopLevelDepartmentDialog}>
+        <AlertDialogContent className="sm:max-w-[425px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Yeni Departman Ekle</AlertDialogTitle>
+            <AlertDialogDescription>
+              Üst seviye departmanın adını girin
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={newTopLevelDepartmentName}
+            onChange={(e) => setNewTopLevelDepartmentName(e.target.value)}
+            placeholder="Departman adı"
+            className="my-4"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setNewTopLevelDepartmentName("");
+              setShowAddTopLevelDepartmentDialog(false);
+            }}>
+              İptal
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleAddTopLevelDepartment}>
               Ekle
             </AlertDialogAction>
           </AlertDialogFooter>
