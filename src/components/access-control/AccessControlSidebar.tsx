@@ -1,5 +1,5 @@
 
-import { Shield, Clock, MapPin } from "lucide-react";
+import { Shield, Clock } from "lucide-react";
 
 interface AccessControlSidebarProps {
   selected: string;
@@ -16,11 +16,6 @@ const sidebarItems = [
     key: "temporary",
     label: "Geçici Erişim",
     icon: Clock
-  },
-  {
-    key: "zones",
-    label: "Bölgeler ve Kapılar",
-    icon: MapPin
   }
 ];
 

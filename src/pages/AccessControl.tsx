@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import UnifiedAccessControl from '@/components/access-control/unified/UnifiedAccessControl';
 import TemporaryAccess from '@/components/access-control/TemporaryAccess';
-import ZonesAndDoors from '@/components/access-control/ZonesAndDoors';
 import { AccessControlSidebar } from '@/components/access-control/AccessControlSidebar';
 
 const AccessControl = () => {
@@ -19,7 +18,6 @@ const AccessControl = () => {
           <div className="p-4 md:p-8">
             {activeTab === 'unified' && <UnifiedAccessControl />}
             {activeTab === 'temporary' && <TemporaryAccess />}
-            {activeTab === 'zones' && <ZonesAndDoors />}
           </div>
         </div>
       </div>
@@ -28,4 +26,3 @@ const AccessControl = () => {
 };
 
 export default AccessControl;
-
