@@ -44,8 +44,8 @@ export function AssignLocationForm({ device }: AssignLocationFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      zoneId: device.zone_id ?? undefined,
-      doorId: device.door_id ?? undefined,
+      zoneId: device.zone_id || undefined,
+      doorId: device.door_id || undefined,
     },
   });
 
@@ -54,11 +54,12 @@ export function AssignLocationForm({ device }: AssignLocationFormProps) {
   );
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    // With z.coerce.number() in the schema, values.zoneId and values.doorId are now numbers
     const { error } = await supabase
       .from("devices")
       .update({
-        zone_id: values.zoneId, // Now correctly typed as number
-        door_id: values.doorId,  // Now correctly typed as number
+        zone_id: values.zoneId, 
+        door_id: values.doorId, 
       })
       .eq("id", device.id);
 
