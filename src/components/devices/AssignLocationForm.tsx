@@ -25,9 +25,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
+// Updated form schema to use coerce for type conversion
 const formSchema = z.object({
-  zoneId: z.string().min(1, "Bölge seçiniz"),
-  doorId: z.string().min(1, "Kapı seçiniz"),
+  zoneId: z.coerce.number().min(1, "Bölge seçiniz"),
+  doorId: z.coerce.number().min(1, "Kapı seçiniz"),
 });
 
 interface AssignLocationFormProps {
@@ -43,8 +44,8 @@ export function AssignLocationForm({ device }: AssignLocationFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      zoneId: device.zone_id?.toString() || "",
-      doorId: device.door_id?.toString() || "",
+      zoneId: device.zone_id ?? undefined,
+      doorId: device.door_id ?? undefined,
     },
   });
 
@@ -56,8 +57,8 @@ export function AssignLocationForm({ device }: AssignLocationFormProps) {
     const { error } = await supabase
       .from("devices")
       .update({
-        zone_id: Number(values.zoneId),  // Fixed: Convert string to number
-        door_id: Number(values.doorId),  // Fixed: Convert string to number
+        zone_id: values.zoneId,
+        door_id: values.doorId,
       })
       .eq("id", device.id);
 
@@ -100,7 +101,7 @@ export function AssignLocationForm({ device }: AssignLocationFormProps) {
                   <FormLabel>Bölge</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    defaultValue={field.value?.toString()}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -127,7 +128,7 @@ export function AssignLocationForm({ device }: AssignLocationFormProps) {
                   <FormLabel>Kapı</FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    defaultValue={field.value?.toString()}
                     disabled={!form.watch("zoneId")}
                   >
                     <FormControl>
