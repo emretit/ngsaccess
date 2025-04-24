@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -9,25 +8,9 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { Badge } from "@/components/ui/badge";
 import { Edit2, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useEmployeeTable } from '@/hooks/useEmployeeTable';
+import { EmployeeBulkActions } from './EmployeeBulkActions';
+import { EmployeeDeleteDialog } from './EmployeeDeleteDialog';
 
 interface EmployeeTableProps {
   employees: Employee[];
@@ -36,144 +19,31 @@ interface EmployeeTableProps {
 }
 
 export default function EmployeeTable({ employees, onEdit, onDelete }: EmployeeTableProps) {
-  const [sortConfig, setSortConfig] = useState<{
-    key: keyof Employee;
-    direction: 'asc' | 'desc';
-  } | null>(null);
-
-  const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [selectedDepartment, setSelectedDepartment] = useState<string>("");
-
-  // Add the missing requestSort function
-  const requestSort = (key: keyof Employee) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    
-    setSortConfig({ key, direction });
-  };
-
-  const sortedEmployees = [...employees].sort((a, b) => {
-    if (!sortConfig) return 0;
-    const { key, direction } = sortConfig;
-    
-    const aVal = a[key];
-    const bVal = b[key];
-    
-    if (aVal === null || bVal === null) return 0;
-    if (aVal < bVal) return direction === 'asc' ? -1 : 1;
-    if (aVal > bVal) return direction === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedEmployees(employees.map(emp => emp.id));
-    } else {
-      setSelectedEmployees([]);
-    }
-  };
-
-  const handleSelectEmployee = (checked: boolean, employeeId: number) => {
-    if (checked) {
-      setSelectedEmployees([...selectedEmployees, employeeId]);
-    } else {
-      setSelectedEmployees(selectedEmployees.filter(id => id !== employeeId));
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    try {
-      const { error } = await supabase
-        .from('employees')
-        .delete()
-        .in('id', selectedEmployees);
-
-      if (error) throw error;
-
-      toast({
-        title: "Başarılı",
-        description: "Seçili personeller silindi",
-      });
-      
-      // Clear selection after successful deletion
-      setSelectedEmployees([]);
-      setShowDeleteDialog(false);
-      
-      // Refresh the page to update the list
-      window.location.reload();
-    } catch (error) {
-      toast({
-        title: "Hata",
-        description: "Personeller silinirken bir hata oluştu",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleBulkDepartmentUpdate = async () => {
-    if (!selectedDepartment || selectedEmployees.length === 0) return;
-
-    try {
-      const { error } = await supabase
-        .from('employees')
-        .update({ department_id: parseInt(selectedDepartment) })
-        .in('id', selectedEmployees);
-
-      if (error) throw error;
-
-      toast({
-        title: "Başarılı",
-        description: "Departman güncellendi",
-      });
-      
-      // Clear selection after successful update
-      setSelectedEmployees([]);
-      setSelectedDepartment("");
-      
-      // Refresh the page to update the list
-      window.location.reload();
-    } catch (error) {
-      toast({
-        title: "Hata",
-        description: "Departman güncellenirken bir hata oluştu",
-        variant: "destructive",
-      });
-    }
-  };
+  const {
+    sortedEmployees,
+    selectedEmployees,
+    selectedDepartment,
+    showDeleteDialog,
+    setShowDeleteDialog,
+    setSelectedDepartment,
+    handleSelectAll,
+    handleSelectEmployee,
+    handleBulkDelete,
+    handleBulkDepartmentUpdate,
+    requestSort
+  } = useEmployeeTable(employees);
 
   return (
     <div className="space-y-4">
       {selectedEmployees.length > 0 && (
-        <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
-          <span className="text-sm font-medium">{selectedEmployees.length} personel seçildi</span>
-          <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Departman seç" />
-            </SelectTrigger>
-            <SelectContent>
-              {Array.from(new Set(employees.map(emp => emp.departments))).map(dept => (
-                dept && <SelectItem key={dept.id} value={dept.id.toString()}>{dept.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="secondary"
-            onClick={handleBulkDepartmentUpdate}
-            disabled={!selectedDepartment}
-          >
-            Departmanı Güncelle
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() => setShowDeleteDialog(true)}
-          >
-            Seçilenleri Sil
-          </Button>
-        </div>
+        <EmployeeBulkActions
+          selectedCount={selectedEmployees.length}
+          departments={Array.from(new Set(employees.map(emp => emp.departments)))}
+          selectedDepartment={selectedDepartment}
+          onDepartmentChange={setSelectedDepartment}
+          onUpdateDepartment={handleBulkDepartmentUpdate}
+          onDelete={() => setShowDeleteDialog(true)}
+        />
       )}
 
       <div className="rounded-md border">
@@ -257,22 +127,12 @@ export default function EmployeeTable({ employees, onEdit, onDelete }: EmployeeT
         </Table>
       </div>
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Seçili personelleri silmek istediğinize emin misiniz?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bu işlem geri alınamaz. Seçili {selectedEmployees.length} personel kalıcı olarak silinecektir.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>İptal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Sil
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <EmployeeDeleteDialog
+        isOpen={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        selectedCount={selectedEmployees.length}
+        onConfirm={handleBulkDelete}
+      />
     </div>
   );
 }
