@@ -5,6 +5,7 @@ import { Building2, Plus } from "lucide-react";
 import { ZoneDoorTree } from "./ZoneDoorTree";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { Zone, Door } from "@/types/access-control";
 
 interface ZoneDoorTreePanelProps {
   onSelectZone?: (zoneId: number | null) => void;
@@ -13,6 +14,7 @@ interface ZoneDoorTreePanelProps {
 
 export function ZoneDoorTreePanel({ onSelectZone, onSelectDoor }: ZoneDoorTreePanelProps) {
   const [projectName, setProjectName] = useState("Ana Proje");
+  const [showAddZoneDialog, setShowAddZoneDialog] = useState(false);
 
   useEffect(() => {
     async function fetchProjectName() {
@@ -27,6 +29,14 @@ export function ZoneDoorTreePanel({ onSelectZone, onSelectDoor }: ZoneDoorTreePa
     fetchProjectName();
   }, []);
 
+  const handleAddZone = () => {
+    // TODO: Implement add zone dialog
+    toast({
+      title: "Bilgi",
+      description: "Bölge ekleme özelliği yakında eklenecek",
+    });
+  };
+
   return (
     <div className="h-full w-[280px] bg-card rounded-lg border shadow">
       <div className="p-4 border-b space-y-1.5">
@@ -39,13 +49,7 @@ export function ZoneDoorTreePanel({ onSelectZone, onSelectDoor }: ZoneDoorTreePa
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            onClick={() => {
-              // TODO: Implement add zone functionality
-              toast({
-                title: "Bilgi",
-                description: "Bölge ekleme özelliği yakında eklenecek",
-              });
-            }}
+            onClick={handleAddZone}
           >
             <Plus className="h-4 w-4" />
           </Button>

@@ -5,17 +5,7 @@ import { ChevronRight, Grid, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
-
-interface Zone {
-  id: number;
-  name: string;
-}
-
-interface Door {
-  id: number;
-  name: string;
-  zone_id: number;
-}
+import { Zone, Door } from "@/types/access-control";
 
 interface ZoneDoorTreeProps {
   onSelectDoor?: (doorId: number | null) => void;
@@ -39,12 +29,12 @@ export const ZoneDoorTree = ({
   async function fetchZonesAndDoors() {
     const { data: zonesData } = await supabase
       .from("zones")
-      .select("id, name")
+      .select("*")
       .order("name", { ascending: true });
 
     const { data: doorsData } = await supabase
       .from("doors")
-      .select("id, name, zone_id")
+      .select("*")
       .order("name", { ascending: true });
 
     setZones(zonesData || []);
@@ -105,6 +95,14 @@ export const ZoneDoorTree = ({
     fetchZonesAndDoors();
   };
 
+  const handleAddDoor = (zoneId: number) => {
+    // TODO: Implement add door dialog
+    toast({
+      title: "Bilgi",
+      description: "Kapı ekleme özelliği yakında eklenecek",
+    });
+  };
+
   return (
     <ul role="tree" className="space-y-0.5">
       {zones.map((zone) => {
@@ -156,11 +154,7 @@ export const ZoneDoorTree = ({
                   className="h-6 w-6 hover:bg-accent/80"
                   onClick={(e) => {
                     e.stopPropagation();
-                    // TODO: Implement add door functionality
-                    toast({
-                      title: "Bilgi",
-                      description: "Kapı ekleme özelliği yakında eklenecek",
-                    });
+                    handleAddDoor(zone.id);
                   }}
                 >
                   <Plus className="h-3 w-3" />
@@ -199,8 +193,8 @@ export const ZoneDoorTree = ({
                         selectedDoor === door.id && "bg-accent/80 text-accent-foreground font-medium"
                       )}
                       onClick={() => {
-                        setSelectedDoor(door.id);
-                        onSelectDoor?.(door.id);
+                        setSelectedDoor(door.id === selectedDoor ? null : door.id);
+                        onSelectDoor?.(door.id === selectedDoor ? null : door.id);
                       }}
                     >
                       <Grid className="h-4 w-4 shrink-0 text-muted-foreground" />

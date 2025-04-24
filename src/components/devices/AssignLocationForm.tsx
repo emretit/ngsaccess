@@ -1,66 +1,51 @@
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-} from "@/components/ui/form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import * as z from "zod";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
-import { useState } from "react";
-import { Device } from "@/types/device";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Device } from "@/types/device";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Zone, Door } from "@/types/access-control";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
-
-// Updated form schema to use coerce for type conversion
-const formSchema = z.object({
-  zoneId: z.coerce.number().min(1, "Bölge seçiniz"),
-  doorId: z.coerce.number().min(1, "Kapı seçiniz"),
-});
 
 interface AssignLocationFormProps {
   device: Device;
 }
 
 export function AssignLocationForm({ device }: AssignLocationFormProps) {
-  const [open, setOpen] = useState(false);
-  const { zones, doors } = useZonesAndDoors();
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [doors, setDoors] = useState<Door[]>([]);
+  const [selectedZone, setSelectedZone] = useState<string | null>(device.zone_id ? String(device.zone_id) : null);
+  const [selectedDoor, setSelectedDoor] = useState<string | null>(device.door_id ? String(device.door_id) : null);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      zoneId: device.zone_id || undefined,
-      doorId: device.door_id || undefined,
-    },
-  });
+  useEffect(() => {
+    async function fetchZonesAndDoors() {
+      const { data: zonesData } = await supabase
+        .from("zones")
+        .select("id, name")
+        .order("name", { ascending: true });
 
-  const filteredDoors = doors.filter(
-    (door) => door.zone_id === Number(form.watch("zoneId"))
-  );
+      const { data: doorsData } = await supabase
+        .from("doors")
+        .select("id, name, zone_id")
+        .order("name", { ascending: true });
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    // With z.coerce.number() in the schema, values.zoneId and values.doorId are now numbers
+      setZones(zonesData || []);
+      setDoors(doorsData || []);
+    }
+    fetchZonesAndDoors();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
     const { error } = await supabase
-      .from("devices")
-      .update({
-        zone_id: values.zoneId, 
-        door_id: values.doorId, 
+      .from('devices')
+      .update({ 
+        zone_id: selectedZone ? Number(selectedZone) : null,
+        door_id: selectedDoor ? Number(selectedDoor) : null 
       })
-      .eq("id", device.id);
+      .eq('id', device.id);
 
     if (error) {
       toast({
@@ -73,94 +58,47 @@ export function AssignLocationForm({ device }: AssignLocationFormProps) {
 
     toast({
       title: "Başarılı",
-      description: "Cihaz konumu güncellendi",
+      description: "Konum güncellendi",
     });
-    
-    queryClient.invalidateQueries({ queryKey: ["devices"] });
-    setOpen(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          Konum Ata
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Cihaz Konumu</DialogTitle>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="zoneId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Bölge</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value?.toString()}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Bölge seçiniz" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {zones.map((zone) => (
-                        <SelectItem key={zone.id} value={zone.id.toString()}>
-                          {zone.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )}
-            />
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <Label htmlFor="zone">Bölge</Label>
+        <Select value={selectedZone} onValueChange={setSelectedZone}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Bölge Seç" />
+          </SelectTrigger>
+          <SelectContent>
+            {zones.map((zone) => (
+              <SelectItem key={zone.id} value={String(zone.id)}>
+                {zone.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-            <FormField
-              control={form.control}
-              name="doorId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Kapı</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value?.toString()}
-                    disabled={!form.watch("zoneId")}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Kapı seçiniz" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {filteredDoors.map((door) => (
-                        <SelectItem key={door.id} value={door.id.toString()}>
-                          {door.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )}
-            />
+      <div>
+        <Label htmlFor="door">Kapı</Label>
+        <Select value={selectedDoor} onValueChange={setSelectedDoor}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Kapı Seç" />
+          </SelectTrigger>
+          <SelectContent>
+            {doors.filter(door => door.zone_id === Number(selectedZone)).map((door) => (
+              <SelectItem key={door.id} value={String(door.id)}>
+                {door.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-              >
-                İptal
-              </Button>
-              <Button type="submit">Kaydet</Button>
-            </div>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+      <Button type="submit" size="sm">
+        Kaydet
+      </Button>
+    </form>
   );
 }
