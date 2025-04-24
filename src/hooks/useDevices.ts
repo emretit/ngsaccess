@@ -1,7 +1,7 @@
 
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Device } from "@/types/device";
+import { Device, ServerDevice } from "@/types/device";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -59,29 +59,32 @@ export function useDevices() {
         throw new Error("Device not found. Please check serial number or contact support.");
       }
 
+      // Type assertion to include zone_id and door_id
+      const serverDevice = existingDevice as ServerDevice;
+
       // If it exists, add it to devices table
       // Using fields that match the database schema
       const { error: insertError } = await supabase
         .from('devices')
         .insert({ 
-          name: existingDevice.name,
-          serial_number: existingDevice.serial_number,
+          name: serverDevice.name,
+          serial_number: serverDevice.serial_number,
           location: "",  // Required field based on schema
           type: "",      // Required field based on schema
-          device_model: existingDevice.device_model || "",
-          device_type: existingDevice.device_type || "",
-          device_serial: existingDevice.serial_number,
+          device_model: serverDevice.device_model || "",
+          device_type: serverDevice.device_type || "",
+          device_serial: serverDevice.serial_number,
           device_location: "",
           // Add zone_id and door_id for location display
-          zone_id: existingDevice.zone_id,
-          door_id: existingDevice.door_id
+          zone_id: serverDevice.zone_id,
+          door_id: serverDevice.door_id
         });
 
       if (insertError) {
         throw new Error("Failed to add device. Please try again.");
       }
 
-      return existingDevice;
+      return serverDevice;
     },
     onSuccess: () => {
       // Refresh the devices list
