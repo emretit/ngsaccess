@@ -1,4 +1,5 @@
 
+import React, { useState } from 'react';
 import { format } from 'date-fns';
 import { 
   Table,
@@ -21,7 +22,7 @@ interface ServerDeviceTableProps {
 }
 
 export function ServerDeviceTable({ devices, isLoading, onDeviceClick, zones, doors }: ServerDeviceTableProps) {
-  const [selectedDevices, setSelectedDevices] = React.useState<string[]>([]);
+  const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
 
   // Helper function to get location display string
   function getLocationString(device: ServerDevice) {
