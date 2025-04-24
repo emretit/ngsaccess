@@ -1,12 +1,11 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ChevronDown, ChevronRight, SquarePlus } from "lucide-react";
+import { ChevronRight, Grid, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
 
-/**
- * Modern DepartmentTree'ye stil ve yapı uyumlu bir zone/door tree.
- */
 interface Zone {
   id: number;
   name: string;
@@ -19,8 +18,8 @@ interface Door {
 }
 
 interface ZoneDoorTreeProps {
-  onSelectDoor?: (doorId: number) => void;
-  onSelectZone?: (zoneId: number) => void;
+  onSelectDoor?: (doorId: number | null) => void;
+  onSelectZone?: (zoneId: number | null) => void;
 }
 
 export const ZoneDoorTree = ({
@@ -52,7 +51,60 @@ export const ZoneDoorTree = ({
     setDoors(doorsData || []);
   }
 
-  // Tree UI modernize edildi (ikoncuklar, spacing, hover, select: department tree gibi)
+  const handleDeleteZone = async (zoneId: number) => {
+    const zoneDoors = doors.filter(door => door.zone_id === zoneId);
+    if (zoneDoors.length > 0) {
+      toast({
+        title: "Hata",
+        description: "Bu bölgede kapılar bulunuyor. Önce kapıları silmelisiniz.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const { error } = await supabase
+      .from("zones")
+      .delete()
+      .eq("id", zoneId);
+
+    if (error) {
+      toast({
+        title: "Hata",
+        description: "Bölge silinirken bir hata oluştu",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    toast({
+      title: "Başarılı",
+      description: "Bölge silindi",
+    });
+    fetchZonesAndDoors();
+  };
+
+  const handleDeleteDoor = async (doorId: number) => {
+    const { error } = await supabase
+      .from("doors")
+      .delete()
+      .eq("id", doorId);
+
+    if (error) {
+      toast({
+        title: "Hata",
+        description: "Kapı silinirken bir hata oluştu",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    toast({
+      title: "Başarılı",
+      description: "Kapı silindi",
+    });
+    fetchZonesAndDoors();
+  };
+
   return (
     <ul role="tree" className="space-y-0.5">
       {zones.map((zone) => {
@@ -63,72 +115,110 @@ export const ZoneDoorTree = ({
           <li key={zone.id} role="treeitem" aria-expanded={isExpanded}>
             <div
               className={cn(
-                "group flex items-center gap-1 rounded-md p-2 transition-all cursor-pointer",
+                "group flex items-center gap-1 rounded-md p-2 transition-all",
                 "hover:bg-accent hover:text-accent-foreground",
                 selectedZone === zone.id && "bg-accent/80 text-accent-foreground font-medium"
               )}
-              style={{ paddingLeft: "12px" }}
               onClick={() => {
                 setSelectedZone(zone.id === selectedZone ? null : zone.id);
                 setSelectedDoor(null);
                 onSelectZone?.(zone.id === selectedZone ? null : zone.id);
-                setExpandedZones((prev) =>
-                  prev.includes(zone.id)
-                    ? prev.filter((z) => z !== zone.id)
-                    : [...prev, zone.id]
-                );
               }}
-              tabIndex={0}
             >
-              {/* Açma/kapatma ikoncuk */}
-              <button
-                type="button"
-                className="h-5 w-5 p-0 flex items-center justify-center rounded hover:bg-accent/40 focus:outline-none mr-1"
-                tabIndex={-1}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 p-0 hover:bg-transparent"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setExpandedZones((prev) =>
+                  setExpandedZones(prev =>
                     prev.includes(zone.id)
-                      ? prev.filter((z) => z !== zone.id)
+                      ? prev.filter(id => id !== zone.id)
                       : [...prev, zone.id]
                   );
                 }}
-                aria-label={isExpanded ? "Kapat" : "Aç"}
               >
-                {isExpanded ? (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground/70 transition-transform" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-muted-foreground/70 transition-transform" />
-                )}
-              </button>
+                <ChevronRight
+                  className={cn(
+                    "h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200",
+                    isExpanded && "rotate-90"
+                  )}
+                />
+              </Button>
+
+              <Grid className="h-4 w-4 shrink-0 text-muted-foreground" />
               <span className="flex-1 truncate text-sm">{zone.name}</span>
+
+              <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 hover:bg-accent/80"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // TODO: Implement add door functionality
+                    toast({
+                      title: "Bilgi",
+                      description: "Kapı ekleme özelliği yakında eklenecek",
+                    });
+                  }}
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 hover:bg-accent/80"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteZone(zone.id);
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
             </div>
-            {/* Kapılar */}
+
+            {/* Doors list */}
             <ul
               role="group"
               className={cn(
-                "overflow-hidden transition-all duration-200 pl-8",
+                "overflow-hidden transition-all duration-200",
                 isExpanded ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
               )}
             >
               {zoneDoors.length === 0 ? (
-                <li className="text-xs text-muted-foreground pl-2 pb-2">Kapı yok</li>
+                <li className="text-xs text-muted-foreground pl-8 py-2">Kapı yok</li>
               ) : (
                 zoneDoors.map((door) => (
                   <li key={door.id}>
                     <div
                       className={cn(
-                        "flex items-center rounded-md px-2 py-1.5 ml-2 cursor-pointer text-sm",
-                        "hover:bg-primary/10 hover:text-primary",
-                        selectedDoor === door.id && "bg-primary/10 text-primary font-medium"
+                        "group flex items-center gap-1 rounded-md p-2 transition-all ml-6",
+                        "hover:bg-accent hover:text-accent-foreground",
+                        selectedDoor === door.id && "bg-accent/80 text-accent-foreground font-medium"
                       )}
                       onClick={() => {
                         setSelectedDoor(door.id);
                         onSelectDoor?.(door.id);
                       }}
-                      style={{ paddingLeft: "16px" }}
                     >
-                      <span className="ml-1">⎯ {door.name}</span>
+                      <Grid className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="flex-1 truncate text-sm">{door.name}</span>
+
+                      <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 hover:bg-accent/80"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteDoor(door.id);
+                          }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   </li>
                 ))
@@ -139,4 +229,4 @@ export const ZoneDoorTree = ({
       })}
     </ul>
   );
-};
+}
