@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { ServerDevice } from '@/types/device';
 import { Zone, Door } from '@/hooks/useZonesAndDoors';
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface ServerDeviceTableProps {
   devices: ServerDevice[];
@@ -20,6 +21,8 @@ interface ServerDeviceTableProps {
 }
 
 export function ServerDeviceTable({ devices, isLoading, onDeviceClick, zones, doors }: ServerDeviceTableProps) {
+  const [selectedDevices, setSelectedDevices] = React.useState<string[]>([]);
+
   // Helper function to get location display string
   function getLocationString(device: ServerDevice) {
     // Find ids as string or number; handle cases where id might be undefined
@@ -31,11 +34,34 @@ export function ServerDeviceTable({ devices, isLoading, onDeviceClick, zones, do
     return "-";
   }
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedDevices(devices.map(device => device.id));
+    } else {
+      setSelectedDevices([]);
+    }
+  };
+
+  const handleSelectDevice = (checked: boolean, deviceId: string) => {
+    if (checked) {
+      setSelectedDevices(prev => [...prev, deviceId]);
+    } else {
+      setSelectedDevices(prev => prev.filter(id => id !== deviceId));
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-[50px]">
+              <Checkbox
+                checked={selectedDevices.length === devices.length && devices.length > 0}
+                onCheckedChange={handleSelectAll}
+                aria-label="Select all devices"
+              />
+            </TableHead>
             <TableHead>Seri Numarası</TableHead>
             <TableHead>İsim</TableHead>
             <TableHead>Model</TableHead>
@@ -48,13 +74,13 @@ export function ServerDeviceTable({ devices, isLoading, onDeviceClick, zones, do
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center py-8">
+              <TableCell colSpan={8} className="text-center py-8">
                 Yükleniyor...
               </TableCell>
             </TableRow>
           ) : devices.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+              <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                 Cihaz bulunamadı
               </TableCell>
             </TableRow>
@@ -62,16 +88,27 @@ export function ServerDeviceTable({ devices, isLoading, onDeviceClick, zones, do
             devices.map((device) => (
               <TableRow
                 key={device.id}
-                className="cursor-pointer hover:bg-gray-50"
-                onClick={() => onDeviceClick(device)}
+                className={`cursor-pointer hover:bg-gray-50 transition-colors ${
+                  selectedDevices.includes(device.id) ? 'bg-gray-50' : ''
+                }`}
               >
-                <TableCell className="font-mono">{device.serial_number}</TableCell>
-                <TableCell>{device.name}</TableCell>
-                <TableCell>{device.device_model_enum}</TableCell>
-                <TableCell>{device.projects?.name || '-'}</TableCell>
-                <TableCell>{getLocationString(device)}</TableCell>
-                <TableCell>{device.date_added ? format(new Date(device.date_added), 'dd.MM.yyyy') : '-'}</TableCell>
-                <TableCell>
+                <TableCell className="w-[50px]">
+                  <Checkbox
+                    checked={selectedDevices.includes(device.id)}
+                    onCheckedChange={(checked) => handleSelectDevice(checked as boolean, device.id)}
+                    aria-label={`Select device ${device.name}`}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </TableCell>
+                <TableCell onClick={() => onDeviceClick(device)} className="font-mono">{device.serial_number}</TableCell>
+                <TableCell onClick={() => onDeviceClick(device)}>{device.name}</TableCell>
+                <TableCell onClick={() => onDeviceClick(device)}>{device.device_model_enum}</TableCell>
+                <TableCell onClick={() => onDeviceClick(device)}>{device.projects?.name || '-'}</TableCell>
+                <TableCell onClick={() => onDeviceClick(device)}>{getLocationString(device)}</TableCell>
+                <TableCell onClick={() => onDeviceClick(device)}>
+                  {device.date_added ? format(new Date(device.date_added), 'dd.MM.yyyy') : '-'}
+                </TableCell>
+                <TableCell onClick={() => onDeviceClick(device)}>
                   {device.expiry_date 
                     ? format(new Date(device.expiry_date), 'dd.MM.yyyy')
                     : '-'
