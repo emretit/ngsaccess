@@ -48,7 +48,7 @@ export function AssignLocationForm({ device }: AssignLocationFormProps) {
         zone_id: selectedZone ? parseInt(selectedZone) : null,
         door_id: selectedDoor ? parseInt(selectedDoor) : null 
       })
-      .eq('id', device.id);
+      .eq('id', device.id.toString()); // Convert to string to match the id type expected by Supabase
 
     if (error) {
       toast({
