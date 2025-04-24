@@ -1,9 +1,9 @@
-
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Users, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DepartmentTree from "@/components/departments/DepartmentTree";
 import SlideOverPanel from "@/components/employees/SlideOverPanel";
 import { Employee } from "@/types/employee";
@@ -28,7 +28,8 @@ export default function Employees() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
 
-  const ITEMS_PER_PAGE = 10;
+  const PAGE_SIZE_OPTIONS = [10, 50, 100];
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const employeeStats = useMemo(() => ({
     total: employees.length,
@@ -87,11 +88,11 @@ export default function Employees() {
   }, [employees, searchQuery]);
 
   const paginatedEmployees = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredEmployees.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredEmployees, currentPage]);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredEmployees.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredEmployees, currentPage, itemsPerPage]);
 
-  const totalPages = Math.ceil(filteredEmployees.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
 
   const handleEditEmployee = (employee: Employee) => {
     setEditingEmployee(employee);
@@ -135,6 +136,7 @@ export default function Employees() {
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Personel Listesi</h1>
           <div className="flex gap-4">
+            {/* Existing search input */}
             <Input
               type="search"
               placeholder="Personel ara..."
@@ -142,6 +144,27 @@ export default function Employees() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-64"
             />
+
+            {/* Page size selector */}
+            <Select 
+              value={String(itemsPerPage)} 
+              onValueChange={(value) => {
+                setItemsPerPage(Number(value));
+                setCurrentPage(1); // Reset to first page when changing page size
+              }}
+            >
+              <SelectTrigger className="w-[100px]">
+                <SelectValue placeholder="Sayfa Boyutu" />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size} Kayıt
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Button
               onClick={() => {
                 setEditingEmployee(null);
