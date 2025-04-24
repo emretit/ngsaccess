@@ -1,3 +1,4 @@
+
 import { format } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { DeviceForm } from "@/components/devices/DeviceForm";
@@ -19,10 +20,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useState } from "react";
-import { Download } from "lucide-react";
+import { Download, Edit, Trash2 } from "lucide-react";
 import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { AssignLocationForm } from "@/components/devices/AssignLocationForm";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Devices() {
   const { devices, isLoading, addDevice, isAddingDevice } = useDevices();
@@ -30,6 +33,8 @@ export default function Devices() {
   const { zones, doors } = useZonesAndDoors();
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [selectedDoorId, setSelectedDoorId] = useState<number | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const filteredDevices = devices.filter(device => {
     if (selectedDoorId) {
@@ -58,6 +63,24 @@ export default function Devices() {
     link.download = `qr-${selectedQR.name.toLowerCase().replace(/\s+/g, '-')}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
+  };
+
+  const handleDeleteDevice = async (deviceId: string) => {
+    try {
+      await fetch(`/api/devices/${deviceId}`, { method: 'DELETE' });
+      toast({
+        title: "Cihaz silindi",
+        description: "Cihaz başarıyla silindi",
+      });
+      // Refresh devices data
+      queryClient.invalidateQueries({ queryKey: ['devices'] });
+    } catch (error) {
+      toast({
+        title: "Hata",
+        description: "Cihaz silinirken bir hata oluştu",
+        variant: "destructive",
+      });
+    }
   };
 
   function getLocationString(device: any) {
@@ -136,7 +159,32 @@ export default function Devices() {
                         {device.created_at ? format(new Date(device.created_at), 'dd.MM.yyyy HH:mm') : '-'}
                       </TableCell>
                       <TableCell>
-                        <AssignLocationForm device={device} />
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // Düzenleme işlemi
+                              console.log('Edit device:', device.id);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteDevice(device.id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <AssignLocationForm device={device} />
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
