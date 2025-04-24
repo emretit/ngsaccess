@@ -1,5 +1,6 @@
-
+import React from 'react';
 import { format } from 'date-fns';
+import { Edit, Trash2 } from 'lucide-react';
 import { 
   Table,
   TableBody,
@@ -8,6 +9,7 @@ import {
   TableHeader,
   TableRow 
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { ServerDevice } from '@/types/device';
 import { Zone, Door } from '@/hooks/useZonesAndDoors';
 
@@ -31,6 +33,11 @@ export function ServerDeviceTable({ devices, isLoading, onDeviceClick, zones, do
     return "-";
   }
 
+  const handleActionClick = (e: React.MouseEvent, callback: () => void) => {
+    e.stopPropagation(); // Prevent row click when clicking action buttons
+    callback();
+  };
+
   return (
     <div className="bg-white rounded-lg shadow overflow-hidden">
       <Table>
@@ -43,18 +50,19 @@ export function ServerDeviceTable({ devices, isLoading, onDeviceClick, zones, do
             <TableHead>Konum</TableHead>
             <TableHead>Eklenme Tarihi</TableHead>
             <TableHead>Son Kullanma Tarihi</TableHead>
+            <TableHead>İşlemler</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center py-8">
+              <TableCell colSpan={8} className="text-center py-8">
                 Yükleniyor...
               </TableCell>
             </TableRow>
           ) : devices.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+              <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                 Cihaz bulunamadı
               </TableCell>
             </TableRow>
@@ -76,6 +84,28 @@ export function ServerDeviceTable({ devices, isLoading, onDeviceClick, zones, do
                     ? format(new Date(device.expiry_date), 'dd.MM.yyyy')
                     : '-'
                   }
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => handleActionClick(e, () => onDeviceClick(device))}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive"
+                      onClick={(e) => handleActionClick(e, () => {
+                        // Delete functionality will be implemented here
+                        console.log('Delete device:', device.id);
+                      })}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))
