@@ -1,8 +1,6 @@
-
 import { format } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { DeviceForm } from "@/components/devices/DeviceForm";
-import { ServerDeviceTable } from "@/components/devices/ServerDeviceTable";
 import {
   Table,
   TableBody,
@@ -25,7 +23,6 @@ import { Download } from "lucide-react";
 import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { AssignLocationForm } from "@/components/devices/AssignLocationForm";
-import { ServerDevice } from "@/types/device";
 
 export default function Devices() {
   const { devices, isLoading, addDevice, isAddingDevice } = useDevices();
@@ -33,7 +30,6 @@ export default function Devices() {
   const { zones, doors } = useZonesAndDoors();
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [selectedDoorId, setSelectedDoorId] = useState<number | null>(null);
-  const [selectedDevice, setSelectedDevice] = useState<ServerDevice | null>(null);
 
   const filteredDevices = devices.filter(device => {
     if (selectedDoorId) {
@@ -64,12 +60,6 @@ export default function Devices() {
     link.click();
   };
 
-  const handleDeviceClick = (device: ServerDevice) => {
-    setSelectedDevice(device);
-    // Display the device edit form or dialog here
-    console.log('Edit device:', device);
-  };
-
   function getLocationString(device: any) {
     const zone = zones.find(z => String(z.id) === String(device.zone_id));
     const door = doors.find(d => String(d.id) === String(device.door_id));
@@ -94,14 +84,74 @@ export default function Devices() {
             <DeviceForm onAddDevice={addDevice} isLoading={isAddingDevice} />
           </div>
 
-          {/* Use ServerDeviceTable component here */}
-          <ServerDeviceTable 
-            devices={filteredDevices as ServerDevice[]} 
-            isLoading={isLoading} 
-            onDeviceClick={handleDeviceClick}
-            zones={zones}
-            doors={doors}
-          />
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>QR Kod</TableHead>
+                  <TableHead>İsim</TableHead>
+                  <TableHead>Seri No</TableHead>
+                  <TableHead>Konum</TableHead>
+                  <TableHead>Tip</TableHead>
+                  <TableHead>Durum</TableHead>
+                  <TableHead>Son Görülme</TableHead>
+                  <TableHead>İşlemler</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      Yükleniyor...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredDevices.length > 0 ? (
+                  filteredDevices.map((device) => (
+                    <TableRow key={device.id}>
+                      <TableCell>
+                        <div 
+                          className="cursor-pointer hover:opacity-80 transition-opacity"
+                          onClick={() => handleQRClick(device)}
+                        >
+                          <QRCode
+                            value={device.device_serial || device.serial_number || ''}
+                            size={64}
+                            level="H"
+                            className="rounded"
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-medium">{device.device_name || device.name}</TableCell>
+                      <TableCell className="font-mono">{device.device_serial || device.serial_number}</TableCell>
+                      <TableCell>{getLocationString(device)}</TableCell>
+                      <TableCell>{device.device_type || device.type || '-'}</TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={device.status === 'online' ? 'success' : 'secondary'}
+                        >
+                          {device.status === 'online' ? 'Aktif' : 'Pasif'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {device.created_at ? format(new Date(device.created_at), 'dd.MM.yyyy HH:mm') : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <AssignLocationForm device={device} />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                      {selectedZoneId || selectedDoorId 
+                        ? "Seçilen konumda cihaz bulunmuyor" 
+                        : "Henüz cihaz bulunmuyor"}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
           <Dialog open={!!selectedQR} onOpenChange={() => setSelectedQR(null)}>
             <DialogContent className="sm:max-w-md flex flex-col items-center">
