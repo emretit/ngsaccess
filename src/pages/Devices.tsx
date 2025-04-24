@@ -23,6 +23,7 @@ import { useState } from "react";
 import { Download } from "lucide-react";
 import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
+import { AssignLocationForm } from "@/components/devices/AssignLocationForm";
 
 export default function Devices() {
   const { 
@@ -92,12 +93,13 @@ export default function Devices() {
                   <TableHead>Tip</TableHead>
                   <TableHead>Durum</TableHead>
                   <TableHead>Son Görülme</TableHead>
+                  <TableHead>İşlemler</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={8} className="text-center py-8">
                       Yükleniyor...
                     </TableCell>
                   </TableRow>
@@ -131,11 +133,14 @@ export default function Devices() {
                       <TableCell>
                         {device.created_at ? format(new Date(device.created_at), 'dd.MM.yyyy HH:mm') : '-'}
                       </TableCell>
+                      <TableCell>
+                        <AssignLocationForm device={device} />
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
                       Henüz cihaz bulunmuyor
                     </TableCell>
                   </TableRow>

@@ -63,6 +63,13 @@ export type Database = {
             foreignKeyName: "access_logs_door_id_fkey"
             columns: ["door_id"]
             isOneToOne: false
+            referencedRelation: "device_locations"
+            referencedColumns: ["door_id"]
+          },
+          {
+            foreignKeyName: "access_logs_door_id_fkey"
+            columns: ["door_id"]
+            isOneToOne: false
             referencedRelation: "doors"
             referencedColumns: ["id"]
           },
@@ -94,6 +101,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "access_permissions_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "device_locations"
+            referencedColumns: ["device_id"]
+          },
           {
             foreignKeyName: "access_permissions_device_id_fkey"
             columns: ["device_id"]
@@ -155,6 +169,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "access_rules_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "device_locations"
+            referencedColumns: ["device_id"]
+          },
           {
             foreignKeyName: "access_rules_device_id_fkey"
             columns: ["device_id"]
@@ -382,6 +403,13 @@ export type Database = {
             foreignKeyName: "card_readings_device_id_fkey"
             columns: ["device_id"]
             isOneToOne: false
+            referencedRelation: "device_locations"
+            referencedColumns: ["device_id"]
+          },
+          {
+            foreignKeyName: "card_readings_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
             referencedRelation: "devices"
             referencedColumns: ["id"]
           },
@@ -480,6 +508,7 @@ export type Database = {
           device_serial: string | null
           device_status: string | null
           device_type: string | null
+          door_id: number | null
           id: number
           is_active: boolean | null
           last_connection: string | null
@@ -492,6 +521,7 @@ export type Database = {
           status: string | null
           type: string
           updated_at: string
+          zone_id: number | null
         }
         Insert: {
           created_at?: string
@@ -504,6 +534,7 @@ export type Database = {
           device_serial?: string | null
           device_status?: string | null
           device_type?: string | null
+          door_id?: number | null
           id?: number
           is_active?: boolean | null
           last_connection?: string | null
@@ -516,6 +547,7 @@ export type Database = {
           status?: string | null
           type: string
           updated_at?: string
+          zone_id?: number | null
         }
         Update: {
           created_at?: string
@@ -528,6 +560,7 @@ export type Database = {
           device_serial?: string | null
           device_status?: string | null
           device_type?: string | null
+          door_id?: number | null
           id?: number
           is_active?: boolean | null
           last_connection?: string | null
@@ -540,13 +573,42 @@ export type Database = {
           status?: string | null
           type?: string
           updated_at?: string
+          zone_id?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "devices_door_id_fkey"
+            columns: ["door_id"]
+            isOneToOne: false
+            referencedRelation: "device_locations"
+            referencedColumns: ["door_id"]
+          },
+          {
+            foreignKeyName: "devices_door_id_fkey"
+            columns: ["door_id"]
+            isOneToOne: false
+            referencedRelation: "doors"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "devices_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devices_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "device_locations"
+            referencedColumns: ["zone_id"]
+          },
+          {
+            foreignKeyName: "devices_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
             referencedColumns: ["id"]
           },
         ]
@@ -583,6 +645,13 @@ export type Database = {
           zone_id?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "doors_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "device_locations"
+            referencedColumns: ["zone_id"]
+          },
           {
             foreignKeyName: "doors_zone_id_fkey"
             columns: ["zone_id"]
@@ -770,6 +839,13 @@ export type Database = {
           id?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "group_devices_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "device_locations"
+            referencedColumns: ["device_id"]
+          },
           {
             foreignKeyName: "group_devices_device_id_fkey"
             columns: ["device_id"]
@@ -1004,6 +1080,13 @@ export type Database = {
             foreignKeyName: "rule_doors_door_id_fkey"
             columns: ["door_id"]
             isOneToOne: false
+            referencedRelation: "device_locations"
+            referencedColumns: ["door_id"]
+          },
+          {
+            foreignKeyName: "rule_doors_door_id_fkey"
+            columns: ["door_id"]
+            isOneToOne: false
             referencedRelation: "doors"
             referencedColumns: ["id"]
           },
@@ -1071,6 +1154,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "access_rules"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rule_zones_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "device_locations"
+            referencedColumns: ["zone_id"]
           },
           {
             foreignKeyName: "rule_zones_zone_id_fkey"
@@ -1275,6 +1365,17 @@ export type Database = {
       }
     }
     Views: {
+      device_locations: {
+        Row: {
+          device_id: number | null
+          device_name: string | null
+          door_id: number | null
+          door_name: string | null
+          zone_id: number | null
+          zone_name: string | null
+        }
+        Relationships: []
+      }
       devices_with_latest_readings: {
         Row: {
           actual_last_seen: string | null
