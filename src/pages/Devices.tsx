@@ -1,4 +1,3 @@
-
 import { format } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { DeviceForm } from "@/components/devices/DeviceForm";
@@ -26,19 +25,21 @@ import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { AssignLocationForm } from "@/components/devices/AssignLocationForm";
 
 export default function Devices() {
-  const { 
-    devices, 
-    isLoading, 
-    addDevice, 
-    isAddingDevice 
-  } = useDevices();
-  
-  const [selectedQR, setSelectedQR] = useState<{
-    serial: string;
-    name: string;
-  } | null>(null);
-
+  const { devices, isLoading, addDevice, isAddingDevice } = useDevices();
+  const [selectedQR, setSelectedQR] = useState<{ serial: string; name: string } | null>(null);
   const { zones, doors } = useZonesAndDoors();
+  const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
+  const [selectedDoorId, setSelectedDoorId] = useState<number | null>(null);
+
+  const filteredDevices = devices.filter(device => {
+    if (selectedDoorId) {
+      return device.door_id === selectedDoorId;
+    }
+    if (selectedZoneId) {
+      return device.zone_id === selectedZoneId;
+    }
+    return true;
+  });
 
   const handleQRClick = (device: any) => {
     setSelectedQR({
@@ -59,9 +60,7 @@ export default function Devices() {
     link.click();
   };
 
-  // Helper function to get location display string
   function getLocationString(device: any) {
-    // Find ids as string or number; handle cases where id might be undefined
     const zone = zones.find(z => String(z.id) === String(device.zone_id));
     const door = doors.find(d => String(d.id) === String(device.door_id));
     
@@ -75,7 +74,10 @@ export default function Devices() {
   return (
     <main className="p-0">
       <div className="max-w-7xl mx-auto flex gap-6">
-        <ZoneDoorTreePanel />
+        <ZoneDoorTreePanel 
+          onSelectZone={setSelectedZoneId} 
+          onSelectDoor={setSelectedDoorId}
+        />
         <div className="flex-1 space-y-6 p-6">
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-semibold">Cihazlar</h1>
@@ -103,8 +105,8 @@ export default function Devices() {
                       Yükleniyor...
                     </TableCell>
                   </TableRow>
-                ) : devices && devices.length > 0 ? (
-                  devices.map((device) => (
+                ) : filteredDevices.length > 0 ? (
+                  filteredDevices.map((device) => (
                     <TableRow key={device.id}>
                       <TableCell>
                         <div 
@@ -141,7 +143,9 @@ export default function Devices() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                      Henüz cihaz bulunmuyor
+                      {selectedZoneId || selectedDoorId 
+                        ? "Seçilen konumda cihaz bulunmuyor" 
+                        : "Henüz cihaz bulunmuyor"}
                     </TableCell>
                   </TableRow>
                 )}
