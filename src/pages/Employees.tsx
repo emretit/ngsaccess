@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Users, UserPlus } from "lucide-react";
@@ -202,7 +203,7 @@ export default function Employees() {
         </div>
 
         <div className="glass-card overflow-hidden">
-          {/* Replace the old table with our new EmployeeTable component */}
+          {/* Using the EmployeeTable component that includes multi-select functionality */}
           <EmployeeTable 
             employees={paginatedEmployees} 
             onEdit={handleEditEmployee} 
