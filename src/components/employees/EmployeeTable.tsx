@@ -45,6 +45,17 @@ export default function EmployeeTable({ employees, onEdit, onDelete }: EmployeeT
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
 
+  // Add the missing requestSort function
+  const requestSort = (key: keyof Employee) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    
+    setSortConfig({ key, direction });
+  };
+
   const sortedEmployees = [...employees].sort((a, b) => {
     if (!sortConfig) return 0;
     const { key, direction } = sortConfig;
