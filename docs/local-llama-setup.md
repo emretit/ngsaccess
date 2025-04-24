@@ -11,7 +11,7 @@ Bu belgede, PDKS AI Asistanı için yerel bir Llama modelini nasıl kuracağın�
 
 ## Kurulum Adımları
 
-### 1. Llama.cpp Reposunu İndirin
+### 1. Llama.cpp Reposunu İndirin111
 
 ```bash
 git clone https://github.com/ggerganov/llama.cpp.git
