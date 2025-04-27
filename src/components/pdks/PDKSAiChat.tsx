@@ -14,14 +14,18 @@ interface Message {
 }
 
 // Configuration for local Llama model
-const LOCAL_LLAMA_ENDPOINT = "http://localhost:8000/generate"; // Default local Llama server endpoint
-const LOCAL_MODEL_ENABLED = true; // Flag to control whether to use local model
+const LOCAL_LLAMA_ENDPOINTS = [
+  "http://localhost:8000/generate",
+  "http://localhost:8000/completion",
+  "http://127.0.0.1:8000/generate"
+];
+const LOCAL_MODEL_ENABLED = true;
 
 export function PDKSAiChat() {
   const [messages, setMessages] = useState<Message[]>([{
     id: 'welcome',
     type: 'assistant',
-    content: 'Merhaba! PDKS kayıtları hakkında sorularınızı yanıtlayabilirim. Örneğin: "Finans departmanının geçen haftaki devam durumu nedir?" gibi sorular sorabilirsiniz.'
+    content: 'Merhaba! PDKS kayıtları hakkında sorularınızı yanıtlayabilirim.'
   }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,23 +36,32 @@ export function PDKSAiChat() {
   const checkLocalModelStatus = async () => {
     if (!LOCAL_MODEL_ENABLED) return;
     
-    try {
-      const response = await fetch(`${LOCAL_LLAMA_ENDPOINT}/status`, { 
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      if (response.ok) {
-        setIsLocalModelConnected(true);
-        toast({
-          title: "Yerel AI modeline bağlanıldı",
-          description: "PDKS AI asistanı şimdi yerel Llama modelinizi kullanarak çalışıyor.",
+    for (const endpoint of LOCAL_LLAMA_ENDPOINTS) {
+      try {
+        const response = await fetch(`${endpoint}/status`, { 
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(3000)  // 3 second timeout
         });
+        
+        if (response.ok) {
+          setIsLocalModelConnected(true);
+          toast({
+            title: "Yerel AI modeline bağlanıldı",
+            description: `${endpoint} üzerinden PDKS AI asistanı aktif.`,
+          });
+          return;
+        }
+      } catch (error) {
+        console.warn(`Endpoint ${endpoint} bağlantı hatası:`, error);
       }
-    } catch (error) {
-      console.error("Yerel model bağlantı hatası:", error);
-      setIsLocalModelConnected(false);
     }
+
+    toast({
+      title: "Yerel Model Bağlantısı Başarısız",
+      description: "Lütfen Llama sunucusunun çalıştığından emin olun.",
+      variant: "destructive"
+    });
   };
 
   // Check local model status on component mount
@@ -70,27 +83,31 @@ export function PDKSAiChat() {
     setIsLoading(true);
 
     try {
-      let aiResponse;
+      let aiResponse = "Şu anda yerel AI modeline bağlanılamıyor.";
       
       if (LOCAL_MODEL_ENABLED && isLocalModelConnected) {
-        // Use local Llama model
-        const response = await fetch(LOCAL_LLAMA_ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: input,
-            max_tokens: 500,
-            temperature: 0.7
-          })
-        });
-        
-        if (!response.ok) throw new Error('Yerel model yanıt hatası');
-        const data = await response.json();
-        aiResponse = data.response || data.generated_text;
-      } else {
-        // Fallback to simulated response if local model is not available
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        aiResponse = 'Bu özellik için yerel Llama modelinin çalışır durumda olması gerekiyor. Lütfen yerel Llama sunucunuzun çalıştığından emin olun.';
+        for (const endpoint of LOCAL_LLAMA_ENDPOINTS) {
+          try {
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                prompt: input,
+                max_tokens: 500,
+                temperature: 0.7
+              }),
+              signal: AbortSignal.timeout(5000)  // 5 second timeout
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              aiResponse = data.response || data.generated_text || data.choices?.[0]?.text || "Yanıt alınamadı.";
+              break;
+            }
+          } catch (endpointError) {
+            console.warn(`Endpoint ${endpoint} hatası:`, endpointError);
+          }
+        }
       }
 
       const aiMessage: Message = {
@@ -100,11 +117,11 @@ export function PDKSAiChat() {
       };
       setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('AI sohbet hatası:', error);
       const errorMessage: Message = {
         id: `error-${userMessage.id}`,
         type: 'assistant',
-        content: 'Üzgünüm, bir hata oluştu. Yerel AI modeliyle bağlantı kurulamadı.'
+        content: 'Üzgünüm, bir hata oluştu. Lütfen daha sonra tekrar deneyin.'
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
