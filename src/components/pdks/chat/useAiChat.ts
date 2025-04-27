@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
+import { supabase } from "@/integrations/supabase/client";
 
 interface MessageData {
   name: string;
@@ -266,11 +267,21 @@ export function useAiChat() {
     console.log("Handling user message:", input);
 
     try {
-      // Call the Supabase natural language query endpoint
+      // Call the Supabase natural language query endpoint WITH AUTHORIZATION
       console.log("Calling Supabase natural language query endpoint:", SUPABASE_NATURAL_QUERY_ENDPOINT);
+      
+      // Get the Supabase access token
+      const { data: { session } } = await supabase.auth.getSession();
+      
       const response = await fetch(SUPABASE_NATURAL_QUERY_ENDPOINT, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          // Add authorization header with JWT from Supabase session
+          'Authorization': `Bearer ${session?.access_token || supabase.auth.session()?.access_token}`,
+          // Add apikey header with anon key
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqdWRzZ2hod21uc25uZG5zd2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyMzk1NTMsImV4cCI6MjA1MTgxNTU1M30.9mA6Q1JDCszfH3nujNpGWd36M4qxZ-L38GPTaNIsjVg'
+        },
         body: JSON.stringify({ query: input }),
         signal: AbortSignal.timeout(15000)  // Increased timeout for more complex queries
       });

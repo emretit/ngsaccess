@@ -23,6 +23,24 @@ interface PDKSReportTableProps {
 }
 
 export function PDKSReportTable({ data }: PDKSReportTableProps) {
+  // Format date for display
+  const formatDateTime = (dateTimeStr: string) => {
+    if (!dateTimeStr) return '-';
+    
+    try {
+      const date = new Date(dateTimeStr);
+      return date.toLocaleString('tr-TR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      return dateTimeStr;
+    }
+  };
+
   // Dynamically determine columns based on data
   const columns = Object.keys(data[0] || {}).filter(key => 
     // Only show these fields in the table
@@ -59,7 +77,9 @@ export function PDKSReportTable({ data }: PDKSReportTableProps) {
             )}>
               {columns.map(column => (
                 <TableCell key={`${index}-${column}`}>
-                  {record[column as keyof MessageData] || '-'}
+                  {column === 'check_in' || column === 'check_out' 
+                    ? formatDateTime(record[column as keyof MessageData] as string) 
+                    : record[column as keyof MessageData] || '-'}
                 </TableCell>
               ))}
             </TableRow>
