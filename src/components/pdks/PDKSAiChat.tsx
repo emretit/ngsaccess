@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Server } from "lucide-react";
+import { Send, Server, FilePdf, FileSpreadsheet } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import * as XLSX from 'xlsx';
 
 interface Message {
   id: string;
@@ -42,7 +43,80 @@ export function PDKSAiChat() {
   const [isLocalModelConnected, setIsLocalModelConnected] = useState(false);
   const { toast } = useToast();
 
-  // Function to check if local model is available
+  const handleExportExcel = (messageData: any) => {
+    if (!messageData || !Array.isArray(messageData)) {
+      toast({
+        title: "Dışa aktarılamadı",
+        description: "Bu mesaj dışa aktarılabilir bir rapor içermiyor.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const ws = XLSX.utils.json_to_sheet(messageData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Rapor");
+    XLSX.writeFile(wb, `pdks_rapor_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+    toast({
+      title: "Excel dosyası indirildi",
+      description: "Rapor başarıyla Excel formatında dışa aktarıldı.",
+    });
+  };
+
+  const handleExportPDF = async (messageData: any) => {
+    if (!messageData || !Array.isArray(messageData)) {
+      toast({
+        title: "Dışa aktarılamadı",
+        description: "Bu mesaj dışa aktarılabilir bir rapor içermiyor.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const headers = Object.keys(messageData[0]);
+      const rows = messageData.map(Object.values);
+      
+      const response = await fetch('https://gjudsghhwmnsnndnswho.supabase.co/functions/v1/generate-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          headers,
+          rows,
+          title: "PDKS Raporu",
+          date: new Date().toLocaleDateString('tr-TR')
+        }),
+      });
+
+      if (!response.ok) throw new Error('PDF oluşturma hatası');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pdks_rapor_${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "PDF dosyası indirildi",
+        description: "Rapor başarıyla PDF formatında dışa aktarıldı.",
+      });
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast({
+        title: "PDF oluşturma hatası",
+        description: "PDF dosyası oluşturulurken bir hata oluştu.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const checkLocalModelStatus = async () => {
     if (!LOCAL_MODEL_ENABLED) return;
     
@@ -74,7 +148,6 @@ export function PDKSAiChat() {
     });
   };
 
-  // Check local model status on component mount
   useEffect(() => {
     checkLocalModelStatus();
   }, []);
@@ -175,6 +248,24 @@ export function PDKSAiChat() {
     if (message.data) {
       return (
         <div className="space-y-2">
+          <div className="flex justify-end gap-2 mb-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExportExcel(message.data)}
+              title="Excel olarak indir"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExportPDF(message.data)}
+              title="PDF olarak indir"
+            >
+              <FilePdf className="h-4 w-4" />
+            </Button>
+          </div>
           <p>{message.content}</p>
           <div className="overflow-x-auto">
             <table className="min-w-full bg-white border border-gray-300">
