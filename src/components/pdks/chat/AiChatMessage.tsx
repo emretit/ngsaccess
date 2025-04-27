@@ -1,6 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { FileSpreadsheet, FileText } from "lucide-react";
+import { PDKSReportTable } from "./PDKSReportTable";
 
 interface MessageData {
   name: string;
@@ -44,28 +45,7 @@ export function AiChatMessage({ message, onExportExcel, onExportPDF }: AiChatMes
             </Button>
           </div>
           <p>{message.content}</p>
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white border border-gray-300">
-              <thead>
-                <tr>
-                  <th className="border p-2">İsim</th>
-                  <th className="border p-2">Giriş Saati</th>
-                  <th className="border p-2">Çıkış Saati</th>
-                  <th className="border p-2">Departman</th>
-                </tr>
-              </thead>
-              <tbody>
-                {message.data.map((record, index) => (
-                  <tr key={index}>
-                    <td className="border p-2">{record.name}</td>
-                    <td className="border p-2">{new Date(record.check_in).toLocaleString()}</td>
-                    <td className="border p-2">{record.check_out ? new Date(record.check_out).toLocaleString() : '-'}</td>
-                    <td className="border p-2">{record.department}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <PDKSReportTable data={message.data} />
         </div>
       );
     }
