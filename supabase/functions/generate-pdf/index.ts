@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import * as pdf from 'https://deno.land/x/pdfkit@v0.5.1/mod.ts';
+import { createPdf } from 'https://deno.land/x/pdfjs@v0.1.1/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,52 +25,54 @@ serve(async (req) => {
       throw new Error("Invalid data format: headers and rows must be arrays");
     }
 
-    const doc = new pdf.default();
-    const chunks: Uint8Array[] = [];
-
-    doc.on('data', (chunk: Uint8Array) => {
-      console.log(`PDF Generation: Received chunk of size ${chunk.length}`);
-      chunks.push(chunk);
+    // Create a new PDF document
+    const pdf = await createPdf();
+    
+    // Add content to the PDF
+    pdf.text(title || "PDKS Report", { x: 250, y: 50, align: 'center', size: 16 });
+    pdf.text(date || new Date().toLocaleDateString(), { x: 250, y: 70, align: 'center', size: 12 });
+    
+    // Set up table parameters
+    const startY = 100;
+    const cellPadding = 10;
+    const columnWidth = 500 / headers.length;
+    let currentY = startY;
+    
+    // Draw table headers
+    headers.forEach((header, i) => {
+      const x = 50 + (i * columnWidth);
+      pdf.text(String(header), { x, y: currentY, size: 12, align: 'center' });
     });
-
-    // Add title
-    doc.fontSize(16).text(title, { align: 'center' });
-    doc.fontSize(12).text(date, { align: 'center' });
-    doc.moveDown();
-
-    // Add table headers
-    const columnWidth = 150;
-    let y = doc.y;
-    console.log(`PDF Generation: Adding headers at y=${y}`);
-    headers.forEach((header: string, i: number) => {
-      doc.text(header, i * columnWidth, y, { width: columnWidth, align: 'center' });
-    });
-
-    // Add rows
-    y += 20;
-    console.log(`PDF Generation: Adding rows starting at y=${y}`);
-    rows.forEach((row: any[], rowIndex: number) => {
-      if (rowIndex % 10 === 0) {
-        console.log(`PDF Generation: Processing row ${rowIndex}/${rows.length}`);
+    
+    currentY += 30;
+    
+    // Draw horizontal line after headers
+    pdf.line(50, currentY - 15, 550, currentY - 15);
+    
+    // Draw table rows
+    rows.forEach((row, rowIndex) => {
+      // Add new page if needed
+      if (currentY > 750) {
+        pdf.pageBreak();
+        currentY = 50;
       }
       
+      // Draw row data
       row.forEach((cell, i) => {
-        doc.text(String(cell), i * columnWidth, y, { width: columnWidth, align: 'center' });
+        const x = 50 + (i * columnWidth);
+        pdf.text(String(cell), { x, y: currentY, size: 10, align: 'center' });
       });
-      y += 20;
-      if (y > 700) {
-        console.log(`PDF Generation: Adding new page at row ${rowIndex}`);
-        doc.addPage();
-        y = 50;
-      }
+      
+      currentY += 25;
+      
+      // Draw light horizontal line between rows
+      pdf.line(50, currentY - 10, 550, currentY - 10, { color: '#DDDDDD' });
     });
-
-    console.log("PDF Generation: Finishing document");
-    doc.end();
-
-    const pdfBytes = new Uint8Array(Buffer.concat(chunks));
+    
+    // Generate the PDF as bytes
+    const pdfBytes = await pdf.save();
     console.log(`PDF Generation: Document complete, total size ${pdfBytes.length} bytes`);
-
+    
     return new Response(pdfBytes, {
       headers: {
         ...corsHeaders,
