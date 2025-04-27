@@ -23,8 +23,16 @@ let cachedDepartments: string[] = [
     'hukuk', 'yönetim', 'muhasebe', 'ar-ge', 'üretim', 'lojistik', 'operasyon', 'engineering'
 ];
 
+// Departman verilerinin yüklenip yüklenmediğini takip eden değişken
+let departmentsLoaded = false;
+
 // departmentTree tablosundan departman verilerini al
 async function loadDepartmentsFromDB(): Promise<string[]> {
+    // Eğer departmanlar zaten yüklendiyse tekrar yüklemeye gerek yok
+    if (departmentsLoaded) {
+        return cachedDepartments;
+    }
+
     try {
         const { data, error } = await supabase
             .from('departments')
@@ -40,10 +48,12 @@ async function loadDepartmentsFromDB(): Promise<string[]> {
             // Veritabanından gelen departman isimlerini küçük harfe çevirip sakla
             const departments = data.map(dept => dept.name.toLowerCase());
             cachedDepartments = departments; // Ön belleğe kaydet
+            departmentsLoaded = true; // Departmanların yüklendiğini işaretle
             console.log('Departmanlar veritabanından yüklendi:', departments);
             return departments;
         }
 
+        departmentsLoaded = true; // Veri yoksa da yüklemeyi tamamladık sayalım
         return cachedDepartments; // Veri yoksa ön belleği kullan
     } catch (error) {
         console.error('Departman verileri yüklenirken beklenmeyen hata:', error);
@@ -51,9 +61,9 @@ async function loadDepartmentsFromDB(): Promise<string[]> {
     }
 }
 
-// İlk yükleme için departmanları getir
+// İlk yükleme için departmanları getirmeye çalış ama uygulamanın başlamasını engelleme
 loadDepartmentsFromDB().catch(error => {
-    console.error('İlk departman yüklemesi sırasında hata:', error);
+    console.warn('İlk departman yüklemesi sırasında hata, varsayılan değerler kullanılacak:', error);
 });
 
 // Departmanları döndüren fonksiyon
@@ -73,11 +83,16 @@ export async function parseQuery(query: string): Promise<QueryParams> {
     const queryLower = query.toLowerCase();
     const params: QueryParams = {};
 
-    // Departman listesini güncelle
-    await loadDepartmentsFromDB();
+    // Departman listesini güncellemeye çalış, ama hata olursa devam et
+    try {
+        await loadDepartmentsFromDB();
+    } catch (error) {
+        console.warn("Departman verilerini güncellerken hata:", error);
+        // Hataya rağmen devam ediyoruz, cachedDepartments kullanılacak
+    }
 
     // Departman tespiti
-    params.department = await extractDepartment(queryLower);
+    params.department = extractDepartment(queryLower);
 
     // Sadece departman adı mı girildi kontrolü
     // Eğer sorgu tek bir kelime ve o da departman listesindeyse
@@ -116,7 +131,7 @@ export async function parseQuery(query: string): Promise<QueryParams> {
 /**
  * Sorgudan departmanı çıkarır
  */
-async function extractDepartment(query: string): Promise<string | null> {
+function extractDepartment(query: string): string | null {
     const departments = getDepartments();
 
     for (const department of departments) {

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SendIcon } from "lucide-react";
+import { Send } from "lucide-react";
 
 export interface AiChatInputProps {
   input: string;
@@ -41,7 +41,7 @@ export function AiChatInput({
         disabled={isLoading || !input.trim()}
         type="submit"
       >
-        <SendIcon className="h-4 w-4" />
+        <Send className="h-4 w-4" />
       </Button>
     </form>
   );

@@ -92,7 +92,20 @@ export async function processNaturalLanguageQuery(query: string) {
 
     try {
         // 1. Önce yerel çözümleme ile parametreleri çıkar
-        const params = await parseQuery(query);
+        let params;
+        try {
+            params = await parseQuery(query);
+        } catch (error) {
+            console.error("Error parsing query:", error);
+            // Hata durumunda basit bir çözümleme yapalım
+            params = {
+                department: query.toLowerCase(), // Girilen sorguyu direkt departman adı olarak ele al
+                startDate: new Date().toISOString().split('T')[0], // Bugün
+                endDate: new Date().toISOString().split('T')[0],
+                isOnlyDepartment: true
+            };
+        }
+
         console.log("Extracted parameters:", params);
 
         // 2. Parametrelere göre veritabanı sorgusunu oluştur
@@ -115,7 +128,10 @@ export async function processNaturalLanguageQuery(query: string) {
         };
     } catch (error) {
         console.error("Natural language query processing error:", error);
-        throw error;
+        return {
+            explanation: `Üzgünüm, sorgunuzu işlerken bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}. Lütfen başka bir sorgu deneyin.`,
+            data: []
+        };
     }
 }
 
