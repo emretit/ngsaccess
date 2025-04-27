@@ -35,9 +35,10 @@ serve(async (req) => {
 
     // Departman adını çıkart (varsa)
     let departmentFilter = null;
-    const departmanMatches = queryLower.match(/(finans|bilgi teknolojileri|insan kaynakları|muhasebe|satış|pazarlama|üretim|ar-ge|lojistik) departman[ıi]/);
+    const departmanMatches = queryLower.match(/(finans|bilgi teknolojileri|insan kaynakları|muhasebe|satış|pazarlama|üretim|ar-ge|lojistik) departman[ıi]?/);
     if (departmanMatches) {
       departmentFilter = departmanMatches[1];
+      console.log(`Departman filtresi: ${departmentFilter}`);
     }
 
     // Ay bilgisini çıkart (varsa)
@@ -47,6 +48,7 @@ serve(async (req) => {
     for (const ay in aylarMap) {
       if (queryLower.includes(ay)) {
         monthFilter = aylarMap[ay];
+        console.log(`Ay filtresi: ${ay} (${monthFilter})`);
         break;
       }
     }
@@ -55,6 +57,20 @@ serve(async (req) => {
     const yearMatches = queryLower.match(/20[0-9]{2}/);
     if (yearMatches) {
       yearFilter = yearMatches[0];
+      console.log(`Yıl filtresi: ${yearFilter}`);
+    }
+
+    // Hiçbir filtre bulunamadıysa
+    if (!departmentFilter && !monthFilter) {
+      return new Response(
+        JSON.stringify({
+          error: 'Filtreleme kriterleri bulunamadı',
+          explanation: "Sorgunuzda departman veya tarih belirterek daha spesifik bir arama yapabilirsiniz. Örneğin: 'Finans departmanı mart ayı giriş raporu'"
+        }), 
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     // Temel sorguyu oluştur
@@ -106,6 +122,16 @@ serve(async (req) => {
     }
 
     console.log(`${data?.length || 0} kayıt bulundu`);
+
+    if (!data || data.length === 0) {
+      return new Response(
+        JSON.stringify({
+          records: [],
+          explanation: "Arama kriterlerine uygun kayıt bulunamadı."
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Yanıt verisini formatla
     const formattedResponse = data?.map(record => {

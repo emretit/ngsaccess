@@ -168,33 +168,50 @@ export function useAiChat() {
 
     try {
       // Önce Supabase Edge Function ile doğal dil sorgusu dene
-      try {
-        console.log("Supabase doğal dil sorgu endpoint'i çağrılıyor:", SUPABASE_NATURAL_QUERY_ENDPOINT);
-        const response = await fetch(SUPABASE_NATURAL_QUERY_ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: input }),
-          signal: AbortSignal.timeout(8000)
-        });
+      console.log("Supabase doğal dil sorgu endpoint'i çağrılıyor:", SUPABASE_NATURAL_QUERY_ENDPOINT);
+      const response = await fetch(SUPABASE_NATURAL_QUERY_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: input }),
+        signal: AbortSignal.timeout(10000)
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          console.log("Doğal dil sorgusu yanıtı:", data);
-          
-          if (data.records && Array.isArray(data.records) && data.records.length > 0) {
-            const aiMessage: Message = {
-              id: `response-${userMessage.id}`,
-              type: 'assistant',
-              content: data.explanation || 'İşte rapor sonuçları:',
-              data: data.records
-            };
-            setMessages(prev => [...prev, aiMessage]);
-            setIsLoading(false);
-            return;
-          }
+      const data = await response.json();
+      console.log("Doğal dil sorgusu yanıtı:", data);
+      
+      if (data.error) {
+        // Hata durumunda açıklama göster
+        const aiMessage: Message = {
+          id: `response-${userMessage.id}`,
+          type: 'assistant',
+          content: data.explanation || 'Sorgunuzu anlamada bir hata oluştu. Lütfen tekrar deneyin.'
+        };
+        setMessages(prev => [...prev, aiMessage]);
+        setIsLoading(false);
+        return;
+      }
+      
+      if (data.records && Array.isArray(data.records)) {
+        if (data.records.length === 0) {
+          // Kayıt bulunamadıysa
+          const aiMessage: Message = {
+            id: `response-${userMessage.id}`,
+            type: 'assistant',
+            content: data.explanation || 'Arama kriterlerinize uygun kayıt bulunamadı.'
+          };
+          setMessages(prev => [...prev, aiMessage]);
+        } else {
+          // Kayıtlar bulunduysa
+          const aiMessage: Message = {
+            id: `response-${userMessage.id}`,
+            type: 'assistant',
+            content: data.explanation || 'İşte rapor sonuçları:',
+            data: data.records
+          };
+          setMessages(prev => [...prev, aiMessage]);
         }
-      } catch (error) {
-        console.warn("Doğal dil sorgusu hatası:", error);
+        setIsLoading(false);
+        return;
       }
 
       // Eğer doğal dil sorgusu çalışmazsa, diğer endpoint'leri dene
