@@ -25,10 +25,17 @@ interface PDKSReportTableProps {
 export function PDKSReportTable({ data }: PDKSReportTableProps) {
   // Format date for display
   const formatDateTime = (dateTimeStr: string) => {
-    if (!dateTimeStr) return '-';
+    if (!dateTimeStr || dateTimeStr === '-') return '-';
     
     try {
+      // If it already looks like a formatted string, return as is
+      if (dateTimeStr.includes('/') && dateTimeStr.includes(':')) {
+        return dateTimeStr;
+      }
+      
       const date = new Date(dateTimeStr);
+      if (isNaN(date.getTime())) return dateTimeStr;
+      
       return date.toLocaleString('tr-TR', {
         day: '2-digit',
         month: '2-digit',
@@ -37,15 +44,16 @@ export function PDKSReportTable({ data }: PDKSReportTableProps) {
         minute: '2-digit'
       });
     } catch (e) {
+      console.log("Date formatting error:", e);
       return dateTimeStr;
     }
   };
 
   // Dynamically determine columns based on data
-  const columns = Object.keys(data[0] || {}).filter(key => 
+  const columns = data.length > 0 ? Object.keys(data[0] || {}).filter(key => 
     // Only show these fields in the table
     ['name', 'check_in', 'check_out', 'department', 'device', 'location'].includes(key)
-  );
+  ) : [];
 
   // Map column keys to display names
   const columnDisplayNames: Record<string, string> = {
@@ -86,7 +94,7 @@ export function PDKSReportTable({ data }: PDKSReportTableProps) {
           ))}
           {data.length === 0 && (
             <TableRow>
-              <TableCell colSpan={columns.length} className="text-center py-4">
+              <TableCell colSpan={columns.length || 6} className="text-center py-4">
                 Veri bulunamadı
               </TableCell>
             </TableRow>

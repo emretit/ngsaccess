@@ -270,7 +270,7 @@ export function useAiChat() {
       // Call the Supabase natural language query endpoint WITH AUTHORIZATION
       console.log("Calling Supabase natural language query endpoint:", SUPABASE_NATURAL_QUERY_ENDPOINT);
       
-      // Get the Supabase access token
+      // Get the Supabase access token - fixed the auth session access
       const { data: { session } } = await supabase.auth.getSession();
       
       const response = await fetch(SUPABASE_NATURAL_QUERY_ENDPOINT, {
@@ -278,7 +278,7 @@ export function useAiChat() {
         headers: { 
           'Content-Type': 'application/json',
           // Add authorization header with JWT from Supabase session
-          'Authorization': `Bearer ${session?.access_token || supabase.auth.session()?.access_token}`,
+          'Authorization': `Bearer ${session?.access_token || ''}`,
           // Add apikey header with anon key
           'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqdWRzZ2hod21uc25uZG5zd2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyMzk1NTMsImV4cCI6MjA1MTgxNTU1M30.9mA6Q1JDCszfH3nujNpGWd36M4qxZ-L38GPTaNIsjVg'
         },
