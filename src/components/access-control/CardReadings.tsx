@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
+import { useState } from "react";
+import { EmployeePagination } from "@/components/employees/EmployeePagination";
 
 interface CardReading {
   id: number;
@@ -25,15 +27,27 @@ interface CardReading {
 }
 
 const CardReadings = () => {
-  const { data: readings, isLoading, error } = useQuery({
-    queryKey: ["cardReadings"],
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 100;
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["cardReadings", currentPage],
     queryFn: async () => {
-      console.log("Fetching card readings...");
+      console.log("Fetching card readings for page:", currentPage);
+      const from = (currentPage - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      // First, get total count
+      const { count } = await supabase
+        .from("card_readings")
+        .select("*", { count: "exact", head: true });
+
+      // Then get paginated data
       const { data, error } = await supabase
         .from("card_readings")
         .select("*")
         .order("access_time", { ascending: false })
-        .limit(1000);
+        .range(from, to);
 
       if (error) {
         console.error("Error fetching card readings:", error);
@@ -41,7 +55,10 @@ const CardReadings = () => {
       }
       
       console.log("Card readings fetched:", data);
-      return data as CardReading[];
+      return {
+        readings: data as CardReading[],
+        totalCount: count || 0
+      };
     },
   });
 
@@ -63,7 +80,7 @@ const CardReadings = () => {
     );
   }
 
-  if (!readings || readings.length === 0) {
+  if (!data?.readings || data.readings.length === 0) {
     return (
       <div className="space-y-6">
         <h2 className="text-2xl font-bold">Kart Okuma Kayıtları</h2>
@@ -76,13 +93,15 @@ const CardReadings = () => {
     );
   }
 
+  const totalPages = Math.ceil(data.totalCount / PAGE_SIZE);
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">Kart Okuma Kayıtları</h2>
       <Card>
         <div className="p-6">
           <div className="mb-4 text-sm text-muted-foreground">
-            Toplam {readings.length} kayıt görüntüleniyor.
+            {data.totalCount} kayıttan {(currentPage - 1) * PAGE_SIZE + 1} - {Math.min(currentPage * PAGE_SIZE, data.totalCount)} arası görüntüleniyor
           </div>
           <div className="overflow-x-auto">
             <Table>
@@ -98,7 +117,7 @@ const CardReadings = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {readings.map((reading) => (
+                {data.readings.map((reading) => (
                   <TableRow key={reading.id}>
                     <TableCell>{reading.employee_name || "Bilinmeyen"}</TableCell>
                     <TableCell>{reading.card_no}</TableCell>
@@ -117,6 +136,13 @@ const CardReadings = () => {
                 ))}
               </TableBody>
             </Table>
+          </div>
+          <div className="mt-4">
+            <EmployeePagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+            />
           </div>
         </div>
       </Card>
