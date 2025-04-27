@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import * as pdf from 'https://deno.land/x/pdfkit@v0.5.1/mod.ts';
+import { jsPDF } from "https://esm.sh/jspdf@2.5.1";
+import "https://esm.sh/jspdf-autotable@3.8.2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,39 +16,35 @@ serve(async (req) => {
   try {
     const { headers, rows, title, date } = await req.json();
 
-    const doc = new pdf.default();
-    const chunks: Uint8Array[] = [];
-
-    doc.on('data', (chunk: Uint8Array) => chunks.push(chunk));
-
+    // Create a new PDF document
+    const doc = new jsPDF();
+    
     // Add title
-    doc.fontSize(16).text(title, { align: 'center' });
-    doc.fontSize(12).text(date, { align: 'center' });
-    doc.moveDown();
-
-    // Add table headers
-    const columnWidth = 150;
-    let y = doc.y;
-    headers.forEach((header: string, i: number) => {
-      doc.text(header, i * columnWidth, y, { width: columnWidth, align: 'center' });
+    doc.setFontSize(16);
+    doc.text(title, doc.internal.pageSize.getWidth() / 2, 20, { align: 'center' });
+    
+    // Add date
+    doc.setFontSize(12);
+    doc.text(date, doc.internal.pageSize.getWidth() / 2, 30, { align: 'center' });
+    
+    // Add table
+    (doc as any).autoTable({
+      head: [headers],
+      body: rows,
+      startY: 40,
+      theme: 'grid',
+      styles: {
+        fontSize: 10,
+      },
+      headStyles: {
+        fillColor: [66, 66, 66],
+        textColor: 255,
+      },
+      margin: { top: 40 },
     });
-
-    // Add rows
-    y += 20;
-    rows.forEach((row: any[]) => {
-      row.forEach((cell, i) => {
-        doc.text(String(cell), i * columnWidth, y, { width: columnWidth, align: 'center' });
-      });
-      y += 20;
-      if (y > 700) {
-        doc.addPage();
-        y = 50;
-      }
-    });
-
-    doc.end();
-
-    const pdfBytes = new Uint8Array(Buffer.concat(chunks));
+    
+    // Convert to bytes
+    const pdfBytes = doc.output('arraybuffer');
 
     return new Response(pdfBytes, {
       headers: {
