@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,21 +10,32 @@ interface Message {
   id: string;
   type: 'user' | 'assistant';
   content: string;
+  data?: any; // Rapor verisi için
 }
 
 // Configuration for local Llama model
-const LOCAL_LLAMA_ENDPOINTS = [
-  "http://localhost:8000/generate",
-  "http://localhost:8000/completion",
-  "http://127.0.0.1:8000/generate"
-];
+const LOCAL_LLAMA_ENDPOINTS = {
+  completion: [
+    "http://localhost:5050/completion",
+    "http://127.0.0.1:5050/completion"
+  ],
+  status: [
+    "http://localhost:5050/status",
+    "http://127.0.0.1:5050/status"
+  ],
+  report: [
+    "http://localhost:5050/api/pdks-report",
+    "http://127.0.0.1:5050/api/pdks-report"
+  ]
+};
+
 const LOCAL_MODEL_ENABLED = true;
 
 export function PDKSAiChat() {
   const [messages, setMessages] = useState<Message[]>([{
     id: 'welcome',
     type: 'assistant',
-    content: 'Merhaba! PDKS kayıtları hakkında sorularınızı yanıtlayabilirim.'
+    content: 'Merhaba! PDKS raporları için sorularınızı yanıtlayabilirim. Örnek: "Finans departmanı mart ayı giriş takip raporu"'
   }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -36,9 +46,9 @@ export function PDKSAiChat() {
   const checkLocalModelStatus = async () => {
     if (!LOCAL_MODEL_ENABLED) return;
     
-    for (const endpoint of LOCAL_LLAMA_ENDPOINTS) {
+    for (const endpoint of LOCAL_LLAMA_ENDPOINTS.status) {
       try {
-        const response = await fetch(`${endpoint}/status`, { 
+        const response = await fetch(endpoint, { 
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           signal: AbortSignal.timeout(3000)  // 3 second timeout
@@ -83,25 +93,57 @@ export function PDKSAiChat() {
     setIsLoading(true);
 
     try {
-      let aiResponse = "Şu anda yerel AI modeline bağlanılamıyor.";
+      // Önce rapor endpoint'ini deneyelim
+      for (const endpoint of LOCAL_LLAMA_ENDPOINTS.report) {
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: input }),
+            signal: AbortSignal.timeout(5000)
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            // Eğer rapor verisi varsa, tablo formatında göster
+            if (Array.isArray(data) && data.length > 0) {
+              const aiMessage: Message = {
+                id: `response-${userMessage.id}`,
+                type: 'assistant',
+                content: 'İşte rapor sonuçları:',
+                data: data
+              };
+              setMessages(prev => [...prev, aiMessage]);
+              setIsLoading(false);
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn(`Rapor endpoint hatası:`, error);
+        }
+      }
+
+      // Rapor alınamadıysa, normal sohbet yanıtı deneyelim
+      let aiResponse = "Üzgünüm, rapor oluşturulamadı veya veriye ulaşılamadı.";
       
       if (LOCAL_MODEL_ENABLED && isLocalModelConnected) {
-        for (const endpoint of LOCAL_LLAMA_ENDPOINTS) {
+        for (const endpoint of LOCAL_LLAMA_ENDPOINTS.completion) {
           try {
             const response = await fetch(endpoint, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                prompt: input,
+                prompt: `Sen bir PDKS (Personel Devam Kontrol Sistemi) asistanısın. Kullanıcının sorusu: ${input}`,
                 max_tokens: 500,
-                temperature: 0.7
+                temperature: 0.7,
+                stop: ["###"]
               }),
-              signal: AbortSignal.timeout(5000)  // 5 second timeout
+              signal: AbortSignal.timeout(5000)
             });
             
             if (response.ok) {
               const data = await response.json();
-              aiResponse = data.response || data.generated_text || data.choices?.[0]?.text || "Yanıt alınamadı.";
+              aiResponse = data.content || data.response || data.generated_text || data.choices?.[0]?.text || "Yanıt alınamadı.";
               break;
             }
           } catch (endpointError) {
@@ -129,10 +171,43 @@ export function PDKSAiChat() {
     }
   };
 
+  const renderMessage = (message: Message) => {
+    if (message.data) {
+      return (
+        <div className="space-y-2">
+          <p>{message.content}</p>
+          <div className="overflow-x-auto">
+            <table className="min-w-full bg-white border border-gray-300">
+              <thead>
+                <tr>
+                  <th className="border p-2">İsim</th>
+                  <th className="border p-2">Giriş Saati</th>
+                  <th className="border p-2">Çıkış Saati</th>
+                  <th className="border p-2">Departman</th>
+                </tr>
+              </thead>
+              <tbody>
+                {message.data.map((record: any, index: number) => (
+                  <tr key={index}>
+                    <td className="border p-2">{record.name}</td>
+                    <td className="border p-2">{new Date(record.check_in).toLocaleString()}</td>
+                    <td className="border p-2">{record.check_out ? new Date(record.check_out).toLocaleString() : '-'}</td>
+                    <td className="border p-2">{record.department}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+    return message.content;
+  };
+
   return (
     <Card className="w-full h-[calc(100vh-12rem)] shadow-lg">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg font-medium">PDKS AI Asistan</CardTitle>
+        <CardTitle className="text-lg font-medium">PDKS AI Rapor Asistanı</CardTitle>
         {LOCAL_MODEL_ENABLED && (
           <div className="flex items-center gap-2">
             <div className={`h-2 w-2 rounded-full ${isLocalModelConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
@@ -159,7 +234,7 @@ export function PDKSAiChat() {
                         : 'bg-muted'
                     }`}
                   >
-                    {message.content}
+                    {renderMessage(message)}
                   </div>
                 </div>
               ))}
@@ -178,7 +253,7 @@ export function PDKSAiChat() {
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="PDKS kayıtları hakkında bir soru sorun..."
+              placeholder="Örnek: Finans departmanı mart ayı giriş takip raporu..."
               disabled={isLoading}
               className="flex-1"
             />
