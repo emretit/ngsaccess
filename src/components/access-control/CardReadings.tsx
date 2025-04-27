@@ -21,6 +21,7 @@ interface CardReading {
   device_name: string;
   access_granted: boolean;
   status: string;
+  device_location: string;
 }
 
 const CardReadings = () => {
@@ -32,7 +33,7 @@ const CardReadings = () => {
         .from("card_readings")
         .select("*")
         .order("access_time", { ascending: false })
-        .limit(100);
+        .limit(1000);
 
       if (error) {
         console.error("Error fetching card readings:", error);
@@ -91,6 +92,7 @@ const CardReadings = () => {
                   <TableHead>Kart No</TableHead>
                   <TableHead>Zaman</TableHead>
                   <TableHead>Cihaz</TableHead>
+                  <TableHead>Konum</TableHead>
                   <TableHead>Durum</TableHead>
                   <TableHead>Erişim</TableHead>
                 </TableRow>
@@ -104,6 +106,7 @@ const CardReadings = () => {
                       {format(new Date(reading.access_time), "dd.MM.yyyy HH:mm:ss")}
                     </TableCell>
                     <TableCell>{reading.device_name || "Bilinmeyen Cihaz"}</TableCell>
+                    <TableCell>{reading.device_location || "-"}</TableCell>
                     <TableCell>{reading.status}</TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded text-sm ${reading.access_granted ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
