@@ -74,5 +74,3 @@ wheels/
 # Build output
 dist/
 build/ 
-llama.cpp
-llama.cpp
