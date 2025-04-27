@@ -64,14 +64,55 @@ serve(async (req) => {
     const departmentKeywords = [
       'finans', 'bilgi teknolojileri', 'insan kaynakları', 'muhasebe', 
       'satış', 'pazarlama', 'üretim', 'ar-ge', 'lojistik', 'it', 'finance', 
-      'hr', 'marketing', 'sales', 'accounting'
+      'hr', 'marketing', 'sales', 'accounting', 'engineering', 'mühendislik'
     ];
     
-    for (const dept of departmentKeywords) {
-      if (queryNormalized.includes(normalizeText(dept))) {
-        departmentFilter = dept;
-        console.log(`PDKS Natural Query: Detected department filter: "${departmentFilter}"`);
-        break;
+    // First check for department prefixes/suffixes to improve detection
+    const deptPrefixes = ['departman', 'bölüm', 'birim', 'department'];
+    
+    for (const prefix of deptPrefixes) {
+      // Look for patterns like "engineering departmanı" or "departman engineering"
+      const prefixRegex = new RegExp(`(\\w+)\\s+${prefix}`, 'i');
+      const suffixRegex = new RegExp(`${prefix}\\s+(\\w+)`, 'i');
+      
+      const prefixMatch = queryNormalized.match(prefixRegex);
+      const suffixMatch = queryNormalized.match(suffixRegex);
+      
+      if (prefixMatch && prefixMatch[1]) {
+        const potentialDept = prefixMatch[1].toLowerCase();
+        console.log(`PDKS Natural Query: Potential department from prefix pattern: "${potentialDept}"`);
+        if (departmentKeywords.includes(potentialDept) || potentialDept === 'engineering' || potentialDept === 'mühendislik') {
+          departmentFilter = potentialDept;
+          console.log(`PDKS Natural Query: Detected department filter from prefix pattern: "${departmentFilter}"`);
+          break;
+        }
+      }
+      
+      if (suffixMatch && suffixMatch[1]) {
+        const potentialDept = suffixMatch[1].toLowerCase();
+        console.log(`PDKS Natural Query: Potential department from suffix pattern: "${potentialDept}"`);
+        if (departmentKeywords.includes(potentialDept) || potentialDept === 'engineering' || potentialDept === 'mühendislik') {
+          departmentFilter = potentialDept;
+          console.log(`PDKS Natural Query: Detected department filter from suffix pattern: "${departmentFilter}"`);
+          break;
+        }
+      }
+    }
+    
+    // If no department found using prefix/suffix patterns, check for direct mention
+    if (!departmentFilter) {
+      for (const dept of departmentKeywords) {
+        if (queryNormalized.includes(normalizeText(dept))) {
+          departmentFilter = dept;
+          console.log(`PDKS Natural Query: Detected department filter: "${departmentFilter}"`);
+          break;
+        }
+      }
+      
+      // Special check for "engineering" as it's being specifically mentioned
+      if (!departmentFilter && (queryNormalized.includes('engineering') || queryNormalized.includes('mühendislik'))) {
+        departmentFilter = 'engineering';
+        console.log(`PDKS Natural Query: Detected special case department filter: "${departmentFilter}"`);
       }
     }
 
@@ -152,6 +193,17 @@ serve(async (req) => {
     
     // Add filters based on extracted information
     if (departmentFilter) {
+      // Map common department aliases
+      if (departmentFilter === 'it' || departmentFilter === 'bilgi teknolojileri') {
+        departmentFilter = 'IT';
+      } else if (departmentFilter === 'engineering' || departmentFilter === 'mühendislik') {
+        departmentFilter = 'Engineering';
+      } else if (departmentFilter === 'finans' || departmentFilter === 'finance') {
+        departmentFilter = 'Finans';
+      } else if (departmentFilter === 'hr' || departmentFilter === 'insan kaynakları') {
+        departmentFilter = 'İnsan Kaynakları';
+      }
+      
       console.log(`PDKS Natural Query: Adding department filter for "${departmentFilter}"`);
       supabaseQuery = supabaseQuery.eq('employees.department.name', departmentFilter);
     }
