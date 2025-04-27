@@ -50,27 +50,7 @@ export function useAiChat() {
 
   const handleExportExcel = (messageData: any) => {
     if (!messageData || !Array.isArray(messageData)) {
-      toast({
-        title: "Dışa aktarılamadı",
-        description: "Bu mesaj dışa aktarılabilir bir rapor içermiyor.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const ws = XLSX.utils.json_to_sheet(messageData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Rapor");
-    XLSX.writeFile(wb, `pdks_rapor_${new Date().toISOString().split('T')[0]}.xlsx`);
-
-    toast({
-      title: "Excel dosyası indirildi",
-      description: "Rapor başarıyla Excel formatında dışa aktarıldı.",
-    });
-  };
-
-  const handleExportPDF = async (messageData: any) => {
-    if (!messageData || !Array.isArray(messageData)) {
+      console.log("Export Excel error: No data to export", messageData);
       toast({
         title: "Dışa aktarılamadı",
         description: "Bu mesaj dışa aktarılabilir bir rapor içermiyor.",
@@ -80,9 +60,46 @@ export function useAiChat() {
     }
 
     try {
+      const ws = XLSX.utils.json_to_sheet(messageData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Rapor");
+      XLSX.writeFile(wb, `pdks_rapor_${new Date().toISOString().split('T')[0]}.xlsx`);
+  
+      toast({
+        title: "Excel dosyası indirildi",
+        description: "Rapor başarıyla Excel formatında dışa aktarıldı.",
+      });
+    } catch (error) {
+      console.error("Excel export error:", error);
+      toast({
+        title: "Excel oluşturma hatası",
+        description: "Excel dosyası oluşturulurken bir hata oluştu.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportPDF = async (messageData: any) => {
+    if (!messageData || !Array.isArray(messageData)) {
+      console.log("Export PDF error: No data to export", messageData);
+      toast({
+        title: "Dışa aktarılamadı",
+        description: "Bu mesaj dışa aktarılabilir bir rapor içermiyor.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      console.log("Preparing PDF export data", { 
+        headers: Object.keys(messageData[0]), 
+        rowCount: messageData.length 
+      });
+
       const headers = Object.keys(messageData[0]);
       const rows = messageData.map(Object.values);
       
+      console.log("Calling generate-pdf function");
       const response = await fetch('https://gjudsghhwmnsnndnswho.supabase.co/functions/v1/generate-pdf', {
         method: 'POST',
         headers: {
@@ -96,9 +113,17 @@ export function useAiChat() {
         }),
       });
 
-      if (!response.ok) throw new Error('PDF oluşturma hatası');
+      console.log("PDF generation response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("PDF generation error response:", errorText);
+        throw new Error(`PDF oluşturma hatası: ${response.status} ${errorText}`);
+      }
 
       const blob = await response.blob();
+      console.log("PDF blob received, size:", blob.size);
+      
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -116,7 +141,7 @@ export function useAiChat() {
       console.error('PDF export error:', error);
       toast({
         title: "PDF oluşturma hatası",
-        description: "PDF dosyası oluşturulurken bir hata oluştu.",
+        description: `PDF dosyası oluşturulurken bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`,
         variant: "destructive",
       });
     }
@@ -125,16 +150,22 @@ export function useAiChat() {
   const checkLocalModelStatus = async () => {
     if (!LOCAL_MODEL_ENABLED) return;
     
+    console.log("Checking local model status...");
     for (const endpoint of LOCAL_LLAMA_ENDPOINTS.status) {
       try {
+        console.log(`Trying endpoint: ${endpoint}`);
         const response = await fetch(endpoint, { 
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           signal: AbortSignal.timeout(3000)
         });
         
+        const data = await response.json();
+        console.log(`Endpoint ${endpoint} response:`, data);
+        
         if (response.ok) {
           setIsLocalModelConnected(true);
+          console.log("Local model connection successful");
           toast({
             title: "Yerel AI modeline bağlanıldı",
             description: `${endpoint} üzerinden PDKS AI asistanı aktif.`,
@@ -142,10 +173,11 @@ export function useAiChat() {
           return;
         }
       } catch (error) {
-        console.warn(`Endpoint ${endpoint} bağlantı hatası:`, error);
+        console.warn(`Endpoint ${endpoint} connection error:`, error);
       }
     }
 
+    console.log("All local model connection attempts failed");
     toast({
       title: "Yerel Model Bağlantısı Başarısız",
       description: "Yerel model kullanılamıyor. Cloud tabanlı doğal dil işleme modeli kullanılacak.",
@@ -165,11 +197,12 @@ export function useAiChat() {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
+    console.log("Handling user message:", input);
 
     try {
-      // Önce Supabase Edge Function ile doğal dil sorgusu dene
+      // First try Supabase Edge Function for natural language query
       try {
-        console.log("Supabase doğal dil sorgu endpoint'i çağrılıyor:", SUPABASE_NATURAL_QUERY_ENDPOINT);
+        console.log("Calling Supabase natural language query endpoint:", SUPABASE_NATURAL_QUERY_ENDPOINT);
         const response = await fetch(SUPABASE_NATURAL_QUERY_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -177,9 +210,11 @@ export function useAiChat() {
           signal: AbortSignal.timeout(8000)
         });
 
+        console.log("Natural language query response status:", response.status);
+
         if (response.ok) {
           const data = await response.json();
-          console.log("Doğal dil sorgusu yanıtı:", data);
+          console.log("Natural language query response data:", data);
           
           if (data.records && Array.isArray(data.records) && data.records.length > 0) {
             const aiMessage: Message = {
@@ -191,16 +226,23 @@ export function useAiChat() {
             setMessages(prev => [...prev, aiMessage]);
             setIsLoading(false);
             return;
+          } else {
+            console.log("Natural language query returned no records");
           }
+        } else {
+          const errorText = await response.text();
+          console.error("Natural language query error response:", errorText);
         }
       } catch (error) {
-        console.warn("Doğal dil sorgusu hatası:", error);
+        console.warn("Natural language query error:", error);
       }
 
-      // Eğer doğal dil sorgusu çalışmazsa, diğer endpoint'leri dene
+      // If natural language query fails, try other endpoints
       // Try report endpoint first
+      console.log("Trying local report endpoints");
       for (const endpoint of LOCAL_LLAMA_ENDPOINTS.report) {
         try {
+          console.log(`Trying report endpoint: ${endpoint}`);
           const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -208,8 +250,12 @@ export function useAiChat() {
             signal: AbortSignal.timeout(5000)
           });
 
+          console.log(`Report endpoint ${endpoint} response status:`, response.status);
+
           if (response.ok) {
             const data = await response.json();
+            console.log(`Report endpoint ${endpoint} response data:`, data);
+            
             if (Array.isArray(data) && data.length > 0) {
               const aiMessage: Message = {
                 id: `response-${userMessage.id}`,
@@ -220,10 +266,15 @@ export function useAiChat() {
               setMessages(prev => [...prev, aiMessage]);
               setIsLoading(false);
               return;
+            } else {
+              console.log(`Report endpoint ${endpoint} returned no data or invalid format`);
             }
+          } else {
+            const errorText = await response.text();
+            console.error(`Report endpoint ${endpoint} error response:`, errorText);
           }
         } catch (error) {
-          console.warn(`Rapor endpoint hatası:`, error);
+          console.warn(`Report endpoint ${endpoint} error:`, error);
         }
       }
 
@@ -231,8 +282,10 @@ export function useAiChat() {
       let aiResponse = "Üzgünüm, raporlar için sorgunuzu anlayamadım. Lütfen 'Finans departmanı mart ayı giriş raporu' gibi daha açık bir ifade kullanın.";
       
       if (LOCAL_MODEL_ENABLED && isLocalModelConnected) {
+        console.log("Trying local completion endpoints");
         for (const endpoint of LOCAL_LLAMA_ENDPOINTS.completion) {
           try {
+            console.log(`Trying completion endpoint: ${endpoint}`);
             const response = await fetch(endpoint, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -245,17 +298,26 @@ export function useAiChat() {
               signal: AbortSignal.timeout(5000)
             });
             
+            console.log(`Completion endpoint ${endpoint} response status:`, response.status);
+            
             if (response.ok) {
               const data = await response.json();
+              console.log(`Completion endpoint ${endpoint} response data:`, data);
               aiResponse = data.content || data.response || data.generated_text || data.choices?.[0]?.text || "Yanıt alınamadı.";
               break;
+            } else {
+              const errorText = await response.text();
+              console.error(`Completion endpoint ${endpoint} error response:`, errorText);
             }
           } catch (endpointError) {
-            console.warn(`Endpoint hatası:`, endpointError);
+            console.warn(`Completion endpoint ${endpoint} error:`, endpointError);
           }
         }
+      } else {
+        console.log("Skipping local completion endpoints - model not connected or disabled");
       }
 
+      console.log("Sending assistant response:", aiResponse.substring(0, 100) + "...");
       const aiMessage: Message = {
         id: `response-${userMessage.id}`,
         type: 'assistant',
@@ -263,11 +325,11 @@ export function useAiChat() {
       };
       setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
-      console.error('AI sohbet hatası:', error);
+      console.error('AI chat error:', error);
       const errorMessage: Message = {
         id: `error-${userMessage.id}`,
         type: 'assistant',
-        content: 'Üzgünüm, bir hata oluştu. Lütfen daha sonra tekrar deneyin.'
+        content: `Üzgünüm, bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -276,6 +338,7 @@ export function useAiChat() {
   };
 
   useEffect(() => {
+    console.log("useAiChat hook initialized");
     checkLocalModelStatus();
   }, []);
 

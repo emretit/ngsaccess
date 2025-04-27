@@ -8,56 +8,64 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Supabase istemcisini başlat
+// Initialize Supabase client
 const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
-// Ay isimlerini sayılara çevirmek için yardımcı fonksiyon
+console.log('PDKS Natural Query: Function initialized with Supabase URL:', Deno.env.get('SUPABASE_URL')?.substring(0, 15) + '...');
+
+// Helper function to convert month names to numbers
 const aylarMap: Record<string, string> = {
   'ocak': '01', 'şubat': '02', 'mart': '03', 'nisan': '04', 'mayıs': '05', 'haziran': '06',
   'temmuz': '07', 'ağustos': '08', 'eylül': '09', 'ekim': '10', 'kasım': '11', 'aralık': '12'
 };
 
 serve(async (req) => {
-  // CORS kontrolleri
+  console.log(`PDKS Natural Query: Received ${req.method} request`);
+
+  // CORS checks
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // İstek parametrelerini al
+    // Get request parameters
     const { query } = await req.json();
     const queryLower = query.toLowerCase();
     
-    console.log(`Alınan sorgu: ${queryLower}`);
+    console.log(`PDKS Natural Query: Received query: "${queryLower}"`);
 
-    // Departman adını çıkart (varsa)
+    // Extract department name (if any)
     let departmentFilter = null;
     const departmanMatches = queryLower.match(/(finans|bilgi teknolojileri|insan kaynakları|muhasebe|satış|pazarlama|üretim|ar-ge|lojistik) departman[ıi]/);
     if (departmanMatches) {
       departmentFilter = departmanMatches[1];
+      console.log(`PDKS Natural Query: Detected department filter: "${departmentFilter}"`);
     }
 
-    // Ay bilgisini çıkart (varsa)
+    // Extract month information (if any)
     let monthFilter = null;
-    let yearFilter = new Date().getFullYear().toString(); // Varsayılan olarak bu yıl
+    let yearFilter = new Date().getFullYear().toString(); // Default to current year
     
     for (const ay in aylarMap) {
       if (queryLower.includes(ay)) {
         monthFilter = aylarMap[ay];
+        console.log(`PDKS Natural Query: Detected month filter: "${ay}" (${monthFilter})`);
         break;
       }
     }
     
-    // Yıl bilgisini çıkart (varsa)
+    // Extract year information (if any)
     const yearMatches = queryLower.match(/20[0-9]{2}/);
     if (yearMatches) {
       yearFilter = yearMatches[0];
+      console.log(`PDKS Natural Query: Detected year filter: "${yearFilter}"`);
     }
 
-    // Temel sorguyu oluştur
+    // Create base query
+    console.log('PDKS Natural Query: Building Supabase query');
     let supabaseQuery = supabaseClient
       .from('card_readings')
       .select(`
@@ -72,15 +80,16 @@ serve(async (req) => {
         )
       `);
     
-    // Filtreleri ekle
+    // Add filters
     if (departmentFilter) {
+      console.log(`PDKS Natural Query: Adding department filter for "${departmentFilter}"`);
       supabaseQuery = supabaseQuery.eq('employees.department.name', departmentFilter);
     }
 
     if (monthFilter) {
       const startDate = `${yearFilter}-${monthFilter}-01T00:00:00`;
       
-      // Ay sonunu hesapla
+      // Calculate month end
       let nextMonth = parseInt(monthFilter) + 1;
       let nextMonthYear = parseInt(yearFilter);
       if (nextMonth > 12) {
@@ -90,29 +99,30 @@ serve(async (req) => {
       const nextMonthStr = nextMonth < 10 ? `0${nextMonth}` : `${nextMonth}`;
       const endDate = `${nextMonthYear}-${nextMonthStr}-01T00:00:00`;
       
+      console.log(`PDKS Natural Query: Adding date range filter from "${startDate}" to "${endDate}"`);
       supabaseQuery = supabaseQuery.gte('access_time', startDate).lt('access_time', endDate);
     }
 
-    // Erişim zamanına göre sırala
+    // Sort by access time
     supabaseQuery = supabaseQuery.order('access_time', { ascending: false });
 
-    // Sorguyu çalıştır
-    console.log("Sorgu yapılıyor...");
+    // Execute query
+    console.log("PDKS Natural Query: Executing Supabase query");
     const { data, error } = await supabaseQuery;
 
     if (error) {
-      console.error("Sorgu hatası:", error);
+      console.error("PDKS Natural Query: Query error:", error);
       throw error;
     }
 
-    console.log(`${data?.length || 0} kayıt bulundu`);
+    console.log(`PDKS Natural Query: Found ${data?.length || 0} records`);
 
-    // Yanıt verisini formatla
+    // Format response data
     const formattedResponse = data?.map(record => {
-      // Giriş saati
+      // Access time
       const accessTime = new Date(record.access_time);
       
-      // Departman adını çıkart
+      // Extract department name
       let departmentName = 'Bilinmiyor';
       if (record.employees && record.employees.department) {
         departmentName = record.employees.department.name;
@@ -121,12 +131,12 @@ serve(async (req) => {
       return {
         name: record.employee_name || 'Bilinmiyor',
         check_in: record.access_time,
-        check_out: null, // Çıkış bilgisi giriş/çıkış mantığına göre işlenecek
+        check_out: null, // Exit information will be processed according to entry/exit logic
         department: departmentName 
       };
     }) || [];
 
-    // Mantıklı açıklama oluştur
+    // Create logical explanation
     let explanation = "İşte sorgunuza göre rapor sonuçları";
     if (departmentFilter && monthFilter) {
       const ayIsimleri = Object.keys(aylarMap).find(key => aylarMap[key] === monthFilter);
@@ -138,6 +148,7 @@ serve(async (req) => {
       explanation = `${ayIsimleri} ${yearFilter} dönemine ait giriş kayıtları`;
     }
 
+    console.log(`PDKS Natural Query: Sending response with explanation: "${explanation}"`);
     return new Response(JSON.stringify({ 
       records: formattedResponse,
       explanation: explanation
@@ -146,10 +157,11 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('PDKS doğal dil sorgusu hatası:', error);
+    console.error('PDKS Natural Query Error:', error);
     return new Response(
       JSON.stringify({ 
         error: error.message,
+        stack: error.stack,
         explanation: "Üzgünüm, sorgunuzu işlerken bir hata oluştu." 
       }), 
       { 
