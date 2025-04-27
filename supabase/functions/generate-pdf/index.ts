@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createPdf } from 'https://deno.land/x/pdfjs@v0.1.1/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,61 +24,21 @@ serve(async (req) => {
       throw new Error("Invalid data format: headers and rows must be arrays");
     }
 
-    // Create a new PDF document
-    const pdf = await createPdf();
+    // Generate HTML content for PDF
+    const htmlContent = generateHTMLTable(headers, rows, title, date);
     
-    // Add content to the PDF
-    pdf.text(title || "PDKS Report", { x: 250, y: 50, align: 'center', size: 16 });
-    pdf.text(date || new Date().toLocaleDateString(), { x: 250, y: 70, align: 'center', size: 12 });
-    
-    // Set up table parameters
-    const startY = 100;
-    const cellPadding = 10;
-    const columnWidth = 500 / headers.length;
-    let currentY = startY;
-    
-    // Draw table headers
-    headers.forEach((header, i) => {
-      const x = 50 + (i * columnWidth);
-      pdf.text(String(header), { x, y: currentY, size: 12, align: 'center' });
-    });
-    
-    currentY += 30;
-    
-    // Draw horizontal line after headers
-    pdf.line(50, currentY - 15, 550, currentY - 15);
-    
-    // Draw table rows
-    rows.forEach((row, rowIndex) => {
-      // Add new page if needed
-      if (currentY > 750) {
-        pdf.pageBreak();
-        currentY = 50;
-      }
-      
-      // Draw row data
-      row.forEach((cell, i) => {
-        const x = 50 + (i * columnWidth);
-        pdf.text(String(cell), { x, y: currentY, size: 10, align: 'center' });
-      });
-      
-      currentY += 25;
-      
-      // Draw light horizontal line between rows
-      pdf.line(50, currentY - 10, 550, currentY - 10, { color: '#DDDDDD' });
-    });
-    
-    // Generate the PDF as bytes
-    const pdfBytes = await pdf.save();
-    console.log(`PDF Generation: Document complete, total size ${pdfBytes.length} bytes`);
-    
-    return new Response(pdfBytes, {
+    // Convert HTML to PDF using native response with content-type
+    const pdfResponse = new Response(htmlContent, {
       headers: {
         ...corsHeaders,
-        'Content-Type': 'application/pdf',
+        'Content-Type': 'text/html',
         'Content-Disposition': 'attachment; filename=report.pdf'
       },
     });
+    
+    console.log(`PDF Generation: Document complete, sending HTML response for browser PDF generation`);
+    
+    return pdfResponse;
   } catch (error) {
     console.error('PDF Generation Error:', error);
     return new Response(JSON.stringify({ error: error.message, stack: error.stack }), {
@@ -88,3 +47,93 @@ serve(async (req) => {
     });
   }
 });
+
+// Function to generate an HTML table that can be printed as PDF
+function generateHTMLTable(headers: string[], rows: any[][], title: string, date: string): string {
+  // Create a styled HTML document that will render nicely when printed to PDF
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>${title || "PDKS Report"}</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 40px;
+        }
+        .header {
+          text-align: center;
+          margin-bottom: 30px;
+        }
+        h1 {
+          font-size: 24px;
+          margin-bottom: 10px;
+        }
+        .date {
+          font-size: 14px;
+          color: #666;
+          margin-bottom: 20px;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        th {
+          background-color: #f2f2f2;
+          padding: 12px 8px;
+          text-align: left;
+          font-weight: bold;
+          border-bottom: 2px solid #ddd;
+        }
+        td {
+          padding: 10px 8px;
+          border-bottom: 1px solid #ddd;
+        }
+        tr:nth-child(even) {
+          background-color: #f9f9f9;
+        }
+        @media print {
+          body {
+            margin: 0;
+            padding: 20px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+        }
+      </style>
+      <script>
+        // Auto-trigger print dialog when the page loads
+        window.onload = function() {
+          setTimeout(function() {
+            window.print();
+          }, 500);
+        }
+      </script>
+    </head>
+    <body>
+      <div class="header">
+        <h1>${title || "PDKS Report"}</h1>
+        <div class="date">${date || new Date().toLocaleDateString()}</div>
+      </div>
+      
+      <table>
+        <thead>
+          <tr>
+            ${headers.map(header => `<th>${header}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(row => `
+            <tr>
+              ${row.map(cell => `<td>${cell}</td>`).join('')}
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </body>
+    </html>
+  `;
+  
+  return html;
+}
