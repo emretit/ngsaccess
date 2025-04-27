@@ -7,19 +7,84 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const extractDepartment = (query) => {
+  // Simple department extraction - look for common patterns
+  const departmentMatch = query.match(/(\w+)\s+departman/i);
+  if (departmentMatch) {
+    return departmentMatch[1];
+  }
+  
+  // Check for standalone department names
+  const commonDepartments = [
+    'engineering', 'mühendislik',
+    'finans', 'finance',
+    'insan kaynakları', 'hr', 'human resources',
+    'satış', 'sales',
+    'pazarlama', 'marketing',
+    'it', 'bilgi teknolojileri',
+    'yönetim', 'management'
+  ];
+  
+  for (const dept of commonDepartments) {
+    if (query.toLowerCase().includes(dept.toLowerCase())) {
+      return dept;
+    }
+  }
+  
+  return null;
+}
+
+const extractMonth = (query) => {
+  const months = {
+    'ocak': '01', 'january': '01',
+    'şubat': '02', 'february': '02',
+    'mart': '03', 'march': '03',
+    'nisan': '04', 'april': '04',
+    'mayıs': '05', 'may': '05',
+    'haziran': '06', 'june': '06',
+    'temmuz': '07', 'july': '07',
+    'ağustos': '08', 'august': '08',
+    'eylül': '09', 'september': '09',
+    'ekim': '10', 'october': '10',
+    'kasım': '11', 'november': '11',
+    'aralık': '12', 'december': '12'
+  };
+  
+  for (const [month, num] of Object.entries(months)) {
+    if (query.toLowerCase().includes(month.toLowerCase())) {
+      return num;
+    }
+  }
+  
+  return null;
+}
+
+const getCurrentMonthAsString = () => {
+  const now = new Date();
+  const month = (now.getMonth() + 1).toString().padStart(2, '0');
+  return month;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { query } = await req.json()
+    const { query } = await req.json();
+    console.log("Received query:", query);
 
     // Initialize Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    );
+
+    // Extract potential filters from the query
+    const departmentFilter = extractDepartment(query);
+    const monthFilter = extractMonth(query) || getCurrentMonthAsString();
+    
+    console.log("Extracted filters:", { departmentFilter, monthFilter });
 
     // Base query that joins with departments
     let supabaseQuery = supabaseClient
@@ -32,25 +97,61 @@ serve(async (req) => {
           department:departments (name)
         )
       `)
-      .order('access_time', { ascending: false })
+      .order('access_time', { ascending: false });
 
-    // Format the response data
+    // Apply department filter if present
+    if (departmentFilter) {
+      console.log(`Filtering by department containing: ${departmentFilter}`);
+      supabaseQuery = supabaseQuery.filter('employees.departments.name', 'ilike', `%${departmentFilter}%`);
+    }
+
+    // Execute the query
     const { data, error } = await supabaseQuery;
     
-    if (error) throw error;
+    if (error) {
+      console.error("Database query error:", error.message);
+      throw error;
+    }
+
+    console.log(`Query returned ${data?.length || 0} records`);
+    
+    // If no data found, return an appropriate message
+    if (!data || data.length === 0) {
+      return new Response(
+        JSON.stringify({
+          data: [],
+          explanation: `Sorgunuz için kayıt bulunamadı${departmentFilter ? ' (' + departmentFilter + ' departmanı)' : ''}.`,
+          message: 'Veri bulunamadı.'
+        }),
+        { 
+          headers: { 
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    }
 
     // Transform the data for the report table
     const formattedData = data.map(record => ({
-      name: record.employee_name || 'Bilinmeyen',
+      name: record.employee_name || `${record.employees?.first_name || ''} ${record.employees?.last_name || ''}`.trim() || 'Bilinmeyen',
       check_in: record.access_time,
       department: record.employees?.department?.name || '-',
       device: record.device_name || '-',
       location: record.device_location || '-'
     }));
 
+    // Generate an explanation based on filters
+    let explanation = 'İşte ';
+    if (departmentFilter) {
+      explanation += `${departmentFilter} departmanı için `;
+    }
+    explanation += `giriş kayıtları.`;
+
     return new Response(
       JSON.stringify({
         data: formattedData,
+        explanation: explanation,
         message: 'Veriler başarıyla getirildi.'
       }),
       { 
@@ -59,12 +160,15 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
       },
-    )
+    );
 
   } catch (error) {
-    console.error('Error:', error.message)
+    console.error('Error:', error.message);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        data: []
+      }),
       { 
         status: 500,
         headers: { 
@@ -72,6 +176,6 @@ serve(async (req) => {
           'Content-Type': 'application/json',
         },
       },
-    )
+    );
   }
 })
