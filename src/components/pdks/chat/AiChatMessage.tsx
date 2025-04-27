@@ -1,71 +1,95 @@
 
-import { Button } from "@/components/ui/button";
-import { FileSpreadsheet, FileText } from "lucide-react";
+import { Check, Download, FileSpreadsheet, FileText, Info } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { PDKSReportTable } from "./PDKSReportTable";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface MessageData {
   name: string;
   check_in: string;
   check_out: string | null;
   department: string;
+  device?: string;
+  location?: string; 
+}
+
+interface Message {
+  id: string;
+  type: 'user' | 'assistant';
+  content: string;
+  data?: MessageData[];
 }
 
 interface AiChatMessageProps {
-  message: {
-    id: string;
-    type: 'user' | 'assistant';
-    content: string;
-    data?: MessageData[];
-  };
+  message: Message;
   onExportExcel: (data: MessageData[]) => void;
   onExportPDF: (data: MessageData[]) => void;
 }
 
 export function AiChatMessage({ message, onExportExcel, onExportPDF }: AiChatMessageProps) {
-  const renderMessageContent = () => {
-    if (message.data) {
-      return (
-        <div className="space-y-2">
-          <div className="flex justify-end gap-2 mb-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onExportExcel(message.data!)}
-              title="Excel olarak indir"
-            >
-              <FileSpreadsheet className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onExportPDF(message.data!)}
-              title="PDF olarak indir"
-            >
-              <FileText className="h-4 w-4" />
-            </Button>
-          </div>
-          <p>{message.content}</p>
-          <PDKSReportTable data={message.data} />
-        </div>
-      );
-    }
-    return message.content;
-  };
-
+  const isUser = message.type === 'user';
+  const hasData = message.data && message.data.length > 0;
+  
   return (
     <div
-      key={message.id}
-      className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+      className={cn(
+        "flex w-max max-w-[90%] flex-col gap-2 rounded-lg px-3 py-2 text-sm",
+        isUser
+          ? "ml-auto bg-primary text-primary-foreground"
+          : "bg-muted"
+      )}
     >
-      <div
-        className={`rounded-lg px-4 py-2 max-w-[80%] animate-fade-in ${
-          message.type === 'user'
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted'
-        }`}
-      >
-        {renderMessageContent()}
-      </div>
+      {message.content}
+      
+      {hasData && (
+        <div className="mt-2">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="h-7 gap-1"
+              onClick={() => onExportExcel(message.data!)}
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              <span>Excel</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="h-7 gap-1"
+              onClick={() => onExportPDF(message.data!)}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              <span>PDF</span>
+            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="h-7 gap-1"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                  <span>Debug Bilgisi</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80">
+                <div className="space-y-2">
+                  <h4 className="font-medium">Sorgu Detayları</h4>
+                  <div className="text-xs space-y-1">
+                    <div>Departman Filtresi: <span className="font-mono bg-muted-foreground/20 px-1 rounded">{message.data?.[0]?.department || 'Belirtilmedi'}</span></div>
+                    <div>Kayıt Sayısı: <span className="font-mono bg-muted-foreground/20 px-1 rounded">{message.data?.length || 0}</span></div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="rounded-md border overflow-hidden">
+            <PDKSReportTable data={message.data} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

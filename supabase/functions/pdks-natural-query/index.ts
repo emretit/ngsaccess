@@ -8,29 +8,64 @@ const corsHeaders = {
 };
 
 const extractDepartment = (query) => {
-  // Simple department extraction - look for common patterns
-  const departmentMatch = query.match(/(\w+)\s+departman/i);
-  if (departmentMatch) {
-    return departmentMatch[1];
-  }
+  console.log("Extracting department from query:", query);
   
-  // Check for standalone department names
-  const commonDepartments = [
-    'engineering', 'mühendislik',
-    'finans', 'finance',
-    'insan kaynakları', 'hr', 'human resources',
-    'satış', 'sales',
-    'pazarlama', 'marketing',
-    'it', 'bilgi teknolojileri',
-    'yönetim', 'management'
+  // First try to match department patterns with "departman" keyword
+  const departmentPatterns = [
+    /(\w+)\s+departman[ıi]/i,   // Match "X departmanı"
+    /departman\s+(\w+)/i,       // Match "departman X"
+    /(\w+)\s+bölümü/i,         // Match "X bölümü"
+    /bölüm\s+(\w+)/i           // Match "bölüm X"
   ];
   
-  for (const dept of commonDepartments) {
-    if (query.toLowerCase().includes(dept.toLowerCase())) {
-      return dept;
+  for (const pattern of departmentPatterns) {
+    const match = query.match(pattern);
+    if (match && match[1]) {
+      console.log(`Found department via pattern: ${match[1]}`);
+      return match[1].toLowerCase();
     }
   }
   
+  // Try to match exact department names - extensive list with both Turkish and English names
+  const commonDepartments = [
+    { tr: 'mühendislik', en: 'engineering' },
+    { tr: 'finans', en: 'finance' },
+    { tr: 'insan kaynakları', en: 'hr', alt: 'human resources' },
+    { tr: 'satış', en: 'sales' },
+    { tr: 'pazarlama', en: 'marketing' },
+    { tr: 'bilgi teknolojileri', en: 'it', alt: 'information technology' },
+    { tr: 'yönetim', en: 'management' },
+    { tr: 'muhasebe', en: 'accounting' },
+    { tr: 'üretim', en: 'production' },
+    { tr: 'lojistik', en: 'logistics' },
+    { tr: 'araştırma', en: 'research' },
+    { tr: 'hukuk', en: 'legal' }
+  ];
+  
+  const queryLower = query.toLowerCase();
+  
+  for (const dept of commonDepartments) {
+    // Check for Turkish name
+    if (queryLower.includes(dept.tr)) {
+      console.log(`Found department via Turkish name: ${dept.tr}`);
+      return dept.tr;
+    }
+    
+    // Check for English name
+    if (queryLower.includes(dept.en)) {
+      console.log(`Found department via English name: ${dept.en}`);
+      return dept.en;
+    }
+    
+    // Check for alternate name if exists
+    if (dept.alt && queryLower.includes(dept.alt)) {
+      console.log(`Found department via alternate name: ${dept.alt}`);
+      return dept.en;
+    }
+  }
+  
+  // If we reach here, no department was found
+  console.log("No department found in query");
   return null;
 }
 
@@ -102,7 +137,12 @@ serve(async (req) => {
     // Apply department filter if present
     if (departmentFilter) {
       console.log(`Filtering by department containing: ${departmentFilter}`);
+      
+      // Make partial matching more flexible - use double wildcards for partial matching
       supabaseQuery = supabaseQuery.filter('employees.departments.name', 'ilike', `%${departmentFilter}%`);
+      
+      // Debug with a log to see the actual SQL being generated
+      console.log(`SQL filter: employees.departments.name ilike %${departmentFilter}%`);
     }
 
     // Execute the query
@@ -117,11 +157,16 @@ serve(async (req) => {
     
     // If no data found, return an appropriate message
     if (!data || data.length === 0) {
+      // More detailed explanation about what filters were attempted
+      const filterExplanation = departmentFilter 
+        ? `departman: "${departmentFilter}"` 
+        : "departman filtresi belirtilmedi";
+        
       return new Response(
         JSON.stringify({
           data: [],
-          explanation: `Sorgunuz için kayıt bulunamadı${departmentFilter ? ' (' + departmentFilter + ' departmanı)' : ''}.`,
-          message: 'Veri bulunamadı.'
+          explanation: `Sorgunuz için kayıt bulunamadı (${filterExplanation}).`,
+          message: 'Veri bulunamadı. Lütfen farklı bir sorgu deneyin.'
         }),
         { 
           headers: { 

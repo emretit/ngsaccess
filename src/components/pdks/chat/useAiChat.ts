@@ -58,6 +58,7 @@ export function useAiChat() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLocalModelConnected, setIsLocalModelConnected] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<Record<string, any> | null>(null);
   const { toast } = useToast();
 
   // Format report data for display
@@ -291,11 +292,12 @@ export function useAiChat() {
       if (response.ok) {
         const data = await response.json();
         console.log("Natural language query response data:", data);
+        setDebugInfo(data);
         
-        // Check if we got a valid response with records
-        if (data.records && Array.isArray(data.records) && data.records.length > 0) {
+        // Check if we got data property and it's an array
+        if (data.data && Array.isArray(data.data) && data.data.length > 0) {
           // Format the data for better display
-          const formattedData = formatReportData(data.records);
+          const formattedData = formatReportData(data.data);
           
           // Create the assistant message with the report data
           const aiMessage: Message = {
@@ -316,11 +318,20 @@ export function useAiChat() {
         else {
           console.log("Natural language query returned no records");
           
-          // Fall back to a helpful message when no records are found
+          // Add more detailed explanation in the error message
+          let detailedExplanation = "Sorgunuza uygun kayıt bulunamadı.";
+          
+          // If we have debug info about what filters were attempted, include that
+          if (data.explanation) {
+            detailedExplanation += " " + data.explanation;
+          }
+          
+          detailedExplanation += " Lütfen farklı filtreleme kriterleri kullanarak tekrar deneyin.";
+          
           const noDataMessage: Message = {
             id: `response-${userMessage.id}`,
             type: 'assistant',
-            content: "Sorgunuza uygun kayıt bulunamadı. Lütfen farklı filtreleme kriterleri kullanarak tekrar deneyin. Örnek: 'Finans departmanı mart ayı raporu' veya 'Bugün giriş yapanlar'."
+            content: detailedExplanation
           };
           
           setMessages(prev => [...prev, noDataMessage]);
@@ -358,6 +369,7 @@ export function useAiChat() {
     isLocalModelConnected,
     handleSendMessage,
     handleExportExcel,
-    handleExportPDF
+    handleExportPDF,
+    debugInfo
   };
 }
