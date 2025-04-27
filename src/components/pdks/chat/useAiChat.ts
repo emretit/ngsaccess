@@ -8,6 +8,8 @@ interface MessageData {
   check_in: string;
   check_out: string | null;
   department: string;
+  device?: string;
+  location?: string;
 }
 
 interface Message {
@@ -15,6 +17,14 @@ interface Message {
   type: 'user' | 'assistant';
   content: string;
   data?: MessageData[];
+}
+
+interface QueryParams {
+  department?: string | null;
+  month?: string | null;
+  year?: string;
+  startDate?: string | null;
+  endDate?: string | null;
 }
 
 const LOCAL_LLAMA_ENDPOINTS = {
@@ -32,8 +42,9 @@ const LOCAL_LLAMA_ENDPOINTS = {
   ]
 };
 
-// Supabase endpoint
+// Supabase endpoint for natural language queries
 const SUPABASE_NATURAL_QUERY_ENDPOINT = "https://gjudsghhwmnsnndnswho.supabase.co/functions/v1/pdks-natural-query";
+const PDF_GENERATION_ENDPOINT = "https://gjudsghhwmnsnndnswho.supabase.co/functions/v1/generate-pdf";
 
 const LOCAL_MODEL_ENABLED = true;
 
@@ -41,12 +52,28 @@ export function useAiChat() {
   const [messages, setMessages] = useState<Message[]>([{
     id: 'welcome',
     type: 'assistant',
-    content: 'Merhaba! PDKS raporları için sorularınızı yanıtlayabilirim. Örnek: "Finans departmanı mart ayı giriş takip raporu"'
+    content: 'Merhaba! PDKS raporları için sorularınızı yanıtlayabilirim. Örnek: "Finans departmanı mart ayı giriş takip raporu" veya "Bugün işe gelenlerin listesi"'
   }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLocalModelConnected, setIsLocalModelConnected] = useState(false);
   const { toast } = useToast();
+
+  // Format report data for display
+  const formatReportData = (data: any[]) => {
+    return data.map(record => {
+      // Format dates for better display
+      const checkInDate = record.check_in ? new Date(record.check_in) : null;
+      const checkOutDate = record.check_out ? new Date(record.check_out) : null;
+
+      return {
+        ...record,
+        // Format dates for display if they exist
+        check_in: checkInDate ? checkInDate.toLocaleString('tr-TR') : '-',
+        check_out: checkOutDate ? checkOutDate.toLocaleString('tr-TR') : '-',
+      };
+    });
+  };
 
   const handleExportExcel = (messageData: any) => {
     if (!messageData || !Array.isArray(messageData)) {
@@ -60,9 +87,26 @@ export function useAiChat() {
     }
 
     try {
+      // Create a worksheet from the data
       const ws = XLSX.utils.json_to_sheet(messageData);
+      
+      // Column width optimization
+      const wscols = [
+        { wch: 25 },  // Name
+        { wch: 25 },  // Check in
+        { wch: 25 },  // Check out
+        { wch: 20 },  // Department
+        { wch: 15 },  // Device (if exists)
+        { wch: 20 }   // Location (if exists)
+      ];
+      
+      ws['!cols'] = wscols;
+      
+      // Create a workbook, add the worksheet
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Rapor");
+      XLSX.utils.book_append_sheet(wb, ws, "PDKS Raporu");
+      
+      // Generate Excel file and trigger download
       XLSX.writeFile(wb, `pdks_rapor_${new Date().toISOString().split('T')[0]}.xlsx`);
   
       toast({
@@ -92,24 +136,50 @@ export function useAiChat() {
 
     try {
       console.log("Preparing PDF export data", { 
-        headers: Object.keys(messageData[0]), 
         rowCount: messageData.length 
       });
 
-      const headers = Object.keys(messageData[0]);
-      const rows = messageData.map(Object.values);
+      // Define table headers based on the available fields
+      const headers = Object.keys(messageData[0]).filter(key => 
+        // Filter out any unwanted properties
+        key !== 'id' && key !== 'access_granted' && key !== 'status'
+      );
       
-      console.log("Calling generate-pdf function");
-      const response = await fetch('https://gjudsghhwmnsnndnswho.supabase.co/functions/v1/generate-pdf', {
+      // Format rows as arrays in the order matching the headers
+      const rows = messageData.map(record => {
+        return headers.map(header => {
+          // Format date values
+          if (header === 'check_in' || header === 'check_out') {
+            return record[header] ? new Date(record[header]).toLocaleString('tr-TR') : '-';
+          }
+          return record[header] || '-';
+        });
+      });
+      
+      // Get current date in Turkish format
+      const currentDate = new Date().toLocaleDateString('tr-TR');
+      
+      // Extract information from the latest message to set the PDF title
+      const lastAssistantMessage = [...messages].reverse().find(msg => msg.type === 'assistant');
+      const pdfTitle = lastAssistantMessage ? lastAssistantMessage.content : "PDKS Raporu";
+      
+      console.log("Calling generate-pdf function with:", {
+        headers: headers,
+        rowCount: rows.length,
+        title: pdfTitle
+      });
+      
+      // Call the PDF generation endpoint
+      const response = await fetch(PDF_GENERATION_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          headers,
+          headers: headers.map(h => h.charAt(0).toUpperCase() + h.slice(1).replace('_', ' ')),
           rows,
-          title: "PDKS Raporu",
-          date: new Date().toLocaleDateString('tr-TR')
+          title: pdfTitle,
+          date: currentDate
         }),
       });
 
@@ -121,21 +191,17 @@ export function useAiChat() {
         throw new Error(`PDF oluşturma hatası: ${response.status} ${errorText}`);
       }
 
-      const blob = await response.blob();
-      console.log("PDF blob received, size:", blob.size);
+      // Get the blob of HTML that will be rendered as PDF by the browser
+      const htmlBlob = await response.blob();
+      console.log("PDF response received, size:", htmlBlob.size);
       
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `pdks_rapor_${new Date().toISOString().split('T')[0]}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
+      // Create a URL for the blob and open it in a new window
+      const url = window.URL.createObjectURL(htmlBlob);
+      window.open(url, '_blank');
+      
       toast({
-        title: "PDF dosyası indirildi",
-        description: "Rapor başarıyla PDF formatında dışa aktarıldı.",
+        title: "PDF görüntüleniyor",
+        description: "PDF raporu yeni pencerede açılıyor. Tarayıcınızın yazdırma dialogu ile kaydedebilirsiniz.",
       });
     } catch (error) {
       console.error('PDF export error:', error);
@@ -200,136 +266,67 @@ export function useAiChat() {
     console.log("Handling user message:", input);
 
     try {
-      // First try Supabase Edge Function for natural language query
-      try {
-        console.log("Calling Supabase natural language query endpoint:", SUPABASE_NATURAL_QUERY_ENDPOINT);
-        const response = await fetch(SUPABASE_NATURAL_QUERY_ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: input }),
-          signal: AbortSignal.timeout(8000)
-        });
+      // Call the Supabase natural language query endpoint
+      console.log("Calling Supabase natural language query endpoint:", SUPABASE_NATURAL_QUERY_ENDPOINT);
+      const response = await fetch(SUPABASE_NATURAL_QUERY_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: input }),
+        signal: AbortSignal.timeout(15000)  // Increased timeout for more complex queries
+      });
 
-        console.log("Natural language query response status:", response.status);
+      console.log("Natural language query response status:", response.status);
 
-        if (response.ok) {
-          const data = await response.json();
-          console.log("Natural language query response data:", data);
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Natural language query response data:", data);
+        
+        // Check if we got a valid response with records
+        if (data.records && Array.isArray(data.records) && data.records.length > 0) {
+          // Format the data for better display
+          const formattedData = formatReportData(data.records);
           
-          if (data.records && Array.isArray(data.records) && data.records.length > 0) {
-            const aiMessage: Message = {
-              id: `response-${userMessage.id}`,
-              type: 'assistant',
-              content: data.explanation || 'İşte rapor sonuçları:',
-              data: data.records
-            };
-            setMessages(prev => [...prev, aiMessage]);
-            setIsLoading(false);
-            return;
-          } else {
-            console.log("Natural language query returned no records");
-          }
-        } else {
-          const errorText = await response.text();
-          console.error("Natural language query error response:", errorText);
+          // Create the assistant message with the report data
+          const aiMessage: Message = {
+            id: `response-${userMessage.id}`,
+            type: 'assistant',
+            content: data.explanation || 'İşte rapor sonuçları:',
+            data: formattedData
+          };
+          
+          setMessages(prev => [...prev, aiMessage]);
+          setIsLoading(false);
+          return;
+        } 
+        else if (data.error) {
+          // Handle specific error from the backend
+          throw new Error(data.error);
         }
-      } catch (error) {
-        console.warn("Natural language query error:", error);
-      }
-
-      // If natural language query fails, try other endpoints
-      // Try report endpoint first
-      console.log("Trying local report endpoints");
-      for (const endpoint of LOCAL_LLAMA_ENDPOINTS.report) {
-        try {
-          console.log(`Trying report endpoint: ${endpoint}`);
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: input }),
-            signal: AbortSignal.timeout(5000)
-          });
-
-          console.log(`Report endpoint ${endpoint} response status:`, response.status);
-
-          if (response.ok) {
-            const data = await response.json();
-            console.log(`Report endpoint ${endpoint} response data:`, data);
-            
-            if (Array.isArray(data) && data.length > 0) {
-              const aiMessage: Message = {
-                id: `response-${userMessage.id}`,
-                type: 'assistant',
-                content: 'İşte rapor sonuçları:',
-                data: data
-              };
-              setMessages(prev => [...prev, aiMessage]);
-              setIsLoading(false);
-              return;
-            } else {
-              console.log(`Report endpoint ${endpoint} returned no data or invalid format`);
-            }
-          } else {
-            const errorText = await response.text();
-            console.error(`Report endpoint ${endpoint} error response:`, errorText);
-          }
-        } catch (error) {
-          console.warn(`Report endpoint ${endpoint} error:`, error);
-        }
-      }
-
-      // If no report data, try chat completion
-      let aiResponse = "Üzgünüm, raporlar için sorgunuzu anlayamadım. Lütfen 'Finans departmanı mart ayı giriş raporu' gibi daha açık bir ifade kullanın.";
-      
-      if (LOCAL_MODEL_ENABLED && isLocalModelConnected) {
-        console.log("Trying local completion endpoints");
-        for (const endpoint of LOCAL_LLAMA_ENDPOINTS.completion) {
-          try {
-            console.log(`Trying completion endpoint: ${endpoint}`);
-            const response = await fetch(endpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                prompt: `Sen bir PDKS (Personel Devam Kontrol Sistemi) asistanısın. Kullanıcının sorusu: ${input}`,
-                max_tokens: 500,
-                temperature: 0.7,
-                stop: ["###"]
-              }),
-              signal: AbortSignal.timeout(5000)
-            });
-            
-            console.log(`Completion endpoint ${endpoint} response status:`, response.status);
-            
-            if (response.ok) {
-              const data = await response.json();
-              console.log(`Completion endpoint ${endpoint} response data:`, data);
-              aiResponse = data.content || data.response || data.generated_text || data.choices?.[0]?.text || "Yanıt alınamadı.";
-              break;
-            } else {
-              const errorText = await response.text();
-              console.error(`Completion endpoint ${endpoint} error response:`, errorText);
-            }
-          } catch (endpointError) {
-            console.warn(`Completion endpoint ${endpoint} error:`, endpointError);
-          }
+        else {
+          console.log("Natural language query returned no records");
+          
+          // Fall back to a helpful message when no records are found
+          const noDataMessage: Message = {
+            id: `response-${userMessage.id}`,
+            type: 'assistant',
+            content: "Sorgunuza uygun kayıt bulunamadı. Lütfen farklı filtreleme kriterleri kullanarak tekrar deneyin. Örnek: 'Finans departmanı mart ayı raporu' veya 'Bugün giriş yapanlar'."
+          };
+          
+          setMessages(prev => [...prev, noDataMessage]);
+          setIsLoading(false);
+          return;
         }
       } else {
-        console.log("Skipping local completion endpoints - model not connected or disabled");
+        const errorText = await response.text();
+        console.error("Natural language query error response:", errorText);
+        throw new Error(`Doğal dil işleme hatası: ${errorText}`);
       }
-
-      console.log("Sending assistant response:", aiResponse.substring(0, 100) + "...");
-      const aiMessage: Message = {
-        id: `response-${userMessage.id}`,
-        type: 'assistant',
-        content: aiResponse
-      };
-      setMessages(prev => [...prev, aiMessage]);
     } catch (error) {
       console.error('AI chat error:', error);
       const errorMessage: Message = {
         id: `error-${userMessage.id}`,
         type: 'assistant',
-        content: `Üzgünüm, bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`
+        content: `Üzgünüm, bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}. Lütfen farklı bir soru sorun veya daha sonra tekrar deneyin.`
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {

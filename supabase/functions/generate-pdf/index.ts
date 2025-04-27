@@ -32,7 +32,7 @@ serve(async (req) => {
       headers: {
         ...corsHeaders,
         'Content-Type': 'text/html',
-        'Content-Disposition': 'attachment; filename=report.pdf'
+        'Content-Disposition': 'attachment; filename=pdks_rapor.pdf'
       },
     });
     
@@ -56,7 +56,7 @@ function generateHTMLTable(headers: string[], rows: any[][], title: string, date
     <html>
     <head>
       <meta charset="utf-8">
-      <title>${title || "PDKS Report"}</title>
+      <title>${title || "PDKS Raporu"}</title>
       <style>
         body {
           font-family: Arial, sans-serif;
@@ -100,6 +100,10 @@ function generateHTMLTable(headers: string[], rows: any[][], title: string, date
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
+          @page {
+            size: A4;
+            margin: 2cm;
+          }
         }
       </style>
       <script>
@@ -113,8 +117,8 @@ function generateHTMLTable(headers: string[], rows: any[][], title: string, date
     </head>
     <body>
       <div class="header">
-        <h1>${title || "PDKS Report"}</h1>
-        <div class="date">${date || new Date().toLocaleDateString()}</div>
+        <h1>${title || "PDKS Raporu"}</h1>
+        <div class="date">${date || new Date().toLocaleDateString('tr-TR')}</div>
       </div>
       
       <table>
@@ -126,7 +130,7 @@ function generateHTMLTable(headers: string[], rows: any[][], title: string, date
         <tbody>
           ${rows.map(row => `
             <tr>
-              ${row.map(cell => `<td>${cell}</td>`).join('')}
+              ${row.map(cell => `<td>${cell !== null && cell !== undefined ? cell : '-'}</td>`).join('')}
             </tr>
           `).join('')}
         </tbody>
