@@ -3,11 +3,18 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
 
+interface MessageData {
+  name: string;
+  check_in: string;
+  check_out: string | null;
+  department: string;
+}
+
 interface Message {
   id: string;
   type: 'user' | 'assistant';
   content: string;
-  data?: any;
+  data?: MessageData[];
 }
 
 const LOCAL_LLAMA_ENDPOINTS = {
@@ -24,6 +31,9 @@ const LOCAL_LLAMA_ENDPOINTS = {
     "http://127.0.0.1:5050/api/pdks-report"
   ]
 };
+
+// Supabase endpoint
+const SUPABASE_NATURAL_QUERY_ENDPOINT = "https://gjudsghhwmnsnndnswho.supabase.co/functions/v1/pdks-natural-query";
 
 const LOCAL_MODEL_ENABLED = true;
 
@@ -138,7 +148,7 @@ export function useAiChat() {
 
     toast({
       title: "Yerel Model Bağlantısı Başarısız",
-      description: "Lütfen Llama sunucusunun çalıştığından emin olun.",
+      description: "Yerel model kullanılamıyor. Cloud tabanlı doğal dil işleme modeli kullanılacak.",
       variant: "destructive"
     });
   };
@@ -157,6 +167,37 @@ export function useAiChat() {
     setIsLoading(true);
 
     try {
+      // Önce Supabase Edge Function ile doğal dil sorgusu dene
+      try {
+        console.log("Supabase doğal dil sorgu endpoint'i çağrılıyor:", SUPABASE_NATURAL_QUERY_ENDPOINT);
+        const response = await fetch(SUPABASE_NATURAL_QUERY_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: input }),
+          signal: AbortSignal.timeout(8000)
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log("Doğal dil sorgusu yanıtı:", data);
+          
+          if (data.records && Array.isArray(data.records) && data.records.length > 0) {
+            const aiMessage: Message = {
+              id: `response-${userMessage.id}`,
+              type: 'assistant',
+              content: data.explanation || 'İşte rapor sonuçları:',
+              data: data.records
+            };
+            setMessages(prev => [...prev, aiMessage]);
+            setIsLoading(false);
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn("Doğal dil sorgusu hatası:", error);
+      }
+
+      // Eğer doğal dil sorgusu çalışmazsa, diğer endpoint'leri dene
       // Try report endpoint first
       for (const endpoint of LOCAL_LLAMA_ENDPOINTS.report) {
         try {
@@ -187,7 +228,7 @@ export function useAiChat() {
       }
 
       // If no report data, try chat completion
-      let aiResponse = "Üzgünüm, rapor oluşturulamadı veya veriye ulaşılamadı.";
+      let aiResponse = "Üzgünüm, raporlar için sorgunuzu anlayamadım. Lütfen 'Finans departmanı mart ayı giriş raporu' gibi daha açık bir ifade kullanın.";
       
       if (LOCAL_MODEL_ENABLED && isLocalModelConnected) {
         for (const endpoint of LOCAL_LLAMA_ENDPOINTS.completion) {

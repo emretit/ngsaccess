@@ -1,1 +1,54 @@
+
 project_id = "gjudsghhwmnsnndnswho"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[realtime]
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost"
+
+[inbucket]
+enabled = true
+port = 54324
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[storage]
+enabled = true
+
+[analytics]
+enabled = false
+
+[vector]
+enabled = false
+
+[edge_functions]
+enabled = true
+
+[edge_functions.pdks-ai]
+verify_jwt = false
+
+[edge_functions.generate-pdf]
+verify_jwt = false
+
+[edge_functions.check-access]
+verify_jwt = false
+
+[edge_functions.pdks-natural-query]
+verify_jwt = false
