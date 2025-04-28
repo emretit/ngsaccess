@@ -1,3 +1,4 @@
+
 import { useToast } from "@/hooks/use-toast";
 import { Message } from '../types';
 import { sendChatMessage, executeSqlQuery } from '../services/chatService';
@@ -44,6 +45,60 @@ export function useMessageHandler() {
         return;
       }
       
+      try {
+        console.log("Attempting to contact Llama model directly");
+        const llamaResponse = await fetch("http://localhost:5050/completion", {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: input,
+            temperature: 0.7,
+            max_tokens: 800
+          })
+        });
+        
+        if (llamaResponse.ok) {
+          console.log("Direct Llama connection successful!");
+          const data = await llamaResponse.json();
+          
+          const aiMessage: Message = {
+            id: `response-${userMessage.id}`,
+            type: 'assistant',
+            content: data.content || 'Llama model yanıtı alındı.'
+          };
+          
+          // If there's a SQL query in the response, execute it
+          if (isReportQuery && data.sqlQuery) {
+            try {
+              const sqlData = await executeSqlQuery(data.sqlQuery);
+              
+              if (sqlData.data && Array.isArray(sqlData.data) && sqlData.data.length > 0) {
+                const formattedData = formatReportData(sqlData.data);
+                aiMessage.data = formattedData;
+                aiMessage.content += "\n\nVeriler başarıyla çekildi.";
+              } else {
+                aiMessage.content += "\n\nSorgu çalıştı ancak sonuç döndürmedi.";
+              }
+            } catch (sqlError) {
+              console.error("SQL execution error:", sqlError);
+              aiMessage.content += `\n\nSQL sorgusu çalıştırılırken bir hata oluştu: ${sqlError.message}`;
+            }
+          }
+          
+          addMessage(aiMessage);
+          setIsLoading(false);
+          return;
+        } else {
+          console.log("Direct Llama connection failed, status:", llamaResponse.status);
+          // Continue to edge function as fallback
+        }
+      } catch (llamaError) {
+        console.error("Direct Llama connection error:", llamaError);
+        // Continue to edge function as fallback
+      }
+      
+      // If direct connection failed, try through edge function
+      console.log("Trying through edge function");
       const response = await sendChatMessage(input);
 
       if (response) {
