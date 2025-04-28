@@ -1,8 +1,6 @@
-
 import * as XLSX from 'xlsx';
 import { useToast } from "@/hooks/use-toast";
 import { MessageData } from './types';
-import { PDF_GENERATION_ENDPOINT } from './constants';
 
 export function useExportUtils() {
   const { toast } = useToast();
@@ -76,46 +74,10 @@ export function useExportUtils() {
     }
 
     try {
-      const headers = Object.keys(messageData[0]).filter(key => 
-        key !== 'id' && key !== 'access_granted' && key !== 'status'
-      );
-      
-      const rows = messageData.map(record => {
-        return headers.map(header => {
-          if (header === 'check_in' || header === 'check_out') {
-            return record[header] ? new Date(record[header]).toLocaleString('tr-TR') : '-';
-          }
-          return record[header] || '-';
-        });
-      });
-      
-      const currentDate = new Date().toLocaleDateString('tr-TR');
-      
-      const response = await fetch(PDF_GENERATION_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          headers: headers.map(h => h.charAt(0).toUpperCase() + h.slice(1).replace('_', ' ')),
-          rows,
-          title: "PDKS Raporu",
-          date: currentDate
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`PDF oluşturma hatası: ${response.status} ${errorText}`);
-      }
-
-      const htmlBlob = await response.blob();
-      const url = window.URL.createObjectURL(htmlBlob);
-      window.open(url, '_blank');
-      
       toast({
-        title: "PDF görüntüleniyor",
-        description: "PDF raporu yeni pencerede açılıyor. Tarayıcınızın yazdırma dialogu ile kaydedebilirsiniz.",
+        title: "PDF Dışa Aktarma",
+        description: "PDF dışa aktarma özelliği yeniden düzenleniyor. Lütfen Excel dışa aktarma seçeneğini kullanın.",
+        variant: "default",
       });
     } catch (error) {
       console.error('PDF export error:', error);
