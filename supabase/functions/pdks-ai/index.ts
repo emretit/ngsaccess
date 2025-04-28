@@ -25,25 +25,40 @@ serve(async (req) => {
   try {
     const { prompt } = await req.json();
 
-    // Get PDKS records from database for context
-    const { data: records, error } = await supabaseClient
-      .from('pdks_records')
-      .select(`
-        *,
-        employees (
-          department_id,
-          departments (name)
-        )
-      `);
+    // Determine if this is a chat or report query
+    const isReportQuery = prompt.toLowerCase().includes('rapor:') || 
+                          prompt.toLowerCase().includes('report:');
 
-    if (error) throw error;
-
-    // Format context for the Llama model
-    const context = `Sen bir PDKS (Personel Devam Kontrol Sistemi) asistanısın. 
-    İşte mevcut veriler: ${JSON.stringify(records)}. 
-    Soru: ${prompt}
+    let context = '';
     
-    Lütfen verilen bağlamı kullanarak soruyu yanıtla.`;
+    if (isReportQuery) {
+      // Get PDKS records from database for context if it's a report query
+      const { data: records, error } = await supabaseClient
+        .from('pdks_records')
+        .select(`
+          *,
+          employees (
+            department_id,
+            departments (name)
+          )
+        `);
+
+      if (error) throw error;
+
+      // Format context for the Llama model
+      context = `Sen bir PDKS (Personel Devam Kontrol Sistemi) asistanısın. 
+      İşte mevcut veriler: ${JSON.stringify(records)}. 
+      Soru: ${prompt}
+      
+      Lütfen verilen bağlamı kullanarak soruyu yanıtla.`;
+    } else {
+      // Regular conversational chat
+      context = `Sen yardımcı bir asistansın. Kullanıcı ile normal bir sohbet ediyorsun.
+      Soru: ${prompt}
+      
+      Lütfen doğal ve yardımsever bir şekilde yanıt ver. Eğer kullanıcı PDKS verisi isterse,
+      onu 'Rapor:' ile başlayan bir soru sormaya yönlendir.`;
+    }
 
     try {
       // Try to connect to local Llama server
@@ -65,7 +80,7 @@ serve(async (req) => {
 
       const data = await llamaResponse.json();
       return new Response(JSON.stringify({ 
-        answer: data.content,
+        content: data.content,
         source: 'llama'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -75,7 +90,9 @@ serve(async (req) => {
       console.error('Llama server error:', llamaError);
       // Fallback response when Llama server is not available
       return new Response(JSON.stringify({ 
-        answer: "Üzgünüm, şu anda yerel Llama modeline bağlanamıyorum. Lütfen modelin çalıştığından emin olun.",
+        content: isReportQuery 
+          ? "Üzgünüm, şu anda yerel Llama modeline bağlanamıyorum. Raporunuz için doğal dil işleme servisi kullanılacak." 
+          : "Üzgünüm, şu anda yerel Llama modeline bağlanamıyorum. Sohbet için lütfen daha sonra tekrar deneyin veya 'Rapor:' komutuyla veri sorgulayın.",
         error: llamaError.message,
         shouldUseLocalModel: true
       }), {

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SUPABASE_NATURAL_QUERY_ENDPOINT, LOCAL_MODEL_ENABLED } from './constants';
@@ -9,7 +10,7 @@ export function useAiChat() {
   const [messages, setMessages] = useState<Message[]>([{
     id: 'welcome',
     type: 'assistant',
-    content: 'Merhaba! Size nasıl yardımcı olabilirim? Örneğin:\n- "Finans departmanı mart ayı giriş kayıtları"\n- "Bugün işe gelenlerin listesi"\n- "Geçen ay en çok geç kalan personel"'
+    content: 'Merhaba! Size nasıl yardımcı olabilirim? Normal sohbet edebilir veya PDKS rapor sorguları sorabilirim. Örnek rapor sorguları:\n- "Rapor: Finans departmanı mart ayı giriş kayıtları"\n- "Rapor: Bugün işe gelenlerin listesi"\n- "Rapor: Geçen ay en çok geç kalan personel"'
   }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -19,9 +20,14 @@ export function useAiChat() {
   const { formatReportData, handleExportExcel, handleExportPDF } = useExportUtils();
 
   const createLlamaPrompt = (userInput: string) => {
-    return `Sen bir PDKS (Personel Devam Kontrol Sistemi) asistanısın. Görevin, personel giriş-çıkış kayıtları hakkında soruları yanıtlamak ve raporlar oluşturmak.
+    // Rapor sorgusu olup olmadığını kontrol et
+    const isReportQuery = userInput.toLowerCase().startsWith('rapor:');
+    
+    if (isReportQuery) {
+      // Rapor sorgusu için özel prompt
+      return `Sen bir PDKS (Personel Devam Kontrol Sistemi) asistanısın. Görevin, personel giriş-çıkış kayıtları hakkında soruları yanıtlamak ve raporlar oluşturmak.
 
-Kullanıcı Sorusu: ${userInput}
+Kullanıcı Sorusu: ${userInput.substring(6).trim()}
 
 Lütfen aşağıdaki formatta yanıt ver:
 1. Anlaşılır bir dille sorguyu açıkla
@@ -37,6 +43,18 @@ Lütfen aşağıdaki formatta yanıt ver:
 - location: Konum
 
 Not: Yanıtında samimi ve yardımsever bir ton kullan.`;
+    } else {
+      // Normal sohbet için genel prompt
+      return `Sen yardımcı bir asistansın. Kullanıcı PDKS (Personel Devam Kontrol Sistemi) uygulaması kullanıyor, 
+ancak şu anda seninle normal sohbet etmek istiyor. Sorulara doğal ve samimi bir şekilde yanıt ver.
+
+Kullanıcı Sorusu: ${userInput}
+
+Eğer kullanıcı PDKS verileri hakkında soru sorarsa, ona şunu belirtebilirsin:
+"Detaylı rapor almak isterseniz, sorunuzu 'Rapor:' ile başlatabilirsiniz. Örneğin, 'Rapor: Nisan ayı devamsızlık durumu'"
+
+Yanıtın doğal, samimi ve yardımcı olsun.`;
+    }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -54,8 +72,12 @@ Not: Yanıtında samimi ve yardımsever bir ton kullan.`;
     console.log("Handling user message:", input);
 
     try {
+      // Rapor sorgusu olup olmadığını kontrol et
+      const isReportQuery = input.toLowerCase().startsWith('rapor:');
+      
       if (isLocalModelConnected) {
-        // Try local Llama model first
+        // Try local Llama model
+        console.log("Trying local Llama model");
         const llamaResponse = await fetch("http://localhost:5050/completion", {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -77,14 +99,29 @@ Not: Yanıtında samimi ve yardımsever bir ton kullan.`;
           setMessages(prev => [...prev, aiMessage]);
           setIsLoading(false);
           return;
+        } else {
+          console.log("Llama response not OK, status:", llamaResponse.status);
         }
       }
 
-      // Fallback to Supabase natural language query
+      // Eğer rapor sorgusu değilse ve Llama başarısız olduysa, basit bir yanıt ver
+      if (!isReportQuery) {
+        const fallbackMessage: Message = {
+          id: `response-${userMessage.id}`,
+          type: 'assistant',
+          content: `Üzgünüm, şu anda Llama modeline bağlanamadım ve normal sohbet desteği veremiyorum. Rapor sorguları için lütfen 'Rapor:' ile başlayan sorular sorun.`
+        };
+        setMessages(prev => [...prev, fallbackMessage]);
+        setIsLoading(false);
+        return;
+      }
+
+      // Eğer buraya kadar geldiyse, rapor sorgusu için Supabase API'sini kullan
       console.log("Calling Supabase natural language query endpoint:", SUPABASE_NATURAL_QUERY_ENDPOINT);
       
       const { data: { session } } = await supabase.auth.getSession();
-      
+      const actualQuery = isReportQuery ? input.substring(6).trim() : input;
+
       const response = await fetch(SUPABASE_NATURAL_QUERY_ENDPOINT, {
         method: 'POST',
         headers: { 
@@ -92,7 +129,7 @@ Not: Yanıtında samimi ve yardımsever bir ton kullan.`;
           'Authorization': `Bearer ${session?.access_token || ''}`,
           'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqdWRzZ2hod21uc25uZG5zd2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyMzk1NTMsImV4cCI6MjA1MTgxNTU1M30.9mA6Q1JDCszfH3nujNpGWd36M4qxZ-L38GPTaNIsjVg'
         },
-        body: JSON.stringify({ query: input }),
+        body: JSON.stringify({ query: actualQuery }),
         signal: AbortSignal.timeout(15000)
       });
 
