@@ -46,106 +46,41 @@ export function useMessageHandler() {
         setIsLoading(false);
         return;
       }
-      
-      // Try all available Llama completion endpoints
-      let llamaResponseSuccess = false;
-      
-      for (const endpoint of LOCAL_LLAMA_ENDPOINTS.completion) {
-        try {
-          console.log(`Attempting to contact Llama model at ${endpoint}`);
-          
-          const llamaResponse = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              prompt: input,
-              temperature: 0.7,
-              max_tokens: 800
-            }),
-            signal: AbortSignal.timeout(8000) // 8 second timeout
-          });
-          
-          if (llamaResponse.ok) {
-            console.log(`Direct Llama connection successful at ${endpoint}!`);
-            const data = await llamaResponse.json();
-            
-            const aiMessage: Message = {
-              id: `response-${userMessage.id}`,
-              type: 'assistant',
-              content: data.content || 'Llama model yanıtı alındı.'
-            };
-            
-            // If there's a SQL query in the response, execute it
-            if (isReportQuery && data.sqlQuery) {
-              try {
-                const sqlData = await executeSqlQuery(data.sqlQuery);
-                
-                if (sqlData.data && Array.isArray(sqlData.data) && sqlData.data.length > 0) {
-                  const formattedData = formatReportData(sqlData.data);
-                  aiMessage.data = formattedData;
-                  aiMessage.content += "\n\nVeriler başarıyla çekildi.";
-                } else {
-                  aiMessage.content += "\n\nSorgu çalıştı ancak sonuç döndürmedi.";
-                }
-              } catch (sqlError) {
-                console.error("SQL execution error:", sqlError);
-                aiMessage.content += `\n\nSQL sorgusu çalıştırılırken bir hata oluştu: ${sqlError.message}`;
+
+      // Try to get response from edge function
+      try {
+        const response = await sendChatMessage(input);
+
+        if (response) {
+          const aiMessage: Message = {
+            id: `response-${userMessage.id}`,
+            type: 'assistant',
+            content: response.content || 'Üzgünüm, yanıt oluşturulamadı.'
+          };
+
+          if (isReportQuery && response.sqlQuery) {
+            try {
+              const sqlData = await executeSqlQuery(response.sqlQuery);
+              
+              if (sqlData.data && Array.isArray(sqlData.data) && sqlData.data.length > 0) {
+                const formattedData = formatReportData(sqlData.data);
+                aiMessage.data = formattedData;
+                aiMessage.content += "\n\nVeriler başarıyla çekildi.";
+              } else {
+                aiMessage.content += "\n\nSorgu çalıştı ancak sonuç döndürmedi.";
               }
+            } catch (sqlError) {
+              console.error("SQL execution error:", sqlError);
+              aiMessage.content += `\n\nSQL sorgusu çalıştırılırken bir hata oluştu: ${sqlError.message}`;
             }
-            
-            addMessage(aiMessage);
-            setIsLoading(false);
-            llamaResponseSuccess = true;
-            return;
-          } else {
-            console.log(`Direct Llama connection failed at ${endpoint}, status:`, llamaResponse.status);
-            console.log("Error response:", await llamaResponse.text());
           }
-        } catch (llamaError) {
-          console.error(`Direct Llama connection error at ${endpoint}:`, llamaError);
-          // Continue to next endpoint
+
+          addMessage(aiMessage);
+          return;
         }
-      }
-      
-      // If all direct connections failed, try through edge function
-      if (!llamaResponseSuccess) {
-        console.log("All direct Llama connections failed. Trying through edge function...");
-      
-        try {
-          const response = await sendChatMessage(input);
-
-          if (response) {
-            const aiMessage: Message = {
-              id: `response-${userMessage.id}`,
-              type: 'assistant',
-              content: response.content || 'Üzgünüm, yanıt oluşturulamadı.'
-            };
-
-            if (isReportQuery && response.sqlQuery) {
-              try {
-                const sqlData = await executeSqlQuery(response.sqlQuery);
-                
-                if (sqlData.data && Array.isArray(sqlData.data) && sqlData.data.length > 0) {
-                  const formattedData = formatReportData(sqlData.data);
-                  aiMessage.data = formattedData;
-                  aiMessage.content += "\n\nVeriler başarıyla çekildi.";
-                } else {
-                  aiMessage.content += "\n\nSorgu çalıştı ancak sonuç döndürmedi.";
-                }
-              } catch (sqlError) {
-                console.error("SQL execution error:", sqlError);
-                aiMessage.content += `\n\nSQL sorgusu çalıştırılırken bir hata oluştu: ${sqlError.message}`;
-              }
-            }
-
-            addMessage(aiMessage);
-            setIsLoading(false);
-            return;
-          }
-        } catch (edgeFunctionError) {
-          console.error('Edge function error:', edgeFunctionError);
-          // Will continue to fallback response below
-        }
+      } catch (error) {
+        console.error('Chat service error:', error);
+        throw error;
       }
       
       // If everything fails, provide a fallback response
