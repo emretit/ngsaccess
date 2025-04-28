@@ -18,20 +18,12 @@ export async function sendChatMessage(input: string) {
 }
 
 export async function executeSqlQuery(query: string) {
-  console.log("Executing SQL query:", query);
+  const { data, error } = await supabase.rpc('execute_sql', { query_text: query });
   
-  const response = await fetch("http://localhost:5050/api/execute-sql", {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query }),
-    signal: AbortSignal.timeout(10000)
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("SQL execution error:", errorText);
-    throw new Error(errorText);
+  if (error) {
+    console.error("SQL execution error:", error);
+    throw error;
   }
 
-  return response.json();
+  return { data };
 }
