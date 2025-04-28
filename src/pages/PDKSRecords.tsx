@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePdksAi } from "@/hooks/usePdksAi";
 import { useMedia } from "@/hooks/use-mobile";
 import { usePdksRecords } from "@/hooks/usePdksRecords";
@@ -9,10 +9,12 @@ import { PDKSRecordsContent } from '@/components/pdks/PDKSRecordsContent';
 import { PDKSAiChat } from "@/components/pdks/PDKSAiChat";
 import { AiDrawer } from "@/components/pdks/AiDrawer";
 import { exportToCsv } from "@/utils/exportToCsv";
+import { useToast } from "@/hooks/use-toast";
 
 export default function PDKSRecords() {
   const [selectedSection, setSelectedSection] = useState("summary");
   const [showAiPanel, setShowAiPanel] = useState(false);
+  const { toast } = useToast();
   const { insight, isLoadingInsight, fetchInsight } = usePdksAi();
   const isMobile = useMedia("(max-width: 768px)");
   const {
@@ -25,6 +27,31 @@ export default function PDKSRecords() {
     setStatusFilter,
     handleRefresh
   } = usePdksRecords();
+
+  // Check if Llama server is accessible on page load
+  useEffect(() => {
+    const checkLlamaServer = async () => {
+      try {
+        const response = await fetch("http://localhost:5050/status", {
+          method: 'GET',
+          signal: AbortSignal.timeout(3000) // 3 second timeout
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          toast({
+            title: "Llama AI Modeli Hazır",
+            description: `Yerel Llama sunucusu ${data.status || 'aktif'} durumunda.`,
+          });
+        }
+      } catch (error) {
+        console.log("Llama server check failed:", error);
+        // Silent fail - the model status component will handle the display
+      }
+    };
+    
+    checkLlamaServer();
+  }, [toast]);
 
   return (
     <main className="flex-1 p-6 bg-gray-50 flex flex-col min-h-[calc(100vh-4rem)]">

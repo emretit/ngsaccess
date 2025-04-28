@@ -1,5 +1,6 @@
 
-import { Server } from "lucide-react";
+import { Server, AlertTriangle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface AiModelStatusProps {
   isConnected: boolean;
@@ -13,6 +14,19 @@ export function AiModelStatus({ isConnected }: AiModelStatusProps) {
         <Server size={12} /> 
         {isConnected ? 'Yerel Model Aktif' : 'Yerel Model Bağlantısı Yok'}
       </span>
+      {!isConnected && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <AlertTriangle size={14} className="text-amber-500 cursor-help" />
+          </TooltipTrigger>
+          <TooltipContent side="right" className="max-w-80">
+            <p className="text-xs">
+              Yerel Llama modeli bağlantısı kurulamadı. Lütfen sunucunun çalıştığından emin olun. 
+              Kurulum detayları için <a href="#" className="text-blue-500 underline">local-llama-setup.md</a> dosyasını inceleyebilirsiniz.
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      )}
     </div>
   );
 }

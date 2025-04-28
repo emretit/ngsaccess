@@ -2,31 +2,51 @@
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface AiChatInputProps {
   input: string;
   isLoading: boolean;
+  isModelConnected: boolean;
   onInputChange: (value: string) => void;
   onSubmit: (e: React.FormEvent) => void;
 }
 
-export function AiChatInput({ input, isLoading, onInputChange, onSubmit }: AiChatInputProps) {
+export function AiChatInput({ 
+  input, 
+  isLoading, 
+  isModelConnected, 
+  onInputChange, 
+  onSubmit 
+}: AiChatInputProps) {
   return (
     <form onSubmit={onSubmit} className="flex gap-2">
       <Input
         value={input}
         onChange={(e) => onInputChange(e.target.value)}
-        placeholder="Örnek: Finans departmanı mart ayı giriş takip raporu..."
+        placeholder={isModelConnected 
+          ? "Yerel Llama modeline sorunuzu yazın..." 
+          : "Örnek: Finans departmanı mart ayı giriş takip raporu..."}
         disabled={isLoading}
         className="flex-1"
       />
-      <Button 
-        type="submit" 
-        disabled={!input.trim() || isLoading}
-        title="Gönder"
-      >
-        <Send className="h-4 w-4" />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button 
+            type="submit" 
+            disabled={!input.trim() || isLoading}
+            title="Gönder"
+            variant={isModelConnected ? "default" : "secondary"}
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          {isModelConnected 
+            ? "Yerel Llama modeline sorunuzu gönderin" 
+            : "Cloud tabanlı AI hizmetine sorunuzu gönderin"}
+        </TooltipContent>
+      </Tooltip>
     </form>
   );
 }
