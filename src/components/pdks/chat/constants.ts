@@ -2,11 +2,15 @@
 export const LOCAL_LLAMA_ENDPOINTS = {
   completion: [
     "http://localhost:5050/completion",
-    "http://127.0.0.1:5050/completion"
+    "http://127.0.0.1:5050/completion",
+    "http://localhost:5050/api/completion",
+    "http://127.0.0.1:5050/api/completion"
   ],
   status: [
     "http://localhost:5050/status",
-    "http://127.0.0.1:5050/status"
+    "http://127.0.0.1:5050/status",
+    "http://localhost:5050/api/status",
+    "http://127.0.0.1:5050/api/status"
   ],
   report: [
     "http://localhost:5050/api/pdks-report",
