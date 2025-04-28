@@ -367,6 +367,7 @@ export function useAiChat() {
     setInput,
     isLoading,
     isLocalModelConnected,
+    checkLocalModelStatus, // Added the missing function to the returned object
     handleSendMessage,
     handleExportExcel,
     handleExportPDF,
