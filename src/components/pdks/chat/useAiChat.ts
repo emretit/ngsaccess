@@ -1,6 +1,6 @@
 
-import { useModelStatus } from '../useModelStatus';
-import { useExportUtils } from '../useExportUtils';
+import { useModelStatus } from './useModelStatus';
+import { useExportUtils } from './useExportUtils';
 import { useMessageHandler } from './hooks/useMessageHandler';
 
 export function useAiChat() {
