@@ -32,6 +32,17 @@ try:
 except Exception as e:
     logger.error(f"Supabase connection error: {str(e)}")
 
+# Check if Llama model path exists
+LLAMA_PATH = "/Users/emreaydin/Desktop/ngsaccess/llama.cpp/build/bin/llama-simple-chat"
+MODEL_PATH = "model.gguf"
+LLAMA_AVAILABLE = os.path.exists(LLAMA_PATH) and os.path.exists(MODEL_PATH)
+
+if LLAMA_AVAILABLE:
+    logger.info(f"Llama model found at: {LLAMA_PATH}")
+else:
+    logger.warning(f"Llama model not found at: {LLAMA_PATH} or model file missing at: {MODEL_PATH}")
+    logger.warning("Server will run in fallback mode (no local AI)")
+
 @app.route('/status')
 def status():
     try:
@@ -42,53 +53,78 @@ def status():
         return jsonify({
             "status": "running",
             "database": "connected",
-            "record_count": test.count if hasattr(test, 'count') else 0
+            "record_count": test.count if hasattr(test, 'count') else 0,
+            "llama_available": LLAMA_AVAILABLE
         })
     except Exception as e:
         logger.error(f"Status check error: {str(e)}")
         return jsonify({
             "status": "running",
             "database": "error",
-            "error": str(e)
+            "error": str(e),
+            "llama_available": LLAMA_AVAILABLE
         })
 
-@app.route('/completion', methods=['POST'])
+@app.route('/completion', methods=['POST', 'OPTIONS'])
 def completion():
+    if request.method == 'OPTIONS':
+        response = jsonify({})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'POST')
+        return response
+        
     try:
         data = request.json
         prompt = data.get('prompt', '')
         logger.info(f"Received completion request with prompt: {prompt[:50]}...")
         
+        if not LLAMA_AVAILABLE:
+            logger.warning("Llama model not available, returning fallback response")
+            return jsonify({
+                "error": "Llama model not available",
+                "content": "Üzgünüm, yerel AI modeli bulunamadı. Lütfen sistem yöneticinizle iletişime geçin."
+            }), 503
+        
         # Llama model call
         cmd = [
-            "/Users/emreaydin/Desktop/ngsaccess/llama.cpp/build/bin/llama-simple-chat",
-            "-m", "model.gguf",
-            "-c", "context_size",
-            "-ngl", "n_gpu_layers"
+            LLAMA_PATH,
+            "-m", MODEL_PATH,
+            "-c", "2048",  # Using a reasonable context size
+            "-ngl", "0"    # Default to CPU for compatibility
         ]
         
         logger.info(f"Executing command: {' '.join(cmd)}")
         
-        process = subprocess.Popen(
-            cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        
-        output, error = process.communicate(input=prompt)
-        
-        if error:
-            logger.error(f"Llama model error: {error}")
-            return jsonify({"error": error}), 500
+        try:
+            process = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
             
-        logger.info(f"Completion successful, generated {len(output)} chars")
-        return jsonify({"content": output})
-        
+            output, error = process.communicate(input=prompt, timeout=30)  # Add timeout
+            
+            if error:
+                logger.error(f"Llama model error: {error}")
+                return jsonify({"error": error, "content": "AI model çalıştırılırken bir hata oluştu."}), 500
+                
+            logger.info(f"Completion successful, generated {len(output)} chars")
+            return jsonify({"content": output})
+            
+        except subprocess.TimeoutExpired:
+            logger.error("Llama model process timed out")
+            return jsonify({"error": "Timeout", "content": "AI model yanıt vermedi, işlem zaman aşımına uğradı."}), 504
+            
+        except FileNotFoundError:
+            logger.error(f"Llama executable not found at: {LLAMA_PATH}")
+            return jsonify({"error": "File not found", "content": "AI model bulunamadı."}), 404
+            
     except Exception as e:
         logger.error(f"Completion error: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e), "content": "AI istemcisinde bir hata oluştu."}), 500
 
 @app.route('/api/pdks-report', methods=['POST'])
 def get_pdks_report():

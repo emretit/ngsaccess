@@ -5,8 +5,10 @@ import { SUPABASE_NATURAL_QUERY_ENDPOINT, LOCAL_MODEL_ENABLED } from './constant
 import { Message } from './types';
 import { useModelStatus } from './useModelStatus';
 import { useExportUtils } from './useExportUtils';
+import { useToast } from "@/hooks/use-toast";
 
 export function useAiChat() {
+  const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([{
     id: 'welcome',
     type: 'assistant',
@@ -75,111 +77,155 @@ Yanıtın doğal, samimi ve yardımcı olsun.`;
       // Rapor sorgusu olup olmadığını kontrol et
       const isReportQuery = input.toLowerCase().startsWith('rapor:');
       
-      if (isLocalModelConnected) {
-        // Try local Llama model
-        console.log("Trying local Llama model");
-        const llamaResponse = await fetch("http://localhost:5050/completion", {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: createLlamaPrompt(input),
-            temperature: 0.7,
-            max_tokens: 500,
-            stop: ["###"]
-          })
+      // First, try to use the Supabase Edge Function for processing (supports both chat and report)
+      console.log("Calling Supabase pdks-ai edge function");
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      try {
+        const response = await supabase.functions.invoke('pdks-ai', {
+          body: JSON.stringify({ prompt: input })
         });
-
-        if (llamaResponse.ok) {
-          const data = await llamaResponse.json();
+        
+        console.log("Edge function response:", response);
+        
+        if (response.error) {
+          throw new Error(response.error.message || "Edge function error");
+        }
+        
+        if (response.data) {
+          // If the edge function returns data, use it
           const aiMessage: Message = {
             id: `response-${userMessage.id}`,
             type: 'assistant',
-            content: data.content || 'Üzgünüm, yanıt oluşturulamadı.'
+            content: response.data.content || 'Üzgünüm, yanıt oluşturulamadı.'
           };
           setMessages(prev => [...prev, aiMessage]);
           setIsLoading(false);
           return;
-        } else {
-          console.log("Llama response not OK, status:", llamaResponse.status);
+        }
+      } catch (edgeFunctionError) {
+        console.error("Edge function error:", edgeFunctionError);
+        // Continue to fallback if edge function fails
+      }
+
+      // If still here, try the local Llama API directly
+      if (isLocalModelConnected && LOCAL_MODEL_ENABLED) {
+        try {
+          // Try local Llama model
+          console.log("Trying local Llama model directly");
+          const llamaResponse = await fetch("http://localhost:5050/completion", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: createLlamaPrompt(input),
+              temperature: 0.7,
+              max_tokens: 500
+            }),
+            signal: AbortSignal.timeout(10000)
+          });
+
+          if (llamaResponse.ok) {
+            const data = await llamaResponse.json();
+            const aiMessage: Message = {
+              id: `response-${userMessage.id}`,
+              type: 'assistant',
+              content: data.content || 'Üzgünüm, yanıt oluşturulamadı.'
+            };
+            setMessages(prev => [...prev, aiMessage]);
+            setIsLoading(false);
+            return;
+          } else {
+            console.log("Llama response not OK, status:", llamaResponse.status);
+            // Fall through to next option
+          }
+        } catch (llamaError) {
+          console.error("Direct Llama API error:", llamaError);
+          // Fall through to next option
         }
       }
 
-      // Eğer rapor sorgusu değilse ve Llama başarısız olduysa, basit bir yanıt ver
+      // Eğer rapor sorgusu değilse ve herşey başarısız olduysa, basit bir yanıt ver
       if (!isReportQuery) {
         const fallbackMessage: Message = {
           id: `response-${userMessage.id}`,
           type: 'assistant',
-          content: `Üzgünüm, şu anda Llama modeline bağlanamadım ve normal sohbet desteği veremiyorum. Rapor sorguları için lütfen 'Rapor:' ile başlayan sorular sorun.`
+          content: `Merhaba! Şu anda normal sohbet hizmeti veremiyorum, ancak PDKS raporları için size yardımcı olabilirim. Lütfen 'Rapor:' ile başlayan bir soru sorun.`
         };
         setMessages(prev => [...prev, fallbackMessage]);
         setIsLoading(false);
         return;
       }
 
-      // Eğer buraya kadar geldiyse, rapor sorgusu için Supabase API'sini kullan
+      // If it's a report query and we're still here, use the natural language query API
       console.log("Calling Supabase natural language query endpoint:", SUPABASE_NATURAL_QUERY_ENDPOINT);
       
-      const { data: { session } } = await supabase.auth.getSession();
-      const actualQuery = isReportQuery ? input.substring(6).trim() : input;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const actualQuery = isReportQuery ? input.substring(6).trim() : input;
 
-      const response = await fetch(SUPABASE_NATURAL_QUERY_ENDPOINT, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || ''}`,
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqdWRzZ2hod21uc25uZG5zd2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyMzk1NTMsImV4cCI6MjA1MTgxNTU1M30.9mA6Q1JDCszfH3nujNpGWd36M4qxZ-L38GPTaNIsjVg'
-        },
-        body: JSON.stringify({ query: actualQuery }),
-        signal: AbortSignal.timeout(15000)
-      });
+        const response = await fetch(SUPABASE_NATURAL_QUERY_ENDPOINT, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token || ''}`,
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqdWRzZ2hod21uc25uZG5zd2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyMzk1NTMsImV4cCI6MjA1MTgxNTU1M30.9mA6Q1JDCszfH3nujNpGWd36M4qxZ-L38GPTaNIsjVg'
+          },
+          body: JSON.stringify({ query: actualQuery }),
+          signal: AbortSignal.timeout(15000)
+        });
 
-      console.log("Natural language query response status:", response.status);
+        console.log("Natural language query response status:", response.status);
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log("Natural language query response data:", data);
-        setDebugInfo(data);
-        
-        if (data.data && Array.isArray(data.data) && data.data.length > 0) {
-          const formattedData = formatReportData(data.data);
+        if (response.ok) {
+          const data = await response.json();
+          console.log("Natural language query response data:", data);
+          setDebugInfo(data);
           
-          const aiMessage: Message = {
-            id: `response-${userMessage.id}`,
-            type: 'assistant',
-            content: data.explanation || 'İşte rapor sonuçları:',
-            data: formattedData
-          };
-          
-          setMessages(prev => [...prev, aiMessage]);
-          setIsLoading(false);
-          return;
-        } 
-        else if (data.error) {
-          throw new Error(data.error);
-        }
-        else {
-          console.log("Natural language query returned no records");
-          
-          let detailedExplanation = "Sorgunuza uygun kayıt bulunamadı.";
-          
-          if (data.explanation) {
-            detailedExplanation += " " + data.explanation;
+          if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+            const formattedData = formatReportData(data.data);
+            
+            const aiMessage: Message = {
+              id: `response-${userMessage.id}`,
+              type: 'assistant',
+              content: data.explanation || 'İşte rapor sonuçları:',
+              data: formattedData
+            };
+            
+            setMessages(prev => [...prev, aiMessage]);
+            setIsLoading(false);
+            return;
+          } 
+          else if (data.error) {
+            throw new Error(data.error);
           }
-          
-          detailedExplanation += " Lütfen farklı filtreleme kriterleri kullanarak tekrar deneyin.";
-          
-          const noDataMessage: Message = {
-            id: `response-${userMessage.id}`,
-            type: 'assistant',
-            content: detailedExplanation
-          };
-          
-          setMessages(prev => [...prev, noDataMessage]);
+          else {
+            console.log("Natural language query returned no records");
+            
+            let detailedExplanation = "Sorgunuza uygun kayıt bulunamadı.";
+            
+            if (data.explanation) {
+              detailedExplanation += " " + data.explanation;
+            }
+            
+            detailedExplanation += " Lütfen farklı filtreleme kriterleri kullanarak tekrar deneyin.";
+            
+            const noDataMessage: Message = {
+              id: `response-${userMessage.id}`,
+              type: 'assistant',
+              content: detailedExplanation
+            };
+            
+            setMessages(prev => [...prev, noDataMessage]);
+          }
+        } else {
+          const errorText = await response.text();
+          console.error("Natural language query error response:", errorText);
+          throw new Error(`Doğal dil işleme hatası: ${errorText}`);
         }
-      } else {
-        const errorText = await response.text();
-        console.error("Natural language query error response:", errorText);
-        throw new Error(`Doğal dil işleme hatası: ${errorText}`);
+      } catch (nlpError) {
+        console.error("Natural language processing error:", nlpError);
+        throw nlpError;
       }
     } catch (error) {
       console.error('AI chat error:', error);

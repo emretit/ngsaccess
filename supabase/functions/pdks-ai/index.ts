@@ -75,7 +75,7 @@ serve(async (req) => {
       });
 
       if (!llamaResponse.ok) {
-        throw new Error('Local Llama server connection failed');
+        throw new Error(`Local Llama server connection failed: ${llamaResponse.status} ${llamaResponse.statusText}`);
       }
 
       const data = await llamaResponse.json();
@@ -88,13 +88,22 @@ serve(async (req) => {
 
     } catch (llamaError) {
       console.error('Llama server error:', llamaError);
-      // Fallback response when Llama server is not available
+      
+      // For normal chat, provide a generic fallback response
+      if (!isReportQuery) {
+        return new Response(JSON.stringify({ 
+          content: "Merhaba! Ben PDKS asistanıyım. Şu anda normal sohbet modunda hizmet veremiyorum, ancak 'Rapor:' ile başlayan bir soru sorarak veri sorgulayabilirsiniz. Örneğin: 'Rapor: Bugün işe gelenler'", 
+          source: 'fallback'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      // For report queries, use the natural language processor
       return new Response(JSON.stringify({ 
-        content: isReportQuery 
-          ? "Üzgünüm, şu anda yerel Llama modeline bağlanamıyorum. Raporunuz için doğal dil işleme servisi kullanılacak." 
-          : "Üzgünüm, şu anda yerel Llama modeline bağlanamıyorum. Sohbet için lütfen daha sonra tekrar deneyin veya 'Rapor:' komutuyla veri sorgulayın.",
+        content: "Raporunuz için doğal dil işleme servisi kullanılacak. Lütfen bekleyin...",
         error: llamaError.message,
-        shouldUseLocalModel: true
+        shouldUseNaturalQuery: true
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
