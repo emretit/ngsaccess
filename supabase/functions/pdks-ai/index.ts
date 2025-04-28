@@ -15,7 +15,7 @@ const supabaseClient = createClient(
 );
 
 // Llama model endpoint configuration
-const LLAMA_ENDPOINT = 'http://localhost:8000';
+const LLAMA_ENDPOINT = 'http://localhost:5050';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -34,39 +34,57 @@ serve(async (req) => {
     if (isReportQuery) {
       // Get PDKS records from database for context if it's a report query
       const { data: records, error } = await supabaseClient
-        .from('pdks_records')
+        .from('card_readings')
         .select(`
           *,
           employees (
+            first_name,
+            last_name,
             department_id,
             departments (name)
           )
-        `);
+        `)
+        .limit(20); // Limit context size for performance
 
       if (error) throw error;
 
-      // Format context for the Llama model
+      // Format context for the Llama model with SQL generation instructions
       context = `Sen bir PDKS (Personel Devam Kontrol Sistemi) asistanısın. 
-      İşte mevcut veriler: ${JSON.stringify(records)}. 
-      Soru: ${prompt}
+      İşte mevcut verilerden örnekler: ${JSON.stringify(records).substring(0, 1000)}... 
       
-      Lütfen verilen bağlamı kullanarak soruyu yanıtla.`;
+      Kullanıcı Sorusu: ${prompt}
+      
+      Lütfen bu soruya cevap ver ve SADECE cevabın sonunda üç backtick içinde SQL sorgusunu oluştur. 
+      Örnek format:
+      
+      Analiz sonuçlarım şunlar...
+      
+      \`\`\`sql
+      SELECT * FROM card_readings WHERE ...
+      \`\`\`
+      
+      Sorgu, card_readings tablosunu sorgulayacak şekilde olmalıdır. Bu tablo çalışanların kart okutma kayıtlarını içerir.`;
     } else {
       // Regular conversational chat
-      context = `Sen yardımcı bir asistansın. Kullanıcı ile normal bir sohbet ediyorsun.
+      context = `Sen yardımcı bir PDKS (Personel Devam Kontrol Sistemi) asistanısın. 
+      Kullanıcı ile normal bir sohbet ediyorsun.
       Soru: ${prompt}
       
-      Lütfen doğal ve yardımsever bir şekilde yanıt ver.`;
+      Lütfen doğal ve yardımsever bir şekilde yanıt ver. Eğer kullanıcı PDKS verileri hakkında bir rapor 
+      isterse, ona "Rapor:" ile başlayan bir soru sormasını öner.`;
     }
 
+    // First try to connect to local Llama model
     try {
-      // Try to connect to local Llama server
+      console.log("Connecting to Llama model at:", LLAMA_ENDPOINT);
+      
+      // First try /completion endpoint
       const llamaResponse = await fetch(`${LLAMA_ENDPOINT}/completion`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: context,
-          max_tokens: 500,
+          max_tokens: 800,
           temperature: 0.7,
           top_p: 0.9,
           stop: ["###"]
@@ -78,8 +96,21 @@ serve(async (req) => {
       }
 
       const data = await llamaResponse.json();
+      
+      let content = data.content;
+      let sqlQuery = null;
+      
+      // Extract SQL query if it exists in the response
+      if (isReportQuery && content.includes('```sql')) {
+        const sqlMatch = content.match(/```sql\s+([\s\S]*?)\s+```/);
+        if (sqlMatch && sqlMatch[1]) {
+          sqlQuery = sqlMatch[1].trim();
+        }
+      }
+
       return new Response(JSON.stringify({ 
-        content: data.content,
+        content,
+        sqlQuery,
         source: 'llama'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -90,36 +121,18 @@ serve(async (req) => {
       
       // For normal chat, provide customized responses based on the question
       if (!isReportQuery) {
-        // Generate a response based on the input for normal chat mode
-        let response = "Merhaba! Size nasıl yardımcı olabilirim?";
-        
-        if (prompt.toLowerCase().includes('merhaba') || prompt.toLowerCase().includes('selam')) {
-          response = "Merhaba! Ben PDKS asistanıyım. Nasıl yardımcı olabilirim?";
-        } else if (prompt.toLowerCase().includes('nasılsın')) {
-          response = "Ben bir AI asistanı olarak harikayım, teşekkürler! Size nasıl yardımcı olabilirim?";
-        } else if (prompt.toLowerCase().includes('adın') || prompt.toLowerCase().includes('ismin')) {
-          response = "Ben PDKS AI asistanıyım. Personel Devam Kontrol Sistemi verilerinizle ilgili sorularınızı yanıtlayabilirim.";
-        } else if (prompt.toLowerCase().includes('teşekkür')) {
-          response = "Rica ederim! Başka bir konuda yardıma ihtiyacınız olursa buradayım.";
-        } else if (prompt.toLowerCase().includes('ne yapabilirsin')) {
-          response = "Normal sohbet edebilirim veya 'Rapor:' ile başlayan sorularınızla PDKS verilerinizi analiz edebilirim. Örneğin: 'Rapor: Bugün işe gelenler' gibi.";
-        } else {
-          response = `Anlıyorum, "${prompt}" hakkında konuşmak istiyorsunuz. Size daha iyi hizmet verebilmem için normal sohbet edebiliriz veya 'Rapor:' ile başlayan bir soru sorarak PDKS verilerinizi sorgulayabilirsiniz.`;
-        }
-        
         return new Response(JSON.stringify({ 
-          content: response, 
+          content: "Üzgünüm, şu anda Llama AI modeline bağlanamıyorum. Lütfen daha sonra tekrar deneyin veya sistem yöneticinize başvurun.",
           source: 'fallback'
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
       
-      // For report queries, use the natural language processor
+      // For report queries, fall back to a simplified explanation
       return new Response(JSON.stringify({ 
-        content: "Raporunuz için doğal dil işleme servisi kullanılacak. Lütfen bekleyin...",
-        error: llamaError.message,
-        shouldUseNaturalQuery: true
+        content: "Üzgünüm, rapor oluşturmak için Llama AI modeline bağlanamıyorum. Lütfen sistem yöneticisi ile iletişime geçin.",
+        error: llamaError.message
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

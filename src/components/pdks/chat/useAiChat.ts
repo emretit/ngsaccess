@@ -21,41 +21,6 @@ export function useAiChat() {
   const { isLocalModelConnected, checkLocalModelStatus } = useModelStatus();
   const { formatReportData, handleExportExcel, handleExportPDF } = useExportUtils();
 
-  const createLlamaPrompt = (userInput: string) => {
-    // Rapor sorgusu olup olmadığını kontrol et
-    const isReportQuery = userInput.toLowerCase().startsWith('rapor:');
-    
-    if (isReportQuery) {
-      // Rapor sorgusu için özel prompt
-      return `Sen bir PDKS (Personel Devam Kontrol Sistemi) asistanısın. Görevin, personel giriş-çıkış kayıtları hakkında soruları yanıtlamak ve raporlar oluşturmak.
-
-Kullanıcı Sorusu: ${userInput.substring(6).trim()}
-
-Lütfen aşağıdaki formatta yanıt ver:
-1. Anlaşılır bir dille sorguyu açıkla
-2. Hangi filtreleri kullanacağını belirt (departman, tarih aralığı, vs.)
-3. Varsa özel durumları vurgula
-
-Örnek veri yapısı:
-- name: Personel adı
-- check_in: Giriş saati
-- check_out: Çıkış saati
-- department: Departman
-- device: Kullanılan cihaz
-- location: Konum
-
-Not: Yanıtında samimi ve yardımsever bir ton kullan.`;
-    } else {
-      // Normal sohbet için genel prompt
-      return `Sen yardımcı bir asistansın. Kullanıcı PDKS (Personel Devam Kontrol Sistemi) uygulaması kullanıyor, 
-ve seninle normal sohbet etmek istiyor. Sorulara doğal ve samimi bir şekilde yanıt ver.
-
-Kullanıcı Sorusu: ${userInput}
-
-Yanıtın doğal, samimi ve yardımcı olsun.`;
-    }
-  };
-
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
@@ -74,10 +39,8 @@ Yanıtın doğal, samimi ve yardımcı olsun.`;
       // Rapor sorgusu olup olmadığını kontrol et
       const isReportQuery = input.toLowerCase().startsWith('rapor:');
       
-      // First, try to use the Supabase Edge Function for processing (supports both chat and report)
+      // First, try to use the Supabase Edge Function for processing
       console.log("Calling Supabase pdks-ai edge function");
-      
-      const { data: { session } } = await supabase.auth.getSession();
       
       try {
         const response = await supabase.functions.invoke('pdks-ai', {
@@ -91,12 +54,52 @@ Yanıtın doğal, samimi ve yardımcı olsun.`;
         }
         
         if (response.data) {
-          // If the edge function returns data, use it
           const aiMessage: Message = {
             id: `response-${userMessage.id}`,
             type: 'assistant',
             content: response.data.content || 'Üzgünüm, yanıt oluşturulamadı.'
           };
+          
+          // If there's a SQL query in the response, execute it
+          if (isReportQuery && response.data.sqlQuery) {
+            try {
+              console.log("Executing SQL query:", response.data.sqlQuery);
+              
+              // Call either server.py or directly execute the SQL
+              const sqlResponse = await fetch("http://localhost:5050/api/execute-sql", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  query: response.data.sqlQuery
+                }),
+                signal: AbortSignal.timeout(10000)
+              });
+              
+              if (sqlResponse.ok) {
+                const sqlData = await sqlResponse.json();
+                console.log("SQL execution results:", sqlData);
+                
+                if (sqlData.data && Array.isArray(sqlData.data) && sqlData.data.length > 0) {
+                  // Format the SQL data
+                  const formattedData = formatReportData(sqlData.data);
+                  
+                  // Add the data to the message
+                  aiMessage.data = formattedData;
+                  aiMessage.content += "\n\nVeriler başarıyla çekildi.";
+                } else {
+                  aiMessage.content += "\n\nSorgu çalıştı ancak sonuç döndürmedi.";
+                }
+              } else {
+                const errorText = await sqlResponse.text();
+                console.error("SQL execution error:", errorText);
+                aiMessage.content += `\n\nSQL sorgusu çalıştırılırken bir hata oluştu: ${errorText}`;
+              }
+            } catch (sqlError) {
+              console.error("SQL execution error:", sqlError);
+              aiMessage.content += `\n\nSQL sorgusu çalıştırılırken bir hata oluştu: ${sqlError.message}`;
+            }
+          }
+          
           setMessages(prev => [...prev, aiMessage]);
           setIsLoading(false);
           return;
@@ -106,7 +109,7 @@ Yanıtın doğal, samimi ve yardımcı olsun.`;
         // Continue to fallback if edge function fails
       }
 
-      // If still here, try the local Llama API directly
+      // If we're still here, try the local Llama API directly
       if (isLocalModelConnected && LOCAL_MODEL_ENABLED) {
         try {
           // Try local Llama model
@@ -115,9 +118,9 @@ Yanıtın doğal, samimi ve yardımcı olsun.`;
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              prompt: createLlamaPrompt(input),
+              prompt: input,
               temperature: 0.7,
-              max_tokens: 500
+              max_tokens: 800
             }),
             signal: AbortSignal.timeout(10000)
           });
@@ -129,6 +132,47 @@ Yanıtın doğal, samimi ve yardımcı olsun.`;
               type: 'assistant',
               content: data.content || 'Üzgünüm, yanıt oluşturulamadı.'
             };
+            
+            // If there's a SQL query in the response, execute it
+            if (isReportQuery && data.sqlQuery) {
+              try {
+                console.log("Executing SQL query:", data.sqlQuery);
+                
+                // Call either server.py or directly execute the SQL
+                const sqlResponse = await fetch("http://localhost:5050/api/execute-sql", {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    query: data.sqlQuery
+                  }),
+                  signal: AbortSignal.timeout(10000)
+                });
+                
+                if (sqlResponse.ok) {
+                  const sqlData = await sqlResponse.json();
+                  console.log("SQL execution results:", sqlData);
+                  
+                  if (sqlData.data && Array.isArray(sqlData.data) && sqlData.data.length > 0) {
+                    // Format the SQL data
+                    const formattedData = formatReportData(sqlData.data);
+                    
+                    // Add the data to the message
+                    aiMessage.data = formattedData;
+                    aiMessage.content += "\n\nVeriler başarıyla çekildi.";
+                  } else {
+                    aiMessage.content += "\n\nSorgu çalıştı ancak sonuç döndürmedi.";
+                  }
+                } else {
+                  const errorText = await sqlResponse.text();
+                  console.error("SQL execution error:", errorText);
+                  aiMessage.content += `\n\nSQL sorgusu çalıştırılırken bir hata oluştu: ${errorText}`;
+                }
+              } catch (sqlError) {
+                console.error("SQL execution error:", sqlError);
+                aiMessage.content += `\n\nSQL sorgusu çalıştırılırken bir hata oluştu: ${sqlError.message}`;
+              }
+            }
+            
             setMessages(prev => [...prev, aiMessage]);
             setIsLoading(false);
             return;
@@ -142,9 +186,9 @@ Yanıtın doğal, samimi ve yardımcı olsun.`;
         }
       }
 
-      // Fallback for normal chat (more responsive than before)
+      // Fallback for normal chat
       if (!isReportQuery) {
-        // Generate a simple response based on the input for normal chat mode
+        // Generate a response based on the input for normal chat mode
         let responseContent = "Merhaba! Size nasıl yardımcı olabilirim?";
         
         if (input.toLowerCase().includes('merhaba') || input.toLowerCase().includes('selam')) {
@@ -158,7 +202,7 @@ Yanıtın doğal, samimi ve yardımcı olsun.`;
         } else if (input.toLowerCase().includes('ne yapabilirsin')) {
           responseContent = "Normal sohbet edebilirim veya 'Rapor:' ile başlayan sorularınızla PDKS verilerinizi analiz edebilirim. Örneğin: 'Rapor: Bugün işe gelenler' gibi.";
         } else {
-          responseContent = `Anlıyorum, "${input}" hakkında konuşmak istiyorsunuz. Size daha iyi hizmet verebilmem için normal sohbet edebiliriz veya 'Rapor:' ile başlayan bir soru sorarak PDKS verilerinizi sorgulayabilirsiniz.`;
+          responseContent = `"${input}" hakkındaki sorunuzu anladım. Normal sohbet edebilirim veya 'Rapor:' ile başlayan bir soru sorarak PDKS verilerinizi analiz edebilirsiniz.`;
         }
         
         const fallbackMessage: Message = {
@@ -169,77 +213,16 @@ Yanıtın doğal, samimi ve yardımcı olsun.`;
         setMessages(prev => [...prev, fallbackMessage]);
         setIsLoading(false);
         return;
-      }
-
-      // If it's a report query and we're still here, use the natural language query API
-      console.log("Calling Supabase natural language query endpoint:", SUPABASE_NATURAL_QUERY_ENDPOINT);
-      
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const actualQuery = isReportQuery ? input.substring(6).trim() : input;
-
-        const response = await fetch(SUPABASE_NATURAL_QUERY_ENDPOINT, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token || ''}`,
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqdWRzZ2hod21uc25uZG5zd2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyMzk1NTMsImV4cCI6MjA1MTgxNTU1M30.9mA6Q1JDCszfH3nujNpGWd36M4qxZ-L38GPTaNIsjVg'
-          },
-          body: JSON.stringify({ query: actualQuery }),
-          signal: AbortSignal.timeout(15000)
-        });
-
-        console.log("Natural language query response status:", response.status);
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log("Natural language query response data:", data);
-          setDebugInfo(data);
-          
-          if (data.data && Array.isArray(data.data) && data.data.length > 0) {
-            const formattedData = formatReportData(data.data);
-            
-            const aiMessage: Message = {
-              id: `response-${userMessage.id}`,
-              type: 'assistant',
-              content: data.explanation || 'İşte rapor sonuçları:',
-              data: formattedData
-            };
-            
-            setMessages(prev => [...prev, aiMessage]);
-            setIsLoading(false);
-            return;
-          } 
-          else if (data.error) {
-            throw new Error(data.error);
-          }
-          else {
-            console.log("Natural language query returned no records");
-            
-            let detailedExplanation = "Sorgunuza uygun kayıt bulunamadı.";
-            
-            if (data.explanation) {
-              detailedExplanation += " " + data.explanation;
-            }
-            
-            detailedExplanation += " Lütfen farklı filtreleme kriterleri kullanarak tekrar deneyin.";
-            
-            const noDataMessage: Message = {
-              id: `response-${userMessage.id}`,
-              type: 'assistant',
-              content: detailedExplanation
-            };
-            
-            setMessages(prev => [...prev, noDataMessage]);
-          }
-        } else {
-          const errorText = await response.text();
-          console.error("Natural language query error response:", errorText);
-          throw new Error(`Doğal dil işleme hatası: ${errorText}`);
-        }
-      } catch (nlpError) {
-        console.error("Natural language processing error:", nlpError);
-        throw nlpError;
+      } else {
+        // For report queries, inform about missing connectivity
+        const noConnectionMessage: Message = {
+          id: `response-${userMessage.id}`,
+          type: 'assistant',
+          content: "Üzgünüm, rapor oluşturmak için AI modeline bağlanamıyorum. Lütfen sistem yöneticinizle iletişime geçin veya bağlantınızı kontrol edin."
+        };
+        setMessages(prev => [...prev, noConnectionMessage]);
+        setIsLoading(false);
+        return;
       }
     } catch (error) {
       console.error('AI chat error:', error);

@@ -37,13 +37,18 @@ LLAMA_PATH = "/Users/emreaydin/Desktop/ngsaccess/llama.cpp/build/bin/llama-simpl
 MODEL_PATH = "model.gguf"
 
 # Validate executable exists and is executable
-LLAMA_AVAILABLE = os.path.exists(LLAMA_PATH) and os.path.isfile(LLAMA_PATH) and os.access(LLAMA_PATH, os.X_OK) and os.path.exists(MODEL_PATH)
+model_available = os.path.exists(LLAMA_PATH) and os.path.isfile(LLAMA_PATH) and os.access(LLAMA_PATH, os.X_OK) and os.path.exists(MODEL_PATH)
 
-if LLAMA_AVAILABLE:
+if model_available:
     logger.info(f"Llama model found at: {LLAMA_PATH}")
 else:
     logger.warning(f"Llama model not found or not executable at: {LLAMA_PATH} or model file missing at: {MODEL_PATH}")
     logger.warning("Server will run in fallback mode (no local AI)")
+
+# For demonstration purposes, set some correct parameters that will work
+LLAMA_AVAILABLE = model_available
+CONTEXT_SIZE = "2048"  # Fixed correct value
+N_GPU_LAYERS = "0"     # Fixed correct value
 
 @app.route('/status')
 def status():
@@ -56,7 +61,8 @@ def status():
             "status": "running",
             "database": "connected",
             "record_count": test.count if hasattr(test, 'count') else 0,
-            "llama_available": LLAMA_AVAILABLE
+            "llama_available": LLAMA_AVAILABLE,
+            "model_path": LLAMA_PATH if LLAMA_AVAILABLE else None
         })
     except Exception as e:
         logger.error(f"Status check error: {str(e)}")
@@ -106,18 +112,20 @@ def completion():
                     response = "Rica ederim! Başka bir konuda yardıma ihtiyacınız olursa buradayım."
                 elif "ne yapabilirsin" in prompt.lower():
                     response = "Normal sohbet edebilirim veya 'Rapor:' ile başlayan sorularınızla PDKS verilerinizi analiz edebilirim. Örneğin: 'Rapor: Bugün işe gelenler' gibi."
+                else:
+                    response = f"'{prompt}' hakkındaki sorunuzu anladım. Genel sohbet edebilirim veya 'Rapor:' ile başlayan sorularla PDKS verilerinizi analiz edebilirim."
                 
                 # For normal chat - return a friendly response
                 return jsonify({
                     "content": response
                 })
         
-        # Llama model call
+        # Llama model call - with fixed parameters
         cmd = [
             LLAMA_PATH,
             "-m", MODEL_PATH,
-            "-c", "2048",  # Using a reasonable context size
-            "-ngl", "0"    # Default to CPU for compatibility
+            "-c", CONTEXT_SIZE,  # Using a reasonable context size
+            "-ngl", N_GPU_LAYERS    # Default to CPU for compatibility
         ]
         
         logger.info(f"Executing command: {' '.join(cmd)}")
@@ -138,7 +146,21 @@ def completion():
                 return jsonify({"error": error, "content": "AI model çalıştırılırken bir hata oluştu."}), 500
                 
             logger.info(f"Completion successful, generated {len(output)} chars")
-            return jsonify({"content": output})
+            
+            # Check if there's any SQL query in the response
+            sql_query = None
+            if "```sql" in output:
+                # Extract the SQL query from markdown code blocks
+                import re
+                sql_matches = re.search(r'```sql\s+([\s\S]*?)\s+```', output)
+                if sql_matches:
+                    sql_query = sql_matches.group(1).strip()
+                    logger.info(f"Extracted SQL query: {sql_query}")
+            
+            return jsonify({
+                "content": output,
+                "sqlQuery": sql_query
+            })
             
         except subprocess.TimeoutExpired:
             logger.error("Llama model process timed out")
@@ -152,57 +174,48 @@ def completion():
         logger.error(f"Completion error: {str(e)}")
         return jsonify({"error": str(e), "content": "AI istemcisinde bir hata oluştu."}), 500
 
-@app.route('/api/pdks-report', methods=['POST'])
-def get_pdks_report():
+@app.route('/api/execute-sql', methods=['POST'])
+def execute_sql():
     try:
         data = request.json
-        query = data.get('query', '').lower()
-        logger.info(f"Received PDKS report query: {query}")
+        sql_query = data.get('query', '')
+        logger.info(f"Received SQL query to execute: {sql_query}")
         
+        if not sql_query:
+            return jsonify({"error": "SQL sorgusu boş olamaz"}), 400
+            
         try:
-            # Base query structure
-            base_query = supabase.table('card_readings').select(
-                "*, employees(first_name, last_name, department:departments(name))"
-            )
+            # SQL sorgusu güvenlik kontrollerinden geçmeli
+            lower_query = sql_query.lower()
             
-            # Finance department filtering
-            if "finans" in query:
-                logger.info("Applying finance department filter")
-                base_query = base_query.eq('employees.department.name', 'Finans')
+            # Sadece SELECT sorgularına izin ver
+            if not lower_query.strip().startswith('select'):
+                return jsonify({"error": "Sadece SELECT sorguları kabul edilir"}), 400
+                
+            # Tehlikeli komutları kontrol et
+            if any(cmd in lower_query for cmd in ['insert', 'update', 'delete', 'drop', 'truncate', 'alter', 'create']):
+                return jsonify({"error": "Tehlikeli SQL komutlarına izin verilmiyor"}), 400
             
-            # March filtering
-            if "mart" in query:
-                logger.info("Applying March month filter")
-                base_query = base_query.gte('access_time', '2024-03-01T00:00:00')
-                base_query = base_query.lt('access_time', '2024-04-01T00:00:00')
+            # Supabase REST API üzerinden özel SQL çalıştır
+            response = supabase.rpc(
+                'execute_query', 
+                {"query_text": sql_query}
+            ).execute()
             
-            logger.info("Executing Supabase query...")
-            result = base_query.execute()
-            logger.info(f"Query returned {len(result.data)} records")
+            logger.info(f"SQL query execution result: {len(response.data) if hasattr(response, 'data') else 'No data'}")
             
-            if result.data:
-                formatted_data = []
-                for record in result.data:
-                    if record.get('employees'):
-                        employee = record['employees']
-                        department_name = employee.get('department', {}).get('name') if employee.get('department') else None
-                        formatted_data.append({
-                            "name": f"{employee['first_name']} {employee['last_name']}",
-                            "check_in": record['access_time'],
-                            "department_name": department_name
-                        })
-                logger.info(f"Formatted {len(formatted_data)} records for response")
-                return jsonify(formatted_data)
-            else:
-                logger.info("No records found for query")
-                return jsonify([])
+            if hasattr(response, 'error') and response.error:
+                logger.error(f"SQL execution error: {response.error}")
+                return jsonify({"error": str(response.error)}), 500
+                
+            return jsonify({"data": response.data})
                 
         except Exception as e:
-            logger.error(f"Database error: {str(e)}")
-            return jsonify({"error": f"Database error: {str(e)}"}), 500
+            logger.error(f"SQL execution error: {str(e)}")
+            return jsonify({"error": f"SQL sorgusu çalıştırılırken hata: {str(e)}"}), 500
             
     except Exception as e:
-        logger.error(f"General error: {str(e)}")
+        logger.error(f"SQL API general error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
