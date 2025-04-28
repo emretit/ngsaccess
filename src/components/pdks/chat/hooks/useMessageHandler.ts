@@ -1,11 +1,10 @@
-
 import { useToast } from "@/hooks/use-toast";
 import { Message } from '../types';
 import { sendChatMessage, executeSqlQuery } from '../services/chatService';
 import { useMessages } from './useMessages';
 import { useInput } from './useInput';
 import { useExportUtils } from '../useExportUtils';
-import { LOCAL_LLAMA_ENDPOINTS } from '../constants';
+import { LOCAL_GPT4ALL_ENDPOINTS } from '../constants';
 
 export function useMessageHandler() {
   const { toast } = useToast();
