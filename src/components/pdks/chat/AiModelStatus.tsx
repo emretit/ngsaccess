@@ -1,4 +1,3 @@
-
 import { Server } from "lucide-react";
 
 interface AiModelStatusProps {
