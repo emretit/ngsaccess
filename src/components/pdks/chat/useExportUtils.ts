@@ -1,7 +1,7 @@
-
 import * as XLSX from 'xlsx';
 import { useToast } from "@/hooks/use-toast";
 import { MessageData } from './types';
+import { PDF_GENERATION_ENDPOINT } from './constants';
 
 export function useExportUtils() {
   const { toast } = useToast();
@@ -132,4 +132,3 @@ export function useExportUtils() {
     handleExportPDF
   };
 }
-
