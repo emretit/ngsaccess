@@ -1,3 +1,4 @@
+
 export const LOCAL_LLAMA_ENDPOINTS = {
   completion: [
     "http://localhost:4891/v1/chat/completions",
@@ -6,10 +7,6 @@ export const LOCAL_LLAMA_ENDPOINTS = {
   status: [
     "http://localhost:4891/v1/models",
     "http://127.0.0.1:4891/v1/models"
-  ],
-  report: [
-    "http://localhost:4891/v1/pdks-report",
-    "http://127.0.0.1:4891/v1/pdks-report"
   ]
 };
 

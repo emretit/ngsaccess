@@ -84,7 +84,7 @@ export function useModelStatus() {
         });
       }
     } else {
-      console.log("Tüm model bağlantı denemeleri başarısız");
+      console.log("Model bağlantı denemesi başarısız");
       setIsLocalModelConnected(false);
       toast({
         title: "GPT4All Bağlantısı Başarısız",
