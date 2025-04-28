@@ -1,8 +1,8 @@
+
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from 'xlsx';
 import { supabase } from "@/integrations/supabase/client";
-import { checkLlamaModelStatus, processNaturalLanguageQuery } from "@/integrations/llama/service";
 
 interface MessageData {
   name: string;
@@ -53,7 +53,7 @@ export function useAiChat() {
   const [messages, setMessages] = useState<Message[]>([{
     id: 'welcome',
     type: 'assistant',
-    content: 'Merhaba! PDKS raporları için sorularınızı yanıtlayabilirim. Örnekler:\n• "Finans departmanı mart ayı giriş takip raporu"\n• "Engineering departmanı"\n• "Bugün işe gelenlerin listesi"'
+    content: 'Merhaba! PDKS raporları için sorularınızı yanıtlayabilirim. Örnek: "Finans departmanı mart ayı giriş takip raporu" veya "Bugün işe gelenlerin listesi"'
   }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -91,7 +91,7 @@ export function useAiChat() {
     try {
       // Create a worksheet from the data
       const ws = XLSX.utils.json_to_sheet(messageData);
-
+      
       // Column width optimization
       const wscols = [
         { wch: 25 },  // Name
@@ -101,16 +101,16 @@ export function useAiChat() {
         { wch: 15 },  // Device (if exists)
         { wch: 20 }   // Location (if exists)
       ];
-
+      
       ws['!cols'] = wscols;
-
+      
       // Create a workbook, add the worksheet
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "PDKS Raporu");
-
+      
       // Generate Excel file and trigger download
       XLSX.writeFile(wb, `pdks_rapor_${new Date().toISOString().split('T')[0]}.xlsx`);
-
+  
       toast({
         title: "Excel dosyası indirildi",
         description: "Rapor başarıyla Excel formatında dışa aktarıldı.",
@@ -137,16 +137,16 @@ export function useAiChat() {
     }
 
     try {
-      console.log("Preparing PDF export data", {
-        rowCount: messageData.length
+      console.log("Preparing PDF export data", { 
+        rowCount: messageData.length 
       });
 
       // Define table headers based on the available fields
-      const headers = Object.keys(messageData[0]).filter(key =>
+      const headers = Object.keys(messageData[0]).filter(key => 
         // Filter out any unwanted properties
         key !== 'id' && key !== 'access_granted' && key !== 'status'
       );
-
+      
       // Format rows as arrays in the order matching the headers
       const rows = messageData.map(record => {
         return headers.map(header => {
@@ -157,20 +157,20 @@ export function useAiChat() {
           return record[header] || '-';
         });
       });
-
+      
       // Get current date in Turkish format
       const currentDate = new Date().toLocaleDateString('tr-TR');
-
+      
       // Extract information from the latest message to set the PDF title
       const lastAssistantMessage = [...messages].reverse().find(msg => msg.type === 'assistant');
       const pdfTitle = lastAssistantMessage ? lastAssistantMessage.content : "PDKS Raporu";
-
+      
       console.log("Calling generate-pdf function with:", {
         headers: headers,
         rowCount: rows.length,
         title: pdfTitle
       });
-
+      
       // Call the PDF generation endpoint
       const response = await fetch(PDF_GENERATION_ENDPOINT, {
         method: 'POST',
@@ -196,11 +196,11 @@ export function useAiChat() {
       // Get the blob of HTML that will be rendered as PDF by the browser
       const htmlBlob = await response.blob();
       console.log("PDF response received, size:", htmlBlob.size);
-
+      
       // Create a URL for the blob and open it in a new window
       const url = window.URL.createObjectURL(htmlBlob);
       window.open(url, '_blank');
-
+      
       toast({
         title: "PDF görüntüleniyor",
         description: "PDF raporu yeni pencerede açılıyor. Tarayıcınızın yazdırma dialogu ile kaydedebilirsiniz.",
@@ -216,33 +216,41 @@ export function useAiChat() {
   };
 
   const checkLocalModelStatus = async () => {
-    try {
-      const isConnected = await checkLlamaModelStatus();
-      setIsLocalModelConnected(isConnected);
-
-      if (isConnected) {
-        console.log("Local model connection successful");
-        toast({
-          title: "Yerel AI modeline bağlanıldı",
-          description: "PDKS AI asistanı aktif.",
+    if (!LOCAL_MODEL_ENABLED) return;
+    
+    console.log("Checking local model status...");
+    for (const endpoint of LOCAL_LLAMA_ENDPOINTS.status) {
+      try {
+        console.log(`Trying endpoint: ${endpoint}`);
+        const response = await fetch(endpoint, { 
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(3000)
         });
-      } else {
-        console.log("Local model not available");
-        toast({
-          title: "Yerel Model Bağlantısı Başarısız",
-          description: "Yerel model kullanılamıyor. Cloud tabanlı doğal dil işleme modeli kullanılacak.",
-          variant: "destructive"
-        });
+        
+        const data = await response.json();
+        console.log(`Endpoint ${endpoint} response:`, data);
+        
+        if (response.ok) {
+          setIsLocalModelConnected(true);
+          console.log("Local model connection successful");
+          toast({
+            title: "Yerel AI modeline bağlanıldı",
+            description: `${endpoint} üzerinden PDKS AI asistanı aktif.`,
+          });
+          return;
+        }
+      } catch (error) {
+        console.warn(`Endpoint ${endpoint} connection error:`, error);
       }
-    } catch (error) {
-      console.error("Error checking local model status:", error);
-      setIsLocalModelConnected(false);
-      toast({
-        title: "Yerel Model Bağlantı Hatası",
-        description: "Yerel model bağlantısı kontrol edilirken bir hata oluştu.",
-        variant: "destructive"
-      });
     }
+
+    console.log("All local model connection attempts failed");
+    toast({
+      title: "Yerel Model Bağlantısı Başarısız",
+      description: "Yerel model kullanılamıyor. Cloud tabanlı doğal dil işleme modeli kullanılacak.",
+      variant: "destructive"
+    });
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -260,35 +268,81 @@ export function useAiChat() {
     console.log("Handling user message:", input);
 
     try {
-      // Yeni entegre ettiğimiz processNaturalLanguageQuery servisini kullan
-      const result = await processNaturalLanguageQuery(input);
-      console.log("Natural language query result:", result);
+      // Call the Supabase natural language query endpoint WITH AUTHORIZATION
+      console.log("Calling Supabase natural language query endpoint:", SUPABASE_NATURAL_QUERY_ENDPOINT);
+      
+      // Get the Supabase access token - fixed the auth session access
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(SUPABASE_NATURAL_QUERY_ENDPOINT, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          // Add authorization header with JWT from Supabase session
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+          // Add apikey header with anon key
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqdWRzZ2hod21uc25uZG5zd2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyMzk1NTMsImV4cCI6MjA1MTgxNTU1M30.9mA6Q1JDCszfH3nujNpGWd36M4qxZ-L38GPTaNIsjVg'
+        },
+        body: JSON.stringify({ query: input }),
+        signal: AbortSignal.timeout(15000)  // Increased timeout for more complex queries
+      });
 
-      // Veri kontrolü
-      if (result.data && Array.isArray(result.data) && result.data.length > 0) {
-        // Format the data for better display
-        const formattedData = formatReportData(result.data);
+      console.log("Natural language query response status:", response.status);
 
-        // Create the assistant message with the report data
-        const aiMessage: Message = {
-          id: `response-${userMessage.id}`,
-          type: 'assistant',
-          content: result.explanation || 'İşte rapor sonuçları:',
-          data: formattedData
-        };
-
-        setMessages(prev => [...prev, aiMessage]);
+      if (response.ok) {
+        const data = await response.json();
+        console.log("Natural language query response data:", data);
+        setDebugInfo(data);
+        
+        // Check if we got data property and it's an array
+        if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+          // Format the data for better display
+          const formattedData = formatReportData(data.data);
+          
+          // Create the assistant message with the report data
+          const aiMessage: Message = {
+            id: `response-${userMessage.id}`,
+            type: 'assistant',
+            content: data.explanation || 'İşte rapor sonuçları:',
+            data: formattedData
+          };
+          
+          setMessages(prev => [...prev, aiMessage]);
+          setIsLoading(false);
+          return;
+        } 
+        else if (data.error) {
+          // Handle specific error from the backend
+          throw new Error(data.error);
+        }
+        else {
+          console.log("Natural language query returned no records");
+          
+          // Add more detailed explanation in the error message
+          let detailedExplanation = "Sorgunuza uygun kayıt bulunamadı.";
+          
+          // If we have debug info about what filters were attempted, include that
+          if (data.explanation) {
+            detailedExplanation += " " + data.explanation;
+          }
+          
+          detailedExplanation += " Lütfen farklı filtreleme kriterleri kullanarak tekrar deneyin.";
+          
+          const noDataMessage: Message = {
+            id: `response-${userMessage.id}`,
+            type: 'assistant',
+            content: detailedExplanation
+          };
+          
+          setMessages(prev => [...prev, noDataMessage]);
+          setIsLoading(false);
+          return;
+        }
       } else {
-        // Veri bulunamadıysa açıklama mesajı göster
-        const noDataMessage: Message = {
-          id: `response-${userMessage.id}`,
-          type: 'assistant',
-          content: result.explanation || 'Sorgunuza uygun kayıt bulunamadı. Lütfen farklı bir sorgu deneyin.'
-        };
-
-        setMessages(prev => [...prev, noDataMessage]);
+        const errorText = await response.text();
+        console.error("Natural language query error response:", errorText);
+        throw new Error(`Doğal dil işleme hatası: ${errorText}`);
       }
-
     } catch (error) {
       console.error('AI chat error:', error);
       const errorMessage: Message = {

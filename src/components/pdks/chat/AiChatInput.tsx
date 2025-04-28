@@ -1,45 +1,29 @@
-import React from 'react';
+
+import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send } from "lucide-react";
 
-export interface AiChatInputProps {
+interface AiChatInputProps {
   input: string;
   isLoading: boolean;
   onInputChange: (value: string) => void;
   onSubmit: (e: React.FormEvent) => void;
-  placeholder?: string;
 }
 
-export function AiChatInput({
-  input,
-  isLoading,
-  onInputChange,
-  onSubmit,
-  placeholder = "Sorgunuzu yazın..."
-}: AiChatInputProps) {
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      onSubmit(e as unknown as React.FormEvent);
-    }
-  };
-
+export function AiChatInput({ input, isLoading, onInputChange, onSubmit }: AiChatInputProps) {
   return (
-    <form onSubmit={onSubmit} className="flex space-x-2">
+    <form onSubmit={onSubmit} className="flex gap-2">
       <Input
-        autoComplete="off"
         value={input}
         onChange={(e) => onInputChange(e.target.value)}
-        placeholder={placeholder}
-        onKeyDown={handleKeyDown}
+        placeholder="Örnek: Finans departmanı mart ayı giriş takip raporu..."
         disabled={isLoading}
         className="flex-1"
       />
-      <Button
-        size="icon"
-        disabled={isLoading || !input.trim()}
-        type="submit"
+      <Button 
+        type="submit" 
+        disabled={!input.trim() || isLoading}
+        title="Gönder"
       >
         <Send className="h-4 w-4" />
       </Button>
