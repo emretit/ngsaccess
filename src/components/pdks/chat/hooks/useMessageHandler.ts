@@ -4,11 +4,13 @@ import { Message } from '../types';
 import { sendChatMessage, executeSqlQuery } from '../services/chatService';
 import { useMessages } from './useMessages';
 import { useInput } from './useInput';
+import { useExportUtils } from '../useExportUtils';
 
 export function useMessageHandler() {
   const { toast } = useToast();
   const { messages, addMessage } = useMessages();
   const { input, setInput, isLoading, setIsLoading } = useInput();
+  const { formatReportData } = useExportUtils();
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
