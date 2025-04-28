@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import { LOCAL_GPT4ALL_ENDPOINTS } from "./constants";
+import { GPT4ALL_ENDPOINT } from "./constants";
 
 export function useModelStatus() {
   const { toast } = useToast();
@@ -9,7 +9,7 @@ export function useModelStatus() {
 
   const checkLocalModelStatus = async () => {
     try {
-      const response = await fetch(LOCAL_GPT4ALL_ENDPOINTS.STATUS, {
+      const response = await fetch(`${GPT4ALL_ENDPOINT}/v1/models`, {
         method: 'GET',
         signal: AbortSignal.timeout(3000) // 3 second timeout
       });
@@ -19,7 +19,7 @@ export function useModelStatus() {
         setIsLocalModelConnected(true);
         toast({
           title: "GPT4All Bağlantısı Kuruldu",
-          description: `GPT4All ${data.model || 'model'} başarıyla bağlandı.`,
+          description: "Yerel AI modeli başarıyla bağlandı.",
         });
         return true;
       } else {

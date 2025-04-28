@@ -19,7 +19,7 @@ export function AiModelStatus({ isConnected }: AiModelStatusProps) {
         ) : (
           <>
             <AlertCircle size={12} />
-            GPT4All Bağlantısı Yok
+            Yerel AI Bağlantısı Yok
           </>
         )}
       </span>
