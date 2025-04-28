@@ -1,20 +1,15 @@
-
 export const LOCAL_LLAMA_ENDPOINTS = {
   completion: [
-    "http://localhost:5050/completion",
-    "http://127.0.0.1:5050/completion",
-    "http://localhost:5050/api/completion",
-    "http://127.0.0.1:5050/api/completion"
+    "http://localhost:4891/v1/chat/completions",
+    "http://127.0.0.1:4891/v1/chat/completions"
   ],
   status: [
-    "http://localhost:5050/status",
-    "http://127.0.0.1:5050/status",
-    "http://localhost:5050/api/status",
-    "http://127.0.0.1:5050/api/status"
+    "http://localhost:4891/v1/models",
+    "http://127.0.0.1:4891/v1/models"
   ],
   report: [
-    "http://localhost:5050/api/pdks-report",
-    "http://127.0.0.1:5050/api/pdks-report"
+    "http://localhost:4891/v1/pdks-report",
+    "http://127.0.0.1:4891/v1/pdks-report"
   ]
 };
 

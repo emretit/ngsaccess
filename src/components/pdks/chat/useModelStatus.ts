@@ -8,14 +8,14 @@ export function useModelStatus() {
   const { toast } = useToast();
 
   const checkLocalModelStatus = async () => {
-    console.log("Checking local model status...");
+    console.log("GPT4All model durumu kontrol ediliyor...");
     let modelConnected = false;
     let workingEndpoint = '';
 
     // Try all status endpoints
     for (const endpoint of LOCAL_LLAMA_ENDPOINTS.status) {
       try {
-        console.log(`Trying status endpoint: ${endpoint}`);
+        console.log(`Model durumu kontrol noktası deneniyor: ${endpoint}`);
         const response = await fetch(endpoint, { 
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
@@ -24,71 +24,71 @@ export function useModelStatus() {
         
         if (response.ok) {
           const data = await response.json();
-          console.log(`Status endpoint ${endpoint} response:`, data);
+          console.log(`Model durumu yanıtı ${endpoint}:`, data);
           setIsLocalModelConnected(true);
           modelConnected = true;
           workingEndpoint = endpoint;
-          console.log("Local model status connection successful");
+          console.log("GPT4All model bağlantısı başarılı");
           break;
         }
       } catch (error) {
-        console.warn(`Status endpoint ${endpoint} connection error:`, error);
+        console.warn(`Model durumu kontrolü başarısız ${endpoint}:`, error);
       }
     }
 
     // If we found a working status endpoint, check corresponding completion endpoint
     if (modelConnected && workingEndpoint) {
       // Try to find a matching completion endpoint based on the working status endpoint
-      let completionEndpoint = '';
-      
-      if (workingEndpoint.includes('/api/')) {
-        completionEndpoint = workingEndpoint.replace('/api/status', '/api/completion');
-      } else {
-        completionEndpoint = workingEndpoint.replace('/status', '/completion');
-      }
+      let completionEndpoint = workingEndpoint.replace('/v1/models', '/v1/chat/completions');
       
       try {
-        console.log(`Testing completion endpoint: ${completionEndpoint}`);
+        console.log(`Tamamlama uç noktası test ediliyor: ${completionEndpoint}`);
         
         const completionResponse = await fetch(completionEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            prompt: "test connection",
-            max_tokens: 5,
-            temperature: 0.7
+            messages: [
+              {
+                role: "user",
+                content: "test connection"
+              }
+            ],
+            model: "gpt4all-j",
+            temperature: 0.7,
+            max_tokens: 5
           }),
           signal: AbortSignal.timeout(5000)
         });
         
         if (completionResponse.ok) {
-          console.log("Completion endpoint working correctly!");
+          console.log("Tamamlama uç noktası çalışıyor!");
           toast({
-            title: "Yerel AI modeline bağlanıldı",
-            description: "Llama modeli ile bağlantı başarılı. Şimdi sorularınızı sorabilirsiniz.",
+            title: "GPT4All Modeline Bağlanıldı",
+            description: "GPT4All modeli ile bağlantı başarılı. Şimdi sorularınızı sorabilirsiniz.",
           });
         } else {
-          console.log("Completion endpoint not working correctly. Response:", await completionResponse.text());
+          console.log("Tamamlama uç noktası çalışmıyor. Yanıt:", await completionResponse.text());
           toast({
-            title: "Yerel Model Bağlantısı Kısmen Başarılı",
+            title: "Model Bağlantısı Kısmen Başarılı",
             description: "Model durumu iyi ancak tamamlama işlevi çalışmıyor olabilir.",
-            variant: "default" // Changed from "warning" to "default"
+            variant: "default"
           });
         }
       } catch (completionError) {
-        console.error("Completion endpoint test failed:", completionError);
+        console.error("Tamamlama testi başarısız:", completionError);
         toast({
-          title: "Yerel Model Kısmen Bağlı",
+          title: "Model Kısmen Bağlı",
           description: "Model durumu iyi ancak tamamlama işlevi test edilemedi.",
           variant: "default"
         });
       }
     } else {
-      console.log("All local model connection attempts failed");
+      console.log("Tüm model bağlantı denemeleri başarısız");
       setIsLocalModelConnected(false);
       toast({
-        title: "Yerel Model Bağlantısı Başarısız",
-        description: "Yerel model kullanılamıyor. Cloud tabanlı doğal dil işleme modeli kullanılacak.",
+        title: "GPT4All Bağlantısı Başarısız",
+        description: "Yerel GPT4All modeli kullanılamıyor. Cloud tabanlı doğal dil işleme modeli kullanılacak.",
         variant: "destructive"
       });
     }
