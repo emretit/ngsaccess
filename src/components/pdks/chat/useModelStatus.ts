@@ -55,7 +55,7 @@ export function useModelStatus() {
               toast({
                 title: "Yerel Model Bağlantısı Kısmen Başarılı",
                 description: "Model durumu iyi ancak tamamlama işlevi çalışmıyor olabilir.",
-                variant: "warning"
+                variant: "default" // Changed from "warning" to "default"
               });
             }
           } catch (completionError) {
