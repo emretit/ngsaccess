@@ -30,6 +30,7 @@ serve(async (req) => {
                           prompt.toLowerCase().includes('report:');
 
     let context = '';
+    let response = null;
     
     if (isReportQuery) {
       // Get PDKS records from database for context if it's a report query
@@ -56,8 +57,7 @@ serve(async (req) => {
       context = `Sen yardımcı bir asistansın. Kullanıcı ile normal bir sohbet ediyorsun.
       Soru: ${prompt}
       
-      Lütfen doğal ve yardımsever bir şekilde yanıt ver. Eğer kullanıcı PDKS verisi isterse,
-      onu 'Rapor:' ile başlayan bir soru sormaya yönlendir.`;
+      Lütfen doğal ve yardımsever bir şekilde yanıt ver.`;
     }
 
     try {
@@ -89,10 +89,10 @@ serve(async (req) => {
     } catch (llamaError) {
       console.error('Llama server error:', llamaError);
       
-      // For normal chat, provide a generic fallback response
+      // For normal chat, provide a custom friendly response (instead of asking for reports)
       if (!isReportQuery) {
         return new Response(JSON.stringify({ 
-          content: "Merhaba! Ben PDKS asistanıyım. Şu anda normal sohbet modunda hizmet veremiyorum, ancak 'Rapor:' ile başlayan bir soru sorarak veri sorgulayabilirsiniz. Örneğin: 'Rapor: Bugün işe gelenler'", 
+          content: "Merhaba! Ben PDKS asistanıyım. Size nasıl yardımcı olabilirim? Normal sohbet edebiliriz veya 'Rapor:' ile başlayan bir soru sorarak verileri sorgulayabilirsiniz.", 
           source: 'fallback'
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

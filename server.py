@@ -32,15 +32,17 @@ try:
 except Exception as e:
     logger.error(f"Supabase connection error: {str(e)}")
 
-# Check if Llama model path exists
+# Check if Llama model path exists and set correct parameters
 LLAMA_PATH = "/Users/emreaydin/Desktop/ngsaccess/llama.cpp/build/bin/llama-simple-chat"
 MODEL_PATH = "model.gguf"
-LLAMA_AVAILABLE = os.path.exists(LLAMA_PATH) and os.path.exists(MODEL_PATH)
+
+# Validate executable exists and is executable
+LLAMA_AVAILABLE = os.path.exists(LLAMA_PATH) and os.path.isfile(LLAMA_PATH) and os.access(LLAMA_PATH, os.X_OK) and os.path.exists(MODEL_PATH)
 
 if LLAMA_AVAILABLE:
     logger.info(f"Llama model found at: {LLAMA_PATH}")
 else:
-    logger.warning(f"Llama model not found at: {LLAMA_PATH} or model file missing at: {MODEL_PATH}")
+    logger.warning(f"Llama model not found or not executable at: {LLAMA_PATH} or model file missing at: {MODEL_PATH}")
     logger.warning("Server will run in fallback mode (no local AI)")
 
 @app.route('/status')
@@ -80,11 +82,21 @@ def completion():
         logger.info(f"Received completion request with prompt: {prompt[:50]}...")
         
         if not LLAMA_AVAILABLE:
-            logger.warning("Llama model not available, returning fallback response")
-            return jsonify({
-                "error": "Llama model not available",
-                "content": "Üzgünüm, yerel AI modeli bulunamadı. Lütfen sistem yöneticinizle iletişime geçin."
-            }), 503
+            logger.warning("Llama model not available, returning friendly fallback response")
+            # Check if it's a chat or report query
+            is_report_query = "rapor:" in prompt.lower() or "report:" in prompt.lower()
+            
+            if is_report_query:
+                # For report queries
+                return jsonify({
+                    "error": "Llama model not available",
+                    "content": "Üzgünüm, rapor oluşturmak için gereken AI modeli bulunamadı. Lütfen sistem yöneticinizle iletişime geçin."
+                }), 503
+            else:
+                # For normal chat - return a friendly response
+                return jsonify({
+                    "content": "Merhaba! Ben PDKS asistanıyım. Size nasıl yardımcı olabilirim? Normal sohbet edebiliriz veya 'Rapor:' ile başlayan bir soru sorarak verileri sorgulayabilirsiniz."
+                })
         
         # Llama model call
         cmd = [

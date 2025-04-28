@@ -12,7 +12,7 @@ export function useAiChat() {
   const [messages, setMessages] = useState<Message[]>([{
     id: 'welcome',
     type: 'assistant',
-    content: 'Merhaba! Size nasıl yardımcı olabilirim? Normal sohbet edebilir veya PDKS rapor sorguları sorabilirim. Örnek rapor sorguları:\n- "Rapor: Finans departmanı mart ayı giriş kayıtları"\n- "Rapor: Bugün işe gelenlerin listesi"\n- "Rapor: Geçen ay en çok geç kalan personel"'
+    content: 'Merhaba! Size nasıl yardımcı olabilirim? Normal sohbet edebiliriz veya PDKS rapor sorguları sorabilirim. Örnek rapor sorguları:\n- "Rapor: Finans departmanı mart ayı giriş kayıtları"\n- "Rapor: Bugün işe gelenlerin listesi"\n- "Rapor: Geçen ay en çok geç kalan personel"'
   }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -48,12 +48,9 @@ Not: Yanıtında samimi ve yardımsever bir ton kullan.`;
     } else {
       // Normal sohbet için genel prompt
       return `Sen yardımcı bir asistansın. Kullanıcı PDKS (Personel Devam Kontrol Sistemi) uygulaması kullanıyor, 
-ancak şu anda seninle normal sohbet etmek istiyor. Sorulara doğal ve samimi bir şekilde yanıt ver.
+ve seninle normal sohbet etmek istiyor. Sorulara doğal ve samimi bir şekilde yanıt ver.
 
 Kullanıcı Sorusu: ${userInput}
-
-Eğer kullanıcı PDKS verileri hakkında soru sorarsa, ona şunu belirtebilirsin:
-"Detaylı rapor almak isterseniz, sorunuzu 'Rapor:' ile başlatabilirsiniz. Örneğin, 'Rapor: Nisan ayı devamsızlık durumu'"
 
 Yanıtın doğal, samimi ve yardımcı olsun.`;
     }
@@ -150,7 +147,7 @@ Yanıtın doğal, samimi ve yardımcı olsun.`;
         const fallbackMessage: Message = {
           id: `response-${userMessage.id}`,
           type: 'assistant',
-          content: `Merhaba! Şu anda normal sohbet hizmeti veremiyorum, ancak PDKS raporları için size yardımcı olabilirim. Lütfen 'Rapor:' ile başlayan bir soru sorun.`
+          content: `Merhaba! Ben size yardımcı olmak için buradayım. Normal sohbet için yanıt verebilirim veya "Rapor:" ile başlayan sorularınızda size PDKS verilerini sunabilirim.`
         };
         setMessages(prev => [...prev, fallbackMessage]);
         setIsLoading(false);
