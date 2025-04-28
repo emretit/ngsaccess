@@ -1,4 +1,3 @@
-
 import { useToast } from "@/hooks/use-toast";
 import { Message } from '../types';
 import { sendChatMessage, executeSqlQuery } from '../services/chatService';
@@ -27,7 +26,24 @@ export function useMessageHandler() {
     setIsLoading(true);
 
     try {
-      const isReportQuery = input.toLowerCase().startsWith('rapor:');
+      const lowerInput = input.toLowerCase();
+      const isGreeting = ["selam", "merhaba", "hi", "hello", "hey"].some(greeting => 
+        lowerInput === greeting || lowerInput.startsWith(`${greeting} `)
+      );
+      
+      const isReportQuery = lowerInput.startsWith('rapor:');
+
+      if (isGreeting && !isReportQuery) {
+        const greetingResponse: Message = {
+          id: `response-${userMessage.id}`,
+          type: 'assistant',
+          content: 'Merhaba! Size nasıl yardımcı olabilirim? Rapor sorguları için mesajınıza "Rapor:" ile başlayabilirsiniz.'
+        };
+        addMessage(greetingResponse);
+        setIsLoading(false);
+        return;
+      }
+      
       const response = await sendChatMessage(input);
 
       if (response) {
