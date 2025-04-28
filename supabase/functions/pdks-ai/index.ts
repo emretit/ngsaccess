@@ -30,7 +30,6 @@ serve(async (req) => {
                           prompt.toLowerCase().includes('report:');
 
     let context = '';
-    let response = null;
     
     if (isReportQuery) {
       // Get PDKS records from database for context if it's a report query
@@ -89,10 +88,27 @@ serve(async (req) => {
     } catch (llamaError) {
       console.error('Llama server error:', llamaError);
       
-      // For normal chat, provide a custom friendly response (instead of asking for reports)
+      // For normal chat, provide customized responses based on the question
       if (!isReportQuery) {
+        // Generate a response based on the input for normal chat mode
+        let response = "Merhaba! Size nasıl yardımcı olabilirim?";
+        
+        if (prompt.toLowerCase().includes('merhaba') || prompt.toLowerCase().includes('selam')) {
+          response = "Merhaba! Ben PDKS asistanıyım. Nasıl yardımcı olabilirim?";
+        } else if (prompt.toLowerCase().includes('nasılsın')) {
+          response = "Ben bir AI asistanı olarak harikayım, teşekkürler! Size nasıl yardımcı olabilirim?";
+        } else if (prompt.toLowerCase().includes('adın') || prompt.toLowerCase().includes('ismin')) {
+          response = "Ben PDKS AI asistanıyım. Personel Devam Kontrol Sistemi verilerinizle ilgili sorularınızı yanıtlayabilirim.";
+        } else if (prompt.toLowerCase().includes('teşekkür')) {
+          response = "Rica ederim! Başka bir konuda yardıma ihtiyacınız olursa buradayım.";
+        } else if (prompt.toLowerCase().includes('ne yapabilirsin')) {
+          response = "Normal sohbet edebilirim veya 'Rapor:' ile başlayan sorularınızla PDKS verilerinizi analiz edebilirim. Örneğin: 'Rapor: Bugün işe gelenler' gibi.";
+        } else {
+          response = `Anlıyorum, "${prompt}" hakkında konuşmak istiyorsunuz. Size daha iyi hizmet verebilmem için normal sohbet edebiliriz veya 'Rapor:' ile başlayan bir soru sorarak PDKS verilerinizi sorgulayabilirsiniz.`;
+        }
+        
         return new Response(JSON.stringify({ 
-          content: "Merhaba! Ben PDKS asistanıyım. Size nasıl yardımcı olabilirim? Normal sohbet edebiliriz veya 'Rapor:' ile başlayan bir soru sorarak verileri sorgulayabilirsiniz.", 
+          content: response, 
           source: 'fallback'
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

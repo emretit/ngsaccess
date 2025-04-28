@@ -93,9 +93,23 @@ def completion():
                     "content": "Üzgünüm, rapor oluşturmak için gereken AI modeli bulunamadı. Lütfen sistem yöneticinizle iletişime geçin."
                 }), 503
             else:
+                # Generate a simple response based on the input for normal chat mode
+                response = "Merhaba! Size nasıl yardımcı olabilirim?"
+                
+                if "merhaba" in prompt.lower() or "selam" in prompt.lower():
+                    response = "Merhaba! Ben PDKS asistanıyım. Nasıl yardımcı olabilirim?"
+                elif "nasılsın" in prompt.lower():
+                    response = "Ben bir AI asistanı olarak harikayım, teşekkürler! Size nasıl yardımcı olabilirim?"
+                elif "adın" in prompt.lower() or "ismin" in prompt.lower():
+                    response = "Ben PDKS AI asistanıyım. Personel Devam Kontrol Sistemi verilerinizle ilgili sorularınızı yanıtlayabilirim."
+                elif "teşekkür" in prompt.lower():
+                    response = "Rica ederim! Başka bir konuda yardıma ihtiyacınız olursa buradayım."
+                elif "ne yapabilirsin" in prompt.lower():
+                    response = "Normal sohbet edebilirim veya 'Rapor:' ile başlayan sorularınızla PDKS verilerinizi analiz edebilirim. Örneğin: 'Rapor: Bugün işe gelenler' gibi."
+                
                 # For normal chat - return a friendly response
                 return jsonify({
-                    "content": "Merhaba! Ben PDKS asistanıyım. Size nasıl yardımcı olabilirim? Normal sohbet edebiliriz veya 'Rapor:' ile başlayan bir soru sorarak verileri sorgulayabilirsiniz."
+                    "content": response
                 })
         
         # Llama model call

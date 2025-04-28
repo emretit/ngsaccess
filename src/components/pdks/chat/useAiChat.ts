@@ -12,7 +12,7 @@ export function useAiChat() {
   const [messages, setMessages] = useState<Message[]>([{
     id: 'welcome',
     type: 'assistant',
-    content: 'Merhaba! Size nasıl yardımcı olabilirim? Normal sohbet edebiliriz veya PDKS rapor sorguları sorabilirim. Örnek rapor sorguları:\n- "Rapor: Finans departmanı mart ayı giriş kayıtları"\n- "Rapor: Bugün işe gelenlerin listesi"\n- "Rapor: Geçen ay en çok geç kalan personel"'
+    content: 'Merhaba! Ben PDKS asistanıyım. Size nasıl yardımcı olabilirim? Normal sohbet edebiliriz veya "Rapor:" ile başlayan sorularla PDKS verilerinizi analiz edebilirim.'
   }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -142,12 +142,29 @@ Yanıtın doğal, samimi ve yardımcı olsun.`;
         }
       }
 
-      // Eğer rapor sorgusu değilse ve herşey başarısız olduysa, basit bir yanıt ver
+      // Fallback for normal chat (more responsive than before)
       if (!isReportQuery) {
+        // Generate a simple response based on the input for normal chat mode
+        let responseContent = "Merhaba! Size nasıl yardımcı olabilirim?";
+        
+        if (input.toLowerCase().includes('merhaba') || input.toLowerCase().includes('selam')) {
+          responseContent = "Merhaba! Ben PDKS asistanıyım. Nasıl yardımcı olabilirim?";
+        } else if (input.toLowerCase().includes('nasılsın')) {
+          responseContent = "Ben bir AI asistanı olarak harikayım, teşekkürler! Size nasıl yardımcı olabilirim?";
+        } else if (input.toLowerCase().includes('adın') || input.toLowerCase().includes('ismin')) {
+          responseContent = "Ben PDKS AI asistanıyım. Personel Devam Kontrol Sistemi verilerinizle ilgili sorularınızı yanıtlayabilirim.";
+        } else if (input.toLowerCase().includes('teşekkür')) {
+          responseContent = "Rica ederim! Başka bir konuda yardıma ihtiyacınız olursa buradayım.";
+        } else if (input.toLowerCase().includes('ne yapabilirsin')) {
+          responseContent = "Normal sohbet edebilirim veya 'Rapor:' ile başlayan sorularınızla PDKS verilerinizi analiz edebilirim. Örneğin: 'Rapor: Bugün işe gelenler' gibi.";
+        } else {
+          responseContent = `Anlıyorum, "${input}" hakkında konuşmak istiyorsunuz. Size daha iyi hizmet verebilmem için normal sohbet edebiliriz veya 'Rapor:' ile başlayan bir soru sorarak PDKS verilerinizi sorgulayabilirsiniz.`;
+        }
+        
         const fallbackMessage: Message = {
           id: `response-${userMessage.id}`,
           type: 'assistant',
-          content: `Merhaba! Ben size yardımcı olmak için buradayım. Normal sohbet için yanıt verebilirim veya "Rapor:" ile başlayan sorularınızda size PDKS verilerini sunabilirim.`
+          content: responseContent
         };
         setMessages(prev => [...prev, fallbackMessage]);
         setIsLoading(false);
