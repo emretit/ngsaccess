@@ -1,5 +1,5 @@
 
-import { GPT4ALL_ENDPOINT, GPT4ALL_DEFAULT_MODEL } from "../constants";
+import { GPT4ALL_ENDPOINT, GPT4ALL_DEFAULT_MODEL, GPT4ALL_SYSTEM_PROMPT } from "../constants";
 
 export async function sendChatMessage(input: string) {
   console.log("Sending message to GPT4All");
@@ -12,8 +12,8 @@ export async function sendChatMessage(input: string) {
       },
       body: JSON.stringify({
         model: GPT4ALL_DEFAULT_MODEL,
-        prompt: input,
-        max_tokens: 500,
+        prompt: preparePrompt(input),
+        max_tokens: 1000, // Increased token limit for longer responses
         temperature: 0.7
       })
     });
@@ -36,4 +36,9 @@ export async function sendChatMessage(input: string) {
       source: 'error'
     };
   }
+}
+
+// Helper function to format the prompt with system instructions
+function preparePrompt(userInput: string): string {
+  return `${GPT4ALL_SYSTEM_PROMPT}\n\nKullanıcı: ${userInput}\nAsistan:`;
 }

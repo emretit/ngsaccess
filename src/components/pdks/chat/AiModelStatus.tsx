@@ -1,5 +1,5 @@
 
-import { Server, AlertCircle } from "lucide-react";
+import { Server, AlertCircle, Sparkles } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface AiModelStatusProps {
@@ -14,7 +14,15 @@ export function AiModelStatus({ isConnected }: AiModelStatusProps) {
         {isConnected ? (
           <>
             <Server size={12} /> 
-            GPT4All Aktif
+            <span>GPT4All Aktif</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Sparkles size={12} className="text-amber-500 ml-1" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[250px] text-xs">
+                PDKS uzman asistan sistemi aktif
+              </TooltipContent>
+            </Tooltip>
           </>
         ) : (
           <>
