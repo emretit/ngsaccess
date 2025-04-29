@@ -1,7 +1,6 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
-import { GPT4ALL_ENDPOINT } from "./constants";
 
 export function useModelStatus() {
   const { toast } = useToast();
@@ -13,45 +12,39 @@ export function useModelStatus() {
     
     setIsChecking(true);
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 saniye zaman aşımı
+      // Check if OpenAI API key exists
+      const apiKey = process.env.OPEN_AI_API_KEY || localStorage.getItem('OPENAI_API_KEY');
       
-      const response = await fetch(`${GPT4ALL_ENDPOINT}/v1/models`, {
-        method: 'GET',
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setIsLocalModelConnected(true);
-        toast({
-          title: "GPT4All Bağlantısı Kuruldu",
-          description: "Yerel AI modeli başarıyla bağlandı.",
-        });
-        return true;
-      } else {
+      if (!apiKey) {
         setIsLocalModelConnected(false);
         toast({
-          title: "GPT4All Bağlantı Hatası",
-          description: "API'ye erişilemedi. API sunucusunun etkin olduğundan emin olun.",
+          title: "OpenAI API Anahtarı Bulunamadı",
+          description: "Lütfen API anahtarınızı ayarlardan kontrol edin.",
           variant: "destructive"
         });
         return false;
       }
+      
+      // Simply mark as connected if API key exists
+      // In a real implementation, you might want to make a test request
+      setIsLocalModelConnected(true);
+      toast({
+        title: "OpenAI Bağlantısı Hazır",
+        description: "API anahtarı bulundu, OpenAI kullanıma hazır.",
+      });
+      return true;
     } catch (error) {
-      console.error("GPT4All connection error:", error);
+      console.error("OpenAI connection check error:", error);
       setIsLocalModelConnected(false);
       
-      let errorMessage = "Bağlantı başarısız oldu. Lütfen GPT4All uygulamasının açık olduğundan emin olun.";
+      let errorMessage = "Bağlantı kontrolünde hata oluştu.";
       
-      if (error instanceof DOMException && error.name === "AbortError") {
-        errorMessage = "Bağlantı zaman aşımına uğradı. GPT4All yanıt vermedi.";
+      if (error instanceof Error) {
+        errorMessage = `Hata: ${error.message}`;
       }
       
       toast({
-        title: "GPT4All Bağlantı Hatası",
+        title: "OpenAI Bağlantı Hatası",
         description: errorMessage,
         variant: "destructive"
       });
@@ -62,16 +55,16 @@ export function useModelStatus() {
     }
   };
 
-  // Komponent yüklendiğinde bağlantıyı kontrol et
+  // Component loaded, check connection
   useEffect(() => {
     checkLocalModelStatus();
     
-    // 30 saniyede bir bağlantıyı kontrol et
+    // Check connection every 5 minutes
     const intervalId = setInterval(() => {
       if (!isLocalModelConnected) {
         checkLocalModelStatus();
       }
-    }, 30000);
+    }, 300000); // 5 minutes
     
     return () => clearInterval(intervalId);
   }, [isLocalModelConnected]);

@@ -1,22 +1,38 @@
 
-import { GPT4ALL_ENDPOINT, GPT4ALL_DEFAULT_MODEL, GPT4ALL_SYSTEM_PROMPT } from "../constants";
+import { GPT4ALL_SYSTEM_PROMPT } from "../constants";
+
+const OPENAI_API_ENDPOINT = "https://api.openai.com/v1/chat/completions";
+const OPENAI_MODEL = "gpt-4o-mini"; // Using a modern OpenAI model
 
 export async function sendChatMessage(input: string) {
-  console.log("Sending message to GPT4All");
+  console.log("Sending message to OpenAI API");
   
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 saniye zaman aşımı
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 saniye zaman aşımı
     
-    const response = await fetch(`${GPT4ALL_ENDPOINT}/v1/completions`, {
+    const apiKey = process.env.OPEN_AI_API_KEY || localStorage.getItem('OPENAI_API_KEY');
+    
+    if (!apiKey) {
+      return {
+        content: "OpenAI API anahtarı bulunamadı. Lütfen API anahtarını ayarlayın.",
+        source: 'error'
+      };
+    }
+    
+    const response = await fetch(OPENAI_API_ENDPOINT, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: GPT4ALL_DEFAULT_MODEL,
-        prompt: preparePrompt(input),
-        max_tokens: 1000, // Increased token limit for longer responses
+        model: OPENAI_MODEL,
+        messages: [
+          { role: "system", content: GPT4ALL_SYSTEM_PROMPT },
+          { role: "user", content: input }
+        ],
+        max_tokens: 1000,
         temperature: 0.7
       }),
       signal: controller.signal
@@ -25,11 +41,12 @@ export async function sendChatMessage(input: string) {
     clearTimeout(timeoutId);
     
     if (!response.ok) {
-      throw new Error(`GPT4All API hatası: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`OpenAI API hatası: ${response.status} - ${errorData.error?.message || 'Bilinmeyen hata'}`);
     }
     
     const data = await response.json();
-    console.log("GPT4All yanıtı:", data);
+    console.log("OpenAI yanıtı:", data);
     
     if (!data.choices || !data.choices[0]) {
       return {
@@ -39,31 +56,27 @@ export async function sendChatMessage(input: string) {
     }
     
     return {
-      content: data.choices[0].text,
-      source: 'gpt4all'
+      content: data.choices[0].message.content,
+      source: 'openai'
     };
   } catch (error) {
     console.error("Chat service error:", error);
     
     // Daha detaylı hata mesajları
-    let errorMessage = "Üzgünüm, GPT4All bağlantısında bir hata oluştu.";
+    let errorMessage = "Üzgünüm, OpenAI bağlantısında bir hata oluştu.";
     
     if (error instanceof DOMException && error.name === "AbortError") {
-      errorMessage = "Bağlantı zaman aşımına uğradı. GPT4All yanıt vermedi.";
+      errorMessage = "Bağlantı zaman aşımına uğradı. OpenAI yanıt vermedi.";
     } else if (error instanceof Error) {
-      if (error.message.includes("Failed to fetch")) {
-        errorMessage = "GPT4All API'sine bağlanılamadı. Lütfen GPT4All uygulamasının çalıştığından ve API sunucusunun etkinleştirildiğinden emin olun.";
-      }
+      errorMessage = `Hata: ${error.message}`;
     }
     
     return {
-      content: `${errorMessage}\n\nKurulum rehberi için docs/gpt4all-setup.md dosyasını inceleyebilirsiniz.`,
+      content: errorMessage,
       source: 'error'
     };
   }
 }
 
-// Helper function to format the prompt with system instructions
-function preparePrompt(userInput: string): string {
-  return `${GPT4ALL_SYSTEM_PROMPT}\n\nKullanıcı: ${userInput}\nAsistan:`;
-}
+// Helper function to format the prompt with system instructions is no longer needed
+// since we're using OpenAI's message structure

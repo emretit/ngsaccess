@@ -1,5 +1,5 @@
 
-import { Server, AlertCircle, Sparkles, Info } from "lucide-react";
+import { Sparkles, AlertCircle, Info, Cpu } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface AiModelStatusProps {
@@ -13,8 +13,8 @@ export function AiModelStatus({ isConnected }: AiModelStatusProps) {
       <span className="text-xs text-gray-500 flex items-center gap-1">
         {isConnected ? (
           <>
-            <Server size={12} /> 
-            <span>GPT4All Aktif</span>
+            <Cpu size={12} /> 
+            <span>OpenAI Aktif</span>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Sparkles size={12} className="text-amber-500 ml-1" />
@@ -27,13 +27,13 @@ export function AiModelStatus({ isConnected }: AiModelStatusProps) {
         ) : (
           <>
             <AlertCircle size={12} />
-            <span>Yerel AI Bağlantısı Yok</span>
+            <span>OpenAI Bağlantısı Yok</span>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Info size={12} className="text-blue-500 ml-1" />
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[290px] text-xs">
-                GPT4All uygulamasını başlatın ve API sunucusunu etkinleştirin. 
+                OpenAI API anahtarınızı kontrol edin.
                 Daha fazla bilgi için yardım dokümanını inceleyebilirsiniz.
               </TooltipContent>
             </Tooltip>

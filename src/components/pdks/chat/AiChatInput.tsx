@@ -25,7 +25,7 @@ export function AiChatInput({
         value={input}
         onChange={(e) => onInputChange(e.target.value)}
         placeholder={isModelConnected 
-          ? "Yerel Llama modeline sorunuzu yazın..." 
+          ? "PDKS hakkında sorunuzu yazın..." 
           : "Örnek: Finans departmanı mart ayı giriş takip raporu..."}
         disabled={isLoading}
         className="flex-1"
@@ -34,17 +34,16 @@ export function AiChatInput({
         <TooltipTrigger asChild>
           <Button 
             type="submit" 
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || !isModelConnected}
             title="Gönder"
-            variant={isModelConnected ? "default" : "secondary"}
           >
             <Send className="h-4 w-4" />
           </Button>
         </TooltipTrigger>
         <TooltipContent side="top">
           {isModelConnected 
-            ? "Yerel Llama modeline sorunuzu gönderin" 
-            : "Cloud tabanlı AI hizmetine sorunuzu gönderin"}
+            ? "OpenAI modeline sorunuzu gönderin" 
+            : "API anahtarınızı ayarlamadan soru gönderemezsiniz"}
         </TooltipContent>
       </Tooltip>
     </form>
