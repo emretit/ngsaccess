@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Key } from "lucide-react";
@@ -14,6 +14,18 @@ export function OpenAiKeyInput({ onComplete }: OpenAiKeyInputProps) {
   const [apiKey, setApiKey] = useState("");
   const [isVisible, setIsVisible] = useState(false);
 
+  useEffect(() => {
+    // Check if key was provided in URL or exists in localStorage
+    const urlParams = new URLSearchParams(window.location.search);
+    const keyFromUrl = urlParams.get('apikey');
+    
+    if (keyFromUrl) {
+      setApiKey(keyFromUrl);
+      // Remove the key from URL for security
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
   const handleSaveKey = () => {
     if (!apiKey.trim()) {
       toast({
@@ -24,7 +36,7 @@ export function OpenAiKeyInput({ onComplete }: OpenAiKeyInputProps) {
       return;
     }
 
-    // Save to localStorage (in a real app, consider more secure options)
+    // Save to localStorage
     localStorage.setItem('OPENAI_API_KEY', apiKey);
     
     toast({

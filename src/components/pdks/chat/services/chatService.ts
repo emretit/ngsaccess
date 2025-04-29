@@ -11,7 +11,7 @@ export async function sendChatMessage(input: string) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 saniye zaman aşımı
     
-    const apiKey = process.env.OPEN_AI_API_KEY || localStorage.getItem('OPENAI_API_KEY');
+    const apiKey = localStorage.getItem('OPENAI_API_KEY');
     
     if (!apiKey) {
       return {

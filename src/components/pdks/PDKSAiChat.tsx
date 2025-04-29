@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { OpenAiKeyInput } from "./chat/OpenAiKeyInput";
 
 export function PDKSAiChat() {
   const { toast } = useToast();
-  const [showApiKeyInput, setShowApiKeyInput] = useState(!localStorage.getItem('OPENAI_API_KEY'));
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   
   const {
     messages,
@@ -26,6 +26,24 @@ export function PDKSAiChat() {
     handleExportExcel,
     handleExportPDF
   } = useAiChat();
+  
+  useEffect(() => {
+    // Check if API key exists in localStorage
+    const apiKey = localStorage.getItem('OPENAI_API_KEY');
+    setShowApiKeyInput(!apiKey);
+    
+    // Check URL parameters for API key
+    const urlParams = new URLSearchParams(window.location.search);
+    const keyFromUrl = urlParams.get('apikey');
+    
+    if (keyFromUrl) {
+      localStorage.setItem('OPENAI_API_KEY', keyFromUrl);
+      setShowApiKeyInput(false);
+      // Remove the key from URL for security
+      window.history.replaceState({}, document.title, window.location.pathname);
+      checkLocalModelStatus();
+    }
+  }, []);
 
   const handleRefreshModelStatus = () => {
     checkLocalModelStatus();

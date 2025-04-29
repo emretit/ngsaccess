@@ -13,7 +13,7 @@ export function useModelStatus() {
     setIsChecking(true);
     try {
       // Check if OpenAI API key exists
-      const apiKey = process.env.OPEN_AI_API_KEY || localStorage.getItem('OPENAI_API_KEY');
+      const apiKey = localStorage.getItem('OPENAI_API_KEY');
       
       if (!apiKey) {
         setIsLocalModelConnected(false);
