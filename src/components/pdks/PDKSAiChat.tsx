@@ -30,20 +30,20 @@ export function PDKSAiChat() {
   useEffect(() => {
     // Check if API key exists in localStorage
     const apiKey = localStorage.getItem('OPENAI_API_KEY');
-    setShowApiKeyInput(!apiKey);
+    setShowApiKeyInput(!apiKey || !apiKey.startsWith('sk-'));
     
     // Check URL parameters for API key
     const urlParams = new URLSearchParams(window.location.search);
     const keyFromUrl = urlParams.get('apikey');
     
-    if (keyFromUrl) {
+    if (keyFromUrl && keyFromUrl.startsWith('sk-')) {
       localStorage.setItem('OPENAI_API_KEY', keyFromUrl);
       setShowApiKeyInput(false);
       // Remove the key from URL for security
       window.history.replaceState({}, document.title, window.location.pathname);
       checkLocalModelStatus();
     }
-  }, []);
+  }, [checkLocalModelStatus]);
 
   const handleRefreshModelStatus = () => {
     checkLocalModelStatus();

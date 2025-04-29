@@ -29,6 +29,7 @@ export async function sendChatMessage(input: string) {
     }
     
     try {
+      console.log("Connecting to OpenAI API...");
       const response = await fetch(OPENAI_API_ENDPOINT, {
         method: 'POST',
         headers: {
@@ -48,6 +49,7 @@ export async function sendChatMessage(input: string) {
       });
       
       clearTimeout(timeoutId);
+      console.log("OpenAI API response status:", response.status);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -55,8 +57,10 @@ export async function sendChatMessage(input: string) {
         
         if (errorData.error) {
           if (errorData.error.type === "invalid_request_error" && 
-              errorData.error.message.includes("API key")) {
+              errorData.error.message && errorData.error.message.includes("API key")) {
             errorMessage = "Geçersiz OpenAI API anahtarı. Lütfen API anahtarınızı kontrol edin.";
+            // Clear invalid key
+            localStorage.removeItem('OPENAI_API_KEY');
           } else {
             errorMessage += ` - ${errorData.error.message || 'Bilinmeyen hata'}`;
           }
@@ -66,7 +70,7 @@ export async function sendChatMessage(input: string) {
       }
       
       const data = await response.json();
-      console.log("OpenAI yanıtı:", data);
+      console.log("OpenAI yanıtı alındı");
       
       if (!data.choices || !data.choices[0]) {
         return {
@@ -94,6 +98,11 @@ export async function sendChatMessage(input: string) {
       errorMessage = "Bağlantı zaman aşımına uğradı. OpenAI yanıt vermedi.";
     } else if (error instanceof Error) {
       errorMessage = error.message;
+      
+      // If API key is invalid, suggest resetting it
+      if (errorMessage.includes("Geçersiz OpenAI API anahtarı")) {
+        errorMessage += " Yeni bir API anahtarı eklemek için sayfayı yenileyebilirsiniz.";
+      }
     }
     
     return {

@@ -19,7 +19,7 @@ export function useModelStatus() {
         setIsLocalModelConnected(false);
         toast({
           title: "OpenAI API Anahtarı Bulunamadı",
-          description: "Lütfen API anahtarınızı ayarlardan kontrol edin.",
+          description: "Lütfen API anahtarınızı ayarlayın.",
           variant: "destructive"
         });
         return false;
@@ -38,16 +38,23 @@ export function useModelStatus() {
       
       // Perform a test request to validate the API key
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
         const testRequest = await fetch("https://api.openai.com/v1/models", {
           headers: {
             "Authorization": `Bearer ${apiKey}`,
             "Content-Type": "application/json"
-          }
+          },
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         if (!testRequest.ok) {
           const errorData = await testRequest.json().catch(() => ({}));
-          throw new Error(`API test failed: ${testRequest.status} - ${errorData.error?.message || 'Unknown error'}`);
+          const errorMsg = errorData.error?.message || `HTTP ${testRequest.status}`;
+          throw new Error(`API doğrulama hatası: ${errorMsg}`);
         }
         
         setIsLocalModelConnected(true);
@@ -60,9 +67,16 @@ export function useModelStatus() {
         console.error("OpenAI test request failed:", requestError);
         setIsLocalModelConnected(false);
         
+        let errorMessage = "API anahtarı doğrulanamadı";
+        if (requestError instanceof DOMException && requestError.name === "AbortError") {
+          errorMessage = "API yanıt vermedi, zaman aşımı.";
+        } else if (requestError instanceof Error) {
+          errorMessage = requestError.message;
+        }
+        
         toast({
           title: "OpenAI API Bağlantı Hatası",
-          description: requestError instanceof Error ? requestError.message : "API anahtarı geçerli değil veya bağlantı hatası.",
+          description: errorMessage,
           variant: "destructive"
         });
         
@@ -73,7 +87,6 @@ export function useModelStatus() {
       setIsLocalModelConnected(false);
       
       let errorMessage = "Bağlantı kontrolünde hata oluştu.";
-      
       if (error instanceof Error) {
         errorMessage = `Hata: ${error.message}`;
       }
@@ -97,18 +110,10 @@ export function useModelStatus() {
       checkLocalModelStatus();
     }, 500);
     
-    // Check connection every 5 minutes
-    const intervalId = setInterval(() => {
-      if (!isLocalModelConnected) {
-        checkLocalModelStatus();
-      }
-    }, 300000); // 5 minutes
-    
     return () => {
       clearTimeout(timer);
-      clearInterval(intervalId);
     };
-  }, [isLocalModelConnected]);
+  }, []);
 
   return {
     isLocalModelConnected,

@@ -24,6 +24,12 @@ export function OpenAiKeyInput({ onComplete }: OpenAiKeyInputProps) {
       setApiKey(keyFromUrl);
       // Remove the key from URL for security
       window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+      // Check if there's an API key in localStorage
+      const storedKey = localStorage.getItem('OPENAI_API_KEY');
+      if (storedKey) {
+        setApiKey(storedKey);
+      }
     }
   }, []);
 

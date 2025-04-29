@@ -33,7 +33,7 @@ export function AiModelStatus({ isConnected }: AiModelStatusProps) {
                 <Info size={12} className="text-blue-500 ml-1 cursor-help" />
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[290px] text-xs">
-                OpenAI API anahtarınızı kontrol edin.
+                OpenAI API anahtarınızı kontrol edin veya yeniden girin.
                 Geçerli bir API anahtarı (sk- ile başlayan) girmeniz gerekiyor.
               </TooltipContent>
             </Tooltip>
