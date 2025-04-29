@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Key } from "lucide-react";
+import { Key, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface OpenAiKeyInputProps {
@@ -13,6 +13,7 @@ export function OpenAiKeyInput({ onComplete }: OpenAiKeyInputProps) {
   const { toast } = useToast();
   const [apiKey, setApiKey] = useState("");
   const [isVisible, setIsVisible] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     // Check if key was provided in URL or exists in localStorage
@@ -26,16 +27,33 @@ export function OpenAiKeyInput({ onComplete }: OpenAiKeyInputProps) {
     }
   }, []);
 
+  const validateApiKey = (key: string) => {
+    if (!key.trim()) {
+      return "API anahtarı boş olamaz";
+    }
+    
+    if (!key.startsWith('sk-')) {
+      return "API anahtarı 'sk-' ile başlamalıdır";
+    }
+    
+    return "";
+  };
+
   const handleSaveKey = () => {
-    if (!apiKey.trim()) {
+    const validationError = validateApiKey(apiKey);
+    if (validationError) {
+      setError(validationError);
       toast({
-        title: "API Anahtarı Gerekli",
-        description: "Lütfen geçerli bir OpenAI API anahtarı girin.",
+        title: "API Anahtarı Geçersiz",
+        description: validationError,
         variant: "destructive"
       });
       return;
     }
 
+    // Clear any previous errors
+    setError("");
+    
     // Save to localStorage
     localStorage.setItem('OPENAI_API_KEY', apiKey);
     
@@ -55,7 +73,8 @@ export function OpenAiKeyInput({ onComplete }: OpenAiKeyInputProps) {
       </div>
       
       <p className="text-xs text-muted-foreground">
-        PDKS AI asistanını kullanmak için OpenAI API anahtarı gereklidir.
+        PDKS AI asistanını kullanmak için OpenAI API anahtarı gereklidir. 
+        API anahtarı 'sk-' ile başlamalıdır.
       </p>
       
       <div className="flex gap-2">
@@ -64,7 +83,7 @@ export function OpenAiKeyInput({ onComplete }: OpenAiKeyInputProps) {
           placeholder="sk-..."
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
-          className="flex-1"
+          className={`flex-1 ${error ? "border-red-500" : ""}`}
         />
         <Button 
           variant="outline" 
@@ -74,6 +93,13 @@ export function OpenAiKeyInput({ onComplete }: OpenAiKeyInputProps) {
           {isVisible ? "Gizle" : "Göster"}
         </Button>
       </div>
+      
+      {error && (
+        <div className="flex items-center text-red-500 text-xs gap-1">
+          <AlertCircle size={12} />
+          <span>{error}</span>
+        </div>
+      )}
       
       <Button onClick={handleSaveKey} className="w-full">
         Kaydet ve Devam Et

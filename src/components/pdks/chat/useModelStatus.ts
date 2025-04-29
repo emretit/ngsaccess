@@ -25,14 +25,49 @@ export function useModelStatus() {
         return false;
       }
       
-      // Simply mark as connected if API key exists
-      // In a real implementation, you might want to make a test request
-      setIsLocalModelConnected(true);
-      toast({
-        title: "OpenAI Bağlantısı Hazır",
-        description: "API anahtarı bulundu, OpenAI kullanıma hazır.",
-      });
-      return true;
+      // Simple validation for API key format
+      if (!apiKey.startsWith('sk-')) {
+        setIsLocalModelConnected(false);
+        toast({
+          title: "Geçersiz OpenAI API Anahtarı",
+          description: "API anahtarınızın formatı doğru değil. Anahtarlar genellikle 'sk-' ile başlar.",
+          variant: "destructive"
+        });
+        return false;
+      }
+      
+      // Perform a test request to validate the API key
+      try {
+        const testRequest = await fetch("https://api.openai.com/v1/models", {
+          headers: {
+            "Authorization": `Bearer ${apiKey}`,
+            "Content-Type": "application/json"
+          }
+        });
+        
+        if (!testRequest.ok) {
+          const errorData = await testRequest.json().catch(() => ({}));
+          throw new Error(`API test failed: ${testRequest.status} - ${errorData.error?.message || 'Unknown error'}`);
+        }
+        
+        setIsLocalModelConnected(true);
+        toast({
+          title: "OpenAI Bağlantısı Hazır",
+          description: "API anahtarı doğrulandı, OpenAI kullanıma hazır.",
+        });
+        return true;
+      } catch (requestError) {
+        console.error("OpenAI test request failed:", requestError);
+        setIsLocalModelConnected(false);
+        
+        toast({
+          title: "OpenAI API Bağlantı Hatası",
+          description: requestError instanceof Error ? requestError.message : "API anahtarı geçerli değil veya bağlantı hatası.",
+          variant: "destructive"
+        });
+        
+        return false;
+      }
     } catch (error) {
       console.error("OpenAI connection check error:", error);
       setIsLocalModelConnected(false);
@@ -57,7 +92,10 @@ export function useModelStatus() {
 
   // Component loaded, check connection
   useEffect(() => {
-    checkLocalModelStatus();
+    // Short timeout to ensure localStorage is available
+    const timer = setTimeout(() => {
+      checkLocalModelStatus();
+    }, 500);
     
     // Check connection every 5 minutes
     const intervalId = setInterval(() => {
@@ -66,7 +104,10 @@ export function useModelStatus() {
       }
     }, 300000); // 5 minutes
     
-    return () => clearInterval(intervalId);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(intervalId);
+    };
   }, [isLocalModelConnected]);
 
   return {

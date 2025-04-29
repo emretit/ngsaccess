@@ -9,7 +9,7 @@ interface AiModelStatusProps {
 export function AiModelStatus({ isConnected }: AiModelStatusProps) {
   return (
     <div className="flex items-center gap-2">
-      <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
+      <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'} animate-pulse`} />
       <span className="text-xs text-gray-500 flex items-center gap-1">
         {isConnected ? (
           <>
@@ -17,10 +17,10 @@ export function AiModelStatus({ isConnected }: AiModelStatusProps) {
             <span>OpenAI Aktif</span>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Sparkles size={12} className="text-amber-500 ml-1" />
+                <Sparkles size={12} className="text-amber-500 ml-1 cursor-help" />
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[250px] text-xs">
-                PDKS uzman asistan sistemi aktif
+                PDKS uzman asistan sistemi aktif - OpenAI bağlantısı kuruldu
               </TooltipContent>
             </Tooltip>
           </>
@@ -30,11 +30,11 @@ export function AiModelStatus({ isConnected }: AiModelStatusProps) {
             <span>OpenAI Bağlantısı Yok</span>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Info size={12} className="text-blue-500 ml-1" />
+                <Info size={12} className="text-blue-500 ml-1 cursor-help" />
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[290px] text-xs">
                 OpenAI API anahtarınızı kontrol edin.
-                Daha fazla bilgi için yardım dokümanını inceleyebilirsiniz.
+                Geçerli bir API anahtarı (sk- ile başlayan) girmeniz gerekiyor.
               </TooltipContent>
             </Tooltip>
           </>
