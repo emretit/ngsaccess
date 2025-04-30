@@ -1,32 +1,18 @@
-import { format } from 'date-fns';
+
 import { Button } from "@/components/ui/button";
 import { DeviceForm } from "@/components/devices/DeviceForm";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { useDevices } from "@/hooks/useDevices";
-import QRCode from 'qrcode.react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { useState } from "react";
-import { Download, Edit, Trash2, MapPin } from "lucide-react";
 import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { AssignLocationForm } from "@/components/devices/AssignLocationForm";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Device, ServerDevice } from "@/types/device";
+import { useDevices } from "@/hooks/useDevices";
 import { DeviceFilters } from "@/components/devices/DeviceFilters";
+import { DeviceList } from "@/components/devices/DeviceList";
+import { QRCodeDialog } from "@/components/devices/QRCodeDialog";
+import { useDeviceFilters } from "@/hooks/useDeviceFilters";
 
 export default function Devices() {
   const { devices, isLoading, addDevice, isAddingDevice } = useDevices();
@@ -41,48 +27,17 @@ export default function Devices() {
     device: null
   });
   
-  // Add filtering state variables
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
-
-  const filteredDevices = devices.filter(device => {
-    // Filter by zone/door
-    const locationMatch = () => {
-      if (selectedDoorId) {
-        return device.door_id === selectedDoorId;
-      }
-      if (selectedZoneId) {
-        return device.zone_id === selectedZoneId;
-      }
-      return true;
-    };
-
-    // Filter by search text
-    const searchMatch = () => {
-      if (!search) return true;
-      const searchLower = search.toLowerCase();
-      return (
-        (device.device_name || device.name || '').toLowerCase().includes(searchLower) ||
-        (device.device_serial || device.serial_number || '').toLowerCase().includes(searchLower) ||
-        (device.device_location || device.location || '').toLowerCase().includes(searchLower)
-      );
-    };
-
-    // Filter by status
-    const statusMatch = () => {
-      if (statusFilter === 'all') return true;
-      return device.status === statusFilter;
-    };
-
-    // Filter by type
-    const typeMatch = () => {
-      if (typeFilter === 'all') return true;
-      return (device.device_type || device.type || '').toLowerCase() === typeFilter.toLowerCase();
-    };
-
-    return locationMatch() && searchMatch() && statusMatch() && typeMatch();
-  });
+  // Use the extracted filter hook
+  const {
+    search,
+    setSearch,
+    statusFilter,
+    setStatusFilter,
+    typeFilter,
+    setTypeFilter,
+    deviceTypes,
+    filteredDevices
+  } = useDeviceFilters(devices, selectedZoneId, selectedDoorId);
 
   const handleQRClick = (device: Device) => {
     setSelectedQR({
@@ -157,22 +112,9 @@ export default function Devices() {
     }
   };
 
-  function getLocationString(device: Device) {
-    const zone = zones.find(z => String(z.id) === String(device.zone_id));
-    const door = doors.find(d => String(d.id) === String(device.door_id));
-    
-    if (zone && door) return `${zone.name} / ${door.name}`;
-    if (zone) return zone.name;
-    if (door) return door.name;
-    
-    return device.device_location || device.location || '-';
-  }
-
-  // Extract unique device types for filtering
-  const deviceTypes = Array.from(new Set(
-    devices.map(device => (device.device_type || device.type || ''))
-    .filter(type => type !== '')
-  ));
+  const openLocationForm = (device: Device) => {
+    setShowLocationForm({open: true, device});
+  };
 
   return (
     <main className="p-0">
@@ -187,7 +129,6 @@ export default function Devices() {
             <DeviceForm onAddDevice={addDevice} isLoading={isAddingDevice} />
           </div>
 
-          {/* Add filtering options */}
           <DeviceFilters 
             search={search}
             onSearchChange={setSearch}
@@ -198,140 +139,24 @@ export default function Devices() {
             deviceTypes={deviceTypes}
           />
 
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>QR Kod</TableHead>
-                  <TableHead>İsim</TableHead>
-                  <TableHead>Seri No</TableHead>
-                  <TableHead>Konum</TableHead>
-                  <TableHead>Tip</TableHead>
-                  <TableHead>Durum</TableHead>
-                  <TableHead>Son Görülme</TableHead>
-                  <TableHead>İşlemler</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
-                      Yükleniyor...
-                    </TableCell>
-                  </TableRow>
-                ) : filteredDevices.length > 0 ? (
-                  filteredDevices.map((device) => (
-                    <TableRow key={device.id}>
-                      <TableCell>
-                        <div 
-                          className="cursor-pointer hover:opacity-80 transition-opacity"
-                          onClick={() => handleQRClick(device)}
-                        >
-                          <QRCode
-                            value={device.device_serial || device.serial_number || ''}
-                            size={64}
-                            level="H"
-                            className="rounded"
-                          />
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-medium">{device.device_name || device.name}</TableCell>
-                      <TableCell className="font-mono">{device.device_serial || device.serial_number}</TableCell>
-                      <TableCell>{getLocationString(device)}</TableCell>
-                      <TableCell>{device.device_type || device.type || '-'}</TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={device.status === 'online' ? 'success' : 'secondary'}
-                        >
-                          {device.status === 'online' ? 'Aktif' : 'Pasif'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {device.created_at ? format(new Date(device.created_at), 'dd.MM.yyyy HH:mm') : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Düzenleme işlemi
-                              console.log('Edit device:', device.id);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // Konum atama formunu aç
-                              setShowLocationForm({open: true, device});
-                            }}
-                          >
-                            <MapPin className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteDevice(device.id);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                      {(selectedZoneId || selectedDoorId || search || statusFilter !== 'all' || typeFilter !== 'all') 
-                        ? "Filtrelere uygun cihaz bulunamadı" 
-                        : "Henüz cihaz bulunmuyor"}
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <DeviceList 
+            devices={devices}
+            filteredDevices={filteredDevices}
+            isLoading={isLoading}
+            zones={zones}
+            doors={doors}
+            onQRClick={handleQRClick}
+            onDeleteDevice={handleDeleteDevice}
+            onAssignLocation={openLocationForm}
+          />
 
-          <Dialog open={!!selectedQR} onOpenChange={() => setSelectedQR(null)}>
-            <DialogContent className="sm:max-w-md flex flex-col items-center">
-              <DialogHeader>
-                <DialogTitle className="text-center">
-                  {selectedQR?.name} QR Kodu
-                </DialogTitle>
-              </DialogHeader>
-              {selectedQR && (
-                <div className="space-y-4">
-                  <QRCode
-                    id="qr-large"
-                    value={selectedQR.serial}
-                    size={256}
-                    level="H"
-                    className="rounded"
-                  />
-                  <Button 
-                    className="w-full" 
-                    onClick={handleDownloadQR}
-                  >
-                    <Download className="mr-2" />
-                    QR Kodunu İndir
-                  </Button>
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
+          <QRCodeDialog 
+            open={!!selectedQR}
+            onOpenChange={() => setSelectedQR(null)}
+            qrData={selectedQR}
+            onDownload={handleDownloadQR}
+          />
           
-          {/* Fix the typing issue with AssignLocationForm */}
           {showLocationForm.open && showLocationForm.device && (
             <AssignLocationForm
               open={showLocationForm.open}
