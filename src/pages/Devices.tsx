@@ -20,13 +20,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useState } from "react";
-import { Download, Edit, Trash2, MapPin } from "lucide-react";
+import { Download, Edit, Trash2, MapPin, Search } from "lucide-react";
 import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { AssignLocationForm } from "@/components/devices/AssignLocationForm";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Device } from "@/types/device";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DeviceFilters } from "@/components/devices/DeviceFilters";
 
 export default function Devices() {
   const { devices, isLoading, addDevice, isAddingDevice } = useDevices();
@@ -40,15 +43,48 @@ export default function Devices() {
     open: false, 
     device: null
   });
+  
+  // Add filtering state variables
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
 
   const filteredDevices = devices.filter(device => {
-    if (selectedDoorId) {
-      return device.door_id === selectedDoorId;
-    }
-    if (selectedZoneId) {
-      return device.zone_id === selectedZoneId;
-    }
-    return true;
+    // Filter by zone/door
+    const locationMatch = () => {
+      if (selectedDoorId) {
+        return device.door_id === selectedDoorId;
+      }
+      if (selectedZoneId) {
+        return device.zone_id === selectedZoneId;
+      }
+      return true;
+    };
+
+    // Filter by search text
+    const searchMatch = () => {
+      if (!search) return true;
+      const searchLower = search.toLowerCase();
+      return (
+        (device.device_name || device.name || '').toLowerCase().includes(searchLower) ||
+        (device.device_serial || device.serial_number || '').toLowerCase().includes(searchLower) ||
+        (device.device_location || device.location || '').toLowerCase().includes(searchLower)
+      );
+    };
+
+    // Filter by status
+    const statusMatch = () => {
+      if (statusFilter === 'all') return true;
+      return device.status === statusFilter;
+    };
+
+    // Filter by type
+    const typeMatch = () => {
+      if (typeFilter === 'all') return true;
+      return (device.device_type || device.type || '').toLowerCase() === typeFilter.toLowerCase();
+    };
+
+    return locationMatch() && searchMatch() && statusMatch() && typeMatch();
   });
 
   const handleQRClick = (device: Device) => {
@@ -135,6 +171,12 @@ export default function Devices() {
     return device.device_location || device.location || '-';
   }
 
+  // Extract unique device types for filtering
+  const deviceTypes = Array.from(new Set(
+    devices.map(device => (device.device_type || device.type || ''))
+    .filter(type => type !== '')
+  ));
+
   return (
     <main className="p-0">
       <div className="max-w-7xl mx-auto flex gap-6">
@@ -147,6 +189,17 @@ export default function Devices() {
             <h1 className="text-2xl font-semibold">Cihazlar</h1>
             <DeviceForm onAddDevice={addDevice} isLoading={isAddingDevice} />
           </div>
+
+          {/* Add filtering options */}
+          <DeviceFilters 
+            search={search}
+            onSearchChange={setSearch}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            typeFilter={typeFilter}
+            onTypeFilterChange={setTypeFilter}
+            deviceTypes={deviceTypes}
+          />
 
           <div className="bg-white rounded-lg shadow overflow-hidden">
             <Table>
@@ -243,8 +296,8 @@ export default function Devices() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                      {selectedZoneId || selectedDoorId 
-                        ? "Seçilen konumda cihaz bulunmuyor" 
+                      {(selectedZoneId || selectedDoorId || search || statusFilter !== 'all' || typeFilter !== 'all') 
+                        ? "Filtrelere uygun cihaz bulunamadı" 
                         : "Henüz cihaz bulunmuyor"}
                     </TableCell>
                   </TableRow>
@@ -281,22 +334,22 @@ export default function Devices() {
             </DialogContent>
           </Dialog>
           
-          {/* Separate AssignLocationForm component with properly typed device */}
-          {showLocationForm.device && (
+          {/* Fix the typing issue with AssignLocationForm */}
+          {showLocationForm.open && showLocationForm.device && (
             <AssignLocationForm
               open={showLocationForm.open}
               onClose={() => setShowLocationForm({open: false, device: null})}
               deviceName={showLocationForm.device?.device_name || showLocationForm.device?.name || 'Cihaz'}
               onSubmit={handleAssignLocation}
-              // Instead of passing the Device object directly, just pass the necessary properties
-              // that match the ServerDevice type's zone_id and door_id
               device={{
                 id: showLocationForm.device.id,
                 name: showLocationForm.device.name || '',
                 serial_number: showLocationForm.device.serial_number || '',
                 device_model_enum: "Other",
                 zone_id: showLocationForm.device.zone_id,
-                door_id: showLocationForm.device.door_id
+                door_id: showLocationForm.device.door_id,
+                date_added: new Date().toISOString(), // Add required date_added property
+                status: 'active'
               }}
             />
           )}
