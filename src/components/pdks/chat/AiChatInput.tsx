@@ -8,7 +8,7 @@ interface AiChatInputProps {
   input: string;
   isLoading: boolean;
   isModelConnected: boolean;
-  hasMessages: boolean;
+  isSaving?: boolean;
   onInputChange: (value: string) => void;
   onSubmit: (e: React.FormEvent) => void;
   onSave?: () => void;
@@ -18,7 +18,7 @@ export function AiChatInput({
   input, 
   isLoading, 
   isModelConnected, 
-  hasMessages,
+  isSaving = false,
   onInputChange, 
   onSubmit,
   onSave
@@ -34,24 +34,7 @@ export function AiChatInput({
         disabled={isLoading}
         className="flex-1"
       />
-      {onSave && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button 
-              type="button" 
-              onClick={onSave}
-              variant="outline"
-              disabled={!hasMessages}
-              title="Konuşmayı Kaydet"
-            >
-              <Save className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top">
-            Konuşmayı veritabanına kaydet
-          </TooltipContent>
-        </Tooltip>
-      )}
+      
       <Tooltip>
         <TooltipTrigger asChild>
           <Button 
@@ -68,6 +51,25 @@ export function AiChatInput({
             : "API anahtarınızı ayarlamadan soru gönderemezsiniz"}
         </TooltipContent>
       </Tooltip>
+      
+      {onSave && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button 
+              type="button" 
+              variant="outline"
+              onClick={onSave}
+              disabled={isSaving}
+              title="Sohbeti Kaydet"
+            >
+              <Save className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            Sohbet geçmişini kaydedin
+          </TooltipContent>
+        </Tooltip>
+      )}
     </form>
   );
 }
