@@ -30,7 +30,8 @@ export function useServerDeviceForm(device: ExtendedServerDevice | null, onSucce
   const [description, setDescription] = useState(device?.description || '');
   const [ipAddress, setIpAddress] = useState(device?.device_ip || '');
   const [macAddress, setMacAddress] = useState(device?.device_mac || '');
-  const [isActive, setIsActive] = useState(device?.status === 'active' || device?.status === 'online' || true);
+  // Fix: Change this to useState<boolean> so it accepts both true and false values
+  const [isActive, setIsActive] = useState<boolean>(device?.status === 'active' || device?.status === 'online' || true);
   const [firmwareVersion, setFirmwareVersion] = useState(device?.device_firmware || '');
 
   const queryClient = useQueryClient();
