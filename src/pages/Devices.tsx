@@ -20,12 +20,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useState } from "react";
-import { Download, Edit, Trash2 } from "lucide-react";
+import { Download, Edit, Trash2, MapPin } from "lucide-react";
 import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { AssignLocationForm } from "@/components/devices/AssignLocationForm";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { Device } from "@/types/device";
 
 export default function Devices() {
   const { devices, isLoading, addDevice, isAddingDevice } = useDevices();
@@ -35,6 +36,10 @@ export default function Devices() {
   const [selectedDoorId, setSelectedDoorId] = useState<number | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [showLocationForm, setShowLocationForm] = useState<{open: boolean; device: Device | null}>({
+    open: false, 
+    device: null
+  });
 
   const filteredDevices = devices.filter(device => {
     if (selectedDoorId) {
@@ -46,7 +51,7 @@ export default function Devices() {
     return true;
   });
 
-  const handleQRClick = (device: any) => {
+  const handleQRClick = (device: Device) => {
     setSelectedQR({
       serial: device.device_serial || device.serial_number || '',
       name: device.device_name || device.name || 'Device QR'
@@ -83,7 +88,43 @@ export default function Devices() {
     }
   };
 
-  function getLocationString(device: any) {
+  const handleAssignLocation = async (zoneId: number, doorId: number) => {
+    if (!showLocationForm.device) return;
+    
+    try {
+      // Update device location in database
+      const { error } = await fetch(`/api/devices/${showLocationForm.device.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          zone_id: zoneId,
+          door_id: doorId
+        })
+      }).then(res => res.json());
+      
+      if (error) throw new Error(error);
+
+      // Refresh devices data
+      queryClient.invalidateQueries({ queryKey: ['devices'] });
+      
+      toast({
+        title: "Konum atandı",
+        description: "Cihaz konumu başarıyla güncellendi",
+      });
+      
+      setShowLocationForm({open: false, device: null});
+    } catch (error) {
+      toast({
+        title: "Hata",
+        description: "Konum atanırken bir hata oluştu",
+        variant: "destructive",
+      });
+    }
+  };
+
+  function getLocationString(device: Device) {
     const zone = zones.find(z => String(z.id) === String(device.zone_id));
     const door = doors.find(d => String(d.id) === String(device.door_id));
     
@@ -175,6 +216,18 @@ export default function Devices() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              // Konum atama formunu aç
+                              setShowLocationForm({open: true, device});
+                            }}
+                          >
+                            <MapPin className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-8 w-8 text-destructive hover:text-destructive"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -183,7 +236,6 @@ export default function Devices() {
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
-                          <AssignLocationForm device={device} />
                         </div>
                       </TableCell>
                     </TableRow>
@@ -228,6 +280,26 @@ export default function Devices() {
               )}
             </DialogContent>
           </Dialog>
+          
+          {/* Separate AssignLocationForm component with properly typed device */}
+          {showLocationForm.device && (
+            <AssignLocationForm
+              open={showLocationForm.open}
+              onClose={() => setShowLocationForm({open: false, device: null})}
+              deviceName={showLocationForm.device?.device_name || showLocationForm.device?.name || 'Cihaz'}
+              onSubmit={handleAssignLocation}
+              // Instead of passing the Device object directly, just pass the necessary properties
+              // that match the ServerDevice type's zone_id and door_id
+              device={{
+                id: showLocationForm.device.id,
+                name: showLocationForm.device.name || '',
+                serial_number: showLocationForm.device.serial_number || '',
+                device_model_enum: "Other",
+                zone_id: showLocationForm.device.zone_id,
+                door_id: showLocationForm.device.door_id
+              }}
+            />
+          )}
         </div>
       </div>
     </main>
