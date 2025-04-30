@@ -47,7 +47,7 @@ export function ServerDeviceFormFields({
   return (
     <div className="space-y-4">
       <FormTextField
-        label="Device Name"
+        label="Cihaz Adı"
         name="name"
         value={name}
         onChange={onNameChange}
@@ -55,7 +55,7 @@ export function ServerDeviceFormFields({
       />
 
       <FormTextField
-        label="Serial Number"
+        label="Seri Numarası"
         name="serial_number"
         value={serialNumber}
         onChange={onSerialNumberChange}
@@ -63,22 +63,22 @@ export function ServerDeviceFormFields({
       />
 
       <FormSelectField
-        label="Device Model"
+        label="Cihaz Modeli"
         name="device_model"
         value={deviceModel}
         onChange={(value) => onDeviceModelChange(value as typeof deviceModel)}
         options={[
-          { id: "QR Reader", name: "QR Reader" },
-          { id: "Fingerprint Reader", name: "Fingerprint Reader" },
-          { id: "RFID Reader", name: "RFID Reader" },
-          { id: "Access Control Terminal", name: "Access Control Terminal" },
-          { id: "Other", name: "Other" }
+          { id: "QR Reader", name: "QR Okuyucu" },
+          { id: "Fingerprint Reader", name: "Parmak İzi Okuyucu" },
+          { id: "RFID Reader", name: "RFID Kart Okuyucu" },
+          { id: "Access Control Terminal", name: "Geçiş Kontrol Terminali" },
+          { id: "Other", name: "Diğer" }
         ]}
         required
       />
 
       <FormSelectField
-        label="Project"
+        label="Proje"
         name="project"
         value={projectId}
         onChange={onProjectChange}
@@ -86,19 +86,25 @@ export function ServerDeviceFormFields({
           id: project.id.toString(),
           name: project.name
         }))}
-        placeholder="Select Project"
+        placeholder="Proje Seçiniz"
       />
 
       <FormSelectField
         label="Bölge"
         name="zone"
         value={zoneId}
-        onChange={onZoneChange}
+        onChange={(val) => {
+          onZoneChange(val);
+          if (val !== zoneId) {
+            // Bölge değiştiğinde kapı seçimini sıfırla
+            onDoorChange('');
+          }
+        }}
         options={zones.map(zone => ({
           id: String(zone.id),
           name: zone.name
         }))}
-        placeholder="Bölge Seçiniz"
+        placeholder={loading ? "Yükleniyor..." : "Bölge Seçiniz"}
         required
       />
 
@@ -111,14 +117,18 @@ export function ServerDeviceFormFields({
           id: String(door.id),
           name: door.name
         }))}
-        placeholder={zoneId ? (filteredDoors.length === 0 ? "Seçili bölgede kapı yok" : "Kapı Seçiniz") : "Önce bölge seçiniz"}
+        placeholder={zoneId 
+          ? (filteredDoors.length === 0 
+              ? "Seçili bölgede kapı yok" 
+              : "Kapı Seçiniz") 
+          : "Önce bölge seçiniz"}
         required
-        disabled={!zoneId}
+        disabled={!zoneId || loading}
       />
 
       <div className="space-y-1">
         <label htmlFor="expiry_date" className="text-sm font-medium">
-          Expiry Date
+          Son Kullanma Tarihi
         </label>
         <Input
           id="expiry_date"

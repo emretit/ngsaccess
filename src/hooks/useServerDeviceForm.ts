@@ -15,8 +15,8 @@ export function useServerDeviceForm(device: ServerDevice | null, onSuccess: () =
   const [expiryDate, setExpiryDate] = useState(
     device?.expiry_date ? new Date(device.expiry_date).toISOString().split('T')[0] : ''
   );
-  const [zoneId, setZoneId] = useState(device?.["zone_id"] ? String(device["zone_id"]) : '');
-  const [doorId, setDoorId] = useState(device?.["door_id"] ? String(device["door_id"]) : '');
+  const [zoneId, setZoneId] = useState(device?.zone_id ? String(device.zone_id) : '');
+  const [doorId, setDoorId] = useState(device?.door_id ? String(device.door_id) : '');
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -36,26 +36,32 @@ export function useServerDeviceForm(device: ServerDevice | null, onSuccess: () =
 
     try {
       if (device) {
+        // Cihazı güncelle
         await supabase
           .from('server_devices')
           .update(deviceData)
           .eq('id', device.id);
       } else {
+        // Yeni cihaz ekle
         await supabase
           .from('server_devices')
           .insert([deviceData]);
       }
 
+      // React Query cache'ini yenile
       queryClient.invalidateQueries({ queryKey: ['server-devices'] });
+      
       toast({
-        title: `Device ${device ? 'updated' : 'added'} successfully`,
+        title: `Cihaz ${device ? 'güncellendi' : 'eklendi'}`,
+        description: `${name} başarıyla ${device ? 'güncellendi' : 'eklendi'}.`,
         variant: 'default'
       });
+      
       onSuccess();
     } catch (error) {
       toast({
-        title: 'Error saving device',
-        description: error instanceof Error ? error.message : 'An error occurred',
+        title: 'Cihaz kaydedilirken hata oluştu',
+        description: error instanceof Error ? error.message : 'Bir hata oluştu',
         variant: 'destructive'
       });
     }

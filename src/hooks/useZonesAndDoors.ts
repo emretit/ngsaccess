@@ -1,39 +1,71 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 
 export interface Zone {
   id: number;
   name: string;
+  description?: string;
 }
 export interface Door {
   id: number;
   name: string;
   zone_id: number;
+  location?: string;
+  status?: string;
 }
 
 export function useZonesAndDoors() {
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [doors, setDoors] = useState<Door[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      const { data: zoneData } = await supabase
+  const { 
+    data: zones = [], 
+    isLoading: zonesLoading,
+    error: zonesError,
+    refetch: refetchZones
+  } = useQuery({
+    queryKey: ['zones'],
+    queryFn: async () => {
+      const { data, error } = await supabase
         .from("zones")
-        .select("id, name").order("name", { ascending: true });
-      setZones(zoneData || []);
-
-      const { data: doorData } = await supabase
-        .from("doors")
-        .select("id, name, zone_id").order("name", { ascending: true });
-      setDoors(doorData || []);
-
-      setLoading(false);
+        .select("id, name, description")
+        .order("name", { ascending: true });
+        
+      if (error) throw error;
+      return data || [];
     }
-    fetchData();
-  }, []);
+  });
 
-  return { zones, doors, loading };
+  const { 
+    data: doors = [], 
+    isLoading: doorsLoading,
+    error: doorsError,
+    refetch: refetchDoors
+  } = useQuery({
+    queryKey: ['doors'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("doors")
+        .select("id, name, zone_id, location, status")
+        .order("name", { ascending: true });
+        
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  const loading = zonesLoading || doorsLoading;
+  
+  // Tüm verileri yenileme fonksiyonu
+  const refreshData = () => {
+    refetchZones();
+    refetchDoors();
+  };
+
+  return { 
+    zones, 
+    doors, 
+    loading, 
+    error: zonesError || doorsError,
+    refreshData
+  };
 }

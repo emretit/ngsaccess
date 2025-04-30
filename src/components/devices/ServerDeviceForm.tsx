@@ -43,7 +43,7 @@ export function ServerDeviceForm({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {device ? 'Edit Device' : 'Add New Device'}
+            {device ? 'Cihazı Düzenle' : 'Yeni Cihaz Ekle'}
           </DialogTitle>
         </DialogHeader>
 
@@ -68,10 +68,10 @@ export function ServerDeviceForm({
 
           <div className="flex justify-end gap-4">
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              İptal
             </Button>
             <Button type="submit">
-              {device ? 'Update' : 'Add'} Device
+              {device ? 'Güncelle' : 'Ekle'}
             </Button>
           </div>
         </form>
