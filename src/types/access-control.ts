@@ -30,3 +30,19 @@ export interface Door {
   created_at: string;
   updated_at: string;
 }
+
+export interface CardReading {
+  id: number;
+  employee_name: string;
+  card_no: string;
+  access_time: string;
+  device_name: string;
+  access_granted: boolean;
+  status: string;
+  device_location: string;
+  employees?: {
+    departments?: {
+      name: string;
+    } | null;
+  } | null;
+}
