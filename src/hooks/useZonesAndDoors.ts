@@ -8,6 +8,7 @@ export interface Zone {
   name: string;
   description?: string;
 }
+
 export interface Door {
   id: number;
   name: string;
@@ -55,7 +56,7 @@ export function useZonesAndDoors() {
 
   const loading = zonesLoading || doorsLoading;
   
-  // Tüm verileri yenileme fonksiyonu
+  // Verileri yenileme fonksiyonu
   const refreshData = () => {
     refetchZones();
     refetchDoors();

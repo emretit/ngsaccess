@@ -1,19 +1,18 @@
 
-import React from 'react';
-import { format } from 'date-fns';
-import { Edit, Trash2 } from 'lucide-react';
-import { 
+import { useState } from "react";
+import {
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
-  TableRow 
+  TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Loader2 } from "lucide-react";
+import { format } from "date-fns";
 import { ServerDevice } from '@/types/device';
-import { Zone, Door } from '@/hooks/useZonesAndDoors';
-import { Badge } from '@/components/ui/badge';
+import { type Zone, type Door } from '@/hooks/useZonesAndDoors';
 
 interface ServerDeviceTableProps {
   devices: ServerDevice[];
@@ -21,123 +20,96 @@ interface ServerDeviceTableProps {
   onDeviceClick: (device: ServerDevice) => void;
   zones: Zone[];
   doors: Door[];
-  onDeleteDevice?: (device: ServerDevice) => void;
 }
 
-export function ServerDeviceTable({ 
-  devices, 
-  isLoading, 
-  onDeviceClick, 
-  zones, 
-  doors,
-  onDeleteDevice 
+export function ServerDeviceTable({
+  devices,
+  isLoading,
+  onDeviceClick,
+  zones,
+  doors
 }: ServerDeviceTableProps) {
-  // Helper function to get location display string
-  function getLocationString(device: ServerDevice) {
-    // Find ids as string or number; handle cases where id might be undefined
-    const zone = zones.find(z => String(z.id) === String(device.zone_id));
-    const door = doors.find(d => String(d.id) === String(device.door_id));
-    if (zone && door) return `${zone.name} / ${door.name}`;
-    if (zone) return zone.name;
-    if (door) return door.name;
-    return "-";
-  }
 
-  // Get device status class and text
-  function getStatusBadge(device: ServerDevice) {
-    if (!device.status || device.status === 'active') {
-      return <Badge variant="success">Aktif</Badge>;
-    } else if (device.status === 'inactive') {
-      return <Badge variant="secondary">Pasif</Badge>;
-    } else if (device.status === 'maintenance') {
-      return <Badge variant="warning">Bakımda</Badge>;
-    } else {
-      return <Badge variant="outline">{device.status}</Badge>;
-    }
-  }
-
-  // Format date function with null check
-  function formatDateSafe(dateString: string | undefined | null) {
-    return dateString ? format(new Date(dateString), 'dd.MM.yyyy') : '-';
-  }
-
-  const handleActionClick = (e: React.MouseEvent, callback: () => void) => {
-    e.stopPropagation(); // Prevent row click when clicking action buttons
-    callback();
+  // Yardımcı fonksiyon - zone ID'sine göre zone adını bul
+  const getZoneName = (zoneId: number | null) => {
+    if (!zoneId) return "-";
+    const zone = zones.find(z => z.id === zoneId);
+    return zone ? zone.name : "-";
   };
 
+  // Yardımcı fonksiyon - door ID'sine göre kapı adını bul
+  const getDoorName = (doorId: number | null) => {
+    if (!doorId) return "-";
+    const door = doors.find(d => d.id === doorId);
+    return door ? door.name : "-";
+  };
+
+  const getStatusBadge = (status: string) => {
+    if (status === "active") {
+      return <Badge variant="success">Aktif</Badge>;
+    } else if (status === "inactive") {
+      return <Badge variant="destructive">Pasif</Badge>;
+    } else if (status === "maintenance") {
+      return <Badge variant="secondary">Bakımda</Badge>;
+    }
+    return <Badge>Bilinmiyor</Badge>;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-burgundy" />
+        <span className="ml-2">Cihazlar yükleniyor...</span>
+      </div>
+    );
+  }
+
+  if (devices.length === 0) {
+    return (
+      <div className="text-center py-12 border rounded-md">
+        <p className="text-muted-foreground">Sistemde kayıtlı cihaz bulunmamaktadır.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Seri Numarası</TableHead>
-            <TableHead>İsim</TableHead>
-            <TableHead>Model</TableHead>
-            <TableHead>Proje</TableHead>
-            <TableHead>Konum (Bölge/Kapı)</TableHead>
-            <TableHead>Durum</TableHead>
-            <TableHead>Eklenme Tarihi</TableHead>
-            <TableHead>Son Kullanma Tarihi</TableHead>
-            <TableHead>İşlemler</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading ? (
+    <div className="border rounded-md overflow-hidden">
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableCell colSpan={9} className="text-center py-8">
-                Yükleniyor...
-              </TableCell>
+              <TableHead>Cihaz Adı</TableHead>
+              <TableHead>Seri No</TableHead>
+              <TableHead>Cihaz Tipi</TableHead>
+              <TableHead>Proje</TableHead>
+              <TableHead>Bölge</TableHead>
+              <TableHead>Kapı</TableHead>
+              <TableHead>Son Kullanma</TableHead>
+              <TableHead>Durum</TableHead>
             </TableRow>
-          ) : devices.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={9} className="text-center py-8 text-gray-500">
-                Cihaz bulunamadı
-              </TableCell>
-            </TableRow>
-          ) : (
-            devices.map((device) => (
+          </TableHeader>
+          <TableBody>
+            {devices.map((device) => (
               <TableRow
                 key={device.id}
-                className="cursor-pointer hover:bg-gray-50"
                 onClick={() => onDeviceClick(device)}
+                className="cursor-pointer hover:bg-muted/50"
               >
-                <TableCell className="font-mono">{device.serial_number}</TableCell>
-                <TableCell>{device.name}</TableCell>
-                <TableCell>{device.device_model_enum}</TableCell>
-                <TableCell>{device.projects?.name || '-'}</TableCell>
-                <TableCell>{getLocationString(device)}</TableCell>
-                <TableCell>{getStatusBadge(device)}</TableCell>
-                <TableCell>{formatDateSafe(device.date_added)}</TableCell>
+                <TableCell className="font-medium">{device.name}</TableCell>
+                <TableCell>{device.serial_number}</TableCell>
+                <TableCell>{device.device_model_enum || "-"}</TableCell>
+                <TableCell>{device.projects?.name || "-"}</TableCell>
+                <TableCell>{getZoneName(device.zone_id)}</TableCell>
+                <TableCell>{getDoorName(device.door_id)}</TableCell>
                 <TableCell>
-                  {formatDateSafe(device.expiry_date)}
+                  {device.expiry_date ? format(new Date(device.expiry_date), "dd.MM.yyyy") : "-"}
                 </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => handleActionClick(e, () => onDeviceClick(device))}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    {onDeleteDevice && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive"
-                        onClick={(e) => handleActionClick(e, () => onDeleteDevice(device))}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
+                <TableCell>{getStatusBadge(device.status)}</TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

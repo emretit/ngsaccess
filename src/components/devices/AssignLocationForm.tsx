@@ -1,124 +1,146 @@
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Device } from "@/types/device";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useForm } from "react-hook-form";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Zone, Door } from "@/types/access-control";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
-import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
+import { useZonesAndDoors } from "@/hooks/useZonesAndDoors"; 
 
 interface AssignLocationFormProps {
-  device: Device;
+  open: boolean;
+  onClose: () => void;
+  onSubmit: (zoneId: number, doorId: number) => Promise<void>;
+  deviceName: string;
 }
 
-export function AssignLocationForm({ device }: AssignLocationFormProps) {
-  const { zones, doors, loading } = useZonesAndDoors();
-  const [selectedZone, setSelectedZone] = useState<string | null>(device.zone_id ? String(device.zone_id) : null);
-  const [selectedDoor, setSelectedDoor] = useState<string | null>(device.door_id ? String(device.door_id) : null);
+export function AssignLocationForm({
+  open,
+  onClose,
+  onSubmit,
+  deviceName,
+}: AssignLocationFormProps) {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const { zones, doors, loading } = useZonesAndDoors();
+  const [selectedZoneId, setSelectedZoneId] = useState<string>("");
+  const [selectedDoorId, setSelectedDoorId] = useState<string>("");
+  const [filteredDoors, setFilteredDoors] = useState<typeof doors>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Seçilen bölgeye göre filtrelenmiş kapılar
-  const filteredDoors = doors.filter(door => 
-    selectedZone && String(door.zone_id) === selectedZone
-  );
-
-  // Bölge değiştiğinde kapı seçimini sıfırlama
+  // Filter doors when zone changes
   useEffect(() => {
-    if (selectedZone) {
-      // Eğer seçili kapı varsa ve bölge değiştiyse, kapıyı sıfırla
-      if (selectedDoor) {
-        const doorExists = filteredDoors.some(door => String(door.id) === selectedDoor);
-        if (!doorExists) {
-          setSelectedDoor(null);
-        }
-      }
+    if (selectedZoneId) {
+      // Convert string to number for comparison
+      const zoneIdNumber = parseInt(selectedZoneId, 10);
+      setFilteredDoors(doors.filter(door => door.zone_id === zoneIdNumber));
+      setSelectedDoorId(""); // Reset door selection when zone changes
     } else {
-      setSelectedDoor(null); // Bölge seçili değilse kapı da sıfırlanmalı
+      setFilteredDoors([]);
+      setSelectedDoorId("");
     }
-  }, [selectedZone, filteredDoors, selectedDoor]);
+  }, [selectedZoneId, doors]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const { error } = await supabase
-      .from('devices')
-      .update({ 
-        zone_id: selectedZone ? parseInt(selectedZone) : null,
-        door_id: selectedDoor ? parseInt(selectedDoor) : null 
-      })
-      .eq('id', device.id);
-
-    if (error) {
+    if (!selectedZoneId || !selectedDoorId) {
       toast({
-        title: "Hata",
-        description: "Konum güncellenirken bir hata oluştu",
+        title: "Validation Error",
+        description: "Please select both zone and door",
         variant: "destructive",
       });
       return;
     }
-
-    toast({
-      title: "Başarılı",
-      description: "Konum güncellendi",
-    });
-
-    // Refresh the devices data after successful update
-    queryClient.invalidateQueries({ queryKey: ['devices'] });
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Convert string IDs to numbers
+      await onSubmit(parseInt(selectedZoneId, 10), parseInt(selectedDoorId, 10));
+      toast({
+        title: "Location assigned",
+        description: `${deviceName} has been assigned to the selected location.`,
+      });
+      onClose();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to assign location",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="zone">Bölge</Label>
-        <Select value={selectedZone || ''} onValueChange={setSelectedZone}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder={loading ? "Yükleniyor..." : "Bölge Seç"} />
-          </SelectTrigger>
-          <SelectContent>
-            {zones.map((zone) => (
-              <SelectItem key={zone.id} value={String(zone.id)}>
-                {zone.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div>
-        <Label htmlFor="door">Kapı</Label>
-        <Select 
-          value={selectedDoor || ''} 
-          onValueChange={setSelectedDoor}
-          disabled={!selectedZone || filteredDoors.length === 0}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue 
-              placeholder={
-                !selectedZone 
-                  ? "Önce bölge seçin" 
-                  : filteredDoors.length === 0 
-                    ? "Bu bölgede kapı yok" 
-                    : "Kapı Seç"
-              } 
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {filteredDoors.map((door) => (
-              <SelectItem key={door.id} value={String(door.id)}>
-                {door.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <Button type="submit" size="sm">
-        Kaydet
-      </Button>
-    </form>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Assign Location to {deviceName}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="zone" className="text-right">
+                Zone
+              </Label>
+              <Select
+                value={selectedZoneId}
+                onValueChange={setSelectedZoneId}
+                disabled={loading}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select a zone" />
+                </SelectTrigger>
+                <SelectContent>
+                  {zones.map((zone) => (
+                    <SelectItem key={zone.id} value={zone.id.toString()}>
+                      {zone.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="door" className="text-right">
+                Door
+              </Label>
+              <Select
+                value={selectedDoorId}
+                onValueChange={setSelectedDoorId}
+                disabled={!selectedZoneId || loading}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select a door" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredDoors.map((door) => (
+                    <SelectItem key={door.id} value={door.id.toString()}>
+                      {door.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting || !selectedZoneId || !selectedDoorId}>
+              {isSubmitting ? "Assigning..." : "Assign Location"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
