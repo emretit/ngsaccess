@@ -7,6 +7,7 @@ import { Device } from "@/types/device";
 import QRCode from 'qrcode.react';
 import { Edit, Trash2, MapPin } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface DeviceTableRowProps {
   device: Device;
@@ -15,6 +16,8 @@ interface DeviceTableRowProps {
   onDeleteDevice: (deviceId: string) => void;
   onAssignLocation: (device: Device) => void;
   onEditDevice: (device: Device) => void;
+  selected: boolean;
+  onSelect: (checked: boolean, deviceId: string) => void;
 }
 
 export function DeviceTableRow({
@@ -23,7 +26,9 @@ export function DeviceTableRow({
   onQRClick,
   onDeleteDevice,
   onAssignLocation,
-  onEditDevice
+  onEditDevice,
+  selected,
+  onSelect
 }: DeviceTableRowProps) {
 
   const statusColor = device.status === 'online' 
@@ -32,6 +37,12 @@ export function DeviceTableRow({
 
   return (
     <TableRow className="hover:bg-muted/30 transition-colors">
+      <TableCell>
+        <Checkbox
+          checked={selected}
+          onCheckedChange={(checked) => onSelect(!!checked, device.id)}
+        />
+      </TableCell>
       <TableCell>
         <div 
           className="cursor-pointer hover:opacity-80 transition-opacity"

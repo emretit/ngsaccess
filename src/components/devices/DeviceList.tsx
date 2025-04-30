@@ -14,6 +14,10 @@ import { Zone, Door } from "@/hooks/useZonesAndDoors";
 import { DeviceTableRow } from "@/components/devices/DeviceTableRow";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
+import { DeviceBulkActions } from "./DeviceBulkActions";
+import { DeviceDeleteDialog } from "./DeviceDeleteDialog";
+import { useDeviceTable } from "@/hooks/useDeviceTable";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface DeviceListProps {
   devices: Device[];
@@ -38,6 +42,14 @@ export function DeviceList({
   onAssignLocation,
   onEditDevice
 }: DeviceListProps) {
+  const {
+    selectedDevices,
+    showDeleteDialog,
+    setShowDeleteDialog,
+    handleSelectAll,
+    handleSelectDevice,
+    handleBulkDelete
+  } = useDeviceTable(filteredDevices);
 
   function getLocationString(device: Device) {
     const zone = zones.find(z => String(z.id) === String(device.zone_id));
@@ -61,10 +73,24 @@ export function DeviceList({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
+        {selectedDevices.length > 0 && (
+          <div className="p-4">
+            <DeviceBulkActions
+              selectedCount={selectedDevices.length}
+              onDelete={() => setShowDeleteDialog(true)}
+            />
+          </div>
+        )}
         <div className="rounded-md overflow-hidden">
           <Table>
             <TableHeader className="bg-muted/20">
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox 
+                    checked={filteredDevices.length > 0 && selectedDevices.length === filteredDevices.length} 
+                    onCheckedChange={handleSelectAll}
+                  />
+                </TableHead>
                 <TableHead>QR Kod</TableHead>
                 <TableHead>İsim</TableHead>
                 <TableHead>Seri No</TableHead>
@@ -78,7 +104,7 @@ export function DeviceList({
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-16">
+                  <TableCell colSpan={9} className="text-center py-16">
                     <div className="flex flex-col items-center justify-center">
                       <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-2" />
                       <span className="text-muted-foreground">Cihazlar yükleniyor...</span>
@@ -95,11 +121,13 @@ export function DeviceList({
                     onDeleteDevice={onDeleteDevice}
                     onAssignLocation={onAssignLocation}
                     onEditDevice={onEditDevice}
+                    selected={selectedDevices.includes(device.id)}
+                    onSelect={handleSelectDevice}
                   />
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-16">
+                  <TableCell colSpan={9} className="text-center py-16">
                     <div className="flex flex-col items-center justify-center">
                       <p className="text-muted-foreground">
                         {devices.length > 0 
@@ -118,6 +146,13 @@ export function DeviceList({
             </TableBody>
           </Table>
         </div>
+
+        <DeviceDeleteDialog 
+          isOpen={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          selectedCount={selectedDevices.length}
+          onConfirm={handleBulkDelete}
+        />
       </CardContent>
     </Card>
   );
