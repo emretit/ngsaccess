@@ -1,4 +1,3 @@
-
 import { GPT4ALL_SYSTEM_PROMPT } from "../constants";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageData, QueryParams } from "../types";
@@ -41,7 +40,7 @@ function extractDateFromQuery(query: string): string | null {
         const month = monthMap[match[2].toLowerCase()];
         const year = match[3];
         return `${year}-${month}-${day}`; // ISO format: YYYY-MM-DD
-      } else if (pattern.toString().includes('\\d{4}')[\/\.-]) {
+      } else if (pattern.toString().includes('\\d{4}')) {
         // Format: 2023/04/25
         const year = match[1];
         const month = match[2].padStart(2, '0');
