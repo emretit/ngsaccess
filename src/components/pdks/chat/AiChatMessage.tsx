@@ -1,5 +1,5 @@
 
-import { FileExcel, FilePdf, Download, Info } from "lucide-react";
+import { FileText, Download, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PDKSReportTable } from "./PDKSReportTable";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,7 @@ export function AiChatMessage({ message, onExportExcel, onExportPDF }: AiChatMes
               className="h-7 gap-1"
               onClick={() => onExportExcel(message.data!)}
             >
-              <FileExcel className="h-3.5 w-3.5" />
+              <FileText className="h-3.5 w-3.5" />
               <span>Excel</span>
             </Button>
             <Button 
@@ -52,7 +52,7 @@ export function AiChatMessage({ message, onExportExcel, onExportPDF }: AiChatMes
               className="h-7 gap-1"
               onClick={() => onExportPDF(message.data!)}
             >
-              <FilePdf className="h-3.5 w-3.5" />
+              <FileText className="h-3.5 w-3.5" />
               <span>PDF</span>
             </Button>
             <Popover>
