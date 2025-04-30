@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export function useAiChat() {
-  // AI sohbetini kaydetme durumu
+  // AI chat saving state
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const { toast } = useToast();
@@ -17,7 +17,7 @@ export function useAiChat() {
   const { formatReportData, handleExportExcel, handleExportPDF } = useExportUtils();
   const { messages, input, setInput, isLoading, handleSendMessage } = useMessageHandler();
 
-  // Sohbet mesajlarını veritabanına kaydetme fonksiyonu
+  // Function to save conversation to Supabase
   const saveConversationToSupabase = async () => {
     if (messages.length === 0) return;
     
@@ -25,14 +25,14 @@ export function useAiChat() {
       setIsSaving(true);
       setSaveError(null);
       
-      // Sohbet verilerini hazırla
+      // Prepare conversation data
       const conversationData = {
         messages: JSON.stringify(messages),
         created_at: new Date().toISOString(),
-        title: messages[0]?.content.substring(0, 50) || 'Yeni sohbet'
+        title: messages[0]?.content.substring(0, 50) || 'New conversation'
       };
       
-      // Supabase'e kaydet - card_readings tablosunun conversation_data alanına
+      // Save to Supabase - card_readings table with conversation_data field
       const { error } = await supabase
         .from('card_readings')
         .insert([{
@@ -48,9 +48,9 @@ export function useAiChat() {
         description: "Sohbet başarıyla kaydedildi",
       });
       
-      console.log('Sohbet başarıyla kaydedildi');
+      console.log('Conversation saved successfully');
     } catch (error) {
-      console.error('Sohbet kaydedilirken hata:', error);
+      console.error('Error saving conversation:', error);
       setSaveError('Sohbet kaydedilemedi.');
       
       toast({

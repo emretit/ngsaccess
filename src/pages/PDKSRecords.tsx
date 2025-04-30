@@ -1,69 +1,16 @@
 
-import { useState } from 'react';
-import { usePdksAi } from "@/hooks/usePdksAi";
-import { useMedia } from "@/hooks/use-mobile";
-import { usePdksRecords } from "@/hooks/usePdksRecords";
-import { PDKSHeader } from "@/components/pdks/PDKSHeader";
-import { PDKSRecordsSidebar } from '@/components/pdks/PDKSRecordsSidebar';
-import { PDKSRecordsContent } from '@/components/pdks/PDKSRecordsContent';
-import { PDKSAiChat } from "@/components/pdks/PDKSAiChat";
+import { PDKSRecordsContent } from "@/components/pdks/PDKSRecordsContent";
+import { PDKSRecordsSidebar } from "@/components/pdks/PDKSRecordsSidebar";
 import { AiDrawer } from "@/components/pdks/AiDrawer";
-import { exportToCsv } from "@/utils/exportToCsv";
 
 export default function PDKSRecords() {
-  const [selectedSection, setSelectedSection] = useState("summary");
-  const [showAiPanel, setShowAiPanel] = useState(false);
-  const { insight, isLoadingInsight, fetchInsight } = usePdksAi();
-  const isMobile = useMedia("(max-width: 768px)");
-  const {
-    records,
-    filteredRecords,
-    loading,
-    searchTerm,
-    setSearchTerm,
-    statusFilter,
-    setStatusFilter,
-    handleRefresh
-  } = usePdksRecords();
-
   return (
-    <main className="flex-1 p-6 bg-gray-50 flex flex-col min-h-[calc(100vh-4rem)]">
-      <PDKSHeader
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        statusFilter={statusFilter}
-        setStatusFilter={setStatusFilter}
-        onRefresh={handleRefresh}
-        onExportCSV={() => exportToCsv(filteredRecords)}
-        onAiPanelToggle={() => setShowAiPanel(!showAiPanel)}
-        showAiPanel={showAiPanel}
-        isMobile={isMobile}
-        AiDrawer={<AiDrawer filters={{ statusFilter }} />}
-        showSearchFilters={selectedSection === "attendance"}
-      />
-      <div className="flex flex-1 min-h-0 mt-2 gap-4">
-        <PDKSRecordsSidebar 
-          selected={selectedSection}
-          onSelect={setSelectedSection}
-        />
-        <div className="flex-1 overflow-auto">
-          <PDKSRecordsContent
-            section={selectedSection}
-            records={records}
-            filteredRecords={filteredRecords}
-            loading={loading}
-            searchTerm={searchTerm}
-            statusFilter={statusFilter}
-            insight={insight}
-            isLoadingInsight={isLoadingInsight}
-          />
-        </div>
-        {showAiPanel && !isMobile && (
-          <div className="w-96">
-            <PDKSAiChat />
-          </div>
-        )}
+    <div className="flex h-full">
+      <PDKSRecordsSidebar />
+      <div className="flex-1 overflow-hidden">
+        <PDKSRecordsContent />
       </div>
-    </main>
+      <AiDrawer />
+    </div>
   );
 }

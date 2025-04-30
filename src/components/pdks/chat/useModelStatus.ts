@@ -1,119 +1,44 @@
 
-import { useState, useEffect } from 'react';
-import { useToast } from "@/hooks/use-toast";
+import { useState, useCallback, useEffect } from 'react';
 
 export function useModelStatus() {
-  const { toast } = useToast();
-  const [isOpenAIConnected, setIsOpenAIConnected] = useState(false);
-  const [isChecking, setIsChecking] = useState(false);
+  const [isOpenAIConnected, setIsOpenAIConnected] = useState<boolean>(false);
 
-  const checkOpenAIStatus = async () => {
-    if (isChecking) return false;
+  const checkOpenAIStatus = useCallback(async () => {
+    const apiKey = localStorage.getItem('OPENAI_API_KEY');
     
-    setIsChecking(true);
+    if (!apiKey) {
+      setIsOpenAIConnected(false);
+      return;
+    }
+
     try {
-      // Check if OpenAI API key exists
-      const apiKey = localStorage.getItem('OPENAI_API_KEY');
-      
-      if (!apiKey) {
-        setIsOpenAIConnected(false);
-        toast({
-          title: "OpenAI API Anahtarı Bulunamadı",
-          description: "Lütfen API anahtarınızı ayarlayın.",
-          variant: "destructive"
-        });
-        return false;
-      }
-      
-      // Simple validation for API key format
-      if (!apiKey.startsWith('sk-')) {
-        setIsOpenAIConnected(false);
-        toast({
-          title: "Geçersiz OpenAI API Anahtarı",
-          description: "API anahtarınızın formatı doğru değil. Anahtarlar genellikle 'sk-' ile başlar.",
-          variant: "destructive"
-        });
-        return false;
-      }
-      
-      // Perform a test request to validate the API key
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-        
-        const testRequest = await fetch("https://api.openai.com/v1/models", {
-          headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json"
-          },
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!testRequest.ok) {
-          const errorData = await testRequest.json().catch(() => ({}));
-          const errorMsg = errorData.error?.message || `HTTP ${testRequest.status}`;
-          throw new Error(`API doğrulama hatası: ${errorMsg}`);
+      // Make a simple call to OpenAI API to check if the key works
+      const response = await fetch("https://api.openai.com/v1/models", {
+        headers: {
+          "Authorization": `Bearer ${apiKey}`
         }
-        
-        setIsOpenAIConnected(true);
-        toast({
-          title: "OpenAI Bağlantısı Hazır",
-          description: "API anahtarı doğrulandı, OpenAI kullanıma hazır.",
-        });
-        return true;
-      } catch (requestError) {
-        console.error("OpenAI test request failed:", requestError);
-        setIsOpenAIConnected(false);
-        
-        let errorMessage = "API anahtarı doğrulanamadı";
-        if (requestError instanceof DOMException && requestError.name === "AbortError") {
-          errorMessage = "API yanıt vermedi, zaman aşımı.";
-        } else if (requestError instanceof Error) {
-          errorMessage = requestError.message;
+      });
+
+      setIsOpenAIConnected(response.ok);
+      
+      if (!response.ok) {
+        // If the key is invalid, remove it
+        if (response.status === 401) {
+          localStorage.removeItem('OPENAI_API_KEY');
         }
-        
-        toast({
-          title: "OpenAI API Bağlantı Hatası",
-          description: errorMessage,
-          variant: "destructive"
-        });
-        
-        return false;
+        console.error("OpenAI API key validation failed:", response.status, response.statusText);
       }
     } catch (error) {
-      console.error("OpenAI connection check error:", error);
+      console.error("OpenAI API check failed:", error);
       setIsOpenAIConnected(false);
-      
-      let errorMessage = "Bağlantı kontrolünde hata oluştu.";
-      if (error instanceof Error) {
-        errorMessage = `Hata: ${error.message}`;
-      }
-      
-      toast({
-        title: "OpenAI Bağlantı Hatası",
-        description: errorMessage,
-        variant: "destructive"
-      });
-      
-      return false;
-    } finally {
-      setIsChecking(false);
     }
-  };
-
-  // Component loaded, check connection
-  useEffect(() => {
-    // Short timeout to ensure localStorage is available
-    const timer = setTimeout(() => {
-      checkOpenAIStatus();
-    }, 500);
-    
-    return () => {
-      clearTimeout(timer);
-    };
   }, []);
+
+  // Check on initial load
+  useEffect(() => {
+    checkOpenAIStatus();
+  }, [checkOpenAIStatus]);
 
   return {
     isOpenAIConnected,

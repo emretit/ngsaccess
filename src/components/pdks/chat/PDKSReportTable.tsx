@@ -7,29 +7,25 @@ interface PDKSReportTableProps {
 }
 
 export function PDKSReportTable({ data }: PDKSReportTableProps) {
-  if (!data || data.length === 0) {
-    return <div className="p-4 text-center text-muted-foreground">Veri bulunamadı</div>;
-  }
-
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Ad Soyad</TableHead>
-          <TableHead>Giriş Saati</TableHead>
+          <TableHead>Çalışan</TableHead>
           <TableHead>Departman</TableHead>
+          <TableHead>Giriş Saati</TableHead>
           <TableHead>Cihaz</TableHead>
           <TableHead>Konum</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {data.map((row, index) => (
-          <TableRow key={index}>
-            <TableCell className="font-medium">{row.name}</TableCell>
-            <TableCell>{row.check_in}</TableCell>
-            <TableCell>{row.department}</TableCell>
-            <TableCell>{row.device || '-'}</TableCell>
-            <TableCell>{row.location || '-'}</TableCell>
+        {data.map((item, index) => (
+          <TableRow key={`${item.name}-${index}`}>
+            <TableCell className="font-medium">{item.name}</TableCell>
+            <TableCell>{item.department}</TableCell>
+            <TableCell>{item.check_in}</TableCell>
+            <TableCell>{item.device}</TableCell>
+            <TableCell>{item.location}</TableCell>
           </TableRow>
         ))}
       </TableBody>

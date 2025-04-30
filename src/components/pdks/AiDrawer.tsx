@@ -1,32 +1,29 @@
 
-import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
-import { Button } from "@/components/ui/button";
-import { MessageSquare } from "lucide-react";
-import { AiChatPanel } from "./AiChatPanel";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { PDKSAiChat } from "./PDKSAiChat";
+import { MessageSquare, X } from "lucide-react";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
-interface AiDrawerProps {
-  filters?: {
-    dateRange?: { from: Date; to: Date };
-    department?: string;
-    shift?: string;
-    statusFilter?: string;  // Add statusFilter to the interface
-  };
-}
-
-export function AiDrawer({ filters }: AiDrawerProps) {
-  const [open, setOpen] = useState(false);
+export function AiDrawer() {
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <Drawer open={open} onOpenChange={setOpen}>
-      <DrawerTrigger asChild>
-        <Button variant="outline" size="icon" className="md:hidden">
-          <MessageSquare size={18} />
+    <Sheet open={isOpen} onOpenChange={setIsOpen}>
+      <SheetTrigger asChild>
+        <Button 
+          className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg"
+          size="icon"
+          onClick={() => setIsOpen(true)}
+        >
+          <MessageSquare className="h-6 w-6" />
         </Button>
-      </DrawerTrigger>
-      <DrawerContent className="h-[85vh] flex flex-col">
-        <AiChatPanel onClose={() => setOpen(false)} filters={filters} />
-      </DrawerContent>
-    </Drawer>
+      </SheetTrigger>
+      <SheetContent className="w-full sm:max-w-md md:max-w-lg lg:max-w-xl p-0" side="right">
+        <div className="flex flex-col h-full">
+          <PDKSAiChat />
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

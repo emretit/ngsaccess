@@ -1,9 +1,10 @@
+
 import { GPT4ALL_SYSTEM_PROMPT } from "../constants";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageData, QueryParams } from "../types";
 
 const OPENAI_API_ENDPOINT = "https://api.openai.com/v1/chat/completions";
-const OPENAI_MODEL = "gpt-4o-mini"; // OpenAI'ın modern modelini kullanıyoruz
+const OPENAI_MODEL = "gpt-4o-mini"; // OpenAI's modern model
 
 // Helper function to extract date from a query string
 function extractDateFromQuery(query: string): string | null {
@@ -263,7 +264,7 @@ export async function sendChatMessage(input: string) {
     
     // If not a report query, process with OpenAI
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 saniye zaman aşımı
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
     
     const apiKey = localStorage.getItem('OPENAI_API_KEY');
     
@@ -282,16 +283,16 @@ export async function sendChatMessage(input: string) {
       };
     }
 
-    // Veritabanından departman bilgilerini çek
+    // Get department information from the database
     const { data: departmentsData, error: departmentsError } = await supabase
       .from('departments')
       .select('*');
     
     if (departmentsError) {
-      console.error("Departman bilgileri çekilirken hata:", departmentsError);
+      console.error("Error fetching departments:", departmentsError);
     }
 
-    // Veritabanından çalışan bilgilerini çek
+    // Get employee information from the database
     const { data: employeesData, error: employeesError } = await supabase
       .from('employees')
       .select(`
@@ -301,21 +302,21 @@ export async function sendChatMessage(input: string) {
       `);
     
     if (employeesError) {
-      console.error("Çalışan bilgileri çekilirken hata:", employeesError);
+      console.error("Error fetching employees:", employeesError);
     }
 
-    // Veritabanı bilgilerini içeren bir context oluştur
-    let dbContext = "Sistem veritabanı bilgileri:";
+    // Create a context with database information
+    let dbContext = "System database information:";
     
     if (departmentsData && departmentsData.length > 0) {
-      dbContext += `\nDepartmanlar: ${departmentsData.map(d => `${d.id}: ${d.name}`).join(", ")}`;
+      dbContext += `\nDepartments: ${departmentsData.map(d => `${d.id}: ${d.name}`).join(", ")}`;
     }
     
     if (employeesData && employeesData.length > 0) {
-      dbContext += `\nÇalışanlar: ${employeesData.map(e => `${e.first_name} ${e.last_name} (${e.departments?.name || 'Departman yok'} departmanı, ${e.positions?.name || 'Pozisyon yok'})`).join("; ")}`;
+      dbContext += `\nEmployees: ${employeesData.map(e => `${e.first_name} ${e.last_name} (${e.departments?.name || 'No Department'} department, ${e.positions?.name || 'No Position'})`).join("; ")}`;
     }
     
-    // Güncellenmiş sistem prompt'u oluştur
+    // Create enhanced system prompt
     const enhancedSystemPrompt = `${GPT4ALL_SYSTEM_PROMPT}\n\n${dbContext}`;
     
     try {
@@ -343,16 +344,16 @@ export async function sendChatMessage(input: string) {
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        let errorMessage = `OpenAI API hatası: ${response.status}`;
+        let errorMessage = `OpenAI API error: ${response.status}`;
         
         if (errorData.error) {
           if (errorData.error.type === "invalid_request_error" && 
               errorData.error.message && errorData.error.message.includes("API key")) {
-            errorMessage = "Geçersiz OpenAI API anahtarı. Lütfen API anahtarınızı kontrol edin.";
+            errorMessage = "Invalid OpenAI API key. Please check your API key.";
             // Clear invalid key
             localStorage.removeItem('OPENAI_API_KEY');
           } else {
-            errorMessage += ` - ${errorData.error.message || 'Bilinmeyen hata'}`;
+            errorMessage += ` - ${errorData.error.message || 'Unknown error'}`;
           }
         }
         
@@ -360,11 +361,11 @@ export async function sendChatMessage(input: string) {
       }
       
       const data = await response.json();
-      console.log("OpenAI yanıtı alındı");
+      console.log("OpenAI response received");
       
       if (!data.choices || !data.choices[0]) {
         return {
-          content: "Üzgünüm, yanıt oluşturulurken bir hata meydana geldi.",
+          content: "Sorry, I couldn't generate a response.",
           source: 'error'
         };
       }
@@ -381,17 +382,17 @@ export async function sendChatMessage(input: string) {
   } catch (error) {
     console.error("Chat service error:", error);
     
-    // Daha detaylı hata mesajları
-    let errorMessage = "Üzgünüm, OpenAI bağlantısında bir hata oluştu.";
+    // More detailed error messages
+    let errorMessage = "Sorry, there was an error connecting to OpenAI.";
     
     if (error instanceof DOMException && error.name === "AbortError") {
-      errorMessage = "Bağlantı zaman aşımına uğradı. OpenAI yanıt vermedi.";
+      errorMessage = "Connection timed out. OpenAI did not respond.";
     } else if (error instanceof Error) {
       errorMessage = error.message;
       
       // If API key is invalid, suggest resetting it
-      if (errorMessage.includes("Geçersiz OpenAI API anahtarı")) {
-        errorMessage += " Yeni bir API anahtarı eklemek için sayfayı yenileyebilirsiniz.";
+      if (errorMessage.includes("Invalid OpenAI API key")) {
+        errorMessage += " You can refresh the page to add a new API key.";
       }
     }
     

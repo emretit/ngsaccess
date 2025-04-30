@@ -1,115 +1,106 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Key, AlertCircle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface OpenAiKeyInputProps {
   onComplete: () => void;
 }
 
 export function OpenAiKeyInput({ onComplete }: OpenAiKeyInputProps) {
-  const { toast } = useToast();
   const [apiKey, setApiKey] = useState("");
-  const [isVisible, setIsVisible] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    // Check if key was provided in URL or exists in localStorage
-    const urlParams = new URLSearchParams(window.location.search);
-    const keyFromUrl = urlParams.get('apikey');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
     
-    if (keyFromUrl) {
-      setApiKey(keyFromUrl);
-      // Remove the key from URL for security
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else {
-      // Check if there's an API key in localStorage
-      const storedKey = localStorage.getItem('OPENAI_API_KEY');
-      if (storedKey) {
-        setApiKey(storedKey);
+    try {
+      if (!apiKey.trim()) {
+        setError("API anahtarı boş olamaz");
+        return;
       }
-    }
-  }, []);
 
-  const validateApiKey = (key: string) => {
-    if (!key.trim()) {
-      return "API anahtarı boş olamaz";
-    }
-    
-    if (!key.startsWith('sk-')) {
-      return "API anahtarı 'sk-' ile başlamalıdır";
-    }
-    
-    return "";
-  };
+      if (!apiKey.startsWith("sk-")) {
+        setError("OpenAI API anahtarları 'sk-' ile başlamalıdır");
+        return;
+      }
 
-  const handleSaveKey = () => {
-    const validationError = validateApiKey(apiKey);
-    if (validationError) {
-      setError(validationError);
-      toast({
-        title: "API Anahtarı Geçersiz",
-        description: validationError,
-        variant: "destructive"
+      // Store the API key in localStorage
+      localStorage.setItem('OPENAI_API_KEY', apiKey);
+      
+      // Validate the API key with a simple call
+      const response = await fetch("https://api.openai.com/v1/models", {
+        headers: {
+          "Authorization": `Bearer ${apiKey}`
+        }
       });
-      return;
-    }
 
-    // Clear any previous errors
-    setError("");
-    
-    // Save to localStorage
-    localStorage.setItem('OPENAI_API_KEY', apiKey);
-    
-    toast({
-      title: "API Anahtarı Kaydedildi",
-      description: "OpenAI API anahtarınız başarıyla kaydedildi.",
-    });
-    
-    onComplete();
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || "API anahtarı doğrulanamadı");
+      }
+      
+      // If we got here, the key is valid
+      onComplete();
+      
+    } catch (error) {
+      console.error("API key validation error:", error);
+      setError(error instanceof Error ? error.message : "Bilinmeyen bir hata oluştu");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
-      <div className="flex items-center gap-2">
-        <Key size={16} />
-        <h3 className="text-sm font-medium">OpenAI API Anahtarı Ayarla</h3>
+    <div className="space-y-4 max-w-xl mx-auto">
+      <div className="text-center">
+        <h3 className="text-lg font-semibold">OpenAI API Anahtarınız</h3>
+        <p className="text-sm text-muted-foreground">
+          PDKS AI Asistanı için OpenAI API anahtarınızı girin. 
+          Bu anahtar tarayıcınızda yerel olarak saklanacak ve sunucuya gönderilmeyecektir.
+        </p>
       </div>
-      
-      <p className="text-xs text-muted-foreground">
-        PDKS AI asistanını kullanmak için OpenAI API anahtarı gereklidir. 
-        API anahtarı 'sk-' ile başlamalıdır.
-      </p>
-      
-      <div className="flex gap-2">
-        <Input
-          type={isVisible ? "text" : "password"}
-          placeholder="sk-..."
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          className={`flex-1 ${error ? "border-red-500" : ""}`}
-        />
-        <Button 
-          variant="outline" 
-          size="sm"
-          onClick={() => setIsVisible(!isVisible)}
-        >
-          {isVisible ? "Gizle" : "Göster"}
-        </Button>
-      </div>
-      
+
       {error && (
-        <div className="flex items-center text-red-500 text-xs gap-1">
-          <AlertCircle size={12} />
-          <span>{error}</span>
-        </div>
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
-      
-      <Button onClick={handleSaveKey} className="w-full">
-        Kaydet ve Devam Et
-      </Button>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <Input
+            type="password"
+            placeholder="OpenAI API anahtarınızı girin (sk-...)"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            OpenAI API anahtarınızı <a 
+              href="https://platform.openai.com/account/api-keys" 
+              target="_blank" 
+              rel="noreferrer" 
+              className="underline hover:text-primary"
+            >
+              openai.com
+            </a> adresinden alabilirsiniz.
+          </p>
+        </div>
+
+        <Button 
+          type="submit" 
+          className="w-full"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "Doğrulanıyor..." : "API Anahtarını Doğrula"}
+        </Button>
+      </form>
     </div>
   );
 }
