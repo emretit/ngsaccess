@@ -26,7 +26,7 @@ export function AiChatInput({
         onChange={(e) => onInputChange(e.target.value)}
         placeholder={isModelConnected 
           ? "PDKS hakkında sorunuzu yazın..." 
-          : "Örnek: Finans departmanı mart ayı giriş takip raporu..."}
+          : "OpenAI API anahtarı gerekli..."}
         disabled={isLoading}
         className="flex-1"
       />

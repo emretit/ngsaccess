@@ -20,8 +20,8 @@ export function PDKSAiChat() {
     input,
     setInput,
     isLoading,
-    isLocalModelConnected,
-    checkLocalModelStatus,
+    isOpenAIConnected,
+    checkOpenAIStatus,
     handleSendMessage,
     handleExportExcel,
     handleExportPDF
@@ -41,28 +41,28 @@ export function PDKSAiChat() {
       setShowApiKeyInput(false);
       // Remove the key from URL for security
       window.history.replaceState({}, document.title, window.location.pathname);
-      checkLocalModelStatus();
+      checkOpenAIStatus();
     }
-  }, [checkLocalModelStatus]);
+  }, [checkOpenAIStatus]);
 
   const handleRefreshModelStatus = () => {
-    checkLocalModelStatus();
+    checkOpenAIStatus();
     toast({
-      title: "Model bağlantısı kontrol ediliyor",
-      description: "OpenAI API bağlantısı yeniden kontrol ediliyor.",
+      title: "OpenAI bağlantısı kontrol ediliyor",
+      description: "API bağlantısı yeniden kontrol ediliyor.",
     });
   };
 
   const handleApiKeyComplete = () => {
     setShowApiKeyInput(false);
-    checkLocalModelStatus();
+    checkOpenAIStatus();
   };
 
   return (
     <Card className="w-full h-[calc(100vh-12rem)] shadow-lg">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg font-medium">
-          {isLocalModelConnected ? "OpenAI PDKS Asistanı" : "PDKS AI Rapor Asistanı"}
+          PDKS AI Asistanı
         </CardTitle>
         <div className="flex items-center gap-2">
           <Button 
@@ -73,7 +73,7 @@ export function PDKSAiChat() {
           >
             <RefreshCcw className="h-4 w-4" />
           </Button>
-          <AiModelStatus isConnected={isLocalModelConnected} />
+          <AiModelStatus isConnected={isOpenAIConnected} />
         </div>
       </CardHeader>
       <CardContent>
@@ -106,7 +106,7 @@ export function PDKSAiChat() {
               <AiChatInput
                 input={input}
                 isLoading={isLoading}
-                isModelConnected={isLocalModelConnected}
+                isModelConnected={isOpenAIConnected}
                 onInputChange={setInput}
                 onSubmit={handleSendMessage}
               />

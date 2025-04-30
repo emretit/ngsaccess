@@ -4,10 +4,10 @@ import { useToast } from "@/hooks/use-toast";
 
 export function useModelStatus() {
   const { toast } = useToast();
-  const [isLocalModelConnected, setIsLocalModelConnected] = useState(false);
+  const [isOpenAIConnected, setIsOpenAIConnected] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
 
-  const checkLocalModelStatus = async () => {
+  const checkOpenAIStatus = async () => {
     if (isChecking) return false;
     
     setIsChecking(true);
@@ -16,7 +16,7 @@ export function useModelStatus() {
       const apiKey = localStorage.getItem('OPENAI_API_KEY');
       
       if (!apiKey) {
-        setIsLocalModelConnected(false);
+        setIsOpenAIConnected(false);
         toast({
           title: "OpenAI API Anahtarı Bulunamadı",
           description: "Lütfen API anahtarınızı ayarlayın.",
@@ -27,7 +27,7 @@ export function useModelStatus() {
       
       // Simple validation for API key format
       if (!apiKey.startsWith('sk-')) {
-        setIsLocalModelConnected(false);
+        setIsOpenAIConnected(false);
         toast({
           title: "Geçersiz OpenAI API Anahtarı",
           description: "API anahtarınızın formatı doğru değil. Anahtarlar genellikle 'sk-' ile başlar.",
@@ -57,7 +57,7 @@ export function useModelStatus() {
           throw new Error(`API doğrulama hatası: ${errorMsg}`);
         }
         
-        setIsLocalModelConnected(true);
+        setIsOpenAIConnected(true);
         toast({
           title: "OpenAI Bağlantısı Hazır",
           description: "API anahtarı doğrulandı, OpenAI kullanıma hazır.",
@@ -65,7 +65,7 @@ export function useModelStatus() {
         return true;
       } catch (requestError) {
         console.error("OpenAI test request failed:", requestError);
-        setIsLocalModelConnected(false);
+        setIsOpenAIConnected(false);
         
         let errorMessage = "API anahtarı doğrulanamadı";
         if (requestError instanceof DOMException && requestError.name === "AbortError") {
@@ -84,7 +84,7 @@ export function useModelStatus() {
       }
     } catch (error) {
       console.error("OpenAI connection check error:", error);
-      setIsLocalModelConnected(false);
+      setIsOpenAIConnected(false);
       
       let errorMessage = "Bağlantı kontrolünde hata oluştu.";
       if (error instanceof Error) {
@@ -107,7 +107,7 @@ export function useModelStatus() {
   useEffect(() => {
     // Short timeout to ensure localStorage is available
     const timer = setTimeout(() => {
-      checkLocalModelStatus();
+      checkOpenAIStatus();
     }, 500);
     
     return () => {
@@ -116,7 +116,7 @@ export function useModelStatus() {
   }, []);
 
   return {
-    isLocalModelConnected,
-    checkLocalModelStatus
+    isOpenAIConnected,
+    checkOpenAIStatus
   };
 }

@@ -5,7 +5,7 @@ import { useMessageHandler } from './hooks/useMessageHandler';
 
 export function useAiChat() {
   // Get all functionality from other hooks
-  const { isLocalModelConnected, checkLocalModelStatus } = useModelStatus();
+  const { isOpenAIConnected, checkOpenAIStatus } = useModelStatus();
   const { formatReportData, handleExportExcel, handleExportPDF } = useExportUtils();
   const { messages, input, setInput, isLoading, handleSendMessage } = useMessageHandler();
 
@@ -14,8 +14,8 @@ export function useAiChat() {
     input,
     setInput,
     isLoading,
-    isLocalModelConnected,
-    checkLocalModelStatus,
+    isOpenAIConnected,
+    checkOpenAIStatus,
     handleSendMessage,
     handleExportExcel,
     handleExportPDF

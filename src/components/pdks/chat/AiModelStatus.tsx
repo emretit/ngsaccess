@@ -1,5 +1,5 @@
 
-import { Sparkles, AlertCircle, Info, Cpu } from "lucide-react";
+import { Sparkles, AlertCircle, Info } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface AiModelStatusProps {
@@ -13,14 +13,14 @@ export function AiModelStatus({ isConnected }: AiModelStatusProps) {
       <span className="text-xs text-gray-500 flex items-center gap-1">
         {isConnected ? (
           <>
-            <Cpu size={12} /> 
+            <Sparkles size={12} className="text-amber-500" /> 
             <span>OpenAI Aktif</span>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Sparkles size={12} className="text-amber-500 ml-1 cursor-help" />
+                <Info size={12} className="text-blue-500 ml-1 cursor-help" />
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[250px] text-xs">
-                PDKS uzman asistan sistemi aktif - OpenAI bağlantısı kuruldu
+                OpenAI bağlantısı aktif - API anahtarı doğrulandı
               </TooltipContent>
             </Tooltip>
           </>
