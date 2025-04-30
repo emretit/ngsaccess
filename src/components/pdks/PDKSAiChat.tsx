@@ -24,9 +24,7 @@ export function PDKSAiChat() {
     checkOpenAIStatus,
     handleSendMessage,
     handleExportExcel,
-    handleExportPDF,
-    saveConversationToSupabase,
-    isSaving
+    handleExportPDF
   } = useAiChat();
   
   useEffect(() => {
@@ -58,24 +56,6 @@ export function PDKSAiChat() {
   const handleApiKeyComplete = () => {
     setShowApiKeyInput(false);
     checkOpenAIStatus();
-  };
-
-  const handleSaveConversation = () => {
-    if (messages.length === 0) {
-      toast({
-        title: "Kayıt edilecek sohbet yok",
-        description: "Kaydetmek için önce bir sohbet başlatın.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    saveConversationToSupabase();
-    
-    toast({
-      title: "Sohbet kaydedildi",
-      description: "Sohbet geçmişiniz başarıyla kaydedildi."
-    });
   };
 
   return (
@@ -127,10 +107,8 @@ export function PDKSAiChat() {
                 input={input}
                 isLoading={isLoading}
                 isModelConnected={isOpenAIConnected}
-                isSaving={isSaving}
                 onInputChange={setInput}
                 onSubmit={handleSendMessage}
-                onSave={handleSaveConversation}
               />
             </>
           )}
