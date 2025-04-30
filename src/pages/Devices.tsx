@@ -12,6 +12,7 @@ import { DeviceFilters } from "@/components/devices/DeviceFilters";
 import { DeviceList } from "@/components/devices/DeviceList";
 import { QRCodeDialog } from "@/components/devices/QRCodeDialog";
 import { useDeviceFilters } from "@/hooks/useDeviceFilters";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function Devices() {
   
@@ -120,13 +121,30 @@ export default function Devices() {
     
     <main className="p-0">
       <div className="max-w-7xl mx-auto flex gap-6">
-        <ZoneDoorTreePanel 
-          onSelectZone={setSelectedZoneId} 
-          onSelectDoor={setSelectedDoorId}
-        />
-        <div className="flex-1 space-y-6 p-6">
-          <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-semibold">Cihazlar</h1>
+        <div className="w-64 lg:w-72 shrink-0">
+          <Card className="h-full border-0 shadow-md">
+            <CardHeader className="bg-muted/30 pb-4">
+              <CardTitle className="text-lg font-semibold">Bölgeler ve Kapılar</CardTitle>
+              <CardDescription>
+                Cihazları filtrelemek için bölge veya kapı seçin
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <ZoneDoorTreePanel 
+                onSelectZone={setSelectedZoneId} 
+                onSelectDoor={setSelectedDoorId}
+              />
+            </CardContent>
+          </Card>
+        </div>
+        <div className="flex-1 space-y-6">
+          <div className="flex justify-between items-center bg-white p-6 rounded-lg shadow-sm border-0">
+            <div>
+              <h1 className="text-2xl font-semibold">Cihazlar</h1>
+              <p className="text-sm text-muted-foreground">
+                {devices.length} cihaz bulundu, {filteredDevices.length} tanesi gösteriliyor
+              </p>
+            </div>
             <DeviceForm onAddDevice={addDevice} isLoading={isAddingDevice} />
           </div>
 
