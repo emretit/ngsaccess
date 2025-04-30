@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Device, ServerDevice } from "@/types/device";
 import { useToast } from "@/hooks/use-toast";
@@ -171,7 +170,6 @@ export default function Devices() {
             filteredCount={devices.length}
             onAddDevice={addDevice}
             isAddingDevice={isAddingDevice}
-            onOpenDevicePanel={() => openDevicePanel()}
           />
 
           <DevicesContent

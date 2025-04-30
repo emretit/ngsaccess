@@ -1,7 +1,5 @@
 
-import { Button } from "@/components/ui/button";
 import { DeviceForm } from "@/components/devices/DeviceForm";
-import { Edit } from "lucide-react";
 
 interface DevicesHeaderProps {
   deviceCount: number;
@@ -15,8 +13,7 @@ export function DevicesHeader({
   deviceCount,
   filteredCount,
   onAddDevice,
-  isAddingDevice,
-  onOpenDevicePanel
+  isAddingDevice
 }: DevicesHeaderProps) {
   return (
     <div className="flex justify-between items-center bg-white p-6 rounded-lg shadow-sm border-0">
@@ -26,12 +23,8 @@ export function DevicesHeader({
           {deviceCount} cihaz bulundu, {filteredCount} tanesi gösteriliyor
         </p>
       </div>
-      <div className="space-x-2">
+      <div>
         <DeviceForm onAddDevice={onAddDevice} isLoading={isAddingDevice} />
-        <Button variant="outline" onClick={onOpenDevicePanel}>
-          <Edit className="mr-2 h-4 w-4" />
-          Yeni Cihaz Oluştur
-        </Button>
       </div>
     </div>
   );

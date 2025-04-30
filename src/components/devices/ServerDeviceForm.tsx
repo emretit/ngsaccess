@@ -75,7 +75,7 @@ export function ServerDeviceForm({
             macAddress={macAddress}
             onMacAddressChange={setMacAddress}
             isActive={isActive}
-            onIsActiveChange={setIsActive}
+            onIsActiveChange={setIsActive ? (value: boolean) => setIsActive(value) : undefined}
             firmwareVersion={firmwareVersion}
             onFirmwareVersionChange={setFirmwareVersion}
           />

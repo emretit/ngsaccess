@@ -1,5 +1,4 @@
 
-import { useState } from "react";
 import { Device, ServerDevice } from "@/types/device";
 import { DeviceList } from "@/components/devices/DeviceList";
 import { DeviceFilters } from "@/components/devices/DeviceFilters";

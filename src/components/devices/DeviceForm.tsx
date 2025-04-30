@@ -33,7 +33,10 @@ export function DeviceForm({ onAddDevice, isLoading }: DeviceFormProps) {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>
+      <Button 
+        onClick={() => setOpen(true)}
+        className="bg-primary hover:bg-primary/90"
+      >
         <Plus className="mr-2 h-4 w-4" /> Yeni Cihaz Ekle
       </Button>
 
@@ -42,7 +45,7 @@ export function DeviceForm({ onAddDevice, isLoading }: DeviceFormProps) {
           <DialogHeader>
             <DialogTitle>Yeni Cihaz Ekle</DialogTitle>
             <DialogDescription>
-              Projenize eklemek istediğiniz cihazın seri numarasını girin.
+              Projenize eklemek istediğiniz cihazın seri numarasını girin ya da yeni bir cihaz oluşturun.
             </DialogDescription>
           </DialogHeader>
 
