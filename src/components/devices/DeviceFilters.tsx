@@ -45,6 +45,7 @@ export function DeviceFilters({
           <SelectItem value="all">Tüm Durumlar</SelectItem>
           <SelectItem value="online">Aktif</SelectItem>
           <SelectItem value="offline">Pasif</SelectItem>
+          <SelectItem value="expired">Süresi Dolmuş</SelectItem>
         </SelectContent>
       </Select>
 

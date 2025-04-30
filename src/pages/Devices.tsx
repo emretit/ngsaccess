@@ -1,4 +1,3 @@
-
 import { format } from 'date-fns';
 import { Button } from "@/components/ui/button";
 import { DeviceForm } from "@/components/devices/DeviceForm";
@@ -20,15 +19,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useState } from "react";
-import { Download, Edit, Trash2, MapPin, Search } from "lucide-react";
+import { Download, Edit, Trash2, MapPin } from "lucide-react";
 import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { AssignLocationForm } from "@/components/devices/AssignLocationForm";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { Device } from "@/types/device";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Device, ServerDevice } from "@/types/device";
 import { DeviceFilters } from "@/components/devices/DeviceFilters";
 
 export default function Devices() {
@@ -348,8 +345,8 @@ export default function Devices() {
                 device_model_enum: "Other",
                 zone_id: showLocationForm.device.zone_id,
                 door_id: showLocationForm.device.door_id,
-                date_added: new Date().toISOString(), // Add required date_added property
-                status: 'active'
+                date_added: new Date().toISOString(),
+                status: 'online'
               }}
             />
           )}
