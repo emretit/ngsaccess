@@ -1,11 +1,10 @@
 
-import { FormSelectField, FormTextField } from "@/components/employees/FormFields";
 import { Project } from "@/types/device";
-import { Input } from "../ui/input";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
+import { DeviceBasicInfo } from "./form-fields/DeviceBasicInfo";
+import { DeviceNetworkInfo } from "./form-fields/DeviceNetworkInfo";
+import { DeviceLocationInfo } from "./form-fields/DeviceLocationInfo";
+import { DeviceAdditionalInfo } from "./form-fields/DeviceAdditionalInfo";
 
 interface ServerDeviceFormFieldsProps {
   name: string;
@@ -52,170 +51,59 @@ export function ServerDeviceFormFields({
   doorId,
   onDoorChange,
   description = "",
-  onDescriptionChange,
+  onDescriptionChange = () => {},
   ipAddress = "",
-  onIpAddressChange,
+  onIpAddressChange = () => {},
   macAddress = "",
-  onMacAddressChange,
+  onMacAddressChange = () => {},
   isActive = true,
-  onIsActiveChange,
+  onIsActiveChange = () => {},
   firmwareVersion = "",
-  onFirmwareVersionChange,
+  onFirmwareVersionChange = () => {},
 }: ServerDeviceFormFieldsProps) {
   const { zones, doors, loading } = useZonesAndDoors();
 
-  // Kapı listesini seçili bölgeye göre filtrele
-  const filteredDoors = doors.filter(door => String(door.zone_id) === zoneId);
-
   return (
     <div className="space-y-5 py-4">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-sm font-medium">Cihaz Durumu</h3>
-        <div className="flex items-center space-x-2">
-          <Switch 
-            id="is-active" 
-            checked={isActive}
-            onCheckedChange={onIsActiveChange}
-          />
-          <Label htmlFor="is-active" className="text-sm">
-            {isActive ? "Aktif" : "Pasif"}
-          </Label>
-        </div>
-      </div>
-
-      <FormTextField
-        label="Cihaz Adı"
-        name="name"
-        value={name}
-        onChange={onNameChange}
-        required
+      <DeviceBasicInfo 
+        name={name}
+        onNameChange={onNameChange}
+        serialNumber={serialNumber}
+        onSerialNumberChange={onSerialNumberChange}
+        deviceModel={deviceModel}
+        onDeviceModelChange={onDeviceModelChange}
+        isActive={isActive}
+        onIsActiveChange={onIsActiveChange}
       />
 
-      <FormTextField
-        label="Seri Numarası"
-        name="serial_number"
-        value={serialNumber}
-        onChange={onSerialNumberChange}
-        required
+      <DeviceNetworkInfo
+        ipAddress={ipAddress}
+        onIpAddressChange={onIpAddressChange}
+        macAddress={macAddress}
+        onMacAddressChange={onMacAddressChange}
+        firmwareVersion={firmwareVersion}
+        onFirmwareVersionChange={onFirmwareVersionChange}
       />
 
-      <FormSelectField
-        label="Cihaz Modeli"
-        name="device_model"
-        value={deviceModel}
-        onChange={(value) => onDeviceModelChange(value as typeof deviceModel)}
-        options={[
-          { id: "QR Reader", name: "QR Okuyucu" },
-          { id: "Fingerprint Reader", name: "Parmak İzi Okuyucu" },
-          { id: "RFID Reader", name: "RFID Kart Okuyucu" },
-          { id: "Access Control Terminal", name: "Geçiş Kontrol Terminali" },
-          { id: "Other", name: "Diğer" }
-        ]}
-        required
+      <DeviceLocationInfo
+        projectId={projectId}
+        onProjectChange={onProjectChange}
+        zoneId={zoneId}
+        onZoneChange={onZoneChange}
+        doorId={doorId}
+        onDoorChange={onDoorChange}
+        projects={projects}
+        zones={zones}
+        doors={doors}
+        loading={loading}
       />
 
-      <div className="space-y-2">
-        <Label htmlFor="ip_address">IP Adresi</Label>
-        <Input 
-          id="ip_address"
-          value={ipAddress}
-          onChange={(e) => onIpAddressChange && onIpAddressChange(e.target.value)}
-          placeholder="Örn: 192.168.1.100"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="mac_address">MAC Adresi</Label>
-        <Input 
-          id="mac_address"
-          value={macAddress}
-          onChange={(e) => onMacAddressChange && onMacAddressChange(e.target.value)}
-          placeholder="Örn: AA:BB:CC:DD:EE:FF"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="firmware_version">Firmware Versiyonu</Label>
-        <Input 
-          id="firmware_version"
-          value={firmwareVersion}
-          onChange={(e) => onFirmwareVersionChange && onFirmwareVersionChange(e.target.value)}
-          placeholder="Örn: v1.2.3"
-        />
-      </div>
-
-      <FormSelectField
-        label="Proje"
-        name="project"
-        value={projectId}
-        onChange={onProjectChange}
-        options={projects.map(project => ({
-          id: project.id.toString(),
-          name: project.name
-        }))}
-        placeholder="Proje Seçiniz"
+      <DeviceAdditionalInfo
+        description={description}
+        onDescriptionChange={onDescriptionChange}
+        expiryDate={expiryDate}
+        onExpiryDateChange={onExpiryDateChange}
       />
-
-      <FormSelectField
-        label="Bölge"
-        name="zone"
-        value={zoneId}
-        onChange={(val) => {
-          onZoneChange(val);
-          if (val !== zoneId) {
-            // Bölge değiştiğinde kapı seçimini sıfırla
-            onDoorChange('');
-          }
-        }}
-        options={zones.map(zone => ({
-          id: String(zone.id),
-          name: zone.name
-        }))}
-        placeholder={loading ? "Yükleniyor..." : "Bölge Seçiniz"}
-      />
-
-      <FormSelectField
-        label="Kapı"
-        name="door"
-        value={doorId}
-        onChange={onDoorChange}
-        options={filteredDoors.map(door => ({
-          id: String(door.id),
-          name: door.name
-        }))}
-        placeholder={zoneId 
-          ? (filteredDoors.length === 0 
-              ? "Seçili bölgede kapı yok" 
-              : "Kapı Seçiniz") 
-          : "Önce bölge seçiniz"}
-        disabled={!zoneId || loading}
-      />
-
-      <div className="space-y-2">
-        <Label htmlFor="description">Açıklama</Label>
-        <Textarea
-          id="description"
-          value={description}
-          onChange={(e) => onDescriptionChange && onDescriptionChange(e.target.value)}
-          placeholder="Cihaz hakkında detaylı bilgi giriniz..."
-          className="resize-none h-24"
-        />
-      </div>
-
-      <div className="space-y-1">
-        <label htmlFor="expiry_date" className="text-sm font-medium">
-          Son Kullanma Tarihi
-        </label>
-        <Input
-          id="expiry_date"
-          type="date"
-          value={expiryDate}
-          onChange={(e) => onExpiryDateChange(e.target.value)}
-        />
-        <p className="text-xs text-muted-foreground mt-1">
-          Eğer cihazın bir son kullanma tarihi varsa belirtin, yoksa boş bırakın.
-        </p>
-      </div>
     </div>
   );
 }
