@@ -1,4 +1,3 @@
-
 import { GPT4ALL_SYSTEM_PROMPT } from "../constants";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageData, QueryParams } from "../types";
@@ -78,34 +77,38 @@ function extractDateFromQuery(query: string): string | null {
 
 // Helper function to extract department from a query string
 function extractDepartmentFromQuery(query: string): string | null {
-  // Define common department patterns
+  // Define common department patterns with Turkish and English terms and improved matching
   const departmentPatterns = [
-    /(insan\s+kaynakları|human\s+resources|hr)\s+departmanı/i,
-    /departman[ıi]?\s+(insan\s+kaynakları|human\s+resources|hr)/i,
+    /(insan\s+kaynakları|human\s+resources|hr|ik)\s+departmanı/i,
+    /departman[ıi]?\s+(insan\s+kaynakları|human\s+resources|hr|ik)/i,
     /(finans|finance)\s+departmanı/i,
     /departman[ıi]?\s+(finans|finance)/i,
-    /(bilgi\s+teknolojileri|information\s+technology|it)\s+departmanı/i,
-    /departman[ıi]?\s+(bilgi\s+teknolojileri|information\s+technology|it)/i,
+    /(bilgi\s+teknolojileri|information\s+technology|it|bt)\s+departmanı/i,
+    /departman[ıi]?\s+(bilgi\s+teknolojileri|information\s+technology|it|bt)/i,
     /(satış|sales)\s+departmanı/i,
     /departman[ıi]?\s+(satış|sales)/i,
     /(pazarlama|marketing)\s+departmanı/i,
     /departman[ıi]?\s+(pazarlama|marketing)/i,
     /(üretim|production|manufacturing)\s+departmanı/i,
     /departman[ıi]?\s+(üretim|production|manufacturing)/i,
-    /(mühendislik|engineering)\s+departmanı/i,
-    /departman[ıi]?\s+(mühendislik|engineering)/i
+    /(mühendislik|engineering|yazılım|software)\s+departmanı/i,
+    /departman[ıi]?\s+(mühendislik|engineering|yazılım|software)/i,
+    /(yazılım\s+geliştirme|software\s+development)\s+departmanı/i,
+    /departman[ıi]?\s+(yazılım\s+geliştirme|software\s+development)/i
   ];
   
-  // Department name mapping
+  // Department name mapping - genişletilmiş eslesmeler
   const departmentMap: Record<string, string> = {
     'insan kaynakları': 'Human Resources',
     'human resources': 'Human Resources',
     'hr': 'Human Resources',
+    'ik': 'Human Resources',
     'finans': 'Finance',
     'finance': 'Finance',
     'bilgi teknolojileri': 'IT',
     'information technology': 'IT',
     'it': 'IT',
+    'bt': 'IT', 
     'satış': 'Sales',
     'sales': 'Sales',
     'pazarlama': 'Marketing',
@@ -114,8 +117,36 @@ function extractDepartmentFromQuery(query: string): string | null {
     'production': 'Production',
     'manufacturing': 'Production',
     'mühendislik': 'Engineering',
-    'engineering': 'Engineering'
+    'engineering': 'Engineering',
+    'yazılım': 'Software Development',
+    'software': 'Software Development',
+    'yazılım geliştirme': 'Software Development',
+    'software development': 'Software Development'
   };
+  
+  // İleri düzey arama: Soru içindeki departman adını kontrol et
+  if (query.includes("Mevcut departmanlar:")) {
+    // Mesaja eklenmiş departman listesini işle
+    const departmentsSection = query.split("Mevcut departmanlar:")[1]?.trim();
+    if (departmentsSection) {
+      const departmentsList = departmentsSection.split(', ');
+      console.log("Mesajdan çıkarılan departman listesi:", departmentsList);
+      
+      // Mesajdaki departman ismiyle eşleşen bir departman ara
+      for (const deptPattern of Object.keys(departmentMap)) {
+        if (query.toLowerCase().includes(deptPattern)) {
+          const matchingDept = departmentsList.find(
+            dept => dept.toLowerCase().includes(deptPattern) || 
+                   deptPattern.includes(dept.toLowerCase())
+          );
+          if (matchingDept) {
+            console.log("Mesajda bulunan departman:", matchingDept);
+            return matchingDept;
+          }
+        }
+      }
+    }
+  }
   
   // Check each pattern
   for (const pattern of departmentPatterns) {
@@ -124,6 +155,7 @@ function extractDepartmentFromQuery(query: string): string | null {
       // Find which department matched
       for (const [key, value] of Object.entries(departmentMap)) {
         if (match[0].toLowerCase().includes(key)) {
+          console.log("Desenle eşleşen departman bulundu:", key, "->", value);
           return value;
         }
       }
@@ -133,8 +165,16 @@ function extractDepartmentFromQuery(query: string): string | null {
   // Direct department name detection
   for (const [key, value] of Object.entries(departmentMap)) {
     if (query.toLowerCase().includes(key)) {
+      console.log("Doğrudan departman adı tespit edildi:", key, "->", value);
       return value;
     }
+  }
+  
+  // Mesajda departman veya bölüm kelimesi varsa ama eşleşme yoksa debug için log
+  if (query.toLowerCase().includes("departman") || 
+      query.toLowerCase().includes("bölüm") || 
+      query.toLowerCase().includes("department")) {
+    console.log("Departman kelimesi bulundu fakat eşleşme yok. Query:", query);
   }
   
   return null;
@@ -224,8 +264,22 @@ export async function sendChatMessage(input: string) {
   console.log("Processing chat message:", input);
   
   try {
+    // Mesajı işleme için log ekle
+    console.log("İncelenen mesaj içeriği:", input);
+    
+    // Departman bilgileri içeren bir mesaj mı kontrol et
+    const containsDepartmentInfo = input.includes("Mevcut departmanlar:");
+    if (containsDepartmentInfo) {
+      console.log("Mesaj departman bilgileri içeriyor, bağlam zenginleştirmesi yapıldı.");
+    }
+    
     // Check if this is a query that can be handled by the natural language parser
     const queryParams = parseQuery(input);
+    
+    if (queryParams.department) {
+      console.log("Tespit edilen departman:", queryParams.department);
+    }
+    
     const isReportQuery = (queryParams.department || queryParams.date);
     
     if (isReportQuery) {

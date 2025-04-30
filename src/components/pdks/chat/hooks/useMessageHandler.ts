@@ -10,22 +10,30 @@ export function useMessageHandler() {
   const { messages, addMessage } = useMessages();
   const { input, setInput, isLoading, setIsLoading } = useInput();
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent, customContent?: string) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    
+    // Kullanılacak içerik - özelleştirilmiş içerik veya normal input
+    const messageContent = customContent || input;
+    
+    if (!messageContent.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
-      content: input
+      content: messageContent
     };
 
     addMessage(userMessage);
-    setInput('');
+    
+    if (!customContent) {
+      setInput(''); // Sadece normal input ise temizle, özelleştirilmiş içerik kullanıldığında temizleme
+    }
+    
     setIsLoading(true);
 
     try {
-      const response = await sendChatMessage(input);
+      const response = await sendChatMessage(messageContent);
       
       const aiMessage: Message = {
         id: `response-${userMessage.id}`,

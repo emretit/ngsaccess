@@ -10,10 +10,12 @@ import { AiModelStatus } from "./chat/AiModelStatus";
 import { useAiChat } from "./chat/useAiChat";
 import { useToast } from "@/hooks/use-toast";
 import { OpenAiKeyInput } from "./chat/OpenAiKeyInput";
+import { useDepartments } from "@/hooks/useDepartments";
 
 export function PDKSAiChat() {
   const { toast } = useToast();
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const { departments } = useDepartments();
   
   const {
     messages,
@@ -47,6 +49,13 @@ export function PDKSAiChat() {
     }
   }, [checkOpenAIStatus]);
 
+  // Departman bilgilerini konsolda göster (debug amaçlı)
+  useEffect(() => {
+    if (departments.length > 0) {
+      console.log("Mevcut departmanlar:", departments.map(d => d.name));
+    }
+  }, [departments]);
+
   const handleRefreshModelStatus = () => {
     checkOpenAIStatus();
     toast({
@@ -76,6 +85,31 @@ export function PDKSAiChat() {
       title: "Sohbet kaydedildi",
       description: "Sohbet geçmişiniz başarıyla kaydedildi."
     });
+  };
+
+  const handleSendWithDepartmentContext = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Departman içeren bir soru mu kontrol et
+    const departmentKeywords = ["departman", "bölüm", "department"];
+    const containsDepartmentKeyword = departmentKeywords.some(keyword => 
+      input.toLowerCase().includes(keyword)
+    );
+    
+    if (containsDepartmentKeyword && departments.length > 0) {
+      // Mevcut departman listesini mesaja ekle
+      const deptContext = `\n\nDepartman bilgisi sorgulanıyor. Mevcut departmanlar: ${departments.map(d => d.name).join(', ')}`;
+      const enhancedInput = input + deptContext;
+      
+      // Mesaj içeriğini debug amaçlı göster
+      console.log("Departman bağlamıyla zenginleştirilmiş mesaj:", enhancedInput);
+      
+      // Gerçek sorgulama fonksiyonunu çağır
+      handleSendMessage(e, enhancedInput);
+    } else {
+      // Normal mesaj gönderme işlemi
+      handleSendMessage(e);
+    }
   };
 
   return (
@@ -129,7 +163,7 @@ export function PDKSAiChat() {
                 isModelConnected={isOpenAIConnected}
                 isSaving={isSaving}
                 onInputChange={setInput}
-                onSubmit={handleSendMessage}
+                onSubmit={handleSendWithDepartmentContext}
                 onSave={handleSaveConversation}
               />
             </>

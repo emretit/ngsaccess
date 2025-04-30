@@ -15,7 +15,27 @@ export function useAiChat() {
   // Get all functionality from other hooks
   const { isOpenAIConnected, checkOpenAIStatus } = useModelStatus();
   const { formatReportData, handleExportExcel, handleExportPDF } = useExportUtils();
-  const { messages, input, setInput, isLoading, handleSendMessage } = useMessageHandler();
+  const { messages, input, setInput, isLoading, handleSendMessage: originalSendMessage } = useMessageHandler();
+
+  // Özel mesaj gönderme fonksiyonu, opsiyonel olarak özelleştirilmiş içerikle
+  const handleSendMessage = (e: React.FormEvent, customContent?: string) => {
+    if (customContent) {
+      // Eğer özelleştirilmiş bir içerik varsa, o içerikle gönder
+      const originalInput = input;
+      setInput(customContent);
+      
+      e.preventDefault();  // Formun normal davranışını engelle
+      
+      // Bir sonraki tick'te mesajı gönder ve sonra input'u eski haline getir
+      setTimeout(() => {
+        originalSendMessage(new Event('submit') as any);
+        setInput(originalInput);
+      }, 0);
+    } else {
+      // Normal mesaj gönderme işlemini yap
+      originalSendMessage(e);
+    }
+  };
 
   // Function to save conversation to Supabase
   const saveConversationToSupabase = async () => {
