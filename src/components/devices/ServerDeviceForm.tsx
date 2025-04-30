@@ -48,6 +48,11 @@ export function ServerDeviceForm({
     handleSubmit
   } = useServerDeviceForm(device || null, onSuccess);
 
+  // Create a wrapper function that accepts a boolean value
+  const handleIsActiveChange = (value: boolean) => {
+    setIsActive(value);
+  };
+
   return (
     <div className="pt-4">
       <ScrollArea className="h-[calc(100vh-180px)] px-1">
@@ -75,7 +80,7 @@ export function ServerDeviceForm({
             macAddress={macAddress}
             onMacAddressChange={setMacAddress}
             isActive={isActive}
-            onIsActiveChange={setIsActive}
+            onIsActiveChange={handleIsActiveChange}
             firmwareVersion={firmwareVersion}
             onFirmwareVersionChange={setFirmwareVersion}
           />
