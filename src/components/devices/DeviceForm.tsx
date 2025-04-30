@@ -1,5 +1,4 @@
 
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,7 +10,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
-import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useDeviceForm } from "@/hooks/useDeviceForm";
 
 interface DeviceFormProps {
   onAddDevice: (serialNumber: string) => void;
@@ -19,15 +26,10 @@ interface DeviceFormProps {
 }
 
 export function DeviceForm({ onAddDevice, isLoading }: DeviceFormProps) {
-  const [open, setOpen] = useState(false);
-  const [serialNumber, setSerialNumber] = useState("");
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onAddDevice(serialNumber);
-    setSerialNumber("");
-    setOpen(false);
-  };
+  const { form, open, setOpen, handleSubmit } = useDeviceForm({
+    onAddDevice,
+    isLoading,
+  });
 
   return (
     <>
@@ -44,28 +46,38 @@ export function DeviceForm({ onAddDevice, isLoading }: DeviceFormProps) {
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit}>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="serialNumber">Seri Numarası</Label>
-                <Input
-                  id="serialNumber"
-                  value={serialNumber}
-                  onChange={(e) => setSerialNumber(e.target.value)}
-                  placeholder="Cihaz seri numarasını girin"
-                  required
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                İptal
-              </Button>
-              <Button type="submit" disabled={isLoading || !serialNumber}>
-                {isLoading ? "Ekleniyor..." : "Cihazı Ekle"}
-              </Button>
-            </DialogFooter>
-          </form>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="serialNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Seri Numarası</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Cihaz seri numarasını girin"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                  İptal
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isLoading || !form.formState.isValid}
+                >
+                  {isLoading ? "Ekleniyor..." : "Cihazı Ekle"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </>

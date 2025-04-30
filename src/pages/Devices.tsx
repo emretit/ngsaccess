@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { DeviceForm } from "@/components/devices/DeviceForm";
 import { useState } from "react";
@@ -15,6 +14,7 @@ import { QRCodeDialog } from "@/components/devices/QRCodeDialog";
 import { useDeviceFilters } from "@/hooks/useDeviceFilters";
 
 export default function Devices() {
+  
   const { devices, isLoading, addDevice, isAddingDevice } = useDevices();
   const [selectedQR, setSelectedQR] = useState<{ serial: string; name: string } | null>(null);
   const { zones, doors } = useZonesAndDoors();
@@ -117,6 +117,7 @@ export default function Devices() {
   };
 
   return (
+    
     <main className="p-0">
       <div className="max-w-7xl mx-auto flex gap-6">
         <ZoneDoorTreePanel 
