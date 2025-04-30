@@ -41,6 +41,9 @@ interface CardReading {
   access_granted: boolean;
   status: string;
   device_location: string;
+  departments?: {
+    name: string;
+  } | null;
 }
 
 const CardReadings = () => {
@@ -67,7 +70,12 @@ const CardReadings = () => {
       // Sorgu oluşturma
       let query = supabase
         .from("card_readings")
-        .select("*", { count: "exact" });
+        .select(`
+          *,
+          employees (
+            departments (name)
+          )
+        `, { count: "exact" });
       
       // Arama filtresi
       if (searchTerm) {
@@ -172,6 +180,15 @@ const CardReadings = () => {
 
   const totalPages = Math.ceil(data.totalCount / PAGE_SIZE);
 
+  // Helper function to get status badge with combined status & access
+  const getStatusBadge = (reading: CardReading) => {
+    if (reading.access_granted) {
+      return <Badge variant="success">İzin Verildi</Badge>;
+    } else {
+      return <Badge variant="destructive">Reddedildi</Badge>;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between gap-4">
@@ -253,10 +270,10 @@ const CardReadings = () => {
                   <TableHead>Çalışan</TableHead>
                   <TableHead>Kart No</TableHead>
                   <TableHead>Zaman</TableHead>
+                  <TableHead>Departman</TableHead>
                   <TableHead>Cihaz</TableHead>
                   <TableHead>Konum</TableHead>
                   <TableHead>Durum</TableHead>
-                  <TableHead>Erişim</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -267,18 +284,10 @@ const CardReadings = () => {
                     <TableCell>
                       {format(new Date(reading.access_time), "dd.MM.yyyy HH:mm:ss", { locale: tr })}
                     </TableCell>
+                    <TableCell>{reading.employees?.departments?.name || "-"}</TableCell>
                     <TableCell>{reading.device_name || "Bilinmeyen Cihaz"}</TableCell>
                     <TableCell>{reading.device_location || "-"}</TableCell>
-                    <TableCell>
-                      <Badge variant={reading.status === "success" ? "success" : "destructive"}>
-                        {reading.status === "success" ? "Başarılı" : "Hata"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded text-sm ${reading.access_granted ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        {reading.access_granted ? 'İzin Verildi' : 'Reddedildi'}
-                      </span>
-                    </TableCell>
+                    <TableCell>{getStatusBadge(reading)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -298,3 +307,4 @@ const CardReadings = () => {
 };
 
 export default CardReadings;
+
