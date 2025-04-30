@@ -1,9 +1,9 @@
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ServerDevice, Project } from '@/types/device';
 import { useServerDeviceForm } from '@/hooks/useServerDeviceForm';
 import { ServerDeviceFormFields } from './ServerDeviceFormFields';
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ServerDeviceFormProps {
   open: boolean;
@@ -35,19 +35,23 @@ export function ServerDeviceForm({
     setZoneId,
     doorId,
     setDoorId,
+    description,
+    setDescription,
+    ipAddress,
+    setIpAddress,
+    macAddress,
+    setMacAddress,
+    isActive,
+    setIsActive,
+    firmwareVersion,
+    setFirmwareVersion,
     handleSubmit
   } = useServerDeviceForm(device || null, onSuccess);
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            {device ? 'Cihazı Düzenle' : 'Yeni Cihaz Ekle'}
-          </DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="pt-4">
+      <ScrollArea className="h-[calc(100vh-180px)] px-1">
+        <form onSubmit={handleSubmit} className="space-y-6 pr-4">
           <ServerDeviceFormFields
             name={name}
             onNameChange={setName}
@@ -64,9 +68,19 @@ export function ServerDeviceForm({
             onZoneChange={setZoneId}
             doorId={doorId}
             onDoorChange={setDoorId}
+            description={description}
+            onDescriptionChange={setDescription}
+            ipAddress={ipAddress}
+            onIpAddressChange={setIpAddress}
+            macAddress={macAddress}
+            onMacAddressChange={setMacAddress}
+            isActive={isActive}
+            onIsActiveChange={setIsActive}
+            firmwareVersion={firmwareVersion}
+            onFirmwareVersionChange={setFirmwareVersion}
           />
 
-          <div className="flex justify-end gap-4">
+          <div className="flex justify-end gap-4 pt-4 sticky bottom-0 bg-background pb-4">
             <Button type="button" variant="outline" onClick={onClose}>
               İptal
             </Button>
@@ -75,7 +89,7 @@ export function ServerDeviceForm({
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </ScrollArea>
+    </div>
   );
 }

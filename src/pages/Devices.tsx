@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { DeviceForm } from "@/components/devices/DeviceForm";
 import { useState } from "react";
@@ -13,6 +14,8 @@ import { DeviceList } from "@/components/devices/DeviceList";
 import { QRCodeDialog } from "@/components/devices/QRCodeDialog";
 import { useDeviceFilters } from "@/hooks/useDeviceFilters";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DeviceDetailsPanel } from "@/components/devices/DeviceDetailsPanel";
+import { Edit } from "lucide-react";
 
 export default function Devices() {
   
@@ -25,6 +28,15 @@ export default function Devices() {
   const queryClient = useQueryClient();
   const [showLocationForm, setShowLocationForm] = useState<{open: boolean; device: Device | null}>({
     open: false, 
+    device: null
+  });
+  
+  // Device Edit Panel State
+  const [devicePanel, setDevicePanel] = useState<{
+    open: boolean;
+    device: ServerDevice | null;
+  }>({
+    open: false,
     device: null
   });
   
@@ -117,6 +129,39 @@ export default function Devices() {
     setShowLocationForm({open: true, device});
   };
 
+  const openDevicePanel = (device: ServerDevice | null = null) => {
+    setDevicePanel({
+      open: true,
+      device
+    });
+  };
+
+  const handleDeviceEditClick = (device: Device) => {
+    // Convert regular device to server device format for the form
+    const serverDevice: ServerDevice = {
+      id: device.id,
+      name: device.name || device.device_name || '',
+      serial_number: device.serial_number || device.device_serial || '',
+      device_model_enum: "Other",
+      date_added: device.created_at || new Date().toISOString(),
+      status: device.status || 'online',
+      zone_id: device.zone_id,
+      door_id: device.door_id
+    };
+    
+    openDevicePanel(serverDevice);
+  };
+
+  const handleDevicePanelSuccess = () => {
+    setDevicePanel({ open: false, device: null });
+    queryClient.invalidateQueries({ queryKey: ['devices'] });
+    
+    toast({
+      title: "İşlem başarılı",
+      description: "Cihaz bilgileri kaydedildi",
+    });
+  };
+
   return (
     
     <main className="p-0">
@@ -145,7 +190,13 @@ export default function Devices() {
                 {devices.length} cihaz bulundu, {filteredDevices.length} tanesi gösteriliyor
               </p>
             </div>
-            <DeviceForm onAddDevice={addDevice} isLoading={isAddingDevice} />
+            <div className="space-x-2">
+              <DeviceForm onAddDevice={addDevice} isLoading={isAddingDevice} />
+              <Button variant="outline" onClick={() => openDevicePanel()}>
+                <Edit className="mr-2 h-4 w-4" />
+                Yeni Cihaz Oluştur
+              </Button>
+            </div>
           </div>
 
           <DeviceFilters 
@@ -167,6 +218,7 @@ export default function Devices() {
             onQRClick={handleQRClick}
             onDeleteDevice={handleDeleteDevice}
             onAssignLocation={openLocationForm}
+            onEditDevice={handleDeviceEditClick}
           />
 
           <QRCodeDialog 
@@ -194,6 +246,14 @@ export default function Devices() {
               }}
             />
           )}
+          
+          {/* Device Details Panel */}
+          <DeviceDetailsPanel 
+            open={devicePanel.open}
+            onClose={() => setDevicePanel({ open: false, device: null })}
+            selectedDevice={devicePanel.device}
+            onSuccess={handleDevicePanelSuccess}
+          />
         </div>
       </div>
     </main>

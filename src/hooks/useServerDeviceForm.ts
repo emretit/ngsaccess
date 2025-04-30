@@ -17,6 +17,13 @@ export function useServerDeviceForm(device: ServerDevice | null, onSuccess: () =
   );
   const [zoneId, setZoneId] = useState(device?.zone_id ? String(device.zone_id) : '');
   const [doorId, setDoorId] = useState(device?.door_id ? String(device.door_id) : '');
+  
+  // Additional fields
+  const [description, setDescription] = useState(device?.description || '');
+  const [ipAddress, setIpAddress] = useState(device?.device_ip || '');
+  const [macAddress, setMacAddress] = useState(device?.device_mac || '');
+  const [isActive, setIsActive] = useState(device?.status === 'active' || device?.status === 'online' || true);
+  const [firmwareVersion, setFirmwareVersion] = useState(device?.device_firmware || '');
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -32,6 +39,12 @@ export function useServerDeviceForm(device: ServerDevice | null, onSuccess: () =
       expiry_date: expiryDate || null,
       zone_id: zoneId ? parseInt(zoneId) : null,
       door_id: doorId ? parseInt(doorId) : null,
+      description,
+      device_ip: ipAddress,
+      device_mac: macAddress,
+      status: isActive ? 'active' : 'inactive',
+      device_firmware: firmwareVersion,
+      device_type: deviceModel,
     };
 
     try {
@@ -50,6 +63,7 @@ export function useServerDeviceForm(device: ServerDevice | null, onSuccess: () =
 
       // React Query cache'ini yenile
       queryClient.invalidateQueries({ queryKey: ['server-devices'] });
+      queryClient.invalidateQueries({ queryKey: ['devices'] });
       
       toast({
         title: `Cihaz ${device ? 'güncellendi' : 'eklendi'}`,
@@ -82,6 +96,16 @@ export function useServerDeviceForm(device: ServerDevice | null, onSuccess: () =
     setZoneId,
     doorId,
     setDoorId,
+    description,
+    setDescription,
+    ipAddress,
+    setIpAddress,
+    macAddress,
+    setMacAddress,
+    isActive,
+    setIsActive,
+    firmwareVersion,
+    setFirmwareVersion,
     handleSubmit
   };
 }

@@ -14,6 +14,7 @@ interface DeviceTableRowProps {
   onQRClick: (device: Device) => void;
   onDeleteDevice: (deviceId: string) => void;
   onAssignLocation: (device: Device) => void;
+  onEditDevice: (device: Device) => void;
 }
 
 export function DeviceTableRow({
@@ -21,7 +22,8 @@ export function DeviceTableRow({
   locationString,
   onQRClick,
   onDeleteDevice,
-  onAssignLocation
+  onAssignLocation,
+  onEditDevice
 }: DeviceTableRowProps) {
 
   const statusColor = device.status === 'online' 
@@ -71,7 +73,7 @@ export function DeviceTableRow({
                   className="h-8 w-8 rounded-full hover:bg-muted"
                   onClick={(e) => {
                     e.stopPropagation();
-                    console.log('Edit device:', device.id);
+                    onEditDevice(device);
                   }}
                 >
                   <Edit className="h-4 w-4" />
