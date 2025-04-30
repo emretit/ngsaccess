@@ -35,7 +35,7 @@ export interface ServerDevice {
   projects?: {
     name: string;
   };
-  status?: 'online' | 'offline' | 'expired';
+  status?: 'online' | 'offline' | 'expired' | 'active' | 'inactive';
   created_at?: string;
   device_type?: string;
   device_model?: string;
@@ -45,4 +45,8 @@ export interface ServerDevice {
   device_location?: string;
   zone_id?: number;
   door_id?: number;
+  description?: string;
+  device_ip?: string;
+  device_mac?: string;
+  device_firmware?: string;
 }

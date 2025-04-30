@@ -6,7 +6,6 @@ import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { FormItem, FormLabel, FormControl, FormDescription } from "@/components/ui/form";
 
 interface ServerDeviceFormFieldsProps {
   name: string;
@@ -115,29 +114,35 @@ export function ServerDeviceFormFields({
         required
       />
 
-      <FormTextField
-        label="IP Adresi"
-        name="ip_address"
-        value={ipAddress}
-        onChange={onIpAddressChange || (() => {})}
-        placeholder="Örn: 192.168.1.100"
-      />
+      <div className="space-y-2">
+        <Label htmlFor="ip_address">IP Adresi</Label>
+        <Input 
+          id="ip_address"
+          value={ipAddress}
+          onChange={(e) => onIpAddressChange && onIpAddressChange(e.target.value)}
+          placeholder="Örn: 192.168.1.100"
+        />
+      </div>
 
-      <FormTextField
-        label="MAC Adresi"
-        name="mac_address"
-        value={macAddress}
-        onChange={onMacAddressChange || (() => {})}
-        placeholder="Örn: AA:BB:CC:DD:EE:FF"
-      />
+      <div className="space-y-2">
+        <Label htmlFor="mac_address">MAC Adresi</Label>
+        <Input 
+          id="mac_address"
+          value={macAddress}
+          onChange={(e) => onMacAddressChange && onMacAddressChange(e.target.value)}
+          placeholder="Örn: AA:BB:CC:DD:EE:FF"
+        />
+      </div>
 
-      <FormTextField
-        label="Firmware Versiyonu"
-        name="firmware_version"
-        value={firmwareVersion}
-        onChange={onFirmwareVersionChange || (() => {})}
-        placeholder="Örn: v1.2.3"
-      />
+      <div className="space-y-2">
+        <Label htmlFor="firmware_version">Firmware Versiyonu</Label>
+        <Input 
+          id="firmware_version"
+          value={firmwareVersion}
+          onChange={(e) => onFirmwareVersionChange && onFirmwareVersionChange(e.target.value)}
+          placeholder="Örn: v1.2.3"
+        />
+      </div>
 
       <FormSelectField
         label="Proje"

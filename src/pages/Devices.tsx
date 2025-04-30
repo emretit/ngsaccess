@@ -1,24 +1,19 @@
 
-import { Button } from "@/components/ui/button";
-import { DeviceForm } from "@/components/devices/DeviceForm";
 import { useState } from "react";
-import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
-import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
-import { AssignLocationForm } from "@/components/devices/AssignLocationForm";
+import { Device, ServerDevice } from "@/types/device";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { Device, ServerDevice } from "@/types/device";
 import { useDevices } from "@/hooks/useDevices";
-import { DeviceFilters } from "@/components/devices/DeviceFilters";
-import { DeviceList } from "@/components/devices/DeviceList";
+import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
+import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
 import { QRCodeDialog } from "@/components/devices/QRCodeDialog";
-import { useDeviceFilters } from "@/hooks/useDeviceFilters";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AssignLocationForm } from "@/components/devices/AssignLocationForm";
 import { DeviceDetailsPanel } from "@/components/devices/DeviceDetailsPanel";
-import { Edit } from "lucide-react";
+import { DevicesHeader } from "@/components/devices/DevicesHeader";
+import { DevicesContent } from "@/components/devices/DevicesContent";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function Devices() {
-  
   const { devices, isLoading, addDevice, isAddingDevice } = useDevices();
   const [selectedQR, setSelectedQR] = useState<{ serial: string; name: string } | null>(null);
   const { zones, doors } = useZonesAndDoors();
@@ -40,18 +35,6 @@ export default function Devices() {
     device: null
   });
   
-  // Use the extracted filter hook
-  const {
-    search,
-    setSearch,
-    statusFilter,
-    setStatusFilter,
-    typeFilter,
-    setTypeFilter,
-    deviceTypes,
-    filteredDevices
-  } = useDeviceFilters(devices, selectedZoneId, selectedDoorId);
-
   const handleQRClick = (device: Device) => {
     setSelectedQR({
       serial: device.device_serial || device.serial_number || '',
@@ -163,7 +146,6 @@ export default function Devices() {
   };
 
   return (
-    
     <main className="p-0">
       <div className="max-w-7xl mx-auto flex gap-6">
         <div className="w-64 lg:w-72 shrink-0">
@@ -182,39 +164,23 @@ export default function Devices() {
             </CardContent>
           </Card>
         </div>
+        
         <div className="flex-1 space-y-6">
-          <div className="flex justify-between items-center bg-white p-6 rounded-lg shadow-sm border-0">
-            <div>
-              <h1 className="text-2xl font-semibold">Cihazlar</h1>
-              <p className="text-sm text-muted-foreground">
-                {devices.length} cihaz bulundu, {filteredDevices.length} tanesi gösteriliyor
-              </p>
-            </div>
-            <div className="space-x-2">
-              <DeviceForm onAddDevice={addDevice} isLoading={isAddingDevice} />
-              <Button variant="outline" onClick={() => openDevicePanel()}>
-                <Edit className="mr-2 h-4 w-4" />
-                Yeni Cihaz Oluştur
-              </Button>
-            </div>
-          </div>
-
-          <DeviceFilters 
-            search={search}
-            onSearchChange={setSearch}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-            typeFilter={typeFilter}
-            onTypeFilterChange={setTypeFilter}
-            deviceTypes={deviceTypes}
+          <DevicesHeader
+            deviceCount={devices.length}
+            filteredCount={devices.length}
+            onAddDevice={addDevice}
+            isAddingDevice={isAddingDevice}
+            onOpenDevicePanel={() => openDevicePanel()}
           />
 
-          <DeviceList 
+          <DevicesContent
             devices={devices}
-            filteredDevices={filteredDevices}
             isLoading={isLoading}
             zones={zones}
             doors={doors}
+            selectedZoneId={selectedZoneId}
+            selectedDoorId={selectedDoorId}
             onQRClick={handleQRClick}
             onDeleteDevice={handleDeleteDevice}
             onAssignLocation={openLocationForm}
@@ -247,7 +213,6 @@ export default function Devices() {
             />
           )}
           
-          {/* Device Details Panel */}
           <DeviceDetailsPanel 
             open={devicePanel.open}
             onClose={() => setDevicePanel({ open: false, device: null })}

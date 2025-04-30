@@ -5,7 +5,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { ServerDevice } from '@/types/device';
 import { useToast } from '@/hooks/use-toast';
 
-export function useServerDeviceForm(device: ServerDevice | null, onSuccess: () => void) {
+// Update ServerDevice type to include new fields
+type ExtendedServerDevice = ServerDevice & {
+  description?: string;
+  device_ip?: string;
+  device_mac?: string;
+  device_firmware?: string;
+};
+
+export function useServerDeviceForm(device: ExtendedServerDevice | null, onSuccess: () => void) {
   const [name, setName] = useState(device?.name || '');
   const [serialNumber, setSerialNumber] = useState(device?.serial_number || '');
   const [deviceModel, setDeviceModel] = useState<"QR Reader" | "Fingerprint Reader" | "RFID Reader" | "Access Control Terminal" | "Other">(
