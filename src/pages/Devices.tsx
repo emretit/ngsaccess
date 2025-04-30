@@ -1,149 +1,41 @@
+
 import { useState } from "react";
-import { Device, ServerDevice } from "@/types/device";
-import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
 import { useDevices } from "@/hooks/useDevices";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
-import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
 import { QRCodeDialog } from "@/components/devices/QRCodeDialog";
 import { AssignLocationForm } from "@/components/devices/AssignLocationForm";
 import { DeviceDetailsPanel } from "@/components/devices/DeviceDetailsPanel";
 import { DevicesHeader } from "@/components/devices/DevicesHeader";
 import { DevicesContent } from "@/components/devices/DevicesContent";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
+import { useQRCodeDialog } from "@/components/devices/useQRCodeDialog";
+import { useLocationForm } from "@/components/devices/useLocationForm";
+import { useDeviceActions } from "@/components/devices/useDeviceActions";
+import { DevicePanelContainer } from "@/components/devices/DevicePanelContainer";
 
 export default function Devices() {
   const { devices, isLoading, addDevice, isAddingDevice } = useDevices();
-  const [selectedQR, setSelectedQR] = useState<{ serial: string; name: string } | null>(null);
   const { zones, doors } = useZonesAndDoors();
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [selectedDoorId, setSelectedDoorId] = useState<number | null>(null);
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [showLocationForm, setShowLocationForm] = useState<{open: boolean; device: Device | null}>({
-    open: false, 
-    device: null
+  
+  // Use our extracted hooks
+  const { selectedQR, handleQRClick, handleDownloadQR, closeQRDialog } = useQRCodeDialog();
+  const { showLocationForm, openLocationForm, closeLocationForm, handleAssignLocation } = useLocationForm();
+  const { handleDeleteDevice } = useDeviceActions();
+  
+  // Device panel state and handlers
+  const { 
+    devicePanel,
+    openDevicePanel, 
+    handleDevicePanelSuccess, 
+    handleDeviceEditClick,
+    closeDevicePanel
+  } = DevicePanelContainer({ 
+    onSuccess: () => {} // Empty callback since we handle success in the container
   });
   
-  // Device Edit Panel State
-  const [devicePanel, setDevicePanel] = useState<{
-    open: boolean;
-    device: ServerDevice | null;
-  }>({
-    open: false,
-    device: null
-  });
-  
-  const handleQRClick = (device: Device) => {
-    setSelectedQR({
-      serial: device.device_serial || device.serial_number || '',
-      name: device.device_name || device.name || 'Device QR'
-    });
-  };
-
-  const handleDownloadQR = () => {
-    if (!selectedQR) return;
-    
-    const canvas = document.querySelector('#qr-large') as HTMLCanvasElement;
-    if (!canvas) return;
-
-    const link = document.createElement('a');
-    link.download = `qr-${selectedQR.name.toLowerCase().replace(/\s+/g, '-')}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-  };
-
-  const handleDeleteDevice = async (deviceId: string) => {
-    try {
-      await fetch(`/api/devices/${deviceId}`, { method: 'DELETE' });
-      toast({
-        title: "Cihaz silindi",
-        description: "Cihaz başarıyla silindi",
-      });
-      // Refresh devices data
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
-    } catch (error) {
-      toast({
-        title: "Hata",
-        description: "Cihaz silinirken bir hata oluştu",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleAssignLocation = async (zoneId: number, doorId: number) => {
-    if (!showLocationForm.device) return;
-    
-    try {
-      // Update device location in database
-      const { error } = await fetch(`/api/devices/${showLocationForm.device.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          zone_id: zoneId,
-          door_id: doorId
-        })
-      }).then(res => res.json());
-      
-      if (error) throw new Error(error);
-
-      // Refresh devices data
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
-      
-      toast({
-        title: "Konum atandı",
-        description: "Cihaz konumu başarıyla güncellendi",
-      });
-      
-      setShowLocationForm({open: false, device: null});
-    } catch (error) {
-      toast({
-        title: "Hata",
-        description: "Konum atanırken bir hata oluştu",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const openLocationForm = (device: Device) => {
-    setShowLocationForm({open: true, device});
-  };
-
-  const openDevicePanel = (device: ServerDevice | null = null) => {
-    setDevicePanel({
-      open: true,
-      device
-    });
-  };
-
-  const handleDeviceEditClick = (device: Device) => {
-    // Convert regular device to server device format for the form
-    const serverDevice: ServerDevice = {
-      id: device.id,
-      name: device.name || device.device_name || '',
-      serial_number: device.serial_number || device.device_serial || '',
-      device_model_enum: "Other",
-      date_added: device.created_at || new Date().toISOString(),
-      status: device.status || 'online',
-      zone_id: device.zone_id,
-      door_id: device.door_id
-    };
-    
-    openDevicePanel(serverDevice);
-  };
-
-  const handleDevicePanelSuccess = () => {
-    setDevicePanel({ open: false, device: null });
-    queryClient.invalidateQueries({ queryKey: ['devices'] });
-    
-    toast({
-      title: "İşlem başarılı",
-      description: "Cihaz bilgileri kaydedildi",
-    });
-  };
-
   return (
     <main className="p-0">
       <div className="max-w-7xl mx-auto flex gap-6">
@@ -188,7 +80,7 @@ export default function Devices() {
 
           <QRCodeDialog 
             open={!!selectedQR}
-            onOpenChange={() => setSelectedQR(null)}
+            onOpenChange={closeQRDialog}
             qrData={selectedQR}
             onDownload={handleDownloadQR}
           />
@@ -196,7 +88,7 @@ export default function Devices() {
           {showLocationForm.open && showLocationForm.device && (
             <AssignLocationForm
               open={showLocationForm.open}
-              onClose={() => setShowLocationForm({open: false, device: null})}
+              onClose={closeLocationForm}
               deviceName={showLocationForm.device?.device_name || showLocationForm.device?.name || 'Cihaz'}
               onSubmit={handleAssignLocation}
               device={{
@@ -214,7 +106,7 @@ export default function Devices() {
           
           <DeviceDetailsPanel 
             open={devicePanel.open}
-            onClose={() => setDevicePanel({ open: false, device: null })}
+            onClose={closeDevicePanel}
             selectedDevice={devicePanel.device}
             onSuccess={handleDevicePanelSuccess}
           />
