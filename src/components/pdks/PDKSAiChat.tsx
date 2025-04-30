@@ -24,7 +24,8 @@ export function PDKSAiChat() {
     checkOpenAIStatus,
     handleSendMessage,
     handleExportExcel,
-    handleExportPDF
+    handleExportPDF,
+    handleSaveConversation
   } = useAiChat();
   
   useEffect(() => {
@@ -107,8 +108,10 @@ export function PDKSAiChat() {
                 input={input}
                 isLoading={isLoading}
                 isModelConnected={isOpenAIConnected}
+                hasMessages={messages.length > 0}
                 onInputChange={setInput}
                 onSubmit={handleSendMessage}
+                onSave={handleSaveConversation}
               />
             </>
           )}

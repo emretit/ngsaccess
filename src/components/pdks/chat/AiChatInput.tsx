@@ -1,5 +1,5 @@
 
-import { Send } from "lucide-react";
+import { Send, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -8,16 +8,20 @@ interface AiChatInputProps {
   input: string;
   isLoading: boolean;
   isModelConnected: boolean;
+  hasMessages: boolean;
   onInputChange: (value: string) => void;
   onSubmit: (e: React.FormEvent) => void;
+  onSave?: () => void;
 }
 
 export function AiChatInput({ 
   input, 
   isLoading, 
   isModelConnected, 
+  hasMessages,
   onInputChange, 
-  onSubmit 
+  onSubmit,
+  onSave
 }: AiChatInputProps) {
   return (
     <form onSubmit={onSubmit} className="flex gap-2">
@@ -30,6 +34,24 @@ export function AiChatInput({
         disabled={isLoading}
         className="flex-1"
       />
+      {onSave && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button 
+              type="button" 
+              onClick={onSave}
+              variant="outline"
+              disabled={!hasMessages}
+              title="Konuşmayı Kaydet"
+            >
+              <Save className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            Konuşmayı veritabanına kaydet
+          </TooltipContent>
+        </Tooltip>
+      )}
       <Tooltip>
         <TooltipTrigger asChild>
           <Button 
