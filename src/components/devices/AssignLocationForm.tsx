@@ -13,12 +13,14 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors"; 
+import { ServerDevice } from '@/types/device';
 
 interface AssignLocationFormProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (zoneId: number, doorId: number) => Promise<void>;
   deviceName: string;
+  device?: ServerDevice; // Making device optional to maintain backward compatibility
 }
 
 export function AssignLocationForm({
@@ -26,6 +28,7 @@ export function AssignLocationForm({
   onClose,
   onSubmit,
   deviceName,
+  device
 }: AssignLocationFormProps) {
   const { toast } = useToast();
   const { zones, doors, loading } = useZonesAndDoors();
@@ -33,6 +36,18 @@ export function AssignLocationForm({
   const [selectedDoorId, setSelectedDoorId] = useState<string>("");
   const [filteredDoors, setFilteredDoors] = useState<typeof doors>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Set initial values if device has zone_id or door_id
+  useEffect(() => {
+    if (device) {
+      if (device.zone_id) {
+        setSelectedZoneId(device.zone_id.toString());
+      }
+      if (device.door_id) {
+        setSelectedDoorId(device.door_id.toString());
+      }
+    }
+  }, [device]);
 
   // Filter doors when zone changes
   useEffect(() => {

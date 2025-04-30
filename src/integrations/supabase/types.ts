@@ -1429,6 +1429,10 @@ export type Database = {
         Args: { query_text: string; query_params?: Json }
         Returns: Json
       }
+      generate_random_card_readings: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       get_employee_access_rules: {
         Args: { p_employee_id: number }
         Returns: {
