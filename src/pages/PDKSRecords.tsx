@@ -39,6 +39,7 @@ export default function PDKSRecords() {
         showAiPanel={showAiPanel}
         isMobile={isMobile}
         AiDrawer={<AiDrawer filters={{ statusFilter }} />}
+        showSearchFilters={selectedSection === "attendance"}
       />
       <div className="flex flex-1 min-h-0 mt-2 gap-4">
         <PDKSRecordsSidebar 
