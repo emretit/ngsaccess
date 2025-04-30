@@ -1,18 +1,10 @@
 
-import { Check, Download, FileSpreadsheet, FileText, Info } from "lucide-react";
+import { FileExcel, FilePdf, Download, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PDKSReportTable } from "./PDKSReportTable";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-
-interface MessageData {
-  name: string;
-  check_in: string;
-  check_out: string | null;
-  department: string;
-  device?: string;
-  location?: string; 
-}
+import { MessageData } from './types';
 
 interface Message {
   id: string;
@@ -51,7 +43,7 @@ export function AiChatMessage({ message, onExportExcel, onExportPDF }: AiChatMes
               className="h-7 gap-1"
               onClick={() => onExportExcel(message.data!)}
             >
-              <FileSpreadsheet className="h-3.5 w-3.5" />
+              <FileExcel className="h-3.5 w-3.5" />
               <span>Excel</span>
             </Button>
             <Button 
@@ -60,7 +52,7 @@ export function AiChatMessage({ message, onExportExcel, onExportPDF }: AiChatMes
               className="h-7 gap-1"
               onClick={() => onExportPDF(message.data!)}
             >
-              <FileText className="h-3.5 w-3.5" />
+              <FilePdf className="h-3.5 w-3.5" />
               <span>PDF</span>
             </Button>
             <Popover>

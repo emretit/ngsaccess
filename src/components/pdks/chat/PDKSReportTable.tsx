@@ -8,15 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-
-interface MessageData {
-  name: string;
-  check_in: string;
-  check_out: string | null;
-  department: string;
-  device?: string;
-  location?: string;
-}
+import { MessageData } from "./types";
 
 interface PDKSReportTableProps {
   data: MessageData[];

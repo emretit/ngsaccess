@@ -22,4 +22,3 @@ export interface QueryParams {
   startDate?: string | null;
   endDate?: string | null;
 }
-
