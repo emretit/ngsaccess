@@ -2,6 +2,7 @@
 import { Device, ServerDevice } from "@/types/device";
 import { DeviceList } from "@/components/devices/DeviceList";
 import { DeviceFilters } from "@/components/devices/DeviceFilters";
+import { DeviceStats } from "@/components/devices/DeviceStats";
 import { Zone, Door } from "@/hooks/useZonesAndDoors";
 import { useDeviceFilters } from "@/hooks/useDeviceFilters";
 
@@ -44,6 +45,8 @@ export function DevicesContent({
 
   return (
     <div className="space-y-6">
+      <DeviceStats devices={filteredDevices} />
+
       <DeviceFilters 
         search={search}
         onSearchChange={setSearch}
