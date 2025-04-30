@@ -170,6 +170,7 @@ export default function Devices() {
             filteredCount={devices.length}
             onAddDevice={addDevice}
             isAddingDevice={isAddingDevice}
+            onOpenDevicePanel={() => openDevicePanel()}
           />
 
           <DevicesContent

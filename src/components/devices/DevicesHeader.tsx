@@ -13,7 +13,8 @@ export function DevicesHeader({
   deviceCount,
   filteredCount,
   onAddDevice,
-  isAddingDevice
+  isAddingDevice,
+  onOpenDevicePanel
 }: DevicesHeaderProps) {
   return (
     <div className="flex justify-between items-center bg-white p-6 rounded-lg shadow-sm border-0">
@@ -24,7 +25,7 @@ export function DevicesHeader({
         </p>
       </div>
       <div>
-        <DeviceForm onAddDevice={onAddDevice} isLoading={isAddingDevice} />
+        <DeviceForm onAddDevice={onAddDevice} isLoading={isAddingDevice} onOpenDevicePanel={onOpenDevicePanel} />
       </div>
     </div>
   );
