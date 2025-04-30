@@ -30,20 +30,34 @@ export function useMessageHandler() {
       const aiMessage: Message = {
         id: `response-${userMessage.id}`,
         type: 'assistant',
-        content: response.content
+        content: response.content,
+        data: response.data // Include the data if it exists
       };
       
       addMessage(aiMessage);
+      
+      if (response.data && response.data.length > 0) {
+        toast({
+          title: "Veri başarıyla getirildi",
+          description: `${response.data.length} kayıt bulundu.`,
+        });
+      }
     } catch (error) {
       console.error('AI chat error:', error);
       
       const errorMessage: Message = {
         id: `error-${userMessage.id}`,
         type: 'assistant',
-        content: `Üzgünüm, bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}. GPT4All uygulamasının çalıştığından emin olun.`
+        content: `Üzgünüm, bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}.`
       };
       
       addMessage(errorMessage);
+      
+      toast({
+        title: "Hata",
+        description: "Mesaj işlenirken bir hata oluştu.",
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }

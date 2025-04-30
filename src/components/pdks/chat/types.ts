@@ -17,7 +17,8 @@ export interface Message {
 
 export interface QueryParams {
   department?: string | null;
-  month?: string | null;
+  date?: string | null;
+  month?: string;
   year?: string;
   startDate?: string | null;
   endDate?: string | null;
