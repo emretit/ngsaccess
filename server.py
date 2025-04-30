@@ -56,11 +56,19 @@ def status():
         # Supabase connection test
         logger.info("Testing Supabase connection via /status endpoint")
         test = supabase.table('card_readings').select("count", count='exact').execute()
+        
+        # Veritabanından departman ve çalışan bilgilerini çek
+        departments = supabase.table('departments').select("*").execute()
+        employees = supabase.table('employees').select("*,departments(name),positions(name)").execute()
+        
         logger.info(f"Status check success: Found {test.count if hasattr(test, 'count') else 0} records")
+        
         return jsonify({
             "status": "running",
             "database": "connected",
             "record_count": test.count if hasattr(test, 'count') else 0,
+            "department_count": len(departments.data) if hasattr(departments, 'data') else 0,
+            "employee_count": len(employees.data) if hasattr(employees, 'data') else 0,
             "llama_available": LLAMA_AVAILABLE,
             "model_path": LLAMA_PATH if LLAMA_AVAILABLE else None
         })
@@ -87,6 +95,28 @@ def completion():
         prompt = data.get('prompt', '')
         logger.info(f"Received completion request with prompt: {prompt[:50]}...")
         
+        # Veritabanından departman ve çalışan bilgilerini çek
+        try:
+            departments = supabase.table('departments').select("*").execute()
+            employees = supabase.table('employees').select("*,departments(name),positions(name)").execute()
+            
+            # Veritabanı bilgilerinin özeti
+            db_context = "Veritabanı bilgileri:\n"
+            
+            if hasattr(departments, 'data') and len(departments.data) > 0:
+                db_context += f"Departmanlar: {', '.join([d['name'] for d in departments.data if 'name' in d])}\n"
+            
+            if hasattr(employees, 'data') and len(employees.data) > 0:
+                db_context += f"Çalışanlar: {', '.join([f'{e['first_name']} {e['last_name']} ({e['departments']['name'] if e.get('departments') else 'Departmansız'})' for e in employees.data])}"
+            
+            # Orijinal prompt'a veritabanı bilgilerini ekle
+            enhanced_prompt = f"{db_context}\n\nÖNEMLİ: Yanıtlarında hayali veya örnek isimler (Ahmet Yılmaz, Ayşe Demir vb.) KULLANMA. Yanıtlarında sadece burada listelenmiş gerçek çalışan isimlerini kullan.\n\n{prompt}"
+            
+            logger.info(f"Enhanced prompt with database context")
+        except Exception as db_error:
+            logger.error(f"Database context error: {str(db_error)}")
+            enhanced_prompt = prompt
+            
         if not LLAMA_AVAILABLE:
             logger.warning("Llama model not available, returning friendly fallback response")
             # Check if it's a chat or report query
@@ -96,24 +126,42 @@ def completion():
                 # For report queries
                 return jsonify({
                     "error": "Llama model not available",
-                    "content": "Üzgünüm, rapor oluşturmak için gereken AI modeli bulunamadı. Lütfen sistem yöneticinizle iletişime geçin."
+                    "content": "Üzgünüm, rapor oluşturmak için gereken AI modeli bulunamadı. Ancak veritabanındaki mevcut bilgilere göre size yardımcı olmaya çalışabilirim. Lütfen daha spesifik bir soru sorun."
                 }), 503
             else:
-                # Generate a simple response based on the input for normal chat mode
+                # Generate a response based on the database context
                 response = "Merhaba! Size nasıl yardımcı olabilirim?"
                 
-                if "merhaba" in prompt.lower() or "selam" in prompt.lower():
-                    response = "Merhaba! Ben PDKS asistanıyım. Nasıl yardımcı olabilirim?"
-                elif "nasılsın" in prompt.lower():
-                    response = "Ben bir AI asistanı olarak harikayım, teşekkürler! Size nasıl yardımcı olabilirim?"
-                elif "adın" in prompt.lower() or "ismin" in prompt.lower():
-                    response = "Ben PDKS AI asistanıyım. Personel Devam Kontrol Sistemi verilerinizle ilgili sorularınızı yanıtlayabilirim."
-                elif "teşekkür" in prompt.lower():
-                    response = "Rica ederim! Başka bir konuda yardıma ihtiyacınız olursa buradayım."
-                elif "ne yapabilirsin" in prompt.lower():
-                    response = "Normal sohbet edebilirim veya 'Rapor:' ile başlayan sorularınızla PDKS verilerinizi analiz edebilirim. Örneğin: 'Rapor: Bugün işe gelenler' gibi."
-                else:
-                    response = f"'{prompt}' hakkındaki sorunuzu anladım. Genel sohbet edebilirim veya 'Rapor:' ile başlayan sorularla PDKS verilerinizi analiz edebilirim."
+                try:
+                    if hasattr(employees, 'data') and len(employees.data) > 0:
+                        if "mühendislik" in prompt.lower() or "engineering" in prompt.lower():
+                            # Engineering departmanındaki çalışanları filtrele
+                            eng_employees = [e for e in employees.data if e.get('departments') and e['departments'].get('name') and "engineering" in e['departments']['name'].lower()]
+                            
+                            if eng_employees:
+                                response = f"Engineering departmanında çalışanlar: {', '.join([f'{e['first_name']} {e['last_name']}' for e in eng_employees])}"
+                            else:
+                                response = "Engineering departmanında hiç çalışan bulunamadı."
+                        elif "merhaba" in prompt.lower() or "selam" in prompt.lower():
+                            response = "Merhaba! Ben PDKS asistanıyım. Nasıl yardımcı olabilirim?"
+                        elif "nasılsın" in prompt.lower():
+                            response = "Ben bir AI asistanı olarak harikayım, teşekkürler! Size nasıl yardımcı olabilirim?"
+                        elif "adın" in prompt.lower() or "ismin" in prompt.lower():
+                            response = "Ben PDKS AI asistanıyım. Personel Devam Kontrol Sistemi verilerinizle ilgili sorularınızı yanıtlayabilirim."
+                        elif "teşekkür" in prompt.lower():
+                            response = "Rica ederim! Başka bir konuda yardıma ihtiyacınız olursa buradayım."
+                        elif "ne yapabilirsin" in prompt.lower():
+                            response = "Normal sohbet edebilirim veya 'Rapor:' ile başlayan sorularınızla PDKS verilerinizi analiz edebilirim. Örneğin: 'Rapor: Bugün işe gelenler' gibi."
+                        elif "departman" in prompt.lower() or "department" in prompt.lower():
+                            if hasattr(departments, 'data') and len(departments.data) > 0:
+                                response = f"Sistemde kayıtlı departmanlar: {', '.join([d['name'] for d in departments.data if 'name' in d])}"
+                        elif "çalışan" in prompt.lower() or "employee" in prompt.lower():
+                            response = f"Sistemde kayıtlı çalışanlar: {', '.join([f'{e['first_name']} {e['last_name']} ({e['departments']['name'] if e.get('departments') else 'Departmansız'})' for e in employees.data])}"
+                        else:
+                            response = f"'{prompt}' hakkında bilgi verirken veritabanındaki gerçek çalışan ve departman bilgilerini kullanmam gerekiyor. Size daha iyi yardımcı olabilmem için nasıl bir bilgiye ihtiyacınız var?"
+                except Exception as context_error:
+                    logger.error(f"Context processing error: {str(context_error)}")
+                    response = f"Veritabanı bilgilerini işlerken bir hata oluştu. Buna rağmen size nasıl yardımcı olabilirim?"
                 
                 # For normal chat - return a friendly response
                 return jsonify({
@@ -139,7 +187,7 @@ def completion():
                 text=True
             )
             
-            output, error = process.communicate(input=prompt, timeout=30)  # Add timeout
+            output, error = process.communicate(input=enhanced_prompt, timeout=30)  # Add timeout
             
             if error:
                 logger.error(f"Llama model error: {error}")

@@ -1,5 +1,6 @@
 
 import { GPT4ALL_SYSTEM_PROMPT } from "../constants";
+import { supabase } from "@/integrations/supabase/client";
 
 const OPENAI_API_ENDPOINT = "https://api.openai.com/v1/chat/completions";
 const OPENAI_MODEL = "gpt-4o-mini"; // Using a modern OpenAI model
@@ -27,6 +28,42 @@ export async function sendChatMessage(input: string) {
         source: 'error'
       };
     }
+
+    // Veritabanından departman bilgilerini çek
+    const { data: departmentsData, error: departmentsError } = await supabase
+      .from('departments')
+      .select('*');
+    
+    if (departmentsError) {
+      console.error("Departman bilgileri çekilirken hata:", departmentsError);
+    }
+
+    // Veritabanından çalışan bilgilerini çek
+    const { data: employeesData, error: employeesError } = await supabase
+      .from('employees')
+      .select(`
+        *,
+        departments (id, name),
+        positions (id, name)
+      `);
+    
+    if (employeesError) {
+      console.error("Çalışan bilgileri çekilirken hata:", employeesError);
+    }
+
+    // Veritabanı bilgilerini içeren bir context oluştur
+    let dbContext = "Sistem veritabanı bilgileri:";
+    
+    if (departmentsData && departmentsData.length > 0) {
+      dbContext += `\nDepartmanlar: ${departmentsData.map(d => `${d.id}: ${d.name}`).join(", ")}`;
+    }
+    
+    if (employeesData && employeesData.length > 0) {
+      dbContext += `\nÇalışanlar: ${employeesData.map(e => `${e.first_name} ${e.last_name} (${e.departments?.name || 'Departman yok'} departmanı, ${e.positions?.name || 'Pozisyon yok'})`).join("; ")}`;
+    }
+    
+    // Güncellenmiş sistem prompt'u oluştur
+    const enhancedSystemPrompt = `${GPT4ALL_SYSTEM_PROMPT}\n\n${dbContext}`;
     
     try {
       console.log("Connecting to OpenAI API...");
@@ -39,7 +76,7 @@ export async function sendChatMessage(input: string) {
         body: JSON.stringify({
           model: OPENAI_MODEL,
           messages: [
-            { role: "system", content: GPT4ALL_SYSTEM_PROMPT },
+            { role: "system", content: enhancedSystemPrompt },
             { role: "user", content: input }
           ],
           max_tokens: 1000,
