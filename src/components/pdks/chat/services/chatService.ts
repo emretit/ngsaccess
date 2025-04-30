@@ -3,7 +3,7 @@ import { GPT4ALL_SYSTEM_PROMPT } from "../constants";
 import { supabase } from "@/integrations/supabase/client";
 
 const OPENAI_API_ENDPOINT = "https://api.openai.com/v1/chat/completions";
-const OPENAI_MODEL = "gpt-4o-mini"; // Using a modern OpenAI model
+const OPENAI_MODEL = "gpt-4o-mini"; // OpenAI'ın modern modelini kullanıyoruz
 
 export async function sendChatMessage(input: string) {
   console.log("Sending message to OpenAI API");
