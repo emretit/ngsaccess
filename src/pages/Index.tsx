@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -15,7 +14,6 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import StatusCard from '@/components/StatusCard';
-import CardReaderTester from '@/components/access-control/CardReaderTester';
 
 interface CardReading {
   id: number;
@@ -118,9 +116,6 @@ export default function Index() {
           icon={<AlertCircle className="h-4 w-4 text-red-500" />}
         />
       </div>
-
-      {/* Kart Okuyucu Test Aracı */}
-      <CardReaderTester />
 
       <div className="bg-card rounded-lg shadow-md">
         <div className="p-6">
