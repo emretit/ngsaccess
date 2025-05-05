@@ -1,13 +1,16 @@
 
 import { Card } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmployeePagination } from "@/components/employees/EmployeePagination";
 import { useCardReadings } from "@/hooks/useCardReadings";
 import { CardReadingsFilters } from "./CardReadingsFilters";
 import { CardReadingsTable } from "./CardReadingsTable";
+import { useToast } from "@/components/ui/use-toast";
+import { useEffect } from "react";
 
 const CardReadings = () => {
+  const { toast } = useToast();
   const { 
     data, 
     isLoading, 
@@ -26,6 +29,21 @@ const CardReadings = () => {
     pageSize
   } = useCardReadings(100);
 
+  // Auto-refresh on initial load
+  useEffect(() => {
+    console.log("Card readings component mounted, refreshing data...");
+    handleRefresh();
+  }, []);
+
+  const onRefreshClick = () => {
+    console.log("Manual refresh requested");
+    handleRefresh();
+    toast({
+      title: "Yenileniyor",
+      description: "Kart okutma kayıtları yenileniyor...",
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -40,6 +58,10 @@ const CardReadings = () => {
       <div className="p-6 text-center text-red-500">
         <p>Kart okutma kayıtları yüklenirken bir hata oluştu.</p>
         <p>{(error as Error).message}</p>
+        <Button variant="outline" size="sm" onClick={handleRefresh} className="mt-4">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Yeniden Dene
+        </Button>
       </div>
     );
   }
@@ -50,8 +72,8 @@ const CardReadings = () => {
         <div className="flex justify-between items-center">
           <h2 className="text-2xl font-bold">Kart Okuma Kayıtları</h2>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleRefresh}>
-              <Loader2 className="h-4 w-4 mr-2" />
+            <Button variant="outline" size="sm" onClick={onRefreshClick}>
+              <RefreshCw className="h-4 w-4 mr-2" />
               Yenile
             </Button>
           </div>
@@ -66,7 +88,12 @@ const CardReadings = () => {
                 </Button>
               </>
             ) : (
-              <p>Görüntülenecek kart okutma kaydı bulunamadı.</p>
+              <>
+                <p>Görüntülenecek kart okutma kaydı bulunamadı.</p>
+                <Button variant="ghost" size="sm" onClick={onRefreshClick} className="mt-2">
+                  Verileri Yenile
+                </Button>
+              </>
             )}
           </div>
         </Card>
@@ -85,7 +112,7 @@ const CardReadings = () => {
           setDateFilter={setDateFilter}
           accessFilter={accessFilter}
           setAccessFilter={setAccessFilter}
-          handleRefresh={handleRefresh}
+          handleRefresh={onRefreshClick}
         />
       </div>
 
