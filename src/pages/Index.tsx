@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -14,16 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import StatusCard from '@/components/StatusCard';
-
-interface CardReading {
-  id: number;
-  card_no: string;
-  status: string;
-  access_time: string;
-  employee_name: string;
-  device_name: string | null;
-  device_location: string | null;
-}
+import CardReaderTester from '@/components/CardReaderTester';
 
 export default function Index() {
   const [stats, setStats] = useState({
@@ -117,6 +109,9 @@ export default function Index() {
         />
       </div>
 
+      {/* Add the Card Reader Test Panel */}
+      <CardReaderTester />
+
       <div className="bg-card rounded-lg shadow-md">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
@@ -176,4 +171,4 @@ export default function Index() {
       </div>
     </div>
   );
-}
+};

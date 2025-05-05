@@ -14,11 +14,30 @@ export const useCardReadings = (pageSize: number = 100) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [accessFilter, setAccessFilter] = useState<'all' | 'granted' | 'denied'>('all');
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [refreshInterval, setRefreshInterval] = useState(30000); // 30 seconds default
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, dateFilter, accessFilter]);
+
+  // Setup auto-refresh if enabled
+  useEffect(() => {
+    let intervalId: number | undefined;
+    
+    if (autoRefresh) {
+      intervalId = window.setInterval(() => {
+        refetch();
+      }, refreshInterval);
+    }
+    
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [autoRefresh, refreshInterval]);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["cardReadings", currentPage, searchTerm, dateFilter, accessFilter],
@@ -109,6 +128,10 @@ export const useCardReadings = (pageSize: number = 100) => {
     handleRefresh,
     handleClearFilters,
     totalPages,
-    pageSize
+    pageSize,
+    autoRefresh,
+    setAutoRefresh,
+    refreshInterval,
+    setRefreshInterval
   };
 };

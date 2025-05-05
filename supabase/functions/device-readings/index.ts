@@ -8,7 +8,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.43.2'
 // CORS headers for browser clients
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
 }
 
 // Create a Supabase client with the Admin key
@@ -19,19 +19,27 @@ const supabaseAdmin = createClient(
 
 function validateApiKey(apiKey: string | null): boolean {
   const validApiKey = Deno.env.get('DEVICE_API_KEY')
+  if (Deno.env.get('DEVELOPMENT_MODE') === 'true') {
+    console.log('Development mode enabled, skipping API key validation')
+    return true
+  }
   return apiKey === validApiKey && validApiKey !== undefined && validApiKey !== ''
 }
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log('Handling OPTIONS request for CORS preflight')
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // API Key validation
+    console.log('Request received at device-readings endpoint')
+    
+    // API Key validation (allow bypass in development mode)
     const apiKey = req.headers.get('x-api-key')
     if (!validateApiKey(apiKey)) {
+      console.error('Invalid API key provided:', apiKey)
       return new Response(
         JSON.stringify({ error: 'Geçersiz API anahtarı' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -40,6 +48,7 @@ serve(async (req) => {
 
     // Proceed only for POST requests
     if (req.method !== 'POST') {
+      console.error('Unsupported method:', req.method)
       return new Response(
         JSON.stringify({ error: 'Sadece POST istekleri desteklenir' }),
         { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -48,34 +57,42 @@ serve(async (req) => {
 
     // Parse request body
     const body = await req.json()
-    console.log('Received device data:', body)
+    console.log('Received device data:', JSON.stringify(body))
 
-    // Validate required fields
-    if (!body.card_no || !body.device_id || !body.user_id) {
+    // Validate required fields (adjust based on your actual device parameters)
+    // card_no: Card number from the swiped card
+    // device_id: Device serial number/identifier
+    if (!body.card_no || !body.device_id) {
+      console.error('Missing required fields:', body)
       return new Response(
         JSON.stringify({ 
           response: "close_relay", 
-          error: "Eksik veri: card_no, device_id ve user_id gerekli" 
+          error: "Eksik veri: card_no ve device_id gerekli" 
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
+    // Determine device IP address from request if not in body
+    const deviceIp = body.ip_address || req.headers.get('x-forwarded-for') || 'unknown';
+    
     // Check if device exists & update last_seen
-    const { data: deviceData, error: deviceError } = await supabaseAdmin
+    let deviceData;
+    const { data: existingDevice, error: deviceError } = await supabaseAdmin
       .from('server_devices')
       .select('id, name')
-      .eq('ip_address', body.user_id)
+      .eq('serial_number', body.device_id.toString())
       .single()
 
     if (deviceError) {
+      console.log('Device not found, creating a new one with serial:', body.device_id)
       // If device not found, add it
       if (deviceError.code === 'PGRST116') {
         const { data: newDevice, error: insertError } = await supabaseAdmin
           .from('server_devices')
           .insert({
-            name: `Cihaz-${body.user_id}`,
-            ip_address: body.user_id,
+            name: `Cihaz-${body.device_id}`,
+            ip_address: deviceIp,
             status: 'active',
             last_seen: new Date().toISOString(),
             device_model_enum: "Access Control Terminal",
@@ -85,7 +102,7 @@ serve(async (req) => {
           .single()
 
         if (insertError) {
-          console.error('Yeni cihaz ekleme hatası:', insertError)
+          console.error('Error adding new device:', insertError)
           return new Response(
             JSON.stringify({ 
               response: "close_relay", 
@@ -98,7 +115,7 @@ serve(async (req) => {
         // Use the newly created device
         deviceData = newDevice
       } else {
-        console.error('Cihaz sorgulama hatası:', deviceError)
+        console.error('Device query error:', deviceError)
         return new Response(
           JSON.stringify({ 
             response: "close_relay", 
@@ -107,13 +124,19 @@ serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
+    } else {
+      deviceData = existingDevice
+      console.log('Found existing device:', deviceData)
     }
 
     // Always update device last_seen
     await supabaseAdmin
       .from('server_devices')
-      .update({ last_seen: new Date().toISOString() })
-      .eq('ip_address', body.user_id)
+      .update({ 
+        last_seen: new Date().toISOString(),
+        ip_address: deviceIp
+      })
+      .eq('serial_number', body.device_id.toString())
 
     // Find employee by card number
     const { data: employeeData, error: employeeError } = await supabaseAdmin
@@ -147,17 +170,18 @@ serve(async (req) => {
         employee_name: employeeName,
         employee_photo_url: employeePhotoUrl,
         device_id: body.device_id,
-        device_name: deviceData?.name || `Cihaz-${body.user_id}`,
+        device_name: deviceData?.name || `Cihaz-${body.device_id}`,
         device_location: body.location || "",
-        device_ip: body.user_id,
+        device_ip: deviceIp,
         device_serial: body.device_id.toString(),
-        status: access_granted ? 'success' : 'denied'
+        status: access_granted ? 'success' : 'denied',
+        raw_data: JSON.stringify(body) // Store raw request for debugging
       })
       .select()
       .single()
 
     if (readingError) {
-      console.error('Kart okutma kaydı hatası:', readingError)
+      console.error('Card reading record error:', readingError)
       return new Response(
         JSON.stringify({ 
           response: "close_relay", 
@@ -167,15 +191,21 @@ serve(async (req) => {
       )
     }
 
+    console.log('Card reading record saved:', readingData?.id)
+
     // Return response based on access_granted status
+    const responseData = {
+      response: access_granted ? "open_relay" : "close_relay",
+      confirmation: access_granted ? "relay_opened" : "access_denied",
+      employee_name: employeeName,
+      timestamp: new Date().toISOString(),
+      reading_id: readingData?.id
+    };
+    
+    console.log('Sending response:', responseData);
+    
     return new Response(
-      JSON.stringify({
-        response: access_granted ? "open_relay" : "close_relay",
-        confirmation: access_granted ? "relay_opened" : "access_denied",
-        employee_name: employeeName,
-        timestamp: new Date().toISOString(),
-        reading_id: readingData?.id
-      }),
+      JSON.stringify(responseData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {
@@ -183,7 +213,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         response: "close_relay", 
-        error: "Sunucu hatası" 
+        error: "Sunucu hatası: " + (error.message || 'Bilinmeyen hata') 
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
