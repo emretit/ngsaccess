@@ -59,15 +59,33 @@ serve(async (req) => {
     const body = await req.json()
     console.log('Received device data:', JSON.stringify(body))
 
+    // Handle the new format where user_id is actually the card number
+    if (body.user_id && !body.card_no) {
+      body.card_no = body.user_id;
+      console.log('Converted user_id to card_no:', body.card_no);
+    }
+
     // Validate required fields (adjust based on your actual device parameters)
-    // card_no: Card number from the swiped card
+    // card_no: Card number from the swiped card (now possibly from user_id field)
     // device_id: Device serial number/identifier
-    if (!body.card_no || !body.device_id) {
-      console.error('Missing required fields:', body)
+    if (!body.card_no && !body.user_id) {
+      console.error('Missing required fields: card number', body)
       return new Response(
         JSON.stringify({ 
           response: "close_relay", 
-          error: "Eksik veri: card_no ve device_id gerekli" 
+          error: "Eksik veri: card_no veya user_id gerekli" 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // If we only have device_id but not card_no, throw an error
+    if (!body.device_id) {
+      console.error('Missing device_id field:', body)
+      return new Response(
+        JSON.stringify({ 
+          response: "close_relay", 
+          error: "Eksik veri: device_id gerekli" 
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )

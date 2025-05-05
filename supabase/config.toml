@@ -64,4 +64,3 @@ port = 54325
 
 [functions.device-readings]
 verify_jwt = false
-

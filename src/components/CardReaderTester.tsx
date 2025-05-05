@@ -28,15 +28,20 @@ const CardReaderTester = () => {
     try {
       setLoading(true);
       
+      // Create payload matching the device format (user_id for card number)
+      const payload = {
+        user_id: cardNumber,
+        device_id: deviceId,
+      };
+      
+      console.log("Sending request with payload:", payload);
+      
       const response = await fetch(functionUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          card_no: cardNumber,
-          device_id: deviceId,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
