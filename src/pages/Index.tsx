@@ -68,7 +68,14 @@ export default function Index() {
           .order('access_time', { ascending: false })
           .limit(5);
 
-        setRecentReadings(recent || []);
+        // Map the data to match the CardReading type
+        const mappedReadings: CardReading[] = recent?.map((reading: any) => ({
+          ...reading,
+          // Ensure status is one of the allowed values
+          status: reading.access_granted ? 'success' : 'denied'
+        })) || [];
+        
+        setRecentReadings(mappedReadings);
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
