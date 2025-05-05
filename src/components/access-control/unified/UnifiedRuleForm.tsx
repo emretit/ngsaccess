@@ -3,12 +3,15 @@ import { useState } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
+  DialogDescription
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Save, X, Clock } from "lucide-react";
 import DepartmentEmployeeSelector from "./DepartmentEmployeeSelector";
+import ZoneDoorSelector from "./ZoneDoorSelector";
 
 interface UnifiedRuleFormProps {
   open: boolean;
@@ -17,6 +20,12 @@ interface UnifiedRuleFormProps {
 
 interface DepartmentEmployeeSelection {
   type: "department" | "employee";
+  id: number;
+  name: string;
+}
+
+interface ZoneDoorSelection {
+  type: "zone" | "door";
   id: number;
   name: string;
 }
@@ -34,7 +43,7 @@ const DAYS = [
 export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
   const [name, setName] = useState("");
   const [selection, setSelection] = useState<DepartmentEmployeeSelection[]>([]);
-  const [doors, setDoors] = useState<string[]>([]);
+  const [zonesDoors, setZonesDoors] = useState<ZoneDoorSelection[]>([]);
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("18:00");
   const [days, setDays] = useState<string[]>(["paz", "sal", "çar", "per", "cum"]);
@@ -48,6 +57,19 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
 
   const handleSelectionChange = (newSelection: DepartmentEmployeeSelection[]) => {
     setSelection(newSelection);
+  };
+
+  const handleZonesDoorChange = (newSelection: ZoneDoorSelection[]) => {
+    setZonesDoors(newSelection);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Here you would implement the actual form submission logic
+    
+    // Close the form after submission
+    onOpenChange(false);
   };
 
   return (
@@ -72,7 +94,12 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
           >
             {/* HEADER */}
             <div className="px-10 py-7 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-[#FAE8E8] to-[#F1F0FB] dark:from-[#28213c] dark:to-[#260F19]">
-              <h2 className="text-2xl font-extrabold tracking-tight text-gray-800 dark:text-white">Yeni Kural Oluştur</h2>
+              <div>
+                <DialogTitle className="text-2xl font-extrabold tracking-tight text-gray-800 dark:text-white">Yeni Kural Oluştur</DialogTitle>
+                <DialogDescription className="text-sm text-muted-foreground mt-1">
+                  Personel ve kapı erişim kuralını tanımlayın
+                </DialogDescription>
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
@@ -89,6 +116,7 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
             <form
               className="p-10 bg-white/85 dark:bg-[#1A1F2C]/80"
               autoComplete="off"
+              onSubmit={handleSubmit}
             >
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {/* Kural Adı */}
@@ -122,17 +150,14 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
                 {/* Kapı / Bölge */}
                 <div className="flex flex-col gap-3">
                   <label className="text-xs font-semibold text-gray-500 dark:text-gray-300">Kapı & Bölge</label>
-                  <Button
-                    variant="outline"
-                    className="justify-between gap-2 w-full text-base bg-white/90 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700"
-                    type="button"
-                  >
-                    <span className={doors.length > 0 ? "" : "text-muted-foreground"}>
-                      {doors.length > 0 ? `${doors.length} kapı seçildi` : "Erişim verilecek kapıları seçin"}
-                    </span>
-                  </Button>
+                  <div className="rounded-xl border border-gray-100 dark:border-gray-800 bg-white/80 dark:bg-gray-900/40 p-2">
+                    <ZoneDoorSelector
+                      value={zonesDoors}
+                      onChange={handleZonesDoorChange}
+                    />
+                  </div>
                   <span className="text-xs text-muted-foreground">
-                    Erişim izni verilecek kapı/bölgeleri seçin.
+                    Erişim izni verilecek kapı/bölgeleri seçin
                   </span>
                 </div>
                 {/* Saat aralığı */}
