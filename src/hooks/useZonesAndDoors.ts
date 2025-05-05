@@ -4,6 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Zone, Door } from "@/types/access-control";
 
+// Re-export the types so components importing from this file can use them
+export type { Zone, Door };
+
 export function useZonesAndDoors() {
   const { 
     data: zones = [], 
