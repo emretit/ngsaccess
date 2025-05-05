@@ -2,20 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-
-export interface Zone {
-  id: number;
-  name: string;
-  description?: string;
-}
-
-export interface Door {
-  id: number;
-  name: string;
-  zone_id: number;
-  location?: string;
-  status?: string;
-}
+import { Zone, Door } from "@/types/access-control";
 
 export function useZonesAndDoors() {
   const { 
@@ -32,7 +19,7 @@ export function useZonesAndDoors() {
         .order("name", { ascending: true });
         
       if (error) throw error;
-      return data || [];
+      return data as Zone[] || [];
     }
   });
 
@@ -50,7 +37,7 @@ export function useZonesAndDoors() {
         .order("name", { ascending: true });
         
       if (error) throw error;
-      return data || [];
+      return data as Door[] || [];
     }
   });
 

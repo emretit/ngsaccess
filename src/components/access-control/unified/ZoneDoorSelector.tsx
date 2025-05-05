@@ -2,11 +2,23 @@
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { X, ChevronsUpDown, CircleAlert } from "lucide-react";
+import { 
+  Command,
+  CommandEmpty, 
+  CommandGroup,
+  CommandInput, 
+  CommandItem,
+  CommandList
+} from "@/components/ui/command";
+import { 
+  Popover, 
+  PopoverContent, 
+  PopoverTrigger 
+} from "@/components/ui/popover";
+import { X, ChevronsUpDown, Grid, ChevronRight } from "lucide-react";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { cn } from "@/lib/utils";
+import { Zone, Door } from "@/types/access-control";
 
 interface ZoneDoorSelection {
   type: "zone" | "door";
@@ -23,7 +35,25 @@ export default function ZoneDoorSelector({ value, onChange }: ZoneDoorSelectorPr
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { zones, doors, loading, error } = useZonesAndDoors();
+  const [expandedZones, setExpandedZones] = useState<number[]>([]);
   
+  // Toggle zone expansion in the tree view
+  const toggleZoneExpansion = (zoneId: number, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    
+    setExpandedZones(prev => 
+      prev.includes(zoneId) 
+        ? prev.filter(id => id !== zoneId)
+        : [...prev, zoneId]
+    );
+  };
+  
+  // Check if an item is selected
+  const isSelected = (type: "zone" | "door", id: number) => {
+    return value.some((item) => item.type === type && item.id === id);
+  };
+
+  // Handle item selection
   const handleToggleItem = (item: ZoneDoorSelection) => {
     const exists = value.some(
       (i) => i.type === item.type && i.id === item.id
@@ -36,13 +66,30 @@ export default function ZoneDoorSelector({ value, onChange }: ZoneDoorSelectorPr
     }
   };
 
+  // Handle item removal
   const handleRemoveItem = (item: ZoneDoorSelection) => {
     onChange(value.filter((i) => !(i.type === item.type && i.id === item.id)));
   };
 
-  const isSelected = (type: "zone" | "door", id: number) => {
-    return value.some((item) => item.type === type && item.id === id);
-  };
+  // Filter zones and doors based on search query
+  const filteredZones = zones.filter(zone => 
+    zone.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
+  const filteredDoors = doors.filter(door => 
+    door.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
+  // Group doors by zone for the tree view
+  const doorsByZone: Record<number, Door[]> = {};
+  filteredDoors.forEach(door => {
+    if (door.zone_id) {
+      if (!doorsByZone[door.zone_id]) {
+        doorsByZone[door.zone_id] = [];
+      }
+      doorsByZone[door.zone_id].push(door);
+    }
+  });
 
   return (
     <div className="flex flex-col gap-2">
@@ -62,7 +109,7 @@ export default function ZoneDoorSelector({ value, onChange }: ZoneDoorSelectorPr
             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-full p-0" align="start">
+        <PopoverContent className="w-[300px] p-0" align="start">
           <Command className="w-full">
             <CommandInput 
               placeholder="Bölge veya kapı ara..." 
@@ -76,20 +123,19 @@ export default function ZoneDoorSelector({ value, onChange }: ZoneDoorSelectorPr
                   Yükleniyor...
                 </div>
               ) : error ? (
-                <div className="py-6 text-center text-sm text-destructive flex items-center justify-center gap-2">
-                  <CircleAlert className="h-4 w-4" />
-                  <span>Veriler yüklenirken hata oluştu</span>
+                <div className="py-6 text-center text-sm text-destructive">
+                  Veriler yüklenirken hata oluştu
                 </div>
               ) : (
-                <>
-                  <CommandGroup heading="Bölgeler">
-                    {zones
-                      .filter(zone => 
-                        zone.name.toLowerCase().includes(searchQuery.toLowerCase())
-                      )
-                      .map((zone) => (
+                <div className="max-h-[300px] overflow-auto">
+                  {filteredZones.length === 0 ? (
+                    <div className="py-2 px-2 text-sm text-muted-foreground">
+                      Bölge bulunamadı
+                    </div>
+                  ) : (
+                    filteredZones.map((zone) => (
+                      <div key={`zone-${zone.id}`}>
                         <CommandItem
-                          key={`zone-${zone.id}`}
                           value={`zone-${zone.id}-${zone.name}`}
                           onSelect={() => {
                             handleToggleItem({
@@ -100,7 +146,20 @@ export default function ZoneDoorSelector({ value, onChange }: ZoneDoorSelectorPr
                           }}
                           className="flex items-center justify-between"
                         >
-                          <div className="flex items-center">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={(e) => toggleZoneExpansion(zone.id, e)}
+                              className="h-5 w-5 flex items-center justify-center rounded-sm hover:bg-accent"
+                            >
+                              <ChevronRight
+                                className={cn(
+                                  "h-4 w-4 transition-transform",
+                                  expandedZones.includes(zone.id) && "rotate-90"
+                                )}
+                              />
+                            </button>
+                            <Grid className="h-4 w-4 text-muted-foreground" />
                             <span>{zone.name}</span>
                           </div>
                           <div className={cn(
@@ -110,44 +169,77 @@ export default function ZoneDoorSelector({ value, onChange }: ZoneDoorSelectorPr
                               : "opacity-50"
                           )}/>
                         </CommandItem>
-                      ))}
-                  </CommandGroup>
-                  <CommandSeparator />
-                  <CommandGroup heading="Kapılar">
-                    {doors
-                      .filter(door => 
-                        door.name.toLowerCase().includes(searchQuery.toLowerCase())
-                      )
-                      .map((door) => (
-                        <CommandItem
-                          key={`door-${door.id}`}
-                          value={`door-${door.id}-${door.name}`}
-                          onSelect={() => {
-                            handleToggleItem({
-                              type: "door",
-                              id: door.id,
-                              name: door.name,
-                            });
-                          }}
-                          className="flex items-center justify-between"
-                        >
-                          <span>{door.name}</span>
-                          <div className={cn(
-                            "h-4 w-4 rounded-sm border border-primary",
-                            isSelected("door", door.id)
-                              ? "bg-primary text-primary-foreground"
-                              : "opacity-50"
-                          )}/>
-                        </CommandItem>
-                      ))}
-                  </CommandGroup>
-                </>
+                        
+                        {/* Door items under each zone */}
+                        {expandedZones.includes(zone.id) && doorsByZone[zone.id]?.map(door => (
+                          <CommandItem
+                            key={`door-${door.id}`}
+                            value={`door-${door.id}-${door.name}`}
+                            onSelect={() => {
+                              handleToggleItem({
+                                type: "door",
+                                id: door.id,
+                                name: door.name,
+                              });
+                            }}
+                            className="pl-9 flex items-center justify-between"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Grid className="h-4 w-4 text-muted-foreground" />
+                              <span>{door.name}</span>
+                            </div>
+                            <div className={cn(
+                              "h-4 w-4 rounded-sm border border-primary",
+                              isSelected("door", door.id)
+                                ? "bg-primary text-primary-foreground"
+                                : "opacity-50"
+                            )}/>
+                          </CommandItem>
+                        ))}
+                      </div>
+                    ))
+                  )}
+                  
+                  {/* Show unassigned doors (those without a zone) */}
+                  {filteredDoors.filter(door => !door.zone_id).length > 0 && (
+                    <CommandGroup heading="Atanmamış Kapılar">
+                      {filteredDoors
+                        .filter(door => !door.zone_id)
+                        .map((door) => (
+                          <CommandItem
+                            key={`door-${door.id}`}
+                            value={`door-${door.id}-${door.name}`}
+                            onSelect={() => {
+                              handleToggleItem({
+                                type: "door",
+                                id: door.id,
+                                name: door.name,
+                              });
+                            }}
+                            className="flex items-center justify-between"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Grid className="h-4 w-4 text-muted-foreground" />
+                              <span>{door.name}</span>
+                            </div>
+                            <div className={cn(
+                              "h-4 w-4 rounded-sm border border-primary",
+                              isSelected("door", door.id)
+                                ? "bg-primary text-primary-foreground"
+                                : "opacity-50"
+                            )}/>
+                          </CommandItem>
+                        ))}
+                    </CommandGroup>
+                  )}
+                </div>
               )}
             </CommandList>
           </Command>
         </PopoverContent>
       </Popover>
 
+      {/* Selected items display */}
       {value.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-1">
           {value.map((item) => (
