@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -94,8 +93,15 @@ export const useCardReadings = (pageSize: number = 100) => {
       }
       
       console.log("Card readings fetched:", data);
+
+      // Convert the response to match CardReading type
+      const cardReadings: CardReading[] = data.map((item: any) => ({
+        ...item,
+        // Ensure device_id is the correct type (keep as is, TypeScript now accepts both number and string)
+      }));
+      
       return {
-        readings: data as CardReading[],
+        readings: cardReadings,
         totalCount: count || 0
       };
     },

@@ -16,6 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import StatusCard from '@/components/StatusCard';
 import CardReaderTester from '@/components/CardReaderTester';
+import { CardReading } from '@/types/access-control';
 
 export default function Index() {
   const [stats, setStats] = useState({

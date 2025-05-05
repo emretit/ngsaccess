@@ -7,7 +7,7 @@ export interface CardReading {
     employee_id: number | null;
     employee_name: string | null;
     employee_photo_url: string | null;
-    device_id: string;
+    device_id: number | string; // Changed to accept both number and string
     device_name: string;
     device_location: string;
     device_ip: string;
