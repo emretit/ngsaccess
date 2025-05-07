@@ -17,6 +17,9 @@ import PDKSRecords from "./pages/PDKSRecords";
 import ServerDevices from "./pages/ServerDevices";
 import Settings from "./pages/Settings";
 import VirtualReaders from "./pages/VirtualReaders";
+import AdminDashboard from "./pages/dashboard/AdminDashboard";
+import ProjectAdminDashboard from "./pages/dashboard/ProjectAdminDashboard";
+import UserDashboard from "./pages/dashboard/UserDashboard";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +33,13 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<Auth />} />
             <Route path="/register" element={<Auth />} />
+            
+            {/* Dashboard Routes */}
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/project/dashboard" element={<ProjectAdminDashboard />} />
+            <Route path="/dashboard" element={<UserDashboard />} />
+            
+            {/* Original Routes */}
             <Route path="/" element={<Layout><Index /></Layout>} />
             <Route path="/employees" element={<Layout><Employees /></Layout>} />
             <Route path="/devices" element={<Layout><Devices /></Layout>} />

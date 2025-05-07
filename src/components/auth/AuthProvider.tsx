@@ -48,6 +48,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             title: "Giriş başarılı",
             description: "Başarıyla giriş yaptınız"
           });
+          
+          // We'll handle redirection after profile is fetched
         } else if (event === 'SIGNED_OUT') {
           toast({
             title: "Çıkış yapıldı",
@@ -65,8 +67,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (currentSession?.user) {
         fetchProfile(currentSession.user.id);
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -82,12 +85,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error('Error fetching user profile:', error);
+        setLoading(false);
         return;
       }
 
       setProfile(data);
+      
+      // After profile is fetched, redirect based on role
+      if (data) {
+        redirectBasedOnRole(data.role);
+      }
+      
+      setLoading(false);
     } catch (error) {
       console.error('Error fetching profile:', error);
+      setLoading(false);
+    }
+  };
+  
+  const redirectBasedOnRole = (role: string) => {
+    switch (role) {
+      case 'super_admin':
+        navigate('/admin/dashboard');
+        break;
+      case 'project_admin':
+        navigate('/project/dashboard');
+        break;
+      case 'project_user':
+        navigate('/dashboard');
+        break;
+      default:
+        navigate('/');
+        break;
     }
   };
 
@@ -130,7 +159,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    navigate('/login');
   };
 
   // Check if the current user has the required role
