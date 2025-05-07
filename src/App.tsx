@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import Layout from "./components/Layout";
 import Index from "./pages/Index";
+import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
@@ -30,6 +31,8 @@ const App = () => (
           <Toaster />
           <Sonner />
           <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Auth />} />
             <Route path="/register" element={<Auth />} />
             
@@ -37,8 +40,8 @@ const App = () => (
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/dashboard" element={<UserDashboard />} />
             
-            {/* Original Routes */}
-            <Route path="/" element={<Layout><Index /></Layout>} />
+            {/* Protected Routes */}
+            <Route path="/home" element={<Layout><Index /></Layout>} />
             <Route path="/employees" element={<Layout><Employees /></Layout>} />
             <Route path="/devices" element={<Layout><Devices /></Layout>} />
             <Route path="/access-control" element={<Layout><AccessControl /></Layout>} />
