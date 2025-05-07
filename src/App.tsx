@@ -18,7 +18,6 @@ import ServerDevices from "./pages/ServerDevices";
 import Settings from "./pages/Settings";
 import VirtualReaders from "./pages/VirtualReaders";
 import AdminDashboard from "./pages/dashboard/AdminDashboard";
-import ProjectAdminDashboard from "./pages/dashboard/ProjectAdminDashboard";
 import UserDashboard from "./pages/dashboard/UserDashboard";
 
 const queryClient = new QueryClient();
@@ -36,7 +35,6 @@ const App = () => (
             
             {/* Dashboard Routes */}
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/project/dashboard" element={<ProjectAdminDashboard />} />
             <Route path="/dashboard" element={<UserDashboard />} />
             
             {/* Original Routes */}

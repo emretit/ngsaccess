@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
@@ -109,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         navigate('/admin/dashboard');
         break;
       case 'project_admin':
-        navigate('/project/dashboard');
+        navigate('/settings');
         break;
       case 'project_user':
         navigate('/dashboard');
