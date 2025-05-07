@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Users, Dices, Shield, FileText, Settings, Bell, User, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useAuth } from '@/components/auth/AuthProvider';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,17 +25,31 @@ export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
   const profileRef = useRef<HTMLDivElement>(null);
+  const { user, profile, signOut } = useAuth();
 
   // Close mobile menu when route changes
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
-  // Mock user data - in a real app, this would come from authentication
-  const user = {
-    name: "Admin User",
-    email: "admin@example.com",
-    avatarUrl: "" // placeholder for user avatar
+  // Get user display name from profile or email
+  const getUserDisplayName = () => {
+    if (profile?.email) {
+      return profile.email.split('@')[0];
+    }
+    return user?.email?.split('@')[0] || 'Kullanıcı';
+  };
+
+  // Get user initials for avatar
+  const getUserInitials = () => {
+    if (profile?.email) {
+      return profile.email.substring(0, 2).toUpperCase();
+    }
+    return user?.email?.substring(0, 2).toUpperCase() || 'KU';
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
   };
 
   return (
@@ -82,18 +97,18 @@ export default function Header() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="flex items-center space-x-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.avatarUrl} alt={user.name} />
+                    <AvatarImage src={profile?.photo_url || ''} alt={getUserDisplayName()} />
                     <AvatarFallback className="bg-[#711A1A] text-white">
-                      {user.name.substring(0, 2).toUpperCase()}
+                      {getUserInitials()}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="font-medium text-sm hidden sm:inline">{user.name}</span>
+                  <span className="font-medium text-sm hidden sm:inline">{getUserDisplayName()}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <div className="px-4 py-2">
-                  <p className="text-sm font-medium">{user.name}</p>
-                  <p className="text-xs text-muted-foreground">{user.email}</p>
+                  <p className="text-sm font-medium">{getUserDisplayName()}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
@@ -107,7 +122,10 @@ export default function Header() {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600 dark:text-red-400 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-950">
+                <DropdownMenuItem 
+                  onClick={handleSignOut}
+                  className="text-red-600 dark:text-red-400 focus:text-red-700 focus:bg-red-50 dark:focus:bg-red-950 cursor-pointer"
+                >
                   Çıkış Yap
                 </DropdownMenuItem>
               </DropdownMenuContent>
