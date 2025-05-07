@@ -4,19 +4,20 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import LoginForm from '@/components/auth/LoginForm';
 import RegisterForm from '@/components/auth/RegisterForm';
+import { toast } from '@/hooks/use-toast';
 
 const Auth = () => {
-  const { user, loading } = useAuth();
+  const { user, session, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const isRegisterPage = location.pathname === '/register';
 
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && session) {
       // If user is already logged in, redirect to home page
       navigate('/');
     }
-  }, [user, loading, navigate]);
+  }, [user, session, loading, navigate]);
 
   if (loading) {
     return (
@@ -31,7 +32,7 @@ const Auth = () => {
     );
   }
 
-  if (user) {
+  if (session) {
     return null; // Will redirect in useEffect
   }
 

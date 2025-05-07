@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   session: Session | null;
@@ -13,6 +14,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, name?: string) => Promise<{ error: any | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  checkUserRole: (requiredRole: 'super_admin' | 'project_admin' | 'project_user') => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,6 +40,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }, 0);
         } else {
           setProfile(null);
+        }
+
+        // Handle edge cases for authentication events
+        if (event === 'SIGNED_IN') {
+          toast({
+            title: "Giriş başarılı",
+            description: "Başarıyla giriş yaptınız"
+          });
+        } else if (event === 'SIGNED_OUT') {
+          toast({
+            title: "Çıkış yapıldı",
+            description: "Başarıyla çıkış yaptınız"
+          });
+          navigate('/login');
         }
       }
     );
@@ -117,6 +133,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     navigate('/login');
   };
 
+  // Check if the current user has the required role
+  const checkUserRole = (requiredRole: 'super_admin' | 'project_admin' | 'project_user'): boolean => {
+    if (!profile) return false;
+    
+    // Super admin can do everything
+    if (profile.role === 'super_admin') return true;
+    
+    // Project admin can do project_admin and project_user tasks
+    if (profile.role === 'project_admin') {
+      return requiredRole === 'project_admin' || requiredRole === 'project_user';
+    }
+    
+    // Project user can only do project_user tasks
+    if (profile.role === 'project_user') {
+      return requiredRole === 'project_user';
+    }
+    
+    return false;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -127,7 +163,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signUp,
         signOut,
-        refreshProfile
+        refreshProfile,
+        checkUserRole
       }}
     >
       {children}

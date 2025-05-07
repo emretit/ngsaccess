@@ -9,15 +9,15 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, session } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     // Redirect to login if not authenticated
-    if (!loading && !user) {
+    if (!loading && !session) {
       navigate('/login');
     }
-  }, [user, loading, navigate]);
+  }, [user, session, loading, navigate]);
 
   // Show loading screen if checking auth
   if (loading) {
@@ -34,7 +34,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   }
   
   // If not authenticated, the useEffect above will redirect to login
-  if (!user) {
+  if (!session) {
     return null;
   }
 
