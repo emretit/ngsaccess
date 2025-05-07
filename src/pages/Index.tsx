@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
@@ -53,20 +52,12 @@ export default function Index() {
       
       setSession(data.session);
       
-      // Get user profile if available
+      // Get user email if available and use it for display
       if (data.session?.user) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('name')
-          .eq('id', data.session.user.id)
-          .single();
-          
-        if (userData?.name) {
-          setUserName(userData.name);
-        } else {
-          // Use email if name is not available
-          setUserName(data.session.user.email?.split('@')[0] || "Kullanıcı");
-        }
+        // Extract username from email (part before @)
+        const email = data.session.user.email;
+        const displayName = email ? email.split('@')[0] : "Kullanıcı";
+        setUserName(displayName);
       }
     };
     
