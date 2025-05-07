@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
-import { Users, Cpu, Key, AlertCircle, ArrowRight, Shield } from 'lucide-react';
+import { Users, Cpu, Key, AlertCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Table,
@@ -14,8 +14,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import StatusCard from '@/components/StatusCard';
 import CardReaderTester from '@/components/CardReaderTester';
 import { CardReading } from '@/types/access-control';
@@ -91,103 +89,71 @@ export default function Index() {
   }, []);
 
   return (
-    <div className="space-y-12 p-6">
-      {/* Hero Section */}
-      <section className="py-8">
-        <div className="flex flex-col md:flex-row items-center gap-8 bg-card rounded-lg p-8 shadow-lg">
-          <div className="flex-1 space-y-4">
-            <h1 className="text-4xl font-bold">
-              Hoş Geldiniz, <span className="text-primary">{userName}</span>
-            </h1>
-            <p className="text-xl text-muted-foreground">
-              Güvenli Erişim Kontrol Sistemi yönetim panelinize hoş geldiniz. Tüm erişim kontrol ihtiyaçlarınızı buradan kolayca yönetebilirsiniz.
-            </p>
-            <div className="flex flex-wrap gap-4 pt-4">
-              <Button asChild size="lg" className="gap-2">
-                <Link to="/access-control">
-                  Erişim Kontrolü <ArrowRight size={16} />
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg">
-                <Link to="/employees">
-                  Çalışanlar
-                </Link>
-              </Button>
-            </div>
-          </div>
-          <div className="flex-shrink-0">
-            <Shield className="h-32 w-32 text-primary opacity-80" />
-          </div>
-        </div>
-      </section>
+    <div className="space-y-8 p-6">
+      <h1 className="text-2xl font-bold text-foreground">
+        Welcome, {userName}
+      </h1>
 
-      {/* Stats Section */}
-      <section>
-        <h2 className="text-2xl font-semibold mb-4">Sistem Özeti</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatusCard
-            title="Toplam Çalışan"
-            value={stats.employees.toString()}
-            icon={<Users className="h-5 w-5 text-primary" />}
-          />
-          <StatusCard
-            title="Aktif Cihazlar"
-            value={stats.devices.toString()}
-            icon={<Cpu className="h-5 w-5 text-green-500" />}
-          />
-          <StatusCard
-            title="Bugünkü Geçişler"
-            value={stats.cardReadings.toString()}
-            icon={<Key className="h-5 w-5 text-yellow-500" />}
-          />
-          <StatusCard
-            title="Bekleyen İstekler"
-            value={stats.pendingRequests.toString()}
-            icon={<AlertCircle className="h-5 w-5 text-red-500" />}
-          />
-        </div>
-      </section>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatusCard
+          title="Total People"
+          value={stats.employees.toString()}
+          icon={<Users className="h-4 w-4 text-primary" />}
+        />
+        <StatusCard
+          title="Active Devices"
+          value={stats.devices.toString()}
+          icon={<Cpu className="h-4 w-4 text-green-500" />}
+        />
+        <StatusCard
+          title="Today's Openings"
+          value={stats.cardReadings.toString()}
+          icon={<Key className="h-4 w-4 text-yellow-500" />}
+        />
+        <StatusCard
+          title="Pending Requests"
+          value={stats.pendingRequests.toString()}
+          icon={<AlertCircle className="h-4 w-4 text-red-500" />}
+        />
+      </div>
 
-      {/* Card Reader Test Section */}
-      <section>
-        <h2 className="text-2xl font-semibold mb-4">Kart Okuyucu Test Paneli</h2>
-        <CardReaderTester />
-      </section>
+      {/* Add the Card Reader Test Panel */}
+      <CardReaderTester />
 
-      {/* Recent Card Readings */}
-      <section className="bg-card rounded-lg shadow-md">
+      <div className="bg-card rounded-lg shadow-md">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">
-              Son Kart Okutmaları
+            <h2 className="text-lg font-semibold">
+              Recent Card Readings
             </h2>
-            <Button variant="link" asChild className="text-primary">
-              <Link to="/access-control">
-                Tümünü Görüntüle
-              </Link>
-            </Button>
+            <Link 
+              to="/access-control" 
+              className="text-primary hover:text-primary/80 text-sm"
+            >
+              View All
+            </Link>
           </div>
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Zaman</TableHead>
-                  <TableHead>Kişi</TableHead>
-                  <TableHead>Cihaz</TableHead>
-                  <TableHead>Durum</TableHead>
+                  <TableHead>Time</TableHead>
+                  <TableHead>Person</TableHead>
+                  <TableHead>Device</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-4">
-                      Yükleniyor...
+                      Loading...
                     </TableCell>
                   </TableRow>
                 ) : recentReadings.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">
-                      Son kart okutma bulunamadı
+                      No recent card readings
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -200,7 +166,7 @@ export default function Index() {
                       <TableCell>{reading.device_name || '-'}</TableCell>
                       <TableCell>
                         <Badge variant={reading.status === 'success' ? 'success' : 'destructive'}>
-                          {reading.status === 'success' ? 'İzin Verildi' : 'Reddedildi'}
+                          {reading.status === 'success' ? 'Granted' : 'Denied'}
                         </Badge>
                       </TableCell>
                     </TableRow>
@@ -210,64 +176,7 @@ export default function Index() {
             </Table>
           </div>
         </div>
-      </section>
-
-      {/* Quick Links Section */}
-      <section>
-        <h2 className="text-2xl font-semibold mb-4">Hızlı Erişim</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Cihazlar</CardTitle>
-              <CardDescription>Tüm cihazlarınızı yönetin ve durumlarını izleyin</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Okuyucu cihazları, elektronik kilitler ve diğer erişim kontrol donanımlarını buradan yönetin.
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button asChild variant="ghost" className="w-full">
-                <Link to="/devices">Cihazları Yönetin</Link>
-              </Button>
-            </CardFooter>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>PDKS Kayıtları</CardTitle>
-              <CardDescription>Çalışan giriş-çıkış kayıtlarını görüntüleyin</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Personel devam kontrol sistemi kayıtlarına buradan erişin ve raporlar oluşturun.
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button asChild variant="ghost" className="w-full">
-                <Link to="/pdks-records">PDKS Kayıtlarına Git</Link>
-              </Button>
-            </CardFooter>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Ayarlar</CardTitle>
-              <CardDescription>Sistem ayarlarını ve tercihleri yönetin</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Bildirimler, zaman dilimi, kullanıcı hesapları ve diğer sistem tercihlerini değiştirin.
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button asChild variant="ghost" className="w-full">
-                <Link to="/settings">Ayarlara Git</Link>
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      </section>
+      </div>
     </div>
   );
 };
