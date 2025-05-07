@@ -2,54 +2,25 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const checkSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error('Error getting session:', error);
-        navigate('/login');
-        return;
-      }
-      
-      if (!data.session) {
-        // Not logged in, redirect to login
-        navigate('/login');
-        return;
-      }
-      
-      // User is authenticated
-      setIsAuthenticated(true);
-      setIsLoading(false);
-    };
-    
-    checkSession();
-    
-    // Setup auth state change listener
-    const { data: { subscription }} = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') {
-        setIsAuthenticated(false);
-        navigate('/login');
-      } else if (event === 'SIGNED_IN') {
-        setIsAuthenticated(true);
-      }
-    });
-    
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    // Redirect to login if not authenticated
+    if (!loading && !user) {
+      navigate('/login');
+    }
+  }, [user, loading, navigate]);
 
   // Show loading screen if checking auth
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-pulse text-center">
@@ -63,6 +34,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   }
   
   // If not authenticated, the useEffect above will redirect to login
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
