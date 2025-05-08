@@ -5,6 +5,15 @@ import { Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const LandingFooter = () => {
+  // Sayfa içi kaydırma fonksiyonu
+  const scrollToSection = (sectionId: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+  
   return (
     <footer className="bg-muted py-12">
       <div className="container mx-auto px-4">
@@ -19,20 +28,20 @@ const LandingFooter = () => {
           <div>
             <h4 className="font-medium mb-4">Şirket</h4>
             <ul className="space-y-2">
-              <li><Link to="#" className="text-muted-foreground hover:text-foreground transition-colors">Hakkımızda</Link></li>
-              <li><Link to="#" className="text-muted-foreground hover:text-foreground transition-colors">Kariyer</Link></li>
-              <li><Link to="#" className="text-muted-foreground hover:text-foreground transition-colors">Blog</Link></li>
-              <li><Link to="#" className="text-muted-foreground hover:text-foreground transition-colors">Basın Kiti</Link></li>
+              <li><a href="#testimonials" onClick={scrollToSection('testimonials')} className="text-muted-foreground hover:text-foreground transition-colors">Hakkımızda</a></li>
+              <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Kariyer</a></li>
+              <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Blog</a></li>
+              <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Basın Kiti</a></li>
             </ul>
           </div>
           
           <div>
             <h4 className="font-medium mb-4">Kaynaklar</h4>
             <ul className="space-y-2">
-              <li><Link to="#" className="text-muted-foreground hover:text-foreground transition-colors">Dökümantasyon</Link></li>
-              <li><Link to="#" className="text-muted-foreground hover:text-foreground transition-colors">Yardım Merkezi</Link></li>
-              <li><Link to="#" className="text-muted-foreground hover:text-foreground transition-colors">Gizlilik Politikası</Link></li>
-              <li><Link to="#" className="text-muted-foreground hover:text-foreground transition-colors">Kullanım Koşulları</Link></li>
+              <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Dökümantasyon</a></li>
+              <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Yardım Merkezi</a></li>
+              <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Gizlilik Politikası</a></li>
+              <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Kullanım Koşulları</a></li>
             </ul>
           </div>
           
@@ -63,9 +72,9 @@ const LandingFooter = () => {
             &copy; {new Date().getFullYear()} ngsplus.app. Tüm hakları saklıdır.
           </p>
           <div className="flex space-x-4 mt-4 md:mt-0">
-            <Link to="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Gizlilik</Link>
-            <Link to="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Koşullar</Link>
-            <Link to="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Çerezler</Link>
+            <a href="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Gizlilik</a>
+            <a href="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Koşullar</a>
+            <a href="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Çerezler</a>
           </div>
         </div>
       </div>

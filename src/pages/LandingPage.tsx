@@ -11,11 +11,21 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <LandingHeader />
-      <HeroSection />
-      <FeaturesSection />
-      <PricingSection />
-      <TestimonialsSection />
-      <LandingFooter />
+      <main>
+        <HeroSection />
+        <section id="features">
+          <FeaturesSection />
+        </section>
+        <section id="pricing">
+          <PricingSection />
+        </section>
+        <section id="testimonials">
+          <TestimonialsSection />
+        </section>
+      </main>
+      <footer id="contact">
+        <LandingFooter />
+      </footer>
     </div>
   );
 };
