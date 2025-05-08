@@ -1,5 +1,6 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -24,6 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -54,7 +56,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             title: "Çıkış yapıldı",
             description: "Başarıyla çıkış yaptınız"
           });
-          navigate('/login');
+          // Only redirect to login if not already on the landing page
+          if (location.pathname !== '/') {
+            navigate('/login');
+          }
         }
       }
     );
@@ -72,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -91,11 +96,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(data);
       
       // After profile is fetched, redirect based on role
-      if (data) {
+      // But only redirect if not on the landing page
+      if (data && location.pathname !== '/') {
         redirectBasedOnRole(data.role);
+      } else {
+        setLoading(false);
       }
-      
-      setLoading(false);
     } catch (error) {
       console.error('Error fetching profile:', error);
       setLoading(false);
@@ -103,6 +109,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
   
   const redirectBasedOnRole = (role: string) => {
+    // Don't redirect if on the landing page
+    if (location.pathname === '/') {
+      return;
+    }
+    
     switch (role) {
       case 'super_admin':
         navigate('/admin/dashboard');
@@ -114,7 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         navigate('/dashboard');
         break;
       default:
-        navigate('/');
+        // Don't redirect to '/' as it's the landing page
         break;
     }
   };

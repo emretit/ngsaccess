@@ -31,16 +31,16 @@ const App = () => (
           <Toaster />
           <Sonner />
           <Routes>
-            {/* Public Routes */}
+            {/* Public Routes - Not requiring authentication */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Auth />} />
             <Route path="/register" element={<Auth />} />
             
-            {/* Dashboard Routes */}
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/dashboard" element={<UserDashboard />} />
+            {/* Dashboard Routes - Requiring authentication */}
+            <Route path="/admin/dashboard" element={<Layout><AdminDashboard /></Layout>} />
+            <Route path="/dashboard" element={<Layout><UserDashboard /></Layout>} />
             
-            {/* Protected Routes */}
+            {/* Protected Routes - Requiring authentication */}
             <Route path="/home" element={<Layout><Index /></Layout>} />
             <Route path="/employees" element={<Layout><Employees /></Layout>} />
             <Route path="/devices" element={<Layout><Devices /></Layout>} />

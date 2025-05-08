@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Header from '@/components/Header';
 import { useAuth } from '@/components/auth/AuthProvider';
 
@@ -11,13 +11,15 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, loading, session } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     // Redirect to login if not authenticated
-    if (!loading && !session) {
+    // But don't redirect if on the landing page
+    if (!loading && !session && location.pathname !== '/') {
       navigate('/login');
     }
-  }, [user, session, loading, navigate]);
+  }, [user, session, loading, navigate, location.pathname]);
 
   // Show loading screen if checking auth
   if (loading) {
@@ -33,8 +35,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     );
   }
   
-  // If not authenticated, the useEffect above will redirect to login
-  if (!session) {
+  // If not authenticated and not on landing page, the useEffect above will redirect to login
+  if (!session && location.pathname !== '/') {
     return null;
   }
 

@@ -18,10 +18,11 @@ const Auth = () => {
       // If user is already logged in, start the redirection process
       setRedirecting(true);
       
-      // AuthProvider will handle the redirection based on user role
-      navigate('/');
+      // Only redirect to dashboard if not coming from the landing page
+      const from = location.state?.from || '/dashboard';
+      navigate(from);
     }
-  }, [user, session, loading, navigate]);
+  }, [user, session, loading, navigate, location.state]);
 
   if (loading || redirecting) {
     return (
