@@ -1,9 +1,17 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useAuthState } from '@/hooks/useAuthState';
+import { 
+  signInWithPassword, 
+  signUpWithPassword, 
+  signOut as authSignOut,
+  redirectBasedOnRole,
+  checkUserRole as checkRole
+} from '@/services/authService';
 
 interface AuthContextType {
   session: Session | null;
@@ -20,175 +28,54 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { session, user, profile, loading, refreshProfile } = useAuthState();
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, currentSession) => {
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        
-        // Defer Supabase calls to avoid deadlocks
-        if (currentSession?.user) {
-          setTimeout(() => {
-            fetchProfile(currentSession.user.id);
-          }, 0);
-        } else {
-          setProfile(null);
+  // Handle auth events and role-based redirects
+  React.useEffect(() => {
+    if (profile && location.pathname !== '/') {
+      redirectBasedOnRole(profile.role, navigate, location.pathname);
+    }
+  }, [profile, navigate, location.pathname]);
+
+  // Listen for auth state changes for toast notifications
+  React.useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        toast({
+          title: "Giriş başarılı",
+          description: "Başarıyla giriş yaptınız"
+        });
+      } else if (event === 'SIGNED_OUT') {
+        toast({
+          title: "Çıkış yapıldı",
+          description: "Başarıyla çıkış yaptınız"
+        });
+        // Only redirect to login if not already on the landing page
+        if (location.pathname !== '/') {
+          navigate('/login');
         }
-
-        // Handle edge cases for authentication events
-        if (event === 'SIGNED_IN') {
-          toast({
-            title: "Giriş başarılı",
-            description: "Başarıyla giriş yaptınız"
-          });
-          
-          // We'll handle redirection after profile is fetched
-        } else if (event === 'SIGNED_OUT') {
-          toast({
-            title: "Çıkış yapıldı",
-            description: "Başarıyla çıkış yaptınız"
-          });
-          // Only redirect to login if not already on the landing page
-          if (location.pathname !== '/') {
-            navigate('/login');
-          }
-        }
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-
-      if (currentSession?.user) {
-        fetchProfile(currentSession.user.id);
-      } else {
-        setLoading(false);
       }
     });
 
     return () => subscription.unsubscribe();
   }, [navigate, location.pathname]);
 
-  const fetchProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        setLoading(false);
-        return;
-      }
-
-      setProfile(data);
-      
-      // After profile is fetched, redirect based on role
-      // But only redirect if not on the landing page
-      if (data && location.pathname !== '/') {
-        redirectBasedOnRole(data.role);
-      } else {
-        setLoading(false);
-      }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-      setLoading(false);
-    }
-  };
-  
-  const redirectBasedOnRole = (role: string) => {
-    // Don't redirect if on the landing page
-    if (location.pathname === '/') {
-      return;
-    }
-    
-    switch (role) {
-      case 'super_admin':
-        navigate('/admin/dashboard');
-        break;
-      case 'project_admin':
-        navigate('/settings');
-        break;
-      case 'project_user':
-        navigate('/dashboard');
-        break;
-      default:
-        // Don't redirect to '/' as it's the landing page
-        break;
-    }
-  };
-
-  const refreshProfile = async () => {
-    if (user) {
-      await fetchProfile(user.id);
-    }
-  };
-
   const signIn = async (email: string, password: string) => {
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      
-      return { error };
-    } catch (error: any) {
-      return { error };
-    }
+    return await signInWithPassword(email, password);
   };
 
   const signUp = async (email: string, password: string, name?: string) => {
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: name || email.split('@')[0]
-          }
-        }
-      });
-      
-      return { error };
-    } catch (error: any) {
-      return { error };
-    }
+    return await signUpWithPassword(email, password, name);
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await authSignOut();
   };
 
-  // Check if the current user has the required role
   const checkUserRole = (requiredRole: 'super_admin' | 'project_admin' | 'project_user'): boolean => {
-    if (!profile) return false;
-    
-    // Super admin can do everything
-    if (profile.role === 'super_admin') return true;
-    
-    // Project admin can do project_admin and project_user tasks
-    if (profile.role === 'project_admin') {
-      return requiredRole === 'project_admin' || requiredRole === 'project_user';
-    }
-    
-    // Project user can only do project_user tasks
-    if (profile.role === 'project_user') {
-      return requiredRole === 'project_user';
-    }
-    
-    return false;
+    return checkRole(profile, requiredRole);
   };
 
   return (
