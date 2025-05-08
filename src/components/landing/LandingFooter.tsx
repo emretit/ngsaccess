@@ -1,8 +1,9 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Lock } from 'lucide-react';
+import { Facebook, Twitter, Linkedin, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import Logo from '@/components/ui/logo';
 
 const LandingFooter = () => {
   // Sayfa içi kaydırma fonksiyonu
@@ -19,7 +20,7 @@ const LandingFooter = () => {
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div>
-            <div className="text-2xl font-bold text-primary mb-4">ngsplus.app</div>
+            <Logo size="md" variant="full" className="mb-4" />
             <p className="text-muted-foreground">
               Modern işletmeler için modern personel takibi ve geçiş kontrol sistemleri.
             </p>
@@ -49,16 +50,20 @@ const LandingFooter = () => {
             <h4 className="font-medium mb-4">Bize Ulaşın</h4>
             <div className="flex space-x-4">
               <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <Lock className="h-5 w-5" />
+                <Facebook className="h-5 w-5" />
                 <span className="sr-only">Facebook</span>
               </a>
               <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <Lock className="h-5 w-5" />
+                <Twitter className="h-5 w-5" />
                 <span className="sr-only">Twitter</span>
               </a>
               <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <Lock className="h-5 w-5" />
+                <Linkedin className="h-5 w-5" />
                 <span className="sr-only">LinkedIn</span>
+              </a>
+              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Mail className="h-5 w-5" />
+                <span className="sr-only">Email</span>
               </a>
             </div>
             <div className="mt-6">
@@ -69,7 +74,7 @@ const LandingFooter = () => {
         
         <div className="border-t border-border pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} ngsplus.app. Tüm hakları saklıdır.
+            &copy; {new Date().getFullYear()} NGS Plus. Tüm hakları saklıdır.
           </p>
           <div className="flex space-x-4 mt-4 md:mt-0">
             <a href="#" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Gizlilik</a>
