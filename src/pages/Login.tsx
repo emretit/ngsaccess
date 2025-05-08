@@ -13,7 +13,7 @@ export default function Login() {
         // If already authenticated, go to home
         navigate('/');
       } else {
-        // Otherwise go to auth page
+        // Otherwise go to auth page, using replace to avoid back button issues
         navigate('/login', { replace: true });
       }
     }

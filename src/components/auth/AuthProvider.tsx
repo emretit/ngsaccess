@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Handle auth events and role-based redirects
+  // Handle auth events and role-based redirects - but not on landing page
   React.useEffect(() => {
     if (profile && location.pathname !== '/') {
       redirectBasedOnRole(profile.role, navigate, location.pathname);
