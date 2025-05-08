@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Handle auth events and role-based redirects - but not on landing page
   React.useEffect(() => {
-    // Eğer ana sayfadaysa ('/') yönlendirme yapma
+    // Ana sayfa, login veya register sayfalarında yönlendirme yapma
     if (profile && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register') {
       redirectBasedOnRole(profile.role, navigate, location.pathname);
     }
@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           title: "Çıkış yapıldı",
           description: "Başarıyla çıkış yaptınız"
         });
-        // Sadece ana sayfada değilse login'e yönlendir
+        // Sadece ana, login ve register sayfalarında değilse login'e yönlendir
         if (location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register') {
           navigate('/login');
         }

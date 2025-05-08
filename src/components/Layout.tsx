@@ -14,7 +14,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
 
   useEffect(() => {
-    // Ana sayfa hariç, kimlik doğrulaması yapılmamış kullanıcıları login sayfasına yönlendir
+    // Ana sayfa, login ve register sayfaları hariç, kimlik doğrulaması yapılmamış kullanıcıları login sayfasına yönlendir
     if (!loading && !session && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register') {
       navigate('/login');
     }
@@ -34,7 +34,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     );
   }
   
-  // Ana sayfa ('/') için session kontrolü yapma, diğer sayfalarda oturum açılmamışsa useEffect redirect yapacak
+  // Ana sayfa, login ve register sayfaları için session kontrolü yapma, diğer sayfalarda oturum açılmamışsa useEffect redirect yapacak
   if (!session && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register') {
     return null;
   }

@@ -35,7 +35,7 @@ const LandingHeader = () => {
             <Link to="/login">Giriş Yap</Link>
           </Button>
           <Button asChild>
-            <Link to="/login">Başlayın</Link>
+            <Link to="/register">Başlayın</Link>
           </Button>
         </div>
       </div>
