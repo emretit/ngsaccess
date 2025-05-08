@@ -14,9 +14,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
 
   useEffect(() => {
-    // Redirect to login if not authenticated
-    // But don't redirect if on the landing page
-    if (!loading && !session && location.pathname !== '/') {
+    // Ana sayfa hariç, kimlik doğrulaması yapılmamış kullanıcıları login sayfasına yönlendir
+    if (!loading && !session && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register') {
       navigate('/login');
     }
   }, [user, session, loading, navigate, location.pathname]);
@@ -35,8 +34,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     );
   }
   
-  // If not authenticated and not on landing page, the useEffect above will redirect to login
-  if (!session && location.pathname !== '/') {
+  // Ana sayfa ('/') için session kontrolü yapma, diğer sayfalarda oturum açılmamışsa useEffect redirect yapacak
+  if (!session && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register') {
     return null;
   }
 

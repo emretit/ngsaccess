@@ -15,10 +15,10 @@ const Auth = () => {
 
   useEffect(() => {
     if (!loading && session) {
-      // If user is already logged in, start the redirection process
+      // Kullanıcı zaten giriş yapmışsa, yönlendirme işlemini başlat
       setRedirecting(true);
       
-      // Only redirect to dashboard if not coming from the landing page
+      // Eğer ana sayfadan gelmediyse dashboard'a yönlendir
       const from = location.state?.from || '/dashboard';
       navigate(from);
     }
@@ -38,7 +38,7 @@ const Auth = () => {
   }
 
   if (session) {
-    return null; // Will redirect in useEffect
+    return null; // useEffect içinde yönlendirme yapılacak
   }
 
   return (

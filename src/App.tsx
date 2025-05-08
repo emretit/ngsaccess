@@ -8,7 +8,6 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import Layout from "./components/Layout";
 import Index from "./pages/Index";
 import LandingPage from "./pages/LandingPage";
-import Login from "./pages/Login";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import AccessControl from "./pages/AccessControl";
