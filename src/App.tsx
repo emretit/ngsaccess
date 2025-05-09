@@ -26,31 +26,44 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <BrowserRouter>
       <TooltipProvider>
-        <AuthProvider>
-          <Toaster />
-          <Sonner />
-          <Routes>
-            {/* Public Routes - Not requiring authentication */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<Auth />} />
-            <Route path="/register" element={<Auth />} />
-            
-            {/* Dashboard Routes - Requiring authentication */}
-            <Route path="/admin/dashboard" element={<Layout><AdminDashboard /></Layout>} />
-            <Route path="/dashboard" element={<Layout><UserDashboard /></Layout>} />
-            
-            {/* Protected Routes - Requiring authentication */}
-            <Route path="/home" element={<Layout><Index /></Layout>} />
-            <Route path="/employees" element={<Layout><Employees /></Layout>} />
-            <Route path="/devices" element={<Layout><Devices /></Layout>} />
-            <Route path="/access-control" element={<Layout><AccessControl /></Layout>} />
-            <Route path="/pdks-records" element={<Layout><PDKSRecords /></Layout>} />
-            <Route path="/server-devices" element={<Layout><ServerDevices /></Layout>} />
-            <Route path="/settings" element={<Layout><Settings /></Layout>} />
-            <Route path="/virtual-readers" element={<Layout><VirtualReaders /></Layout>} />
-            <Route path="*" element={<Layout><NotFound /></Layout>} />
-          </Routes>
-        </AuthProvider>
+        {/* Public route for landing page outside of AuthProvider */}
+        <Routes>
+          <Route path="/" element={
+            <>
+              <Toaster />
+              <Sonner />
+              <LandingPage />
+            </>
+          } />
+          
+          {/* Routes requiring authentication */}
+          <Route path="*" element={
+            <AuthProvider>
+              <Toaster />
+              <Sonner />
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/login" element={<Auth />} />
+                <Route path="/register" element={<Auth />} />
+                
+                {/* Dashboard Routes */}
+                <Route path="/admin/dashboard" element={<Layout><AdminDashboard /></Layout>} />
+                <Route path="/dashboard" element={<Layout><UserDashboard /></Layout>} />
+                
+                {/* Protected Routes */}
+                <Route path="/home" element={<Layout><Index /></Layout>} />
+                <Route path="/employees" element={<Layout><Employees /></Layout>} />
+                <Route path="/devices" element={<Layout><Devices /></Layout>} />
+                <Route path="/access-control" element={<Layout><AccessControl /></Layout>} />
+                <Route path="/pdks-records" element={<Layout><PDKSRecords /></Layout>} />
+                <Route path="/server-devices" element={<Layout><ServerDevices /></Layout>} />
+                <Route path="/settings" element={<Layout><Settings /></Layout>} />
+                <Route path="/virtual-readers" element={<Layout><VirtualReaders /></Layout>} />
+                <Route path="*" element={<Layout><NotFound /></Layout>} />
+              </Routes>
+            </AuthProvider>
+          } />
+        </Routes>
       </TooltipProvider>
     </BrowserRouter>
   </QueryClientProvider>

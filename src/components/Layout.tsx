@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Header from '@/components/Header';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -14,8 +14,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
 
   useEffect(() => {
-    // Ana sayfa, login ve register sayfaları hariç, kimlik doğrulaması yapılmamış kullanıcıları login sayfasına yönlendir
-    if (!loading && !session && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register') {
+    // Redirect unauthenticated users to login page
+    // Landing page is handled outside this component in App.tsx
+    if (!loading && !session && location.pathname !== '/login' && location.pathname !== '/register') {
+      console.log("Layout: No session detected, redirecting to login from:", location.pathname);
       navigate('/login');
     }
   }, [user, session, loading, navigate, location.pathname]);
@@ -34,8 +36,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     );
   }
   
-  // Ana sayfa, login ve register sayfaları için session kontrolü yapma, diğer sayfalarda oturum açılmamışsa useEffect redirect yapacak
-  if (!session && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register') {
+  // If not logged in and not on login/register page, useEffect will redirect
+  if (!session && location.pathname !== '/login' && location.pathname !== '/register') {
+    console.log("Layout: No session, waiting for redirect...");
     return null;
   }
 

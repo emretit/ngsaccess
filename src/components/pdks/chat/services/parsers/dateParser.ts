@@ -1,4 +1,7 @@
 
+import { format } from 'date-fns';
+import { tr } from 'date-fns/locale';
+
 // Helper function to extract date from a query string
 export function extractDateFromQuery(query: string): string | null {
   // Common date formats in Turkish and English
