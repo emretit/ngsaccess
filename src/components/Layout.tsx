@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Header from '@/components/Header';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -13,12 +13,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => {
-    // Ana sayfa, login ve register sayfaları hariç, kimlik doğrulaması yapılmamış kullanıcıları login sayfasına yönlendir
-    if (!loading && !session && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register') {
-      navigate('/login');
+  React.useEffect(() => {
+    // Only check authentication for protected routes
+    if (!loading && !session) {
+      // Redirect to login if not authenticated
+      navigate('/login', { state: { from: location.pathname } });
     }
-  }, [user, session, loading, navigate, location.pathname]);
+  }, [session, loading, navigate, location.pathname]);
 
   // Show loading screen if checking auth
   if (loading) {
@@ -34,8 +35,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     );
   }
   
-  // Ana sayfa, login ve register sayfaları için session kontrolü yapma, diğer sayfalarda oturum açılmamışsa useEffect redirect yapacak
-  if (!session && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register') {
+  // If not authenticated, the useEffect above will redirect
+  if (!session) {
     return null;
   }
 
