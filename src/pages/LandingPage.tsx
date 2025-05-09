@@ -8,6 +8,7 @@ import TestimonialsSection from '@/components/landing/TestimonialsSection';
 import LandingFooter from '@/components/landing/LandingFooter';
 
 const LandingPage = () => {
+  // LandingPage doğrudan geri döndürülüyor, kimlik doğrulama kontrolü yok
   return (
     <div className="min-h-screen bg-background">
       <LandingHeader />
