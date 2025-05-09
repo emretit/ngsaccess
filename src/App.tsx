@@ -30,7 +30,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <Routes>
-            {/* Public Routes - Not requiring authentication or Layout */}
+            {/* Public Routes - Not requiring authentication */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Auth />} />
             <Route path="/register" element={<Auth />} />

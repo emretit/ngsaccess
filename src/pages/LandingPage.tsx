@@ -7,11 +7,8 @@ import PricingSection from '@/components/landing/PricingSection';
 import TestimonialsSection from '@/components/landing/TestimonialsSection';
 import LandingFooter from '@/components/landing/LandingFooter';
 
-// Bu sayfa, authentication gerektirmeyen bir public sayfadır.
-// AuthProvider içindeki yönlendirmelerden etkilenmemesi gerekir.
 const LandingPage = () => {
-  console.log("Landing page rendered");
-  
+  // LandingPage doğrudan geri döndürülüyor, kimlik doğrulama kontrolü yok
   return (
     <div className="min-h-screen bg-background">
       <LandingHeader />

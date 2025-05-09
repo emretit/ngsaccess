@@ -12,17 +12,13 @@ const Auth = () => {
   const isRegisterPage = location.pathname === '/register';
   const [redirecting, setRedirecting] = useState(false);
 
-  console.log("Auth page render:", { user, session, loading, path: location.pathname });
-
   useEffect(() => {
     if (!loading && session) {
       // Kullanıcı zaten giriş yapmışsa, yönlendirme işlemini başlat
-      console.log("Auth: User is logged in, redirecting...");
       setRedirecting(true);
       
       // Eğer ana sayfadan gelmediyse dashboard'a yönlendir
       const from = location.state?.from || '/dashboard';
-      console.log("Redirecting to:", from);
       navigate(from);
     }
   }, [user, session, loading, navigate, location.state]);

@@ -14,7 +14,6 @@ export const useAuthState = () => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
-        console.log("Auth state changed:", event);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
@@ -25,14 +24,12 @@ export const useAuthState = () => {
           }, 0);
         } else {
           setProfile(null);
-          setLoading(false);
         }
       }
     );
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      console.log("Existing session check:", currentSession ? "Found" : "None");
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
 
@@ -47,14 +44,9 @@ export const useAuthState = () => {
   }, []);
 
   const fetchProfile = async (userId: string) => {
-    try {
-      const data = await fetchUserProfile(userId);
-      setProfile(data);
-    } catch (error) {
-      console.error("Error fetching profile:", error);
-    } finally {
-      setLoading(false);
-    }
+    const data = await fetchUserProfile(userId);
+    setProfile(data);
+    setLoading(false);
   };
 
   const refreshProfile = async () => {

@@ -62,29 +62,20 @@ export const signOut = async () => {
 };
 
 export const redirectBasedOnRole = (role: string, navigate: Function, currentPath: string) => {
-  // Public paths that don't require redirection
-  const publicPaths = ['/', '/login', '/register'];
-  
-  // Don't redirect if on a public path
-  if (publicPaths.includes(currentPath)) {
+  // Don't redirect if on the landing page
+  if (currentPath === '/') {
     return;
   }
   
   switch (role) {
     case 'super_admin':
-      if (currentPath !== '/admin/dashboard') {
-        navigate('/admin/dashboard');
-      }
+      navigate('/admin/dashboard');
       break;
     case 'project_admin':
-      if (currentPath !== '/settings') {
-        navigate('/settings');
-      }
+      navigate('/settings');
       break;
     case 'project_user':
-      if (currentPath !== '/dashboard') {
-        navigate('/dashboard');
-      }
+      navigate('/dashboard');
       break;
     default:
       // Don't redirect to '/' as it's the landing page
