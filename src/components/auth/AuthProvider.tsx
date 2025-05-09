@@ -34,8 +34,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Handle auth events and role-based redirects - but not on landing page
   React.useEffect(() => {
+    console.log("AuthProvider: Checking auth profile and location", { 
+      profile: profile?.role, 
+      pathname: location.pathname,
+      hasProfile: !!profile,
+      isLandingOrAuth: location.pathname === '/' || location.pathname === '/login' || location.pathname === '/register' 
+    });
+    
     // Ana sayfa, login veya register sayfalarında yönlendirme yapma
     if (profile && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register') {
+      console.log("AuthProvider: Redirecting based on role", profile.role);
       redirectBasedOnRole(profile.role, navigate, location.pathname);
     }
   }, [profile, navigate, location.pathname]);
@@ -43,11 +51,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Listen for auth state changes for toast notifications
   React.useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      console.log("AuthProvider: Auth state changed", event);
+      
       if (event === 'SIGNED_IN') {
         toast({
           title: "Giriş başarılı",
           description: "Başarıyla giriş yaptınız"
         });
+        
+        // Login sonrası home sayfasına yönlendir
+        console.log("AuthProvider: Redirecting to home after signin");
+        navigate('/home');
       } else if (event === 'SIGNED_OUT') {
         toast({
           title: "Çıkış yapıldı",

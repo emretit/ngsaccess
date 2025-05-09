@@ -46,12 +46,14 @@ const App = () => (
                 <Route path="/login" element={<Auth />} />
                 <Route path="/register" element={<Auth />} />
                 
-                {/* Dashboard Routes */}
-                <Route path="/admin/dashboard" element={<Layout><AdminDashboard /></Layout>} />
-                <Route path="/dashboard" element={<Layout><UserDashboard /></Layout>} />
+                {/* Ana sayfa artık Index komponenti olacak */}
+                <Route path="/home" element={<Layout><Index /></Layout>} />
+                
+                {/* Dashboard sayfaları hala burada, ancak kullanılmayacak */}
+                <Route path="/admin/dashboard" element={<Layout><Index /></Layout>} />
+                <Route path="/dashboard" element={<Layout><Index /></Layout>} />
                 
                 {/* Protected Routes */}
-                <Route path="/home" element={<Layout><Index /></Layout>} />
                 <Route path="/employees" element={<Layout><Employees /></Layout>} />
                 <Route path="/devices" element={<Layout><Devices /></Layout>} />
                 <Route path="/access-control" element={<Layout><AccessControl /></Layout>} />

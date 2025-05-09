@@ -14,12 +14,12 @@ const Auth = () => {
 
   useEffect(() => {
     if (!loading && session) {
-      console.log("Auth: User already logged in, redirecting to dashboard");
+      console.log("Auth: User already logged in, redirecting to home");
       // Kullanıcı zaten giriş yapmışsa, yönlendirme işlemini başlat
       setRedirecting(true);
       
-      // User is logged in, redirect to dashboard
-      navigate('/dashboard');
+      // User is logged in, redirect to home
+      navigate('/home');
     }
   }, [user, session, loading, navigate]);
 

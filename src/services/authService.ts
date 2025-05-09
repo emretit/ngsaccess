@@ -67,6 +67,11 @@ export const redirectBasedOnRole = (role: string, navigate: Function, currentPat
     return;
   }
   
+  // Tüm rolleri home sayfasına yönlendirelim
+  navigate('/home');
+  
+  // Rollerine göre yönlendirme şimdilik iptal edildi
+  /*
   switch (role) {
     case 'super_admin':
       navigate('/admin/dashboard');
@@ -81,6 +86,7 @@ export const redirectBasedOnRole = (role: string, navigate: Function, currentPat
       // Don't redirect to '/' as it's the landing page
       break;
   }
+  */
 };
 
 export const checkUserRole = (profile: any | null, requiredRole: 'super_admin' | 'project_admin' | 'project_user'): boolean => {
