@@ -22,24 +22,28 @@ export async function logCardReading({
     try {
         // Kart geçiş kaydını oluştur
         const currentTimestamp = timestamp;
+        
+        // Create a properly typed object for the insert operation
+        const cardReadingData = {
+            employee_id: employeeId ? Number(employeeId) : null, // Convert to number properly
+            card_no: cardNumber,
+            device_serial: deviceSerial,
+            status: status,
+            access_granted: status === 'granted',
+            employee_name: employeeName,
+            employee_photo_url: employeePhotoUrl,
+            device_name: deviceName,
+            device_id: deviceId, 
+            error_message: errorMessage,
+            timestamp: currentTimestamp,
+            // Geri uyumluluk için read_time ve access_time alanlarını da ayarla
+            read_time: currentTimestamp,
+            access_time: currentTimestamp
+        };
+        
         const { data: readingData, error: logError } = await supabase
             .from('card_readings')
-            .insert({
-                employee_id: employeeId ? parseInt(employeeId) : null, // Convert to number since employeeId is a string
-                card_no: cardNumber,
-                device_serial: deviceSerial,
-                status: status,
-                access_granted: status === 'granted',
-                employee_name: employeeName,
-                employee_photo_url: employeePhotoUrl,
-                device_name: deviceName,
-                device_id: deviceId,
-                error_message: errorMessage,
-                timestamp: currentTimestamp,
-                // Geri uyumluluk için read_time ve access_time alanlarını da ayarla
-                read_time: currentTimestamp,
-                access_time: currentTimestamp
-            })
+            .insert(cardReadingData)
             .select('id')
             .single();
 

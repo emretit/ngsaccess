@@ -22,16 +22,19 @@ export async function getOrCreateDevice(
         if (deviceErr) {
             // Cihaz yoksa oluştur
             console.log('Cihaz bulunamadı, yeni cihaz oluşturuluyor:', deviceSerial);
+            
+            // Create a properly typed object for the insert operation
+            const newDeviceData = {
+                name: `Cihaz-${deviceSerial}`,
+                serial_number: deviceSerial,
+                status: 'active',
+                device_model_enum: 'Access Control Terminal' as Database["public"]["Enums"]["device_model_type"],
+                last_used_at: new Date().toISOString()
+            };
+            
             const { data: newDevice, error: insertErr } = await supabase
                 .from('server_devices')
-                .insert({
-                    name: `Cihaz-${deviceSerial}`,
-                    serial_number: deviceSerial,
-                    status: 'active',
-                    device_model_enum: 'Access Control Terminal',
-                    // last_seen field doesn't exist in the type, use last_used_at instead
-                    last_used_at: new Date().toISOString()
-                })
+                .insert(newDeviceData)
                 .select('id, name')
                 .single();
 
@@ -43,7 +46,7 @@ export async function getOrCreateDevice(
             deviceName = device.name;
             deviceId = device.id;
 
-            // Cihazın son görülme zamanını güncelle
+            // Update device's last_used_at timestamp
             await supabase
                 .from('server_devices')
                 .update({ last_used_at: new Date().toISOString() })
