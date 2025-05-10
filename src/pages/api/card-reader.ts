@@ -136,7 +136,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
             deviceSerial,
             accessStatus,
             errorReason,
-            employee?.id,
+            employee?.id ? employee.id.toString() : undefined, // Fix here: Convert number to string
             employee ? `${employee.first_name} ${employee.last_name}` : undefined,
             employee?.photo_url,
             timestamp
@@ -255,4 +255,4 @@ async function logCardReading(
         console.error('Kart okuma log hatası:', error);
         return undefined;
     }
-} 
+}
