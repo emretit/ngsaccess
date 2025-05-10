@@ -3,7 +3,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
 import { CardReaderResponse, ErrorResponse } from './types/card-reader-types';
-import { logCardReading, parseCardData } from './utils/card-reader-utils';
+import { parseCardData, processCardReading } from './utils/card-reader-utils';
 
 // Supabase bağlantı bilgileri
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -95,13 +95,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         const timestamp = new Date().toISOString();
 
         // Kart okuma olayını veritabanına kaydet
-        await logCardReading({
+        await processCardReading({
             supabase,
             cardNumber,
             deviceSerial,
             status: accessStatus,
             errorMessage: errorReason,
-            employeeId: employee?.id ? employee.id.toString() : undefined, // Convert number to string
+            employeeId: employee?.id ? employee.id.toString() : undefined,
             employeeName: employee ? `${employee.first_name} ${employee.last_name}` : undefined,
             employeePhotoUrl: employee?.photo_url,
             timestamp

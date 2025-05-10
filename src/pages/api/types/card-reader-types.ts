@@ -1,5 +1,6 @@
 
 import { Database } from '@/integrations/supabase/types';
+import { createClient } from '@supabase/supabase-js';
 
 // Response types
 export type SuccessResponse = {
@@ -23,7 +24,7 @@ export interface CardReaderRequest {
 
 // Types for the logging function
 export interface CardReadingLogParams {
-    supabase: any;
+    supabase: ReturnType<typeof createClient<Database>>;
     cardNumber: string;
     deviceSerial: string;
     status: 'granted' | 'denied';
