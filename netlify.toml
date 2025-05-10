@@ -5,6 +5,18 @@
   command = "npm install --legacy-peer-deps && npm run build"
   publish = "dist"
 
+# API isteklerini Supabase Edge Function'a yönlendir
+[[redirects]]
+  from = "/api/card-reader"
+  to = "https://gjudsghhwmnsnndnswho.supabase.co/functions/v1/card-reader"
+  status = 200
+  force = true
+  [redirects.headers]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization, x-api-key"
+
+# Tüm diğer istekleri index.html'e yönlendir (SPA için)
 [[redirects]]
   from = "/*"
   to = "/index.html"
