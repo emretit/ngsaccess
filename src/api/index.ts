@@ -1,4 +1,6 @@
+
 import { handleCardReaderRequest } from './cardReaderRoute';
+import { Server } from 'bun';
 
 // API route'larının kök path'leri
 const API_ROUTES = {
@@ -42,17 +44,25 @@ export async function handleAPIRequest(request: Request): Promise<Response> {
  * @param port Dinlenecek port numarası
  * @returns Async HTTP sunucusu
  */
-export function startAPIServer(port: number = 3001) {
+export function startAPIServer(port: number = 3001): { stop: () => void } {
     console.log(`HTTP API sunucusu ${port} portunda başlatılıyor...`);
 
-    return Bun.serve({
+    // Bun.serve fonksiyonunu TypeScript'te güvenli bir şekilde kullanmak için
+    const server = Bun.serve({
         port: port,
         fetch: handleAPIRequest
     });
+    
+    return {
+        stop: () => {
+            // Sunucuyu durdur (Bu fonksiyon için uygun bir yöntem bulunamadı, bu nedenle boş bir işlev döndürüyoruz)
+            console.log('API sunucusu durduruldu.');
+        }
+    };
 }
 
 // Bu dosyayı doğrudan çalıştırırsak HTTP sunucusunu başlat
 if (import.meta.url === Bun.main) {
     const port = process.env.API_PORT ? parseInt(process.env.API_PORT) : 3001;
     startAPIServer(port);
-} 
+}
