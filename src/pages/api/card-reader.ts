@@ -136,7 +136,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
             deviceSerial,
             accessStatus,
             errorReason,
-            employee?.id ? employee.id.toString() : undefined, // Fix here: Convert number to string
+            employee?.id ? employee.id.toString() : undefined, // Convert number to string
             employee ? `${employee.first_name} ${employee.last_name}` : undefined,
             employee?.photo_url,
             timestamp
