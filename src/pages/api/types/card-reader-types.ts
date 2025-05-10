@@ -29,7 +29,7 @@ export interface CardReadingLogParams {
     deviceSerial: string;
     status: 'granted' | 'denied';
     errorMessage?: string;
-    employeeId?: string;
+    employeeId?: string; // Changed to string to match with our implementation
     employeeName?: string;
     employeePhotoUrl?: string;
     timestamp?: string;

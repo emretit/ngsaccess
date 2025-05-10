@@ -25,7 +25,7 @@ export async function logCardReading({
         const { data: readingData, error: logError } = await supabase
             .from('card_readings')
             .insert({
-                employee_id: employeeId,
+                employee_id: employeeId ? parseInt(employeeId) : undefined, // Convert to number since employeeId is a string
                 card_no: cardNumber,
                 device_serial: deviceSerial,
                 status: status,

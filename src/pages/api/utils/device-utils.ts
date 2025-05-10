@@ -29,7 +29,8 @@ export async function getOrCreateDevice(
                     serial_number: deviceSerial,
                     status: 'active',
                     device_model_enum: 'Access Control Terminal',
-                    last_seen: new Date().toISOString()
+                    // last_seen field doesn't exist in the type, use last_used_at instead
+                    last_used_at: new Date().toISOString()
                 })
                 .select('id, name')
                 .single();
@@ -45,7 +46,7 @@ export async function getOrCreateDevice(
             // Cihazın son görülme zamanını güncelle
             await supabase
                 .from('server_devices')
-                .update({ last_seen: new Date().toISOString() })
+                .update({ last_used_at: new Date().toISOString() })
                 .eq('serial_number', deviceSerial);
         }
 
