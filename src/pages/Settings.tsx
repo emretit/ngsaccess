@@ -1,11 +1,10 @@
 
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { SettingsTabs } from "@/components/settings/SettingsTabs";
 import { SettingsSidebar } from "@/components/settings/SettingsSidebar";
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState("company");
+  const [activeTab, setActiveTab] = useState("general");
 
   return (
     <main className="flex-1 p-6 bg-gray-50 flex flex-col min-h-[calc(100vh-4rem)]">

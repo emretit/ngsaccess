@@ -3,7 +3,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GeneralSettings } from "./sections/GeneralSettings";
 import { WorkScheduleSettings } from "./sections/WorkScheduleSettings";
 import { NotificationSettings } from "./sections/NotificationSettings";
-import { CompanySettings } from "./sections/CompanySettings";
 import { MailSettings } from "./sections/MailSettings";
 import { UserManagement } from "./sections/UserManagement";
 
@@ -16,17 +15,12 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
   return (
     <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
       <TabsList className="hidden">
-        <TabsTrigger value="company">Şirket</TabsTrigger>
         <TabsTrigger value="general">Genel</TabsTrigger>
         <TabsTrigger value="users">Kullanıcı Yönetimi</TabsTrigger>
         <TabsTrigger value="schedule">Çalışma Saatleri</TabsTrigger>
         <TabsTrigger value="mail">Mail Ayarları</TabsTrigger>
         <TabsTrigger value="notifications">Bildirimler</TabsTrigger>
       </TabsList>
-      
-      <TabsContent value="company">
-        <CompanySettings />
-      </TabsContent>
       
       <TabsContent value="general">
         <GeneralSettings />
