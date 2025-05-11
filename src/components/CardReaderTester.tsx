@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import AccessManagementForm from './AccessManagementForm';
 
 const CardReaderTester = () => {
   const { toast } = useToast();
@@ -73,7 +71,6 @@ const CardReaderTester = () => {
         <TabsList className="mb-4">
           <TabsTrigger value="tester">Kart Okuyucu Test</TabsTrigger>
           <TabsTrigger value="config">Ayarlar</TabsTrigger>
-          <TabsTrigger value="device-config">Cihaz Ayarları</TabsTrigger>
         </TabsList>
         
         <TabsContent value="tester" className="space-y-4">
@@ -132,10 +129,6 @@ const CardReaderTester = () => {
               </p>
             </div>
           </div>
-        </TabsContent>
-        
-        <TabsContent value="device-config">
-          <AccessManagementForm />
         </TabsContent>
       </Tabs>
     </Card>
