@@ -40,11 +40,11 @@ export async function getOrCreateDevice(
 
             if (!insertErr && newDevice) {
                 deviceName = newDevice.name;
-                deviceId = newDevice.id;
+                deviceId = newDevice.id.toString(); // Convert UUID to string when returning
             }
         } else {
             deviceName = device.name;
-            deviceId = device.id;
+            deviceId = device.id.toString(); // Convert UUID to string when returning
 
             // Update device's last_used_at timestamp
             await supabase

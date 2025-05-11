@@ -53,7 +53,7 @@ export async function logCardReading({
         }
 
         console.log('Kart okuma kaydı başarıyla oluşturuldu:', readingData?.id);
-        return readingData?.id;
+        return readingData?.id.toString(); // Convert the id to string before returning
 
     } catch (error) {
         console.error('Kart okuma log hatası:', error);
