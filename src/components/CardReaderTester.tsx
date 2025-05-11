@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -5,6 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 
 const CardReaderTester = () => {
   const { toast } = useToast();
@@ -13,6 +17,10 @@ const CardReaderTester = () => {
   const [deviceId, setDeviceId] = useState("TEST-DEVICE-001");
   const [response, setResponse] = useState<any>(null);
   const [apiUrl, setApiUrl] = useState("/api/card-reader");
+  
+  // Edge Function settings
+  const [useEdgeFunction, setUseEdgeFunction] = useState(false);
+  const [edgeFunctionUrl, setEdgeFunctionUrl] = useState("/.netlify/functions/card-reader");
   
   const handleSendRequest = async () => {
     if (!cardNumber || !deviceId) {
@@ -34,7 +42,10 @@ const CardReaderTester = () => {
       
       console.log("İstek gönderiliyor:", payload);
       
-      const response = await fetch(apiUrl, {
+      // Use the edge function URL if selected, otherwise use the API URL
+      const targetUrl = useEdgeFunction ? edgeFunctionUrl : apiUrl;
+      
+      const response = await fetch(targetUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -71,6 +82,7 @@ const CardReaderTester = () => {
         <TabsList className="mb-4">
           <TabsTrigger value="tester">Kart Okuyucu Test</TabsTrigger>
           <TabsTrigger value="config">Ayarlar</TabsTrigger>
+          <TabsTrigger value="netlify">Netlify Edge</TabsTrigger>
         </TabsList>
         
         <TabsContent value="tester" className="space-y-4">
@@ -127,6 +139,51 @@ const CardReaderTester = () => {
               <p className="text-xs text-muted-foreground mt-1">
                 Varsayılan: /api/card-reader
               </p>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="netlify">
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="useEdgeFunction"
+                checked={useEdgeFunction}
+                onCheckedChange={setUseEdgeFunction}
+              />
+              <Label htmlFor="useEdgeFunction">Netlify Edge Function Kullan</Label>
+            </div>
+            
+            {useEdgeFunction && (
+              <div>
+                <Label htmlFor="edgeFunctionUrl">Edge Function URL</Label>
+                <Input
+                  id="edgeFunctionUrl"
+                  value={edgeFunctionUrl}
+                  onChange={(e) => setEdgeFunctionUrl(e.target.value)}
+                  placeholder="Edge Function URL"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Varsayılan: /.netlify/functions/card-reader
+                </p>
+              </div>
+            )}
+
+            <div className="mt-4 border p-4 rounded-md bg-muted/50">
+              <h3 className="font-medium mb-2">Netlify Edge Function Bilgisi</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Netlify Edge Functions, kart okuyucu isteklerini işlemek için kullanılabilir.
+                Bu fonksiyonlar serverless yapıda çalışır ve global CDN altyapısında dağıtılır.
+              </p>
+              <Separator className="my-3" />
+              <p className="text-sm">
+                Netlify Edge Function kurulumu için:
+              </p>
+              <ol className="text-sm list-decimal list-inside text-muted-foreground mt-2">
+                <li>netlify.toml dosyasının projenizde olduğundan emin olun</li>
+                <li>netlify/functions klasörü içinde card-reader.js fonksiyonunu oluşturun</li>
+                <li>Netlify'da projenizi deploy edin</li>
+              </ol>
             </div>
           </div>
         </TabsContent>
