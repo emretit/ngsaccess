@@ -33,8 +33,8 @@ export async function logCardReading({
             employee_name: employeeName,
             employee_photo_url: employeePhotoUrl,
             device_name: deviceName,
-            device_id: deviceId, 
-            error_message: errorMessage,
+            device_id: deviceId ? Number(deviceId) : null, // Convert deviceId to number 
+            error_message: errorMessage, // This should match the column name in DB
             timestamp: currentTimestamp,
             // Geri uyumluluk için read_time ve access_time alanlarını da ayarla
             read_time: currentTimestamp,
