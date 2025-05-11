@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +12,7 @@ const CardReaderTester = () => {
   const [cardNumber, setCardNumber] = useState("");
   const [deviceId, setDeviceId] = useState("TEST-DEVICE-001");
   const [response, setResponse] = useState<any>(null);
-  const [functionUrl, setFunctionUrl] = useState("https://gjudsghhwmnsnndnswho.supabase.co/functions/v1/device-readings");
+  const [apiUrl, setApiUrl] = useState("/api/card-reader");
   
   const handleSendRequest = async () => {
     if (!cardNumber || !deviceId) {
@@ -28,15 +27,14 @@ const CardReaderTester = () => {
     try {
       setLoading(true);
       
-      // Create payload matching the device format (user_id for card number)
+      // Kart okuyucu cihazını simüle eden formatı hazırla
       const payload = {
-        user_id: cardNumber,
-        device_id: deviceId,
+        user_id_serial: `%T${cardNumber},${deviceId}`,
       };
       
-      console.log("Sending request with payload:", payload);
+      console.log("İstek gönderiliyor:", payload);
       
-      const response = await fetch(functionUrl, {
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -56,7 +54,7 @@ const CardReaderTester = () => {
       console.error("İstek hatası:", error);
       toast({
         title: "Bağlantı Hatası",
-        description: "Edge function'a bağlantı sağlanamadı",
+        description: "API endpoint'e bağlantı sağlanamadı",
         variant: "destructive",
       });
       setResponse({ error: error.message });
@@ -119,15 +117,15 @@ const CardReaderTester = () => {
         <TabsContent value="config">
           <div className="space-y-4">
             <div>
-              <Label htmlFor="functionUrl">Edge Function URL</Label>
+              <Label htmlFor="apiUrl">API Endpoint URL</Label>
               <Input 
-                id="functionUrl" 
-                value={functionUrl} 
-                onChange={(e) => setFunctionUrl(e.target.value)} 
-                placeholder="Edge function URL"
+                id="apiUrl" 
+                value={apiUrl} 
+                onChange={(e) => setApiUrl(e.target.value)} 
+                placeholder="API endpoint URL"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Varsayılan: https://gjudsghhwmnsnndnswho.supabase.co/functions/v1/device-readings
+                Varsayılan: /api/card-reader
               </p>
             </div>
           </div>

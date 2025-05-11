@@ -1,4 +1,3 @@
-
 # Updated project configuration
 
 # A string used as a secret to generate JWT tokens for admin access to your REST and GraphQL APIs
@@ -61,6 +60,3 @@ enable_confirmations = false
 [functions]
 # Port to use for Functions server.
 port = 54325
-
-[functions.device-readings]
-verify_jwt = false
