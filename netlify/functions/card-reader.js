@@ -34,21 +34,21 @@ exports.handler = async (event, context) => {
     const body = JSON.parse(event.body);
     console.log('Gelen veri:', body);
 
-    // Validate user_id_serial format
-    if (!body.user_id_serial) {
+    // Check if user_id_serial or user_id,serial exists
+    const userIdSerialValue = body.user_id_serial || body['user_id,serial'];
+    
+    if (!userIdSerialValue) {
       return {
         statusCode: 400,
         headers,
         body: JSON.stringify({
           response: 'deny',
           confirmation: 'relay_closed',
-          error: 'Geçersiz istek formatı: user_id_serial alanı eksik'
+          error: 'Geçersiz istek formatı: user_id_serial veya user_id,serial alanı eksik'
         })
       };
     }
 
-    const userIdSerialValue = body.user_id_serial;
-    
     // Parse the card data
     const parsedData = parseCardData(userIdSerialValue);
     if (!parsedData) {
@@ -58,7 +58,7 @@ exports.handler = async (event, context) => {
         body: JSON.stringify({
           response: 'deny',
           confirmation: 'relay_closed',
-          error: 'Geçersiz istek formatı: user_id_serial değeri doğru formatta değil'
+          error: 'Geçersiz istek formatı: kart verisi doğru formatta değil'
         })
       };
     }
@@ -108,27 +108,27 @@ exports.handler = async (event, context) => {
 
 /**
  * Parses card number and serial number from userIdSerial
+ * Format can be either %T123456,DEVICE001 or just 123456,DEVICE001
  */
 function parseCardData(userIdSerialValue) {
-  // Check for %T format
-  if (!userIdSerialValue.includes('%T')) {
-    return null;
+  // Handle if the value is directly a card number + device serial
+  let cardNumber, deviceSerial;
+  
+  if (userIdSerialValue.includes(',')) {
+    // Split by comma
+    const parts = userIdSerialValue.split(',');
+    if (parts.length < 2) return null;
+    
+    // First part may or may not have %T
+    cardNumber = parts[0].replace('%T', '');
+    deviceSerial = parts[1];
+  } else {
+    // No comma, assume the whole string is a card number
+    cardNumber = userIdSerialValue.replace('%T', '');
+    deviceSerial = 'UNKNOWN';
   }
 
-  // Parse the %T,<serial_number> format
-  const parts = userIdSerialValue.split(',');
-  if (parts.length < 2) {
-    return null;
-  }
-
-  // Card number (value after %T)
-  const cardPart = parts[0];
-  const cardNumber = cardPart.replace('%T', '');
-
-  // Device serial number (value after comma)
-  const deviceSerial = parts[1];
-
-  if (!cardNumber || !deviceSerial) {
+  if (!cardNumber) {
     return null;
   }
 
