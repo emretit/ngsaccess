@@ -1,16 +1,25 @@
-
 [build]
   command = "npm install --legacy-peer-deps && npm run build"
   publish = "dist"
 
+[dev]
+  command = "npm run dev"
+  targetPort = 8080
+  port = 8888
+
 [functions]
   directory = "netlify/functions"
 
-[edge_functions]
-  directory = "netlify/edge-functions"
-  
-[dev]
-  command = "npm run dev"
+# Edge Functions
+[[edge_functions]]
+  path = "/api/card-reader"
+  function = "card-reader"
+
+# Yönlendirmeler
+[[redirects]]
+  from = "/api/card-reader"
+  to = "/.netlify/edge-functions/card-reader"
+  status = 200
 
 [[redirects]]
   from = "/api/*"
