@@ -7,52 +7,7 @@
   targetPort = 8080
   port = 8888
 
-[functions]
-  directory = "netlify/functions"
-
-# Edge Functions
-[[edge_functions]]
-  path = "/api/card-reader"
-  function = "card-reader"
-
-# Ana yönlendirme (hem domain hem IP için)
-[[redirects]]
-  from = "/api/card-reader"
-  to = "/netlify/edge-functions/card-reader"
-  status = 200
-  force = true
-
-# HTTP isteklerini HTTPS'e yönlendirmeyi engelle
-[[redirects]]
-  from = "http://ngsplus.app/api/card-reader"
-  to = "/netlify/edge-functions/card-reader"
-  status = 200
-  force = true
-
-# 3.124.100.143 IP adresi için yönlendirme
-[[redirects]]
-  from = "https://3.124.100.143/api/card-reader"
-  to = "/netlify/edge-functions/card-reader"
-  status = 200
-  force = true
-  
-# 3.75.10.80 IP adresi için yönlendirme
-[[redirects]]
-  from = "https://3.75.10.80/api/card-reader"
-  to = "/netlify/edge-functions/card-reader"
-  status = 200
-  force = true
-
-# Genel API yönlendirmeleri
-[[redirects]]
-  from = "/api/*"
-  to = "/netlify/functions/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/edge/*"
-  to = "/netlify/edge-functions/:splat"
-  status = 200
+# Genel API yönlendirmeleri silindi
 
 [[redirects]]
   from = "/*"
