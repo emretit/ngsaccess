@@ -19,8 +19,8 @@ const CardReaderTester = () => {
   const [apiUrl, setApiUrl] = useState("/api/card-reader");
   
   // Edge Function settings
-  const [useEdgeFunction, setUseEdgeFunction] = useState(false);
-  const [edgeFunctionUrl, setEdgeFunctionUrl] = useState("/.netlify/functions/card-reader");
+  const [useEdgeFunction, setUseEdgeFunction] = useState(true);
+  const [edgeFunctionUrl, setEdgeFunctionUrl] = useState("/.netlify/edge-functions/card-reader");
   
   const handleSendRequest = async () => {
     if (!cardNumber || !deviceId) {
@@ -164,7 +164,7 @@ const CardReaderTester = () => {
                   placeholder="Edge Function URL"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Varsayılan: /.netlify/functions/card-reader
+                  Varsayılan: /.netlify/edge-functions/card-reader
                 </p>
               </div>
             )}
@@ -173,15 +173,15 @@ const CardReaderTester = () => {
               <h3 className="font-medium mb-2">Netlify Edge Function Bilgisi</h3>
               <p className="text-sm text-muted-foreground mb-2">
                 Netlify Edge Functions, kart okuyucu isteklerini işlemek için kullanılabilir.
-                Bu fonksiyonlar serverless yapıda çalışır ve global CDN altyapısında dağıtılır.
+                Bu fonksiyonlar Deno runtime üzerinde çalışır ve global CDN altyapısında dağıtılır.
               </p>
               <Separator className="my-3" />
               <p className="text-sm">
                 Netlify Edge Function kurulumu için:
               </p>
               <ol className="text-sm list-decimal list-inside text-muted-foreground mt-2">
-                <li>netlify.toml dosyasının projenizde olduğundan emin olun</li>
-                <li>netlify/functions klasörü içinde card-reader.js fonksiyonunu oluşturun</li>
+                <li>netlify.toml dosyasında edge_functions bölümünü tanımlayın</li>
+                <li>netlify/edge-functions klasörü içinde card-reader.js fonksiyonunu oluşturun</li>
                 <li>Netlify'da projenizi deploy edin</li>
               </ol>
             </div>

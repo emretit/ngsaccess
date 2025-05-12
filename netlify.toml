@@ -5,6 +5,9 @@
 
 [functions]
   directory = "netlify/functions"
+
+[edge_functions]
+  directory = "netlify/edge-functions"
   
 [dev]
   command = "npm run dev"
@@ -12,6 +15,11 @@
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/edge/*"
+  to = "/.netlify/edge-functions/:splat"
   status = 200
 
 [[redirects]]
