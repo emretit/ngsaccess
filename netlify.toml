@@ -15,28 +15,43 @@
   path = "/api/card-reader"
   function = "card-reader"
 
-# Yönlendirmeler
+# Ana yönlendirme (hem domain hem IP için)
 [[redirects]]
   from = "/api/card-reader"
-  to = "/.netlify/edge-functions/card-reader"
+  to = "/netlify/edge-functions/card-reader"
   status = 200
   force = true
 
 # HTTP isteklerini HTTPS'e yönlendirmeyi engelle
 [[redirects]]
   from = "http://ngsplus.app/api/card-reader"
-  to = "/.netlify/edge-functions/card-reader"
+  to = "/netlify/edge-functions/card-reader"
   status = 200
   force = true
 
+# 3.124.100.143 IP adresi için yönlendirme
+[[redirects]]
+  from = "https://3.124.100.143/api/card-reader"
+  to = "/netlify/edge-functions/card-reader"
+  status = 200
+  force = true
+  
+# 3.75.10.80 IP adresi için yönlendirme
+[[redirects]]
+  from = "https://3.75.10.80/api/card-reader"
+  to = "/netlify/edge-functions/card-reader"
+  status = 200
+  force = true
+
+# Genel API yönlendirmeleri
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/functions/:splat"
+  to = "/netlify/functions/:splat"
   status = 200
 
 [[redirects]]
   from = "/edge/*"
-  to = "/.netlify/edge-functions/:splat"
+  to = "/netlify/edge-functions/:splat"
   status = 200
 
 [[redirects]]
@@ -44,12 +59,13 @@
   to = "/index.html"
   status = 200
 
-# HTTP'yi koruyan özel davranış
+# HTTP başlık tanımlamaları
 [[headers]]
   for = "/api/card-reader"
   [headers.values]
-    # HTTPS redirects'i kapatma
-    X-Frame-Options = "DENY"
-    X-XSS-Protection = "1; mode=block"
+    # CORS ayarları
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Headers = "Content-Type"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
     # SSL yönlendirmesi devre dışı
     Strict-Transport-Security = "max-age=0"
