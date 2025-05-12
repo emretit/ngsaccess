@@ -3,6 +3,14 @@ export const config = {
 };
 
 export default async (request: Request, context: any) => {
+    // Host bilgisini kontrol edip test edelim
+    const url = new URL(request.url);
+    const host = url.host; // 'localhost:8888' veya 'ngsplus.app'
+    const protocol = url.protocol; // 'http:' veya 'https:'
+
+    console.log(`📟 İstek URL: ${request.url}`);
+    console.log(`📟 Host: ${host}, Protocol: ${protocol}`);
+
     // CORS desteği ekliyoruz
     if (request.method === "OPTIONS") {
         return new Response(null, {
@@ -39,7 +47,7 @@ export default async (request: Request, context: any) => {
             console.log("📟 Gelen JSON:", JSON.stringify(body));
         } catch (e) {
             console.error("📟 JSON çözümleme hatası:", e);
-            return new Response(JSON.stringify({ error: "Invalid JSON" }), {
+            return new Response(JSON.stringify({ error: "Invalid JSON", details: String(e) }), {
                 status: 400,
                 headers: {
                     "Access-Control-Allow-Origin": "*",
@@ -49,7 +57,7 @@ export default async (request: Request, context: any) => {
         }
     } catch (e) {
         console.error("📟 İstek gövdesi okuma hatası:", e);
-        return new Response(JSON.stringify({ error: "Error reading request body" }), {
+        return new Response(JSON.stringify({ error: "Error reading request body", details: String(e) }), {
             status: 400,
             headers: {
                 "Access-Control-Allow-Origin": "*",
@@ -70,11 +78,13 @@ export default async (request: Request, context: any) => {
 
         console.log("📟 Kart Okundu, user_id:", user_id, "serial:", serial);
 
-        // Şimdilik her zaman aç komutu dönüyoruz
-        const response = { response: "open_relay" };
-
-        // Eğer cihaz confirmation endpoint'i çağırırsa buna hazırlık yapıyoruz
-        // NOT: Bu kısım ileride gerekirse ayrı bir endpoint olarak da düzenlenebilir
+        // Test sonuçlarını da yanıta ekleyelim
+        const response = {
+            response: "open_relay",
+            host: host,
+            protocol: protocol,
+            env: process.env.NODE_ENV || "unknown"
+        };
 
         return new Response(JSON.stringify(response), {
             status: 200,
@@ -85,7 +95,11 @@ export default async (request: Request, context: any) => {
         });
     } else {
         console.error("📟 user_id,serial alanı bulunamadı");
-        return new Response(JSON.stringify({ error: "Missing user_id,serial field" }), {
+        return new Response(JSON.stringify({
+            error: "Missing user_id,serial field",
+            host: host,
+            protocol: protocol
+        }), {
             status: 400,
             headers: {
                 "Access-Control-Allow-Origin": "*",
