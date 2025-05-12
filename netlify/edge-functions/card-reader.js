@@ -1,3 +1,4 @@
+
 // Edge function yapılandırması
 export const config = {
     path: "/api/card-reader",
@@ -51,17 +52,9 @@ export default async (request) => {
         } catch (error) {
             console.log("📟 JSON parse hatası:", error);
             console.log("📟 Ham veriyi analiz ediyorum...");
-
+            
             // JSON parse hatası olursa, raw body'yi analiz etmeye çalış
-            if (text.includes("user_id,serial")) {
-                console.log("📟 user_id,serial bulundu, manuel olarak işleniyor");
-                const matches = text.match(/"user_id,serial"\s*:\s*"([^"]+)"/);
-                if (matches && matches[1]) {
-                    const value = matches[1];
-                    console.log("📟 Eşleşen değer:", value);
-                    body = { "user_id,serial": value };
-                }
-            }
+            body = { error: "JSON parse error" };
         }
 
         if (!body) {
@@ -69,14 +62,54 @@ export default async (request) => {
             throw new Error("Invalid body format");
         }
 
-        // "user_id,serial" anahtarını işle
-        const combinedValue = body["user_id,serial"];
-        console.log("📟 Birleşik değer:", combinedValue);
+        // Olası tüm kart okuyucu formatlarını kontrol et
+        let combinedValue = null;
+        
+        // 1. "user_id,serial" formatı
+        if (body["user_id,serial"]) {
+            combinedValue = body["user_id,serial"];
+            console.log("📟 Format 1 bulundu: user_id,serial =", combinedValue);
+        } 
+        // 2. "user_id_serial" formatı 
+        else if (body["user_id_serial"]) {
+            combinedValue = body["user_id_serial"];
+            console.log("📟 Format 2 bulundu: user_id_serial =", combinedValue);
+        }
+        // 3. Başka bir key'in değeri içinde kart bilgisi var mı kontrol et
+        else {
+            console.log("📟 Standart format bulunamadı. Tüm body'yi analiz ediyorum...");
+            // Tüm body'yi döngüye alıp değerleri kontrol et
+            for (const key in body) {
+                const value = body[key];
+                if (typeof value === "string" && (value.includes("%T") || value.includes(","))) {
+                    combinedValue = value;
+                    console.log(`📟 Alternatif format bulundu: ${key} =`, value);
+                    break;
+                }
+            }
+        }
 
         if (combinedValue) {
-            // Virgülle ayrılmış değerleri parçala
-            const parts = combinedValue.split(",");
-            const user_id = parts[0].replace("%T", "test-kart-id"); // %T değerini değiştir
+            // Hem virgül hem de noktalı virgül için parse et
+            let parts;
+            if (combinedValue.includes(",")) {
+                parts = combinedValue.split(",");
+                console.log("📟 Virgülle ayrılmış değerler:", parts);
+            } else if (combinedValue.includes(";")) {
+                parts = combinedValue.split(";");
+                console.log("📟 Noktalı virgülle ayrılmış değerler:", parts);
+            } else {
+                parts = [combinedValue]; // Tek bir değer
+                console.log("📟 Bölünemeyen tek değer:", parts);
+            }
+
+            // Kart ID'sini tespit et
+            let user_id = parts[0];
+            if (user_id.includes("%T")) {
+                user_id = user_id.replace("%T", "test-kart-id");
+            }
+            
+            // Seri numarasını tespit et
             const serial = parts.length > 1 ? parts[1] : "";
 
             console.log("📟 Kart Okundu, user_id:", user_id, "serial:", serial);
@@ -93,9 +126,9 @@ export default async (request) => {
                 },
             });
         } else {
-            console.log("📟 user_id,serial alanı bulunamadı, tüm body:", JSON.stringify(body));
+            console.log("📟 Kart bilgisi bulunamadı, tüm body:", JSON.stringify(body));
             return new Response(JSON.stringify({
-                error: "Missing user_id,serial field",
+                error: "Missing card identification field",
                 received: body
             }), {
                 status: 400,
@@ -123,4 +156,4 @@ export default async (request) => {
         console.log("📟 İstek işleme tamamlandı");
         console.log("📟 =============================================");
     }
-}; 
+};
