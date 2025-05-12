@@ -7,8 +7,16 @@
   targetPort = 8080
   port = 8888
 
-# Genel API yönlendirmeleri silindi
+# Edge Functions tanımlamaları
+[[edge_functions]]
+  function = "card-reader"
+  path = "/api/card-reader"
 
+[[edge_functions]]
+  function = "confirm-relay"
+  path = "/api/confirm-relay"
+
+# Varsayılan yönlendirme
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -16,7 +24,7 @@
 
 # HTTP başlık tanımlamaları
 [[headers]]
-  for = "/api/card-reader"
+  for = "/api/*"
   [headers.values]
     # CORS ayarları
     Access-Control-Allow-Origin = "*"

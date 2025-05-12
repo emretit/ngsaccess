@@ -23,7 +23,6 @@ venv/
 .env.test.local
 .env.production.local
 *.pem
-.env
 
 # Debug
 npm-debug.log*

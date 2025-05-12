@@ -1,159 +1,212 @@
+import { createClient } from '@supabase/supabase-js';
 
-// Edge function yapılandırması
-export const config = {
-    path: "/api/card-reader",
-};
-
-// Ana edge function handler
-export default async (request) => {
-    // Tüm istek detaylarını logla
-    console.log("📟 =============================================");
-    console.log("📟 KART OKUYUCU İSTEĞİ ALINDI!");
-    console.log("📟 Timestamp:", new Date().toISOString());
-    console.log("📟 URL:", request.url);
-    console.log("📟 Method:", request.method);
-    console.log("📟 Headers:", JSON.stringify(Object.fromEntries([...request.headers])));
-
-    // CORS OPTIONS desteği
-    if (request.method === "OPTIONS") {
-        console.log("📟 OPTIONS request");
+// HTTP isteğini işleme
+export default async (request, context) => {
+    // CORS kontrolü için OPTIONS isteği kontrolü
+    if (request.method === 'OPTIONS') {
         return new Response(null, {
-            status: 204,
+            status: 200,
             headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type",
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Max-Age': '86400',
             },
         });
     }
 
-    // Sadece POST isteklerini kabul et
-    if (request.method !== "POST") {
-        console.log("📟 POST dışı istek");
-        return new Response("Method Not Allowed", {
+    // Sadece POST isteklerini işle
+    if (request.method !== 'POST') {
+        return new Response(JSON.stringify({ error: 'Sadece POST metodu destekleniyor' }), {
             status: 405,
             headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Content-Type": "text/plain",
-            }
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+            },
         });
     }
 
     try {
-        // İstek gövdesini işle
-        console.log("📟 POST isteği alındı, body okunuyor...");
-        const text = await request.text();
-        console.log("📟 Raw Body:", text);
+        console.log('API isteği alındı');
 
-        let body;
-        try {
-            body = JSON.parse(text);
-            console.log("📟 Parsed Body:", JSON.stringify(body));
-        } catch (error) {
-            console.log("📟 JSON parse hatası:", error);
-            console.log("📟 Ham veriyi analiz ediyorum...");
-            
-            // JSON parse hatası olursa, raw body'yi analiz etmeye çalış
-            body = { error: "JSON parse error" };
-        }
-
-        if (!body) {
-            console.log("📟 Body NULL");
-            throw new Error("Invalid body format");
-        }
-
-        // Olası tüm kart okuyucu formatlarını kontrol et
-        let combinedValue = null;
-        
-        // 1. "user_id,serial" formatı
-        if (body["user_id,serial"]) {
-            combinedValue = body["user_id,serial"];
-            console.log("📟 Format 1 bulundu: user_id,serial =", combinedValue);
-        } 
-        // 2. "user_id_serial" formatı 
-        else if (body["user_id_serial"]) {
-            combinedValue = body["user_id_serial"];
-            console.log("📟 Format 2 bulundu: user_id_serial =", combinedValue);
-        }
-        // 3. Başka bir key'in değeri içinde kart bilgisi var mı kontrol et
-        else {
-            console.log("📟 Standart format bulunamadı. Tüm body'yi analiz ediyorum...");
-            // Tüm body'yi döngüye alıp değerleri kontrol et
-            for (const key in body) {
-                const value = body[key];
-                if (typeof value === "string" && (value.includes("%T") || value.includes(","))) {
-                    combinedValue = value;
-                    console.log(`📟 Alternatif format bulundu: ${key} =`, value);
-                    break;
+        // Service role client oluşturma
+        const supabase = createClient(
+            context.env.NEXT_PUBLIC_SUPABASE_URL,
+            context.env.SUPABASE_SERVICE_ROLE_KEY,
+            {
+                auth: {
+                    persistSession: false
                 }
             }
-        }
+        );
 
-        if (combinedValue) {
-            // Hem virgül hem de noktalı virgül için parse et
-            let parts;
-            if (combinedValue.includes(",")) {
-                parts = combinedValue.split(",");
-                console.log("📟 Virgülle ayrılmış değerler:", parts);
-            } else if (combinedValue.includes(";")) {
-                parts = combinedValue.split(";");
-                console.log("📟 Noktalı virgülle ayrılmış değerler:", parts);
-            } else {
-                parts = [combinedValue]; // Tek bir değer
-                console.log("📟 Bölünemeyen tek değer:", parts);
-            }
-
-            // Kart ID'sini tespit et
-            let user_id = parts[0];
-            if (user_id.includes("%T")) {
-                user_id = user_id.replace("%T", "test-kart-id");
-            }
-            
-            // Seri numarasını tespit et
-            const serial = parts.length > 1 ? parts[1] : "";
-
-            console.log("📟 Kart Okundu, user_id:", user_id, "serial:", serial);
-
-            // Kart okutulunca açma komutu döndür
-            const response = { "response": "open_relay" };
-            console.log("📟 Yanıt döndürülüyor:", JSON.stringify(response));
-
-            return new Response(JSON.stringify(response), {
-                status: 200,
-                headers: {
-                    "Access-Control-Allow-Origin": "*",
-                    "Content-Type": "application/json",
-                },
-            });
-        } else {
-            console.log("📟 Kart bilgisi bulunamadı, tüm body:", JSON.stringify(body));
-            return new Response(JSON.stringify({
-                error: "Missing card identification field",
-                received: body
-            }), {
+        // İstek verisini al
+        let body;
+        try {
+            body = await request.json();
+            console.log('Gelen veri:', body);
+        } catch (error) {
+            console.error('JSON ayrıştırma hatası:', error);
+            return new Response(JSON.stringify({ response: 'close_relay', error: 'Geçersiz JSON formatı' }), {
                 status: 400,
                 headers: {
-                    "Access-Control-Allow-Origin": "*",
-                    "Content-Type": "application/json",
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
                 },
             });
         }
+
+        // Veri formatını düzelt
+        let user_id, serial;
+        if ('user_id,serial' in body) {
+            const [cardNumber, deviceSerial] = body['user_id,serial'].split(',');
+            user_id = cardNumber;
+            serial = deviceSerial;
+        } else if ('user_id_serial' in body) {
+            const [cardNumber, deviceSerial] = body['user_id_serial'].split(',');
+            user_id = cardNumber;
+            serial = deviceSerial;
+        } else {
+            user_id = body.user_id;
+            serial = body.serial;
+        }
+
+        // Eksik alan kontrolü
+        if (!user_id) {
+            console.log('user_id eksik');
+            return new Response(JSON.stringify({ response: 'close_relay', error: 'user_id missing' }), {
+                status: 400,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                },
+            });
+        }
+        if (!serial) {
+            console.log('serial eksik');
+            return new Response(JSON.stringify({ response: 'close_relay', error: 'serial missing' }), {
+                status: 400,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                },
+            });
+        }
+
+        console.log('İşlenmiş veri:', { user_id, serial });
+
+        // Kartın employees tablosunda kayıtlı olup olmadığını kontrol et
+        console.log('Çalışan kontrolü yapılıyor:', user_id);
+        const { data: employee, error: empErr } = await supabase
+            .from('employees')
+            .select('id, first_name, last_name, access_permission')
+            .eq('card_number', user_id)
+            .single();
+
+        if (empErr) {
+            console.error('Çalışan sorgusu hatası:', empErr);
+            return new Response(JSON.stringify({ response: 'close_relay' }), {
+                status: 200,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                },
+            });
+        }
+
+        if (!employee) {
+            console.log('Çalışan bulunamadı:', user_id);
+            return new Response(JSON.stringify({ response: 'close_relay' }), {
+                status: 200,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                },
+            });
+        }
+
+        if (!employee.access_permission) {
+            console.log('Çalışanın erişim izni yok:', user_id);
+            return new Response(JSON.stringify({ response: 'close_relay' }), {
+                status: 200,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                },
+            });
+        }
+
+        console.log('Çalışan bulundu:', employee);
+
+        // Cihaz bilgisini al
+        console.log('Cihaz bilgisi alınıyor:', serial);
+        const { data: device, error: deviceErr } = await supabase
+            .from('devices')
+            .select('name')
+            .eq('serial_number', serial)
+            .single();
+
+        if (deviceErr) {
+            console.error('Cihaz sorgusu hatası:', deviceErr);
+            return new Response(JSON.stringify({ response: 'close_relay' }), {
+                status: 200,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                },
+            });
+        }
+
+        if (!device) {
+            console.log('Cihaz bulunamadı:', serial);
+            return new Response(JSON.stringify({ response: 'close_relay' }), {
+                status: 200,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*',
+                },
+            });
+        }
+
+        console.log('Cihaz bulundu:', device);
+
+        // Kart geçiş kaydını oluştur
+        const { error: logError } = await supabase
+            .from('card_readings')
+            .insert({
+                employee_id: employee.id,
+                card_no: user_id,
+                device_serial: serial,
+                status: 'success',
+                employee_name: `${employee.first_name} ${employee.last_name}`,
+                device_name: device.name
+            });
+
+        if (logError) {
+            console.error('Kart okuma kaydı hatası:', logError);
+        } else {
+            console.log('Kart okuma kaydı başarıyla oluşturuldu');
+        }
+
+        return new Response(JSON.stringify({ response: 'open_relay' }), {
+            status: 200,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+            },
+        });
+
     } catch (error) {
-        // Hata yakalama
-        console.log("📟 HATA:", error.message);
+        console.error('Sistem hatası:', error);
         return new Response(JSON.stringify({
-            error: "Server error",
-            message: error.message,
-            stack: error.stack
+            response: 'close_relay',
+            error: 'system error'
         }), {
             status: 500,
             headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Content-Type": "application/json",
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
             },
         });
-    } finally {
-        console.log("📟 İstek işleme tamamlandı");
-        console.log("📟 =============================================");
     }
-};
+}; 
