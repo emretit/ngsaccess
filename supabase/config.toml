@@ -1,3 +1,4 @@
+
 # Updated project configuration
 
 # A string used as a secret to generate JWT tokens for admin access to your REST and GraphQL APIs
@@ -56,3 +57,7 @@ enable_confirmations = false
 enable_signup = true
 # If enabled, users need to confirm their phone number before signing in.
 enable_confirmations = false
+
+# Function for card-reader
+[functions.card-reader]
+verify_jwt = false
