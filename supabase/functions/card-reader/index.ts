@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -41,10 +40,10 @@ serve(async (req) => {
       })
     }
 
-    // Extract card ID
-    const cardId = requestData.card_id;
+    // Extract card ID (support both user_id and card_id)
+    const cardId = requestData.user_id || requestData.card_id;
     if (!cardId) {
-      return new Response(JSON.stringify({ error: 'card_id is required' }), {
+      return new Response(JSON.stringify({ error: 'user_id is required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -79,9 +78,9 @@ serve(async (req) => {
         employee_name: employeeName,
         employee_photo_url: photoUrl,
         status: accessGranted ? 'success' : 'denied',
-        device_name: 'Supabase Edge Function Reader', // Default device name
-        device_location: 'API Endpoint',
-        device_serial: 'EDGE-FUNC-1',
+        device_name: requestData.device_name || 'Supabase Edge Function Reader',
+        device_location: requestData.device_location || 'API Endpoint',
+        device_serial: requestData.device_serial || 'EDGE-FUNC-1',
       })
       .select();
 
@@ -93,11 +92,13 @@ serve(async (req) => {
       })
     }
 
+    // Format response to match device expectations
     // Return success response with access status
     return new Response(
       JSON.stringify({
-        success: true,
-        access_granted: accessGranted,
+        response: "success",
+        open_relay: accessGranted ? "true" : "false",
+        confirmation: "relay_opened",
         message: accessGranted ? 'Access granted' : 'Access denied',
         reading_id: reading?.[0]?.id
       }),
