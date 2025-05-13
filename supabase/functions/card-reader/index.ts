@@ -34,22 +34,47 @@ serve(async (req) => {
       console.log('Received data:', requestData);
     } catch (error) {
       console.error('Error parsing request body:', error);
-      return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+      return new Response(JSON.stringify({
+        response: "error",
+        error: 'Invalid JSON'
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // Extract card ID (support both user_id and card_id)
-    const cardId = requestData.user_id || requestData.card_id;
+    // Extract card ID and serial from the request
+    // Format is user_id,serial (like 3505234822042881)
+    let cardId = '';
+    let deviceSerial = '';
+
+    if (requestData['user_id,serial']) {
+      // Handle the format where the key is "user_id,serial"
+      const parts = requestData['user_id,serial'].toString().split(',');
+      cardId = parts[0];
+      deviceSerial = parts.length > 1 ? parts[1] : '';
+    } else if (typeof requestData.user_id === 'string' && requestData.user_id.includes(',')) {
+      // Handle case where user_id contains both values separated by comma
+      const parts = requestData.user_id.split(',');
+      cardId = parts[0];
+      deviceSerial = parts.length > 1 ? parts[1] : '';
+    } else {
+      // Fallback to regular user_id or card_id
+      cardId = requestData.user_id || requestData.card_id;
+      deviceSerial = requestData.serial || '';
+    }
+
     if (!cardId) {
-      return new Response(JSON.stringify({ error: 'user_id is required' }), {
+      return new Response(JSON.stringify({
+        response: "error",
+        error: 'user_id is required'
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    console.log('Processing card ID:', cardId);
+    console.log('Processing card ID:', cardId, 'Device Serial:', deviceSerial);
 
     // Find employee by card number
     const { data: employee, error: employeeError } = await supabaseClient
@@ -78,29 +103,31 @@ serve(async (req) => {
         employee_name: employeeName,
         employee_photo_url: photoUrl,
         status: accessGranted ? 'success' : 'denied',
-        device_name: requestData.device_name || 'Supabase Edge Function Reader',
+        device_name: requestData.device_name || 'Card Reader Device',
         device_location: requestData.device_location || 'API Endpoint',
-        device_serial: requestData.device_serial || 'EDGE-FUNC-1',
+        device_serial: deviceSerial || 'UNKNOWN',
+        raw_data: JSON.stringify(requestData)
       })
       .select();
 
     if (readingError) {
       console.error('Error inserting card reading:', readingError);
-      return new Response(JSON.stringify({ error: 'Failed to process card reading' }), {
+      return new Response(JSON.stringify({
+        response: "error",
+        error: 'Failed to process card reading'
+      }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // Format response to match device expectations
-    // Return success response with access status
+    // Format response to match device expectations exactly as configured
+    // The device is expecting these specific fields with these exact formats
     return new Response(
       JSON.stringify({
         response: "success",
         open_relay: accessGranted ? "true" : "false",
-        confirmation: "relay_opened",
-        message: accessGranted ? 'Access granted' : 'Access denied',
-        reading_id: reading?.[0]?.id
+        confirmation: "relay_opened"
       }),
       {
         status: 200,
@@ -109,7 +136,10 @@ serve(async (req) => {
     )
   } catch (error) {
     console.error('Unexpected error:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    return new Response(JSON.stringify({
+      response: "error",
+      error: 'Internal server error'
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
