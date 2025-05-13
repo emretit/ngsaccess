@@ -6,7 +6,7 @@ import { Input } from './ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Loader2 } from 'lucide-react';
 import { Badge } from './ui/badge';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from './ui/use-toast';
 
 export default function CardReaderTest() {
   const [cardId, setCardId] = useState('');
