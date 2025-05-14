@@ -8,11 +8,6 @@
   targetPort = 8080
   port = 8888
 
-# Edge Functions tanımlamaları
-[[edge_functions]]
-  function = "confirm-relay"
-  path = "/api/confirm-relay"
-
 # API yönlendirmeleri
 [[redirects]]
   from = "/api/*"

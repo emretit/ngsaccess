@@ -76,5 +76,3 @@ build/
 
 # Local Netlify folder
 .netlify
-# Edge Functions için istisna
-!.netlify/edge-functions/

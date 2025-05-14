@@ -1,13 +1,10 @@
-
 import { useDashboard } from '@/hooks/useDashboard';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import StatsGrid from '@/components/dashboard/StatsGrid';
 import ActivitySummaryCard from '@/components/dashboard/ActivitySummaryCard';
 import CalendarCard from '@/components/dashboard/CalendarCard';
-import CardReaderTester from '@/components/CardReaderTester';
 import RecentReadingsTable from '@/components/dashboard/RecentReadingsTable';
 import QuickLinksGrid from '@/components/dashboard/QuickLinksGrid';
-import CardReaderTest from '@/components/CardReaderTest';
 
 export default function Index() {
   const {
@@ -43,10 +40,7 @@ export default function Index() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ActivitySummaryCard />
-        <CardReaderTest />
       </div>
-
-      <CardReaderTester />
 
       <RecentReadingsTable 
         readings={recentReadings} 

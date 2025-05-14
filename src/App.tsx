@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,8 +16,6 @@ import PDKSRecords from "./pages/PDKSRecords";
 import ServerDevices from "./pages/ServerDevices";
 import Settings from "./pages/Settings";
 import VirtualReaders from "./pages/VirtualReaders";
-import AdminDashboard from "./pages/dashboard/AdminDashboard";
-import UserDashboard from "./pages/dashboard/UserDashboard";
 
 const queryClient = new QueryClient();
 
@@ -46,12 +43,8 @@ const App = () => (
                 <Route path="/login" element={<Auth />} />
                 <Route path="/register" element={<Auth />} />
                 
-                {/* Ana sayfa artık Index komponenti olacak */}
+                {/* Ana sayfa */}
                 <Route path="/home" element={<Layout><Index /></Layout>} />
-                
-                {/* Dashboard sayfaları hala burada, ancak kullanılmayacak */}
-                <Route path="/admin/dashboard" element={<Layout><Index /></Layout>} />
-                <Route path="/dashboard" element={<Layout><Index /></Layout>} />
                 
                 {/* Protected Routes */}
                 <Route path="/employees" element={<Layout><Employees /></Layout>} />

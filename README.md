@@ -1,73 +1,82 @@
-# Welcome to your Lovable project
+# NGSPLUS.APP - Personel Devam Kontrol Sistemi
 
-## Project info
+Modern personel devam kontrol ve geçiş sistemleri çözümü sunan web tabanlı
+uygulama.
 
-**URL**: https://lovable.dev/projects/83166804-92d3-4cc5-9b0a-abc77364e70d
+## Kullanılan Teknolojiler
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/83166804-92d3-4cc5-9b0a-abc77364e70d) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
+Bu proje aşağıdaki teknolojilerle geliştirilmiştir:
 
 - Vite
 - TypeScript
 - React
 - shadcn-ui
 - Tailwind CSS
+- Supabase
+- React Query
+- React Router
 
-## How can I deploy this project?
+## Kurulum
 
-Simply open [Lovable](https://lovable.dev/projects/83166804-92d3-4cc5-9b0a-abc77364e70d) and click on Share -> Publish.
+Projeyi yerel geliştirme ortamınızda çalıştırmak için aşağıdaki adımları takip
+edin:
 
-## Can I connect a custom domain to my Lovable project?
+```sh
+# Adım 1: Repository'yi klonlayın
+git clone <REPO_URL>
 
-Yes, you can!
+# Adım 2: Proje dizinine gidin
+cd ngsaccess
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+# Adım 3: Gerekli bağımlılıkları yükleyin
+npm install
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+# Adım 4: Geliştirme sunucusunu başlatın
+npm run dev
+```
+
+## API Server
+
+Uygulamanın API sunucusunu çalıştırmak için:
+
+```sh
+npm run api
+```
+
+Geliştirme modunda API sunucusunu çalıştırmak için:
+
+```sh
+npm run dev:api
+```
+
+## Derleme
+
+Projeyi derlemek için:
+
+```sh
+# Üretim için derleme
+npm run build
+
+# Geliştirme modu için derleme
+npm run build:dev
+```
+
+## Proje Yapısı
+
+- `/src`: Ana kaynak kodu dizini
+  - `/components`: Yeniden kullanılabilir UI bileşenleri
+  - `/pages`: Sayfa bileşenleri
+  - `/hooks`: Özel React hook'ları
+  - `/integrations`: Dış servislerle entegrasyonlar
+  - `/services`: Servis fonksiyonları
+  - `/types`: TypeScript tip tanımlamaları
+  - `/utils`: Yardımcı fonksiyonlar
+  - `/styles`: CSS stilleri
+
+## Özellikler
+
+- Personel yönetimi
+- Cihaz yönetimi
+- Erişim kontrolü
+- PDKS kayıtları
+- Sanal okuyucular
