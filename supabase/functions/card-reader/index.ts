@@ -1,18 +1,26 @@
+
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// CORS başlıkları
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Log girdilerini ekleyelim
+  console.log('İstek URL:', req.url);
+  console.log('İstek Metodu:', req.method);
+  console.log('İstek Headers:', JSON.stringify(req.headers));
+  console.log('İstek IP Adresi:', req.headers.get('x-forwarded-for'));
+
+  // CORS ön kontrol istekleri için
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
-  // Only allow POST requests
+  // Sadece POST isteklerine izin ver
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
@@ -21,119 +29,133 @@ serve(async (req) => {
   }
 
   try {
+    // Supabase istemcisi oluştur
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { persistSession: false } }
     )
 
-    // Parse the request body
+    // İstek gövdesini ayrıştır
     let requestData;
     try {
       requestData = await req.json();
-      console.log('Received data:', requestData);
+      console.log('Ham İstek Gövdesi:', JSON.stringify(requestData));
     } catch (error) {
-      console.error('Error parsing request body:', error);
+      console.error('İstek gövdesi ayrıştırma hatası:', error);
       return new Response(JSON.stringify({
-        response: "error",
-        error: 'Invalid JSON'
+        response: "error", 
+        error: 'Geçersiz JSON'
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // Extract card ID and serial from the request
-    // Format is user_id,serial (like 3505234822042881)
+    // Kart ID ve seri numarasını çıkar
+    // Format user_id,serial (örneğin 3505234822042881,DEVICE123)
     let cardId = '';
     let deviceSerial = '';
 
+    // Farklı format türlerini kontrol et
     if (requestData['user_id,serial']) {
-      // Handle the format where the key is "user_id,serial"
+      // Format "user_id,serial": "3505234822042881,DEVICE123" ise
       const parts = requestData['user_id,serial'].toString().split(',');
       cardId = parts[0];
       deviceSerial = parts.length > 1 ? parts[1] : '';
     } else if (typeof requestData.user_id === 'string' && requestData.user_id.includes(',')) {
-      // Handle case where user_id contains both values separated by comma
+      // Format "user_id": "3505234822042881,DEVICE123" ise
       const parts = requestData.user_id.split(',');
       cardId = parts[0];
       deviceSerial = parts.length > 1 ? parts[1] : '';
     } else {
-      // Fallback to regular user_id or card_id
+      // Düz user_id veya card_id formatı ise
       cardId = requestData.user_id || requestData.card_id;
       deviceSerial = requestData.serial || '';
     }
 
+    // Parse edilmiş veriyi göster
+    console.log('Parse Edilmiş İstek:', JSON.stringify({ user_id: cardId, serial: deviceSerial }));
+
     if (!cardId) {
       return new Response(JSON.stringify({
         response: "error",
-        error: 'user_id is required'
+        error: 'user_id gerekli'
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    console.log('Processing card ID:', cardId, 'Device Serial:', deviceSerial);
+    // Kart numarasına göre çalışanı bul
+    try {
+      const { data: employee, error: employeeError } = await supabaseClient
+        .from('employees')
+        .select('id, first_name, last_name, access_permission, photo_url')
+        .eq('card_number', cardId)
+        .single();
 
-    // Find employee by card number
-    const { data: employee, error: employeeError } = await supabaseClient
-      .from('employees')
-      .select('id, first_name, last_name, access_permission, photo_url')
-      .eq('card_number', cardId)
-      .single();
+      if (employeeError && employeeError.code !== 'PGRST116') { // PGRST116 "kayıt bulunamadı" hatası
+        console.error('Çalışan bulunurken hata:', employeeError);
+      }
 
-    if (employeeError && employeeError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
-      console.error('Error finding employee:', employeeError);
-    }
+      // Çalışan bulunamadıysa varsayılan değerler
+      const employeeId = employee?.id || null;
+      const employeeName = employee ? `${employee.first_name} ${employee.last_name}` : null;
+      const accessGranted = employee?.access_permission || false;
+      const photoUrl = employee?.photo_url || null;
 
-    // Default values if employee not found
-    const employeeId = employee?.id || null;
-    const employeeName = employee ? `${employee.first_name} ${employee.last_name}` : null;
-    const accessGranted = employee?.access_permission || false;
-    const photoUrl = employee?.photo_url || null;
+      // Kart okutma kaydı oluştur
+      const { data: reading, error: readingError } = await supabaseClient
+        .from('card_readings')
+        .insert({
+          card_no: cardId,
+          access_granted: accessGranted,
+          employee_id: employeeId,
+          employee_name: employeeName,
+          employee_photo_url: photoUrl,
+          status: accessGranted ? 'success' : 'denied',
+          device_name: requestData.device_name || 'Kart Okuyucu Cihaz',
+          device_location: requestData.device_location || 'API Endpoint',
+          device_serial: deviceSerial || 'UNKNOWN',
+          raw_data: JSON.stringify(requestData)
+        })
+        .select();
 
-    // Create card reading record
-    const { data: reading, error: readingError } = await supabaseClient
-      .from('card_readings')
-      .insert({
-        card_no: cardId,
-        access_granted: accessGranted,
-        employee_id: employeeId,
-        employee_name: employeeName,
-        employee_photo_url: photoUrl,
-        status: accessGranted ? 'success' : 'denied',
-        device_name: requestData.device_name || 'Card Reader Device',
-        device_location: requestData.device_location || 'API Endpoint',
-        device_serial: deviceSerial || 'UNKNOWN',
-        raw_data: JSON.stringify(requestData)
+      if (readingError) {
+        console.error('Kart okutma kaydı oluştururken hata:', readingError);
+        return new Response(JSON.stringify({
+          response: "error",
+          error: 'Kart okutma işlemi başarısız'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Cihaz beklentilerine göre yanıt formatı
+      // Cihaz tam olarak bu formatta yanıt bekliyor
+      const responseData = {
+        response: accessGranted ? "open_relay" : "close_relay",
+        name: employeeName
+      };
+
+      console.log('Sending response:', JSON.stringify(responseData));
+      
+      return new Response(JSON.stringify(responseData), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
-      .select();
-
-    if (readingError) {
-      console.error('Error inserting card reading:', readingError);
+    } catch (err) {
+      console.error('Supabase lookup error:', err);
       return new Response(JSON.stringify({
         response: "error",
-        error: 'Failed to process card reading'
+        error: 'Database error'
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-
-    // Format response to match device expectations exactly as configured
-    // The device is expecting these specific fields with these exact formats
-    return new Response(
-      JSON.stringify({
-        response: "success",
-        open_relay: accessGranted ? "true" : "false",
-        confirmation: "relay_opened"
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    )
   } catch (error) {
     console.error('Unexpected error:', error);
     return new Response(JSON.stringify({
