@@ -1,3 +1,4 @@
+
 import express from 'express';
 import serverless from 'serverless-http';
 import cors from 'cors';
@@ -42,10 +43,17 @@ app.post('/card-reader', async (req, res) => {
 
         // Veri formatını düzelt
         let user_id, serial;
+        
+        // Gelen verinin formatını kontrol et
         if ('user_id,serial' in body) {
             const [cardNumber, deviceSerial] = body['user_id,serial'].split(',');
             user_id = cardNumber;
             serial = deviceSerial;
+        } else if ('user_id' in body && '%T' in body) {
+            // Cihaz formatına göre işleme
+            user_id = body.user_id;
+            // Burada %T kısmını serial olarak alıyoruz - gerçek cihaz değerini alacak
+            serial = body['%T'];
         } else {
             user_id = body.user_id;
             serial = body.serial;
@@ -117,7 +125,8 @@ app.post('/card-reader', async (req, res) => {
                 device_serial: serial,
                 status: 'success',
                 employee_name: `${employee.first_name} ${employee.last_name}`,
-                device_name: device.name
+                device_name: device.name,
+                access_granted: true
             });
 
         if (logError) {
@@ -126,6 +135,7 @@ app.post('/card-reader', async (req, res) => {
             console.log('Kart okuma kaydı başarıyla oluşturuldu');
         }
 
+        // Görüntüden gelen format ile tutarlı cevap dön
         return res.json({ response: 'open_relay' });
 
     } catch (error) {
@@ -141,7 +151,7 @@ app.post('/card-reader', async (req, res) => {
 app.post('/confirm-relay', (req, res) => {
     try {
         console.log('Relay onay isteği alındı:', req.body);
-        // Burada ekstra işlemler yapılabilir (log kaydetme vb.)
+        // Görüntüdeki formata göre onaylama yanıtı
         return res.json({ confirmation: 'relay_opened' });
     } catch (error) {
         console.error('Relay onay hatası:', error);
