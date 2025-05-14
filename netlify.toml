@@ -1,7 +1,7 @@
-
 [build]
   command = "npm install --legacy-peer-deps && npm run build"
   publish = "dist"
+  functions = "netlify/functions"
 
 [dev]
   command = "npm run dev"
@@ -12,6 +12,13 @@
 [[edge_functions]]
   function = "confirm-relay"
   path = "/api/confirm-relay"
+
+# API yönlendirmeleri
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
 
 # Varsayılan yönlendirme
 [[redirects]]
