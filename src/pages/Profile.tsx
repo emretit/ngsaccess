@@ -92,7 +92,9 @@ export default function Profile() {
       // Profil bilgilerini veritabanında güncelle
       await supabase
         .from('users')
-        .update({ photo_url: publicUrl })
+        .update({ 
+          photo_url: publicUrl 
+        })
         .eq('id', user!.id);
       
       // Context'teki profil bilgisini güncelle
