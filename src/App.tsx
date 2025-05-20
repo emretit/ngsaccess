@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,6 +17,7 @@ import PDKSRecords from "./pages/PDKSRecords";
 import ServerDevices from "./pages/ServerDevices";
 import Settings from "./pages/Settings";
 import VirtualReaders from "./pages/VirtualReaders";
+import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +56,7 @@ const App = () => (
                 <Route path="/server-devices" element={<Layout><ServerDevices /></Layout>} />
                 <Route path="/settings" element={<Layout><Settings /></Layout>} />
                 <Route path="/virtual-readers" element={<Layout><VirtualReaders /></Layout>} />
+                <Route path="/profile" element={<Layout><Profile /></Layout>} />
                 <Route path="*" element={<Layout><NotFound /></Layout>} />
               </Routes>
             </AuthProvider>

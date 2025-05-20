@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
@@ -32,7 +31,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Handle auth events and role-based redirects - but not on landing page
   React.useEffect(() => {
     console.log("AuthProvider: Checking auth profile and location", { 
       profile: profile?.role, 
@@ -48,7 +46,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [profile, navigate, location.pathname]);
 
-  // Listen for auth state changes for toast notifications
   React.useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       console.log("AuthProvider: Auth state changed", event);
