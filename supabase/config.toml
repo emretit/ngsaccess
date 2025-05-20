@@ -28,10 +28,3 @@ enabled = true
 [analytics]
 enabled = true
 port = 54327
-
-[functions]
-[functions.card-reader]
-verify_jwt = false
-
-[functions.confirm-relay]
-verify_jwt = false
