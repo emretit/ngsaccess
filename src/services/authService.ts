@@ -62,31 +62,18 @@ export const signOut = async () => {
 };
 
 export const redirectBasedOnRole = (role: string, navigate: Function, currentPath: string) => {
-  // Don't redirect if on the landing page
-  if (currentPath === '/') {
+  // Bu fonksiyon, artık her sayfa değişiminde değil,
+  // sadece giriş sonrası veya başka özel durumlarda çağrılmalı
+  
+  // Eğer kullanıcı zaten istediği sayfadaysa yönlendirme yapma
+  // Bu sayede sürekli /home'a yönlendirme sorunu çözülecek
+  if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/') {
+    console.log("Kullanıcı zaten istediği sayfada, yönlendirme yapılmıyor:", currentPath);
     return;
   }
   
-  // Tüm rolleri home sayfasına yönlendirelim
+  // Giriş sonrası ana sayfaya yönlendir
   navigate('/home');
-  
-  // Rollerine göre yönlendirme şimdilik iptal edildi
-  /*
-  switch (role) {
-    case 'super_admin':
-      navigate('/admin/dashboard');
-      break;
-    case 'project_admin':
-      navigate('/settings');
-      break;
-    case 'project_user':
-      navigate('/dashboard');
-      break;
-    default:
-      // Don't redirect to '/' as it's the landing page
-      break;
-  }
-  */
 };
 
 export const checkUserRole = (profile: any | null, requiredRole: 'super_admin' | 'project_admin' | 'project_user'): boolean => {

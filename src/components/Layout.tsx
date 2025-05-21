@@ -14,8 +14,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
 
   useEffect(() => {
-    // Redirect unauthenticated users to login page
-    // Landing page is handled outside this component in App.tsx
+    // Sadece kullanıcı oturum açmamışsa ve login/register sayfalarında değilse yönlendir
     if (!loading && !session && location.pathname !== '/login' && location.pathname !== '/register') {
       console.log("Layout: No session detected, redirecting to login from:", location.pathname);
       navigate('/login');

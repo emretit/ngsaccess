@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
@@ -39,10 +40,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLandingOrAuth: location.pathname === '/' || location.pathname === '/login' || location.pathname === '/register' 
     });
     
-    // Ana sayfa, login veya register sayfalarında yönlendirme yapma
-    if (profile && location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register') {
-      console.log("AuthProvider: Redirecting based on role", profile.role);
-      redirectBasedOnRole(profile.role, navigate, location.pathname);
+    // Yönlendirme davranışını değiştirdik - artık her sayfa değişiminde yönlendirme yapmıyoruz
+    // Sadece login sonrası veya profilimiz ilk yüklendiğinde kontrol ediyoruz
+    if (!profile || location.pathname === '/' || location.pathname === '/login' || location.pathname === '/register') {
+      // Sadece ilk girişte veya kimlik doğrulama sayfalarında yönlendirme yap
+      if (profile && (location.pathname === '/login' || location.pathname === '/register')) {
+        navigate('/home');
+      }
     }
   }, [profile, navigate, location.pathname]);
 
