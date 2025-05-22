@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import DepartmentTree from "@/components/departments/DepartmentTree";
@@ -19,6 +20,7 @@ export default function Employees() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [viewMode, setViewMode] = useState(false);
 
   const employeeStats = useMemo(() => ({
     total: employees.length,
@@ -85,6 +87,13 @@ export default function Employees() {
 
   const handleEditEmployee = (employee: Employee) => {
     setEditingEmployee(employee);
+    setViewMode(false);
+    setIsPanelOpen(true);
+  };
+
+  const handleViewEmployeeDetails = (employee: Employee) => {
+    setEditingEmployee(employee);
+    setViewMode(true);
     setIsPanelOpen(true);
   };
 
@@ -131,6 +140,7 @@ export default function Employees() {
           }}
           onNewEmployee={() => {
             setEditingEmployee(null);
+            setViewMode(false);
             setIsPanelOpen(true);
           }}
         />
@@ -141,7 +151,8 @@ export default function Employees() {
           <EmployeeTable 
             employees={paginatedEmployees} 
             onEdit={handleEditEmployee} 
-            onDelete={handleDeleteEmployee} 
+            onDelete={handleDeleteEmployee}
+            onViewDetails={handleViewEmployeeDetails}
           />
         </div>
 
@@ -155,9 +166,15 @@ export default function Employees() {
           isOpen={isPanelOpen}
           onClose={() => setIsPanelOpen(false)}
           employee={editingEmployee}
-          onSave={() => {
-            fetchEmployees();
-            setIsPanelOpen(false);
+          viewMode={viewMode}
+          onSave={(employee) => {
+            if (viewMode) {
+              // Switch to edit mode
+              setViewMode(false);
+            } else {
+              fetchEmployees();
+              setIsPanelOpen(false);
+            }
           }}
         />
       </div>

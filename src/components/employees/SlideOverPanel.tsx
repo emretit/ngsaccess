@@ -4,19 +4,22 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Employee } from '@/types/employee';
 import EmployeeForm from './EmployeeForm';
+import EmployeeDetails from './EmployeeDetails';
 
 interface SlideOverPanelProps {
   isOpen: boolean;
   onClose: () => void;
   employee: Employee | null;
   onSave: (employee: Employee) => void;
+  viewMode?: boolean;
 }
 
 export default function SlideOverPanel({ 
   isOpen, 
   onClose, 
   employee, 
-  onSave 
+  onSave,
+  viewMode = false
 }: SlideOverPanelProps) {
   const mapEmployeeToFormData = (emp: Employee | null) => {
     if (!emp) return null;
@@ -32,16 +35,20 @@ export default function SlideOverPanel({
       <SheetContent>
         <SheetHeader>
           <SheetTitle>
-            {employee ? 'Personel Düzenle' : 'Yeni Personel'}
+            {viewMode ? 'Personel Detayları' : (employee ? 'Personel Düzenle' : 'Yeni Personel')}
           </SheetTitle>
         </SheetHeader>
         
         <div className="mt-6">
-          <EmployeeForm
-            employee={mapEmployeeToFormData(employee)}
-            onClose={onClose}
-            onSave={onSave}
-          />
+          {viewMode ? (
+            <EmployeeDetails employee={employee} onEdit={() => onSave(employee!)} />
+          ) : (
+            <EmployeeForm
+              employee={mapEmployeeToFormData(employee)}
+              onClose={onClose}
+              onSave={onSave}
+            />
+          )}
         </div>
       </SheetContent>
     </Sheet>

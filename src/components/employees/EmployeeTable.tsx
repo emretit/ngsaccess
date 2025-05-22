@@ -16,9 +16,15 @@ interface EmployeeTableProps {
   employees: Employee[];
   onEdit: (employee: Employee) => void;
   onDelete: (employee: Employee) => void;
+  onViewDetails: (employee: Employee) => void;
 }
 
-export default function EmployeeTable({ employees, onEdit, onDelete }: EmployeeTableProps) {
+export default function EmployeeTable({ 
+  employees, 
+  onEdit, 
+  onDelete,
+  onViewDetails 
+}: EmployeeTableProps) {
   const {
     sortedEmployees,
     selectedEmployees,
@@ -80,8 +86,16 @@ export default function EmployeeTable({ employees, onEdit, onDelete }: EmployeeT
           </TableHeader>
           <TableBody>
             {sortedEmployees.map(employee => (
-              <TableRow key={employee.id}>
-                <TableCell>
+              <TableRow 
+                key={employee.id}
+                className="cursor-pointer"
+                onClick={(e) => {
+                  // Prevent row click when clicking on checkbox or buttons
+                  if ((e.target as HTMLElement).closest('button, input[type="checkbox"]')) return;
+                  onViewDetails(employee);
+                }}
+              >
+                <TableCell onClick={(e) => e.stopPropagation()}>
                   <Checkbox
                     checked={selectedEmployees.includes(employee.id)}
                     onCheckedChange={(checked) => handleSelectEmployee(checked as boolean, employee.id)}
@@ -103,7 +117,7 @@ export default function EmployeeTable({ employees, onEdit, onDelete }: EmployeeT
                     {employee.is_active ? 'Aktif' : 'Pasif'}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                   <Button
                     variant="ghost"
                     size="icon"
