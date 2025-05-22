@@ -27,11 +27,11 @@ export const employeeLogin = async (credentials: LoginCredentials): Promise<Auth
       return { user: null, error: 'Email or phone is required' };
     }
     
-    const response = await fetch(`${supabase.supabaseUrl}/functions/v1/employee-login`, {
+    const response = await fetch(`https://gjudsghhwmnsnndnswho.supabase.co/functions/v1/employee-login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabase.supabaseKey}`
+        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqdWRzZ2hod21uc25uZG5zd2hvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYyMzk1NTMsImV4cCI6MjA1MTgxNTU1M30.9mA6Q1JDCszfH3nujNpGWd36M4qxZ-L38GPTaNIsjVg`
       },
       body: JSON.stringify({ email, phone, password })
     });
@@ -91,7 +91,7 @@ export const fetchEmployeeRecords = async () => {
       return { records: null, error: 'Authentication required' };
     }
     
-    const response = await fetch(`${supabase.supabaseUrl}/functions/v1/employee-records`, {
+    const response = await fetch(`https://gjudsghhwmnsnndnswho.supabase.co/functions/v1/employee-records`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
