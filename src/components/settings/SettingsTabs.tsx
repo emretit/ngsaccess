@@ -14,7 +14,7 @@ interface SettingsTabsProps {
 export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
   return (
     <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-      <TabsList className="mb-6">
+      <TabsList>
         <TabsTrigger value="general">Genel</TabsTrigger>
         <TabsTrigger value="users">Kullanıcı Yönetimi</TabsTrigger>
         <TabsTrigger value="schedule">Çalışma Saatleri</TabsTrigger>
