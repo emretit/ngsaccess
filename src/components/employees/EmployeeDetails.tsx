@@ -3,8 +3,9 @@ import { Employee } from '@/types/employee';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Edit2 } from "lucide-react";
+import { Edit2, Mail, Phone, Calendar } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { format } from 'date-fns';
 
 interface EmployeeDetailProps {
   employee: Employee | null;
@@ -26,7 +27,9 @@ export default function EmployeeDetails({ employee, onEdit }: EmployeeDetailProp
           </Avatar>
           <div>
             <h3 className="font-medium text-lg">{employee.first_name} {employee.last_name}</h3>
-            <p className="text-sm text-muted-foreground">{employee.email}</p>
+            <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+              <Mail className="h-3 w-3" /> {employee.email}
+            </p>
             <div className="mt-1">
               <Badge variant={employee.is_active ? "success" : "secondary"}>
                 {employee.is_active ? 'Aktif' : 'Pasif'}
@@ -42,28 +45,52 @@ export default function EmployeeDetails({ employee, onEdit }: EmployeeDetailProp
 
       <Separator />
 
-      <div className="space-y-3">
-        <DetailItem label="TC No" value={employee.tc_no} />
-        <DetailItem label="Kart No" value={employee.card_number} />
-        <DetailItem label="Departman" value={employee.departments?.name || '-'} />
-        <DetailItem label="Pozisyon" value={employee.positions?.name || '-'} />
-        <DetailItem label="Vardiya" value={employee.shift || '-'} />
-        <DetailItem 
-          label="Erişim İzni" 
-          value={employee.access_permission ? 'Var' : 'Yok'} 
-          valueClass={employee.access_permission ? 'text-green-600' : 'text-red-600'} 
-        />
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium">Kişisel Bilgiler</h4>
+          <DetailItem label="TC No" value={employee.tc_no} />
+          <DetailItem label="Kart No" value={employee.card_number} />
+          <DetailItem 
+            label="Erişim İzni" 
+            value={employee.access_permission ? 'Var' : 'Yok'} 
+            valueClass={employee.access_permission ? 'text-green-600' : 'text-red-600'} 
+          />
+        </div>
+
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium">İş Bilgileri</h4>
+          <DetailItem label="Departman" value={employee.departments?.name || '-'} />
+          <DetailItem label="Pozisyon" value={employee.positions?.name || '-'} />
+          <DetailItem label="Vardiya" value={employee.shift || '-'} />
+        </div>
       </div>
 
       <Separator />
 
-      {employee.notes && (
-        <div>
-          <h4 className="text-sm font-medium mb-2">Notlar</h4>
-          <div className="text-sm p-3 bg-muted rounded-md">
-            {employee.notes}
-          </div>
+      <div className="space-y-3">
+        <h4 className="text-sm font-medium">Sistem Bilgileri</h4>
+        <div className="grid grid-cols-2 gap-4">
+          <DetailItem 
+            label="Oluşturulma Tarihi" 
+            value={employee.created_at ? format(new Date(employee.created_at), 'dd.MM.yyyy HH:mm') : '-'} 
+          />
+          <DetailItem 
+            label="Son Güncelleme" 
+            value={employee.updated_at ? format(new Date(employee.updated_at), 'dd.MM.yyyy HH:mm') : '-'} 
+          />
         </div>
+      </div>
+
+      {employee.notes && (
+        <>
+          <Separator />
+          <div>
+            <h4 className="text-sm font-medium mb-2">Notlar</h4>
+            <div className="text-sm p-3 bg-muted rounded-md">
+              {employee.notes}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

@@ -32,7 +32,7 @@ export default function SlideOverPanel({
 
   return (
     <Sheet open={isOpen} onOpenChange={open => !open && onClose()}>
-      <SheetContent>
+      <SheetContent className="sm:max-w-md md:max-w-lg">
         <SheetHeader>
           <SheetTitle>
             {viewMode ? 'Personel Detayları' : (employee ? 'Personel Düzenle' : 'Yeni Personel')}
