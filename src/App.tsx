@@ -18,6 +18,9 @@ import ServerDevices from "./pages/ServerDevices";
 import Settings from "./pages/Settings";
 import VirtualReaders from "./pages/VirtualReaders";
 import Profile from "./pages/Profile";
+import EmployeeLogin from "./pages/EmployeeLogin";
+import EmployeeDashboard from "./pages/EmployeeDashboard";
+import { EmployeeAuthProvider } from "./components/employee-auth/EmployeeAuthProvider";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +36,23 @@ const App = () => (
               <Sonner />
               <LandingPage />
             </>
+          } />
+          
+          {/* Employee authentication routes */}
+          <Route path="/employee-login" element={
+            <EmployeeAuthProvider>
+              <Toaster />
+              <Sonner />
+              <EmployeeLogin />
+            </EmployeeAuthProvider>
+          } />
+          
+          <Route path="/employee-dashboard" element={
+            <EmployeeAuthProvider>
+              <Toaster />
+              <Sonner />
+              <EmployeeDashboard />
+            </EmployeeAuthProvider>
           } />
           
           {/* Routes requiring authentication */}

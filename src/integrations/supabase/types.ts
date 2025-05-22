@@ -689,6 +689,47 @@ export type Database = {
           },
         ]
       }
+      employee_auth: {
+        Row: {
+          created_at: string
+          email: string | null
+          employee_id: number
+          id: string
+          last_login: string | null
+          password_hash: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          employee_id: number
+          id?: string
+          last_login?: string | null
+          password_hash?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          employee_id?: number
+          id?: string
+          last_login?: string | null
+          password_hash?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_auth_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           access_permission: boolean | null
@@ -1574,6 +1615,10 @@ export type Database = {
       }
     }
     Functions: {
+      employee_login: {
+        Args: { email_or_phone: string; password: string }
+        Returns: Json
+      }
       execute_query: {
         Args: { query_text: string }
         Returns: Json
@@ -1585,6 +1630,10 @@ export type Database = {
       generate_random_card_readings: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      get_authenticated_employee_id: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       get_employee_access_rules: {
         Args: { p_employee_id: number }
