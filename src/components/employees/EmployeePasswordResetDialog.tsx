@@ -41,7 +41,12 @@ export function EmployeePasswordResetDialog({
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
+
+      console.log('Email sent successfully:', data);
 
       toast({
         title: "Mail Gönderildi",
@@ -50,6 +55,7 @@ export function EmployeePasswordResetDialog({
 
       onOpenChange(false);
     } catch (error: any) {
+      console.error('Error sending email:', error);
       toast({
         title: "Hata",
         description: error.message || "Mail gönderilirken bir hata oluştu.",
