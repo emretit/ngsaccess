@@ -58,7 +58,7 @@ const handler = async (req: Request): Promise<Response> => {
     const setupUrl = `${Deno.env.get('SITE_URL') || 'http://localhost:8080'}/employee-setup?token=${token}`;
 
     const emailResponse = await resend.emails.send({
-      from: "PDKS Sistemi <noreply@ngsplus.app>",
+      from: "PDKS Sistemi <onboarding@resend.dev>",
       to: [email],
       subject: "PDKS Sistemi - Şifre Belirleme",
       html: `
@@ -115,7 +115,7 @@ const handler = async (req: Request): Promise<Response> => {
               
               <p style="font-size: 12px; color: #666;">
                 Bu email otomatik olarak gönderilmiştir. Lütfen yanıtlamayınız.<br>
-                PDKS Sistemi - ngsplus.app
+                PDKS Sistemi - Resend.dev
               </p>
             </div>
           </div>
