@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import Logo from '@/components/ui/logo';
 
 const LandingHeader = () => {
-  // Sayfa içi kaydırma fonksiyonu
   const scrollToSection = (sectionId: string) => (e: React.MouseEvent) => {
     e.preventDefault();
     const element = document.getElementById(sectionId);
@@ -16,27 +15,68 @@ const LandingHeader = () => {
   };
 
   return (
-    <header className="border-b bg-white sticky top-0 z-10 shadow-sm">
-      <div className="container mx-auto px-4 py-6 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <Logo size="lg" variant="full" className="mr-2" />
-          <Badge variant="outline" className="hidden sm:inline-flex text-sm px-3 py-1">Cloud</Badge>
-        </div>
-        
-        <nav className="hidden md:flex items-center space-x-8">
-          <a href="#features" onClick={scrollToSection('features')} className="text-foreground/80 hover:text-foreground transition-colors font-medium">Özellikler</a>
-          <a href="#pricing" onClick={scrollToSection('pricing')} className="text-foreground/80 hover:text-foreground transition-colors font-medium">Fiyatlandırma</a>
-          <a href="#testimonials" onClick={scrollToSection('testimonials')} className="text-foreground/80 hover:text-foreground transition-colors font-medium">Hakkımızda</a>
-          <a href="#contact" onClick={scrollToSection('contact')} className="text-foreground/80 hover:text-foreground transition-colors font-medium">İletişim</a>
-        </nav>
-        
-        <div className="flex items-center space-x-3">
-          <Button asChild variant="outline" className="mr-2 hidden sm:inline-flex">
-            <Link to="/login">Giriş Yap</Link>
-          </Button>
-          <Button asChild className="px-6 py-2">
-            <Link to="/register">Başlayın</Link>
-          </Button>
+    <header className="bg-[#800020] sticky top-0 z-10 shadow-lg border-b border-[#600018]">
+      <div className="container mx-auto px-6 py-4">
+        <div className="flex items-center justify-between">
+          {/* Logo Section */}
+          <div className="flex items-center gap-4">
+            <Logo size="lg" variant="full" />
+            <Badge 
+              variant="outline" 
+              className="hidden sm:inline-flex text-xs px-3 py-1 border-white/30 text-white/90 bg-white/10 hover:bg-white/20"
+            >
+              Cloud
+            </Badge>
+          </div>
+          
+          {/* Navigation */}
+          <nav className="hidden md:flex items-center space-x-8">
+            <a 
+              href="#features" 
+              onClick={scrollToSection('features')} 
+              className="text-white/90 hover:text-white transition-colors font-medium text-sm tracking-wide hover:underline"
+            >
+              Özellikler
+            </a>
+            <a 
+              href="#pricing" 
+              onClick={scrollToSection('pricing')} 
+              className="text-white/90 hover:text-white transition-colors font-medium text-sm tracking-wide hover:underline"
+            >
+              Fiyatlandırma
+            </a>
+            <a 
+              href="#testimonials" 
+              onClick={scrollToSection('testimonials')} 
+              className="text-white/90 hover:text-white transition-colors font-medium text-sm tracking-wide hover:underline"
+            >
+              Hakkımızda
+            </a>
+            <a 
+              href="#contact" 
+              onClick={scrollToSection('contact')} 
+              className="text-white/90 hover:text-white transition-colors font-medium text-sm tracking-wide hover:underline"
+            >
+              İletişim
+            </a>
+          </nav>
+          
+          {/* Action Buttons */}
+          <div className="flex items-center gap-3">
+            <Button 
+              asChild 
+              variant="outline" 
+              className="hidden sm:inline-flex border-white/30 text-white bg-transparent hover:bg-white/10 hover:text-white"
+            >
+              <Link to="/login">Giriş Yap</Link>
+            </Button>
+            <Button 
+              asChild 
+              className="bg-white text-[#800020] hover:bg-white/90 font-semibold px-6 py-2 shadow-lg"
+            >
+              <Link to="/register">Başlayın</Link>
+            </Button>
+          </div>
         </div>
       </div>
     </header>
