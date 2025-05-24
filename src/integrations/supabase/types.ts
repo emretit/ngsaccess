@@ -698,6 +698,8 @@ export type Database = {
           last_login: string | null
           password_hash: string | null
           phone: string | null
+          setup_token: string | null
+          token_expires_at: string | null
           updated_at: string
         }
         Insert: {
@@ -708,6 +710,8 @@ export type Database = {
           last_login?: string | null
           password_hash?: string | null
           phone?: string | null
+          setup_token?: string | null
+          token_expires_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -718,6 +722,8 @@ export type Database = {
           last_login?: string | null
           password_hash?: string | null
           phone?: string | null
+          setup_token?: string | null
+          token_expires_at?: string | null
           updated_at?: string
         }
         Relationships: [

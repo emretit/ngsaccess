@@ -38,23 +38,19 @@ export default function EmployeeSetup() {
 
   const validateToken = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: authData, error: authError } = await supabase
         .from('employee_auth')
-        .select(`
-          employee_id,
-          token_expires_at,
-          employees!inner(first_name, last_name)
-        `)
+        .select('employee_id, token_expires_at')
         .eq('setup_token', token)
         .single();
 
-      if (error || !data) {
+      if (authError || !authData) {
         setTokenValid(false);
         return;
       }
 
       // Check if token is expired
-      const expiresAt = new Date(data.token_expires_at);
+      const expiresAt = new Date(authData.token_expires_at);
       const now = new Date();
       
       if (now > expiresAt) {
@@ -67,8 +63,20 @@ export default function EmployeeSetup() {
         return;
       }
 
+      // Get employee info
+      const { data: employeeData, error: employeeError } = await supabase
+        .from('employees')
+        .select('first_name, last_name')
+        .eq('id', authData.employee_id)
+        .single();
+
+      if (employeeError || !employeeData) {
+        setTokenValid(false);
+        return;
+      }
+
       setTokenValid(true);
-      setEmployeeInfo(data.employees);
+      setEmployeeInfo(employeeData);
     } catch (error) {
       console.error('Token validation error:', error);
       setTokenValid(false);

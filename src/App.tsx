@@ -20,6 +20,7 @@ import VirtualReaders from "./pages/VirtualReaders";
 import Profile from "./pages/Profile";
 import EmployeeLogin from "./pages/EmployeeLogin";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
+import EmployeeSetup from "./pages/EmployeeSetup";
 import { EmployeeAuthProvider } from "./components/employee-auth/EmployeeAuthProvider";
 
 const queryClient = new QueryClient();
@@ -45,6 +46,14 @@ const App = () => (
               <Sonner />
               <EmployeeLogin />
             </EmployeeAuthProvider>
+          } />
+          
+          <Route path="/employee-setup" element={
+            <>
+              <Toaster />
+              <Sonner />
+              <EmployeeSetup />
+            </>
           } />
           
           <Route path="/employee-dashboard" element={
