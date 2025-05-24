@@ -18,8 +18,8 @@ const LandingHeader = () => {
     <header className="bg-white sticky top-0 z-10 shadow-lg border-b border-gray-200">
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
-          {/* Logo Section - Bordo arka plan */}
-          <div className="flex items-center gap-4 bg-[#800020] px-6 py-3 rounded-lg shadow-md">
+          {/* Logo Section - Primary renk arka plan */}
+          <div className="flex items-center gap-4 bg-primary px-6 py-3 rounded-lg shadow-md">
             <Logo size="lg" variant="full" />
             <Badge 
               variant="outline" 
@@ -66,13 +66,13 @@ const LandingHeader = () => {
             <Button 
               asChild 
               variant="outline" 
-              className="hidden sm:inline-flex border-[#800020] text-[#800020] bg-transparent hover:bg-[#800020] hover:text-white"
+              className="hidden sm:inline-flex border-primary text-primary bg-transparent hover:bg-primary hover:text-white"
             >
               <Link to="/login">Giriş Yap</Link>
             </Button>
             <Button 
               asChild 
-              className="bg-[#800020] text-white hover:bg-[#800020]/90 font-semibold px-6 py-2 shadow-lg"
+              className="bg-primary text-white hover:bg-primary/90 font-semibold px-6 py-2 shadow-lg"
             >
               <Link to="/register">Başlayın</Link>
             </Button>

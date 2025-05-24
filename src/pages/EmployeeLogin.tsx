@@ -63,7 +63,7 @@ export default function EmployeeLogin() {
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-background to-muted/30">
       <div className="w-full max-w-md px-4">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-[#711A1A] rounded-md flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
+          <div className="w-16 h-16 bg-primary rounded-md flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
             P
           </div>
           <h1 className="text-2xl font-bold">PDKS Personel Girişi</h1>
@@ -149,7 +149,7 @@ export default function EmployeeLogin() {
                 
                 <Button 
                   type="submit" 
-                  className="w-full h-11 bg-[#711A1A] hover:bg-[#5a1515]" 
+                  className="w-full h-11 bg-primary hover:bg-primary/90" 
                   disabled={isLoading}
                 >
                   {isLoading ? "Giriş yapılıyor..." : "Giriş Yap"}
@@ -162,7 +162,7 @@ export default function EmployeeLogin() {
               Bu giriş, sadece personel içindir. Yönetim girişi için{" "}
               <Button 
                 variant="link" 
-                className="p-0 h-auto text-[#711A1A]" 
+                className="p-0 h-auto text-primary" 
                 onClick={() => navigate('/login')}
               >
                 buraya tıklayın
