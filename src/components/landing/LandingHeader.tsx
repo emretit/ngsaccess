@@ -34,28 +34,28 @@ const LandingHeader = () => {
             <a 
               href="#features" 
               onClick={scrollToSection('features')} 
-              className="text-white/90 hover:text-white transition-colors font-medium text-sm tracking-wide hover:underline"
+              className="text-gray-700 hover:text-primary transition-colors font-medium text-sm tracking-wide hover:underline"
             >
               Özellikler
             </a>
             <a 
               href="#pricing" 
               onClick={scrollToSection('pricing')} 
-              className="text-white/90 hover:text-white transition-colors font-medium text-sm tracking-wide hover:underline"
+              className="text-gray-700 hover:text-primary transition-colors font-medium text-sm tracking-wide hover:underline"
             >
               Fiyatlandırma
             </a>
             <a 
               href="#testimonials" 
               onClick={scrollToSection('testimonials')} 
-              className="text-white/90 hover:text-white transition-colors font-medium text-sm tracking-wide hover:underline"
+              className="text-gray-700 hover:text-primary transition-colors font-medium text-sm tracking-wide hover:underline"
             >
               Hakkımızda
             </a>
             <a 
               href="#contact" 
               onClick={scrollToSection('contact')} 
-              className="text-white/90 hover:text-white transition-colors font-medium text-sm tracking-wide hover:underline"
+              className="text-gray-700 hover:text-primary transition-colors font-medium text-sm tracking-wide hover:underline"
             >
               İletişim
             </a>
