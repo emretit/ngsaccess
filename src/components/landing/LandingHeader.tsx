@@ -15,11 +15,11 @@ const LandingHeader = () => {
   };
 
   return (
-    <header className="bg-[#800020] sticky top-0 z-10 shadow-lg border-b border-[#600018]">
+    <header className="bg-white sticky top-0 z-10 shadow-lg border-b border-gray-200">
       <div className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
-          {/* Logo Section */}
-          <div className="flex items-center gap-4">
+          {/* Logo Section - Bordo arka plan */}
+          <div className="flex items-center gap-4 bg-[#800020] px-6 py-3 rounded-lg shadow-md">
             <Logo size="lg" variant="full" />
             <Badge 
               variant="outline" 
@@ -66,13 +66,13 @@ const LandingHeader = () => {
             <Button 
               asChild 
               variant="outline" 
-              className="hidden sm:inline-flex border-white/30 text-white bg-transparent hover:bg-white/10 hover:text-white"
+              className="hidden sm:inline-flex border-[#800020] text-[#800020] bg-transparent hover:bg-[#800020] hover:text-white"
             >
               <Link to="/login">Giriş Yap</Link>
             </Button>
             <Button 
               asChild 
-              className="bg-white text-[#800020] hover:bg-white/90 font-semibold px-6 py-2 shadow-lg"
+              className="bg-[#800020] text-white hover:bg-[#800020]/90 font-semibold px-6 py-2 shadow-lg"
             >
               <Link to="/register">Başlayın</Link>
             </Button>
