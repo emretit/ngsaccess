@@ -32,16 +32,44 @@ export function EmployeePasswordResetDialog({
 
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('send-employee-setup-email', {
-        body: {
+      // Call Netlify function instead of Supabase function
+      const response = await fetch('/.netlify/functions/send-employee-setup-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           employee_id: employee.id,
           email: employee.email,
           first_name: employee.first_name,
           last_name: employee.last_name
-        }
+        })
       });
 
-      if (error) throw error;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Mail gönderilirken bir hata oluştu.');
+      }
+
+      // Store the token in employee_auth table
+      if (data.token) {
+        const { error: authError } = await supabase
+          .from('employee_auth')
+          .upsert({
+            employee_id: employee.id,
+            email: employee.email,
+            password_hash: null,
+            setup_token: data.token,
+            token_expires_at: data.expires_at,
+            last_login: null
+          });
+
+        if (authError) {
+          console.error('Error storing auth token:', authError);
+          // Continue anyway since email was sent
+        }
+      }
 
       toast({
         title: "Mail Gönderildi",
