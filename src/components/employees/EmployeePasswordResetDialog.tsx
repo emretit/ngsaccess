@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import {
   Dialog,
@@ -31,7 +32,7 @@ export function EmployeePasswordResetDialog({
 
     setIsLoading(true);
     try {
-      // Call Netlify function
+      // Call Netlify function instead of Supabase function
       const response = await fetch('/.netlify/functions/send-employee-setup-email', {
         method: 'POST',
         headers: {
