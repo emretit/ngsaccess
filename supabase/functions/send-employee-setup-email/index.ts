@@ -37,17 +37,45 @@ const handler = async (req: Request): Promise<Response> => {
     const token = crypto.randomUUID();
     const expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
 
-    // Store token in employee_auth table
-    const { error: authError } = await supabase
+    // Check if employee_auth record already exists
+    const { data: existingAuth, error: checkError } = await supabase
       .from('employee_auth')
-      .upsert({
-        employee_id,
-        email,
-        password_hash: null, // Will be set when password is created
-        setup_token: token,
-        token_expires_at: expires_at.toISOString(),
-        last_login: null
-      });
+      .select('id')
+      .eq('employee_id', employee_id)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows found
+      console.error('Error checking existing auth:', checkError);
+      throw new Error('Failed to check existing authentication record');
+    }
+
+    let authError;
+    if (existingAuth) {
+      // Update existing record
+      const { error } = await supabase
+        .from('employee_auth')
+        .update({
+          email,
+          setup_token: token,
+          token_expires_at: expires_at.toISOString(),
+          password_hash: null
+        })
+        .eq('employee_id', employee_id);
+      authError = error;
+    } else {
+      // Create new record
+      const { error } = await supabase
+        .from('employee_auth')
+        .insert({
+          employee_id,
+          email,
+          password_hash: null,
+          setup_token: token,
+          token_expires_at: expires_at.toISOString(),
+          last_login: null
+        });
+      authError = error;
+    }
 
     if (authError) {
       console.error('Error storing auth token:', authError);
