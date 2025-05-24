@@ -6,11 +6,13 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Edit2, Trash2 } from "lucide-react";
+import { Edit2, Trash2, Mail } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useEmployeeTable } from '@/hooks/useEmployeeTable';
 import { EmployeeBulkActions } from './EmployeeBulkActions';
 import { EmployeeDeleteDialog } from './EmployeeDeleteDialog';
+import { EmployeePasswordResetDialog } from './EmployeePasswordResetDialog';
+import { useState } from 'react';
 
 interface EmployeeTableProps {
   employees: Employee[];
@@ -25,6 +27,9 @@ export default function EmployeeTable({
   onDelete,
   onViewDetails 
 }: EmployeeTableProps) {
+  const [selectedEmployeeForReset, setSelectedEmployeeForReset] = useState<Employee | null>(null);
+  const [showPasswordResetDialog, setShowPasswordResetDialog] = useState(false);
+  
   const {
     sortedEmployees,
     selectedEmployees,
@@ -38,6 +43,11 @@ export default function EmployeeTable({
     handleBulkDepartmentUpdate,
     requestSort
   } = useEmployeeTable(employees);
+
+  const handlePasswordResetClick = (employee: Employee) => {
+    setSelectedEmployeeForReset(employee);
+    setShowPasswordResetDialog(true);
+  };
 
   return (
     <div className="space-y-4">
@@ -121,6 +131,15 @@ export default function EmployeeTable({
                   <Button
                     variant="ghost"
                     size="icon"
+                    onClick={() => handlePasswordResetClick(employee)}
+                    className="mr-2"
+                    title="Şifre Sıfırlama Maili Gönder"
+                  >
+                    <Mail className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => onEdit(employee)}
                     className="mr-2"
                   >
@@ -146,6 +165,12 @@ export default function EmployeeTable({
         onOpenChange={setShowDeleteDialog}
         selectedCount={selectedEmployees.length}
         onConfirm={handleBulkDelete}
+      />
+
+      <EmployeePasswordResetDialog
+        isOpen={showPasswordResetDialog}
+        onOpenChange={setShowPasswordResetDialog}
+        employee={selectedEmployeeForReset}
       />
     </div>
   );
