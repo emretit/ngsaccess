@@ -18,19 +18,19 @@ const Logo: React.FC<LogoProps> = ({
       container: 'h-8',
       icon: 'h-6 w-6',
       text: 'text-lg',
-      plus: 'w-3 h-3'
+      logo: 'h-6 w-6'
     },
     md: {
       container: 'h-10',
       icon: 'h-8 w-8',
       text: 'text-xl',
-      plus: 'w-4 h-4'
+      logo: 'h-8 w-8'
     },
     lg: {
       container: 'h-12',
       icon: 'h-10 w-10',
       text: 'text-2xl',
-      plus: 'w-5 h-5'
+      logo: 'h-10 w-10'
     }
   };
 
@@ -41,12 +41,11 @@ const Logo: React.FC<LogoProps> = ({
   if (variant === 'icon') {
     return (
       <div className={`flex items-center justify-center ${className}`}>
-        <div className={`bg-[#800020] rounded-md flex items-center justify-center relative ${currentSize.icon}`}>
-          <span className="text-white font-bold">N</span>
-          <div className={`absolute -bottom-1 -right-1 bg-white rounded-full flex items-center justify-center ${currentSize.plus}`}>
-            <span className="text-[#800020] font-bold text-xs">+</span>
-          </div>
-        </div>
+        <img 
+          src="/lovable-uploads/42e75e5c-71bf-4922-82ed-7f442cd9d3ea.png" 
+          alt="NGS Plus" 
+          className={`${currentSize.logo} object-contain`}
+        />
       </div>
     );
   }
@@ -54,12 +53,11 @@ const Logo: React.FC<LogoProps> = ({
   if (variant === 'compact') {
     return (
       <div className={`flex items-center ${className}`}>
-        <div className={`bg-[#800020] rounded-md flex items-center justify-center mr-2 relative ${currentSize.icon}`}>
-          <span className="text-white font-bold">N</span>
-          <div className={`absolute -bottom-1 -right-1 bg-white rounded-full flex items-center justify-center ${currentSize.plus}`}>
-            <span className="text-[#800020] font-bold text-xs">+</span>
-          </div>
-        </div>
+        <img 
+          src="/lovable-uploads/42e75e5c-71bf-4922-82ed-7f442cd9d3ea.png" 
+          alt="NGS Plus" 
+          className={`${currentSize.logo} object-contain mr-2`}
+        />
         <span className={`font-semibold font-['Poppins'] ${currentSize.text}`}>
           <span className="text-[#800020]">Plus</span>
         </span>
@@ -70,12 +68,11 @@ const Logo: React.FC<LogoProps> = ({
   // Default full logo
   return (
     <div className={`flex items-center ${className}`}>
-      <div className={`bg-[#800020] rounded-md flex items-center justify-center mr-2 relative ${currentSize.icon}`}>
-        <span className="text-white font-bold">N</span>
-        <div className={`absolute -bottom-1 -right-1 bg-white rounded-full flex items-center justify-center ${currentSize.plus}`}>
-          <span className="text-[#800020] font-bold text-xs">+</span>
-        </div>
-      </div>
+      <img 
+        src="/lovable-uploads/42e75e5c-71bf-4922-82ed-7f442cd9d3ea.png" 
+        alt="NGS Plus" 
+        className={`${currentSize.logo} object-contain mr-2`}
+      />
       <span className={`font-semibold font-['Poppins'] ${currentSize.text}`}>
         <span className="text-gray-800">NGS</span> <span className="text-[#800020]">Plus</span>
       </span>

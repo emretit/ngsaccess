@@ -743,6 +743,7 @@ export type Database = {
           is_active: boolean | null
           last_name: string
           notes: string | null
+          password: string | null
           photo_url: string | null
           position_id: number | null
           shift: string | null
@@ -762,6 +763,7 @@ export type Database = {
           is_active?: boolean | null
           last_name: string
           notes?: string | null
+          password?: string | null
           photo_url?: string | null
           position_id?: number | null
           shift?: string | null
@@ -781,6 +783,7 @@ export type Database = {
           is_active?: boolean | null
           last_name?: string
           notes?: string | null
+          password?: string | null
           photo_url?: string | null
           position_id?: number | null
           shift?: string | null
