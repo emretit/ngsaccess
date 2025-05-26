@@ -13,22 +13,28 @@ import { EmployeeBulkActions } from './EmployeeBulkActions';
 import { EmployeeDeleteDialog } from './EmployeeDeleteDialog';
 import { EmployeePasswordResetDialog } from './EmployeePasswordResetDialog';
 import { useState } from 'react';
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 interface EmployeeTableProps {
   employees: Employee[];
   onEdit: (employee: Employee) => void;
   onDelete: (employee: Employee) => void;
   onViewDetails: (employee: Employee) => void;
+  onRefresh?: () => void;
 }
 
 export default function EmployeeTable({ 
   employees, 
   onEdit, 
   onDelete,
-  onViewDetails 
+  onViewDetails,
+  onRefresh 
 }: EmployeeTableProps) {
   const [selectedEmployeeForReset, setSelectedEmployeeForReset] = useState<Employee | null>(null);
   const [showPasswordResetDialog, setShowPasswordResetDialog] = useState(false);
+  const [showIndividualDeleteDialog, setShowIndividualDeleteDialog] = useState(false);
+  const [selectedEmployeeForDelete, setSelectedEmployeeForDelete] = useState<Employee | null>(null);
   
   const {
     sortedEmployees,
@@ -47,6 +53,39 @@ export default function EmployeeTable({
   const handlePasswordResetClick = (employee: Employee) => {
     setSelectedEmployeeForReset(employee);
     setShowPasswordResetDialog(true);
+  };
+
+  const handleIndividualDeleteClick = (employee: Employee) => {
+    setSelectedEmployeeForDelete(employee);
+    setShowIndividualDeleteDialog(true);
+  };
+
+  const handleIndividualDeleteConfirm = async () => {
+    if (!selectedEmployeeForDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from('employees')
+        .delete()
+        .eq('id', selectedEmployeeForDelete.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Başarılı",
+        description: "Personel silindi",
+      });
+      
+      setShowIndividualDeleteDialog(false);
+      setSelectedEmployeeForDelete(null);
+      onRefresh?.();
+    } catch (error) {
+      toast({
+        title: "Hata",
+        description: "Personel silinirken bir hata oluştu",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -148,7 +187,7 @@ export default function EmployeeTable({
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => onDelete(employee)}
+                    onClick={() => handleIndividualDeleteClick(employee)}
                     className="text-destructive hover:text-destructive"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -165,6 +204,13 @@ export default function EmployeeTable({
         onOpenChange={setShowDeleteDialog}
         selectedCount={selectedEmployees.length}
         onConfirm={handleBulkDelete}
+      />
+
+      <EmployeeDeleteDialog
+        isOpen={showIndividualDeleteDialog}
+        onOpenChange={setShowIndividualDeleteDialog}
+        selectedCount={1}
+        onConfirm={handleIndividualDeleteConfirm}
       />
 
       <EmployeePasswordResetDialog

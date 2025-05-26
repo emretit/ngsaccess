@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import DepartmentTree from "@/components/departments/DepartmentTree";
@@ -98,15 +97,7 @@ export default function Employees() {
   };
 
   const handleDeleteEmployee = (employee: Employee) => {
-    if (window.confirm(`Personeli silmek istediğinize emin misiniz: ${employee.first_name} ${employee.last_name}?`)) {
-      supabase
-        .from('employees')
-        .delete()
-        .eq('id', employee.id)
-        .then(() => {
-          fetchEmployees();
-        });
-    }
+    console.log('Delete employee:', employee);
   };
 
   if (loading) {
@@ -153,6 +144,7 @@ export default function Employees() {
             onEdit={handleEditEmployee} 
             onDelete={handleDeleteEmployee}
             onViewDetails={handleViewEmployeeDetails}
+            onRefresh={fetchEmployees}
           />
         </div>
 
