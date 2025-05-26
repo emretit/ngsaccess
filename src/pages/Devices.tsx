@@ -5,7 +5,6 @@ import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { QRCodeDialog } from "@/components/devices/QRCodeDialog";
 import { AssignLocationForm } from "@/components/devices/AssignLocationForm";
 import { DeviceDetailsPanel } from "@/components/devices/DeviceDetailsPanel";
-import { DevicesHeader } from "@/components/devices/DevicesHeader";
 import { DevicesContent } from "@/components/devices/DevicesContent";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
@@ -56,14 +55,6 @@ export default function Devices() {
       </div>
       
       <div className="flex-1 space-y-6">
-        <DevicesHeader
-          deviceCount={devices.length}
-          filteredCount={devices.length}
-          onAddDevice={addDevice}
-          isAddingDevice={isAddingDevice}
-          onOpenDevicePanel={() => openDevicePanel()}
-        />
-
         <DevicesContent
           devices={devices}
           isLoading={isLoading}
@@ -75,6 +66,7 @@ export default function Devices() {
           onDeleteDevice={handleDeleteDevice}
           onAssignLocation={openLocationForm}
           onEditDevice={handleDeviceEditClick}
+          onNewDevice={() => openDevicePanel()}
         />
 
         <QRCodeDialog 
