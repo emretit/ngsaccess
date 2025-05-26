@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { ServerDevice, Project } from '@/types/device';
 import { useServerDeviceForm } from '@/hooks/useServerDeviceForm';
 import { ServerDeviceFormFields } from './ServerDeviceFormFields';
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface ServerDeviceFormProps {
   open: boolean;
@@ -54,47 +53,43 @@ export function ServerDeviceForm({
   };
 
   return (
-    <div className="pt-4">
-      <ScrollArea className="h-[calc(100vh-180px)] px-1">
-        <form onSubmit={handleSubmit} className="space-y-6 pr-4">
-          <ServerDeviceFormFields
-            name={name}
-            onNameChange={setName}
-            serialNumber={serialNumber}
-            onSerialNumberChange={setSerialNumber}
-            deviceModel={deviceModel}
-            onDeviceModelChange={setDeviceModel}
-            projectId={projectId}
-            onProjectChange={setProjectId}
-            expiryDate={expiryDate}
-            onExpiryDateChange={setExpiryDate}
-            projects={projects}
-            zoneId={zoneId}
-            onZoneChange={setZoneId}
-            doorId={doorId}
-            onDoorChange={setDoorId}
-            description={description}
-            onDescriptionChange={setDescription}
-            ipAddress={ipAddress}
-            onIpAddressChange={setIpAddress}
-            macAddress={macAddress}
-            onMacAddressChange={setMacAddress}
-            isActive={isActive}
-            onIsActiveChange={handleIsActiveChange}
-            firmwareVersion={firmwareVersion}
-            onFirmwareVersionChange={setFirmwareVersion}
-          />
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <ServerDeviceFormFields
+        name={name}
+        onNameChange={setName}
+        serialNumber={serialNumber}
+        onSerialNumberChange={setSerialNumber}
+        deviceModel={deviceModel}
+        onDeviceModelChange={setDeviceModel}
+        projectId={projectId}
+        onProjectChange={setProjectId}
+        expiryDate={expiryDate}
+        onExpiryDateChange={setExpiryDate}
+        projects={projects}
+        zoneId={zoneId}
+        onZoneChange={setZoneId}
+        doorId={doorId}
+        onDoorChange={setDoorId}
+        description={description}
+        onDescriptionChange={setDescription}
+        ipAddress={ipAddress}
+        onIpAddressChange={setIpAddress}
+        macAddress={macAddress}
+        onMacAddressChange={setMacAddress}
+        isActive={isActive}
+        onIsActiveChange={handleIsActiveChange}
+        firmwareVersion={firmwareVersion}
+        onFirmwareVersionChange={setFirmwareVersion}
+      />
 
-          <div className="flex justify-end gap-4 pt-4 sticky bottom-0 bg-background pb-4">
-            <Button type="button" variant="outline" onClick={onClose}>
-              İptal
-            </Button>
-            <Button type="submit">
-              {device ? 'Güncelle' : 'Ekle'}
-            </Button>
-          </div>
-        </form>
-      </ScrollArea>
-    </div>
+      <div className="flex justify-end gap-4 pt-4 border-t sticky bottom-0 bg-background">
+        <Button type="button" variant="outline" onClick={onClose}>
+          İptal
+        </Button>
+        <Button type="submit">
+          {device ? 'Güncelle' : 'Ekle'}
+        </Button>
+      </div>
+    </form>
   );
 }

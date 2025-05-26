@@ -2,6 +2,7 @@
 'use client';
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Employee } from '@/types/employee';
 import EmployeeForm from './EmployeeForm';
 import EmployeeDetails from './EmployeeDetails';
@@ -32,24 +33,28 @@ export default function SlideOverPanel({
 
   return (
     <Sheet open={isOpen} onOpenChange={open => !open && onClose()}>
-      <SheetContent className="sm:max-w-md md:max-w-lg">
-        <SheetHeader>
-          <SheetTitle>
-            {viewMode ? 'Personel Detayları' : (employee ? 'Personel Düzenle' : 'Yeni Personel')}
-          </SheetTitle>
-        </SheetHeader>
-        
-        <div className="mt-6">
-          {viewMode ? (
-            <EmployeeDetails employee={employee} onEdit={() => onSave(employee!)} />
-          ) : (
-            <EmployeeForm
-              employee={mapEmployeeToFormData(employee)}
-              onClose={onClose}
-              onSave={onSave}
-            />
-          )}
+      <SheetContent className="sm:max-w-md md:max-w-lg p-0">
+        <div className="p-6 border-b">
+          <SheetHeader>
+            <SheetTitle>
+              {viewMode ? 'Personel Detayları' : (employee ? 'Personel Düzenle' : 'Yeni Personel')}
+            </SheetTitle>
+          </SheetHeader>
         </div>
+        
+        <ScrollArea className="h-[calc(100vh-120px)]">
+          <div className="p-6">
+            {viewMode ? (
+              <EmployeeDetails employee={employee} onEdit={() => onSave(employee!)} />
+            ) : (
+              <EmployeeForm
+                employee={mapEmployeeToFormData(employee)}
+                onClose={onClose}
+                onSave={onSave}
+              />
+            )}
+          </div>
+        </ScrollArea>
       </SheetContent>
     </Sheet>
   );
