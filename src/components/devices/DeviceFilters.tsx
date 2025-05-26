@@ -30,9 +30,6 @@ export function DeviceFilters({
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Cihazlar</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Cihaz listesi ve filtreleme seçenekleri
-          </p>
         </div>
         
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
