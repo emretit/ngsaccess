@@ -63,97 +63,88 @@ export function DeviceList({
   }
 
   return (
-    <Card className="shadow-md border-0">
-      <CardHeader className="bg-muted/30 pb-2">
-        <CardTitle className="text-xl font-semibold text-primary flex items-center justify-between">
-          <span>Cihaz Listesi</span>
-          <Badge variant="outline" className="ml-2">
-            {filteredDevices.length} / {devices.length} Cihaz
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        {selectedDevices.length > 0 && (
-          <div className="p-4">
-            <DeviceBulkActions
-              selectedCount={selectedDevices.length}
-              onDelete={() => setShowDeleteDialog(true)}
-            />
-          </div>
-        )}
-        <div className="rounded-md overflow-hidden">
-          <Table>
-            <TableHeader className="bg-muted/20">
-              <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox 
-                    checked={filteredDevices.length > 0 && selectedDevices.length === filteredDevices.length} 
-                    onCheckedChange={handleSelectAll}
-                  />
-                </TableHead>
-                <TableHead>QR Kod</TableHead>
-                <TableHead>İsim</TableHead>
-                <TableHead>Seri No</TableHead>
-                <TableHead>Konum</TableHead>
-                <TableHead>Tip</TableHead>
-                <TableHead>Durum</TableHead>
-                <TableHead>Son Görülme</TableHead>
-                <TableHead className="text-right">İşlemler</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-16">
-                    <div className="flex flex-col items-center justify-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-2" />
-                      <span className="text-muted-foreground">Cihazlar yükleniyor...</span>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : filteredDevices.length > 0 ? (
-                filteredDevices.map((device) => (
-                  <DeviceTableRow
-                    key={device.id}
-                    device={device}
-                    locationString={getLocationString(device)}
-                    onQRClick={onQRClick}
-                    onDeleteDevice={onDeleteDevice}
-                    onAssignLocation={onAssignLocation}
-                    onEditDevice={onEditDevice}
-                    selected={selectedDevices.includes(device.id)}
-                    onSelect={handleSelectDevice}
-                  />
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-16">
-                    <div className="flex flex-col items-center justify-center">
-                      <p className="text-muted-foreground">
-                        {devices.length > 0 
-                          ? "Filtrelere uygun cihaz bulunamadı" 
-                          : "Henüz cihaz bulunmuyor"}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        {devices.length > 0 
-                          ? "Lütfen filtrelerinizi değiştirip tekrar deneyin" 
-                          : "Yeni cihaz eklemek için 'Yeni Cihaz Ekle' butonuna tıklayın"}
-                      </p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+    <div className="glass-card overflow-hidden">
+      {selectedDevices.length > 0 && (
+        <div className="p-4 border-b">
+          <DeviceBulkActions
+            selectedCount={selectedDevices.length}
+            onDelete={() => setShowDeleteDialog(true)}
+          />
         </div>
+      )}
+      
+      <div className="rounded-md">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[50px]">
+                <Checkbox 
+                  checked={filteredDevices.length > 0 && selectedDevices.length === filteredDevices.length} 
+                  onCheckedChange={handleSelectAll}
+                />
+              </TableHead>
+              <TableHead>QR Kod</TableHead>
+              <TableHead>İsim</TableHead>
+              <TableHead>Seri No</TableHead>
+              <TableHead>Konum</TableHead>
+              <TableHead>Tip</TableHead>
+              <TableHead>Durum</TableHead>
+              <TableHead>Son Görülme</TableHead>
+              <TableHead className="text-right">İşlemler</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={9} className="text-center py-16">
+                  <div className="flex flex-col items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-2" />
+                    <span className="text-muted-foreground">Cihazlar yükleniyor...</span>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : filteredDevices.length > 0 ? (
+              filteredDevices.map((device) => (
+                <DeviceTableRow
+                  key={device.id}
+                  device={device}
+                  locationString={getLocationString(device)}
+                  onQRClick={onQRClick}
+                  onDeleteDevice={onDeleteDevice}
+                  onAssignLocation={onAssignLocation}
+                  onEditDevice={onEditDevice}
+                  selected={selectedDevices.includes(device.id)}
+                  onSelect={handleSelectDevice}
+                />
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={9} className="text-center py-16">
+                  <div className="flex flex-col items-center justify-center">
+                    <p className="text-muted-foreground">
+                      {devices.length > 0 
+                        ? "Filtrelere uygun cihaz bulunamadı" 
+                        : "Henüz cihaz bulunmuyor"}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {devices.length > 0 
+                        ? "Lütfen filtrelerinizi değiştirip tekrar deneyin" 
+                        : "Yeni cihaz eklemek için 'Yeni Cihaz Ekle' butonuna tıklayın"}
+                    </p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
-        <DeviceDeleteDialog 
-          isOpen={showDeleteDialog}
-          onOpenChange={setShowDeleteDialog}
-          selectedCount={selectedDevices.length}
-          onConfirm={handleBulkDelete}
-        />
-      </CardContent>
-    </Card>
+      <DeviceDeleteDialog 
+        isOpen={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        selectedCount={selectedDevices.length}
+        onConfirm={handleBulkDelete}
+      />
+    </div>
   );
 }

@@ -2,7 +2,7 @@
 import { Smartphone, WifiOff, CircleCheck, AlertCircle } from "lucide-react";
 import { Device } from "@/types/device";
 import { useMemo } from "react";
-import StatusCard from "@/components/StatusCard";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface DeviceStatsProps {
   devices: Device[];
@@ -17,34 +17,38 @@ export function DeviceStats({ devices }: DeviceStatsProps) {
   }), [devices]);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-      <StatusCard
-        title="Toplam Cihaz"
-        value={stats.total}
-        icon={<Smartphone className="h-5 w-5 text-primary opacity-75" />}
-        className="glass-card"
-      />
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="glass-card flex items-center justify-between p-6">
+        <Smartphone className="h-8 w-8 text-primary opacity-75" />
+        <div className="text-right">
+          <p className="text-sm text-muted-foreground">Toplam Cihaz</p>
+          <p className="text-2xl font-bold">{stats.total}</p>
+        </div>
+      </div>
       
-      <StatusCard
-        title="Aktif Cihaz"
-        value={stats.online}
-        icon={<CircleCheck className="h-5 w-5 text-green-500 opacity-75" />}
-        className="glass-card"
-      />
+      <div className="glass-card flex items-center justify-between p-6">
+        <CircleCheck className="h-8 w-8 text-green-500 opacity-75" />
+        <div className="text-right">
+          <p className="text-sm text-muted-foreground">Aktif Cihaz</p>
+          <p className="text-2xl font-bold">{stats.online}</p>
+        </div>
+      </div>
       
-      <StatusCard
-        title="Pasif Cihaz"
-        value={stats.offline}
-        icon={<WifiOff className="h-5 w-5 text-gray-500 opacity-75" />}
-        className="glass-card"
-      />
+      <div className="glass-card flex items-center justify-between p-6">
+        <WifiOff className="h-8 w-8 text-gray-500 opacity-75" />
+        <div className="text-right">
+          <p className="text-sm text-muted-foreground">Pasif Cihaz</p>
+          <p className="text-2xl font-bold">{stats.offline}</p>
+        </div>
+      </div>
       
-      <StatusCard
-        title="Süresi Dolmuş"
-        value={stats.expired}
-        icon={<AlertCircle className="h-5 w-5 text-red-500 opacity-75" />}
-        className="glass-card"
-      />
+      <div className="glass-card flex items-center justify-between p-6">
+        <AlertCircle className="h-8 w-8 text-red-500 opacity-75" />
+        <div className="text-right">
+          <p className="text-sm text-muted-foreground">Süresi Dolmuş</p>
+          <p className="text-2xl font-bold">{stats.expired}</p>
+        </div>
+      </div>
     </div>
   );
 }
