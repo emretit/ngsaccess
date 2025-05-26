@@ -45,8 +45,8 @@ export default function EmployeeTable({
     setSelectedDepartment,
     handleSelectAll,
     handleSelectEmployee,
-    handleBulkDelete,
-    handleBulkDepartmentUpdate,
+    handleBulkDelete: originalHandleBulkDelete,
+    handleBulkDepartmentUpdate: originalHandleBulkDepartmentUpdate,
     requestSort
   } = useEmployeeTable(employees);
 
@@ -86,6 +86,16 @@ export default function EmployeeTable({
         variant: "destructive",
       });
     }
+  };
+
+  const handleBulkDelete = async () => {
+    await originalHandleBulkDelete();
+    onRefresh?.();
+  };
+
+  const handleBulkDepartmentUpdate = async () => {
+    await originalHandleBulkDepartmentUpdate();
+    onRefresh?.();
   };
 
   return (

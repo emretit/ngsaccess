@@ -46,7 +46,8 @@ export function useEmployeeTable(employees: Employee[]) {
       
       setSelectedEmployees([]);
       setShowDeleteDialog(false);
-      window.location.reload();
+      // Sayfayı yenilemek yerine callback kullanacağız
+      // window.location.reload();
     } catch (error) {
       toast({
         title: "Hata",
@@ -74,7 +75,8 @@ export function useEmployeeTable(employees: Employee[]) {
       
       setSelectedEmployees([]);
       setSelectedDepartment("");
-      window.location.reload();
+      // Sayfayı yenilemek yerine callback kullanacağız
+      // window.location.reload();
     } catch (error) {
       toast({
         title: "Hata",
