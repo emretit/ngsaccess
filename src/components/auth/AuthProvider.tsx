@@ -37,8 +37,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile: profile?.role, 
       pathname: location.pathname,
       hasProfile: !!profile,
-      isLandingOrAuth: location.pathname === '/' || location.pathname === '/login' || location.pathname === '/register' 
+      isLandingOrAuth: location.pathname === '/' || location.pathname === '/login' || location.pathname === '/register',
+      userEmail: user?.email,
+      profileData: profile
     });
+    
+    // Debug: Profile ve rol bilgilerini detaylı logla
+    if (profile) {
+      console.log("AuthProvider: Kullanıcı profil detayları:", {
+        id: profile.id,
+        email: profile.email,
+        role: profile.role,
+        created_at: profile.created_at
+      });
+    }
     
     // Yönlendirme davranışını değiştirdik - artık her sayfa değişiminde yönlendirme yapmıyoruz
     // Sadece login sonrası veya profilimiz ilk yüklendiğinde kontrol ediyoruz
@@ -91,7 +103,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const checkUserRole = (requiredRole: 'super_admin' | 'project_admin' | 'project_user'): boolean => {
-    return checkRole(profile, requiredRole);
+    const hasRole = checkRole(profile, requiredRole);
+    console.log("AuthProvider: checkUserRole kontrolü", {
+      requiredRole,
+      userRole: profile?.role,
+      hasRole,
+      profileExists: !!profile
+    });
+    return hasRole;
   };
 
   return (

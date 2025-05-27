@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
@@ -7,16 +6,34 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Shield, Database, Users, Activity, Settings, Zap, Lock, BarChart3 } from "lucide-react";
 
 export default function SystemAdmin() {
-  const { checkUserRole, loading, user } = useAuth();
+  const { checkUserRole, loading, user, profile } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log("SystemAdmin: Sayfa yüklendi, kontrol ediliyor...", {
+      loading,
+      hasProfile: !!profile,
+      userRole: profile?.role,
+      userEmail: user?.email,
+      checkResult: profile ? checkUserRole('super_admin') : 'profile yok'
+    });
+
     if (!loading && !checkUserRole('super_admin')) {
+      console.log("SystemAdmin: Yetki yok, /home'a yönlendiriliyor...", {
+        loading,
+        profileRole: profile?.role,
+        checkResult: checkUserRole('super_admin')
+      });
       navigate('/home');
+    } else if (!loading && checkUserRole('super_admin')) {
+      console.log("SystemAdmin: Yetki var, sayfa yükleniyor!", {
+        userRole: profile?.role
+      });
     }
-  }, [checkUserRole, loading, navigate]);
+  }, [checkUserRole, loading, navigate, profile, user]);
 
   if (loading) {
+    console.log("SystemAdmin: Loading durumunda...");
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
         <div className="text-center">
@@ -40,8 +57,11 @@ export default function SystemAdmin() {
   }
 
   if (!checkUserRole('super_admin')) {
+    console.log("SystemAdmin: Yetki kontrol sonucu negatif, null döndürülüyor");
     return null;
   }
+
+  console.log("SystemAdmin: Sayfa render ediliyor, kullanıcı yetkili!");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
