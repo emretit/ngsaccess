@@ -32,12 +32,21 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Search, UserPlus, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 
 interface User {
   id: string;
   email: string;
   role: 'super_admin' | 'project_admin' | 'project_user';
-  projects?: { id: number; name: string }[];
+  projects?: { id: number; name: string; is_admin: boolean }[];
+}
+
+interface Project {
+  id: number;
+  name: string;
+  description?: string;
+  is_active: boolean;
 }
 
 const AdminUsersPanel = () => {
@@ -48,17 +57,20 @@ const AdminUsersPanel = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    role: 'project_user' as 'super_admin' | 'project_admin' | 'project_user'
+    role: 'project_user' as 'super_admin' | 'project_admin' | 'project_user',
+    selectedProjects: [] as number[],
+    isProjectAdmin: false
   });
   const { toast } = useToast();
 
-  // Fetch users
+  // Fetch users with their project assignments
   const { data: users = [], refetch: refetchUsers } = useQuery({
     queryKey: ['admin', 'users'],
     queryFn: async () => {
       const { data: userData, error } = await supabase
-        .from('users_with_projects')
-        .select('*');
+        .from('users')
+        .select('*')
+        .order('email');
 
       if (error) {
         toast({
@@ -69,43 +81,45 @@ const AdminUsersPanel = () => {
         throw error;
       }
       
-      // Group projects by user
-      const usersMap = new Map();
-      
-      userData.forEach(user => {
-        if (!usersMap.has(user.id)) {
-          usersMap.set(user.id, {
-            id: user.id,
-            email: user.email,
-            role: user.role,
-            projects: []
-          });
-        }
-        
-        if (user.project_id) {
-          usersMap.get(user.id).projects.push({
-            id: user.project_id,
-            name: user.project_name,
-            is_admin: user.is_admin
-          });
-        }
-      });
-      
-      return Array.from(usersMap.values());
+      // Get project assignments for each user
+      const enhancedUsers = await Promise.all(
+        userData.map(async (user: User) => {
+          const { data: projectData } = await supabase
+            .from('project_users')
+            .select(`
+              project_id, 
+              is_admin, 
+              projects(id, name)
+            `)
+            .eq('user_id', user.id);
+
+          return {
+            ...user,
+            projects: projectData?.map((p: any) => ({
+              id: p.project_id,
+              name: p.projects?.name || "Unknown Project",
+              is_admin: p.is_admin
+            })) || []
+          };
+        })
+      );
+
+      return enhancedUsers;
     }
   });
 
-  // Fetch projects (for selecting in dialogs)
+  // Fetch projects for assignment
   const { data: projects = [] } = useQuery({
     queryKey: ['admin', 'projects-list'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select('id, name')
+        .select('id, name, is_active')
+        .eq('is_active', true)
         .order('name');
 
       if (error) throw error;
-      return data;
+      return data as Project[];
     }
   });
 
@@ -118,7 +132,9 @@ const AdminUsersPanel = () => {
     setFormData({
       email: '',
       password: '',
-      role: 'project_user'
+      role: 'project_user',
+      selectedProjects: [],
+      isProjectAdmin: false
     });
     setIsDialogOpen(true);
   };
@@ -128,7 +144,9 @@ const AdminUsersPanel = () => {
     setFormData({
       email: user.email,
       password: '',
-      role: user.role
+      role: user.role,
+      selectedProjects: user.projects?.map(p => p.id) || [],
+      isProjectAdmin: !!user.projects?.find(p => p.is_admin)
     });
     setIsDialogOpen(true);
   };
@@ -168,6 +186,27 @@ const AdminUsersPanel = () => {
           .eq('id', currentUser.id);
 
         if (error) throw error;
+
+        // Remove existing project assignments
+        await supabase
+          .from('project_users')
+          .delete()
+          .eq('user_id', currentUser.id);
+
+        // Add new project assignments
+        if (formData.selectedProjects.length > 0) {
+          const projectAssignments = formData.selectedProjects.map(projectId => ({
+            user_id: currentUser.id,
+            project_id: projectId,
+            is_admin: formData.isProjectAdmin && formData.role === 'project_admin'
+          }));
+
+          const { error: assignError } = await supabase
+            .from('project_users')
+            .insert(projectAssignments);
+            
+          if (assignError) throw assignError;
+        }
         
         toast({
           title: "Kullanıcı güncellendi",
@@ -191,6 +230,21 @@ const AdminUsersPanel = () => {
             .eq('id', data.user.id);
             
           if (roleError) throw roleError;
+        }
+
+        // Add project assignments
+        if (formData.selectedProjects.length > 0 && data.user) {
+          const projectAssignments = formData.selectedProjects.map(projectId => ({
+            user_id: data.user!.id,
+            project_id: projectId,
+            is_admin: formData.isProjectAdmin && formData.role === 'project_admin'
+          }));
+
+          const { error: assignError } = await supabase
+            .from('project_users')
+            .insert(projectAssignments);
+            
+          if (assignError) throw assignError;
         }
         
         toast({
@@ -333,7 +387,7 @@ const AdminUsersPanel = () => {
 
       {/* User Form Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{currentUser ? 'Kullanıcı Düzenle' : 'Yeni Kullanıcı'}</DialogTitle>
             <DialogDescription>
@@ -342,9 +396,7 @@ const AdminUsersPanel = () => {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                E-posta*
-              </label>
+              <Label htmlFor="email">E-posta*</Label>
               <Input
                 id="email"
                 type="email"
@@ -356,9 +408,7 @@ const AdminUsersPanel = () => {
             
             {!currentUser && (
               <div className="grid gap-2">
-                <label htmlFor="password" className="text-sm font-medium">
-                  Şifre*
-                </label>
+                <Label htmlFor="password">Şifre*</Label>
                 <Input
                   id="password"
                   type="password"
@@ -369,9 +419,7 @@ const AdminUsersPanel = () => {
             )}
             
             <div className="grid gap-2">
-              <label htmlFor="role" className="text-sm font-medium">
-                Rol
-              </label>
+              <Label htmlFor="role">Rol</Label>
               <Select 
                 value={formData.role} 
                 onValueChange={(value: 'super_admin' | 'project_admin' | 'project_user') => 
@@ -389,6 +437,56 @@ const AdminUsersPanel = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            {formData.role !== 'super_admin' && (
+              <>
+                <div className="grid gap-2">
+                  <Label>Projeler</Label>
+                  <div className="bg-muted/50 p-4 rounded-md space-y-2 max-h-[200px] overflow-y-auto">
+                    {projects.map((project) => (
+                      <div key={project.id} className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id={`project-${project.id}`}
+                          checked={formData.selectedProjects.includes(project.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setFormData({
+                                ...formData,
+                                selectedProjects: [...formData.selectedProjects, project.id]
+                              });
+                            } else {
+                              setFormData({
+                                ...formData,
+                                selectedProjects: formData.selectedProjects.filter(id => id !== project.id)
+                              });
+                            }
+                          }}
+                          className="h-4 w-4 rounded"
+                        />
+                        <label htmlFor={`project-${project.id}`} className="text-sm">
+                          {project.name}
+                        </label>
+                      </div>
+                    ))}
+                    {projects.length === 0 && (
+                      <p className="text-sm text-muted-foreground">Henüz proje bulunmamaktadır.</p>
+                    )}
+                  </div>
+                </div>
+
+                {formData.role === 'project_admin' && formData.selectedProjects.length > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="isProjectAdmin"
+                      checked={formData.isProjectAdmin}
+                      onCheckedChange={(checked) => setFormData({ ...formData, isProjectAdmin: checked })}
+                    />
+                    <Label htmlFor="isProjectAdmin">Seçili projelerde yönetici yetkisine sahip olsun</Label>
+                  </div>
+                )}
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
