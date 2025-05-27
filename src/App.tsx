@@ -75,6 +75,9 @@ const App = () => (
                 <Route path="/login" element={<Auth />} />
                 <Route path="/register" element={<Auth />} />
                 
+                {/* System Admin route - hidden and protected */}
+                <Route path="/system-admin" element={<SystemAdmin />} />
+                
                 {/* Ana sayfa */}
                 <Route path="/home" element={<Layout><Index /></Layout>} />
                 
