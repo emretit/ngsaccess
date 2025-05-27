@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Building2, Activity, Settings } from 'lucide-react';
+import { Users, Building2, Activity, Settings, Shield } from 'lucide-react';
 import AdminProjectsPanel from '@/components/admin/AdminProjectsPanel';
 import AdminUsersPanel from '@/components/admin/AdminUsersPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
