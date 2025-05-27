@@ -6,12 +6,9 @@ import { WorkScheduleSettings } from "@/components/settings/sections/WorkSchedul
 import { NotificationSettings } from "@/components/settings/sections/NotificationSettings";
 import { MailSettings } from "@/components/settings/sections/MailSettings";
 import { UserManagement } from "@/components/settings/sections/UserManagement";
-import { AdminDashboard } from "@/components/settings/sections/AdminDashboard";
-import { useAuth } from "@/components/auth/AuthProvider";
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("general");
-  const { checkUserRole } = useAuth();
 
   const renderActiveContent = () => {
     switch (activeTab) {
@@ -25,8 +22,6 @@ export default function Settings() {
         return <MailSettings />;
       case "notifications":
         return <NotificationSettings />;
-      case "admin":
-        return <AdminDashboard />;
       default:
         return <GeneralSettings />;
     }
@@ -38,7 +33,6 @@ export default function Settings() {
         <SettingsSidebar
           selected={activeTab}
           onSelect={setActiveTab}
-          showAdmin={checkUserRole('super_admin')}
         />
         <div className="flex-1 overflow-auto">
           <div className="p-4 md:p-8">
