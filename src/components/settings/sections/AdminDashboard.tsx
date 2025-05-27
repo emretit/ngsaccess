@@ -34,74 +34,79 @@ export function AdminDashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Sistem Yönetimi</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl font-bold text-white">Yönetim Paneli</h2>
+          <p className="text-slate-400">
             Tüm projeleri ve kullanıcıları yönetin
           </p>
         </div>
-        <Badge variant="destructive" className="px-3 py-1">
+        <Badge variant="destructive" className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 border-0">
+          <Shield className="w-4 h-4 mr-2" />
           Süper Admin
         </Badge>
       </div>
 
       {/* Dashboard Stats */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Toplam Proje</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-slate-300">Toplam Proje</CardTitle>
+            <Building2 className="h-4 w-4 text-blue-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalProjects || 0}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-white">{stats?.totalProjects || 0}</div>
+            <p className="text-xs text-slate-400">
               {stats?.activeProjects || 0} aktif proje
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Toplam Kullanıcı</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-slate-300">Toplam Kullanıcı</CardTitle>
+            <Users className="h-4 w-4 text-green-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.users?.length || 0}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-white">{stats?.users?.length || 0}</div>
+            <p className="text-xs text-slate-400">
               {stats?.activeUsers || 0} aktif kullanıcı
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Süper Admin</CardTitle>
-            <Settings className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-slate-300">Süper Admin</CardTitle>
+            <Settings className="h-4 w-4 text-purple-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-white">
               {stats?.users?.filter(u => u.role === 'super_admin').length || 0}
             </div>
-            <p className="text-xs text-muted-foreground">Sistem yöneticisi</p>
+            <p className="text-xs text-slate-400">Sistem yöneticisi</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Sistem Durumu</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-slate-300">Sistem Durumu</CardTitle>
+            <Activity className="h-4 w-4 text-orange-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">Aktif</div>
-            <p className="text-xs text-muted-foreground">Tüm sistemler çalışıyor</p>
+            <div className="text-2xl font-bold text-green-400">Aktif</div>
+            <p className="text-xs text-slate-400">Tüm sistemler çalışıyor</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Admin Tabs */}
       <Tabs defaultValue="projects" className="w-full">
-        <TabsList>
-          <TabsTrigger value="projects">Proje Yönetimi</TabsTrigger>
-          <TabsTrigger value="users">Kullanıcı Yönetimi</TabsTrigger>
+        <TabsList className="bg-slate-800/50 border-slate-700">
+          <TabsTrigger value="projects" className="data-[state=active]:bg-slate-700 data-[state=active]:text-white">
+            Proje Yönetimi
+          </TabsTrigger>
+          <TabsTrigger value="users" className="data-[state=active]:bg-slate-700 data-[state=active]:text-white">
+            Kullanıcı Yönetimi
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="projects" className="mt-6">
