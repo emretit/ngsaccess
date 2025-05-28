@@ -4,9 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Building2, Activity, Settings, Shield, TrendingUp, Clock } from 'lucide-react';
+import { Users, Building2, Activity, Settings, Shield, TrendingUp, Clock, Monitor } from 'lucide-react';
 import AdminProjectsPanel from '@/components/admin/AdminProjectsPanel';
 import AdminUsersPanel from '@/components/admin/AdminUsersPanel';
+import AdminDevicesPanel from '@/components/admin/AdminDevicesPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function AdminDashboard() {
@@ -141,6 +142,13 @@ export function AdminDashboard() {
             <Users className="w-5 h-5 mr-3" />
             Kullanıcı Yönetimi
           </TabsTrigger>
+          <TabsTrigger 
+            value="devices" 
+            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:via-pink-600 data-[state=active]:to-blue-600 data-[state=active]:text-white text-purple-200 font-bold px-8 py-3 rounded-xl transition-all duration-300 data-[state=active]:shadow-lg data-[state=active]:scale-105"
+          >
+            <Monitor className="w-5 h-5 mr-3" />
+            Cihaz Yönetimi
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="projects" className="mt-10">
@@ -154,6 +162,13 @@ export function AdminDashboard() {
           <div className="bg-white/10 border-white/20 backdrop-blur-xl rounded-3xl p-8 shadow-xl relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600"></div>
             <AdminUsersPanel />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="devices" className="mt-10">
+          <div className="bg-white/10 border-white/20 backdrop-blur-xl rounded-3xl p-8 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600"></div>
+            <AdminDevicesPanel />
           </div>
         </TabsContent>
       </Tabs>
