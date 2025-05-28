@@ -144,12 +144,41 @@ export const useUserManagement = () => {
               
             if (projectError) throw projectError;
           }
+
+          // Send setup email
+          try {
+            const selectedProject = projects.find(p => p.id === formData.projectId);
+            const { error: emailError } = await supabase.functions.invoke('send-user-setup-email', {
+              body: {
+                user_id: data.user.id,
+                email: formData.email,
+                role: formData.role,
+                project_name: selectedProject?.name
+              }
+            });
+
+            if (emailError) {
+              console.error('Email sending error:', emailError);
+              toast({
+                variant: "destructive",
+                title: "Email gönderme hatası",
+                description: "Kullanıcı oluşturuldu ancak kurulum emaili gönderilemedi"
+              });
+            } else {
+              toast({
+                title: "Kullanıcı oluşturuldu",
+                description: "Yeni kullanıcı başarıyla oluşturuldu ve kurulum emaili gönderildi"
+              });
+            }
+          } catch (emailError) {
+            console.error('Email error:', emailError);
+            toast({
+              variant: "destructive",
+              title: "Email hatası",
+              description: "Kullanıcı oluşturuldu ancak email gönderilirken hata oluştu"
+            });
+          }
         }
-        
-        toast({
-          title: "Kullanıcı oluşturuldu",
-          description: "Yeni kullanıcı başarıyla oluşturuldu ve projeye atandı"
-        });
       }
 
       refetchUsers();
