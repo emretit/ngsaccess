@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -115,23 +114,21 @@ export default function UserSetup() {
     setIsLoading(true);
 
     try {
-      // Update user password using auth
-      const { error: passwordError } = await supabase.auth.updateUser({
-        password: password
+      // Use the new edge function to set password
+      const { data, error } = await supabase.functions.invoke('set-user-password', {
+        body: {
+          token: token,
+          password: password
+        }
       });
 
-      if (passwordError) throw passwordError;
+      if (error) {
+        throw new Error(error.message || 'Şifre belirlenirken bir hata oluştu');
+      }
 
-      // Clear the setup token
-      const { error: tokenError } = await supabase
-        .from('users')
-        .update({
-          setup_token: null,
-          token_expires_at: null
-        })
-        .eq('setup_token', token);
-
-      if (tokenError) throw tokenError;
+      if (!data.success) {
+        throw new Error(data.error || 'Şifre belirlenirken bir hata oluştu');
+      }
 
       toast({
         title: "Şifre belirlendi",
