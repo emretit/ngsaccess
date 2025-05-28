@@ -1,11 +1,9 @@
 
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { 
   Table, 
   TableBody, 
@@ -13,7 +11,7 @@ import {
   TableHead, 
   TableHeader, 
   TableRow 
-} from "@/components/ui/table";
+} from '@/components/ui/table';
 import { 
   Dialog,
   DialogContent,
@@ -21,300 +19,467 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Plus, Search, Monitor, Smartphone, Shield } from "lucide-react";
-import { format } from "date-fns";
-import { ServerDevice } from "@/types/device";
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Search, Monitor, Edit, Trash2, Plus, Wifi, WifiOff } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { Label } from '@/components/ui/label';
+import { format } from 'date-fns';
 
-export default function AdminDevicesPanel() {
+interface Device {
+  id: number;
+  name: string;
+  location: string;
+  type: string;
+  status: string;
+  device_serial?: string;
+  device_mac?: string;
+  last_seen?: string;
+  created_at?: string;
+  is_active: boolean;
+}
+
+const AdminDevicesPanel = () => {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDevice, setSelectedDevice] = useState<ServerDevice | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-
-  // Fetch server devices
-  const { data: devices = [], isLoading, refetch } = useQuery({
-    queryKey: ["admin", "server-devices", searchQuery],
-    queryFn: async () => {
-      let query = supabase
-        .from("server_devices")
-        .select("*, projects(name)")
-        .order("created_at", { ascending: false });
-
-      if (searchQuery) {
-        query = query.or(`name.ilike.%${searchQuery}%,serial_number.ilike.%${searchQuery}%`);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as ServerDevice[];
-    },
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [currentDevice, setCurrentDevice] = useState<Device | null>(null);
+  const [formData, setFormData] = useState({
+    name: '',
+    location: '',
+    type: 'card_reader',
+    device_serial: '',
+    device_mac: '',
+    status: 'active'
   });
+  const { toast } = useToast();
 
-  // Fetch device statistics
-  const { data: stats } = useQuery({
-    queryKey: ["admin", "device-stats"],
+  const { data: devices = [], refetch: refetchDevices } = useQuery({
+    queryKey: ['admin', 'devices'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("server_devices")
-        .select("status, device_model_enum");
+        .from('devices')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (error) throw error;
-
-      const total = data?.length || 0;
-      const active = data?.filter(d => d.status === "active").length || 0;
-      const inactive = data?.filter(d => d.status === "inactive").length || 0;
-      const byType = data?.reduce((acc, device) => {
-        const type = device.device_model_enum || "Other";
-        acc[type] = (acc[type] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>) || {};
-
-      return { total, active, inactive, byType };
-    },
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Cihazlar yüklenirken hata",
+          description: error.message
+        });
+        throw error;
+      }
+      
+      return data as Device[];
+    }
   });
 
-  const getStatusBadge = (status: string) => {
-    if (status === "active") {
-      return <Badge className="bg-green-500 hover:bg-green-600">Aktif</Badge>;
-    } else if (status === "inactive") {
-      return <Badge variant="destructive">Pasif</Badge>;
-    }
-    return <Badge variant="secondary">Bilinmiyor</Badge>;
+  const filteredDevices = devices.filter(device => 
+    device.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    device.location.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleCreateDevice = () => {
+    setCurrentDevice(null);
+    setFormData({
+      name: '',
+      location: '',
+      type: 'card_reader',
+      device_serial: '',
+      device_mac: '',
+      status: 'active'
+    });
+    setIsDialogOpen(true);
   };
 
-  const getDeviceIcon = (type: string) => {
-    if (type?.includes("Reader") || type?.includes("Terminal")) {
-      return <Shield className="w-4 h-4" />;
-    } else if (type?.includes("Mobile")) {
-      return <Smartphone className="w-4 h-4" />;
-    }
-    return <Monitor className="w-4 h-4" />;
+  const handleEditDevice = (device: Device) => {
+    setCurrentDevice(device);
+    setFormData({
+      name: device.name,
+      location: device.location,
+      type: device.type,
+      device_serial: device.device_serial || '',
+      device_mac: device.device_mac || '',
+      status: device.status
+    });
+    setIsDialogOpen(true);
   };
 
-  const handleDeviceClick = (device: ServerDevice) => {
-    setSelectedDevice(device);
-    setDialogOpen(true);
+  const handleDeleteClick = (device: Device) => {
+    setCurrentDevice(device);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleSaveDevice = async () => {
+    try {
+      if (!formData.name) {
+        toast({
+          variant: "destructive",
+          title: "Hata",
+          description: "Cihaz adı zorunludur"
+        });
+        return;
+      }
+
+      if (!formData.location) {
+        toast({
+          variant: "destructive",
+          title: "Hata",
+          description: "Konum zorunludur"
+        });
+        return;
+      }
+
+      if (currentDevice) {
+        const { error } = await supabase
+          .from('devices')
+          .update({
+            name: formData.name,
+            location: formData.location,
+            type: formData.type,
+            device_serial: formData.device_serial,
+            device_mac: formData.device_mac,
+            status: formData.status
+          })
+          .eq('id', currentDevice.id);
+
+        if (error) throw error;
+        
+        toast({
+          title: "Cihaz güncellendi",
+          description: "Cihaz bilgileri başarıyla güncellendi"
+        });
+      } else {
+        const { error } = await supabase
+          .from('devices')
+          .insert({
+            name: formData.name,
+            location: formData.location,
+            type: formData.type,
+            device_serial: formData.device_serial,
+            device_mac: formData.device_mac,
+            status: formData.status,
+            is_active: true
+          });
+
+        if (error) throw error;
+        
+        toast({
+          title: "Cihaz oluşturuldu",
+          description: "Yeni cihaz başarıyla oluşturuldu"
+        });
+      }
+
+      setIsDialogOpen(false);
+      refetchDevices();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Hata",
+        description: error.message || "Cihaz kaydedilirken bir hata oluştu"
+      });
+    }
+  };
+
+  const handleDeleteDevice = async () => {
+    if (!currentDevice) return;
+
+    try {
+      const { error } = await supabase
+        .from('devices')
+        .delete()
+        .eq('id', currentDevice.id);
+
+      if (error) throw error;
+      
+      toast({
+        title: "Cihaz silindi",
+        description: "Cihaz başarıyla silindi"
+      });
+      
+      setIsDeleteDialogOpen(false);
+      refetchDevices();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Hata",
+        description: error.message || "Cihaz silinirken bir hata oluştu"
+      });
+    }
+  };
+
+  const getStatusDisplay = (status: string, lastSeen?: string) => {
+    const isOnline = status === 'active' && lastSeen && 
+                   new Date(lastSeen) > new Date(Date.now() - 5 * 60 * 1000); // 5 dakika
+    
+    if (isOnline) {
+      return (
+        <Badge className="bg-green-500/20 text-green-400 border-green-500/30 font-bold px-4 py-2">
+          <Wifi className="w-4 h-4 mr-2" />
+          Çevrimiçi
+        </Badge>
+      );
+    } else if (status === 'active') {
+      return (
+        <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 font-bold px-4 py-2">
+          <WifiOff className="w-4 h-4 mr-2" />
+          Çevrimdışı
+        </Badge>
+      );
+    } else {
+      return (
+        <Badge className="bg-red-500/20 text-red-400 border-red-500/30 font-bold px-4 py-2">
+          <WifiOff className="w-4 h-4 mr-2" />
+          Pasif
+        </Badge>
+      );
+    }
+  };
+
+  const getTypeDisplay = (type: string) => {
+    switch (type) {
+      case 'card_reader':
+        return 'Kart Okuyucu';
+      case 'access_control':
+        return 'Erişim Kontrolü';
+      case 'time_attendance':
+        return 'Zaman Takip';
+      default:
+        return type;
+    }
   };
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      {/* Enhanced Header */}
+      <div className="flex items-center justify-between mb-10">
         <div>
           <h3 className="text-3xl font-bold bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent">
             Cihaz Yönetimi
           </h3>
-          <p className="text-purple-300 mt-2 text-lg">
-            Tüm sistem cihazlarını merkezi olarak yönetin
-          </p>
+          <p className="text-purple-300 mt-2 text-lg">Sistem cihazlarını yönetin</p>
         </div>
-        <Button className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 hover:scale-105 transition-transform duration-300 shadow-xl">
-          <Plus className="w-5 h-5 mr-2" />
-          Yeni Cihaz
-        </Button>
-      </div>
-
-      {/* Device Statistics */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-white/10 border-white/20 backdrop-blur-xl hover:bg-white/15 transition-all duration-500 group relative overflow-hidden shadow-xl">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle className="text-sm font-bold text-purple-200 uppercase tracking-wider">Toplam Cihaz</CardTitle>
-            <div className="w-12 h-12 bg-blue-500/30 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-              <Monitor className="h-6 w-6 text-blue-400" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-white mb-2">{stats?.total || 0}</div>
-            <p className="text-blue-400 text-sm font-medium">Kayıtlı cihaz sayısı</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white/10 border-white/20 backdrop-blur-xl hover:bg-white/15 transition-all duration-500 group relative overflow-hidden shadow-xl">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 to-emerald-500"></div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle className="text-sm font-bold text-purple-200 uppercase tracking-wider">Aktif Cihaz</CardTitle>
-            <div className="w-12 h-12 bg-green-500/30 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-              <Shield className="h-6 w-6 text-green-400" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-white mb-2">{stats?.active || 0}</div>
-            <p className="text-green-400 text-sm font-medium">Çalışır durumda</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white/10 border-white/20 backdrop-blur-xl hover:bg-white/15 transition-all duration-500 group relative overflow-hidden shadow-xl">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 to-pink-500"></div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle className="text-sm font-bold text-purple-200 uppercase tracking-wider">Pasif Cihaz</CardTitle>
-            <div className="w-12 h-12 bg-red-500/30 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-              <Monitor className="h-6 w-6 text-red-400" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-white mb-2">{stats?.inactive || 0}</div>
-            <p className="text-red-400 text-sm font-medium">Devre dışı</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white/10 border-white/20 backdrop-blur-xl hover:bg-white/15 transition-all duration-500 group relative overflow-hidden shadow-xl">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-pink-500"></div>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <CardTitle className="text-sm font-bold text-purple-200 uppercase tracking-wider">Okuyucu</CardTitle>
-            <div className="w-12 h-12 bg-purple-500/30 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-              <Smartphone className="h-6 w-6 text-purple-400" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-white mb-2">
-              {Object.values(stats?.byType || {}).reduce((a, b) => a + b, 0)}
-            </div>
-            <p className="text-purple-400 text-sm font-medium">Tüm tip cihazlar</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Devices Table */}
-      <Card className="bg-white/10 border-white/20 backdrop-blur-xl shadow-xl">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-xl font-bold text-white">Cihaz Listesi</CardTitle>
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400 w-4 h-4" />
-                <Input
-                  placeholder="Cihaz ara..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-purple-300"
-                />
-              </div>
-            </div>
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-purple-400" />
+            <Input
+              type="search"
+              placeholder="Cihaz ara..."
+              className="w-80 pl-10 bg-white/10 border-white/20 text-white placeholder:text-purple-300 focus:bg-white/15 focus:border-purple-400 rounded-xl"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-white/20">
-                  <TableHead className="text-purple-200">Cihaz</TableHead>
-                  <TableHead className="text-purple-200">Seri No</TableHead>
-                  <TableHead className="text-purple-200">Tip</TableHead>
-                  <TableHead className="text-purple-200">Proje</TableHead>
-                  <TableHead className="text-purple-200">Durum</TableHead>
-                  <TableHead className="text-purple-200">Ekleme Tarihi</TableHead>
-                  <TableHead className="text-purple-200">Son Kullanım</TableHead>
+          <Button 
+            onClick={handleCreateDevice}
+            className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 hover:from-purple-700 hover:via-pink-700 hover:to-blue-700 text-white font-bold px-8 py-4 rounded-xl shadow-xl hover:scale-105 transition-all duration-300 border-0"
+          >
+            <Plus className="h-5 w-5 mr-3" />
+            Yeni Cihaz
+          </Button>
+        </div>
+      </div>
+
+      {/* Enhanced Table Container */}
+      <div className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-3xl overflow-hidden shadow-2xl">
+        <div className="p-8">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-white/20 hover:bg-white/5">
+                <TableHead className="text-purple-200 font-bold text-lg">Cihaz Adı</TableHead>
+                <TableHead className="text-purple-200 font-bold text-lg">Konum</TableHead>
+                <TableHead className="text-purple-200 font-bold text-lg">Tip</TableHead>
+                <TableHead className="text-purple-200 font-bold text-lg">Durum</TableHead>
+                <TableHead className="text-purple-200 font-bold text-lg">Son Görülme</TableHead>
+                <TableHead className="text-right text-purple-200 font-bold text-lg">İşlemler</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredDevices.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-16 text-purple-300 text-lg">
+                    <div className="flex flex-col items-center space-y-4">
+                      <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center">
+                        <Monitor className="w-8 h-8 text-purple-400" />
+                      </div>
+                      <span>Cihaz bulunamadı</span>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-purple-300">
-                      Yükleniyor...
+              ) : (
+                filteredDevices.map((device) => (
+                  <TableRow key={device.id} className="border-white/10 hover:bg-white/5 transition-all duration-300 group">
+                    <TableCell className="font-bold text-white text-lg group-hover:text-purple-300 transition-colors duration-300">
+                      {device.name}
+                    </TableCell>
+                    <TableCell className="text-purple-200">
+                      {device.location}
+                    </TableCell>
+                    <TableCell className="text-purple-200">
+                      {getTypeDisplay(device.type)}
+                    </TableCell>
+                    <TableCell>
+                      {getStatusDisplay(device.status, device.last_seen)}
+                    </TableCell>
+                    <TableCell className="text-purple-200">
+                      {device.last_seen ? 
+                        format(new Date(device.last_seen), 'dd.MM.yyyy HH:mm') : 
+                        <span className="text-purple-400 italic">Hiç görülmedi</span>
+                      }
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end space-x-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleEditDevice(device)}
+                          className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 transition-all duration-300 rounded-xl"
+                        >
+                          <Edit className="h-5 w-5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/20 transition-all duration-300 rounded-xl"
+                          onClick={() => handleDeleteClick(device)}
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
-                ) : devices.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-10 text-purple-300">
-                      Cihaz bulunamadı
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  devices.map((device) => (
-                    <TableRow 
-                      key={device.id} 
-                      className="border-white/10 hover:bg-white/5 cursor-pointer transition-colors duration-200"
-                      onClick={() => handleDeviceClick(device)}
-                    >
-                      <TableCell className="text-white">
-                        <div className="flex items-center gap-3">
-                          {getDeviceIcon(device.device_model_enum || "")}
-                          <span className="font-medium">{device.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-purple-200 font-mono">{device.serial_number}</TableCell>
-                      <TableCell className="text-purple-200">{device.device_model_enum || "-"}</TableCell>
-                      <TableCell className="text-purple-200">{device.projects?.name || "-"}</TableCell>
-                      <TableCell>{getStatusBadge(device.status)}</TableCell>
-                      <TableCell className="text-purple-200">
-                        {device.date_added ? format(new Date(device.date_added), "dd.MM.yyyy") : "-"}
-                      </TableCell>
-                      <TableCell className="text-purple-200">
-                        {device.last_used_at ? format(new Date(device.last_used_at), "dd.MM.yyyy HH:mm") : "-"}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
 
-      {/* Device Details Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] bg-slate-900/95 border-white/20 backdrop-blur-xl">
+      {/* Device Form Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-white text-xl">
-              {selectedDevice?.name}
-            </DialogTitle>
-            <DialogDescription className="text-purple-300">
-              Cihaz detayları ve sistem bilgileri
+            <DialogTitle>{currentDevice ? 'Cihaz Düzenle' : 'Yeni Cihaz'}</DialogTitle>
+            <DialogDescription>
+              {currentDevice ? 'Cihaz bilgilerini güncelleyin' : 'Sisteme yeni bir cihaz ekleyin'}
             </DialogDescription>
           </DialogHeader>
-          
-          {selectedDevice && (
-            <div className="space-y-6 py-4">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-purple-200">Cihaz Adı</label>
-                    <p className="text-white font-semibold">{selectedDevice.name}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-purple-200">Seri Numarası</label>
-                    <p className="text-white font-mono">{selectedDevice.serial_number}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-purple-200">Cihaz Tipi</label>
-                    <p className="text-white">{selectedDevice.device_model_enum || "-"}</p>
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-purple-200">Durum</label>
-                    <div className="mt-1">{getStatusBadge(selectedDevice.status)}</div>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-purple-200">Proje</label>
-                    <p className="text-white">{selectedDevice.projects?.name || "-"}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-purple-200">Ekleme Tarihi</label>
-                    <p className="text-white">
-                      {selectedDevice.date_added ? format(new Date(selectedDevice.date_added), "dd.MM.yyyy HH:mm") : "-"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              {selectedDevice.last_used_at && (
-                <div>
-                  <label className="text-sm font-medium text-purple-200">Son Kullanım</label>
-                  <p className="text-white">{format(new Date(selectedDevice.last_used_at), "dd.MM.yyyy HH:mm")}</p>
-                </div>
-              )}
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name">Cihaz Adı*</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
             </div>
-          )}
-          
+            
+            <div className="grid gap-2">
+              <Label htmlFor="location">Konum*</Label>
+              <Input
+                id="location"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+              />
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="type">Cihaz Tipi</Label>
+              <Select 
+                value={formData.type} 
+                onValueChange={(value) => setFormData({ ...formData, type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Tip seçin" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="card_reader">Kart Okuyucu</SelectItem>
+                    <SelectItem value="access_control">Erişim Kontrolü</SelectItem>
+                    <SelectItem value="time_attendance">Zaman Takip</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="device_serial">Seri Numarası</Label>
+              <Input
+                id="device_serial"
+                value={formData.device_serial}
+                onChange={(e) => setFormData({ ...formData, device_serial: e.target.value })}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="device_mac">MAC Adresi</Label>
+              <Input
+                id="device_mac"
+                value={formData.device_mac}
+                onChange={(e) => setFormData({ ...formData, device_mac: e.target.value })}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="status">Durum</Label>
+              <Select 
+                value={formData.status} 
+                onValueChange={(value) => setFormData({ ...formData, status: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Durum seçin" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="active">Aktif</SelectItem>
+                    <SelectItem value="inactive">Pasif</SelectItem>
+                    <SelectItem value="maintenance">Bakımda</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Kapat
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              İptal
+            </Button>
+            <Button onClick={handleSaveDevice}>
+              {currentDevice ? 'Güncelle' : 'Oluştur'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cihaz Silme</DialogTitle>
+            <DialogDescription>
+              Bu işlem geri alınamaz. "{currentDevice?.name}" cihazını silmek istediğinize emin misiniz?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              İptal
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteDevice}>
+              Sil
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
-}
+};
+
+export default AdminDevicesPanel;
