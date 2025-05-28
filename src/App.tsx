@@ -1,4 +1,3 @@
-
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
@@ -42,8 +41,8 @@ function App() {
               <Route path="/auth" element={<Auth />} />
               <Route path="/employee-login" element={<EmployeeLogin />} />
               <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
-              <Route path="/employee-setup/:token" element={<EmployeeSetup />} />
-              <Route path="/user-setup/:token" element={<UserSetup />} />
+              <Route path="/employee-setup" element={<EmployeeSetup />} />
+              <Route path="/user-setup" element={<UserSetup />} />
               <Route path="/system-admin" element={<SystemAdmin />} />
               <Route 
                 path="/home" 
