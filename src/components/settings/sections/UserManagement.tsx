@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,11 +30,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { UserPlus, Edit, Trash2 } from "lucide-react";
+import { UserPlus, Edit, Trash2, Shield } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/components/ui/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 interface User {
   id: string;
@@ -53,6 +53,7 @@ interface Project {
 }
 
 export function UserManagement() {
+  const { checkUserRole } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -62,6 +63,23 @@ export function UserManagement() {
   const [selectedProjects, setSelectedProjects] = useState<number[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
+
+  // Check if user has super_admin access
+  if (!checkUserRole('super_admin')) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+            <Shield className="w-8 h-8 text-red-600" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Erişim Yetkisi Yok</h3>
+            <p className="text-gray-600 mt-2">Bu sayfaya erişim için süper admin yetkisine sahip olmanız gerekiyor.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Fetch users with their roles and project assignments
   const { data: users = [], refetch: refetchUsers } = useQuery({
