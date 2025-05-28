@@ -51,8 +51,8 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Failed to store setup token');
     }
 
-    // Create setup URL
-    const setupUrl = `${Deno.env.get('SITE_URL') || 'http://localhost:8080'}/user-setup?token=${token}`;
+    // Create setup URL - use your domain instead of localhost
+    const setupUrl = `https://ngsplus.app/user-setup?token=${token}`;
 
     // Role display names
     const roleNames = {
