@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmployeePagination } from "@/components/employees/EmployeePagination";
-import { useCardReadings } from "@/hooks/useCardReadings";
+import { useProjectFilteredCardReadings } from "@/hooks/useProjectFilteredCardReadings";
 import { CardReadingsFilters } from "./CardReadingsFilters";
 import { CardReadingsTable } from "./CardReadingsTable";
 
@@ -23,8 +23,28 @@ const CardReadings = () => {
     handleRefresh,
     handleClearFilters,
     totalPages,
-    pageSize
-  } = useCardReadings(100);
+    pageSize,
+    hasProjectAccess
+  } = useProjectFilteredCardReadings(100);
+
+  if (!hasProjectAccess) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto">
+            <span className="text-2xl">🔒</span>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Proje Erişimi Yok</h3>
+            <p className="text-gray-600 mt-2">
+              Bu sayfaya erişim için size atanmış bir proje bulunmuyor. 
+              Lütfen sistem yöneticinizle iletişime geçin.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

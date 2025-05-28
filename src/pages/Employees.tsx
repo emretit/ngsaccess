@@ -1,5 +1,5 @@
+
 import { useState, useMemo, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import DepartmentTree from "@/components/departments/DepartmentTree";
 import SlideOverPanel from "@/components/employees/SlideOverPanel";
 import { Employee } from "@/types/employee";
@@ -7,12 +7,11 @@ import EmployeeTable from "@/components/employees/EmployeeTable";
 import { EmployeeStats } from "@/components/employees/EmployeeStats";
 import { EmployeeFilters } from "@/components/employees/EmployeeFilters";
 import { EmployeePagination } from "@/components/employees/EmployeePagination";
+import { useEmployees } from "@/hooks/useEmployees";
 
 export default function Employees() {
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  const { employees, isLoading, error, refetch, hasProjectAccess } = useEmployees();
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -28,39 +27,11 @@ export default function Employees() {
   }), [employees]);
 
   useEffect(() => {
-    fetchEmployees();
-  }, [selectedDepartment]);
-
-  async function fetchEmployees() {
-    try {
-      let query = supabase
-        .from('employees')
-        .select(`
-          *,
-          departments (id, name),
-          positions (id, name)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (selectedDepartment) {
-        query = query.eq('department_id', selectedDepartment);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setEmployees(data || []);
-      setFilteredEmployees(data || []);
-    } catch (err) {
-      setError('Personel listesi alınırken bir hata oluştu');
-      console.error('Error fetching employees:', err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
     let filtered = employees;
+
+    if (selectedDepartment) {
+      filtered = filtered.filter(emp => emp.department_id === selectedDepartment);
+    }
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -75,7 +46,7 @@ export default function Employees() {
 
     setFilteredEmployees(filtered);
     setCurrentPage(1);
-  }, [employees, searchQuery]);
+  }, [employees, searchQuery, selectedDepartment]);
 
   const paginatedEmployees = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -100,7 +71,26 @@ export default function Employees() {
     console.log('Delete employee:', employee);
   };
 
-  if (loading) {
+  if (!hasProjectAccess) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto">
+            <span className="text-2xl">🔒</span>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Proje Erişimi Yok</h3>
+            <p className="text-gray-600 mt-2">
+              Bu sayfaya erişim için size atanmış bir proje bulunmuyor. 
+              Lütfen sistem yöneticinizle iletişime geçin.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
@@ -111,7 +101,7 @@ export default function Employees() {
   if (error) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-red-500">{error}</div>
+        <div className="text-red-500">{error.toString()}</div>
       </div>
     );
   }
@@ -144,7 +134,7 @@ export default function Employees() {
             onEdit={handleEditEmployee} 
             onDelete={handleDeleteEmployee}
             onViewDetails={handleViewEmployeeDetails}
-            onRefresh={fetchEmployees}
+            onRefresh={refetch}
           />
         </div>
 
@@ -161,10 +151,9 @@ export default function Employees() {
           viewMode={viewMode}
           onSave={(employee) => {
             if (viewMode) {
-              // Switch to edit mode
               setViewMode(false);
             } else {
-              fetchEmployees();
+              refetch();
               setIsPanelOpen(false);
             }
           }}
