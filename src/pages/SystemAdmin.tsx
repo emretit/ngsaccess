@@ -1,3 +1,4 @@
+
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
@@ -18,20 +19,24 @@ export default function SystemAdmin() {
       checkResult: profile ? checkUserRole('super_admin') : 'profile yok'
     });
 
-    if (!loading && !checkUserRole('super_admin')) {
-      console.log("SystemAdmin: Yetki yok, /home'a yönlendiriliyor...", {
-        loading,
-        profileRole: profile?.role,
-        checkResult: checkUserRole('super_admin')
-      });
-      navigate('/home');
-    } else if (!loading && checkUserRole('super_admin')) {
-      console.log("SystemAdmin: Yetki var, sayfa yükleniyor!", {
-        userRole: profile?.role
-      });
+    // Loading tamamlandıktan SONRA yetki kontrolü yap
+    if (!loading) {
+      if (!checkUserRole('super_admin')) {
+        console.log("SystemAdmin: Yetki yok, /home'a yönlendiriliyor...", {
+          loading,
+          profileRole: profile?.role,
+          checkResult: checkUserRole('super_admin')
+        });
+        navigate('/home');
+      } else {
+        console.log("SystemAdmin: Yetki var, sayfa yükleniyor!", {
+          userRole: profile?.role
+        });
+      }
     }
   }, [checkUserRole, loading, navigate, profile, user]);
 
+  // Loading durumunda loading ekranı göster
   if (loading) {
     console.log("SystemAdmin: Loading durumunda...");
     return (
@@ -56,6 +61,7 @@ export default function SystemAdmin() {
     );
   }
 
+  // Loading tamamlandıktan sonra yetki kontrolü
   if (!checkUserRole('super_admin')) {
     console.log("SystemAdmin: Yetki kontrol sonucu negatif, null döndürülüyor");
     return null;
