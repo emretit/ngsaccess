@@ -46,7 +46,7 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
         <DialogHeader>
           <DialogTitle>{currentUser ? 'Kullanıcı Düzenle' : 'Yeni Kullanıcı'}</DialogTitle>
           <DialogDescription>
-            {currentUser ? 'Kullanıcı bilgilerini güncelleyin' : 'Sisteme yeni bir kullanıcı ekleyin'}
+            {currentUser ? 'Kullanıcı bilgilerini güncelleyin' : 'Sisteme yeni bir kullanıcı ekleyin. Kullanıcıya şifre belirleme emaili gönderilecektir.'}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -60,18 +60,6 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
               disabled={!!currentUser}
             />
           </div>
-          
-          {!currentUser && (
-            <div className="grid gap-2">
-              <Label htmlFor="password">Şifre*</Label>
-              <Input
-                id="password"
-                type="password"
-                value={formData.password}
-                onChange={(e) => onFormDataChange({ ...formData, password: e.target.value })}
-              />
-            </div>
-          )}
           
           <div className="grid gap-2">
             <Label htmlFor="role">Rol</Label>

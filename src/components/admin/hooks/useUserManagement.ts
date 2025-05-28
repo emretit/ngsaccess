@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,7 +8,6 @@ export const useUserManagement = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserFormData>({
     email: '',
-    password: '',
     role: 'project_user',
     projectId: undefined
   });
@@ -64,7 +62,6 @@ export const useUserManagement = () => {
     setCurrentUser(user);
     setFormData({
       email: user.email,
-      password: '',
       role: user.role,
       projectId: undefined
     });
@@ -77,15 +74,6 @@ export const useUserManagement = () => {
           variant: "destructive",
           title: "Hata",
           description: "E-posta adresi zorunludur"
-        });
-        return false;
-      }
-
-      if (!currentUser && !formData.password) {
-        toast({
-          variant: "destructive",
-          title: "Hata",
-          description: "Şifre zorunludur"
         });
         return false;
       }
@@ -115,10 +103,12 @@ export const useUserManagement = () => {
           description: "Kullanıcı bilgileri başarıyla güncellendi"
         });
       } else {
-        // Create new user
+        // Create new user - generate a temporary password
+        const tempPassword = Math.random().toString(36).slice(-12);
+        
         const { data, error } = await supabase.auth.admin.createUser({
           email: formData.email,
-          password: formData.password,
+          password: tempPassword,
           email_confirm: true
         });
 
@@ -219,7 +209,6 @@ export const useUserManagement = () => {
     setCurrentUser(null);
     setFormData({
       email: '',
-      password: '',
       role: 'project_user',
       projectId: undefined
     });

@@ -7,6 +7,8 @@ export interface User {
   updated_at: string;
   full_name?: string;
   photo_url?: string;
+  setup_token?: string;
+  token_expires_at?: string;
 }
 
 export interface Project {
@@ -18,7 +20,7 @@ export interface Project {
 
 export interface UserFormData {
   email: string;
-  password: string;
+  password?: string;
   role: 'super_admin' | 'project_admin' | 'project_user';
   projectId?: number;
 }
