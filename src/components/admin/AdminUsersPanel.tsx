@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,7 +38,6 @@ interface User {
   id: string;
   email: string;
   role: 'super_admin' | 'project_admin' | 'project_user';
-  projects?: { id: number; name: string; is_admin: boolean }[];
 }
 
 interface Project {
@@ -61,7 +61,7 @@ const AdminUsersPanel = () => {
   });
   const { toast } = useToast();
 
-  // Fetch users with their project assignments
+  // Fetch users
   const { data: users = [], refetch: refetchUsers } = useQuery({
     queryKey: ['admin', 'users'],
     queryFn: async () => {
@@ -79,30 +79,7 @@ const AdminUsersPanel = () => {
         throw error;
       }
       
-      // Get project assignments for each user
-      const enhancedUsers = await Promise.all(
-        userData.map(async (user: User) => {
-          const { data: projectData } = await supabase
-            .from('project_users')
-            .select(`
-              project_id, 
-              is_admin, 
-              projects(id, name)
-            `)
-            .eq('user_id', user.id);
-
-          return {
-            ...user,
-            projects: projectData?.map((p: any) => ({
-              id: p.project_id,
-              name: p.projects?.name || "Unknown Project",
-              is_admin: p.is_admin
-            })) || []
-          };
-        })
-      );
-
-      return enhancedUsers;
+      return userData as User[];
     }
   });
 
@@ -143,8 +120,8 @@ const AdminUsersPanel = () => {
       email: user.email,
       password: '',
       role: user.role,
-      selectedProjects: user.projects?.map(p => p.id) || [],
-      isProjectAdmin: !!user.projects?.find(p => p.is_admin)
+      selectedProjects: [],
+      isProjectAdmin: false
     });
     setIsDialogOpen(true);
   };
@@ -184,27 +161,6 @@ const AdminUsersPanel = () => {
           .eq('id', currentUser.id);
 
         if (error) throw error;
-
-        // Remove existing project assignments
-        await supabase
-          .from('project_users')
-          .delete()
-          .eq('user_id', currentUser.id);
-
-        // Add new project assignments
-        if (formData.selectedProjects.length > 0) {
-          const projectAssignments = formData.selectedProjects.map(projectId => ({
-            user_id: currentUser.id,
-            project_id: projectId,
-            is_admin: formData.isProjectAdmin && formData.role === 'project_admin'
-          }));
-
-          const { error: assignError } = await supabase
-            .from('project_users')
-            .insert(projectAssignments);
-            
-          if (assignError) throw assignError;
-        }
         
         toast({
           title: "Kullanıcı güncellendi",
@@ -228,21 +184,6 @@ const AdminUsersPanel = () => {
             .eq('id', data.user.id);
             
           if (roleError) throw roleError;
-        }
-
-        // Add project assignments
-        if (formData.selectedProjects.length > 0 && data.user) {
-          const projectAssignments = formData.selectedProjects.map(projectId => ({
-            user_id: data.user!.id,
-            project_id: projectId,
-            is_admin: formData.isProjectAdmin && formData.role === 'project_admin'
-          }));
-
-          const { error: assignError } = await supabase
-            .from('project_users')
-            .insert(projectAssignments);
-            
-          if (assignError) throw assignError;
         }
         
         toast({
@@ -338,14 +279,13 @@ const AdminUsersPanel = () => {
               <TableRow className="border-white/20 hover:bg-white/5">
                 <TableHead className="text-purple-200 font-bold text-lg">E-posta</TableHead>
                 <TableHead className="text-purple-200 font-bold text-lg">Rol</TableHead>
-                <TableHead className="text-purple-200 font-bold text-lg">Atanmış Projeler</TableHead>
                 <TableHead className="text-right text-purple-200 font-bold text-lg">İşlemler</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredUsers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-16 text-purple-300 text-lg">
+                  <TableCell colSpan={3} className="text-center py-16 text-purple-300 text-lg">
                     <div className="flex flex-col items-center space-y-4">
                       <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center">
                         <UserPlus className="w-8 h-8 text-purple-400" />
@@ -361,23 +301,6 @@ const AdminUsersPanel = () => {
                       {user.email}
                     </TableCell>
                     <TableCell>{getRoleDisplay(user.role)}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {user.projects && user.projects.length > 0 ? (
-                          user.projects.map((project) => (
-                            <Badge 
-                              key={project.id} 
-                              variant="outline"
-                              className={project.is_admin ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300" : ""}
-                            >
-                              {project.name} {project.is_admin && "(Admin)"}
-                            </Badge>
-                          ))
-                        ) : (
-                          <span className="text-sm text-muted-foreground">Proje atanmamış</span>
-                        )}
-                      </div>
-                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end space-x-2">
                         <Button 

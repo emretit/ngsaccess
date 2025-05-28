@@ -15,6 +15,7 @@ export type Database = {
           description: string | null
           id: number
           name: string
+          project_id: number | null
           updated_at: string
         }
         Insert: {
@@ -22,6 +23,7 @@ export type Database = {
           description?: string | null
           id?: number
           name: string
+          project_id?: number | null
           updated_at?: string
         }
         Update: {
@@ -29,9 +31,18 @@ export type Database = {
           description?: string | null
           id?: number
           name?: string
+          project_id?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "access_groups_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       access_logs: {
         Row: {
@@ -39,6 +50,7 @@ export type Database = {
           door_id: number | null
           id: number
           notes: string | null
+          project_id: number | null
           status: string
           user_id: number
         }
@@ -47,6 +59,7 @@ export type Database = {
           door_id?: number | null
           id?: number
           notes?: string | null
+          project_id?: number | null
           status: string
           user_id: number
         }
@@ -55,6 +68,7 @@ export type Database = {
           door_id?: number | null
           id?: number
           notes?: string | null
+          project_id?: number | null
           status?: string
           user_id?: number
         }
@@ -73,6 +87,13 @@ export type Database = {
             referencedRelation: "doors"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "access_logs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
       }
       access_permissions: {
@@ -82,6 +103,7 @@ export type Database = {
           employee_id: number
           has_access: boolean
           id: number
+          project_id: number | null
           updated_at: string
         }
         Insert: {
@@ -90,6 +112,7 @@ export type Database = {
           employee_id: number
           has_access?: boolean
           id?: number
+          project_id?: number | null
           updated_at?: string
         }
         Update: {
@@ -98,6 +121,7 @@ export type Database = {
           employee_id?: number
           has_access?: boolean
           id?: number
+          project_id?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -129,6 +153,13 @@ export type Database = {
             referencedRelation: "employees"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "access_permissions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
       }
       access_rules: {
@@ -140,6 +171,7 @@ export type Database = {
           end_time: string
           id: number
           is_active: boolean | null
+          project_id: number | null
           start_time: string
           type: string
           updated_at: string
@@ -152,6 +184,7 @@ export type Database = {
           end_time: string
           id?: number
           is_active?: boolean | null
+          project_id?: number | null
           start_time: string
           type: string
           updated_at?: string
@@ -164,6 +197,7 @@ export type Database = {
           end_time?: string
           id?: number
           is_active?: boolean | null
+          project_id?: number | null
           start_time?: string
           type?: string
           updated_at?: string
@@ -195,6 +229,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "access_rules_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -252,6 +293,7 @@ export type Database = {
           error_message: string | null
           execution_time: unknown | null
           id: number
+          project_id: number | null
           query_id: number | null
           result_data: Json | null
           status: string
@@ -262,6 +304,7 @@ export type Database = {
           error_message?: string | null
           execution_time?: unknown | null
           id?: number
+          project_id?: number | null
           query_id?: number | null
           result_data?: Json | null
           status: string
@@ -272,12 +315,20 @@ export type Database = {
           error_message?: string | null
           execution_time?: unknown | null
           id?: number
+          project_id?: number | null
           query_id?: number | null
           result_data?: Json | null
           status?: string
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ai_report_results_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ai_report_results_query_id_fkey"
             columns: ["query_id"]
@@ -350,6 +401,7 @@ export type Database = {
           employee_name: string | null
           employee_photo_url: string | null
           id: number
+          project_id: number | null
           raw_data: string | null
           read_time: string | null
           read_type: string | null
@@ -371,6 +423,7 @@ export type Database = {
           employee_name?: string | null
           employee_photo_url?: string | null
           id?: number
+          project_id?: number | null
           raw_data?: string | null
           read_time?: string | null
           read_type?: string | null
@@ -392,6 +445,7 @@ export type Database = {
           employee_name?: string | null
           employee_photo_url?: string | null
           id?: number
+          project_id?: number | null
           raw_data?: string | null
           read_time?: string | null
           read_type?: string | null
@@ -425,6 +479,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_readings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -468,6 +529,7 @@ export type Database = {
           level: number | null
           name: string
           parent_id: number | null
+          project_id: number | null
           updated_at: string | null
         }
         Insert: {
@@ -476,6 +538,7 @@ export type Database = {
           level?: number | null
           name: string
           parent_id?: number | null
+          project_id?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -484,6 +547,7 @@ export type Database = {
           level?: number | null
           name?: string
           parent_id?: number | null
+          project_id?: number | null
           updated_at?: string | null
         }
         Relationships: [
@@ -492,6 +556,13 @@ export type Database = {
             columns: ["parent_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "departments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -620,6 +691,7 @@ export type Database = {
           id: number
           location: string | null
           name: string
+          project_id: number | null
           status: string | null
           updated_at: string | null
           zone_id: number | null
@@ -630,6 +702,7 @@ export type Database = {
           id?: number
           location?: string | null
           name: string
+          project_id?: number | null
           status?: string | null
           updated_at?: string | null
           zone_id?: number | null
@@ -640,11 +713,19 @@ export type Database = {
           id?: number
           location?: string | null
           name?: string
+          project_id?: number | null
           status?: string | null
           updated_at?: string | null
           zone_id?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "doors_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "doors_zone_id_fkey"
             columns: ["zone_id"]
@@ -670,6 +751,7 @@ export type Database = {
           last_login: string | null
           password_hash: string | null
           phone: string | null
+          project_id: number | null
           setup_token: string | null
           token_expires_at: string | null
           updated_at: string
@@ -682,6 +764,7 @@ export type Database = {
           last_login?: string | null
           password_hash?: string | null
           phone?: string | null
+          project_id?: number | null
           setup_token?: string | null
           token_expires_at?: string | null
           updated_at?: string
@@ -694,6 +777,7 @@ export type Database = {
           last_login?: string | null
           password_hash?: string | null
           phone?: string | null
+          project_id?: number | null
           setup_token?: string | null
           token_expires_at?: string | null
           updated_at?: string
@@ -704,6 +788,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_auth_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -724,6 +815,7 @@ export type Database = {
           password: string | null
           photo_url: string | null
           position_id: number | null
+          project_id: number | null
           shift: string | null
           shift_id: number | null
           tc_no: string
@@ -744,6 +836,7 @@ export type Database = {
           password?: string | null
           photo_url?: string | null
           position_id?: number | null
+          project_id?: number | null
           shift?: string | null
           shift_id?: number | null
           tc_no: string
@@ -764,12 +857,20 @@ export type Database = {
           password?: string | null
           photo_url?: string | null
           position_id?: number | null
+          project_id?: number | null
           shift?: string | null
           shift_id?: number | null
           tc_no?: string
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "employees_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "fk_employees_company"
             columns: ["company_id"]
@@ -875,18 +976,21 @@ export type Database = {
           device_id: number
           group_id: number
           id: number
+          project_id: number | null
         }
         Insert: {
           created_at?: string
           device_id: number
           group_id: number
           id?: number
+          project_id?: number | null
         }
         Update: {
           created_at?: string
           device_id?: number
           group_id?: number
           id?: number
+          project_id?: number | null
         }
         Relationships: [
           {
@@ -917,6 +1021,13 @@ export type Database = {
             referencedRelation: "access_groups"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "group_devices_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
       }
       group_members: {
@@ -925,18 +1036,21 @@ export type Database = {
           employee_id: number
           group_id: number
           id: number
+          project_id: number | null
         }
         Insert: {
           created_at?: string
           employee_id: number
           group_id: number
           id?: number
+          project_id?: number | null
         }
         Update: {
           created_at?: string
           employee_id?: number
           group_id?: number
           id?: number
+          project_id?: number | null
         }
         Relationships: [
           {
@@ -953,6 +1067,13 @@ export type Database = {
             referencedRelation: "access_groups"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "group_members_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
       }
       pdks_records: {
@@ -965,6 +1086,7 @@ export type Database = {
           entry_time: string | null
           exit_time: string | null
           id: number
+          project_id: number | null
           status: string
           updated_at: string
         }
@@ -977,6 +1099,7 @@ export type Database = {
           entry_time?: string | null
           exit_time?: string | null
           id?: number
+          project_id?: number | null
           status: string
           updated_at?: string
         }
@@ -989,6 +1112,7 @@ export type Database = {
           entry_time?: string | null
           exit_time?: string | null
           id?: number
+          project_id?: number | null
           status?: string
           updated_at?: string
         }
@@ -1000,6 +1124,13 @@ export type Database = {
             referencedRelation: "employees"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pdks_records_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
         ]
       }
       policies: {
@@ -1009,6 +1140,7 @@ export type Database = {
           id: number
           is_active: boolean | null
           name: string
+          project_id: number | null
           updated_at: string | null
         }
         Insert: {
@@ -1017,6 +1149,7 @@ export type Database = {
           id?: number
           is_active?: boolean | null
           name: string
+          project_id?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -1025,30 +1158,92 @@ export type Database = {
           id?: number
           is_active?: boolean | null
           name?: string
+          project_id?: number | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "policies_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       positions: {
         Row: {
           created_at: string | null
           id: number
           name: string
+          project_id: number | null
           updated_at: string | null
         }
         Insert: {
           created_at?: string | null
           id?: number
           name: string
+          project_id?: number | null
           updated_at?: string | null
         }
         Update: {
           created_at?: string | null
           id?: number
           name?: string
+          project_id?: number | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "positions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_users: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_admin: boolean | null
+          project_id: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_admin?: boolean | null
+          project_id?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_admin?: boolean | null
+          project_id?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_users_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       projects: {
         Row: {
@@ -1082,21 +1277,31 @@ export type Database = {
           created_at: string | null
           department_id: number
           id: number
+          project_id: number | null
           rule_id: number | null
         }
         Insert: {
           created_at?: string | null
           department_id: number
           id?: number
+          project_id?: number | null
           rule_id?: number | null
         }
         Update: {
           created_at?: string | null
           department_id?: number
           id?: number
+          project_id?: number | null
           rule_id?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "rule_departments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "rule_departments_rule_id_fkey"
             columns: ["rule_id"]
@@ -1111,18 +1316,21 @@ export type Database = {
           created_at: string | null
           door_id: number | null
           id: number
+          project_id: number | null
           rule_id: number | null
         }
         Insert: {
           created_at?: string | null
           door_id?: number | null
           id?: number
+          project_id?: number | null
           rule_id?: number | null
         }
         Update: {
           created_at?: string | null
           door_id?: number | null
           id?: number
+          project_id?: number | null
           rule_id?: number | null
         }
         Relationships: [
@@ -1141,6 +1349,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "rule_doors_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "rule_doors_rule_id_fkey"
             columns: ["rule_id"]
             isOneToOne: false
@@ -1153,22 +1368,32 @@ export type Database = {
         Row: {
           created_at: string | null
           id: number
+          project_id: number | null
           rule_id: number | null
           user_id: number
         }
         Insert: {
           created_at?: string | null
           id?: number
+          project_id?: number | null
           rule_id?: number | null
           user_id: number
         }
         Update: {
           created_at?: string | null
           id?: number
+          project_id?: number | null
           rule_id?: number | null
           user_id?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "rule_users_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "rule_users_rule_id_fkey"
             columns: ["rule_id"]
@@ -1182,22 +1407,32 @@ export type Database = {
         Row: {
           created_at: string | null
           id: number
+          project_id: number | null
           rule_id: number | null
           zone_id: number | null
         }
         Insert: {
           created_at?: string | null
           id?: number
+          project_id?: number | null
           rule_id?: number | null
           zone_id?: number | null
         }
         Update: {
           created_at?: string | null
           id?: number
+          project_id?: number | null
           rule_id?: number | null
           zone_id?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "rule_zones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "rule_zones_rule_id_fkey"
             columns: ["rule_id"]
@@ -1335,6 +1570,7 @@ export type Database = {
           end_time: string
           id: number
           name: string
+          project_id: number | null
           start_time: string
           updated_at: string
         }
@@ -1345,6 +1581,7 @@ export type Database = {
           end_time: string
           id?: number
           name: string
+          project_id?: number | null
           start_time: string
           updated_at?: string
         }
@@ -1355,10 +1592,19 @@ export type Database = {
           end_time?: string
           id?: number
           name?: string
+          project_id?: number | null
           start_time?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "shifts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_projects: {
         Row: {
@@ -1396,6 +1642,7 @@ export type Database = {
           full_name: string | null
           id: string
           photo_url: string | null
+          project_id: number | null
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
         }
@@ -1405,6 +1652,7 @@ export type Database = {
           full_name?: string | null
           id: string
           photo_url?: string | null
+          project_id?: number | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
         }
@@ -1414,10 +1662,19 @@ export type Database = {
           full_name?: string | null
           id?: string
           photo_url?: string | null
+          project_id?: number | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       zones: {
         Row: {
@@ -1425,6 +1682,7 @@ export type Database = {
           description: string | null
           id: number
           name: string
+          project_id: number | null
           updated_at: string | null
         }
         Insert: {
@@ -1432,6 +1690,7 @@ export type Database = {
           description?: string | null
           id?: number
           name: string
+          project_id?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -1439,9 +1698,18 @@ export type Database = {
           description?: string | null
           id?: number
           name?: string
+          project_id?: number | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "zones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
