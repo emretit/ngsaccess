@@ -135,7 +135,7 @@ export const useUserManagement = () => {
             if (projectError) throw projectError;
           }
 
-          // Send setup email
+          // Send setup email using existing edge function
           try {
             const selectedProject = projects.find(p => p.id === formData.projectId);
             const { error: emailError } = await supabase.functions.invoke('send-user-setup-email', {

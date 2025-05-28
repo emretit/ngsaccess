@@ -37,12 +37,11 @@ export function MailSettings() {
     try {
       const { data, error } = await supabase
         .from('general_settings')
-        .select('*')
+        .select('mail_settings')
         .single();
 
-      if (data && !error) {
-        // Mail ayarları general_settings tablosunda JSON olarak saklanabilir
-        const mailSettings = data.mail_settings || {};
+      if (data && data.mail_settings && !error) {
+        const mailSettings = data.mail_settings;
         setSettings({
           smtp_server: mailSettings.smtp_server || '',
           smtp_port: mailSettings.smtp_port || '587',

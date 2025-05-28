@@ -912,6 +912,7 @@ export type Database = {
           email: string | null
           id: string
           logo_url: string | null
+          mail_settings: Json | null
           notifications_enabled: boolean | null
           phone: string | null
           project_id: number | null
@@ -934,6 +935,7 @@ export type Database = {
           email?: string | null
           id?: string
           logo_url?: string | null
+          mail_settings?: Json | null
           notifications_enabled?: boolean | null
           phone?: string | null
           project_id?: number | null
@@ -956,6 +958,7 @@ export type Database = {
           email?: string | null
           id?: string
           logo_url?: string | null
+          mail_settings?: Json | null
           notifications_enabled?: boolean | null
           phone?: string | null
           project_id?: number | null
@@ -1601,6 +1604,8 @@ export type Database = {
           id: string
           photo_url: string | null
           role: Database["public"]["Enums"]["user_role"]
+          setup_token: string | null
+          token_expires_at: string | null
           updated_at: string
         }
         Insert: {
@@ -1610,6 +1615,8 @@ export type Database = {
           id: string
           photo_url?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          setup_token?: string | null
+          token_expires_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -1619,6 +1626,8 @@ export type Database = {
           id?: string
           photo_url?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          setup_token?: string | null
+          token_expires_at?: string | null
           updated_at?: string
         }
         Relationships: []
