@@ -3,6 +3,7 @@ import { Device, ServerDevice } from "@/types/device";
 import { DeviceList } from "@/components/devices/DeviceList";
 import { DeviceFilters } from "@/components/devices/DeviceFilters";
 import { DeviceStats } from "@/components/devices/DeviceStats";
+import { DevicesHeader } from "@/components/devices/DevicesHeader";
 import { Zone, Door } from "@/hooks/useZonesAndDoors";
 import { useDeviceFilters } from "@/hooks/useDeviceFilters";
 
@@ -17,6 +18,7 @@ interface DevicesContentProps {
   onDeleteDevice: (deviceId: string) => void;
   onAssignLocation: (device: Device) => void;
   onEditDevice: (device: Device) => void;
+  onNewDevice: () => void;
 }
 
 export function DevicesContent({
@@ -29,7 +31,8 @@ export function DevicesContent({
   onQRClick,
   onDeleteDevice,
   onAssignLocation,
-  onEditDevice
+  onEditDevice,
+  onNewDevice
 }: DevicesContentProps) {
   // Use the extracted filter hook
   const {
@@ -45,6 +48,14 @@ export function DevicesContent({
 
   return (
     <div className="space-y-6">
+      <DevicesHeader
+        deviceCount={devices.length}
+        filteredCount={filteredDevices.length}
+        onAddDevice={() => {}}
+        isAddingDevice={false}
+        onOpenDevicePanel={onNewDevice}
+      />
+
       <DeviceFilters 
         search={search}
         onSearchChange={setSearch}
@@ -57,17 +68,19 @@ export function DevicesContent({
 
       <DeviceStats devices={filteredDevices} />
 
-      <DeviceList 
-        devices={devices}
-        filteredDevices={filteredDevices}
-        isLoading={isLoading}
-        zones={zones}
-        doors={doors}
-        onQRClick={onQRClick}
-        onDeleteDevice={onDeleteDevice}
-        onAssignLocation={onAssignLocation}
-        onEditDevice={onEditDevice}
-      />
+      <div className="glass-card overflow-hidden">
+        <DeviceList 
+          devices={devices}
+          filteredDevices={filteredDevices}
+          isLoading={isLoading}
+          zones={zones}
+          doors={doors}
+          onQRClick={onQRClick}
+          onDeleteDevice={onDeleteDevice}
+          onAssignLocation={onAssignLocation}
+          onEditDevice={onEditDevice}
+        />
+      </div>
     </div>
   );
 }

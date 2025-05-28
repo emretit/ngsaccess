@@ -47,8 +47,16 @@ export default function Devices() {
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-[calc(100vh-4rem)] gap-6 p-6">
+    <div className="flex min-h-[calc(100vh-4rem)] gap-6 p-6">
       {/* Left sidebar with zone/door tree */}
       <ZoneDoorTreePanel 
         onSelectZone={setSelectedZoneId}
@@ -56,34 +64,36 @@ export default function Devices() {
       />
 
       {/* Main content area */}
-      <Card className="flex-1 overflow-hidden">
-        <div className="h-full flex flex-col">
-          <DevicesContent
-            devices={devices}
-            isLoading={isLoading}
-            zones={zones}
-            doors={doors}
-            selectedZoneId={selectedZoneId}
-            selectedDoorId={selectedDoorId}
-            onQRClick={handleQRClick}
-            onDeleteDevice={(deviceId) => {
-              const device = devices.find(d => d.id.toString() === deviceId);
-              if (device) {
-                setDeviceToDelete(device);
-                setIsDeleteDialogOpen(true);
-              }
-            }}
-            onAssignLocation={(device) => {
-              setSelectedDevice(device);
-              setIsAssignLocationOpen(true);
-            }}
-            onEditDevice={(device) => {
-              setSelectedDevice(device);
-              setIsPanelOpen(true);
-            }}
-          />
-        </div>
-      </Card>
+      <div className="flex-1 space-y-6">
+        <DevicesContent
+          devices={devices}
+          isLoading={isLoading}
+          zones={zones}
+          doors={doors}
+          selectedZoneId={selectedZoneId}
+          selectedDoorId={selectedDoorId}
+          onQRClick={handleQRClick}
+          onDeleteDevice={(deviceId) => {
+            const device = devices.find(d => d.id.toString() === deviceId);
+            if (device) {
+              setDeviceToDelete(device);
+              setIsDeleteDialogOpen(true);
+            }
+          }}
+          onAssignLocation={(device) => {
+            setSelectedDevice(device);
+            setIsAssignLocationOpen(true);
+          }}
+          onEditDevice={(device) => {
+            setSelectedDevice(device);
+            setIsPanelOpen(true);
+          }}
+          onNewDevice={() => {
+            setSelectedDevice(null);
+            setIsPanelOpen(true);
+          }}
+        />
+      </div>
 
       <DeviceDetailsPanel
         open={isPanelOpen}
