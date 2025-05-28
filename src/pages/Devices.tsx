@@ -7,6 +7,7 @@ import { QRCodeDialog } from "@/components/devices/QRCodeDialog";
 import { DeviceDeleteDialog } from "@/components/devices/DeviceDeleteDialog";
 import { AssignLocationForm } from "@/components/devices/AssignLocationForm";
 import { DeviceForm } from "@/components/devices/DeviceForm";
+import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
 import { useProjectFilteredDevices } from "@/hooks/useProjectFilteredDevices";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { useDeviceActions } from "@/components/devices/useDeviceActions";
@@ -49,8 +50,15 @@ export default function Devices() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
-      <Card className="flex-1 m-6 overflow-hidden">
+    <div className="flex h-[calc(100vh-4rem)] gap-6 p-6">
+      {/* Left sidebar with zone/door tree */}
+      <ZoneDoorTreePanel 
+        onSelectZone={setSelectedZoneId}
+        onSelectDoor={setSelectedDoorId}
+      />
+
+      {/* Main content area */}
+      <Card className="flex-1 overflow-hidden">
         <div className="h-full flex flex-col">
           <DevicesContent
             devices={devices}
@@ -123,6 +131,13 @@ export default function Devices() {
       />
 
       <AssignLocationForm
+        open={isAssignLocationOpen}
+        onClose={() => setIsAssignLocationOpen(false)}
+        onSubmit={async (zoneId: number, doorId: number) => {
+          // TODO: Implement location assignment logic
+          console.log('Assigning location:', { zoneId, doorId });
+        }}
+        deviceName={selectedDevice?.device_name || selectedDevice?.name || ''}
         device={selectedDevice ? {
           id: selectedDevice.id,
           name: selectedDevice.device_name || selectedDevice.name || '',
@@ -132,13 +147,7 @@ export default function Devices() {
           status: selectedDevice.status,
           zone_id: selectedDevice.zone_id,
           door_id: selectedDevice.door_id
-        } : null}
-        isOpen={isAssignLocationOpen}
-        onClose={() => setIsAssignLocationOpen(false)}
-        onSave={async () => {
-          setIsAssignLocationOpen(false);
-          refetch();
-        }}
+        } : undefined}
       />
 
       <DeviceForm
