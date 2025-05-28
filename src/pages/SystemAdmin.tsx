@@ -1,4 +1,3 @@
-
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
@@ -11,27 +10,46 @@ export default function SystemAdmin() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.log("SystemAdmin: Sayfa yüklendi, kontrol ediliyor...", {
+    console.log("SystemAdmin: Sayfa yüklendi, detaylı kontrol ediliyor...", {
       loading,
-      hasProfile: !!profile,
-      userRole: profile?.role,
+      hasUser: !!user,
       userEmail: user?.email,
-      checkResult: profile ? checkUserRole('super_admin') : 'profile yok'
+      hasProfile: !!profile,
+      profileRole: profile?.role,
+      profileData: profile,
+      checkResult: profile ? checkUserRole('super_admin') : 'profile henüz yüklenmedi'
     });
 
     // Loading tamamlandıktan SONRA yetki kontrolü yap
     if (!loading) {
-      if (!checkUserRole('super_admin')) {
-        console.log("SystemAdmin: Yetki yok, /home'a yönlendiriliyor...", {
-          loading,
-          profileRole: profile?.role,
-          checkResult: checkUserRole('super_admin')
-        });
+      console.log("SystemAdmin: Loading tamamlandı, yetki kontrol ediliyor...");
+      
+      // Kullanıcı giriş yapmış mı kontrol et
+      if (!user) {
+        console.log("SystemAdmin: Kullanıcı giriş yapmamış, /login'e yönlendiriliyor...");
+        navigate('/login');
+        return;
+      }
+
+      // Profile yüklenmiş mi kontrol et
+      if (!profile) {
+        console.log("SystemAdmin: Profile henüz yüklenmedi, bekleniyor...");
+        return;
+      }
+
+      const hasAccess = checkUserRole('super_admin');
+      console.log("SystemAdmin: Nihai yetki kontrolü:", {
+        userEmail: user.email,
+        profileRole: profile.role,
+        hasAccess,
+        profileId: profile.id
+      });
+
+      if (!hasAccess) {
+        console.log("SystemAdmin: Yetki yok, /home'a yönlendiriliyor...");
         navigate('/home');
       } else {
-        console.log("SystemAdmin: Yetki var, sayfa yükleniyor!", {
-          userRole: profile?.role
-        });
+        console.log("SystemAdmin: ✅ Yetki onaylandı, sayfa yükleniyor!");
       }
     }
   }, [checkUserRole, loading, navigate, profile, user]);
@@ -61,13 +79,32 @@ export default function SystemAdmin() {
     );
   }
 
-  // Loading tamamlandıktan sonra yetki kontrolü
+  // Kullanıcı giriş yapmamışsa
+  if (!user) {
+    console.log("SystemAdmin: Kullanıcı yok, yönlendirme için null döndürülüyor");
+    return null;
+  }
+
+  // Profile henüz yüklenmemişse
+  if (!profile) {
+    console.log("SystemAdmin: Profile henüz yüklenmedi, bekleniyor...");
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-500 mx-auto mb-4"></div>
+          <p className="text-purple-300">Profile yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Yetki kontrolü
   if (!checkUserRole('super_admin')) {
     console.log("SystemAdmin: Yetki kontrol sonucu negatif, null döndürülüyor");
     return null;
   }
 
-  console.log("SystemAdmin: Sayfa render ediliyor, kullanıcı yetkili!");
+  console.log("SystemAdmin: ✅ Tüm kontroller geçildi, sayfa render ediliyor!");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
@@ -113,7 +150,7 @@ export default function SystemAdmin() {
               <div className="text-right">
                 <p className="text-purple-300 text-sm font-medium">Hoş geldiniz,</p>
                 <p className="text-white font-bold text-xl">{user?.email}</p>
-                <p className="text-purple-400 text-xs mt-1">Son giriş: Şimdi</p>
+                <p className="text-purple-400 text-xs mt-1">Rol: {profile?.role}</p>
               </div>
               <div className="flex flex-col items-center space-y-3">
                 <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white text-sm font-bold px-6 py-3 rounded-full shadow-xl flex items-center space-x-2 hover:scale-105 transition-transform duration-300">

@@ -33,13 +33,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const location = useLocation();
 
   React.useEffect(() => {
-    console.log("AuthProvider: Checking auth profile and location", { 
-      profile: profile?.role, 
-      pathname: location.pathname,
-      hasProfile: !!profile,
-      isLandingOrAuth: location.pathname === '/' || location.pathname === '/login' || location.pathname === '/register',
+    console.log("AuthProvider: Auth durumu kontrol ediliyor", { 
+      hasUser: !!user,
       userEmail: user?.email,
-      profileData: profile
+      hasProfile: !!profile,
+      profileRole: profile?.role,
+      pathname: location.pathname,
+      loading,
+      isSystemAdminPage: location.pathname === '/system-admin'
     });
     
     // Debug: Profile ve rol bilgilerini detaylı logla
@@ -52,15 +53,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     }
     
-    // Yönlendirme davranışını değiştirdik - artık her sayfa değişiminde yönlendirme yapmıyoruz
-    // Sadece login sonrası veya profilimiz ilk yüklendiğinde kontrol ediyoruz
-    if (!profile || location.pathname === '/' || location.pathname === '/login' || location.pathname === '/register') {
-      // Sadece ilk girişte veya kimlik doğrulama sayfalarında yönlendirme yap
-      if (profile && (location.pathname === '/login' || location.pathname === '/register')) {
-        navigate('/home');
-      }
+    // System admin sayfasında özel işlem yapma, sayfa kendi kontrolünü yapacak
+    if (location.pathname === '/system-admin') {
+      console.log("AuthProvider: System admin sayfası, sayfa kendi kontrolünü yapacak");
+      return;
     }
-  }, [profile, navigate, location.pathname]);
+    
+    // Sadece login sonrası veya kimlik doğrulama sayfalarında yönlendirme yap
+    if (profile && (location.pathname === '/login' || location.pathname === '/register')) {
+      console.log("AuthProvider: Login/register sayfasından home'a yönlendiriliyor");
+      navigate('/home');
+    }
+  }, [profile, navigate, location.pathname, user, loading]);
 
   React.useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
@@ -72,9 +76,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           description: "Başarıyla giriş yaptınız"
         });
         
-        // Login sonrası home sayfasına yönlendir
-        console.log("AuthProvider: Redirecting to home after signin");
-        navigate('/home');
+        // Login sonrası home sayfasına yönlendir (system-admin değilse)
+        if (location.pathname !== '/system-admin') {
+          console.log("AuthProvider: Redirecting to home after signin");
+          navigate('/home');
+        }
       } else if (event === 'SIGNED_OUT') {
         toast({
           title: "Çıkış yapıldı",
@@ -108,7 +114,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       requiredRole,
       userRole: profile?.role,
       hasRole,
-      profileExists: !!profile
+      profileExists: !!profile,
+      userEmail: user?.email
     });
     return hasRole;
   };
