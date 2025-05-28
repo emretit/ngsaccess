@@ -87,9 +87,14 @@ export default function Devices() {
         open={isPanelOpen}
         onClose={() => setIsPanelOpen(false)}
         selectedDevice={selectedDevice ? {
-          ...selectedDevice,
+          id: selectedDevice.id,
+          name: selectedDevice.device_name || selectedDevice.name || '',
+          serial_number: selectedDevice.device_serial || selectedDevice.serial_number || '',
           device_model_enum: "Other" as const,
-          date_added: selectedDevice.created_at || new Date().toISOString()
+          date_added: selectedDevice.created_at || new Date().toISOString(),
+          status: selectedDevice.status,
+          zone_id: selectedDevice.zone_id,
+          door_id: selectedDevice.door_id
         } : null}
         onSuccess={() => {
           refetch();
@@ -118,7 +123,16 @@ export default function Devices() {
       />
 
       <AssignLocationForm
-        device={selectedDevice}
+        device={selectedDevice ? {
+          id: selectedDevice.id,
+          name: selectedDevice.device_name || selectedDevice.name || '',
+          serial_number: selectedDevice.device_serial || selectedDevice.serial_number || '',
+          device_model_enum: "Other" as const,
+          date_added: selectedDevice.created_at || new Date().toISOString(),
+          status: selectedDevice.status,
+          zone_id: selectedDevice.zone_id,
+          door_id: selectedDevice.door_id
+        } : null}
         isOpen={isAssignLocationOpen}
         onClose={() => setIsAssignLocationOpen(false)}
         onSave={async () => {
