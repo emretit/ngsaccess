@@ -76,6 +76,23 @@ export const redirectBasedOnRole = (role: string, navigate: Function, currentPat
   navigate('/home');
 };
 
+// Yeni güvenli super admin kontrol fonksiyonu
+export const checkIsSuperAdmin = async (): Promise<boolean> => {
+  try {
+    const { data, error } = await supabase.rpc('is_super_admin');
+    
+    if (error) {
+      console.error('Error checking super admin status:', error);
+      return false;
+    }
+    
+    return data || false;
+  } catch (error) {
+    console.error('Error in checkIsSuperAdmin:', error);
+    return false;
+  }
+};
+
 export const checkUserRole = (profile: any | null, requiredRole: 'super_admin' | 'project_admin' | 'project_user'): boolean => {
   if (!profile) return false;
   
