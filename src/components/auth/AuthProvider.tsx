@@ -86,10 +86,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           title: "Çıkış yapıldı",
           description: "Başarıyla çıkış yaptınız"
         });
-        // Sadece ana, login ve register sayfalarında değilse login'e yönlendir
-        if (location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/register') {
-          navigate('/login');
-        }
+        // Çıkış yapıldığında ana sayfaya yönlendir
+        navigate('/');
       }
     });
 
