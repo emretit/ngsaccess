@@ -34,10 +34,15 @@ import { useToast } from '@/components/ui/use-toast';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 
+// Supabase types'a uygun interface tanımları
 interface User {
   id: string;
   email: string;
   role: 'super_admin' | 'project_admin' | 'project_user';
+  created_at: string;
+  updated_at: string;
+  full_name?: string;
+  photo_url?: string;
 }
 
 interface Project {
@@ -47,12 +52,14 @@ interface Project {
   is_active: boolean;
 }
 
-interface ProjectUser {
-  project_id: number;
-  is_admin: boolean;
-  project: {
-    name: string;
-  };
+interface UserWithProjects extends User {
+  project_users: {
+    project_id: number;
+    is_admin: boolean;
+    projects: {
+      name: string;
+    };
+  }[];
 }
 
 const AdminUsersPanel = () => {
@@ -90,7 +97,7 @@ const AdminUsersPanel = () => {
         throw error;
       }
       
-      return userData as (User & { project_users: ProjectUser[] })[];
+      return userData as UserWithProjects[];
     }
   });
 
@@ -208,6 +215,16 @@ const AdminUsersPanel = () => {
         return;
       }
 
+      // Super admin olmayan kullanıcılar için proje seçimi zorunlu
+      if (formData.role !== 'super_admin' && formData.selectedProjects.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Hata",
+          description: "En az bir proje seçmelisiniz"
+        });
+        return;
+      }
+
       let userId = currentUser?.id;
 
       if (currentUser) {
@@ -258,8 +275,8 @@ const AdminUsersPanel = () => {
         });
       }
 
-      // Add project assignments
-      if (userId && formData.selectedProjects.length > 0) {
+      // Add project assignments (super_admin hariç)
+      if (userId && formData.role !== 'super_admin' && formData.selectedProjects.length > 0) {
         const projectAssignments = formData.selectedProjects.map(projectId => ({
           user_id: userId,
           project_id: projectId,
@@ -328,7 +345,7 @@ const AdminUsersPanel = () => {
     }
   };
 
-  const getProjectsDisplay = (projectUsers: ProjectUser[]) => {
+  const getProjectsDisplay = (projectUsers: UserWithProjects['project_users']) => {
     if (!projectUsers || projectUsers.length === 0) {
       return <span className="text-gray-400 italic">Proje atanmamış</span>;
     }
@@ -341,7 +358,7 @@ const AdminUsersPanel = () => {
             variant="outline" 
             className={`text-xs ${pu.is_admin ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-blue-500/20 text-blue-400 border-blue-500/30'}`}
           >
-            #{pu.project_id} {pu.project.name} {pu.is_admin ? '(Admin)' : ''}
+            #{pu.project_id} {pu.projects.name} {pu.is_admin ? '(Admin)' : ''}
           </Badge>
         ))}
       </div>
@@ -494,7 +511,7 @@ const AdminUsersPanel = () => {
 
             {formData.role !== 'super_admin' && (
               <div className="grid gap-4">
-                <Label>Proje Atamaları</Label>
+                <Label>Proje Atamaları*</Label>
                 <div className="bg-muted/50 p-4 rounded-md space-y-4 max-h-[300px] overflow-y-auto border">
                   {projects.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Henüz aktif proje bulunmamaktadır.</p>
@@ -530,6 +547,11 @@ const AdminUsersPanel = () => {
                     ))
                   )}
                 </div>
+                {formData.role !== 'super_admin' && (
+                  <p className="text-xs text-muted-foreground">
+                    * Süper admin olmayan kullanıcılar için en az bir proje seçimi zorunludur.
+                  </p>
+                )}
               </div>
             )}
           </div>
