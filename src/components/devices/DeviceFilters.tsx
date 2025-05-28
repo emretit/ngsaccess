@@ -13,6 +13,8 @@ interface DeviceFiltersProps {
   onTypeFilterChange: (value: string) => void;
   deviceTypes: string[];
   onNewDevice?: () => void;
+  deviceCount: number;
+  filteredCount: number;
 }
 
 export function DeviceFilters({
@@ -23,13 +25,18 @@ export function DeviceFilters({
   typeFilter,
   onTypeFilterChange,
   deviceTypes,
-  onNewDevice
+  onNewDevice,
+  deviceCount,
+  filteredCount
 }: DeviceFiltersProps) {
   return (
     <div className="glass-card p-6">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Cihazlar</h1>
+          <p className="text-sm text-muted-foreground">
+            {deviceCount} cihaz bulundu, {filteredCount} tanesi gösteriliyor
+          </p>
         </div>
         
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">

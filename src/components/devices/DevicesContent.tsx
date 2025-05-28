@@ -3,7 +3,6 @@ import { Device, ServerDevice } from "@/types/device";
 import { DeviceList } from "@/components/devices/DeviceList";
 import { DeviceFilters } from "@/components/devices/DeviceFilters";
 import { DeviceStats } from "@/components/devices/DeviceStats";
-import { DevicesHeader } from "@/components/devices/DevicesHeader";
 import { Zone, Door } from "@/hooks/useZonesAndDoors";
 import { useDeviceFilters } from "@/hooks/useDeviceFilters";
 
@@ -48,14 +47,6 @@ export function DevicesContent({
 
   return (
     <div className="space-y-6">
-      <DevicesHeader
-        deviceCount={devices.length}
-        filteredCount={filteredDevices.length}
-        onAddDevice={() => {}}
-        isAddingDevice={false}
-        onOpenDevicePanel={onNewDevice}
-      />
-
       <DeviceFilters 
         search={search}
         onSearchChange={setSearch}
@@ -64,6 +55,9 @@ export function DevicesContent({
         typeFilter={typeFilter}
         onTypeFilterChange={setTypeFilter}
         deviceTypes={deviceTypes}
+        onNewDevice={onNewDevice}
+        deviceCount={devices.length}
+        filteredCount={filteredDevices.length}
       />
 
       <DeviceStats devices={filteredDevices} />
