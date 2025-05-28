@@ -1785,6 +1785,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      get_accessible_project_ids: {
+        Args: { user_uuid: string }
+        Returns: number[]
+      }
       get_authenticated_employee_id: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -1801,6 +1805,17 @@ export type Database = {
           end_time: string
           days: string[]
         }[]
+      }
+      get_user_projects: {
+        Args: { user_uuid: string }
+        Returns: {
+          project_id: number
+          is_admin: boolean
+        }[]
+      }
+      has_project_access: {
+        Args: { user_uuid: string; target_project_id: number }
+        Returns: boolean
       }
       is_device_online: {
         Args: { last_seen: string }
