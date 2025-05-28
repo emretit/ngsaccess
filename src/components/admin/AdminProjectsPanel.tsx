@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Plus, Trash2, Users } from 'lucide-react';
+import { Edit, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,13 +34,11 @@ interface Project {
   description: string;
   created_at: string;
   is_active: boolean;
-  user_count?: number;
 }
 
 const AdminProjectsPanel = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isUsersDialogOpen, setIsUsersDialogOpen] = useState(false);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [formData, setFormData] = useState<Partial<Project>>({
     name: '',
@@ -49,16 +47,13 @@ const AdminProjectsPanel = () => {
   });
   const { toast } = useToast();
 
-  // Fetch projects with user counts
+  // Fetch projects (sadece super admin'ler görebilir)
   const { data: projects = [], refetch: refetchProjects } = useQuery({
     queryKey: ['admin', 'projects'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select(`
-          *,
-          project_users(count)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -70,31 +65,8 @@ const AdminProjectsPanel = () => {
         throw error;
       }
       
-      return data.map(project => ({
-        ...project,
-        user_count: project.project_users?.[0]?.count || 0
-      })) as Project[];
+      return data as Project[];
     }
-  });
-
-  // Fetch project users
-  const { data: projectUsers = [] } = useQuery({
-    queryKey: ['admin', 'project-users', currentProject?.id],
-    queryFn: async () => {
-      if (!currentProject?.id) return [];
-      
-      const { data, error } = await supabase
-        .from('project_users')
-        .select(`
-          *,
-          users(email, role)
-        `)
-        .eq('project_id', currentProject.id);
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!currentProject?.id && isUsersDialogOpen
   });
 
   const handleCreateProject = () => {
@@ -120,11 +92,6 @@ const AdminProjectsPanel = () => {
   const handleDeleteClick = (project: Project) => {
     setCurrentProject(project);
     setIsDeleteDialogOpen(true);
-  };
-
-  const handleUsersClick = (project: Project) => {
-    setCurrentProject(project);
-    setIsUsersDialogOpen(true);
   };
 
   const handleSaveProject = async () => {
@@ -227,7 +194,6 @@ const AdminProjectsPanel = () => {
                 <TableRow>
                   <TableHead>Proje Adı</TableHead>
                   <TableHead>Açıklama</TableHead>
-                  <TableHead>Kullanıcı Sayısı</TableHead>
                   <TableHead>Oluşturma Tarihi</TableHead>
                   <TableHead>Durum</TableHead>
                   <TableHead className="text-right">İşlemler</TableHead>
@@ -236,7 +202,7 @@ const AdminProjectsPanel = () => {
               <TableBody>
                 {projects.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
                       Henüz proje bulunmamaktadır
                     </TableCell>
                   </TableRow>
@@ -250,17 +216,6 @@ const AdminProjectsPanel = () => {
                             `${project.description.substring(0, 100)}...` : 
                             project.description : 
                           <span className="text-muted-foreground italic">Açıklama yok</span>}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleUsersClick(project)}
-                          className="flex items-center gap-1"
-                        >
-                          <Users className="h-4 w-4" />
-                          {project.user_count || 0}
-                        </Button>
                       </TableCell>
                       <TableCell>
                         {project.created_at ? format(new Date(project.created_at), 'dd.MM.yyyy HH:mm') : '-'}
@@ -347,63 +302,6 @@ const AdminProjectsPanel = () => {
             </Button>
             <Button variant="destructive" onClick={handleDeleteProject}>
               Sil
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Project Users Dialog */}
-      <Dialog open={isUsersDialogOpen} onOpenChange={setIsUsersDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Proje Kullanıcıları - {currentProject?.name}</DialogTitle>
-            <DialogDescription>
-              Bu projeye atanmış kullanıcıları görüntüleyin
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-96 overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>E-posta</TableHead>
-                  <TableHead>Rol</TableHead>
-                  <TableHead>Proje Yetkileri</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {projectUsers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
-                      Bu projeye henüz kullanıcı atanmamış
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  projectUsers.map((projectUser: any) => (
-                    <TableRow key={projectUser.id}>
-                      <TableCell>{projectUser.users?.email}</TableCell>
-                      <TableCell>
-                        <Badge variant={
-                          projectUser.users?.role === 'super_admin' ? 'destructive' :
-                          projectUser.users?.role === 'project_admin' ? 'default' : 'secondary'
-                        }>
-                          {projectUser.users?.role === 'super_admin' ? 'Süper Admin' :
-                           projectUser.users?.role === 'project_admin' ? 'Proje Yöneticisi' : 'Kullanıcı'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={projectUser.is_admin ? 'default' : 'outline'}>
-                          {projectUser.is_admin ? 'Proje Admini' : 'Kullanıcı'}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsUsersDialogOpen(false)}>
-              Kapat
             </Button>
           </DialogFooter>
         </DialogContent>

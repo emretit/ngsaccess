@@ -244,13 +244,6 @@ export type Database = {
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "ai_report_queries_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "users_with_projects"
-            referencedColumns: ["project_id"]
-          },
         ]
       }
       ai_report_results: {
@@ -338,13 +331,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "ai_report_templates_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "users_with_projects"
-            referencedColumns: ["project_id"]
           },
         ]
       }
@@ -472,13 +458,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_companies_project"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "users_with_projects"
-            referencedColumns: ["project_id"]
           },
         ]
       }
@@ -617,13 +596,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "devices_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "users_with_projects"
-            referencedColumns: ["project_id"]
           },
           {
             foreignKeyName: "devices_zone_id_fkey"
@@ -1078,62 +1050,6 @@ export type Database = {
         }
         Relationships: []
       }
-      project_users: {
-        Row: {
-          created_at: string
-          id: string
-          is_admin: boolean
-          project_id: number
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          is_admin?: boolean
-          project_id: number
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          is_admin?: boolean
-          project_id?: number
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_users_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_users_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "users_with_projects"
-            referencedColumns: ["project_id"]
-          },
-          {
-            foreignKeyName: "project_users_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_users_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users_with_projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       projects: {
         Row: {
           created_at: string | null
@@ -1365,13 +1281,6 @@ export type Database = {
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "server_devices_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "users_with_projects"
-            referencedColumns: ["project_id"]
-          },
         ]
       }
       settings: {
@@ -1415,13 +1324,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_settings_project"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "users_with_projects"
-            referencedColumns: ["project_id"]
           },
         ]
       }
@@ -1484,13 +1386,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fk_user_projects_project"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "users_with_projects"
-            referencedColumns: ["project_id"]
           },
         ]
       }
@@ -1595,30 +1490,12 @@ export type Database = {
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "devices_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "users_with_projects"
-            referencedColumns: ["project_id"]
-          },
         ]
       }
       latest_device_readings: {
         Row: {
           device_serial: string | null
           last_seen: string | null
-        }
-        Relationships: []
-      }
-      users_with_projects: {
-        Row: {
-          email: string | null
-          id: string | null
-          is_admin: boolean | null
-          project_id: number | null
-          project_name: string | null
-          role: Database["public"]["Enums"]["user_role"] | null
         }
         Relationships: []
       }

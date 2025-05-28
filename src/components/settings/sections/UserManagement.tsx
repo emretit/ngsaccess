@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,15 +42,7 @@ interface User {
   id: string;
   email: string;
   role: 'super_admin' | 'project_admin' | 'project_user';
-  projects?: { id: number; name: string; is_admin: boolean }[];
   created_at: string;
-}
-
-interface Project {
-  id: number;
-  name: string;
-  description?: string;
-  is_active: boolean;
 }
 
 export function UserManagement() {
@@ -60,8 +53,6 @@ export function UserManagement() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<"super_admin" | "project_admin" | "project_user">("project_user");
-  const [selectedProjects, setSelectedProjects] = useState<number[]>([]);
-  const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
 
   // Check if user has super_admin access
@@ -81,7 +72,7 @@ export function UserManagement() {
     );
   }
 
-  // Fetch users with their roles and project assignments
+  // Fetch users (project_users referansını kaldırdık)
   const { data: users = [], refetch: refetchUsers } = useQuery({
     queryKey: ["users"],
     queryFn: async () => {
@@ -94,43 +85,7 @@ export function UserManagement() {
         throw usersError;
       }
 
-      // Get project assignments for each user
-      const enhancedUsers = await Promise.all(
-        usersData.map(async (user: User) => {
-          const { data: projectData } = await supabase
-            .from("project_users")
-            .select("project_id, is_admin, projects(id, name)")
-            .eq("user_id", user.id);
-
-          return {
-            ...user,
-            projects: projectData?.map((p: any) => ({
-              id: p.project_id,
-              name: p.projects?.name || "Unknown Project",
-              is_admin: p.is_admin
-            })) || []
-          };
-        })
-      );
-
-      return enhancedUsers;
-    },
-  });
-
-  // Fetch projects for assignment
-  const { data: projects = [] } = useQuery({
-    queryKey: ["projects"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("*")
-        .eq("is_active", true)
-        .order("name");
-
-      if (error) {
-        throw error;
-      }
-      return data as Project[];
+      return usersData as User[];
     },
   });
 
@@ -142,8 +97,6 @@ export function UserManagement() {
     setEmail("");
     setPassword("");
     setRole("project_user");
-    setSelectedProjects([]);
-    setIsAdmin(false);
     setEditingUser(null);
   };
 
@@ -153,8 +106,6 @@ export function UserManagement() {
       setEditingUser(user);
       setEmail(user.email);
       setRole(user.role);
-      setSelectedProjects(user.projects?.map(p => p.id) || []);
-      setIsAdmin(!!user.projects?.find(p => p.is_admin));
     }
     setDialogOpen(true);
   };
@@ -180,17 +131,6 @@ export function UserManagement() {
               .eq("id", data.user.id);
           }
 
-          // Add project assignments
-          if (selectedProjects.length > 0) {
-            const projectAssignments = selectedProjects.map(projectId => ({
-              user_id: data.user!.id,
-              project_id: projectId,
-              is_admin: isAdmin && role === "project_admin"
-            }));
-
-            await supabase.from("project_users").insert(projectAssignments);
-          }
-
           toast({
             title: "Kullanıcı oluşturuldu",
             description: "Yeni kullanıcı başarıyla eklendi.",
@@ -202,23 +142,6 @@ export function UserManagement() {
           .from("users")
           .update({ role })
           .eq("id", editingUser.id);
-
-        // Remove existing project assignments
-        await supabase
-          .from("project_users")
-          .delete()
-          .eq("user_id", editingUser.id);
-
-        // Add new project assignments
-        if (selectedProjects.length > 0) {
-          const projectAssignments = selectedProjects.map(projectId => ({
-            user_id: editingUser.id,
-            project_id: projectId,
-            is_admin: isAdmin && role === "project_admin"
-          }));
-
-          await supabase.from("project_users").insert(projectAssignments);
-        }
 
         toast({
           title: "Kullanıcı güncellendi",
@@ -290,7 +213,6 @@ export function UserManagement() {
                 <TableRow>
                   <TableHead>Kullanıcı Adı</TableHead>
                   <TableHead>Rol</TableHead>
-                  <TableHead>Projeler</TableHead>
                   <TableHead>Durum</TableHead>
                   <TableHead className="text-right">İşlemler</TableHead>
                 </TableRow>
@@ -298,7 +220,7 @@ export function UserManagement() {
               <TableBody>
                 {filteredUsers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center py-10 text-muted-foreground">
                       Kullanıcı bulunamadı
                     </TableCell>
                   </TableRow>
@@ -314,23 +236,6 @@ export function UserManagement() {
                           {user.role === "super_admin" ? "Süper Admin" : 
                            user.role === "project_admin" ? "Proje Yöneticisi" : "Kullanıcı"}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {user.projects && user.projects.length > 0 ? (
-                            user.projects.map((project) => (
-                              <Badge 
-                                key={project.id} 
-                                variant="outline" 
-                                className={project.is_admin ? "bg-blue-100 text-blue-800" : ""}
-                              >
-                                {project.name} {project.is_admin && "(Admin)"}
-                              </Badge>
-                            ))
-                          ) : (
-                            <span className="text-sm text-muted-foreground">Proje atanmamış</span>
-                          )}
-                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -415,57 +320,13 @@ export function UserManagement() {
                 </SelectContent>
               </Select>
             </div>
-
-            {role !== "super_admin" && (
-              <>
-                <div className="space-y-2">
-                  <Label>Projeler</Label>
-                  <div className="bg-muted/50 p-4 rounded-md space-y-2 max-h-[200px] overflow-y-auto">
-                    {projects.map((project) => (
-                      <div key={project.id} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id={`project-${project.id}`}
-                          checked={selectedProjects.includes(project.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedProjects([...selectedProjects, project.id]);
-                            } else {
-                              setSelectedProjects(selectedProjects.filter(id => id !== project.id));
-                            }
-                          }}
-                          className="h-4 w-4 rounded"
-                        />
-                        <label htmlFor={`project-${project.id}`} className="text-sm">
-                          {project.name}
-                        </label>
-                      </div>
-                    ))}
-                    {projects.length === 0 && (
-                      <p className="text-sm text-muted-foreground">Henüz proje bulunmamaktadır.</p>
-                    )}
-                  </div>
-                </div>
-
-                {role === "project_admin" && selectedProjects.length > 0 && (
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="isAdmin"
-                      checked={isAdmin}
-                      onCheckedChange={setIsAdmin}
-                    />
-                    <Label htmlFor="isAdmin">Seçili projelerde yönetici yetkisine sahip olsun</Label>
-                  </div>
-                )}
-              </>
-            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               İptal
             </Button>
             <Button onClick={handleCreateUser}>
-              {editingUser ? "Güncelle" : "Ekle"}
+              {editingUser ? 'Güncelle' : 'Ekle'}
             </Button>
           </DialogFooter>
         </DialogContent>
