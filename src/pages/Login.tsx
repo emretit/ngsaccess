@@ -11,10 +11,10 @@ export default function Login() {
     if (!loading) {
       if (user) {
         // If already authenticated, go to home
-        navigate('/');
+        navigate('/home');
       } else {
         // Otherwise go to auth page, using replace to avoid back button issues
-        navigate('/login', { replace: true });
+        navigate('/register', { replace: true });
       }
     }
   }, [user, loading, navigate]);

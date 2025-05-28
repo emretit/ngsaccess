@@ -21,6 +21,7 @@ import EngineeringDepartment from '@/pages/EngineeringDepartment';
 import EmployeeLogin from '@/pages/EmployeeLogin';
 import EmployeeDashboard from '@/pages/EmployeeDashboard';
 import EmployeeSetup from '@/pages/EmployeeSetup';
+import UserSetup from '@/pages/UserSetup';
 import LandingPage from '@/pages/LandingPage';
 import NotFound from '@/pages/NotFound';
 import './App.css';
@@ -40,6 +41,7 @@ function App() {
               <Route path="/employee-login" element={<EmployeeLogin />} />
               <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
               <Route path="/employee-setup/:token" element={<EmployeeSetup />} />
+              <Route path="/user-setup/:token" element={<UserSetup />} />
               <Route path="/system-admin" element={<SystemAdmin />} />
               <Route 
                 path="/home" 

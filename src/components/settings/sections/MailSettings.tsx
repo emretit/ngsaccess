@@ -41,7 +41,7 @@ export function MailSettings() {
         .single();
 
       if (data && data.mail_settings && !error) {
-        const mailSettings = data.mail_settings;
+        const mailSettings = data.mail_settings as any;
         setSettings({
           smtp_server: mailSettings.smtp_server || '',
           smtp_port: mailSettings.smtp_port || '587',
@@ -62,7 +62,7 @@ export function MailSettings() {
       const { error } = await supabase
         .from('general_settings')
         .upsert({
-          mail_settings: settings
+          mail_settings: settings as any
         });
 
       if (error) throw error;
