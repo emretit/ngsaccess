@@ -26,22 +26,8 @@ export default function Devices() {
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [selectedDoorId, setSelectedDoorId] = useState<number | null>(null);
 
-  const { qrDevice, isQROpen, openQRDialog, closeQRDialog } = useQRCodeDialog();
-  const { handleDeleteDevice, handleAssignLocation, handleEditDevice } = useDeviceActions({
-    onRefresh: refetch,
-    onEditDevice: (device) => {
-      setSelectedDevice(device);
-      setIsPanelOpen(true);
-    },
-    onDeleteDevice: (device) => {
-      setDeviceToDelete(device);
-      setIsDeleteDialogOpen(true);
-    },
-    onAssignLocation: (device) => {
-      setSelectedDevice(device);
-      setIsAssignLocationOpen(true);
-    }
-  });
+  const { selectedQR, handleQRClick, handleDownloadQR, closeQRDialog } = useQRCodeDialog();
+  const { handleDeleteDevice } = useDeviceActions();
 
   if (!hasProjectAccess) {
     return (
@@ -73,7 +59,7 @@ export default function Devices() {
             doors={doors}
             selectedZoneId={selectedZoneId}
             selectedDoorId={selectedDoorId}
-            onQRClick={openQRDialog}
+            onQRClick={handleQRClick}
             onDeleteDevice={(deviceId) => {
               const device = devices.find(d => d.id.toString() === deviceId);
               if (device) {
@@ -98,25 +84,30 @@ export default function Devices() {
       </Card>
 
       <DeviceDetailsPanel
-        isOpen={isPanelOpen}
+        open={isPanelOpen}
         onClose={() => setIsPanelOpen(false)}
-        device={selectedDevice}
-        onSave={() => {
+        selectedDevice={selectedDevice ? {
+          ...selectedDevice,
+          device_model_enum: "Other" as const,
+          date_added: selectedDevice.created_at || new Date().toISOString()
+        } : null}
+        onSuccess={() => {
           refetch();
           setIsPanelOpen(false);
         }}
       />
 
       <QRCodeDialog
-        device={qrDevice}
-        isOpen={isQROpen}
-        onClose={closeQRDialog}
+        open={!!selectedQR}
+        onOpenChange={closeQRDialog}
+        qrData={selectedQR}
+        onDownload={handleDownloadQR}
       />
 
       <DeviceDeleteDialog
-        device={deviceToDelete}
         isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
+        onOpenChange={setIsDeleteDialogOpen}
+        selectedCount={1}
         onConfirm={async () => {
           if (deviceToDelete) {
             await handleDeleteDevice(deviceToDelete.id.toString());
@@ -131,20 +122,17 @@ export default function Devices() {
         isOpen={isAssignLocationOpen}
         onClose={() => setIsAssignLocationOpen(false)}
         onSave={async () => {
-          if (selectedDevice) {
-            await handleAssignLocation(selectedDevice);
-            setIsAssignLocationOpen(false);
-          }
+          setIsAssignLocationOpen(false);
+          refetch();
         }}
       />
 
       <DeviceForm
-        device={null}
-        isOpen={isNewDeviceOpen}
-        onClose={() => setIsNewDeviceOpen(false)}
-        onSave={() => {
-          refetch();
-          setIsNewDeviceOpen(false);
+        onAddDevice={() => {}}
+        isLoading={false}
+        onOpenDevicePanel={() => {
+          setSelectedDevice(null);
+          setIsNewDeviceOpen(true);
         }}
       />
     </div>
