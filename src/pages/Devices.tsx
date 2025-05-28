@@ -9,8 +9,6 @@ import { AssignLocationForm } from "@/components/devices/AssignLocationForm";
 import { DeviceForm } from "@/components/devices/DeviceForm";
 import { useProjectFilteredDevices } from "@/hooks/useProjectFilteredDevices";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
-import { useDeviceActions } from "@/components/devices/useDeviceActions";
-import { useQRCodeDialog } from "@/components/devices/useQRCodeDialog";
 import { Device } from "@/types/device";
 
 export default function Devices() {
@@ -25,23 +23,34 @@ export default function Devices() {
   const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null);
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [selectedDoorId, setSelectedDoorId] = useState<number | null>(null);
+  const [isQROpen, setIsQROpen] = useState(false);
+  const [qrDevice, setQrDevice] = useState<Device | null>(null);
 
-  const { qrDevice, isQROpen, openQRDialog, closeQRDialog } = useQRCodeDialog();
-  const { handleDeleteDevice, handleAssignLocation, handleEditDevice } = useDeviceActions({
-    onRefresh: refetch,
-    onEditDevice: (device) => {
-      setSelectedDevice(device);
-      setIsPanelOpen(true);
-    },
-    onDeleteDevice: (device) => {
-      setDeviceToDelete(device);
-      setIsDeleteDialogOpen(true);
-    },
-    onAssignLocation: (device) => {
-      setSelectedDevice(device);
-      setIsAssignLocationOpen(true);
-    }
-  });
+  const handleQRClick = (device: Device) => {
+    setQrDevice(device);
+    setIsQROpen(true);
+  };
+
+  const closeQRDialog = () => {
+    setIsQROpen(false);
+    setQrDevice(null);
+  };
+
+  const handleDeleteDevice = async (deviceId: string) => {
+    // Delete implementation would go here
+    console.log('Delete device:', deviceId);
+    refetch();
+  };
+
+  const handleAssignLocation = (device: Device) => {
+    setSelectedDevice(device);
+    setIsAssignLocationOpen(true);
+  };
+
+  const handleEditDevice = (device: Device) => {
+    setSelectedDevice(device);
+    setIsPanelOpen(true);
+  };
 
   if (!hasProjectAccess) {
     return (
@@ -73,7 +82,7 @@ export default function Devices() {
             doors={doors}
             selectedZoneId={selectedZoneId}
             selectedDoorId={selectedDoorId}
-            onQRClick={openQRDialog}
+            onQRClick={handleQRClick}
             onDeleteDevice={(deviceId) => {
               const device = devices.find(d => d.id.toString() === deviceId);
               if (device) {
@@ -81,14 +90,8 @@ export default function Devices() {
                 setIsDeleteDialogOpen(true);
               }
             }}
-            onAssignLocation={(device) => {
-              setSelectedDevice(device);
-              setIsAssignLocationOpen(true);
-            }}
-            onEditDevice={(device) => {
-              setSelectedDevice(device);
-              setIsPanelOpen(true);
-            }}
+            onAssignLocation={handleAssignLocation}
+            onEditDevice={handleEditDevice}
             onNewDevice={() => {
               setSelectedDevice(null);
               setIsNewDeviceOpen(true);
@@ -98,8 +101,8 @@ export default function Devices() {
       </Card>
 
       <DeviceDetailsPanel
-        isOpen={isPanelOpen}
-        onClose={() => setIsPanelOpen(false)}
+        open={isPanelOpen}
+        onOpenChange={setIsPanelOpen}
         device={selectedDevice}
         onSave={() => {
           refetch();
@@ -108,15 +111,16 @@ export default function Devices() {
       />
 
       <QRCodeDialog
-        device={qrDevice}
         isOpen={isQROpen}
         onClose={closeQRDialog}
+        deviceName={qrDevice?.name || ''}
+        serialNumber={qrDevice?.device_serial || ''}
       />
 
       <DeviceDeleteDialog
-        device={deviceToDelete}
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
+        deviceName={deviceToDelete?.name || ''}
         onConfirm={async () => {
           if (deviceToDelete) {
             await handleDeleteDevice(deviceToDelete.id.toString());
@@ -131,15 +135,12 @@ export default function Devices() {
         isOpen={isAssignLocationOpen}
         onClose={() => setIsAssignLocationOpen(false)}
         onSave={async () => {
-          if (selectedDevice) {
-            await handleAssignLocation(selectedDevice);
-            setIsAssignLocationOpen(false);
-          }
+          refetch();
+          setIsAssignLocationOpen(false);
         }}
       />
 
       <DeviceForm
-        device={null}
         isOpen={isNewDeviceOpen}
         onClose={() => setIsNewDeviceOpen(false)}
         onSave={() => {
