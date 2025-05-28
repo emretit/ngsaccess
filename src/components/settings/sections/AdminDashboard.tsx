@@ -125,76 +125,50 @@ export function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Premium Unified Admin Tabs */}
+      {/* Premium Admin Tabs */}
       <Tabs defaultValue="projects" className="w-full">
-        <TabsList className="bg-white/5 border border-white/10 backdrop-blur-2xl p-2 h-20 shadow-2xl rounded-2xl">
+        <TabsList className="bg-white/10 border-white/20 backdrop-blur-xl p-2 h-16 shadow-xl">
           <TabsTrigger 
             value="projects" 
-            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:via-pink-600 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-xl data-[state=active]:shadow-purple-500/25 text-purple-200 font-bold px-8 py-4 rounded-xl transition-all duration-500 hover:bg-white/10 data-[state=active]:scale-105 data-[state=active]:border-0 group relative overflow-hidden"
+            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:via-pink-600 data-[state=active]:to-blue-600 data-[state=active]:text-white text-purple-200 font-bold px-8 py-3 rounded-xl transition-all duration-300 data-[state=active]:shadow-lg data-[state=active]:scale-105"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-pink-600/20 to-blue-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-xl"></div>
-            <div className="relative z-10 flex items-center space-x-3">
-              <div className="w-8 h-8 bg-purple-500/30 rounded-lg flex items-center justify-center group-data-[state=active]:bg-white/20 transition-all duration-300 backdrop-blur-sm">
-                <Building2 className="w-5 h-5" />
-              </div>
-              <span className="text-lg">Proje Yönetimi</span>
-            </div>
+            <Building2 className="w-5 h-5 mr-3" />
+            Proje Yönetimi
           </TabsTrigger>
-          
           <TabsTrigger 
             value="users" 
-            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:via-pink-600 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-xl data-[state=active]:shadow-purple-500/25 text-purple-200 font-bold px-8 py-4 rounded-xl transition-all duration-500 hover:bg-white/10 data-[state=active]:scale-105 data-[state=active]:border-0 group relative overflow-hidden"
+            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:via-pink-600 data-[state=active]:to-blue-600 data-[state=active]:text-white text-purple-200 font-bold px-8 py-3 rounded-xl transition-all duration-300 data-[state=active]:shadow-lg data-[state=active]:scale-105"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-pink-600/20 to-blue-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-xl"></div>
-            <div className="relative z-10 flex items-center space-x-3">
-              <div className="w-8 h-8 bg-green-500/30 rounded-lg flex items-center justify-center group-data-[state=active]:bg-white/20 transition-all duration-300 backdrop-blur-sm">
-                <Users className="w-5 h-5" />
-              </div>
-              <span className="text-lg">Kullanıcı Yönetimi</span>
-            </div>
+            <Users className="w-5 h-5 mr-3" />
+            Kullanıcı Yönetimi
           </TabsTrigger>
-          
           <TabsTrigger 
             value="devices" 
-            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:via-pink-600 data-[state=active]:to-blue-600 data-[state=active]:text-white data-[state=active]:shadow-xl data-[state=active]:shadow-purple-500/25 text-purple-200 font-bold px-8 py-4 rounded-xl transition-all duration-500 hover:bg-white/10 data-[state=active]:scale-105 data-[state=active]:border-0 group relative overflow-hidden"
+            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:via-pink-600 data-[state=active]:to-blue-600 data-[state=active]:text-white text-purple-200 font-bold px-8 py-3 rounded-xl transition-all duration-300 data-[state=active]:shadow-lg data-[state=active]:scale-105"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 via-pink-600/20 to-blue-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-xl"></div>
-            <div className="relative z-10 flex items-center space-x-3">
-              <div className="w-8 h-8 bg-orange-500/30 rounded-lg flex items-center justify-center group-data-[state=active]:bg-white/20 transition-all duration-300 backdrop-blur-sm">
-                <Monitor className="w-5 h-5" />
-              </div>
-              <span className="text-lg">Cihaz Yönetimi</span>
-            </div>
+            <Monitor className="w-5 h-5 mr-3" />
+            Cihaz Yönetimi
           </TabsTrigger>
         </TabsList>
         
         <TabsContent value="projects" className="mt-10">
-          <div className="bg-white/5 border border-white/10 backdrop-blur-2xl rounded-3xl p-10 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600"></div>
-            <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl"></div>
-            <div className="relative z-10">
-              <AdminProjectsPanel />
-            </div>
+          <div className="bg-white/10 border-white/20 backdrop-blur-xl rounded-3xl p-8 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600"></div>
+            <AdminProjectsPanel />
           </div>
         </TabsContent>
 
         <TabsContent value="users" className="mt-10">
-          <div className="bg-white/5 border border-white/10 backdrop-blur-2xl rounded-3xl p-10 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600"></div>
-            <div className="absolute -top-40 -right-40 w-80 h-80 bg-green-500/10 rounded-full blur-3xl"></div>
-            <div className="relative z-10">
-              <AdminUsersPanel />
-            </div>
+          <div className="bg-white/10 border-white/20 backdrop-blur-xl rounded-3xl p-8 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600"></div>
+            <AdminUsersPanel />
           </div>
         </TabsContent>
 
         <TabsContent value="devices" className="mt-10">
-          <div className="bg-white/5 border border-white/10 backdrop-blur-2xl rounded-3xl p-10 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600"></div>
-            <div className="absolute -top-40 -right-40 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl"></div>
-            <div className="relative z-10">
-              <AdminDevicesPanel />
-            </div>
+          <div className="bg-white/10 border-white/20 backdrop-blur-xl rounded-3xl p-8 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600"></div>
+            <AdminDevicesPanel />
           </div>
         </TabsContent>
       </Tabs>
