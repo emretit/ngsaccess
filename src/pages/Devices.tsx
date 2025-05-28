@@ -6,7 +6,6 @@ import { DeviceDetailsPanel } from "@/components/devices/DeviceDetailsPanel";
 import { QRCodeDialog } from "@/components/devices/QRCodeDialog";
 import { DeviceDeleteDialog } from "@/components/devices/DeviceDeleteDialog";
 import { AssignLocationForm } from "@/components/devices/AssignLocationForm";
-import { DeviceForm } from "@/components/devices/DeviceForm";
 import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
 import { useProjectFilteredDevices } from "@/hooks/useProjectFilteredDevices";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
@@ -22,7 +21,6 @@ export default function Devices() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isAssignLocationOpen, setIsAssignLocationOpen] = useState(false);
-  const [isNewDeviceOpen, setIsNewDeviceOpen] = useState(false);
   const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null);
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [selectedDoorId, setSelectedDoorId] = useState<number | null>(null);
@@ -82,10 +80,6 @@ export default function Devices() {
             onEditDevice={(device) => {
               setSelectedDevice(device);
               setIsPanelOpen(true);
-            }}
-            onNewDevice={() => {
-              setSelectedDevice(null);
-              setIsNewDeviceOpen(true);
             }}
           />
         </div>
@@ -148,15 +142,6 @@ export default function Devices() {
           zone_id: selectedDevice.zone_id,
           door_id: selectedDevice.door_id
         } : undefined}
-      />
-
-      <DeviceForm
-        onAddDevice={() => {}}
-        isLoading={false}
-        onOpenDevicePanel={() => {
-          setSelectedDevice(null);
-          setIsNewDeviceOpen(true);
-        }}
       />
     </div>
   );
