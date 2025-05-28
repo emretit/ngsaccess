@@ -102,16 +102,16 @@ export default function Devices() {
 
       <DeviceDetailsPanel
         open={isPanelOpen}
-        onOpenChange={setIsPanelOpen}
-        device={selectedDevice}
-        onSave={() => {
+        onClose={() => setIsPanelOpen(false)}
+        selectedDevice={selectedDevice}
+        onSuccess={() => {
           refetch();
           setIsPanelOpen(false);
         }}
       />
 
       <QRCodeDialog
-        isOpen={isQROpen}
+        open={isQROpen}
         onClose={closeQRDialog}
         deviceName={qrDevice?.name || ''}
         serialNumber={qrDevice?.device_serial || ''}
@@ -119,8 +119,8 @@ export default function Devices() {
 
       <DeviceDeleteDialog
         isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
-        deviceName={deviceToDelete?.name || ''}
+        onOpenChange={setIsDeleteDialogOpen}
+        selectedCount={1}
         onConfirm={async () => {
           if (deviceToDelete) {
             await handleDeleteDevice(deviceToDelete.id.toString());
@@ -141,7 +141,7 @@ export default function Devices() {
       />
 
       <DeviceForm
-        isOpen={isNewDeviceOpen}
+        open={isNewDeviceOpen}
         onClose={() => setIsNewDeviceOpen(false)}
         onSave={() => {
           refetch();
