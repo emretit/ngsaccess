@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ProjectFilter } from '@/components/auth/ProjectFilter';
+import ProjectFilter from '@/components/auth/ProjectFilter';
 import { UserTableHeader } from './components/UserTableHeader';
 import { UserTable } from './components/UserTable';
 import { UserFormDialog } from './components/UserFormDialog';

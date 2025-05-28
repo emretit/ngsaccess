@@ -136,11 +136,9 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
                   ))
                 )}
               </div>
-              {formData.role !== 'super_admin' && (
-                <p className="text-xs text-muted-foreground">
-                  * Süper admin olmayan kullanıcılar için en az bir proje seçimi zorunludur.
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground">
+                * Süper admin olmayan kullanıcılar için en az bir proje seçimi zorunludur.
+              </p>
             </div>
           )}
         </div>
