@@ -59,13 +59,33 @@ export function MailSettings() {
   const handleSave = async () => {
     setIsLoading(true);
     try {
-      const { error } = await supabase
+      // First check if any record exists
+      const { data: existingData } = await supabase
         .from('general_settings')
-        .upsert({
-          mail_settings: settings as any
-        });
+        .select('id, company_name')
+        .single();
 
-      if (error) throw error;
+      if (existingData) {
+        // Update existing record
+        const { error } = await supabase
+          .from('general_settings')
+          .update({
+            mail_settings: settings as any
+          })
+          .eq('id', existingData.id);
+
+        if (error) throw error;
+      } else {
+        // Insert new record with required company_name
+        const { error } = await supabase
+          .from('general_settings')
+          .insert({
+            company_name: 'Şirket Adı', // Default company name
+            mail_settings: settings as any
+          });
+
+        if (error) throw error;
+      }
 
       toast({
         title: "Mail ayarları kaydedildi",

@@ -2,9 +2,9 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import LoginForm from "@/components/auth/LoginForm";
+import RegisterForm from "@/components/auth/RegisterForm";
 
-export default function Login() {
+export default function Register() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   
@@ -35,10 +35,10 @@ export default function Login() {
             P
           </div>
           <h1 className="text-3xl font-bold text-gray-900">PDKS Sistemi</h1>
-          <p className="text-gray-600 mt-2">Giriş Yapın</p>
+          <p className="text-gray-600 mt-2">Kayıt Olun</p>
         </div>
 
-        <LoginForm />
+        <RegisterForm />
       </div>
     </div>
   );

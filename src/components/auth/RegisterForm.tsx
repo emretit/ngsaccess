@@ -61,10 +61,10 @@ const RegisterForm = () => {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="w-full shadow-lg border-0">
       <CardHeader>
-        <CardTitle className="text-2xl">Kayıt Ol</CardTitle>
-        <CardDescription>
+        <CardTitle className="text-2xl text-center">Kayıt Ol</CardTitle>
+        <CardDescription className="text-center">
           PDKS sistemine kayıt olmak için bilgilerinizi giriniz.
         </CardDescription>
       </CardHeader>
@@ -111,7 +111,11 @@ const RegisterForm = () => {
                 required
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button 
+              type="submit" 
+              className="w-full h-11 bg-[#711A1A] hover:bg-[#5a1515]" 
+              disabled={isLoading}
+            >
               {isLoading ? "Kayıt yapılıyor..." : "Kayıt Ol"}
             </Button>
           </div>
@@ -120,13 +124,12 @@ const RegisterForm = () => {
       <CardFooter className="flex flex-col gap-2">
         <div className="text-sm text-center text-muted-foreground">
           Hesabınız var mı?{" "}
-          <Button 
-            variant="link" 
-            className="p-0 h-auto text-primary" 
+          <button 
             onClick={() => navigate('/login')}
+            className="text-[#711A1A] cursor-pointer hover:underline"
           >
             Giriş yapın
-          </Button>
+          </button>
         </div>
       </CardFooter>
     </Card>

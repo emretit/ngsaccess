@@ -106,9 +106,12 @@ const LoginForm = () => {
       <CardFooter className="flex flex-col gap-2">
         <div className="text-sm text-center text-muted-foreground">
           Hesabınız yok mu?{" "}
-          <span className="text-[#711A1A] cursor-pointer hover:underline">
+          <button 
+            onClick={() => navigate('/register')}
+            className="text-[#711A1A] cursor-pointer hover:underline"
+          >
             Kayıt olun
-          </span>
+          </button>
         </div>
       </CardFooter>
     </Card>

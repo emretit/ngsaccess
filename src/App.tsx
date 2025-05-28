@@ -7,6 +7,7 @@ import { EmployeeAuthProvider } from '@/components/employee-auth/EmployeeAuthPro
 import Layout from '@/components/Layout';
 import Index from '@/pages/Index';
 import Login from '@/pages/Login';
+import Register from '@/pages/Register';
 import Auth from '@/pages/Auth';
 import Employees from '@/pages/Employees';
 import Devices from '@/pages/Devices';
@@ -37,7 +38,8 @@ function App() {
             <Routes>
               <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Auth />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/auth" element={<Auth />} />
               <Route path="/employee-login" element={<EmployeeLogin />} />
               <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
               <Route path="/employee-setup/:token" element={<EmployeeSetup />} />

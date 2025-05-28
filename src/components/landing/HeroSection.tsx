@@ -18,8 +18,10 @@ const HeroSection = () => {
               Güvenli, bulut tabanlı çözümümüzle personel devam takibini ve geçiş kontrolünü kolaylaştırın.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row gap-4">
-              <Button size="lg" className="text-lg">
-                Demo İsteyin <ChevronRight className="ml-2 h-4 w-4" />
+              <Button size="lg" className="text-lg" asChild>
+                <Link to="/register">
+                  Demo İsteyin <ChevronRight className="ml-2 h-4 w-4" />
+                </Link>
               </Button>
               <Button size="lg" variant="outline" className="text-lg">
                 Daha Fazla Bilgi
