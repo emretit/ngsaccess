@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -103,13 +104,12 @@ export const useUserManagement = () => {
           description: "Kullanıcı bilgileri başarıyla güncellendi"
         });
       } else {
-        // Create new user - generate a temporary password
+        // Create new user using regular signup
         const tempPassword = Math.random().toString(36).slice(-12);
         
-        const { data, error } = await supabase.auth.admin.createUser({
+        const { data, error } = await supabase.auth.signUp({
           email: formData.email,
-          password: tempPassword,
-          email_confirm: true
+          password: tempPassword
         });
 
         if (error) throw error;
