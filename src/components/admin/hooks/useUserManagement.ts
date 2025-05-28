@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -19,52 +20,15 @@ export const useUserManagement = () => {
   const { data: users = [], refetch: refetchUsers } = useQuery({
     queryKey: ['admin', 'users'],
     queryFn: async () => {
-      try {
-        const { data: userData, error } = await supabase
-          .from('users')
-          .select(`
-            id,
-            email,
-            role,
-            created_at,
-            updated_at,
-            full_name,
-            photo_url
-          `)
-          .order('email');
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select(`
+          *,
+          project_users!inner(project_id, is_admin, projects(name))
+        `)
+        .order('email');
 
-        if (error) {
-          console.error('Error fetching users:', error);
-          throw error;
-        }
-
-        // Fetch project assignments separately to avoid RLS issues
-        const userList = userData || [];
-        const usersWithProjects = await Promise.all(
-          userList.map(async (user) => {
-            const { data: projectData } = await supabase
-              .from('project_users')
-              .select(`
-                project_id,
-                is_admin,
-                projects:project_id (name)
-              `)
-              .eq('user_id', user.id);
-
-            return {
-              ...user,
-              project_users: projectData?.map(p => ({
-                project_id: p.project_id,
-                is_admin: p.is_admin,
-                projects: { name: p.projects?.name || 'Unknown' }
-              })) || []
-            };
-          })
-        );
-
-        return usersWithProjects as UserWithProjects[];
-      } catch (error: any) {
-        console.error('Error in useUserManagement query:', error);
+      if (error) {
         toast({
           variant: "destructive",
           title: "Kullanıcılar yüklenirken hata",
@@ -72,6 +36,8 @@ export const useUserManagement = () => {
         });
         throw error;
       }
+      
+      return userData as UserWithProjects[];
     }
   });
 
@@ -85,10 +51,7 @@ export const useUserManagement = () => {
         .eq('is_active', true)
         .order('name');
 
-      if (error) {
-        console.error('Error fetching projects:', error);
-        throw error;
-      }
+      if (error) throw error;
       return data as Project[];
     }
   });
@@ -96,29 +59,25 @@ export const useUserManagement = () => {
   const handleEditUser = async (user: User) => {
     setCurrentUser(user);
     
-    try {
-      // Fetch user's current project assignments
-      const { data: userProjects } = await supabase
-        .from('project_users')
-        .select('project_id, is_admin')
-        .eq('user_id', user.id);
+    // Fetch user's current project assignments
+    const { data: userProjects } = await supabase
+      .from('project_users')
+      .select('project_id, is_admin')
+      .eq('user_id', user.id);
 
-      const selectedProjects = userProjects?.map(up => up.project_id) || [];
-      const projectAdminRights = {};
-      userProjects?.forEach(up => {
-        projectAdminRights[up.project_id] = up.is_admin;
-      });
+    const selectedProjects = userProjects?.map(up => up.project_id) || [];
+    const projectAdminRights = {};
+    userProjects?.forEach(up => {
+      projectAdminRights[up.project_id] = up.is_admin;
+    });
 
-      setFormData({
-        email: user.email,
-        password: '',
-        role: user.role,
-        selectedProjects,
-        projectAdminRights
-      });
-    } catch (error) {
-      console.error('Error fetching user projects:', error);
-    }
+    setFormData({
+      email: user.email,
+      password: '',
+      role: user.role,
+      selectedProjects,
+      projectAdminRights
+    });
   };
 
   const handleProjectSelection = (projectId: number, checked: boolean) => {
@@ -162,7 +121,7 @@ export const useUserManagement = () => {
           title: "Hata",
           description: "E-posta adresi zorunludur"
         });
-        return false;
+        return;
       }
 
       if (!currentUser && !formData.password) {
@@ -171,7 +130,7 @@ export const useUserManagement = () => {
           title: "Hata",
           description: "Şifre zorunludur"
         });
-        return false;
+        return;
       }
 
       // Super admin olmayan kullanıcılar için proje seçimi zorunlu
@@ -181,7 +140,7 @@ export const useUserManagement = () => {
           title: "Hata",
           description: "En az bir proje seçmelisiniz"
         });
-        return false;
+        return;
       }
 
       let userId = currentUser?.id;
@@ -198,14 +157,10 @@ export const useUserManagement = () => {
         if (error) throw error;
         
         // Remove existing project assignments
-        const { error: deleteError } = await supabase
+        await supabase
           .from('project_users')
           .delete()
           .eq('user_id', currentUser.id);
-
-        if (deleteError) {
-          console.error('Error deleting project assignments:', deleteError);
-        }
         
         toast({
           title: "Kullanıcı güncellendi",
@@ -250,16 +205,12 @@ export const useUserManagement = () => {
           .from('project_users')
           .insert(projectAssignments);
 
-        if (projectError) {
-          console.error('Error inserting project assignments:', projectError);
-          throw projectError;
-        }
+        if (projectError) throw projectError;
       }
 
       refetchUsers();
       return true;
     } catch (error: any) {
-      console.error('Error saving user:', error);
       toast({
         variant: "destructive",
         title: "Hata",
@@ -272,14 +223,10 @@ export const useUserManagement = () => {
   const handleDeleteUser = async (user: User) => {
     try {
       // First delete project assignments
-      const { error: projectError } = await supabase
+      await supabase
         .from('project_users')
         .delete()
         .eq('user_id', user.id);
-
-      if (projectError) {
-        console.error('Error deleting project assignments:', projectError);
-      }
 
       // Then delete the user
       const { error } = await supabase.auth.admin.deleteUser(user.id);
@@ -293,7 +240,6 @@ export const useUserManagement = () => {
       
       refetchUsers();
     } catch (error: any) {
-      console.error('Error deleting user:', error);
       toast({
         variant: "destructive",
         title: "Hata",
