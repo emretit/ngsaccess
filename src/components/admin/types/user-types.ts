@@ -16,20 +16,8 @@ export interface Project {
   is_active: boolean;
 }
 
-export interface UserWithProjects extends User {
-  project_users: {
-    project_id: number;
-    is_admin: boolean;
-    projects: {
-      name: string;
-    };
-  }[];
-}
-
 export interface UserFormData {
   email: string;
   password: string;
   role: 'super_admin' | 'project_admin' | 'project_user';
-  selectedProjects: number[];
-  projectAdminRights: Record<number, boolean>;
 }

@@ -1203,48 +1203,6 @@ export type Database = {
           },
         ]
       }
-      project_users: {
-        Row: {
-          created_at: string | null
-          id: string
-          is_admin: boolean | null
-          project_id: number | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          is_admin?: boolean | null
-          project_id?: number | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          is_admin?: boolean | null
-          project_id?: number | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_users_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_users_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       projects: {
         Row: {
           created_at: string | null
@@ -1642,7 +1600,6 @@ export type Database = {
           full_name: string | null
           id: string
           photo_url: string | null
-          project_id: number | null
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
         }
@@ -1652,7 +1609,6 @@ export type Database = {
           full_name?: string | null
           id: string
           photo_url?: string | null
-          project_id?: number | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
         }
@@ -1662,19 +1618,10 @@ export type Database = {
           full_name?: string | null
           id?: string
           photo_url?: string | null
-          project_id?: number | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "users_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       zones: {
         Row: {
@@ -1785,10 +1732,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
-      get_accessible_project_ids: {
-        Args: { user_uuid: string }
-        Returns: number[]
-      }
       get_authenticated_employee_id: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -1806,23 +1749,8 @@ export type Database = {
           days: string[]
         }[]
       }
-      get_user_projects: {
-        Args: { user_uuid: string }
-        Returns: {
-          project_id: number
-          is_admin: boolean
-        }[]
-      }
-      has_project_access: {
-        Args: { user_uuid: string; target_project_id: number }
-        Returns: boolean
-      }
       is_device_online: {
         Args: { last_seen: string }
-        Returns: boolean
-      }
-      is_project_admin: {
-        Args: { project_id: number }
         Returns: boolean
       }
       is_super_admin: {

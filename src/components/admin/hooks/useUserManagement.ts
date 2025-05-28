@@ -3,29 +3,24 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { User, Project, UserWithProjects, UserFormData } from '../types/user-types';
+import { User, UserFormData } from '../types/user-types';
 
 export const useUserManagement = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserFormData>({
     email: '',
     password: '',
-    role: 'project_user',
-    selectedProjects: [],
-    projectAdminRights: {}
+    role: 'project_user'
   });
   const { toast } = useToast();
 
-  // Fetch users with their project assignments
+  // Fetch users - simplified without project assignments
   const { data: users = [], refetch: refetchUsers } = useQuery({
     queryKey: ['admin', 'users'],
     queryFn: async () => {
       const { data: userData, error } = await supabase
         .from('users')
-        .select(`
-          *,
-          project_users!inner(project_id, is_admin, projects(name))
-        `)
+        .select('*')
         .order('email');
 
       if (error) {
@@ -37,79 +32,16 @@ export const useUserManagement = () => {
         throw error;
       }
       
-      return userData as UserWithProjects[];
-    }
-  });
-
-  // Fetch projects for assignment
-  const { data: projects = [] } = useQuery({
-    queryKey: ['admin', 'projects-list'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('id, name, is_active')
-        .eq('is_active', true)
-        .order('name');
-
-      if (error) throw error;
-      return data as Project[];
+      return userData as User[];
     }
   });
 
   const handleEditUser = async (user: User) => {
     setCurrentUser(user);
-    
-    // Fetch user's current project assignments
-    const { data: userProjects } = await supabase
-      .from('project_users')
-      .select('project_id, is_admin')
-      .eq('user_id', user.id);
-
-    const selectedProjects = userProjects?.map(up => up.project_id) || [];
-    const projectAdminRights = {};
-    userProjects?.forEach(up => {
-      projectAdminRights[up.project_id] = up.is_admin;
-    });
-
     setFormData({
       email: user.email,
       password: '',
-      role: user.role,
-      selectedProjects,
-      projectAdminRights
-    });
-  };
-
-  const handleProjectSelection = (projectId: number, checked: boolean) => {
-    if (checked) {
-      setFormData({
-        ...formData,
-        selectedProjects: [...formData.selectedProjects, projectId],
-        projectAdminRights: {
-          ...formData.projectAdminRights,
-          [projectId]: false
-        }
-      });
-    } else {
-      const newSelectedProjects = formData.selectedProjects.filter(id => id !== projectId);
-      const newProjectAdminRights = { ...formData.projectAdminRights };
-      delete newProjectAdminRights[projectId];
-      
-      setFormData({
-        ...formData,
-        selectedProjects: newSelectedProjects,
-        projectAdminRights: newProjectAdminRights
-      });
-    }
-  };
-
-  const handleAdminRightsChange = (projectId: number, isAdmin: boolean) => {
-    setFormData({
-      ...formData,
-      projectAdminRights: {
-        ...formData.projectAdminRights,
-        [projectId]: isAdmin
-      }
+      role: user.role
     });
   };
 
@@ -133,18 +65,6 @@ export const useUserManagement = () => {
         return;
       }
 
-      // Super admin olmayan kullanıcılar için proje seçimi zorunlu
-      if (formData.role !== 'super_admin' && formData.selectedProjects.length === 0) {
-        toast({
-          variant: "destructive",
-          title: "Hata",
-          description: "En az bir proje seçmelisiniz"
-        });
-        return;
-      }
-
-      let userId = currentUser?.id;
-
       if (currentUser) {
         // Update existing user
         const { error } = await supabase
@@ -155,12 +75,6 @@ export const useUserManagement = () => {
           .eq('id', currentUser.id);
 
         if (error) throw error;
-        
-        // Remove existing project assignments
-        await supabase
-          .from('project_users')
-          .delete()
-          .eq('user_id', currentUser.id);
         
         toast({
           title: "Kullanıcı güncellendi",
@@ -175,7 +89,6 @@ export const useUserManagement = () => {
         });
 
         if (error) throw error;
-        userId = data.user?.id;
 
         // Update role if not default
         if (formData.role !== 'project_user' && data.user) {
@@ -193,21 +106,6 @@ export const useUserManagement = () => {
         });
       }
 
-      // Add project assignments (super_admin hariç)
-      if (userId && formData.role !== 'super_admin' && formData.selectedProjects.length > 0) {
-        const projectAssignments = formData.selectedProjects.map(projectId => ({
-          user_id: userId,
-          project_id: projectId,
-          is_admin: formData.projectAdminRights[projectId] || false
-        }));
-
-        const { error: projectError } = await supabase
-          .from('project_users')
-          .insert(projectAssignments);
-
-        if (projectError) throw projectError;
-      }
-
       refetchUsers();
       return true;
     } catch (error: any) {
@@ -222,13 +120,7 @@ export const useUserManagement = () => {
 
   const handleDeleteUser = async (user: User) => {
     try {
-      // First delete project assignments
-      await supabase
-        .from('project_users')
-        .delete()
-        .eq('user_id', user.id);
-
-      // Then delete the user
+      // Delete the user
       const { error } = await supabase.auth.admin.deleteUser(user.id);
       
       if (error) throw error;
@@ -253,21 +145,16 @@ export const useUserManagement = () => {
     setFormData({
       email: '',
       password: '',
-      role: 'project_user',
-      selectedProjects: [],
-      projectAdminRights: {}
+      role: 'project_user'
     });
   };
 
   return {
     users,
-    projects,
     currentUser,
     formData,
     setFormData,
     handleEditUser,
-    handleProjectSelection,
-    handleAdminRightsChange,
     handleSaveUser,
     handleDeleteUser,
     resetForm,

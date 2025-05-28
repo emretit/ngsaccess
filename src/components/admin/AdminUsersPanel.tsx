@@ -15,13 +15,10 @@ const AdminUsersPanel = () => {
 
   const {
     users,
-    projects,
     currentUser,
     formData,
     setFormData,
     handleEditUser,
-    handleProjectSelection,
-    handleAdminRightsChange,
     handleSaveUser,
     handleDeleteUser,
     resetForm
@@ -81,11 +78,8 @@ const AdminUsersPanel = () => {
           onClose={() => setIsDialogOpen(false)}
           currentUser={currentUser}
           formData={formData}
-          projects={projects}
           onFormDataChange={setFormData}
           onSave={handleSave}
-          onProjectSelection={handleProjectSelection}
-          onAdminRightsChange={handleAdminRightsChange}
         />
 
         <DeleteUserDialog

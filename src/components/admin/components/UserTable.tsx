@@ -11,12 +11,12 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
-import { UserWithProjects } from '../types/user-types';
+import { User } from '../types/user-types';
 
 interface UserTableProps {
-  users: UserWithProjects[];
-  onEditUser: (user: UserWithProjects) => void;
-  onDeleteUser: (user: UserWithProjects) => void;
+  users: User[];
+  onEditUser: (user: User) => void;
+  onDeleteUser: (user: User) => void;
 }
 
 export const UserTable: React.FC<UserTableProps> = ({
@@ -37,26 +37,6 @@ export const UserTable: React.FC<UserTableProps> = ({
     }
   };
 
-  const getProjectsDisplay = (projectUsers: UserWithProjects['project_users']) => {
-    if (!projectUsers || projectUsers.length === 0) {
-      return <span className="text-gray-400 italic">Proje atanmamış</span>;
-    }
-
-    return (
-      <div className="flex flex-wrap gap-1">
-        {projectUsers.map((pu) => (
-          <Badge 
-            key={pu.project_id} 
-            variant="outline" 
-            className={`text-xs ${pu.is_admin ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-blue-500/20 text-blue-400 border-blue-500/30'}`}
-          >
-            #{pu.project_id} {pu.projects.name} {pu.is_admin ? '(Admin)' : ''}
-          </Badge>
-        ))}
-      </div>
-    );
-  };
-
   return (
     <div className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-3xl overflow-hidden shadow-2xl">
       <div className="p-8">
@@ -65,14 +45,13 @@ export const UserTable: React.FC<UserTableProps> = ({
             <TableRow className="border-white/20 hover:bg-white/5">
               <TableHead className="text-purple-200 font-bold text-lg">E-posta</TableHead>
               <TableHead className="text-purple-200 font-bold text-lg">Rol</TableHead>
-              <TableHead className="text-purple-200 font-bold text-lg">Atanan Projeler</TableHead>
               <TableHead className="text-right text-purple-200 font-bold text-lg">İşlemler</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-16 text-purple-300 text-lg">
+                <TableCell colSpan={3} className="text-center py-16 text-purple-300 text-lg">
                   <div className="flex flex-col items-center space-y-4">
                     <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center">
                       <UserPlus className="w-8 h-8 text-purple-400" />
@@ -88,7 +67,6 @@ export const UserTable: React.FC<UserTableProps> = ({
                     {user.email}
                   </TableCell>
                   <TableCell>{getRoleDisplay(user.role)}</TableCell>
-                  <TableCell>{getProjectsDisplay(user.project_users)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end space-x-2">
                       <Button 

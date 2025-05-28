@@ -3,7 +3,6 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { 
   Dialog,
   DialogContent,
@@ -20,18 +19,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { User, Project, UserFormData } from '../types/user-types';
+import { User, UserFormData } from '../types/user-types';
 
 interface UserFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: User | null;
   formData: UserFormData;
-  projects: Project[];
   onFormDataChange: (data: UserFormData) => void;
   onSave: () => void;
-  onProjectSelection: (projectId: number, checked: boolean) => void;
-  onAdminRightsChange: (projectId: number, isAdmin: boolean) => void;
 }
 
 export const UserFormDialog: React.FC<UserFormDialogProps> = ({
@@ -39,22 +35,19 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
   onClose,
   currentUser,
   formData,
-  projects,
   onFormDataChange,
-  onSave,
-  onProjectSelection,
-  onAdminRightsChange
+  onSave
 }) => {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{currentUser ? 'Kullanıcı Düzenle' : 'Yeni Kullanıcı'}</DialogTitle>
           <DialogDescription>
-            {currentUser ? 'Kullanıcı bilgilerini ve proje atamalarını güncelleyin' : 'Sisteme yeni bir kullanıcı ekleyin ve projeler atayın'}
+            {currentUser ? 'Kullanıcı bilgilerini güncelleyin' : 'Sisteme yeni bir kullanıcı ekleyin'}
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-6 py-4">
+        <div className="grid gap-4 py-4">
           <div className="grid gap-2">
             <Label htmlFor="email">E-posta*</Label>
             <Input
@@ -97,50 +90,6 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
               </SelectContent>
             </Select>
           </div>
-
-          {formData.role !== 'super_admin' && (
-            <div className="grid gap-4">
-              <Label>Proje Atamaları*</Label>
-              <div className="bg-muted/50 p-4 rounded-md space-y-4 max-h-[300px] overflow-y-auto border">
-                {projects.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Henüz aktif proje bulunmamaktadır.</p>
-                ) : (
-                  projects.map((project) => (
-                    <div key={project.id} className="space-y-2">
-                      <div className="flex items-center space-x-3">
-                        <input
-                          type="checkbox"
-                          id={`project-${project.id}`}
-                          checked={formData.selectedProjects.includes(project.id)}
-                          onChange={(e) => onProjectSelection(project.id, e.target.checked)}
-                          className="h-4 w-4 rounded"
-                        />
-                        <label htmlFor={`project-${project.id}`} className="text-sm font-medium">
-                          #{project.id} - {project.name}
-                        </label>
-                      </div>
-                      
-                      {formData.selectedProjects.includes(project.id) && (
-                        <div className="ml-7 flex items-center space-x-2">
-                          <Switch
-                            id={`admin-${project.id}`}
-                            checked={formData.projectAdminRights[project.id] || false}
-                            onCheckedChange={(checked) => onAdminRightsChange(project.id, checked)}
-                          />
-                          <Label htmlFor={`admin-${project.id}`} className="text-xs text-muted-foreground">
-                            Bu projede admin yetkisine sahip olsun
-                          </Label>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                * Süper admin olmayan kullanıcılar için en az bir proje seçimi zorunludur.
-              </p>
-            </div>
-          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
