@@ -3,18 +3,19 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
-import { User, UserFormData } from '../types/user-types';
+import { User, UserFormData, Project } from '../types/user-types';
 
 export const useUserManagement = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserFormData>({
     email: '',
     password: '',
-    role: 'project_user'
+    role: 'project_user',
+    projectId: undefined
   });
   const { toast } = useToast();
 
-  // Fetch users - simplified without project assignments
+  // Fetch users
   const { data: users = [], refetch: refetchUsers } = useQuery({
     queryKey: ['admin', 'users'],
     queryFn: async () => {
@@ -36,12 +37,36 @@ export const useUserManagement = () => {
     }
   });
 
+  // Fetch projects
+  const { data: projects = [] } = useQuery({
+    queryKey: ['admin', 'projects'],
+    queryFn: async () => {
+      const { data: projectData, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Projeler yüklenirken hata",
+          description: error.message
+        });
+        throw error;
+      }
+      
+      return projectData as Project[];
+    }
+  });
+
   const handleEditUser = async (user: User) => {
     setCurrentUser(user);
     setFormData({
       email: user.email,
       password: '',
-      role: user.role
+      role: user.role,
+      projectId: undefined
     });
   };
 
@@ -53,7 +78,7 @@ export const useUserManagement = () => {
           title: "Hata",
           description: "E-posta adresi zorunludur"
         });
-        return;
+        return false;
       }
 
       if (!currentUser && !formData.password) {
@@ -62,7 +87,16 @@ export const useUserManagement = () => {
           title: "Hata",
           description: "Şifre zorunludur"
         });
-        return;
+        return false;
+      }
+
+      if ((formData.role === 'project_admin' || formData.role === 'project_user') && !formData.projectId) {
+        toast({
+          variant: "destructive",
+          title: "Hata",
+          description: "Proje seçimi zorunludur"
+        });
+        return false;
       }
 
       if (currentUser) {
@@ -91,18 +125,30 @@ export const useUserManagement = () => {
         if (error) throw error;
 
         // Update role if not default
-        if (formData.role !== 'project_user' && data.user) {
+        if (data.user) {
           const { error: roleError } = await supabase
             .from('users')
             .update({ role: formData.role })
             .eq('id', data.user.id);
             
           if (roleError) throw roleError;
+
+          // If project is selected, create user-project relationship
+          if (formData.projectId) {
+            const { error: projectError } = await supabase
+              .from('user_projects')
+              .insert({
+                user_id: data.user.id,
+                project_id: formData.projectId
+              });
+              
+            if (projectError) throw projectError;
+          }
         }
         
         toast({
           title: "Kullanıcı oluşturuldu",
-          description: "Yeni kullanıcı başarıyla oluşturuldu"
+          description: "Yeni kullanıcı başarıyla oluşturuldu ve projeye atandı"
         });
       }
 
@@ -145,12 +191,14 @@ export const useUserManagement = () => {
     setFormData({
       email: '',
       password: '',
-      role: 'project_user'
+      role: 'project_user',
+      projectId: undefined
     });
   };
 
   return {
     users,
+    projects,
     currentUser,
     formData,
     setFormData,

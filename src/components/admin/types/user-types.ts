@@ -20,4 +20,5 @@ export interface UserFormData {
   email: string;
   password: string;
   role: 'super_admin' | 'project_admin' | 'project_user';
+  projectId?: number;
 }

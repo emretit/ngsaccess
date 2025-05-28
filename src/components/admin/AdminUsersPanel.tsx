@@ -15,6 +15,7 @@ const AdminUsersPanel = () => {
 
   const {
     users,
+    projects,
     currentUser,
     formData,
     setFormData,
@@ -80,6 +81,7 @@ const AdminUsersPanel = () => {
           formData={formData}
           onFormDataChange={setFormData}
           onSave={handleSave}
+          projects={projects}
         />
 
         <DeleteUserDialog

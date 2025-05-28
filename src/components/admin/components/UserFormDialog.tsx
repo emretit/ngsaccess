@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { User, UserFormData } from '../types/user-types';
+import { User, UserFormData, Project } from '../types/user-types';
 
 interface UserFormDialogProps {
   isOpen: boolean;
@@ -28,6 +28,7 @@ interface UserFormDialogProps {
   formData: UserFormData;
   onFormDataChange: (data: UserFormData) => void;
   onSave: () => void;
+  projects: Project[];
 }
 
 export const UserFormDialog: React.FC<UserFormDialogProps> = ({
@@ -36,7 +37,8 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
   currentUser,
   formData,
   onFormDataChange,
-  onSave
+  onSave,
+  projects
 }) => {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -90,6 +92,30 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
               </SelectContent>
             </Select>
           </div>
+
+          {(formData.role === 'project_admin' || formData.role === 'project_user') && (
+            <div className="grid gap-2">
+              <Label htmlFor="project">Proje*</Label>
+              <Select 
+                value={formData.projectId?.toString()} 
+                onValueChange={(value) => 
+                  onFormDataChange({ ...formData, projectId: parseInt(value) })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Proje seçin" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id.toString()}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
