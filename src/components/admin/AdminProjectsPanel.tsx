@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,7 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Plus, Trash2 } from 'lucide-react';
+import { Edit, Plus, Trash2, Hash } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -201,6 +202,12 @@ const AdminProjectsPanel = () => {
           <Table>
             <TableHeader>
               <TableRow className="border-white/20 hover:bg-white/5">
+                <TableHead className="text-purple-200 font-bold text-lg">
+                  <div className="flex items-center space-x-2">
+                    <Hash className="w-5 h-5" />
+                    <span>ID</span>
+                  </div>
+                </TableHead>
                 <TableHead className="text-purple-200 font-bold text-lg">Proje Adı</TableHead>
                 <TableHead className="text-purple-200 font-bold text-lg">Açıklama</TableHead>
                 <TableHead className="text-purple-200 font-bold text-lg">Oluşturma Tarihi</TableHead>
@@ -211,7 +218,7 @@ const AdminProjectsPanel = () => {
             <TableBody>
               {projects.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-16 text-purple-300 text-lg">
+                  <TableCell colSpan={6} className="text-center py-16 text-purple-300 text-lg">
                     <div className="flex flex-col items-center space-y-4">
                       <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center">
                         <Plus className="w-8 h-8 text-purple-400" />
@@ -223,6 +230,9 @@ const AdminProjectsPanel = () => {
               ) : (
                 projects.map((project) => (
                   <TableRow key={project.id} className="border-white/10 hover:bg-white/5 transition-all duration-300 group">
+                    <TableCell className="font-mono text-purple-300 text-lg bg-purple-500/10 rounded-lg group-hover:bg-purple-500/20 transition-colors duration-300 border border-purple-500/30">
+                      #{project.id}
+                    </TableCell>
                     <TableCell className="font-bold text-white text-lg group-hover:text-purple-300 transition-colors duration-300">
                       {project.name}
                     </TableCell>
