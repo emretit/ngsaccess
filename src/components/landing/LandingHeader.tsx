@@ -19,22 +19,15 @@ const LandingHeader = () => {
           <div className="flex items-center space-x-4">
             <Button 
               variant="outline" 
-              onClick={() => navigate('/demo-request')}
-              className="border-[#711A1A] text-[#711A1A] hover:bg-[#711A1A] hover:text-white"
-            >
-              Demo Talep Et
-            </Button>
-            <Button 
-              variant="outline" 
               onClick={() => navigate('/login')}
             >
               Giriş Yap
             </Button>
             <Button 
-              onClick={() => navigate('/register')}
+              onClick={() => navigate('/demo-request')}
               className="bg-[#711A1A] hover:bg-[#5a1515]"
             >
-              Kayıt Ol
+              Demo İsteyin
             </Button>
           </div>
         </div>
