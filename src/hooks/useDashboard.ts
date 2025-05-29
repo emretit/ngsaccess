@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { CardReading } from '@/types/access-control';
 import { toast } from '@/hooks/use-toast';
 import { fetchDashboardStats, DashboardStats, fetchRecentReadings } from '@/utils/dashboardUtils';
+import { useProjectAccess } from '@/hooks/useProjectAccess';
 
 export const useDashboard = () => {
   const [stats, setStats] = useState<DashboardStats>({
@@ -18,6 +19,9 @@ export const useDashboard = () => {
   const [userName, setUserName] = useState("Kullanıcı");
   const [session, setSession] = useState<any>(null);
   const navigate = useNavigate();
+  
+  // Get project access information
+  const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
 
   // Check authentication status
   useEffect(() => {
@@ -62,12 +66,12 @@ export const useDashboard = () => {
   // Fetch dashboard data
   useEffect(() => {
     const loadDashboardData = async () => {
-      if (!session) return;
+      if (!session || projectLoading) return;
       
       try {
         const [statsData, readingsData] = await Promise.all([
-          fetchDashboardStats(),
-          fetchRecentReadings()
+          fetchDashboardStats(projectIds, isSuperAdmin),
+          fetchRecentReadings(projectIds, isSuperAdmin)
         ]);
         
         setStats(statsData);
@@ -79,19 +83,21 @@ export const useDashboard = () => {
       }
     };
 
-    if (session) {
+    if (session && !projectLoading) {
       loadDashboardData();
       const interval = setInterval(loadDashboardData, 30000);
       return () => clearInterval(interval);
     }
-  }, [session]);
+  }, [session, projectIds, isSuperAdmin, projectLoading]);
 
   const refreshData = async () => {
+    if (projectLoading) return;
+    
     setLoading(true);
     try {
       const [statsData, readingsData] = await Promise.all([
-        fetchDashboardStats(),
-        fetchRecentReadings()
+        fetchDashboardStats(projectIds, isSuperAdmin),
+        fetchRecentReadings(projectIds, isSuperAdmin)
       ]);
       
       setStats(statsData);
@@ -117,7 +123,7 @@ export const useDashboard = () => {
   return {
     stats,
     recentReadings,
-    loading,
+    loading: loading || projectLoading,
     userName,
     session,
     refreshData
