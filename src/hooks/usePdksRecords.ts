@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
+import { useProjectAccess } from '@/hooks/useProjectAccess';
 
 export interface PDKSRecord {
   id: number;
@@ -17,18 +18,35 @@ export function usePdksRecords() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  
+  // Get project access information
+  const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
 
   useEffect(() => {
-    fetchRecords();
-  }, []);
+    if (!projectLoading) {
+      fetchRecords();
+    }
+  }, [projectIds, isSuperAdmin, projectLoading]);
 
   async function fetchRecords() {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('pdks_records')
         .select('*')
         .order('date', { ascending: false });
+
+      // Apply project filtering if not super admin
+      if (!isSuperAdmin && projectIds.length > 0) {
+        query = query.in('project_id', projectIds);
+      } else if (!isSuperAdmin && projectIds.length === 0) {
+        // User has no project access, return empty array
+        setRecords([]);
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setRecords(data || []);
@@ -53,7 +71,7 @@ export function usePdksRecords() {
   return {
     records,
     filteredRecords,
-    loading,
+    loading: loading || projectLoading,
     searchTerm,
     setSearchTerm,
     statusFilter,

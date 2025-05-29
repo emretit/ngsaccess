@@ -3,6 +3,7 @@ import { AiInsightsCard } from "@/components/pdks/AiInsightsCard";
 import { PDKSTable } from "./PDKSTable";
 import { PDKSAiChat } from "./PDKSAiChat";
 import { supabase } from "@/integrations/supabase/client";
+import { useProjectAccess } from '@/hooks/useProjectAccess';
 
 interface PDKSRecord {
   id: number;
@@ -37,17 +38,34 @@ export function PDKSRecordsContent({
 }: PDKSRecordsContentProps) {
   const [employees, setEmployees] = useState<PDKSRecord[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(true);
+  
+  // Get project access information
+  const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
 
   useEffect(() => {
-    fetchEmployees();
-  }, []);
+    if (!projectLoading) {
+      fetchEmployees();
+    }
+  }, [projectIds, isSuperAdmin, projectLoading]);
 
   async function fetchEmployees() {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('employees')
         .select('*')
         .eq('is_active', true);
+
+      // Apply project filtering if not super admin
+      if (!isSuperAdmin && projectIds.length > 0) {
+        query = query.in('project_id', projectIds);
+      } else if (!isSuperAdmin && projectIds.length === 0) {
+        // User has no project access, return empty array
+        setEmployees([]);
+        setEmployeesLoading(false);
+        return;
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -86,7 +104,7 @@ export function PDKSRecordsContent({
         <div className="glass-card overflow-hidden mt-6 mx-6">
           <PDKSTable
             records={displayRecords}
-            loading={employeesLoading}
+            loading={employeesLoading || projectLoading}
             searchTerm={searchTerm}
             statusFilter={statusFilter}
           />
