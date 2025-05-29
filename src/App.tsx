@@ -20,6 +20,7 @@ import SystemAdmin from '@/pages/SystemAdmin';
 import EngineeringDepartment from '@/pages/EngineeringDepartment';
 import UserSetup from '@/pages/UserSetup';
 import LandingPage from '@/pages/LandingPage';
+import DemoRequest from '@/pages/DemoRequest';
 import NotFound from '@/pages/NotFound';
 import './App.css';
 
@@ -35,6 +36,7 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/demo-request" element={<DemoRequest />} />
             <Route path="/user-setup" element={<UserSetup />} />
             <Route path="/system-admin" element={<SystemAdmin />} />
             <Route 
