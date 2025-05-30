@@ -60,7 +60,7 @@ type SelectFieldProps = {
   options: SelectOption[];
   required?: boolean;
   placeholder?: string;
-  disabled?: boolean; // Add the disabled property here
+  disabled?: boolean;
 };
 
 export function FormSelectField({
@@ -71,22 +71,42 @@ export function FormSelectField({
   options,
   required,
   placeholder = "Seçiniz",
-  disabled // Destructure the disabled property
+  disabled
 }: SelectFieldProps) {
+  // "Durum" alanı için özel eşleştirme
+  const getDisplayValue = () => {
+    if (name === 'is_active') {
+      if (value === 'active' || value === 'true' || value === true) return 'active';
+      if (value === 'inactive' || value === 'false' || value === false) return 'inactive';
+      return value;
+    }
+    return value;
+  };
+
+  const getDisplayOptions = () => {
+    if (name === 'is_active') {
+      return [
+        { id: 'active', name: 'Aktif' },
+        { id: 'inactive', name: 'Pasif' }
+      ];
+    }
+    return options;
+  };
+
   return (
     <div className="space-y-1">
       <Label htmlFor={name}>{label}</Label>
-      <Select value={value} onValueChange={onChange} required={required} disabled={disabled}>
+      <Select value={getDisplayValue()} onValueChange={onChange} required={required} disabled={disabled}>
         <SelectTrigger id={name}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
-          {options.map(option => (
+          {getDisplayOptions().map(option => (
             <SelectItem 
               key={typeof option.id === 'string' ? option.id : option.id.toString()} 
               value={typeof option.id === 'string' ? option.id : option.id.toString()}
             >
-              {option.name || `Option ${option.id}`}
+              {option.name}
             </SelectItem>
           ))}
         </SelectContent>

@@ -34,6 +34,7 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
   const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
   const [companies, setCompanies] = useState<{ id: number; name: string }[]>([]);
   const [shifts, setShifts] = useState<{ id: number; name: string }[]>([]);
+  const [positions, setPositions] = useState<{ id: number; name: string }[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
@@ -59,6 +60,7 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
     fetchDepartments();
     fetchCompanies();
     fetchShifts();
+    fetchPositions();
   }, [employee]);
 
   const fetchDepartments = async () => {
@@ -83,6 +85,15 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
       setShifts(data);
     } else {
       setShifts([]);
+    }
+  };
+
+  const fetchPositions = async () => {
+    const { data, error } = await supabase.from('positions').select('id, name');
+    if (!error && data) {
+      setPositions(data);
+    } else {
+      setPositions([]);
     }
   };
 
@@ -151,6 +162,13 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
         const selectedDept = departments.find(d => d.name === formData.department);
         if (selectedDept) {
           employeeData.department_id = selectedDept.id;
+        }
+      }
+
+      if (formData.position) {
+        const selectedPos = positions.find(p => p.name === formData.position);
+        if (selectedPos) {
+          employeeData.position_id = selectedPos.id;
         }
       }
 
@@ -277,8 +295,8 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
           value={formData.is_active ? 'active' : 'inactive'}
           onChange={(value) => setFormData({ ...formData, is_active: value === 'active' })}
           options={[
-            { id: 1, name: 'active' },
-            { id: 0, name: 'inactive' }
+            { id: 'active', name: 'Aktif' },
+            { id: 'inactive', name: 'Pasif' }
           ]}
           required
         />
