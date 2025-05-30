@@ -55,7 +55,7 @@ type SelectOption = {
 type SelectFieldProps = {
   label: string;
   name: string;
-  value: string;
+  value: string | boolean;
   onChange: (value: string) => void;
   options: SelectOption[];
   required?: boolean;
@@ -78,9 +78,9 @@ export function FormSelectField({
     if (name === 'is_active') {
       if (value === 'active' || value === 'true' || value === true) return 'active';
       if (value === 'inactive' || value === 'false' || value === false) return 'inactive';
-      return value;
+      return String(value);
     }
-    return value;
+    return String(value);
   };
 
   const getDisplayOptions = () => {
