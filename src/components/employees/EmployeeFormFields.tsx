@@ -8,6 +8,7 @@ interface EmployeeFormFieldsProps {
   companies: { id: number; name: string }[];
   departments: { id: number; name: string }[];
   shifts: { id: number; name: string }[];
+  positions?: { id: number; name: string }[];
 }
 
 export default function EmployeeFormFields({
@@ -15,7 +16,8 @@ export default function EmployeeFormFields({
   setFormData,
   companies,
   departments,
-  shifts
+  shifts,
+  positions = []
 }: EmployeeFormFieldsProps) {
   return (
     <div className="space-y-4">
@@ -73,11 +75,12 @@ export default function EmployeeFormFields({
         required
       />
 
-      <FormTextField
+      <FormSelectField
         label="Pozisyon"
         name="position"
         value={formData.position || ''}
         onChange={(value) => setFormData({ ...formData, position: value })}
+        options={positions}
         required
       />
 

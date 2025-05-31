@@ -62,6 +62,7 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
           companies={companies}
           departments={departments}
           shifts={shifts}
+          positions={positions}
         />
       </div>
 
