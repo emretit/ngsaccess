@@ -69,8 +69,16 @@ export default function EmployeeFormFields({
       <FormSelectField
         label="Departman"
         name="department"
-        value={formData.department || ''}
-        onChange={(value) => setFormData({ ...formData, department: value })}
+        value={formData.department_id?.toString() || formData.department || ''}
+        onChange={(value) => {
+          // ID olarak kaydet ama gösterim için isim de sakla
+          const selectedDept = departments.find(d => d.id.toString() === value);
+          setFormData({ 
+            ...formData, 
+            department_id: parseInt(value) || null,
+            department: selectedDept ? selectedDept.name : value
+          });
+        }}
         options={departments}
         required
       />
@@ -78,8 +86,16 @@ export default function EmployeeFormFields({
       <FormSelectField
         label="Pozisyon"
         name="position"
-        value={formData.position || ''}
-        onChange={(value) => setFormData({ ...formData, position: value })}
+        value={formData.position_id?.toString() || formData.position || ''}
+        onChange={(value) => {
+          // ID olarak kaydet ama gösterim için isim de sakla
+          const selectedPos = positions.find(p => p.id.toString() === value);
+          setFormData({ 
+            ...formData, 
+            position_id: parseInt(value) || null,
+            position: selectedPos ? selectedPos.name : value
+          });
+        }}
         options={positions}
         required
       />

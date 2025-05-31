@@ -7,6 +7,8 @@ export type EmployeeFormData = Partial<Employee> & {
   department?: string;
   position?: string;
   notes?: string;
+  department_id?: number | null;
+  position_id?: number | null;
 };
 
 export function useEmployeeFormData(employee?: Employee | null) {
@@ -23,6 +25,8 @@ export function useEmployeeFormData(employee?: Employee | null) {
     shift: '',
     company_id: null,
     notes: '',
+    department_id: null,
+    position_id: null,
   });
 
   const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
@@ -42,6 +46,8 @@ export function useEmployeeFormData(employee?: Employee | null) {
         ...employee,
         department: departmentName,
         position: positionName,
+        department_id: employee.department_id,
+        position_id: employee.position_id,
         notes: employee.notes || '',
       });
 
