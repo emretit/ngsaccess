@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -24,12 +25,15 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    target_type: 'individual',
     selected_employees: [] as string[],
     selected_devices: [] as string[],
     selected_departments: [] as string[],
     start_time: '',
     end_time: '',
     days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as string[],
+    access_direction: 'both',
+    priority: 100,
   });
 
   const [expandedDepartments, setExpandedDepartments] = useState<Set<number>>(new Set());
@@ -53,12 +57,15 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
         setFormData({
           name: editingRule.name || '',
           description: editingRule.description || '',
+          target_type: editingRule.target_type || 'individual',
           selected_employees: employeeIds,
           selected_devices: deviceIds,
           selected_departments: [],
           start_time: editingRule.start_time || '',
           end_time: editingRule.end_time || '',
           days: editingRule.days || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+          access_direction: editingRule.access_direction || 'both',
+          priority: editingRule.priority || 100,
         });
       } else {
         // Reset form for new rule
@@ -66,12 +73,15 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
         setFormData({
           name: '',
           description: '',
+          target_type: 'individual',
           selected_employees: [],
           selected_devices: [],
           selected_departments: [],
           start_time: '',
           end_time: '',
           days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+          access_direction: 'both',
+          priority: 100,
         });
       }
     }
@@ -86,8 +96,13 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
     console.log('Selected employees array:', formData.selected_employees);
     console.log('Selected devices count:', formData.selected_devices.length);
     
-    if (formData.selected_employees.length === 0) {
-      console.error('NO EMPLOYEES SELECTED!');
+    if (!formData.name.trim()) {
+      alert('Lütfen kural adı girin.');
+      return;
+    }
+
+    if (formData.target_type === 'individual' && formData.selected_employees.length === 0) {
+      console.error('NO EMPLOYEES SELECTED FOR INDIVIDUAL RULE!');
       alert('Lütfen en az bir çalışan seçin.');
       return;
     }
@@ -345,6 +360,21 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
                 required
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="target_type">Hedef Türü</Label>
+              <Select value={formData.target_type} onValueChange={(value) => 
+                setFormData(prev => ({ ...prev, target_type: value }))
+              }>
+                <SelectTrigger>
+                  <SelectValue placeholder="Hedef türünü seçin" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="individual">Bireysel</SelectItem>
+                  <SelectItem value="department">Departman</SelectItem>
+                  <SelectItem value="all">Tüm Çalışanlar</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -360,41 +390,58 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
 
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-3">
-              <Label>Çalışanlar (Departmanlar)</Label>
-              <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-1">
-                {renderDepartmentTree()}
-                
-                {/* Departmanı olmayan çalışanlar */}
-                {orphanEmployees.length > 0 && (
-                  <div className="mt-4 pt-4 border-t">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Users className="h-4 w-4 text-gray-500" />
-                      <Label className="text-sm font-medium text-gray-700">
-                        Departmanı Olmayan Çalışanlar ({orphanEmployees.length})
-                      </Label>
-                    </div>
-                    {orphanEmployees.map(employee => (
-                      <div key={employee.id} className="flex items-center space-x-2 ml-6">
-                        <Checkbox
-                          id={`orphan-employee-${employee.id}`}
-                          checked={formData.selected_employees.includes(employee.id.toString())}
-                          onCheckedChange={(checked) => {
-                            console.log(`Orphan employee ${employee.id} changed to:`, checked);
-                            handleEmployeeChange(employee.id.toString(), Boolean(checked));
-                          }}
-                        />
-                        <User className="h-3 w-3 text-gray-500" />
-                        <Label 
-                          htmlFor={`orphan-employee-${employee.id}`}
-                          className="text-sm font-normal cursor-pointer"
-                        >
-                          {employee.first_name} {employee.last_name}
+              <Label>
+                {formData.target_type === 'individual' ? 'Çalışanlar (Departmanlar)' : 
+                 formData.target_type === 'department' ? 'Departmanlar' : 
+                 'Hedefler'}
+              </Label>
+              
+              {formData.target_type === 'all' ? (
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <Users className="h-4 w-4 text-blue-500" />
+                    <span className="font-medium">Tüm Çalışanlar Seçildi</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Bu kural tüm çalışanlar için geçerli olacaktır.
+                  </p>
+                </div>
+              ) : (
+                <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-1">
+                  {renderDepartmentTree()}
+                  
+                  {/* Departmanı olmayan çalışanlar */}
+                  {orphanEmployees.length > 0 && (
+                    <div className="mt-4 pt-4 border-t">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <Users className="h-4 w-4 text-gray-500" />
+                        <Label className="text-sm font-medium text-gray-700">
+                          Departmanı Olmayan Çalışanlar ({orphanEmployees.length})
                         </Label>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      {orphanEmployees.map(employee => (
+                        <div key={employee.id} className="flex items-center space-x-2 ml-6">
+                          <Checkbox
+                            id={`orphan-employee-${employee.id}`}
+                            checked={formData.selected_employees.includes(employee.id.toString())}
+                            onCheckedChange={(checked) => {
+                              console.log(`Orphan employee ${employee.id} changed to:`, checked);
+                              handleEmployeeChange(employee.id.toString(), Boolean(checked));
+                            }}
+                          />
+                          <User className="h-3 w-3 text-gray-500" />
+                          <Label 
+                            htmlFor={`orphan-employee-${employee.id}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {employee.first_name} {employee.last_name}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -421,7 +468,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="start_time">Başlangıç Saati</Label>
               <Input
@@ -438,6 +485,18 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
                 type="time"
                 value={formData.end_time}
                 onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="priority">Öncelik (1-1000)</Label>
+              <Input
+                id="priority"
+                type="number"
+                value={formData.priority}
+                onChange={(e) => setFormData(prev => ({ ...prev, priority: parseInt(e.target.value) || 100 }))}
+                min="1"
+                max="1000"
+                placeholder="100"
               />
             </div>
           </div>

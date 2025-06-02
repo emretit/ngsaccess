@@ -12,10 +12,11 @@ export const useAccessRules = () => {
   const { data: rules = [], isLoading } = useQuery({
     queryKey: ['access-rules'],
     queryFn: async () => {
-      console.log('Fetching access rules with multiple relations...');
+      console.log('Fetching enhanced access rules...');
       const { data, error } = await supabase
         .from('access_rules')
         .select('*')
+        .order('priority', { ascending: false })
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -23,74 +24,73 @@ export const useAccessRules = () => {
         throw error;
       }
 
-      // Her kural için ilişkili çalışanları ve cihazları getir
+      // Fetch related data for each rule
       const rulesWithRelations = await Promise.all(
         (data || []).map(async (rule) => {
-          // Çoklu çalışan ilişkilerini getir
-          const { data: employeeRelations, error: empError } = await supabase
-            .from('group_members')
-            .select(`
-              employees:employee_id (
-                id,
-                first_name,
-                last_name
-              )
-            `)
-            .eq('group_id', rule.id);
-
-          // Çoklu cihaz ilişkilerini getir  
-          const { data: deviceRelations, error: deviceError } = await supabase
-            .from('group_devices')
-            .select(`
-              devices:device_id (
-                id,
-                name,
-                location
-              )
-            `)
-            .eq('group_id', rule.id);
-
-          if (empError) console.error('Error fetching employee relations:', empError);
-          if (deviceError) console.error('Error fetching device relations:', deviceError);
-
-          // Fallback: Eğer group tabloları boşsa, tekil değerleri kullan
-          let finalEmployeeRelations = employeeRelations || [];
-          let finalDeviceRelations = deviceRelations || [];
-
-          if (finalEmployeeRelations.length === 0 && rule.employee_id) {
-            const { data: singleEmployee } = await supabase
+          // Get employee relations
+          let employeeRelations = [];
+          if (rule.target_type === 'individual' && rule.employee_id) {
+            const { data: employee } = await supabase
               .from('employees')
               .select('id, first_name, last_name')
               .eq('id', rule.employee_id)
               .single();
-            
-            if (singleEmployee) {
-              finalEmployeeRelations = [{ employees: singleEmployee }];
-            }
+            if (employee) employeeRelations = [{ employees: employee }];
+          } else if (rule.target_type === 'department') {
+            const { data: groupMembers } = await supabase
+              .from('group_members')
+              .select(`employees:employee_id (id, first_name, last_name)`)
+              .eq('group_id', rule.id);
+            employeeRelations = groupMembers || [];
           }
 
-          if (finalDeviceRelations.length === 0 && rule.device_id) {
-            const { data: singleDevice } = await supabase
+          // Get device relations
+          let deviceRelations = [];
+          if (rule.device_id) {
+            const { data: device } = await supabase
               .from('devices')
               .select('id, name, location')
               .eq('id', rule.device_id)
               .single();
-            
-            if (singleDevice) {
-              finalDeviceRelations = [{ devices: singleDevice }];
-            }
+            if (device) deviceRelations = [{ devices: device }];
+          } else {
+            const { data: groupDevices } = await supabase
+              .from('group_devices')
+              .select(`devices:device_id (id, name, location)`)
+              .eq('group_id', rule.id);
+            deviceRelations = groupDevices || [];
           }
+
+          // Get position relations
+          const { data: positionRelations } = await supabase
+            .from('rule_positions')
+            .select(`positions:position_id (id, name)`)
+            .eq('rule_id', rule.id);
+
+          // Get zone relations
+          const { data: zoneRelations } = await supabase
+            .from('rule_zones')
+            .select(`zones:zone_id (id, name)`)
+            .eq('rule_id', rule.id);
+
+          // Get door relations
+          const { data: doorRelations } = await supabase
+            .from('rule_doors')
+            .select(`doors:door_id (id, name)`)
+            .eq('rule_id', rule.id);
 
           return {
             ...rule,
-            rule_employees: finalEmployeeRelations,
-            rule_devices: finalDeviceRelations,
-            rule_departments: [],
+            rule_employees: employeeRelations,
+            rule_devices: deviceRelations,
+            rule_positions: positionRelations || [],
+            rule_zones: zoneRelations || [],
+            rule_doors: doorRelations || [],
           };
         })
       );
 
-      console.log('Access rules with multiple relationships fetched:', rulesWithRelations);
+      console.log('Enhanced access rules loaded:', rulesWithRelations);
       return rulesWithRelations;
     },
   });
@@ -99,30 +99,41 @@ export const useAccessRules = () => {
     mutationFn: async (ruleData: {
       name: string;
       description?: string;
-      selected_employees: string[];
-      selected_devices: string[];
+      target_type: string;
+      selected_employees?: string[];
+      selected_devices?: string[];
+      selected_positions?: string[];
+      selected_zones?: string[];
+      selected_doors?: string[];
       start_time?: string;
       end_time?: string;
       days: string[];
+      access_direction?: string;
+      priority?: number;
     }) => {
-      console.log('Creating access rule with multiple selections:', ruleData);
+      console.log('Creating enhanced access rule:', ruleData);
       
       const projectId = projectIds.length > 0 ? projectIds[0] : null;
 
-      // Ana kuralı oluştur
+      // Create the main rule
       const { data: rule, error: ruleError } = await supabase
         .from('access_rules')
         .insert([{
           name: ruleData.name,
           description: ruleData.description || null,
+          target_type: ruleData.target_type || 'individual',
           start_time: ruleData.start_time || null,
           end_time: ruleData.end_time || null,
           days: ruleData.days,
+          access_direction: ruleData.access_direction || 'both',
+          priority: ruleData.priority || 100,
           is_active: true,
           project_id: projectId,
-          // Çoklu seçim kullanıyorsak tekil alanları null bırak
-          employee_id: ruleData.selected_employees.length === 1 ? parseInt(ruleData.selected_employees[0]) : null,
-          device_id: ruleData.selected_devices.length === 1 ? parseInt(ruleData.selected_devices[0]) : null,
+          // Set single relations for individual rules
+          employee_id: ruleData.target_type === 'individual' && ruleData.selected_employees?.length === 1 
+            ? parseInt(ruleData.selected_employees[0]) : null,
+          device_id: ruleData.selected_devices?.length === 1 
+            ? parseInt(ruleData.selected_devices[0]) : null,
         }])
         .select()
         .single();
@@ -132,43 +143,61 @@ export const useAccessRules = () => {
         throw ruleError;
       }
 
-      console.log('Rule created:', rule);
+      // Create junction table relations
+      const promises = [];
 
-      // Çoklu çalışan ilişkilerini ekle (eğer birden fazla seçilmişse)
-      if (ruleData.selected_employees.length > 1) {
+      // Employee relations for department rules
+      if (ruleData.target_type === 'department' && ruleData.selected_employees?.length) {
         const employeeRelations = ruleData.selected_employees.map(empId => ({
           group_id: rule.id,
           employee_id: parseInt(empId),
           project_id: projectId
         }));
-
-        const { error: empError } = await supabase
-          .from('group_members')
-          .insert(employeeRelations);
-
-        if (empError) {
-          console.error('Error creating employee relations:', empError);
-          throw empError;
-        }
+        promises.push(supabase.from('group_members').insert(employeeRelations));
       }
 
-      // Çoklu cihaz ilişkilerini ekle (eğer birden fazla seçilmişse)
-      if (ruleData.selected_devices.length > 1) {
+      // Position relations
+      if (ruleData.selected_positions?.length) {
+        const positionRelations = ruleData.selected_positions.map(posId => ({
+          rule_id: rule.id,
+          position_id: parseInt(posId),
+          project_id: projectId
+        }));
+        promises.push(supabase.from('rule_positions').insert(positionRelations));
+      }
+
+      // Device relations (for multiple devices)
+      if (ruleData.selected_devices && ruleData.selected_devices.length > 1) {
         const deviceRelations = ruleData.selected_devices.map(deviceId => ({
           group_id: rule.id,
           device_id: parseInt(deviceId),
           project_id: projectId
         }));
-
-        const { error: deviceError } = await supabase
-          .from('group_devices')
-          .insert(deviceRelations);
-
-        if (deviceError) {
-          console.error('Error creating device relations:', deviceError);
-          throw deviceError;
-        }
+        promises.push(supabase.from('group_devices').insert(deviceRelations));
       }
+
+      // Zone relations
+      if (ruleData.selected_zones?.length) {
+        const zoneRelations = ruleData.selected_zones.map(zoneId => ({
+          rule_id: rule.id,
+          zone_id: parseInt(zoneId),
+          project_id: projectId
+        }));
+        promises.push(supabase.from('rule_zones').insert(zoneRelations));
+      }
+
+      // Door relations
+      if (ruleData.selected_doors?.length) {
+        const doorRelations = ruleData.selected_doors.map(doorId => ({
+          rule_id: rule.id,
+          door_id: parseInt(doorId),
+          project_id: projectId
+        }));
+        promises.push(supabase.from('rule_doors').insert(doorRelations));
+      }
+
+      // Execute all relation inserts
+      await Promise.all(promises);
 
       return rule;
     },
@@ -176,7 +205,7 @@ export const useAccessRules = () => {
       queryClient.invalidateQueries({ queryKey: ['access-rules'] });
       toast({
         title: "Başarılı",
-        description: "Erişim kuralı başarıyla oluşturuldu.",
+        description: "Gelişmiş erişim kuralı başarıyla oluşturuldu.",
       });
     },
     onError: (error) => {
@@ -227,28 +256,16 @@ export const useAccessRules = () => {
     mutationFn: async (ruleId: number) => {
       console.log('Deleting access rule:', ruleId);
       
-      // İlk olarak ilişkili kayıtları sil
-      const { error: groupMembersError } = await supabase
-        .from('group_members')
-        .delete()
-        .eq('group_id', ruleId);
+      // Delete relations first
+      await Promise.all([
+        supabase.from('group_members').delete().eq('group_id', ruleId),
+        supabase.from('group_devices').delete().eq('group_id', ruleId),
+        supabase.from('rule_positions').delete().eq('rule_id', ruleId),
+        supabase.from('rule_zones').delete().eq('rule_id', ruleId),
+        supabase.from('rule_doors').delete().eq('rule_id', ruleId),
+      ]);
 
-      if (groupMembersError) {
-        console.error('Error deleting group members:', groupMembersError);
-        throw groupMembersError;
-      }
-
-      const { error: groupDevicesError } = await supabase
-        .from('group_devices')
-        .delete()
-        .eq('group_id', ruleId);
-
-      if (groupDevicesError) {
-        console.error('Error deleting group devices:', groupDevicesError);
-        throw groupDevicesError;
-      }
-
-      // Sonra ana kuralı sil
+      // Delete the main rule
       const { data, error } = await supabase
         .from('access_rules')
         .delete()
@@ -289,28 +306,39 @@ export const useAccessRules = () => {
       ruleData: {
         name: string;
         description?: string;
-        selected_employees: string[];
-        selected_devices: string[];
+        target_type: string;
+        selected_employees?: string[];
+        selected_devices?: string[];
+        selected_positions?: string[];
+        selected_zones?: string[];
+        selected_doors?: string[];
         start_time?: string;
         end_time?: string;
         days: string[];
+        access_direction?: string;
+        priority?: number;
       };
     }) => {
-      console.log('Updating access rule:', id, ruleData);
+      console.log('Updating enhanced access rule:', id, ruleData);
       
       const projectId = projectIds.length > 0 ? projectIds[0] : null;
 
-      // Ana kuralı güncelle
+      // Update the main rule
       const { data: rule, error: ruleError } = await supabase
         .from('access_rules')
         .update({
           name: ruleData.name,
           description: ruleData.description || null,
+          target_type: ruleData.target_type || 'individual',
           start_time: ruleData.start_time || null,
           end_time: ruleData.end_time || null,
           days: ruleData.days,
-          employee_id: ruleData.selected_employees.length === 1 ? parseInt(ruleData.selected_employees[0]) : null,
-          device_id: ruleData.selected_devices.length === 1 ? parseInt(ruleData.selected_devices[0]) : null,
+          access_direction: ruleData.access_direction || 'both',
+          priority: ruleData.priority || 100,
+          employee_id: ruleData.target_type === 'individual' && ruleData.selected_employees?.length === 1 
+            ? parseInt(ruleData.selected_employees[0]) : null,
+          device_id: ruleData.selected_devices?.length === 1 
+            ? parseInt(ruleData.selected_devices[0]) : null,
         })
         .eq('id', id)
         .select()
@@ -321,45 +349,64 @@ export const useAccessRules = () => {
         throw ruleError;
       }
 
-      // Mevcut ilişkileri sil
-      await supabase.from('group_members').delete().eq('group_id', id);
-      await supabase.from('group_devices').delete().eq('group_id', id);
+      // Clear existing relations
+      await Promise.all([
+        supabase.from('group_members').delete().eq('group_id', id),
+        supabase.from('group_devices').delete().eq('group_id', id),
+        supabase.from('rule_positions').delete().eq('rule_id', id),
+        supabase.from('rule_zones').delete().eq('rule_id', id),
+        supabase.from('rule_doors').delete().eq('rule_id', id),
+      ]);
 
-      // Çoklu çalışan ilişkilerini yeniden ekle
-      if (ruleData.selected_employees.length > 1) {
+      // Recreate relations (same logic as create)
+      const promises = [];
+
+      if (ruleData.target_type === 'department' && ruleData.selected_employees?.length) {
         const employeeRelations = ruleData.selected_employees.map(empId => ({
-          group_id: id,
+          group_id: rule.id,
           employee_id: parseInt(empId),
           project_id: projectId
         }));
-
-        const { error: empError } = await supabase
-          .from('group_members')
-          .insert(employeeRelations);
-
-        if (empError) {
-          console.error('Error updating employee relations:', empError);
-          throw empError;
-        }
+        promises.push(supabase.from('group_members').insert(employeeRelations));
       }
 
-      // Çoklu cihaz ilişkilerini yeniden ekle
-      if (ruleData.selected_devices.length > 1) {
+      if (ruleData.selected_positions?.length) {
+        const positionRelations = ruleData.selected_positions.map(posId => ({
+          rule_id: rule.id,
+          position_id: parseInt(posId),
+          project_id: projectId
+        }));
+        promises.push(supabase.from('rule_positions').insert(positionRelations));
+      }
+
+      if (ruleData.selected_devices && ruleData.selected_devices.length > 1) {
         const deviceRelations = ruleData.selected_devices.map(deviceId => ({
-          group_id: id,
+          group_id: rule.id,
           device_id: parseInt(deviceId),
           project_id: projectId
         }));
-
-        const { error: deviceError } = await supabase
-          .from('group_devices')
-          .insert(deviceRelations);
-
-        if (deviceError) {
-          console.error('Error updating device relations:', deviceError);
-          throw deviceError;
-        }
+        promises.push(supabase.from('group_devices').insert(deviceRelations));
       }
+
+      if (ruleData.selected_zones?.length) {
+        const zoneRelations = ruleData.selected_zones.map(zoneId => ({
+          rule_id: rule.id,
+          zone_id: parseInt(zoneId),
+          project_id: projectId
+        }));
+        promises.push(supabase.from('rule_zones').insert(zoneRelations));
+      }
+
+      if (ruleData.selected_doors?.length) {
+        const doorRelations = ruleData.selected_doors.map(doorId => ({
+          rule_id: rule.id,
+          door_id: parseInt(doorId),
+          project_id: projectId
+        }));
+        promises.push(supabase.from('rule_doors').insert(doorRelations));
+      }
+
+      await Promise.all(promises);
 
       return rule;
     },
