@@ -1,12 +1,11 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Search, X, Users, Building, ChevronDown } from "lucide-react";
+import { Search, X, Users, Building } from "lucide-react";
 
 interface DepartmentEmployeeSelection {
   type: "department" | "employee";
@@ -69,41 +68,17 @@ const DepartmentEmployeeSelector = ({
     emp.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const isSelected = (item: DepartmentEmployeeSelection) => {
-    return value.some(v => v.type === item.type && v.id === item.id);
-  };
-
-  const toggleSelection = (item: DepartmentEmployeeSelection) => {
+  const addSelection = (item: DepartmentEmployeeSelection) => {
     const exists = value.some(v => v.type === item.type && v.id === item.id);
-    if (exists) {
-      onChange(value.filter(v => !(v.type === item.type && v.id === item.id)));
-    } else {
+    if (!exists) {
       onChange([...value, item]);
     }
+    setSearchTerm("");
+    setShowDropdown(false);
   };
 
   const removeSelection = (item: DepartmentEmployeeSelection) => {
     onChange(value.filter(v => !(v.type === item.type && v.id === item.id)));
-  };
-
-  const selectAllDepartments = () => {
-    const allDepts = filteredDepartments.map(dept => ({
-      type: "department" as const,
-      id: dept.id,
-      name: dept.name
-    }));
-    const newSelections = allDepts.filter(dept => !isSelected(dept));
-    onChange([...value, ...newSelections]);
-  };
-
-  const selectAllEmployees = () => {
-    const allEmps = filteredEmployees.map(emp => ({
-      type: "employee" as const,
-      id: emp.id,
-      name: emp.name
-    }));
-    const newSelections = allEmps.filter(emp => !isSelected(emp));
-    onChange([...value, ...newSelections]);
   };
 
   return (
@@ -132,127 +107,69 @@ const DepartmentEmployeeSelector = ({
         ))}
       </div>
 
-      {/* Dropdown trigger */}
+      {/* Search input */}
       <div className="relative">
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full justify-between"
-          onClick={() => setShowDropdown(!showDropdown)}
-          disabled={disabled}
-        >
-          <span className="text-sm text-muted-foreground">
-            Departman veya personel seçin...
-          </span>
-          <ChevronDown className="h-4 w-4" />
-        </Button>
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            placeholder="Departman veya personel ara..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onFocus={() => setShowDropdown(true)}
+            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+            className="pl-8 text-sm"
+            disabled={disabled}
+          />
+        </div>
 
-        {/* Dropdown content */}
-        {showDropdown && !disabled && (
-          <div className="absolute z-50 w-full mt-1 bg-white border rounded-md shadow-lg max-h-80 overflow-hidden">
-            {/* Search input */}
-            <div className="p-3 border-b">
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="Ara..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 text-sm"
-                />
+        {/* Dropdown */}
+        {showDropdown && !disabled && (searchTerm || filteredDepartments.length > 0 || filteredEmployees.length > 0) && (
+          <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+            {/* Departments */}
+            {filteredDepartments.length > 0 && (
+              <div>
+                <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 border-b">
+                  Departmanlar
+                </div>
+                {filteredDepartments.map((dept) => (
+                  <button
+                    key={`dept-${dept.id}`}
+                    onClick={() => addSelection({ type: "department", id: dept.id, name: dept.name })}
+                    className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-sm"
+                    disabled={value.some(v => v.type === "department" && v.id === dept.id)}
+                  >
+                    <Building className="w-4 h-4 text-blue-500" />
+                    {dept.name}
+                  </button>
+                ))}
               </div>
-            </div>
+            )}
 
-            <div className="max-h-60 overflow-auto">
-              {/* Departments section */}
-              {filteredDepartments.length > 0 && (
-                <div>
-                  <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 border-b flex justify-between items-center">
-                    <span>Departmanlar</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs"
-                      onClick={selectAllDepartments}
-                    >
-                      Tümünü Seç
-                    </Button>
-                  </div>
-                  {filteredDepartments.map((dept) => {
-                    const item = { type: "department" as const, id: dept.id, name: dept.name };
-                    return (
-                      <div
-                        key={`dept-${dept.id}`}
-                        className="flex items-center space-x-2 px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => toggleSelection(item)}
-                      >
-                        <Checkbox
-                          checked={isSelected(item)}
-                          onChange={() => {}}
-                        />
-                        <Building className="w-4 h-4 text-blue-500" />
-                        <span className="text-sm">{dept.name}</span>
-                      </div>
-                    );
-                  })}
+            {/* Employees */}
+            {filteredEmployees.length > 0 && (
+              <div>
+                <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 border-b">
+                  Personel
                 </div>
-              )}
+                {filteredEmployees.map((emp) => (
+                  <button
+                    key={`emp-${emp.id}`}
+                    onClick={() => addSelection({ type: "employee", id: emp.id, name: emp.name })}
+                    className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-sm"
+                    disabled={value.some(v => v.type === "employee" && v.id === emp.id)}
+                  >
+                    <Users className="w-4 h-4 text-green-500" />
+                    {emp.name}
+                  </button>
+                ))}
+              </div>
+            )}
 
-              {/* Employees section */}
-              {filteredEmployees.length > 0 && (
-                <div>
-                  <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 border-b flex justify-between items-center">
-                    <span>Personel</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 px-2 text-xs"
-                      onClick={selectAllEmployees}
-                    >
-                      Tümünü Seç
-                    </Button>
-                  </div>
-                  {filteredEmployees.map((emp) => {
-                    const item = { type: "employee" as const, id: emp.id, name: emp.name };
-                    return (
-                      <div
-                        key={`emp-${emp.id}`}
-                        className="flex items-center space-x-2 px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                        onClick={() => toggleSelection(item)}
-                      >
-                        <Checkbox
-                          checked={isSelected(item)}
-                          onChange={() => {}}
-                        />
-                        <Users className="w-4 h-4 text-green-500" />
-                        <span className="text-sm">{emp.name}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {searchTerm && filteredDepartments.length === 0 && filteredEmployees.length === 0 && (
-                <div className="px-3 py-2 text-sm text-gray-500">
-                  Sonuç bulunamadı
-                </div>
-              )}
-            </div>
-
-            {/* Close button */}
-            <div className="p-2 border-t bg-gray-50">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => setShowDropdown(false)}
-              >
-                Kapat
-              </Button>
-            </div>
+            {searchTerm && filteredDepartments.length === 0 && filteredEmployees.length === 0 && (
+              <div className="px-3 py-2 text-sm text-gray-500">
+                Sonuç bulunamadı
+              </div>
+            )}
           </div>
         )}
       </div>
