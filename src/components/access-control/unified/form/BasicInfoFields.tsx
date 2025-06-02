@@ -1,6 +1,7 @@
 
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 
 interface BasicInfoFieldsProps {
   name: string;
@@ -67,20 +68,32 @@ export function BasicInfoFields({
           </span>
         </div>
       </div>
-
-      <div className="md:col-span-3 flex flex-col gap-3">
-        <label htmlFor="description" className="text-xs font-semibold text-gray-500 dark:text-gray-300">
-          Açıklama
-        </label>
-        <Input
-          id="description"
-          placeholder="Kural açıklaması (isteğe bağlı)"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="bg-background text-base shadow-sm"
-          disabled={isCreating}
-        />
-      </div>
     </>
+  );
+}
+
+export function DescriptionField({
+  description,
+  setDescription,
+  isCreating
+}: {
+  description: string;
+  setDescription: (value: string) => void;
+  isCreating: boolean;
+}) {
+  return (
+    <div className="md:col-span-3 flex flex-col gap-2">
+      <label htmlFor="description" className="text-xs font-semibold text-gray-500 dark:text-gray-300">
+        Açıklama
+      </label>
+      <Textarea
+        id="description"
+        placeholder="Kural açıklaması (isteğe bağlı)"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        className="bg-background text-sm shadow-sm resize-none h-16"
+        disabled={isCreating}
+      />
+    </div>
   );
 }

@@ -9,7 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import DepartmentEmployeeSelector from "./DepartmentEmployeeSelector";
 import ZoneDoorSelector from "./ZoneDoorSelector";
 import { FormHeader } from "./form/FormHeader";
-import { BasicInfoFields } from "./form/BasicInfoFields";
+import { BasicInfoFields, DescriptionField } from "./form/BasicInfoFields";
 import { TimeFields } from "./form/TimeFields";
 import { DaysSelector } from "./form/DaysSelector";
 import { FormActions } from "./form/FormActions";
@@ -141,10 +141,10 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="shadow-2xl border-0 bg-transparent w-full max-w-2xl p-0 flex justify-center items-center"
+        className="shadow-2xl border-0 bg-transparent w-full max-w-4xl p-0 flex justify-center items-center"
         style={{
-          minWidth: 700,
-          maxWidth: 900,
+          minWidth: 800,
+          maxWidth: 1000,
           borderRadius: 24,
         }}
       >
@@ -152,8 +152,8 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
           <div
             className="rounded-3xl bg-gradient-to-br from-[#F1F0FB] via-white to-[#FAE8E8] dark:from-[#28213c] dark:to-[#260F19] border border-gray-200 dark:border-gray-700 shadow-xl p-0 overflow-hidden"
             style={{
-              minWidth: 700,
-              maxWidth: 900,
+              minWidth: 800,
+              maxWidth: 1000,
               margin: "0 auto",
             }}
           >
@@ -164,7 +164,7 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
               autoComplete="off"
               onSubmit={handleSubmit}
             >
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                 <BasicInfoFields
                   name={name}
                   setName={setName}
@@ -176,14 +176,16 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
                   errors={errors}
                   setErrors={setErrors}
                 />
+              </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                 <div className="flex flex-col gap-3">
                   <label className="text-xs font-semibold text-gray-500 dark:text-gray-300">
                     Departman & Personel *
                   </label>
                   <div className={`rounded-xl border ${
                     errors.selection ? "border-red-500" : "border-gray-100 dark:border-gray-800"
-                  } bg-white/80 dark:bg-gray-900/40 p-2`}>
+                  } bg-white/80 dark:bg-gray-900/40 p-4 min-h-[200px]`}>
                     <DepartmentEmployeeSelector
                       value={selection}
                       onChange={handleSelectionChange}
@@ -201,7 +203,7 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
                   </label>
                   <div className={`rounded-xl border ${
                     errors.access_points ? "border-red-500" : "border-gray-100 dark:border-gray-800"
-                  } bg-white/80 dark:bg-gray-900/40 p-2`}>
+                  } bg-white/80 dark:bg-gray-900/40 p-4 min-h-[200px]`}>
                     <ZoneDoorSelector
                       value={zonesDoors}
                       onChange={handleZonesDoorChange}
@@ -212,7 +214,9 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
                     <span className="text-red-500 text-xs">{errors.access_points}</span>
                   )}
                 </div>
+              </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
                 <TimeFields
                   startTime={startTime}
                   setStartTime={setStartTime}
@@ -222,13 +226,23 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
                   errors={errors}
                   setErrors={setErrors}
                 />
+              </div>
 
+              <div className="mb-6">
                 <DaysSelector
                   days={days}
                   setDays={setDays}
                   isCreating={isCreating}
                   errors={errors}
                   setErrors={setErrors}
+                />
+              </div>
+
+              <div className="mb-6">
+                <DescriptionField
+                  description={description}
+                  setDescription={setDescription}
+                  isCreating={isCreating}
                 />
               </div>
 
