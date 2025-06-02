@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -50,6 +49,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
         const deviceIds = editingRule.rule_devices?.map((rd: any) => rd.devices?.id?.toString()).filter(Boolean) || 
                          (editingRule.device_id ? [editingRule.device_id.toString()] : []);
 
+        console.log('Editing rule - setting employee IDs:', employeeIds);
         setFormData({
           name: editingRule.name || '',
           description: editingRule.description || '',
@@ -62,6 +62,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
         });
       } else {
         // Reset form for new rule
+        console.log('Resetting form for new rule');
         setFormData({
           name: '',
           description: '',
@@ -79,7 +80,23 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('Submitting form with data:', formData);
+    console.log('=== FORM SUBMIT ===');
+    console.log('Form data being submitted:', formData);
+    console.log('Selected employees count:', formData.selected_employees.length);
+    console.log('Selected employees array:', formData.selected_employees);
+    console.log('Selected devices count:', formData.selected_devices.length);
+    
+    if (formData.selected_employees.length === 0) {
+      console.error('NO EMPLOYEES SELECTED!');
+      alert('Lütfen en az bir çalışan seçin.');
+      return;
+    }
+    
+    if (formData.selected_devices.length === 0) {
+      console.error('NO DEVICES SELECTED!');
+      alert('Lütfen en az bir cihaz seçin.');
+      return;
+    }
     
     if (editingRule) {
       updateRule({
@@ -94,29 +111,54 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
   };
 
   const handleEmployeeChange = (employeeId: string, checked: boolean) => {
-    console.log('Employee change:', employeeId, checked);
-    setFormData(prev => ({
-      ...prev,
-      selected_employees: checked 
+    console.log('=== EMPLOYEE CHANGE ===');
+    console.log('Employee ID:', employeeId, 'Checked:', checked);
+    
+    setFormData(prev => {
+      const newEmployees = checked 
         ? [...prev.selected_employees, employeeId]
-        : prev.selected_employees.filter(id => id !== employeeId)
-    }));
+        : prev.selected_employees.filter(id => id !== employeeId);
+      
+      console.log('Previous employees:', prev.selected_employees);
+      console.log('New employees:', newEmployees);
+      
+      return {
+        ...prev,
+        selected_employees: newEmployees
+      };
+    });
   };
 
   const handleDepartmentChange = (departmentId: string, checked: boolean) => {
-    console.log('Department change:', departmentId, checked);
+    console.log('=== DEPARTMENT CHANGE ===');
+    console.log('Department ID:', departmentId, 'Checked:', checked);
+    
     const departmentEmployees = getEmployeesForDepartment(parseInt(departmentId));
     const employeeIds = departmentEmployees.map(emp => emp.id.toString());
     
-    setFormData(prev => ({
-      ...prev,
-      selected_departments: checked 
+    console.log('Department employees:', departmentEmployees.map(emp => `${emp.id}: ${emp.first_name} ${emp.last_name}`));
+    console.log('Employee IDs to toggle:', employeeIds);
+    
+    setFormData(prev => {
+      const newDepartments = checked 
         ? [...prev.selected_departments, departmentId]
-        : prev.selected_departments.filter(id => id !== departmentId),
-      selected_employees: checked
+        : prev.selected_departments.filter(id => id !== departmentId);
+      
+      const newEmployees = checked
         ? [...new Set([...prev.selected_employees, ...employeeIds])]
-        : prev.selected_employees.filter(id => !employeeIds.includes(id))
-    }));
+        : prev.selected_employees.filter(id => !employeeIds.includes(id));
+      
+      console.log('Previous departments:', prev.selected_departments);
+      console.log('New departments:', newDepartments);
+      console.log('Previous employees:', prev.selected_employees);
+      console.log('New employees:', newEmployees);
+      
+      return {
+        ...prev,
+        selected_departments: newDepartments,
+        selected_employees: newEmployees
+      };
+    });
   };
 
   const handleDeviceChange = (deviceId: string, checked: boolean) => {
@@ -171,6 +213,8 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
     const isSelected = isDepartmentSelected(departmentId);
     const isPartiallySelected = isDepartmentPartiallySelected(departmentId);
 
+    console.log(`Department ${departmentId} - Selected: ${isSelected}, Partially: ${isPartiallySelected}`);
+
     useEffect(() => {
       if (checkboxRef.current) {
         const element = checkboxRef.current.querySelector('input[type="checkbox"]') as HTMLInputElement;
@@ -185,9 +229,10 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
         ref={checkboxRef}
         id={`dept-${departmentId}`}
         checked={isSelected}
-        onCheckedChange={(checked) => 
-          handleDepartmentChange(departmentId.toString(), checked as boolean)
-        }
+        onCheckedChange={(checked) => {
+          console.log(`Department checkbox ${departmentId} changed to:`, checked);
+          handleDepartmentChange(departmentId.toString(), checked as boolean);
+        }}
       />
     );
   };
@@ -294,6 +339,15 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Debug bilgileri göster */}
+          <div className="bg-gray-100 p-2 rounded text-xs">
+            <div>Seçili çalışan sayısı: {formData.selected_employees.length}</div>
+            <div>Seçili cihaz sayısı: {formData.selected_devices.length}</div>
+            {formData.selected_employees.length > 0 && (
+              <div>Seçili çalışanlar: {formData.selected_employees.join(', ')}</div>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Kural Adı</Label>
@@ -338,9 +392,10 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
                         <Checkbox
                           id={`orphan-employee-${employee.id}`}
                           checked={formData.selected_employees.includes(employee.id.toString())}
-                          onCheckedChange={(checked) => 
-                            handleEmployeeChange(employee.id.toString(), checked as boolean)
-                          }
+                          onCheckedChange={(checked) => {
+                            console.log(`Orphan employee ${employee.id} changed to:`, checked);
+                            handleEmployeeChange(employee.id.toString(), checked as boolean);
+                          }}
                         />
                         <User className="h-3 w-3 text-gray-500" />
                         <Label 
