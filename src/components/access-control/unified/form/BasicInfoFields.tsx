@@ -24,14 +24,18 @@ export function BasicInfoFields({
   errors,
   setErrors
 }: BasicInfoFieldsProps) {
+  console.log("BasicInfoFields render:", { name, isActive, isCreating });
+
   const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    console.log("Name change:", { value });
     setName(value);
     // Clear name error without depending on current error state
     setErrors(prev => ({ ...prev, name: "" }));
   }, [setName, setErrors]);
 
   const handleStatusChange = useCallback((checked: boolean) => {
+    console.log("Status change:", { checked, currentStatus: isActive });
     setIsActive(checked);
   }, [setIsActive]);
 
@@ -64,6 +68,7 @@ export function BasicInfoFields({
         </label>
         <div className="flex items-center gap-2">
           <Switch
+            key={`status-switch-${isActive}`}
             id="statusSwitch"
             checked={isActive}
             onCheckedChange={handleStatusChange}
@@ -87,7 +92,10 @@ export function DescriptionField({
   setDescription: (value: string) => void;
   isCreating: boolean;
 }) {
+  console.log("DescriptionField render:", { description, isCreating });
+
   const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    console.log("Description change:", { value: e.target.value });
     setDescription(e.target.value);
   }, [setDescription]);
 
