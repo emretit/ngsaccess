@@ -2,12 +2,11 @@
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useCallback } from "react";
 
 interface BasicInfoFieldsProps {
   name: string;
   setName: (value: string) => void;
-  description: string;
-  setDescription: (value: string) => void;
   isActive: boolean;
   setIsActive: (value: boolean) => void;
   isCreating: boolean;
@@ -18,14 +17,21 @@ interface BasicInfoFieldsProps {
 export function BasicInfoFields({
   name,
   setName,
-  description,
-  setDescription,
   isActive,
   setIsActive,
   isCreating,
   errors,
   setErrors
 }: BasicInfoFieldsProps) {
+  const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setName(e.target.value);
+    if (errors.name) setErrors(prev => ({ ...prev, name: "" }));
+  }, [setName, errors.name, setErrors]);
+
+  const handleStatusChange = useCallback((checked: boolean) => {
+    setIsActive(checked);
+  }, [setIsActive]);
+
   return (
     <>
       <div className="flex flex-col gap-3">
@@ -36,10 +42,7 @@ export function BasicInfoFields({
           id="ruleName"
           placeholder="Kural adını girin"
           value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            if (errors.name) setErrors(prev => ({ ...prev, name: "" }));
-          }}
+          onChange={handleNameChange}
           className={`bg-background text-base shadow-sm ${
             errors.name ? "border-red-500" : ""
           }`}
@@ -60,7 +63,7 @@ export function BasicInfoFields({
           <Switch
             id="statusSwitch"
             checked={isActive}
-            onCheckedChange={setIsActive}
+            onCheckedChange={handleStatusChange}
             disabled={isCreating}
           />
           <span className="font-semibold text-xs ml-1">
@@ -81,8 +84,12 @@ export function DescriptionField({
   setDescription: (value: string) => void;
   isCreating: boolean;
 }) {
+  const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setDescription(e.target.value);
+  }, [setDescription]);
+
   return (
-    <div className="md:col-span-3 flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       <label htmlFor="description" className="text-xs font-semibold text-gray-500 dark:text-gray-300">
         Açıklama
       </label>
@@ -90,8 +97,8 @@ export function DescriptionField({
         id="description"
         placeholder="Kural açıklaması (isteğe bağlı)"
         value={description}
-        onChange={(e) => setDescription(e.target.value)}
-        className="bg-background text-sm shadow-sm resize-none h-16"
+        onChange={handleDescriptionChange}
+        className="bg-background text-sm shadow-sm resize-none h-12"
         disabled={isCreating}
       />
     </div>
