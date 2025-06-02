@@ -1,6 +1,7 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { AccessRule } from '@/types/access-control';
 import { useProjectAccess } from './useProjectAccess';
 
@@ -61,31 +62,13 @@ export const useAccessRules = () => {
             deviceRelations = groupDevices || [];
           }
 
-          // Get position relations
-          const { data: positionRelations } = await supabase
-            .from('rule_positions')
-            .select(`positions:position_id (id, name)`)
-            .eq('rule_id', rule.id);
-
-          // Get zone relations
-          const { data: zoneRelations } = await supabase
-            .from('rule_zones')
-            .select(`zones:zone_id (id, name)`)
-            .eq('rule_id', rule.id);
-
-          // Get door relations
-          const { data: doorRelations } = await supabase
-            .from('rule_doors')
-            .select(`doors:door_id (id, name)`)
-            .eq('rule_id', rule.id);
-
           return {
             ...rule,
             rule_employees: employeeRelations,
             rule_devices: deviceRelations,
-            rule_positions: positionRelations || [],
-            rule_zones: zoneRelations || [],
-            rule_doors: doorRelations || [],
+            rule_positions: [],
+            rule_zones: [],
+            rule_doors: [],
           };
         })
       );
@@ -156,16 +139,6 @@ export const useAccessRules = () => {
         promises.push(supabase.from('group_members').insert(employeeRelations));
       }
 
-      // Position relations
-      if (ruleData.selected_positions?.length) {
-        const positionRelations = ruleData.selected_positions.map(posId => ({
-          rule_id: rule.id,
-          position_id: parseInt(posId),
-          project_id: projectId
-        }));
-        promises.push(supabase.from('rule_positions').insert(positionRelations));
-      }
-
       // Device relations (for multiple devices)
       if (ruleData.selected_devices && ruleData.selected_devices.length > 1) {
         const deviceRelations = ruleData.selected_devices.map(deviceId => ({
@@ -174,26 +147,6 @@ export const useAccessRules = () => {
           project_id: projectId
         }));
         promises.push(supabase.from('group_devices').insert(deviceRelations));
-      }
-
-      // Zone relations
-      if (ruleData.selected_zones?.length) {
-        const zoneRelations = ruleData.selected_zones.map(zoneId => ({
-          rule_id: rule.id,
-          zone_id: parseInt(zoneId),
-          project_id: projectId
-        }));
-        promises.push(supabase.from('rule_zones').insert(zoneRelations));
-      }
-
-      // Door relations
-      if (ruleData.selected_doors?.length) {
-        const doorRelations = ruleData.selected_doors.map(doorId => ({
-          rule_id: rule.id,
-          door_id: parseInt(doorId),
-          project_id: projectId
-        }));
-        promises.push(supabase.from('rule_doors').insert(doorRelations));
       }
 
       // Execute all relation inserts
@@ -260,9 +213,6 @@ export const useAccessRules = () => {
       await Promise.all([
         supabase.from('group_members').delete().eq('group_id', ruleId),
         supabase.from('group_devices').delete().eq('group_id', ruleId),
-        supabase.from('rule_positions').delete().eq('rule_id', ruleId),
-        supabase.from('rule_zones').delete().eq('rule_id', ruleId),
-        supabase.from('rule_doors').delete().eq('rule_id', ruleId),
       ]);
 
       // Delete the main rule
@@ -353,9 +303,6 @@ export const useAccessRules = () => {
       await Promise.all([
         supabase.from('group_members').delete().eq('group_id', id),
         supabase.from('group_devices').delete().eq('group_id', id),
-        supabase.from('rule_positions').delete().eq('rule_id', id),
-        supabase.from('rule_zones').delete().eq('rule_id', id),
-        supabase.from('rule_doors').delete().eq('rule_id', id),
       ]);
 
       // Recreate relations (same logic as create)
@@ -370,15 +317,6 @@ export const useAccessRules = () => {
         promises.push(supabase.from('group_members').insert(employeeRelations));
       }
 
-      if (ruleData.selected_positions?.length) {
-        const positionRelations = ruleData.selected_positions.map(posId => ({
-          rule_id: rule.id,
-          position_id: parseInt(posId),
-          project_id: projectId
-        }));
-        promises.push(supabase.from('rule_positions').insert(positionRelations));
-      }
-
       if (ruleData.selected_devices && ruleData.selected_devices.length > 1) {
         const deviceRelations = ruleData.selected_devices.map(deviceId => ({
           group_id: rule.id,
@@ -386,24 +324,6 @@ export const useAccessRules = () => {
           project_id: projectId
         }));
         promises.push(supabase.from('group_devices').insert(deviceRelations));
-      }
-
-      if (ruleData.selected_zones?.length) {
-        const zoneRelations = ruleData.selected_zones.map(zoneId => ({
-          rule_id: rule.id,
-          zone_id: parseInt(zoneId),
-          project_id: projectId
-        }));
-        promises.push(supabase.from('rule_zones').insert(zoneRelations));
-      }
-
-      if (ruleData.selected_doors?.length) {
-        const doorRelations = ruleData.selected_doors.map(doorId => ({
-          rule_id: rule.id,
-          door_id: parseInt(doorId),
-          project_id: projectId
-        }));
-        promises.push(supabase.from('rule_doors').insert(doorRelations));
       }
 
       await Promise.all(promises);
