@@ -13,21 +13,10 @@ export const useAccessRules = () => {
   const { data: rules = [], isLoading } = useQuery({
     queryKey: ['access-rules'],
     queryFn: async () => {
-      console.log('Fetching access rules with relationships...');
+      console.log('Fetching access rules...');
       const { data, error } = await supabase
         .from('access_rules')
-        .select(`
-          *,
-          rule_employees!inner(
-            employees(first_name, last_name, id)
-          ),
-          rule_devices!inner(
-            devices(name, location, id)
-          ),
-          rule_departments!inner(
-            departments(name, id)
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -35,8 +24,35 @@ export const useAccessRules = () => {
         throw error;
       }
 
-      console.log('Access rules with relationships fetched:', data);
-      return data || [];
+      // Her kural için ilişkili çalışanları ve cihazları getir
+      const rulesWithRelations = await Promise.all(
+        (data || []).map(async (rule) => {
+          // Çalışan ilişkilerini getir
+          const { data: employees, error: empError } = await supabase
+            .from('employees')
+            .select('id, first_name, last_name')
+            .eq('id', rule.employee_id || 0);
+
+          // Cihaz ilişkilerini getir
+          const { data: devices, error: deviceError } = await supabase
+            .from('devices')
+            .select('id, name, location')
+            .eq('id', rule.device_id || 0);
+
+          if (empError) console.error('Error fetching employees:', empError);
+          if (deviceError) console.error('Error fetching devices:', deviceError);
+
+          return {
+            ...rule,
+            rule_employees: (employees || []).map(emp => ({ employees: emp })),
+            rule_devices: (devices || []).map(dev => ({ devices: dev })),
+            rule_departments: [],
+          };
+        })
+      );
+
+      console.log('Access rules with relationships fetched:', rulesWithRelations);
+      return rulesWithRelations;
     },
   });
 
@@ -50,16 +66,26 @@ export const useAccessRules = () => {
       end_time?: string;
       days: string[];
     }) => {
-      console.log('Creating access rule with multiple selections:', ruleData);
+      console.log('Creating access rule:', ruleData);
       
       const projectId = projectIds.length > 0 ? projectIds[0] : null;
       
+      // Şimdilik sadece ilk seçilen çalışan ve cihazla çalışalım
+      const firstEmployeeId = ruleData.selected_employees.length > 0 
+        ? parseInt(ruleData.selected_employees[0]) 
+        : null;
+      const firstDeviceId = ruleData.selected_devices.length > 0 
+        ? parseInt(ruleData.selected_devices[0]) 
+        : null;
+
       // Ana kuralı oluştur
       const { data: rule, error: ruleError } = await supabase
         .from('access_rules')
         .insert([{
           name: ruleData.name,
           description: ruleData.description || null,
+          employee_id: firstEmployeeId,
+          device_id: firstDeviceId,
           start_time: ruleData.start_time || null,
           end_time: ruleData.end_time || null,
           days: ruleData.days,
@@ -75,41 +101,6 @@ export const useAccessRules = () => {
       }
 
       console.log('Rule created:', rule);
-
-      // Çalışan ilişkilerini ekle
-      if (ruleData.selected_employees.length > 0) {
-        const employeeRelations = ruleData.selected_employees.map(empId => ({
-          rule_id: rule.id,
-          employee_id: parseInt(empId)
-        }));
-
-        const { error: empError } = await supabase
-          .from('rule_employees')
-          .insert(employeeRelations);
-
-        if (empError) {
-          console.error('Error creating employee relations:', empError);
-          throw empError;
-        }
-      }
-
-      // Cihaz ilişkilerini ekle
-      if (ruleData.selected_devices.length > 0) {
-        const deviceRelations = ruleData.selected_devices.map(deviceId => ({
-          rule_id: rule.id,
-          device_id: parseInt(deviceId)
-        }));
-
-        const { error: deviceError } = await supabase
-          .from('rule_devices')
-          .insert(deviceRelations);
-
-        if (deviceError) {
-          console.error('Error creating device relations:', deviceError);
-          throw deviceError;
-        }
-      }
-
       return rule;
     },
     onSuccess: () => {
