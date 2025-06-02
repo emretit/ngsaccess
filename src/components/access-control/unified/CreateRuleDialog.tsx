@@ -11,7 +11,7 @@ import { useEmployees } from "@/hooks/useEmployees";
 import { useDevices } from "@/hooks/useDevices";
 import { useDepartments } from "@/hooks/useDepartments";
 import { useAccessRules } from "@/hooks/useAccessRules";
-import { Loader2, ChevronRight, ChevronDown, Users } from "lucide-react";
+import { Loader2, ChevronRight, ChevronDown, Users, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface CreateRuleDialogProps {
@@ -27,6 +27,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
     description: '',
     selected_employees: [] as string[],
     selected_devices: [] as string[],
+    selected_departments: [] as string[],
     start_time: '',
     end_time: '',
     days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as string[],
@@ -54,6 +55,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
           description: editingRule.description || '',
           selected_employees: employeeIds,
           selected_devices: deviceIds,
+          selected_departments: [],
           start_time: editingRule.start_time || '',
           end_time: editingRule.end_time || '',
           days: editingRule.days || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
@@ -65,6 +67,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
           description: '',
           selected_employees: [],
           selected_devices: [],
+          selected_departments: [],
           start_time: '',
           end_time: '',
           days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
@@ -94,6 +97,21 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
       selected_employees: checked 
         ? [...prev.selected_employees, employeeId]
         : prev.selected_employees.filter(id => id !== employeeId)
+    }));
+  };
+
+  const handleDepartmentChange = (departmentId: string, checked: boolean) => {
+    const departmentEmployees = getEmployeesForDepartment(parseInt(departmentId));
+    const employeeIds = departmentEmployees.map(emp => emp.id.toString());
+    
+    setFormData(prev => ({
+      ...prev,
+      selected_departments: checked 
+        ? [...prev.selected_departments, departmentId]
+        : prev.selected_departments.filter(id => id !== departmentId),
+      selected_employees: checked
+        ? [...new Set([...prev.selected_employees, ...employeeIds])]
+        : prev.selected_employees.filter(id => !employeeIds.includes(id))
     }));
   };
 
@@ -131,6 +149,19 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
     return employees.filter(emp => emp.department_id === departmentId);
   };
 
+  const isDepartmentSelected = (departmentId: number) => {
+    return formData.selected_departments.includes(departmentId.toString());
+  };
+
+  const isDepartmentPartiallySelected = (departmentId: number) => {
+    const departmentEmployees = getEmployeesForDepartment(departmentId);
+    const selectedEmployeeIds = formData.selected_employees;
+    const departmentEmployeeIds = departmentEmployees.map(emp => emp.id.toString());
+    
+    const selectedCount = departmentEmployeeIds.filter(id => selectedEmployeeIds.includes(id)).length;
+    return selectedCount > 0 && selectedCount < departmentEmployeeIds.length;
+  };
+
   const renderDepartmentTree = (parentId: number | null = null, level: number = 0) => {
     const children = departments.filter(dept => dept.parent_id === parentId);
     
@@ -140,6 +171,8 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
       const hasChildren = departments.some(dept => dept.parent_id === department.id);
       const departmentEmployees = getEmployeesForDepartment(department.id);
       const isExpanded = expandedDepartments.has(department.id);
+      const isSelected = isDepartmentSelected(department.id);
+      const isPartiallySelected = isDepartmentPartiallySelected(department.id);
       
       return (
         <div key={department.id} className="space-y-1">
@@ -160,8 +193,24 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
               )}
             </Button>
             
+            <Checkbox
+              id={`dept-${department.id}`}
+              checked={isSelected}
+              ref={(el) => {
+                if (el && isPartiallySelected && !isSelected) {
+                  el.indeterminate = true;
+                }
+              }}
+              onCheckedChange={(checked) => 
+                handleDepartmentChange(department.id.toString(), checked as boolean)
+              }
+            />
+            
             <Users className="h-4 w-4 text-blue-500" />
-            <Label className="text-sm font-medium cursor-pointer flex-1">
+            <Label 
+              htmlFor={`dept-${department.id}`}
+              className="text-sm font-medium cursor-pointer flex-1"
+            >
               {department.name} ({departmentEmployees.length} çalışan)
             </Label>
           </div>
@@ -182,6 +231,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
                       handleEmployeeChange(employee.id.toString(), checked as boolean)
                     }
                   />
+                  <User className="h-3 w-3 text-gray-500" />
                   <Label 
                     htmlFor={`employee-${employee.id}`}
                     className="text-sm font-normal cursor-pointer"
@@ -275,6 +325,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
                             handleEmployeeChange(employee.id.toString(), checked as boolean)
                           }
                         />
+                        <User className="h-3 w-3 text-gray-500" />
                         <Label 
                           htmlFor={`orphan-employee-${employee.id}`}
                           className="text-sm font-normal cursor-pointer"
