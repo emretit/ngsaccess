@@ -13,13 +13,20 @@ export const useAccessRules = () => {
   const { data: rules = [], isLoading } = useQuery({
     queryKey: ['access-rules'],
     queryFn: async () => {
-      console.log('Fetching access rules...');
+      console.log('Fetching access rules with relationships...');
       const { data, error } = await supabase
         .from('access_rules')
         .select(`
           *,
-          employees(first_name, last_name),
-          devices(name, location)
+          rule_employees!inner(
+            employees(first_name, last_name, id)
+          ),
+          rule_devices!inner(
+            devices(name, location, id)
+          ),
+          rule_departments!inner(
+            departments(name, id)
+          )
         `)
         .order('created_at', { ascending: false });
 
@@ -28,35 +35,82 @@ export const useAccessRules = () => {
         throw error;
       }
 
-      console.log('Access rules fetched:', data);
+      console.log('Access rules with relationships fetched:', data);
       return data || [];
     },
   });
 
   const createRuleMutation = useMutation({
-    mutationFn: async (newRule: Omit<AccessRule, 'id' | 'created_at' | 'updated_at'>) => {
-      console.log('Creating access rule:', newRule);
+    mutationFn: async (ruleData: {
+      name: string;
+      description?: string;
+      selected_employees: string[];
+      selected_devices: string[];
+      start_time?: string;
+      end_time?: string;
+      days: string[];
+    }) => {
+      console.log('Creating access rule with multiple selections:', ruleData);
       
-      // Eğer project_id belirtilmemişse, kullanıcının ilk projesini kullan
-      const ruleWithProject = {
-        ...newRule,
-        project_id: newRule.project_id || (projectIds.length > 0 ? projectIds[0] : null)
-      };
+      const projectId = projectIds.length > 0 ? projectIds[0] : null;
       
-      console.log('Rule with project ID:', ruleWithProject);
-      
-      const { data, error } = await supabase
+      // Ana kuralı oluştur
+      const { data: rule, error: ruleError } = await supabase
         .from('access_rules')
-        .insert([ruleWithProject])
+        .insert([{
+          name: ruleData.name,
+          description: ruleData.description || null,
+          start_time: ruleData.start_time || null,
+          end_time: ruleData.end_time || null,
+          days: ruleData.days,
+          is_active: true,
+          project_id: projectId,
+        }])
         .select()
         .single();
 
-      if (error) {
-        console.error('Error creating access rule:', error);
-        throw error;
+      if (ruleError) {
+        console.error('Error creating access rule:', ruleError);
+        throw ruleError;
       }
 
-      return data;
+      console.log('Rule created:', rule);
+
+      // Çalışan ilişkilerini ekle
+      if (ruleData.selected_employees.length > 0) {
+        const employeeRelations = ruleData.selected_employees.map(empId => ({
+          rule_id: rule.id,
+          employee_id: parseInt(empId)
+        }));
+
+        const { error: empError } = await supabase
+          .from('rule_employees')
+          .insert(employeeRelations);
+
+        if (empError) {
+          console.error('Error creating employee relations:', empError);
+          throw empError;
+        }
+      }
+
+      // Cihaz ilişkilerini ekle
+      if (ruleData.selected_devices.length > 0) {
+        const deviceRelations = ruleData.selected_devices.map(deviceId => ({
+          rule_id: rule.id,
+          device_id: parseInt(deviceId)
+        }));
+
+        const { error: deviceError } = await supabase
+          .from('rule_devices')
+          .insert(deviceRelations);
+
+        if (deviceError) {
+          console.error('Error creating device relations:', deviceError);
+          throw deviceError;
+        }
+      }
+
+      return rule;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['access-rules'] });

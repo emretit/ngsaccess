@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -82,28 +81,7 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Eğer hiç çalışan seçilmemişse null, seçildiyse ilk seçileni al (basit implementasyon için)
-    const employeeId = formData.selected_employees.length > 0 
-      ? parseInt(formData.selected_employees[0]) 
-      : null;
-
-    // Eğer hiç cihaz seçilmemişse null, seçildiyse ilk seçileni al (basit implementasyon için)
-    const deviceId = formData.selected_devices.length > 0 
-      ? parseInt(formData.selected_devices[0]) 
-      : null;
-
-    const ruleData = {
-      name: formData.name,
-      description: formData.description || null,
-      employee_id: employeeId,
-      device_id: deviceId,
-      start_time: formData.start_time || null,
-      end_time: formData.end_time || null,
-      days: formData.days,
-      is_active: true,
-    };
-
-    createRule(ruleData);
+    createRule(formData);
     onOpenChange(false);
     
     // Form'u temizle

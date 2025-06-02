@@ -11,7 +11,9 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { useAccessRules } from "@/hooks/useAccessRules";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, Users, Monitor, ChevronDown, ChevronUp } from "lucide-react";
+import { useState } from "react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface AccessRulesListProps {
   onCreateRule: () => void;
@@ -19,6 +21,19 @@ interface AccessRulesListProps {
 
 const AccessRulesList = ({ onCreateRule }: AccessRulesListProps) => {
   const { rules, isLoading, toggleRule, isToggling } = useAccessRules();
+  const [expandedRules, setExpandedRules] = useState<Set<number>>(new Set());
+
+  const toggleExpanded = (ruleId: number) => {
+    setExpandedRules(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(ruleId)) {
+        newSet.delete(ruleId);
+      } else {
+        newSet.add(ruleId);
+      }
+      return newSet;
+    });
+  };
 
   if (isLoading) {
     return (
@@ -62,6 +77,68 @@ const AccessRulesList = ({ onCreateRule }: AccessRulesListProps) => {
     return days.map(day => dayMap[day] || day).join(', ');
   };
 
+  const renderEmployees = (rule: any) => {
+    const employees = rule.rule_employees?.map((re: any) => re.employees).filter(Boolean) || [];
+    
+    if (employees.length === 0) {
+      return (
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-blue-500" />
+          <span className="text-sm text-gray-500">Tüm çalışanlar</span>
+        </div>
+      );
+    }
+
+    if (employees.length === 1) {
+      return (
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-blue-500" />
+          <span className="text-sm">{employees[0].first_name} {employees[0].last_name}</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-2">
+        <Users className="h-4 w-4 text-blue-500" />
+        <Badge variant="secondary" className="text-xs">
+          {employees.length} çalışan
+        </Badge>
+      </div>
+    );
+  };
+
+  const renderDevices = (rule: any) => {
+    const devices = rule.rule_devices?.map((rd: any) => rd.devices).filter(Boolean) || [];
+    
+    if (devices.length === 0) {
+      return (
+        <div className="flex items-center gap-2">
+          <Monitor className="h-4 w-4 text-green-500" />
+          <span className="text-sm text-gray-500">Tüm cihazlar</span>
+        </div>
+      );
+    }
+
+    if (devices.length === 1) {
+      return (
+        <div className="flex items-center gap-2">
+          <Monitor className="h-4 w-4 text-green-500" />
+          <span className="text-sm">{devices[0].name}</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-2">
+        <Monitor className="h-4 w-4 text-green-500" />
+        <Badge variant="secondary" className="text-xs">
+          {devices.length} cihaz
+        </Badge>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -72,63 +149,128 @@ const AccessRulesList = ({ onCreateRule }: AccessRulesListProps) => {
         </Button>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Kural Adı</TableHead>
-            <TableHead>Çalışan</TableHead>
-            <TableHead>Cihaz</TableHead>
-            <TableHead>Saat Aralığı</TableHead>
-            <TableHead>Günler</TableHead>
-            <TableHead>Durum</TableHead>
-            <TableHead>Aktif</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rules.map((rule: any) => (
-            <TableRow key={rule.id}>
-              <TableCell className="font-medium">{rule.name}</TableCell>
-              <TableCell>
-                {rule.employees 
-                  ? `${rule.employees.first_name} ${rule.employees.last_name}`
-                  : 'Tüm çalışanlar'
-                }
-              </TableCell>
-              <TableCell>
-                {rule.devices 
-                  ? `${rule.devices.name} (${rule.devices.location})`
-                  : 'Tüm cihazlar'
-                }
-              </TableCell>
-              <TableCell>
-                {rule.start_time && rule.end_time 
-                  ? `${rule.start_time} - ${rule.end_time}`
-                  : '24 saat'
-                }
-              </TableCell>
-              <TableCell>
-                <span className="text-sm text-gray-600">
-                  {formatDays(rule.days || [])}
-                </span>
-              </TableCell>
-              <TableCell>
-                <Badge variant={rule.is_active ? "default" : "secondary"}>
-                  {rule.is_active ? 'Aktif' : 'Pasif'}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <Switch
-                  checked={rule.is_active}
-                  onCheckedChange={(checked) => 
-                    toggleRule({ id: rule.id, is_active: checked })
-                  }
-                  disabled={isToggling}
-                />
-              </TableCell>
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12"></TableHead>
+              <TableHead>Kural Adı</TableHead>
+              <TableHead>Çalışanlar</TableHead>
+              <TableHead>Cihazlar</TableHead>
+              <TableHead>Saat Aralığı</TableHead>
+              <TableHead>Günler</TableHead>
+              <TableHead>Durum</TableHead>
+              <TableHead>Aktif</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {rules.map((rule: any) => (
+              <>
+                <TableRow key={rule.id} className="group">
+                  <TableCell>
+                    <Collapsible>
+                      <CollapsibleTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleExpanded(rule.id)}
+                          className="p-1 h-8 w-8"
+                        >
+                          {expandedRules.has(rule.id) ? (
+                            <ChevronUp className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </CollapsibleTrigger>
+                    </Collapsible>
+                  </TableCell>
+                  <TableCell className="font-medium">{rule.name}</TableCell>
+                  <TableCell>{renderEmployees(rule)}</TableCell>
+                  <TableCell>{renderDevices(rule)}</TableCell>
+                  <TableCell>
+                    {rule.start_time && rule.end_time 
+                      ? `${rule.start_time} - ${rule.end_time}`
+                      : '24 saat'
+                    }
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-gray-600">
+                      {formatDays(rule.days || [])}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={rule.is_active ? "default" : "secondary"}>
+                      {rule.is_active ? 'Aktif' : 'Pasif'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Switch
+                      checked={rule.is_active}
+                      onCheckedChange={(checked) => 
+                        toggleRule({ id: rule.id, is_active: checked })
+                      }
+                      disabled={isToggling}
+                    />
+                  </TableCell>
+                </TableRow>
+                
+                {expandedRules.has(rule.id) && (
+                  <TableRow>
+                    <TableCell></TableCell>
+                    <TableCell colSpan={7}>
+                      <Collapsible open={expandedRules.has(rule.id)}>
+                        <CollapsibleContent>
+                          <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                            {rule.description && (
+                              <div>
+                                <span className="text-sm font-medium text-gray-700">Açıklama:</span>
+                                <p className="text-sm text-gray-600 mt-1">{rule.description}</p>
+                              </div>
+                            )}
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <span className="text-sm font-medium text-gray-700">Çalışanlar:</span>
+                                <div className="mt-1 space-y-1">
+                                  {rule.rule_employees?.length > 0 ? (
+                                    rule.rule_employees.map((re: any, index: number) => (
+                                      <div key={index} className="text-sm text-gray-600">
+                                        • {re.employees?.first_name} {re.employees?.last_name}
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="text-sm text-gray-500">Tüm çalışanlar</div>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <span className="text-sm font-medium text-gray-700">Cihazlar:</span>
+                                <div className="mt-1 space-y-1">
+                                  {rule.rule_devices?.length > 0 ? (
+                                    rule.rule_devices.map((rd: any, index: number) => (
+                                      <div key={index} className="text-sm text-gray-600">
+                                        • {rd.devices?.name} ({rd.devices?.location})
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div className="text-sm text-gray-500">Tüm cihazlar</div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 };
