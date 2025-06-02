@@ -168,8 +168,6 @@ export function UnifiedRuleForm({ open, onOpenChange }: UnifiedRuleFormProps) {
                 <BasicInfoFields
                   name={name}
                   setName={setName}
-                  description={description}
-                  setDescription={setDescription}
                   isActive={isActive}
                   setIsActive={setIsActive}
                   isCreating={isCreating}

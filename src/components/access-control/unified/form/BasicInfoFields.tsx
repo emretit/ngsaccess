@@ -1,4 +1,5 @@
 
+import React from "react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,9 +25,12 @@ export function BasicInfoFields({
   setErrors
 }: BasicInfoFieldsProps) {
   const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setName(e.target.value);
-    if (errors.name) setErrors(prev => ({ ...prev, name: "" }));
-  }, [setName, errors.name, setErrors]);
+    const value = e.target.value;
+    setName(value);
+    if (errors.name) {
+      setErrors(prev => ({ ...prev, name: "" }));
+    }
+  }, [setName, setErrors, errors.name]);
 
   const handleStatusChange = useCallback((checked: boolean) => {
     setIsActive(checked);
