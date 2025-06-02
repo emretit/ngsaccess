@@ -29,8 +29,8 @@ interface CreateRuleDialogProps {
 
 const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
   const { createRule, isCreating } = useAccessRules();
-  const { data: employees = [] } = useEmployees();
-  const { data: devices = [] } = useDevices();
+  const { employees = [] } = useEmployees();
+  const { devices = [] } = useDevices();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -134,7 +134,7 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
                   <SelectValue placeholder="Çalışan seçin (opsiyonel)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tüm çalışanlar</SelectItem>
+                  <SelectItem value="tum-calisanlar">Tüm çalışanlar</SelectItem>
                   {employees.map((employee: any) => (
                     <SelectItem key={employee.id} value={employee.id.toString()}>
                       {employee.first_name} {employee.last_name}
@@ -154,7 +154,7 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
                   <SelectValue placeholder="Cihaz seçin (opsiyonel)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Tüm cihazlar</SelectItem>
+                  <SelectItem value="tum-cihazlar">Tüm cihazlar</SelectItem>
                   {devices.map((device: any) => (
                     <SelectItem key={device.id} value={device.id.toString()}>
                       {device.name} ({device.location})
