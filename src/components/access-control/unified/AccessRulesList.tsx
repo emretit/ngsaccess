@@ -1,3 +1,4 @@
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -188,7 +189,6 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
               <TableHead>Cihazlar</TableHead>
               <TableHead>Saat Aralığı</TableHead>
               <TableHead>Günler</TableHead>
-              <TableHead>Durum</TableHead>
               <TableHead>Aktif</TableHead>
               <TableHead className="w-24">İşlemler</TableHead>
             </TableRow>
@@ -228,11 +228,6 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                     <span className="text-sm text-gray-600">
                       {formatDays(rule.days || [])}
                     </span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={rule.is_active ? "default" : "secondary"}>
-                      {rule.is_active ? 'Aktif' : 'Pasif'}
-                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Switch
@@ -296,7 +291,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                 {expandedRules.has(rule.id) && (
                   <TableRow>
                     <TableCell></TableCell>
-                    <TableCell colSpan={8}>
+                    <TableCell colSpan={7}>
                       <Collapsible open={expandedRules.has(rule.id)}>
                         <CollapsibleContent>
                           <div className="bg-gray-50 p-4 rounded-lg space-y-3">
