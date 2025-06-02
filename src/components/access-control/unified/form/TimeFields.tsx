@@ -9,7 +9,7 @@ interface TimeFieldsProps {
   setEndTime: (value: string) => void;
   isCreating: boolean;
   errors: Record<string, string>;
-  setErrors: (errors: Record<string, string>) => void;
+  setErrors: (errors: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => void;
 }
 
 export function TimeFields({

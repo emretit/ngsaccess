@@ -6,7 +6,7 @@ interface DaysSelectorProps {
   setDays: (days: string[]) => void;
   isCreating: boolean;
   errors: Record<string, string>;
-  setErrors: (errors: Record<string, string>) => void;
+  setErrors: (errors: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => void;
 }
 
 const DAYS = [
