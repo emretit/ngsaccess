@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useAccessRules } from "@/hooks/useAccessRules";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useDevices } from "@/hooks/useDevices";
+import { useDepartments } from "@/hooks/useDepartments";
 
 interface CreateRuleDialogProps {
   open: boolean;
@@ -31,6 +32,7 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
   const { createRule, isCreating } = useAccessRules();
   const { employees = [] } = useEmployees();
   const { devices = [] } = useDevices();
+  const { departments = [] } = useDepartments();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -55,10 +57,16 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Eğer departman seçildiyse, employee_id'yi null yap
+    let employeeId = null;
+    if (formData.employee_id && !formData.employee_id.startsWith('dept-')) {
+      employeeId = parseInt(formData.employee_id);
+    }
+
     const ruleData = {
       name: formData.name,
       description: formData.description || null,
-      employee_id: formData.employee_id ? parseInt(formData.employee_id) : null,
+      employee_id: employeeId,
       device_id: formData.device_id ? parseInt(formData.device_id) : null,
       start_time: formData.start_time || null,
       end_time: formData.end_time || null,
@@ -125,19 +133,30 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="employee">Çalışan</Label>
+              <Label htmlFor="employee">Çalışan / Departman</Label>
               <Select 
                 value={formData.employee_id} 
                 onValueChange={(value) => setFormData(prev => ({ ...prev, employee_id: value }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Çalışan seçin (opsiyonel)" />
+                  <SelectValue placeholder="Seçin (opsiyonel)" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="tum-calisanlar">Tüm çalışanlar</SelectItem>
+                  
+                  {departments.length > 0 && (
+                    <>
+                      {departments.map((department: any) => (
+                        <SelectItem key={`dept-${department.id}`} value={`dept-${department.id}`}>
+                          📁 {department.name} (Departman)
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  
                   {employees.map((employee: any) => (
                     <SelectItem key={employee.id} value={employee.id.toString()}>
-                      {employee.first_name} {employee.last_name}
+                      👤 {employee.first_name} {employee.last_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
