@@ -1,4 +1,3 @@
-
 export interface CardReading {
     id: number;
     card_no: string;
@@ -46,13 +45,15 @@ export interface Door {
 
 export interface AccessRule {
   id: number;
+  name: string;
+  description?: string;
   employee_id?: number;
   device_id?: number;
-  is_active: boolean;
-  start_time: string;
-  end_time: string;
-  type: string;
+  start_time?: string;
+  end_time?: string;
   days: string[];
+  is_active: boolean;
+  project_id?: number;
   created_at: string;
   updated_at: string;
 }

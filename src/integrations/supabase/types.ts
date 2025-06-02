@@ -162,6 +162,80 @@ export type Database = {
           },
         ]
       }
+      access_rules: {
+        Row: {
+          created_at: string | null
+          days: string[] | null
+          description: string | null
+          device_id: number | null
+          employee_id: number | null
+          end_time: string | null
+          id: number
+          is_active: boolean | null
+          name: string
+          project_id: number | null
+          start_time: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          days?: string[] | null
+          description?: string | null
+          device_id?: number | null
+          employee_id?: number | null
+          end_time?: string | null
+          id?: number
+          is_active?: boolean | null
+          name: string
+          project_id?: number | null
+          start_time?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          days?: string[] | null
+          description?: string | null
+          device_id?: number | null
+          employee_id?: number | null
+          end_time?: string | null
+          id?: number
+          is_active?: boolean | null
+          name?: string
+          project_id?: number | null
+          start_time?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_rules_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "device_locations"
+            referencedColumns: ["device_id"]
+          },
+          {
+            foreignKeyName: "access_rules_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "access_rules_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices_with_latest_readings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "access_rules_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_report_queries: {
         Row: {
           created_at: string | null

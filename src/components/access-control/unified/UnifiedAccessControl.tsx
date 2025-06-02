@@ -1,20 +1,23 @@
 
-import UnifiedRuleTable from "./UnifiedRuleTable";
+import { useState } from "react";
+import AccessRulesList from "./AccessRulesList";
+import CreateRuleDialog from "./CreateRuleDialog";
 
 const UnifiedAccessControl = () => {
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-end items-center">
-        <div className="text-sm text-gray-500">
-          Yeni kural sistemi yakında...
+      <div className="bg-card rounded-lg border shadow-sm">
+        <div className="p-6">
+          <AccessRulesList onCreateRule={() => setShowCreateDialog(true)} />
         </div>
       </div>
 
-      <div className="bg-card rounded-lg border shadow-sm">
-        <div className="p-6">
-          <UnifiedRuleTable />
-        </div>
-      </div>
+      <CreateRuleDialog 
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+      />
     </div>
   );
 };
