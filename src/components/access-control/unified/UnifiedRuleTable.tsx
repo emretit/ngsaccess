@@ -12,9 +12,15 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Edit, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useCallback } from "react";
 
 const UnifiedRuleTable = () => {
   const { rules, isLoading, toggleRule, isToggling } = useAccessRules();
+
+  const handleToggleRule = useCallback((id: number, currentStatus: boolean) => {
+    console.log('Toggle rule called:', { id, currentStatus, newStatus: !currentStatus });
+    toggleRule({ id, is_active: !currentStatus });
+  }, [toggleRule]);
 
   if (isLoading) {
     return (
@@ -40,10 +46,6 @@ const UnifiedRuleTable = () => {
       </div>
     );
   }
-
-  const handleToggleRule = (id: number, currentStatus: boolean) => {
-    toggleRule({ id, is_active: !currentStatus });
-  };
 
   return (
     <div className="bg-white rounded-lg shadow-sm border">
@@ -130,8 +132,12 @@ const UnifiedRuleTable = () => {
               </TableCell>
               <TableCell>
                 <Switch 
+                  key={`switch-${rule.id}-${rule.is_active}`}
                   checked={rule.is_active} 
-                  onCheckedChange={() => handleToggleRule(rule.id, rule.is_active)}
+                  onCheckedChange={(checked) => {
+                    console.log('Switch onCheckedChange called:', { ruleId: rule.id, checked });
+                    handleToggleRule(rule.id, rule.is_active);
+                  }}
                   className="data-[state=checked]:bg-green-500"
                   disabled={isToggling}
                 />
