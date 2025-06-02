@@ -1,22 +1,44 @@
 
-import { useState } from "react";
-import AccessRulesList from "./AccessRulesList";
-import CreateRuleDialog from "./CreateRuleDialog";
+import { useState } from 'react';
+import AccessRulesList from './AccessRulesList';
+import CreateRuleDialog from './CreateRuleDialog';
 
 const UnifiedAccessControl = () => {
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingRule, setEditingRule] = useState<any>(null);
+
+  const handleCreateRule = () => {
+    setEditingRule(null);
+    setIsCreateDialogOpen(true);
+  };
+
+  const handleEditRule = (rule: any) => {
+    setEditingRule(rule);
+    setIsCreateDialogOpen(true);
+  };
+
+  const handleCloseDialog = () => {
+    setIsCreateDialogOpen(false);
+    setEditingRule(null);
+  };
 
   return (
     <div className="space-y-6">
-      <div className="bg-card rounded-lg border shadow-sm">
-        <div className="p-6">
-          <AccessRulesList onCreateRule={() => setShowCreateDialog(true)} />
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Erişim Yönetimi</h1>
+        <p className="text-gray-600">Çalışan erişim kurallarını yönetin</p>
       </div>
 
-      <CreateRuleDialog 
-        open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
+      <AccessRulesList 
+        onCreateRule={handleCreateRule} 
+        onEditRule={handleEditRule}
+      />
+
+      <CreateRuleDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        editingRule={editingRule}
+        onClose={handleCloseDialog}
       />
     </div>
   );

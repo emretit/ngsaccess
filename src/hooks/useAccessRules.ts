@@ -223,12 +223,173 @@ export const useAccessRules = () => {
     },
   });
 
+  const deleteRuleMutation = useMutation({
+    mutationFn: async (ruleId: number) => {
+      console.log('Deleting access rule:', ruleId);
+      
+      // İlk olarak ilişkili kayıtları sil
+      const { error: groupMembersError } = await supabase
+        .from('group_members')
+        .delete()
+        .eq('group_id', ruleId);
+
+      if (groupMembersError) {
+        console.error('Error deleting group members:', groupMembersError);
+        throw groupMembersError;
+      }
+
+      const { error: groupDevicesError } = await supabase
+        .from('group_devices')
+        .delete()
+        .eq('group_id', ruleId);
+
+      if (groupDevicesError) {
+        console.error('Error deleting group devices:', groupDevicesError);
+        throw groupDevicesError;
+      }
+
+      // Sonra ana kuralı sil
+      const { data, error } = await supabase
+        .from('access_rules')
+        .delete()
+        .eq('id', ruleId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error deleting access rule:', error);
+        throw error;
+      }
+
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['access-rules'] });
+      toast({
+        title: "Başarılı",
+        description: "Erişim kuralı başarıyla silindi.",
+      });
+    },
+    onError: (error) => {
+      console.error('Delete rule error:', error);
+      toast({
+        title: "Hata",
+        description: "Erişim kuralı silinirken hata oluştu.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateRuleMutation = useMutation({
+    mutationFn: async ({
+      id,
+      ruleData
+    }: {
+      id: number;
+      ruleData: {
+        name: string;
+        description?: string;
+        selected_employees: string[];
+        selected_devices: string[];
+        start_time?: string;
+        end_time?: string;
+        days: string[];
+      };
+    }) => {
+      console.log('Updating access rule:', id, ruleData);
+      
+      const projectId = projectIds.length > 0 ? projectIds[0] : null;
+
+      // Ana kuralı güncelle
+      const { data: rule, error: ruleError } = await supabase
+        .from('access_rules')
+        .update({
+          name: ruleData.name,
+          description: ruleData.description || null,
+          start_time: ruleData.start_time || null,
+          end_time: ruleData.end_time || null,
+          days: ruleData.days,
+          employee_id: ruleData.selected_employees.length === 1 ? parseInt(ruleData.selected_employees[0]) : null,
+          device_id: ruleData.selected_devices.length === 1 ? parseInt(ruleData.selected_devices[0]) : null,
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (ruleError) {
+        console.error('Error updating access rule:', ruleError);
+        throw ruleError;
+      }
+
+      // Mevcut ilişkileri sil
+      await supabase.from('group_members').delete().eq('group_id', id);
+      await supabase.from('group_devices').delete().eq('group_id', id);
+
+      // Çoklu çalışan ilişkilerini yeniden ekle
+      if (ruleData.selected_employees.length > 1) {
+        const employeeRelations = ruleData.selected_employees.map(empId => ({
+          group_id: id,
+          employee_id: parseInt(empId),
+          project_id: projectId
+        }));
+
+        const { error: empError } = await supabase
+          .from('group_members')
+          .insert(employeeRelations);
+
+        if (empError) {
+          console.error('Error updating employee relations:', empError);
+          throw empError;
+        }
+      }
+
+      // Çoklu cihaz ilişkilerini yeniden ekle
+      if (ruleData.selected_devices.length > 1) {
+        const deviceRelations = ruleData.selected_devices.map(deviceId => ({
+          group_id: id,
+          device_id: parseInt(deviceId),
+          project_id: projectId
+        }));
+
+        const { error: deviceError } = await supabase
+          .from('group_devices')
+          .insert(deviceRelations);
+
+        if (deviceError) {
+          console.error('Error updating device relations:', deviceError);
+          throw deviceError;
+        }
+      }
+
+      return rule;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['access-rules'] });
+      toast({
+        title: "Başarılı",
+        description: "Erişim kuralı başarıyla güncellendi.",
+      });
+    },
+    onError: (error) => {
+      console.error('Update rule error:', error);
+      toast({
+        title: "Hata",
+        description: "Erişim kuralı güncellenirken hata oluştu.",
+        variant: "destructive",
+      });
+    },
+  });
+
   return {
     rules,
     isLoading,
     createRule: createRuleMutation.mutate,
     isCreating: createRuleMutation.isPending,
     toggleRule: toggleRuleMutation.mutate,
-    isToggling: toggleRuleMutation.isPending
+    isToggling: toggleRuleMutation.isPending,
+    deleteRule: deleteRuleMutation.mutate,
+    isDeleting: deleteRuleMutation.isPending,
+    updateRule: updateRuleMutation.mutate,
+    isUpdating: updateRuleMutation.isPending
   };
 };

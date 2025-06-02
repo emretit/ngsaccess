@@ -1,4 +1,3 @@
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -11,16 +10,28 @@ import {
   TableRow 
 } from "@/components/ui/table";
 import { useAccessRules } from "@/hooks/useAccessRules";
-import { Loader2, Plus, Users, Monitor, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Plus, Users, Monitor, ChevronDown, ChevronUp, Edit, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface AccessRulesListProps {
   onCreateRule: () => void;
+  onEditRule?: (rule: any) => void;
 }
 
-const AccessRulesList = ({ onCreateRule }: AccessRulesListProps) => {
-  const { rules, isLoading, toggleRule, isToggling } = useAccessRules();
+const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => {
+  const { rules, isLoading, toggleRule, isToggling, deleteRule, isDeleting } = useAccessRules();
   const [expandedRules, setExpandedRules] = useState<Set<number>>(new Set());
 
   const toggleExpanded = (ruleId: number) => {
@@ -33,6 +44,16 @@ const AccessRulesList = ({ onCreateRule }: AccessRulesListProps) => {
       }
       return newSet;
     });
+  };
+
+  const handleDeleteRule = (ruleId: number) => {
+    deleteRule(ruleId);
+  };
+
+  const handleEditRule = (rule: any) => {
+    if (onEditRule) {
+      onEditRule(rule);
+    }
   };
 
   if (isLoading) {
@@ -169,6 +190,7 @@ const AccessRulesList = ({ onCreateRule }: AccessRulesListProps) => {
               <TableHead>Günler</TableHead>
               <TableHead>Durum</TableHead>
               <TableHead>Aktif</TableHead>
+              <TableHead className="w-24">İşlemler</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -221,12 +243,60 @@ const AccessRulesList = ({ onCreateRule }: AccessRulesListProps) => {
                       disabled={isToggling}
                     />
                   </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditRule(rule)}
+                        className="h-8 w-8 p-0"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Kuralı Sil</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Bu erişim kuralını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>İptal</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={() => handleDeleteRule(rule.id)}
+                              disabled={isDeleting}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              {isDeleting ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Siliniyor...
+                                </>
+                              ) : (
+                                'Sil'
+                              )}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
                 </TableRow>
                 
                 {expandedRules.has(rule.id) && (
                   <TableRow>
                     <TableCell></TableCell>
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={8}>
                       <Collapsible open={expandedRules.has(rule.id)}>
                         <CollapsibleContent>
                           <div className="bg-gray-50 p-4 rounded-lg space-y-3">
