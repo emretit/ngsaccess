@@ -1,25 +1,11 @@
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { 
-  Command,
-  CommandEmpty, 
-  CommandGroup,
-  CommandInput, 
-  CommandItem,
-  CommandList
-} from "@/components/ui/command";
-import { 
-  Popover, 
-  PopoverContent, 
-  PopoverTrigger 
-} from "@/components/ui/popover";
-import { X, ChevronsUpDown, Grid } from "lucide-react";
-import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
-import { cn } from "@/lib/utils";
-import { Zone, Door } from "@/types/access-control";
+import { Input } from "@/components/ui/input";
+import { Search, X, MapPin, DoorOpen } from "lucide-react";
 
 interface ZoneDoorSelection {
   type: "zone" | "door";
@@ -29,175 +15,163 @@ interface ZoneDoorSelection {
 
 interface ZoneDoorSelectorProps {
   value: ZoneDoorSelection[];
-  onChange: (value: ZoneDoorSelection[]) => void;
+  onChange: (selection: ZoneDoorSelection[]) => void;
+  disabled?: boolean;
 }
 
-export default function ZoneDoorSelector({ value, onChange }: ZoneDoorSelectorProps) {
-  const [open, setOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const { zones, doors, loading, error } = useZonesAndDoors();
-  const [expandedZones, setExpandedZones] = useState<number[]>([]);
-  
-  // Toggle zone expansion in the tree view
-  const toggleZoneExpansion = (zoneId: number, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    
-    setExpandedZones(prev => 
-      prev.includes(zoneId) 
-        ? prev.filter(id => id !== zoneId)
-        : [...prev, zoneId]
-    );
-  };
-  
-  // Check if an item is selected
-  const isSelected = (type: "zone" | "door", id: number) => {
-    return value.some((item) => item.type === type && item.id === id);
-  };
+const ZoneDoorSelector = ({ 
+  value, 
+  onChange, 
+  disabled = false 
+}: ZoneDoorSelectorProps) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
 
-  // Handle item selection
-  const handleToggleItem = (item: ZoneDoorSelection) => {
-    const exists = value.some(
-      (i) => i.type === item.type && i.id === item.id
-    );
-
-    if (exists) {
-      onChange(value.filter((i) => !(i.type === item.type && i.id === item.id)));
-    } else {
-      onChange([...value, item]);
-    }
-  };
-
-  // Handle item removal
-  const handleRemoveItem = (item: ZoneDoorSelection) => {
-    onChange(value.filter((i) => !(i.type === item.type && i.id === item.id)));
-  };
-
-  // Group doors by zone for the tree view
-  const doorsByZone: Record<number, Door[]> = {};
-  doors.forEach(door => {
-    if (door.zone_id) {
-      if (!doorsByZone[door.zone_id]) {
-        doorsByZone[door.zone_id] = [];
-      }
-      doorsByZone[door.zone_id].push(door);
+  // Fetch zones
+  const { data: zones = [] } = useQuery({
+    queryKey: ['zones-selector'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('zones')
+        .select('id, name')
+        .order('name');
+      
+      if (error) throw error;
+      return data || [];
     }
   });
 
-  // Render tree structure
-  function renderTree(nodes: Zone[]) {
-    return nodes.map(zone => (
-      <div key={`zone-${zone.id}`}>
-        <div className="flex items-center gap-2 py-1.5 font-semibold text-sm">
-          <Checkbox
-            checked={isSelected("zone", zone.id)}
-            onCheckedChange={() => {
-              handleToggleItem({
-                type: "zone",
-                id: zone.id,
-                name: zone.name,
-              });
-            }}
-            id={`zone-checkbox-${zone.id}`}
-          />
-          <label htmlFor={`zone-checkbox-${zone.id}`} className="cursor-pointer select-none">
-            {zone.name}
-          </label>
-        </div>
-        <div className="pl-6">
-          {doorsByZone[zone.id]?.map((door) => (
-            <div key={`door-${door.id}`} className="flex items-center gap-2 py-0.5">
-              <div className="border-l h-full mr-2" style={{ minHeight: "14px" }} />
-              <Checkbox
-                checked={isSelected("door", door.id)}
-                onCheckedChange={() => {
-                  handleToggleItem({
-                    type: "door",
-                    id: door.id,
-                    name: door.name,
-                  });
-                }}
-                id={`door-checkbox-${door.id}`}
-              />
-              <label htmlFor={`door-checkbox-${door.id}`} className="cursor-pointer select-none text-xs">
-                {door.name}
-              </label>
-            </div>
-          ))}
-        </div>
-      </div>
-    ));
-  }
-
-  // Render unassigned doors (without a zone)
-  const unassignedDoors = doors.filter(door => !door.zone_id);
-  
-  return (
-    <div className="bg-white rounded-lg shadow p-3 max-w-xs max-h-[300px] overflow-y-auto text-xs">
-      {loading ? (
-        <div className="py-6 text-center text-sm text-muted-foreground">
-          Yükleniyor...
-        </div>
-      ) : error ? (
-        <div className="py-6 text-center text-sm text-destructive">
-          Veriler yüklenirken hata oluştu
-        </div>
-      ) : (
-        <>
-          {renderTree(zones)}
-          
-          {/* Unassigned doors section */}
-          {unassignedDoors.length > 0 && (
-            <div className="mt-2">
-              <div className="text-xs font-medium text-muted-foreground pt-2 border-t">
-                Atanmamış Kapılar
-              </div>
-              {unassignedDoors.map((door) => (
-                <div key={`door-${door.id}`} className="flex items-center gap-2 py-0.5 mt-1">
-                  <Checkbox
-                    checked={isSelected("door", door.id)}
-                    onCheckedChange={() => {
-                      handleToggleItem({
-                        type: "door",
-                        id: door.id,
-                        name: door.name,
-                      });
-                    }}
-                    id={`door-checkbox-${door.id}`}
-                  />
-                  <label htmlFor={`door-checkbox-${door.id}`} className="cursor-pointer select-none text-xs">
-                    {door.name}
-                  </label>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
+  // Fetch doors
+  const { data: doors = [] } = useQuery({
+    queryKey: ['doors-selector'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('doors')
+        .select('id, name')
+        .eq('status', 'active')
+        .order('name');
       
-      {/* Selected items display */}
-      {value.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-3 pt-2 border-t">
-          {value.map((item) => (
-            <Badge
-              key={`${item.type}-${item.id}`}
-              variant="secondary"
-              className="text-xs py-1 pl-2 pr-1 flex items-center gap-1"
-            >
-              <span>{item.name}</span>
+      if (error) throw error;
+      return data || [];
+    }
+  });
+
+  // Filter items based on search term
+  const filteredZones = zones.filter(zone => 
+    zone.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredDoors = doors.filter(door => 
+    door.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const addSelection = (item: ZoneDoorSelection) => {
+    const exists = value.some(v => v.type === item.type && v.id === item.id);
+    if (!exists) {
+      onChange([...value, item]);
+    }
+    setSearchTerm("");
+    setShowDropdown(false);
+  };
+
+  const removeSelection = (item: ZoneDoorSelection) => {
+    onChange(value.filter(v => !(v.type === item.type && v.id === item.id)));
+  };
+
+  return (
+    <div className="space-y-2">
+      {/* Selected items */}
+      <div className="flex flex-wrap gap-1 min-h-[2rem]">
+        {value.map((item) => (
+          <Badge
+            key={`${item.type}-${item.id}`}
+            variant="secondary"
+            className="flex items-center gap-1 pr-1"
+          >
+            {item.type === "zone" ? <MapPin className="w-3 h-3" /> : <DoorOpen className="w-3 h-3" />}
+            <span className="text-xs">{item.name}</span>
+            {!disabled && (
               <Button
-                type="button"
                 variant="ghost"
-                size="icon"
-                className="h-3 w-3 p-0 text-muted-foreground hover:text-foreground rounded-full"
-                onClick={() => handleRemoveItem(item)}
+                size="sm"
+                className="h-4 w-4 p-0 hover:bg-transparent"
+                onClick={() => removeSelection(item)}
               >
-                <X className="h-2 w-2" />
-                <span className="sr-only">Kaldır</span>
+                <X className="w-3 h-3" />
               </Button>
-            </Badge>
-          ))}
+            )}
+          </Badge>
+        ))}
+      </div>
+
+      {/* Search input */}
+      <div className="relative">
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Input
+            placeholder="Bölge veya kapı ara..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onFocus={() => setShowDropdown(true)}
+            onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+            className="pl-8 text-sm"
+            disabled={disabled}
+          />
         </div>
-      )}
+
+        {/* Dropdown */}
+        {showDropdown && !disabled && (searchTerm || filteredZones.length > 0 || filteredDoors.length > 0) && (
+          <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-60 overflow-auto">
+            {/* Zones */}
+            {filteredZones.length > 0 && (
+              <div>
+                <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 border-b">
+                  Bölgeler
+                </div>
+                {filteredZones.map((zone) => (
+                  <button
+                    key={`zone-${zone.id}`}
+                    onClick={() => addSelection({ type: "zone", id: zone.id, name: zone.name })}
+                    className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-sm"
+                    disabled={value.some(v => v.type === "zone" && v.id === zone.id)}
+                  >
+                    <MapPin className="w-4 h-4 text-purple-500" />
+                    {zone.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Doors */}
+            {filteredDoors.length > 0 && (
+              <div>
+                <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 border-b">
+                  Kapılar
+                </div>
+                {filteredDoors.map((door) => (
+                  <button
+                    key={`door-${door.id}`}
+                    onClick={() => addSelection({ type: "door", id: door.id, name: door.name })}
+                    className="w-full px-3 py-2 text-left hover:bg-gray-50 flex items-center gap-2 text-sm"
+                    disabled={value.some(v => v.type === "door" && v.id === door.id)}
+                  >
+                    <DoorOpen className="w-4 h-4 text-orange-500" />
+                    {door.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {searchTerm && filteredZones.length === 0 && filteredDoors.length === 0 && (
+              <div className="px-3 py-2 text-sm text-gray-500">
+                Sonuç bulunamadı
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
-}
+};
+
+export default ZoneDoorSelector;

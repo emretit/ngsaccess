@@ -162,15 +162,133 @@ export type Database = {
           },
         ]
       }
+      access_rule_departments: {
+        Row: {
+          created_at: string
+          department_id: number
+          id: number
+          rule_id: number
+        }
+        Insert: {
+          created_at?: string
+          department_id: number
+          id?: never
+          rule_id: number
+        }
+        Update: {
+          created_at?: string
+          department_id?: number
+          id?: never
+          rule_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_rule_departments_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "access_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      access_rule_doors: {
+        Row: {
+          created_at: string
+          door_id: number
+          id: number
+          rule_id: number
+        }
+        Insert: {
+          created_at?: string
+          door_id: number
+          id?: never
+          rule_id: number
+        }
+        Update: {
+          created_at?: string
+          door_id?: number
+          id?: never
+          rule_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_rule_doors_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "access_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      access_rule_employees: {
+        Row: {
+          created_at: string
+          employee_id: number
+          id: number
+          rule_id: number
+        }
+        Insert: {
+          created_at?: string
+          employee_id: number
+          id?: never
+          rule_id: number
+        }
+        Update: {
+          created_at?: string
+          employee_id?: number
+          id?: never
+          rule_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_rule_employees_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "access_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      access_rule_zones: {
+        Row: {
+          created_at: string
+          id: number
+          rule_id: number
+          zone_id: number
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          rule_id: number
+          zone_id: number
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          rule_id?: number
+          zone_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_rule_zones_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "access_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       access_rules: {
         Row: {
           created_at: string
           days: string[]
+          description: string | null
           device_id: number | null
           employee_id: number | null
           end_time: string
           id: number
           is_active: boolean | null
+          name: string
           project_id: number | null
           start_time: string
           type: string
@@ -179,11 +297,13 @@ export type Database = {
         Insert: {
           created_at?: string
           days: string[]
+          description?: string | null
           device_id?: number | null
           employee_id?: number | null
           end_time: string
           id?: number
           is_active?: boolean | null
+          name: string
           project_id?: number | null
           start_time: string
           type: string
@@ -192,11 +312,13 @@ export type Database = {
         Update: {
           created_at?: string
           days?: string[]
+          description?: string | null
           device_id?: number | null
           employee_id?: number | null
           end_time?: string
           id?: number
           is_active?: boolean | null
+          name?: string
           project_id?: number | null
           start_time?: string
           type?: string
