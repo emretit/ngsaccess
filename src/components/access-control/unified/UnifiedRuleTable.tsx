@@ -131,7 +131,7 @@ const UnifiedRuleTable = () => {
               <TableCell>
                 <Switch 
                   checked={rule.is_active} 
-                  onCheckedChange={() => handleToggleRule(rule.id, rule.is_active)}
+                  onCheckedChange={(checked) => handleToggleRule(rule.id, rule.is_active)}
                   className="data-[state=checked]:bg-green-500"
                   disabled={isToggling}
                 />
