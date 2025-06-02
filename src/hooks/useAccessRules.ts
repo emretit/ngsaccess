@@ -17,7 +17,6 @@ export const useAccessRules = () => {
       const { data, error } = await supabase
         .from('access_rules')
         .select('*')
-        .order('priority', { ascending: false })
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -30,14 +29,14 @@ export const useAccessRules = () => {
         (data || []).map(async (rule) => {
           // Get employee relations
           let employeeRelations = [];
-          if (rule.target_type === 'individual' && rule.employee_id) {
+          if (rule.employee_id) {
             const { data: employee } = await supabase
               .from('employees')
               .select('id, first_name, last_name')
               .eq('id', rule.employee_id)
               .single();
             if (employee) employeeRelations = [{ employees: employee }];
-          } else if (rule.target_type === 'department') {
+          } else {
             const { data: groupMembers } = await supabase
               .from('group_members')
               .select(`employees:employee_id (id, first_name, last_name)`)
@@ -64,6 +63,12 @@ export const useAccessRules = () => {
 
           return {
             ...rule,
+            // Add default values for new fields until DB is updated
+            target_type: rule.target_type || 'individual',
+            access_direction: rule.access_direction || 'both',
+            priority: rule.priority || 100,
+            is_template: rule.is_template || false,
+            template_name: rule.template_name || null,
             rule_employees: employeeRelations,
             rule_devices: deviceRelations,
             rule_positions: [],
@@ -98,18 +103,15 @@ export const useAccessRules = () => {
       
       const projectId = projectIds.length > 0 ? projectIds[0] : null;
 
-      // Create the main rule
+      // Create the main rule - use only existing columns for now
       const { data: rule, error: ruleError } = await supabase
         .from('access_rules')
         .insert([{
           name: ruleData.name,
           description: ruleData.description || null,
-          target_type: ruleData.target_type || 'individual',
           start_time: ruleData.start_time || null,
           end_time: ruleData.end_time || null,
           days: ruleData.days,
-          access_direction: ruleData.access_direction || 'both',
-          priority: ruleData.priority || 100,
           is_active: true,
           project_id: projectId,
           // Set single relations for individual rules
@@ -150,7 +152,9 @@ export const useAccessRules = () => {
       }
 
       // Execute all relation inserts
-      await Promise.all(promises);
+      if (promises.length > 0) {
+        await Promise.all(promises);
+      }
 
       return rule;
     },
@@ -273,18 +277,15 @@ export const useAccessRules = () => {
       
       const projectId = projectIds.length > 0 ? projectIds[0] : null;
 
-      // Update the main rule
+      // Update the main rule - use only existing columns for now
       const { data: rule, error: ruleError } = await supabase
         .from('access_rules')
         .update({
           name: ruleData.name,
           description: ruleData.description || null,
-          target_type: ruleData.target_type || 'individual',
           start_time: ruleData.start_time || null,
           end_time: ruleData.end_time || null,
           days: ruleData.days,
-          access_direction: ruleData.access_direction || 'both',
-          priority: ruleData.priority || 100,
           employee_id: ruleData.target_type === 'individual' && ruleData.selected_employees?.length === 1 
             ? parseInt(ruleData.selected_employees[0]) : null,
           device_id: ruleData.selected_devices?.length === 1 
@@ -326,7 +327,9 @@ export const useAccessRules = () => {
         promises.push(supabase.from('group_devices').insert(deviceRelations));
       }
 
-      await Promise.all(promises);
+      if (promises.length > 0) {
+        await Promise.all(promises);
+      }
 
       return rule;
     },

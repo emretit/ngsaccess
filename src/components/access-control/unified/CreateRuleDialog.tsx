@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
   });
 
   const [expandedDepartments, setExpandedDepartments] = useState<Set<number>>(new Set());
+  const checkboxRefs = useRef<{[key: string]: HTMLInputElement | null}>({});
 
   const { employees } = useEmployees();
   const { devices } = useDevices();
@@ -222,6 +224,18 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
     return selectedCount > 0 && selectedCount < departmentEmployeeIds.length;
   };
 
+  // Set indeterminate state for department checkboxes
+  useEffect(() => {
+    departments.forEach(department => {
+      const checkbox = checkboxRefs.current[`dept-${department.id}`];
+      if (checkbox) {
+        const isSelected = isDepartmentSelected(department.id);
+        const isPartiallySelected = isDepartmentPartiallySelected(department.id);
+        checkbox.indeterminate = isPartiallySelected && !isSelected;
+      }
+    });
+  }, [formData.selected_employees, formData.selected_departments, departments]);
+
   const renderDepartmentTree = (parentId: number | null = null, level: number = 0) => {
     const children = departments.filter(dept => dept.parent_id === parentId);
     
@@ -258,7 +272,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
               checked={isSelected}
               ref={(ref) => {
                 if (ref) {
-                  ref.indeterminate = isPartiallySelected && !isSelected;
+                  checkboxRefs.current[`dept-${department.id}`] = ref;
                 }
               }}
               onCheckedChange={(checked) => {
