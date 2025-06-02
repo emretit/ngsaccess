@@ -10,18 +10,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAccessRules } from "@/hooks/useAccessRules";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useDevices } from "@/hooks/useDevices";
 import { useDepartments } from "@/hooks/useDepartments";
+import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 
 interface CreateRuleDialogProps {
   open: boolean;
@@ -33,12 +27,13 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
   const { employees = [] } = useEmployees();
   const { devices = [] } = useDevices();
   const { departments = [] } = useDepartments();
+  const { zones = [] } = useZonesAndDoors();
 
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     selected_employees: [] as string[],
-    device_id: "",
+    selected_devices: [] as string[],
     start_time: "",
     end_time: "",
     days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as string[],
@@ -69,6 +64,21 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
   // Departmanı olmayan çalışanlar
   const unassignedEmployees = employees.filter((emp: any) => !emp.department_id);
 
+  // Cihazları bölgelerine göre grupla
+  const groupedDevices = zones.reduce((acc: any, zone: any) => {
+    const zoneDevices = devices.filter((device: any) => device.zone_id === zone.id);
+    if (zoneDevices.length > 0) {
+      acc[zone.id] = {
+        name: zone.name,
+        devices: zoneDevices
+      };
+    }
+    return acc;
+  }, {});
+
+  // Bölgesi olmayan cihazlar
+  const unassignedDevices = devices.filter((device: any) => !device.zone_id);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -77,11 +87,16 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
       ? parseInt(formData.selected_employees[0]) 
       : null;
 
+    // Eğer hiç cihaz seçilmemişse null, seçildiyse ilk seçileni al (basit implementasyon için)
+    const deviceId = formData.selected_devices.length > 0 
+      ? parseInt(formData.selected_devices[0]) 
+      : null;
+
     const ruleData = {
       name: formData.name,
       description: formData.description || null,
       employee_id: employeeId,
-      device_id: formData.device_id ? parseInt(formData.device_id) : null,
+      device_id: deviceId,
       start_time: formData.start_time || null,
       end_time: formData.end_time || null,
       days: formData.days,
@@ -96,7 +111,7 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
       name: "",
       description: "",
       selected_employees: [],
-      device_id: "",
+      selected_devices: [],
       start_time: "",
       end_time: "",
       days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
@@ -145,6 +160,38 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
       setFormData(prev => ({
         ...prev,
         selected_employees: prev.selected_employees.filter(id => !deptEmployeeIds.includes(id))
+      }));
+    }
+  };
+
+  const handleDeviceToggle = (deviceId: string, checked: boolean) => {
+    if (checked) {
+      setFormData(prev => ({
+        ...prev,
+        selected_devices: [...prev.selected_devices, deviceId]
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        selected_devices: prev.selected_devices.filter(id => id !== deviceId)
+      }));
+    }
+  };
+
+  const handleZoneToggle = (zoneId: number, checked: boolean) => {
+    const zoneDeviceIds = groupedDevices[zoneId]?.devices.map((device: any) => device.id.toString()) || [];
+    
+    if (checked) {
+      // Bölgedeki tüm cihazları seç
+      setFormData(prev => ({
+        ...prev,
+        selected_devices: [...new Set([...prev.selected_devices, ...zoneDeviceIds])]
+      }));
+    } else {
+      // Bölgedeki tüm cihazları kaldır
+      setFormData(prev => ({
+        ...prev,
+        selected_devices: prev.selected_devices.filter(id => !zoneDeviceIds.includes(id))
       }));
     }
   };
@@ -276,23 +323,100 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
             </div>
 
             <div>
-              <Label htmlFor="device">Cihaz</Label>
-              <Select 
-                value={formData.device_id} 
-                onValueChange={(value) => setFormData(prev => ({ ...prev, device_id: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Cihaz seçin (opsiyonel)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="tum-cihazlar">Tüm cihazlar</SelectItem>
-                  {devices.map((device: any) => (
-                    <SelectItem key={device.id} value={device.id.toString()}>
-                      {device.name} ({device.location})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Cihazlar ({formData.selected_devices.length} seçili)</Label>
+              <div className="border rounded-md p-4 max-h-64 overflow-y-auto bg-background">
+                {/* Tüm cihazlar seçeneği */}
+                <div className="flex items-center space-x-2 mb-3 pb-2 border-b">
+                  <Checkbox
+                    id="all-devices"
+                    checked={formData.selected_devices.length === devices.length}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setFormData(prev => ({
+                          ...prev,
+                          selected_devices: devices.map((device: any) => device.id.toString())
+                        }));
+                      } else {
+                        setFormData(prev => ({
+                          ...prev,
+                          selected_devices: []
+                        }));
+                      }
+                    }}
+                  />
+                  <Label htmlFor="all-devices" className="font-semibold">
+                    Tüm Cihazlar
+                  </Label>
+                </div>
+
+                {/* Bölgelerdeki cihazlar */}
+                {Object.entries(groupedDevices).map(([zoneId, zoneData]: [string, any]) => {
+                  const zoneDeviceIds = zoneData.devices.map((device: any) => device.id.toString());
+                  const isAllSelected = zoneDeviceIds.every((id: string) => 
+                    formData.selected_devices.includes(id)
+                  );
+                  const isSomeSelected = zoneDeviceIds.some((id: string) => 
+                    formData.selected_devices.includes(id)
+                  );
+
+                  return (
+                    <div key={zoneId} className="mb-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <Checkbox
+                          id={`zone-${zoneId}`}
+                          checked={isAllSelected}
+                          onCheckedChange={(checked) => handleZoneToggle(parseInt(zoneId), checked as boolean)}
+                          className={isSomeSelected && !isAllSelected ? "data-[state=checked]:bg-orange-500" : ""}
+                        />
+                        <Label htmlFor={`zone-${zoneId}`} className="font-medium text-green-700">
+                          🏢 {zoneData.name}
+                        </Label>
+                      </div>
+                      <div className="ml-6 space-y-1">
+                        {zoneData.devices.map((device: any) => (
+                          <div key={device.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`device-${device.id}`}
+                              checked={formData.selected_devices.includes(device.id.toString())}
+                              onCheckedChange={(checked) => 
+                                handleDeviceToggle(device.id.toString(), checked as boolean)
+                              }
+                            />
+                            <Label htmlFor={`device-${device.id}`} className="text-sm">
+                              📱 {device.name} ({device.location})
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Bölgesi olmayan cihazlar */}
+                {unassignedDevices.length > 0 && (
+                  <div className="mb-4">
+                    <Label className="font-medium text-gray-600 mb-2 block">
+                      📦 Bölgesi Olmayan Cihazlar
+                    </Label>
+                    <div className="ml-6 space-y-1">
+                      {unassignedDevices.map((device: any) => (
+                        <div key={device.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`device-${device.id}`}
+                            checked={formData.selected_devices.includes(device.id.toString())}
+                            onCheckedChange={(checked) => 
+                              handleDeviceToggle(device.id.toString(), checked as boolean)
+                            }
+                          />
+                          <Label htmlFor={`device-${device.id}`} className="text-sm">
+                            📱 {device.name} ({device.location})
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
