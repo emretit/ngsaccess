@@ -63,7 +63,7 @@ export const useAccessRules = () => {
 
           return {
             ...rule,
-            // Add default values for new fields until DB is updated
+            // Veritabanındaki yeni alanları kullan, eski kodla uyumlu kalması için fallback'ler
             target_type: rule.target_type || 'individual',
             access_direction: rule.access_direction || 'both',
             priority: rule.priority || 100,
@@ -103,12 +103,15 @@ export const useAccessRules = () => {
       
       const projectId = projectIds.length > 0 ? projectIds[0] : null;
 
-      // Create the main rule - use only existing columns for now
+      // Create the main rule - artık yeni alanları kullanabiliriz
       const { data: rule, error: ruleError } = await supabase
         .from('access_rules')
         .insert([{
           name: ruleData.name,
           description: ruleData.description || null,
+          target_type: ruleData.target_type || 'individual',
+          access_direction: ruleData.access_direction || 'both',
+          priority: ruleData.priority || 100,
           start_time: ruleData.start_time || null,
           end_time: ruleData.end_time || null,
           days: ruleData.days,
@@ -277,12 +280,15 @@ export const useAccessRules = () => {
       
       const projectId = projectIds.length > 0 ? projectIds[0] : null;
 
-      // Update the main rule - use only existing columns for now
+      // Update the main rule - artık yeni alanları kullanabiliriz
       const { data: rule, error: ruleError } = await supabase
         .from('access_rules')
         .update({
           name: ruleData.name,
           description: ruleData.description || null,
+          target_type: ruleData.target_type || 'individual',
+          access_direction: ruleData.access_direction || 'both',
+          priority: ruleData.priority || 100,
           start_time: ruleData.start_time || null,
           end_time: ruleData.end_time || null,
           days: ruleData.days,

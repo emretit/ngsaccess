@@ -164,6 +164,7 @@ export type Database = {
       }
       access_rules: {
         Row: {
+          access_direction: string | null
           created_at: string | null
           days: string[] | null
           description: string | null
@@ -172,12 +173,17 @@ export type Database = {
           end_time: string | null
           id: number
           is_active: boolean | null
+          is_template: boolean | null
           name: string
+          priority: number | null
           project_id: number | null
           start_time: string | null
+          target_type: string | null
+          template_name: string | null
           updated_at: string | null
         }
         Insert: {
+          access_direction?: string | null
           created_at?: string | null
           days?: string[] | null
           description?: string | null
@@ -186,12 +192,17 @@ export type Database = {
           end_time?: string | null
           id?: number
           is_active?: boolean | null
+          is_template?: boolean | null
           name: string
+          priority?: number | null
           project_id?: number | null
           start_time?: string | null
+          target_type?: string | null
+          template_name?: string | null
           updated_at?: string | null
         }
         Update: {
+          access_direction?: string | null
           created_at?: string | null
           days?: string[] | null
           description?: string | null
@@ -200,9 +211,13 @@ export type Database = {
           end_time?: string | null
           id?: number
           is_active?: boolean | null
+          is_template?: boolean | null
           name?: string
+          priority?: number | null
           project_id?: number | null
           start_time?: string | null
+          target_type?: string | null
+          template_name?: string | null
           updated_at?: string | null
         }
         Relationships: [
