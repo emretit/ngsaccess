@@ -27,14 +27,11 @@ export function BasicInfoFields({
   const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setName(value);
-    // Only clear error if it exists
-    setErrors(prev => {
-      if (prev.name) {
-        return { ...prev, name: "" };
-      }
-      return prev;
-    });
-  }, [setName, setErrors]);
+    // Clear name error if it exists
+    if (errors.name) {
+      setErrors(prev => ({ ...prev, name: "" }));
+    }
+  }, [setName, setErrors, errors.name]);
 
   const handleStatusChange = useCallback((checked: boolean) => {
     setIsActive(checked);
