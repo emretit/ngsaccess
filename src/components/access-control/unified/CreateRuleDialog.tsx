@@ -9,8 +9,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useDevices } from "@/hooks/useDevices";
+import { useDepartments } from "@/hooks/useDepartments";
 import { useAccessRules } from "@/hooks/useAccessRules";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronRight, ChevronDown, Users } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface CreateRuleDialogProps {
   open: boolean;
@@ -30,8 +32,11 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
     days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as string[],
   });
 
+  const [expandedDepartments, setExpandedDepartments] = useState<Set<number>>(new Set());
+
   const { employees } = useEmployees();
   const { devices } = useDevices();
+  const { departments } = useDepartments();
   const { createRule, isCreating, updateRule, isUpdating } = useAccessRules();
 
   // Reset form when dialog opens/closes or editing rule changes
@@ -110,6 +115,96 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
     }));
   };
 
+  const toggleDepartmentExpansion = (departmentId: number) => {
+    setExpandedDepartments(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(departmentId)) {
+        newSet.delete(departmentId);
+      } else {
+        newSet.add(departmentId);
+      }
+      return newSet;
+    });
+  };
+
+  const getEmployeesForDepartment = (departmentId: number) => {
+    return employees.filter(emp => emp.department_id === departmentId);
+  };
+
+  const renderDepartmentTree = (parentId: number | null = null, level: number = 0) => {
+    const children = departments.filter(dept => dept.parent_id === parentId);
+    
+    if (!children.length) return null;
+
+    return children.map(department => {
+      const hasChildren = departments.some(dept => dept.parent_id === department.id);
+      const departmentEmployees = getEmployeesForDepartment(department.id);
+      const isExpanded = expandedDepartments.has(department.id);
+      
+      return (
+        <div key={department.id} className="space-y-1">
+          <div 
+            className="flex items-center space-x-2"
+            style={{ paddingLeft: `${level * 16}px` }}
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0"
+              onClick={() => toggleDepartmentExpansion(department.id)}
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </Button>
+            
+            <Users className="h-4 w-4 text-blue-500" />
+            <Label className="text-sm font-medium cursor-pointer flex-1">
+              {department.name} ({departmentEmployees.length} çalışan)
+            </Label>
+          </div>
+          
+          {isExpanded && (
+            <div className="space-y-1">
+              {/* Departman çalışanları */}
+              {departmentEmployees.map(employee => (
+                <div 
+                  key={employee.id}
+                  className="flex items-center space-x-2"
+                  style={{ paddingLeft: `${(level + 1) * 16 + 20}px` }}
+                >
+                  <Checkbox
+                    id={`employee-${employee.id}`}
+                    checked={formData.selected_employees.includes(employee.id.toString())}
+                    onCheckedChange={(checked) => 
+                      handleEmployeeChange(employee.id.toString(), checked as boolean)
+                    }
+                  />
+                  <Label 
+                    htmlFor={`employee-${employee.id}`}
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    {employee.first_name} {employee.last_name}
+                  </Label>
+                </div>
+              ))}
+              
+              {/* Alt departmanlar */}
+              {hasChildren && renderDepartmentTree(department.id, level + 1)}
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
+
+  // Departmanı olmayan çalışanlar
+  const getEmployeesWithoutDepartment = () => {
+    return employees.filter(emp => !emp.department_id);
+  };
+
   const weekDays = [
     { value: 'Monday', label: 'Pazartesi' },
     { value: 'Tuesday', label: 'Salı' },
@@ -120,9 +215,11 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
     { value: 'Sunday', label: 'Pazar' },
   ];
 
+  const orphanEmployees = getEmployeesWithoutDepartment();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {editingRule ? 'Erişim Kuralını Düzenle' : 'Yeni Erişim Kuralı'}
@@ -156,31 +253,44 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
 
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-3">
-              <Label>Çalışanlar</Label>
-              <div className="border rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
-                {employees.map((employee) => (
-                  <div key={employee.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`employee-${employee.id}`}
-                      checked={formData.selected_employees.includes(employee.id.toString())}
-                      onCheckedChange={(checked) => 
-                        handleEmployeeChange(employee.id.toString(), checked as boolean)
-                      }
-                    />
-                    <Label 
-                      htmlFor={`employee-${employee.id}`}
-                      className="text-sm font-normal cursor-pointer"
-                    >
-                      {employee.first_name} {employee.last_name}
-                    </Label>
+              <Label>Çalışanlar (Departmanlar)</Label>
+              <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-1">
+                {renderDepartmentTree()}
+                
+                {/* Departmanı olmayan çalışanlar */}
+                {orphanEmployees.length > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Users className="h-4 w-4 text-gray-500" />
+                      <Label className="text-sm font-medium text-gray-700">
+                        Departmanı Olmayan Çalışanlar ({orphanEmployees.length})
+                      </Label>
+                    </div>
+                    {orphanEmployees.map(employee => (
+                      <div key={employee.id} className="flex items-center space-x-2 ml-6">
+                        <Checkbox
+                          id={`orphan-employee-${employee.id}`}
+                          checked={formData.selected_employees.includes(employee.id.toString())}
+                          onCheckedChange={(checked) => 
+                            handleEmployeeChange(employee.id.toString(), checked as boolean)
+                          }
+                        />
+                        <Label 
+                          htmlFor={`orphan-employee-${employee.id}`}
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          {employee.first_name} {employee.last_name}
+                        </Label>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
             <div className="space-y-3">
               <Label>Cihazlar</Label>
-              <div className="border rounded-lg p-3 max-h-40 overflow-y-auto space-y-2">
+              <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
                 {devices.map((device) => (
                   <div key={device.id} className="flex items-center space-x-2">
                     <Checkbox
