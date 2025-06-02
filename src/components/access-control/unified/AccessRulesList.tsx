@@ -84,7 +84,7 @@ const AccessRulesList = ({ onCreateRule }: AccessRulesListProps) => {
       return (
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-blue-500" />
-          <span className="text-sm text-gray-500">Tüm çalışanlar</span>
+          <span className="text-sm text-gray-500">Çalışan seçilmemiş</span>
         </div>
       );
     }
@@ -98,12 +98,16 @@ const AccessRulesList = ({ onCreateRule }: AccessRulesListProps) => {
       );
     }
 
+    const firstEmployee = employees[0];
     return (
       <div className="flex items-center gap-2">
         <Users className="h-4 w-4 text-blue-500" />
-        <Badge variant="secondary" className="text-xs">
-          {employees.length} çalışan
-        </Badge>
+        <div className="flex flex-col">
+          <span className="text-sm">{firstEmployee.first_name} {firstEmployee.last_name}</span>
+          <Badge variant="secondary" className="text-xs mt-1 w-fit">
+            +{employees.length - 1} diğer çalışan
+          </Badge>
+        </div>
       </div>
     );
   };
@@ -115,7 +119,7 @@ const AccessRulesList = ({ onCreateRule }: AccessRulesListProps) => {
       return (
         <div className="flex items-center gap-2">
           <Monitor className="h-4 w-4 text-green-500" />
-          <span className="text-sm text-gray-500">Tüm cihazlar</span>
+          <span className="text-sm text-gray-500">Cihaz seçilmemiş</span>
         </div>
       );
     }
@@ -129,12 +133,16 @@ const AccessRulesList = ({ onCreateRule }: AccessRulesListProps) => {
       );
     }
 
+    const firstDevice = devices[0];
     return (
       <div className="flex items-center gap-2">
         <Monitor className="h-4 w-4 text-green-500" />
-        <Badge variant="secondary" className="text-xs">
-          {devices.length} cihaz
-        </Badge>
+        <div className="flex flex-col">
+          <span className="text-sm">{firstDevice.name}</span>
+          <Badge variant="secondary" className="text-xs mt-1 w-fit">
+            +{devices.length - 1} diğer cihaz
+          </Badge>
+        </div>
       </div>
     );
   };
@@ -240,7 +248,7 @@ const AccessRulesList = ({ onCreateRule }: AccessRulesListProps) => {
                                       </div>
                                     ))
                                   ) : (
-                                    <div className="text-sm text-gray-500">Tüm çalışanlar</div>
+                                    <div className="text-sm text-gray-500">Çalışan seçilmemiş</div>
                                   )}
                                 </div>
                               </div>
@@ -255,7 +263,7 @@ const AccessRulesList = ({ onCreateRule }: AccessRulesListProps) => {
                                       </div>
                                     ))
                                   ) : (
-                                    <div className="text-sm text-gray-500">Tüm cihazlar</div>
+                                    <div className="text-sm text-gray-500">Cihaz seçilmemiş</div>
                                   )}
                                 </div>
                               </div>

@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
@@ -13,7 +12,7 @@ export const useAccessRules = () => {
   const { data: rules = [], isLoading } = useQuery({
     queryKey: ['access-rules'],
     queryFn: async () => {
-      console.log('Fetching access rules...');
+      console.log('Fetching access rules with multiple relations...');
       const { data, error } = await supabase
         .from('access_rules')
         .select('*')
@@ -27,31 +26,71 @@ export const useAccessRules = () => {
       // Her kural için ilişkili çalışanları ve cihazları getir
       const rulesWithRelations = await Promise.all(
         (data || []).map(async (rule) => {
-          // Çalışan ilişkilerini getir
-          const { data: employees, error: empError } = await supabase
-            .from('employees')
-            .select('id, first_name, last_name')
-            .eq('id', rule.employee_id || 0);
+          // Çoklu çalışan ilişkilerini getir
+          const { data: employeeRelations, error: empError } = await supabase
+            .from('group_members')
+            .select(`
+              employees:employee_id (
+                id,
+                first_name,
+                last_name
+              )
+            `)
+            .eq('group_id', rule.id);
 
-          // Cihaz ilişkilerini getir
-          const { data: devices, error: deviceError } = await supabase
-            .from('devices')
-            .select('id, name, location')
-            .eq('id', rule.device_id || 0);
+          // Çoklu cihaz ilişkilerini getir  
+          const { data: deviceRelations, error: deviceError } = await supabase
+            .from('group_devices')
+            .select(`
+              devices:device_id (
+                id,
+                name,
+                location
+              )
+            `)
+            .eq('group_id', rule.id);
 
-          if (empError) console.error('Error fetching employees:', empError);
-          if (deviceError) console.error('Error fetching devices:', deviceError);
+          if (empError) console.error('Error fetching employee relations:', empError);
+          if (deviceError) console.error('Error fetching device relations:', deviceError);
+
+          // Fallback: Eğer group tabloları boşsa, tekil değerleri kullan
+          let finalEmployeeRelations = employeeRelations || [];
+          let finalDeviceRelations = deviceRelations || [];
+
+          if (finalEmployeeRelations.length === 0 && rule.employee_id) {
+            const { data: singleEmployee } = await supabase
+              .from('employees')
+              .select('id, first_name, last_name')
+              .eq('id', rule.employee_id)
+              .single();
+            
+            if (singleEmployee) {
+              finalEmployeeRelations = [{ employees: singleEmployee }];
+            }
+          }
+
+          if (finalDeviceRelations.length === 0 && rule.device_id) {
+            const { data: singleDevice } = await supabase
+              .from('devices')
+              .select('id, name, location')
+              .eq('id', rule.device_id)
+              .single();
+            
+            if (singleDevice) {
+              finalDeviceRelations = [{ devices: singleDevice }];
+            }
+          }
 
           return {
             ...rule,
-            rule_employees: (employees || []).map(emp => ({ employees: emp })),
-            rule_devices: (devices || []).map(dev => ({ devices: dev })),
+            rule_employees: finalEmployeeRelations,
+            rule_devices: finalDeviceRelations,
             rule_departments: [],
           };
         })
       );
 
-      console.log('Access rules with relationships fetched:', rulesWithRelations);
+      console.log('Access rules with multiple relationships fetched:', rulesWithRelations);
       return rulesWithRelations;
     },
   });
@@ -66,17 +105,9 @@ export const useAccessRules = () => {
       end_time?: string;
       days: string[];
     }) => {
-      console.log('Creating access rule:', ruleData);
+      console.log('Creating access rule with multiple selections:', ruleData);
       
       const projectId = projectIds.length > 0 ? projectIds[0] : null;
-      
-      // Şimdilik sadece ilk seçilen çalışan ve cihazla çalışalım
-      const firstEmployeeId = ruleData.selected_employees.length > 0 
-        ? parseInt(ruleData.selected_employees[0]) 
-        : null;
-      const firstDeviceId = ruleData.selected_devices.length > 0 
-        ? parseInt(ruleData.selected_devices[0]) 
-        : null;
 
       // Ana kuralı oluştur
       const { data: rule, error: ruleError } = await supabase
@@ -84,13 +115,14 @@ export const useAccessRules = () => {
         .insert([{
           name: ruleData.name,
           description: ruleData.description || null,
-          employee_id: firstEmployeeId,
-          device_id: firstDeviceId,
           start_time: ruleData.start_time || null,
           end_time: ruleData.end_time || null,
           days: ruleData.days,
           is_active: true,
           project_id: projectId,
+          // Çoklu seçim kullanıyorsak tekil alanları null bırak
+          employee_id: ruleData.selected_employees.length === 1 ? parseInt(ruleData.selected_employees[0]) : null,
+          device_id: ruleData.selected_devices.length === 1 ? parseInt(ruleData.selected_devices[0]) : null,
         }])
         .select()
         .single();
@@ -101,6 +133,43 @@ export const useAccessRules = () => {
       }
 
       console.log('Rule created:', rule);
+
+      // Çoklu çalışan ilişkilerini ekle (eğer birden fazla seçilmişse)
+      if (ruleData.selected_employees.length > 1) {
+        const employeeRelations = ruleData.selected_employees.map(empId => ({
+          group_id: rule.id,
+          employee_id: parseInt(empId),
+          project_id: projectId
+        }));
+
+        const { error: empError } = await supabase
+          .from('group_members')
+          .insert(employeeRelations);
+
+        if (empError) {
+          console.error('Error creating employee relations:', empError);
+          throw empError;
+        }
+      }
+
+      // Çoklu cihaz ilişkilerini ekle (eğer birden fazla seçilmişse)
+      if (ruleData.selected_devices.length > 1) {
+        const deviceRelations = ruleData.selected_devices.map(deviceId => ({
+          group_id: rule.id,
+          device_id: parseInt(deviceId),
+          project_id: projectId
+        }));
+
+        const { error: deviceError } = await supabase
+          .from('group_devices')
+          .insert(deviceRelations);
+
+        if (deviceError) {
+          console.error('Error creating device relations:', deviceError);
+          throw deviceError;
+        }
+      }
+
       return rule;
     },
     onSuccess: () => {
