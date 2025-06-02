@@ -37,7 +37,7 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    employee_id: "",
+    selected_employees: [] as string[],
     device_id: "",
     start_time: "",
     end_time: "",
@@ -54,14 +54,28 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
     { value: 'Sunday', label: 'Pazar' },
   ];
 
+  // Çalışanları departmanlarına göre grupla
+  const groupedEmployees = departments.reduce((acc: any, department: any) => {
+    const deptEmployees = employees.filter((emp: any) => emp.department_id === department.id);
+    if (deptEmployees.length > 0) {
+      acc[department.id] = {
+        name: department.name,
+        employees: deptEmployees
+      };
+    }
+    return acc;
+  }, {});
+
+  // Departmanı olmayan çalışanlar
+  const unassignedEmployees = employees.filter((emp: any) => !emp.department_id);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Eğer departman seçildiyse, employee_id'yi null yap
-    let employeeId = null;
-    if (formData.employee_id && !formData.employee_id.startsWith('dept-')) {
-      employeeId = parseInt(formData.employee_id);
-    }
+    // Eğer hiç çalışan seçilmemişse null, seçildiyse ilk seçileni al (basit implementasyon için)
+    const employeeId = formData.selected_employees.length > 0 
+      ? parseInt(formData.selected_employees[0]) 
+      : null;
 
     const ruleData = {
       name: formData.name,
@@ -81,7 +95,7 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
     setFormData({
       name: "",
       description: "",
-      employee_id: "",
+      selected_employees: [],
       device_id: "",
       start_time: "",
       end_time: "",
@@ -103,9 +117,41 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
     }
   };
 
+  const handleEmployeeToggle = (employeeId: string, checked: boolean) => {
+    if (checked) {
+      setFormData(prev => ({
+        ...prev,
+        selected_employees: [...prev.selected_employees, employeeId]
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        selected_employees: prev.selected_employees.filter(id => id !== employeeId)
+      }));
+    }
+  };
+
+  const handleDepartmentToggle = (departmentId: number, checked: boolean) => {
+    const deptEmployeeIds = groupedEmployees[departmentId]?.employees.map((emp: any) => emp.id.toString()) || [];
+    
+    if (checked) {
+      // Departmandaki tüm çalışanları seç
+      setFormData(prev => ({
+        ...prev,
+        selected_employees: [...new Set([...prev.selected_employees, ...deptEmployeeIds])]
+      }));
+    } else {
+      // Departmandaki tüm çalışanları kaldır
+      setFormData(prev => ({
+        ...prev,
+        selected_employees: prev.selected_employees.filter(id => !deptEmployeeIds.includes(id))
+      }));
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Yeni Erişim Kuralı</DialogTitle>
         </DialogHeader>
@@ -133,34 +179,100 @@ const CreateRuleDialog = ({ open, onOpenChange }: CreateRuleDialogProps) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="employee">Çalışan / Departman</Label>
-              <Select 
-                value={formData.employee_id} 
-                onValueChange={(value) => setFormData(prev => ({ ...prev, employee_id: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seçin (opsiyonel)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="tum-calisanlar">Tüm çalışanlar</SelectItem>
-                  
-                  {departments.length > 0 && (
-                    <>
-                      {departments.map((department: any) => (
-                        <SelectItem key={`dept-${department.id}`} value={`dept-${department.id}`}>
-                          📁 {department.name} (Departman)
-                        </SelectItem>
+              <Label>Çalışanlar ({formData.selected_employees.length} seçili)</Label>
+              <div className="border rounded-md p-4 max-h-64 overflow-y-auto bg-background">
+                {/* Tüm çalışanlar seçeneği */}
+                <div className="flex items-center space-x-2 mb-3 pb-2 border-b">
+                  <Checkbox
+                    id="all-employees"
+                    checked={formData.selected_employees.length === employees.length}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setFormData(prev => ({
+                          ...prev,
+                          selected_employees: employees.map((emp: any) => emp.id.toString())
+                        }));
+                      } else {
+                        setFormData(prev => ({
+                          ...prev,
+                          selected_employees: []
+                        }));
+                      }
+                    }}
+                  />
+                  <Label htmlFor="all-employees" className="font-semibold">
+                    Tüm Çalışanlar
+                  </Label>
+                </div>
+
+                {/* Departmanlı çalışanlar */}
+                {Object.entries(groupedEmployees).map(([deptId, deptData]: [string, any]) => {
+                  const deptEmployeeIds = deptData.employees.map((emp: any) => emp.id.toString());
+                  const isAllSelected = deptEmployeeIds.every((id: string) => 
+                    formData.selected_employees.includes(id)
+                  );
+                  const isSomeSelected = deptEmployeeIds.some((id: string) => 
+                    formData.selected_employees.includes(id)
+                  );
+
+                  return (
+                    <div key={deptId} className="mb-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <Checkbox
+                          id={`dept-${deptId}`}
+                          checked={isAllSelected}
+                          onCheckedChange={(checked) => handleDepartmentToggle(parseInt(deptId), checked as boolean)}
+                          className={isSomeSelected && !isAllSelected ? "data-[state=checked]:bg-orange-500" : ""}
+                        />
+                        <Label htmlFor={`dept-${deptId}`} className="font-medium text-blue-700">
+                          📁 {deptData.name}
+                        </Label>
+                      </div>
+                      <div className="ml-6 space-y-1">
+                        {deptData.employees.map((employee: any) => (
+                          <div key={employee.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`emp-${employee.id}`}
+                              checked={formData.selected_employees.includes(employee.id.toString())}
+                              onCheckedChange={(checked) => 
+                                handleEmployeeToggle(employee.id.toString(), checked as boolean)
+                              }
+                            />
+                            <Label htmlFor={`emp-${employee.id}`} className="text-sm">
+                              👤 {employee.first_name} {employee.last_name}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Departmanı olmayan çalışanlar */}
+                {unassignedEmployees.length > 0 && (
+                  <div className="mb-4">
+                    <Label className="font-medium text-gray-600 mb-2 block">
+                      📂 Departmanı Olmayan Çalışanlar
+                    </Label>
+                    <div className="ml-6 space-y-1">
+                      {unassignedEmployees.map((employee: any) => (
+                        <div key={employee.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`emp-${employee.id}`}
+                            checked={formData.selected_employees.includes(employee.id.toString())}
+                            onCheckedChange={(checked) => 
+                              handleEmployeeToggle(employee.id.toString(), checked as boolean)
+                            }
+                          />
+                          <Label htmlFor={`emp-${employee.id}`} className="text-sm">
+                            👤 {employee.first_name} {employee.last_name}
+                          </Label>
+                        </div>
                       ))}
-                    </>
-                  )}
-                  
-                  {employees.map((employee: any) => (
-                    <SelectItem key={employee.id} value={employee.id.toString()}>
-                      👤 {employee.first_name} {employee.last_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div>
