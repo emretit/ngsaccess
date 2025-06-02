@@ -3,10 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { AccessRule } from '@/types/access-control';
+import { useProjectAccess } from './useProjectAccess';
 
 export const useAccessRules = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { projectIds } = useProjectAccess();
 
   const { data: rules = [], isLoading } = useQuery({
     queryKey: ['access-rules'],
@@ -34,9 +36,18 @@ export const useAccessRules = () => {
   const createRuleMutation = useMutation({
     mutationFn: async (newRule: Omit<AccessRule, 'id' | 'created_at' | 'updated_at'>) => {
       console.log('Creating access rule:', newRule);
+      
+      // Eğer project_id belirtilmemişse, kullanıcının ilk projesini kullan
+      const ruleWithProject = {
+        ...newRule,
+        project_id: newRule.project_id || (projectIds.length > 0 ? projectIds[0] : null)
+      };
+      
+      console.log('Rule with project ID:', ruleWithProject);
+      
       const { data, error } = await supabase
         .from('access_rules')
-        .insert([newRule])
+        .insert([ruleWithProject])
         .select()
         .single();
 
