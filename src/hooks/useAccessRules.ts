@@ -52,59 +52,78 @@ export const useAccessRules = () => {
       const enrichedRules = await Promise.all(
         rulesData.map(async (rule) => {
           // Fetch departments
-          const { data: departments } = await supabase
+          const { data: departmentRels } = await supabase
             .from('access_rule_departments')
-            .select(`
-              department_id,
-              departments (id, name)
-            `)
+            .select('department_id')
             .eq('rule_id', rule.id);
+
+          let departments: Array<{ id: number; name: string }> = [];
+          if (departmentRels && departmentRels.length > 0) {
+            const deptIds = departmentRels.map(rel => rel.department_id);
+            const { data: deptData } = await supabase
+              .from('departments')
+              .select('id, name')
+              .in('id', deptIds);
+            departments = deptData || [];
+          }
 
           // Fetch employees
-          const { data: employees } = await supabase
+          const { data: employeeRels } = await supabase
             .from('access_rule_employees')
-            .select(`
-              employee_id,
-              employees (id, first_name, last_name)
-            `)
+            .select('employee_id')
             .eq('rule_id', rule.id);
+
+          let employees: Array<{ id: number; name: string }> = [];
+          if (employeeRels && employeeRels.length > 0) {
+            const empIds = employeeRels.map(rel => rel.employee_id);
+            const { data: empData } = await supabase
+              .from('employees')
+              .select('id, first_name, last_name')
+              .in('id', empIds);
+            employees = (empData || []).map(emp => ({
+              id: emp.id,
+              name: `${emp.first_name} ${emp.last_name}`.trim()
+            }));
+          }
 
           // Fetch zones
-          const { data: zones } = await supabase
+          const { data: zoneRels } = await supabase
             .from('access_rule_zones')
-            .select(`
-              zone_id,
-              zones (id, name)
-            `)
+            .select('zone_id')
             .eq('rule_id', rule.id);
 
+          let zones: Array<{ id: number; name: string }> = [];
+          if (zoneRels && zoneRels.length > 0) {
+            const zoneIds = zoneRels.map(rel => rel.zone_id);
+            const { data: zoneData } = await supabase
+              .from('zones')
+              .select('id, name')
+              .in('id', zoneIds);
+            zones = zoneData || [];
+          }
+
           // Fetch doors
-          const { data: doors } = await supabase
+          const { data: doorRels } = await supabase
             .from('access_rule_doors')
-            .select(`
-              door_id,
-              doors (id, name)
-            `)
+            .select('door_id')
             .eq('rule_id', rule.id);
+
+          let doors: Array<{ id: number; name: string }> = [];
+          if (doorRels && doorRels.length > 0) {
+            const doorIds = doorRels.map(rel => rel.door_id);
+            const { data: doorData } = await supabase
+              .from('doors')
+              .select('id, name')
+              .in('id', doorIds);
+            doors = doorData || [];
+          }
 
           return {
             ...rule,
-            departments: departments?.map(d => ({ 
-              id: d.departments?.id || 0, 
-              name: d.departments?.name || '' 
-            })) || [],
-            employees: employees?.map(e => ({ 
-              id: e.employees?.id || 0, 
-              name: `${e.employees?.first_name || ''} ${e.employees?.last_name || ''}`.trim() 
-            })) || [],
-            zones: zones?.map(z => ({ 
-              id: z.zones?.id || 0, 
-              name: z.zones?.name || '' 
-            })) || [],
-            doors: doors?.map(d => ({ 
-              id: d.doors?.id || 0, 
-              name: d.doors?.name || '' 
-            })) || []
+            departments,
+            employees,
+            zones,
+            doors
           };
         })
       );
