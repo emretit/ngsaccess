@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,6 +79,8 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('Submitting form with data:', formData);
+    
     if (editingRule) {
       updateRule({
         id: editingRule.id,
@@ -92,6 +94,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
   };
 
   const handleEmployeeChange = (employeeId: string, checked: boolean) => {
+    console.log('Employee change:', employeeId, checked);
     setFormData(prev => ({
       ...prev,
       selected_employees: checked 
@@ -101,6 +104,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
   };
 
   const handleDepartmentChange = (departmentId: string, checked: boolean) => {
+    console.log('Department change:', departmentId, checked);
     const departmentEmployees = getEmployeesForDepartment(parseInt(departmentId));
     const employeeIds = departmentEmployees.map(emp => emp.id.toString());
     
@@ -162,6 +166,32 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
     return selectedCount > 0 && selectedCount < departmentEmployeeIds.length;
   };
 
+  const DepartmentCheckbox = ({ departmentId }: { departmentId: number }) => {
+    const checkboxRef = useRef<HTMLButtonElement>(null);
+    const isSelected = isDepartmentSelected(departmentId);
+    const isPartiallySelected = isDepartmentPartiallySelected(departmentId);
+
+    useEffect(() => {
+      if (checkboxRef.current) {
+        const element = checkboxRef.current.querySelector('input[type="checkbox"]') as HTMLInputElement;
+        if (element) {
+          element.indeterminate = isPartiallySelected && !isSelected;
+        }
+      }
+    }, [isPartiallySelected, isSelected]);
+
+    return (
+      <Checkbox
+        ref={checkboxRef}
+        id={`dept-${departmentId}`}
+        checked={isSelected}
+        onCheckedChange={(checked) => 
+          handleDepartmentChange(departmentId.toString(), checked as boolean)
+        }
+      />
+    );
+  };
+
   const renderDepartmentTree = (parentId: number | null = null, level: number = 0) => {
     const children = departments.filter(dept => dept.parent_id === parentId);
     
@@ -171,8 +201,6 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
       const hasChildren = departments.some(dept => dept.parent_id === department.id);
       const departmentEmployees = getEmployeesForDepartment(department.id);
       const isExpanded = expandedDepartments.has(department.id);
-      const isSelected = isDepartmentSelected(department.id);
-      const isPartiallySelected = isDepartmentPartiallySelected(department.id);
       
       return (
         <div key={department.id} className="space-y-1">
@@ -193,18 +221,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
               )}
             </Button>
             
-            <Checkbox
-              id={`dept-${department.id}`}
-              checked={isSelected}
-              ref={(el) => {
-                if (el && isPartiallySelected && !isSelected) {
-                  el.indeterminate = true;
-                }
-              }}
-              onCheckedChange={(checked) => 
-                handleDepartmentChange(department.id.toString(), checked as boolean)
-              }
-            />
+            <DepartmentCheckbox departmentId={department.id} />
             
             <Users className="h-4 w-4 text-blue-500" />
             <Label 
