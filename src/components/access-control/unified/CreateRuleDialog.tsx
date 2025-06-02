@@ -208,35 +208,6 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
     return selectedCount > 0 && selectedCount < departmentEmployeeIds.length;
   };
 
-  const DepartmentCheckbox = ({ departmentId }: { departmentId: number }) => {
-    const checkboxRef = useRef<HTMLButtonElement>(null);
-    const isSelected = isDepartmentSelected(departmentId);
-    const isPartiallySelected = isDepartmentPartiallySelected(departmentId);
-
-    console.log(`Department ${departmentId} - Selected: ${isSelected}, Partially: ${isPartiallySelected}`);
-
-    useEffect(() => {
-      if (checkboxRef.current) {
-        const element = checkboxRef.current.querySelector('input[type="checkbox"]') as HTMLInputElement;
-        if (element) {
-          element.indeterminate = isPartiallySelected && !isSelected;
-        }
-      }
-    }, [isPartiallySelected, isSelected]);
-
-    return (
-      <Checkbox
-        ref={checkboxRef}
-        id={`dept-${departmentId}`}
-        checked={isSelected}
-        onCheckedChange={(checked) => {
-          console.log(`Department checkbox ${departmentId} changed to:`, checked);
-          handleDepartmentChange(departmentId.toString(), checked as boolean);
-        }}
-      />
-    );
-  };
-
   const renderDepartmentTree = (parentId: number | null = null, level: number = 0) => {
     const children = departments.filter(dept => dept.parent_id === parentId);
     
@@ -246,6 +217,8 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
       const hasChildren = departments.some(dept => dept.parent_id === department.id);
       const departmentEmployees = getEmployeesForDepartment(department.id);
       const isExpanded = expandedDepartments.has(department.id);
+      const isSelected = isDepartmentSelected(department.id);
+      const isPartiallySelected = isDepartmentPartiallySelected(department.id);
       
       return (
         <div key={department.id} className="space-y-1">
@@ -266,7 +239,19 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
               )}
             </Button>
             
-            <DepartmentCheckbox departmentId={department.id} />
+            <Checkbox
+              id={`dept-${department.id}`}
+              checked={isSelected}
+              ref={(ref) => {
+                if (ref) {
+                  ref.indeterminate = isPartiallySelected && !isSelected;
+                }
+              }}
+              onCheckedChange={(checked) => {
+                console.log(`Department checkbox ${department.id} changed to:`, checked);
+                handleDepartmentChange(department.id.toString(), Boolean(checked));
+              }}
+            />
             
             <Users className="h-4 w-4 text-blue-500" />
             <Label 
@@ -289,9 +274,10 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
                   <Checkbox
                     id={`employee-${employee.id}`}
                     checked={formData.selected_employees.includes(employee.id.toString())}
-                    onCheckedChange={(checked) => 
-                      handleEmployeeChange(employee.id.toString(), checked as boolean)
-                    }
+                    onCheckedChange={(checked) => {
+                      console.log(`Employee ${employee.id} changed to:`, checked);
+                      handleEmployeeChange(employee.id.toString(), Boolean(checked));
+                    }}
                   />
                   <User className="h-3 w-3 text-gray-500" />
                   <Label 
@@ -394,7 +380,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
                           checked={formData.selected_employees.includes(employee.id.toString())}
                           onCheckedChange={(checked) => {
                             console.log(`Orphan employee ${employee.id} changed to:`, checked);
-                            handleEmployeeChange(employee.id.toString(), checked as boolean);
+                            handleEmployeeChange(employee.id.toString(), Boolean(checked));
                           }}
                         />
                         <User className="h-3 w-3 text-gray-500" />
@@ -420,7 +406,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
                       id={`device-${device.id}`}
                       checked={formData.selected_devices.includes(device.id.toString())}
                       onCheckedChange={(checked) => 
-                        handleDeviceChange(device.id.toString(), checked as boolean)
+                        handleDeviceChange(device.id.toString(), Boolean(checked))
                       }
                     />
                     <Label 
