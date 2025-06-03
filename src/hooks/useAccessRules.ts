@@ -103,7 +103,7 @@ export const useAccessRules = () => {
       
       const projectId = projectIds.length > 0 ? projectIds[0] : null;
 
-      // Create the main rule - artık yeni alanları kullanabiliriz
+      // Create the main rule - updated logic for multiple employees
       const { data: rule, error: ruleError } = await supabase
         .from('access_rules')
         .insert([{
@@ -117,8 +117,8 @@ export const useAccessRules = () => {
           days: ruleData.days,
           is_active: true,
           project_id: projectId,
-          // Set single relations for individual rules
-          employee_id: ruleData.target_type === 'individual' && ruleData.selected_employees?.length === 1 
+          // Only set single employee_id if there's exactly one employee selected
+          employee_id: ruleData.selected_employees?.length === 1 
             ? parseInt(ruleData.selected_employees[0]) : null,
           device_id: ruleData.selected_devices?.length === 1 
             ? parseInt(ruleData.selected_devices[0]) : null,
@@ -131,17 +131,20 @@ export const useAccessRules = () => {
         throw ruleError;
       }
 
-      // Create junction table relations
+      // Create junction table relations for multiple employees
       const promises = [];
 
-      // Employee relations for department rules
-      if (ruleData.target_type === 'department' && ruleData.selected_employees?.length) {
-        const employeeRelations = ruleData.selected_employees.map(empId => ({
-          group_id: rule.id,
-          employee_id: parseInt(empId),
-          project_id: projectId
-        }));
-        promises.push(supabase.from('group_members').insert(employeeRelations));
+      // For individual rules with multiple employees OR department rules
+      if (ruleData.selected_employees?.length) {
+        // If more than one employee OR it's a department rule, use group_members
+        if (ruleData.selected_employees.length > 1 || ruleData.target_type === 'department') {
+          const employeeRelations = ruleData.selected_employees.map(empId => ({
+            group_id: rule.id,
+            employee_id: parseInt(empId),
+            project_id: projectId
+          }));
+          promises.push(supabase.from('group_members').insert(employeeRelations));
+        }
       }
 
       // Device relations (for multiple devices)
@@ -280,7 +283,7 @@ export const useAccessRules = () => {
       
       const projectId = projectIds.length > 0 ? projectIds[0] : null;
 
-      // Update the main rule - artık yeni alanları kullanabiliriz
+      // Update the main rule - updated logic for multiple employees
       const { data: rule, error: ruleError } = await supabase
         .from('access_rules')
         .update({
@@ -292,7 +295,8 @@ export const useAccessRules = () => {
           start_time: ruleData.start_time || null,
           end_time: ruleData.end_time || null,
           days: ruleData.days,
-          employee_id: ruleData.target_type === 'individual' && ruleData.selected_employees?.length === 1 
+          // Only set single employee_id if there's exactly one employee selected
+          employee_id: ruleData.selected_employees?.length === 1 
             ? parseInt(ruleData.selected_employees[0]) : null,
           device_id: ruleData.selected_devices?.length === 1 
             ? parseInt(ruleData.selected_devices[0]) : null,
@@ -312,16 +316,19 @@ export const useAccessRules = () => {
         supabase.from('group_devices').delete().eq('group_id', id),
       ]);
 
-      // Recreate relations (same logic as create)
+      // Recreate relations with updated logic
       const promises = [];
 
-      if (ruleData.target_type === 'department' && ruleData.selected_employees?.length) {
-        const employeeRelations = ruleData.selected_employees.map(empId => ({
-          group_id: rule.id,
-          employee_id: parseInt(empId),
-          project_id: projectId
-        }));
-        promises.push(supabase.from('group_members').insert(employeeRelations));
+      if (ruleData.selected_employees?.length) {
+        // If more than one employee OR it's a department rule, use group_members
+        if (ruleData.selected_employees.length > 1 || ruleData.target_type === 'department') {
+          const employeeRelations = ruleData.selected_employees.map(empId => ({
+            group_id: rule.id,
+            employee_id: parseInt(empId),
+            project_id: projectId
+          }));
+          promises.push(supabase.from('group_members').insert(employeeRelations));
+        }
       }
 
       if (ruleData.selected_devices && ruleData.selected_devices.length > 1) {

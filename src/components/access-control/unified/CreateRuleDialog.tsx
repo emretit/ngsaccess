@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -100,8 +99,8 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
       return;
     }
 
-    if (formData.target_type === 'individual' && formData.selected_employees.length === 0) {
-      console.error('NO EMPLOYEES SELECTED FOR INDIVIDUAL RULE!');
+    if (formData.selected_employees.length === 0 && formData.target_type !== 'all') {
+      console.error('NO EMPLOYEES SELECTED!');
       alert('Lütfen en az bir çalışan seçin.');
       return;
     }
@@ -363,7 +362,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
                   <SelectValue placeholder="Hedef türünü seçin" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="individual">Bireysel</SelectItem>
+                  <SelectItem value="individual">Bireysel (Çoklu Seçim)</SelectItem>
                   <SelectItem value="department">Departman</SelectItem>
                   <SelectItem value="all">Tüm Çalışanlar</SelectItem>
                 </SelectContent>
@@ -385,7 +384,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
           <div className="grid grid-cols-2 gap-6">
             <div className="space-y-3">
               <Label>
-                {formData.target_type === 'individual' ? 'Çalışanlar (Departmanlar)' : 
+                {formData.target_type === 'individual' ? 'Çalışanlar (Çoklu Seçim Yapabilirsiniz)' : 
                  formData.target_type === 'department' ? 'Departmanlar' : 
                  'Hedefler'}
               </Label>
