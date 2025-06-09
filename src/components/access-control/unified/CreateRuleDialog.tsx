@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useDevices } from "@/hooks/useDevices";
 import { useDepartments } from "@/hooks/useDepartments";
@@ -35,6 +34,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
   });
 
   const [expandedDepartments, setExpandedDepartments] = useState<Set<number>>(new Set());
+  const [expandedZones, setExpandedZones] = useState<Set<number>>(new Set());
 
   const { employees } = useEmployees();
   const { devices } = useDevices();
@@ -99,23 +99,13 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
       return;
     }
     
-    // Convert form data to API format with default values
-    const ruleData = {
-      ...formData,
-      target_type: 'individual', // Default value
-      access_direction: 'both', // Default value
-      priority: 100, // Default value
-      selected_positions: [], // Empty array for compatibility
-      selected_doors: [], // Empty array for compatibility
-    };
-    
     if (editingRule) {
       updateRule({
         id: editingRule.id,
-        ruleData
+        ruleData: formData
       });
     } else {
-      createRule(ruleData);
+      createRule(formData);
     }
     
     onClose();
@@ -165,12 +155,25 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
   };
 
   const handleZoneChange = (zoneId: string, checked: boolean) => {
-    setFormData(prev => ({
-      ...prev,
-      selected_zones: checked 
+    // Bölge seçildiğinde o bölgedeki tüm cihazları da seç
+    const zoneDevices = devices.filter(device => device.zone_id?.toString() === zoneId);
+    const zoneDeviceIds = zoneDevices.map(device => device.id.toString());
+    
+    setFormData(prev => {
+      const newZones = checked 
         ? [...prev.selected_zones, zoneId]
-        : prev.selected_zones.filter(id => id !== zoneId)
-    }));
+        : prev.selected_zones.filter(id => id !== zoneId);
+      
+      const newDevices = checked
+        ? [...new Set([...prev.selected_devices, ...zoneDeviceIds])]
+        : prev.selected_devices.filter(id => !zoneDeviceIds.includes(id));
+      
+      return {
+        ...prev,
+        selected_zones: newZones,
+        selected_devices: newDevices
+      };
+    });
   };
 
   const handleDayChange = (day: string, checked: boolean) => {
@@ -194,12 +197,32 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
     });
   };
 
+  const toggleZoneExpansion = (zoneId: number) => {
+    setExpandedZones(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(zoneId)) {
+        newSet.delete(zoneId);
+      } else {
+        newSet.add(zoneId);
+      }
+      return newSet;
+    });
+  };
+
   const getEmployeesForDepartment = (departmentId: number) => {
     return employees.filter(emp => emp.department_id === departmentId);
   };
 
+  const getDevicesForZone = (zoneId: number) => {
+    return devices.filter(device => device.zone_id === zoneId);
+  };
+
   const isDepartmentSelected = (departmentId: number) => {
     return formData.selected_departments.includes(departmentId.toString());
+  };
+
+  const isZoneSelected = (zoneId: number) => {
+    return formData.selected_zones.includes(zoneId.toString());
   };
 
   const renderDepartmentTree = (parentId: number | null = null, level: number = 0) => {
@@ -284,8 +307,82 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
     });
   };
 
+  const renderZoneTree = () => {
+    return zones.map(zone => {
+      const zoneDevices = getDevicesForZone(zone.id);
+      const isExpanded = expandedZones.has(zone.id);
+      const isSelected = isZoneSelected(zone.id);
+      
+      return (
+        <div key={zone.id} className="space-y-1">
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-5 w-5 p-0"
+              onClick={() => toggleZoneExpansion(zone.id)}
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </Button>
+            
+            <Checkbox
+              id={`zone-${zone.id}`}
+              checked={isSelected}
+              onCheckedChange={(checked) => {
+                handleZoneChange(zone.id.toString(), Boolean(checked));
+              }}
+            />
+            
+            <Building2 className="h-4 w-4 text-purple-500" />
+            <Label 
+              htmlFor={`zone-${zone.id}`}
+              className="text-sm font-medium cursor-pointer flex-1"
+            >
+              {zone.name} ({zoneDevices.length} cihaz)
+            </Label>
+          </div>
+          
+          {isExpanded && (
+            <div className="space-y-1">
+              {/* Bölgedeki cihazlar */}
+              {zoneDevices.map(device => (
+                <div 
+                  key={device.id}
+                  className="flex items-center space-x-2"
+                  style={{ paddingLeft: '36px' }}
+                >
+                  <Checkbox
+                    id={`device-${device.id}`}
+                    checked={formData.selected_devices.includes(device.id.toString())}
+                    onCheckedChange={(checked) => {
+                      handleDeviceChange(device.id.toString(), Boolean(checked));
+                    }}
+                  />
+                  <MapPin className="h-3 w-3 text-green-500" />
+                  <Label 
+                    htmlFor={`device-${device.id}`}
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    {device.name} ({device.location})
+                  </Label>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    });
+  };
+
   // Departmanı olmayan çalışanlar
   const orphanEmployees = employees.filter(emp => !emp.department_id);
+
+  // Bölgesi olmayan cihazlar
+  const orphanDevices = devices.filter(device => !device.zone_id);
 
   const weekDays = [
     { value: 'Monday', label: 'Pazartesi' },
@@ -370,27 +467,31 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
             </div>
 
             <div className="space-y-3">
-              <Label>Hangi Bölgelerde ve Cihazlarda?</Label>
-              <Tabs defaultValue="devices" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="devices">Cihazlar</TabsTrigger>
-                  <TabsTrigger value="zones">Bölgeler</TabsTrigger>
-                </TabsList>
+              <Label>Hangi Bölge ve Cihazlarda?</Label>
+              <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-1">
+                {renderZoneTree()}
                 
-                <TabsContent value="devices" className="space-y-3">
-                  <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-                    {devices.map((device) => (
-                      <div key={device.id} className="flex items-center space-x-2">
+                {/* Bölgesi olmayan cihazlar */}
+                {orphanDevices.length > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <MapPin className="h-4 w-4 text-gray-500" />
+                      <Label className="text-sm font-medium text-gray-700">
+                        Bölgesi Olmayan Cihazlar ({orphanDevices.length})
+                      </Label>
+                    </div>
+                    {orphanDevices.map(device => (
+                      <div key={device.id} className="flex items-center space-x-2 ml-6">
                         <Checkbox
-                          id={`device-${device.id}`}
+                          id={`orphan-device-${device.id}`}
                           checked={formData.selected_devices.includes(device.id.toString())}
-                          onCheckedChange={(checked) => 
-                            handleDeviceChange(device.id.toString(), Boolean(checked))
-                          }
+                          onCheckedChange={(checked) => {
+                            handleDeviceChange(device.id.toString(), Boolean(checked));
+                          }}
                         />
-                        <MapPin className="h-4 w-4 text-green-500" />
+                        <MapPin className="h-3 w-3 text-green-500" />
                         <Label 
-                          htmlFor={`device-${device.id}`}
+                          htmlFor={`orphan-device-${device.id}`}
                           className="text-sm font-normal cursor-pointer"
                         >
                           {device.name} ({device.location})
@@ -398,31 +499,8 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
                       </div>
                     ))}
                   </div>
-                </TabsContent>
-                
-                <TabsContent value="zones" className="space-y-3">
-                  <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-                    {zones.map((zone) => (
-                      <div key={zone.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`zone-${zone.id}`}
-                          checked={formData.selected_zones.includes(zone.id.toString())}
-                          onCheckedChange={(checked) => 
-                            handleZoneChange(zone.id.toString(), Boolean(checked))
-                          }
-                        />
-                        <Building2 className="h-4 w-4 text-purple-500" />
-                        <Label 
-                          htmlFor={`zone-${zone.id}`}
-                          className="text-sm font-normal cursor-pointer"
-                        >
-                          {zone.name}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </TabsContent>
-              </Tabs>
+                )}
+              </div>
             </div>
           </div>
 
