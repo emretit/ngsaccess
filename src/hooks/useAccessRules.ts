@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -87,31 +86,26 @@ export const useAccessRules = () => {
     mutationFn: async (ruleData: {
       name: string;
       description?: string;
-      target_type: string;
       selected_employees?: string[];
       selected_devices?: string[];
-      selected_positions?: string[];
       selected_zones?: string[];
-      selected_doors?: string[];
       start_time?: string;
       end_time?: string;
       days: string[];
-      access_direction?: string;
-      priority?: number;
     }) => {
-      console.log('Creating enhanced access rule:', ruleData);
+      console.log('Creating simplified access rule:', ruleData);
       
       const projectId = projectIds.length > 0 ? projectIds[0] : null;
 
-      // Create the main rule - updated logic for multiple employees
+      // Create the main rule with default values for removed fields
       const { data: rule, error: ruleError } = await supabase
         .from('access_rules')
         .insert([{
           name: ruleData.name,
           description: ruleData.description || null,
-          target_type: ruleData.target_type || 'individual',
-          access_direction: ruleData.access_direction || 'both',
-          priority: ruleData.priority || 100,
+          target_type: 'individual', // Default value
+          access_direction: 'both', // Default value
+          priority: 100, // Default value
           start_time: ruleData.start_time || null,
           end_time: ruleData.end_time || null,
           days: ruleData.days,
@@ -134,17 +128,14 @@ export const useAccessRules = () => {
       // Create junction table relations for multiple employees
       const promises = [];
 
-      // For individual rules with multiple employees OR department rules
-      if (ruleData.selected_employees?.length) {
-        // If more than one employee OR it's a department rule, use group_members
-        if (ruleData.selected_employees.length > 1 || ruleData.target_type === 'department') {
-          const employeeRelations = ruleData.selected_employees.map(empId => ({
-            group_id: rule.id,
-            employee_id: parseInt(empId),
-            project_id: projectId
-          }));
-          promises.push(supabase.from('group_members').insert(employeeRelations));
-        }
+      // For multiple employees, use group_members
+      if (ruleData.selected_employees?.length && ruleData.selected_employees.length > 1) {
+        const employeeRelations = ruleData.selected_employees.map(empId => ({
+          group_id: rule.id,
+          employee_id: parseInt(empId),
+          project_id: projectId
+        }));
+        promises.push(supabase.from('group_members').insert(employeeRelations));
       }
 
       // Device relations (for multiple devices)
@@ -168,7 +159,7 @@ export const useAccessRules = () => {
       queryClient.invalidateQueries({ queryKey: ['access-rules'] });
       toast({
         title: "Başarılı",
-        description: "Gelişmiş erişim kuralı başarıyla oluşturuldu.",
+        description: "Erişim kuralı başarıyla oluşturuldu.",
       });
     },
     onError: (error) => {
@@ -266,32 +257,27 @@ export const useAccessRules = () => {
       ruleData: {
         name: string;
         description?: string;
-        target_type: string;
         selected_employees?: string[];
         selected_devices?: string[];
-        selected_positions?: string[];
         selected_zones?: string[];
-        selected_doors?: string[];
         start_time?: string;
         end_time?: string;
         days: string[];
-        access_direction?: string;
-        priority?: number;
       };
     }) => {
-      console.log('Updating enhanced access rule:', id, ruleData);
+      console.log('Updating simplified access rule:', id, ruleData);
       
       const projectId = projectIds.length > 0 ? projectIds[0] : null;
 
-      // Update the main rule - updated logic for multiple employees
+      // Update the main rule with default values for removed fields
       const { data: rule, error: ruleError } = await supabase
         .from('access_rules')
         .update({
           name: ruleData.name,
           description: ruleData.description || null,
-          target_type: ruleData.target_type || 'individual',
-          access_direction: ruleData.access_direction || 'both',
-          priority: ruleData.priority || 100,
+          target_type: 'individual', // Default value
+          access_direction: 'both', // Default value
+          priority: 100, // Default value
           start_time: ruleData.start_time || null,
           end_time: ruleData.end_time || null,
           days: ruleData.days,
@@ -316,19 +302,16 @@ export const useAccessRules = () => {
         supabase.from('group_devices').delete().eq('group_id', id),
       ]);
 
-      // Recreate relations with updated logic
+      // Recreate relations
       const promises = [];
 
-      if (ruleData.selected_employees?.length) {
-        // If more than one employee OR it's a department rule, use group_members
-        if (ruleData.selected_employees.length > 1 || ruleData.target_type === 'department') {
-          const employeeRelations = ruleData.selected_employees.map(empId => ({
-            group_id: rule.id,
-            employee_id: parseInt(empId),
-            project_id: projectId
-          }));
-          promises.push(supabase.from('group_members').insert(employeeRelations));
-        }
+      if (ruleData.selected_employees?.length && ruleData.selected_employees.length > 1) {
+        const employeeRelations = ruleData.selected_employees.map(empId => ({
+          group_id: rule.id,
+          employee_id: parseInt(empId),
+          project_id: projectId
+        }));
+        promises.push(supabase.from('group_members').insert(employeeRelations));
       }
 
       if (ruleData.selected_devices && ruleData.selected_devices.length > 1) {
