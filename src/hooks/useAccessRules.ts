@@ -21,7 +21,7 @@ export const useAccessRules = (projectId?: number) => {
             employee_id,
             project_id,
             created_at,
-            employees (
+            employees!group_members_employee_id_fkey (
               id,
               first_name,
               last_name,
@@ -34,7 +34,7 @@ export const useAccessRules = (projectId?: number) => {
             device_id,
             project_id,
             created_at,
-            devices (
+            devices!group_devices_device_id_fkey (
               id,
               name,
               location,
@@ -60,7 +60,17 @@ export const useAccessRules = (projectId?: number) => {
   });
 
   const createAccessRule = useMutation({
-    mutationFn: async (newRule: Partial<AccessRule>) => {
+    mutationFn: async (newRule: { 
+      name: string;
+      description?: string;
+      target_type: string;
+      start_time?: string;
+      end_time?: string;
+      days: string[];
+      access_direction: string;
+      priority: number;
+      project_id?: number;
+    }) => {
       const { data, error } = await supabase
         .from('access_rules')
         .insert([newRule])

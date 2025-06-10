@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -48,7 +47,7 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
   const { devices } = useDevices();
   const { departments } = useDepartments();
   const { zones, doors } = useZonesAndDoors();
-  const { createRule, isCreating, updateRule, isUpdating } = useAccessRules();
+  const { createAccessRule, isCreating, updateAccessRule, isUpdating } = useAccessRules();
 
   // Reset form when dialog opens/closes or editing rule changes
   useEffect(() => {
@@ -112,12 +111,12 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
     }
     
     if (editingRule) {
-      updateRule({
+      updateAccessRule.mutate({
         id: editingRule.id,
-        ruleData: formData
+        updates: formData
       });
     } else {
-      createRule(formData);
+      createAccessRule.mutate(formData);
     }
     
     onClose();
