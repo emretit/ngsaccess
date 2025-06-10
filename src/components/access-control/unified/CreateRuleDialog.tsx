@@ -23,6 +23,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
   const [formData, setFormData] = useState({
     name: '',
     description: '',
+    target_type: 'individual' as 'all' | 'department' | 'position' | 'individual',
     selected_employees: [] as string[],
     selected_devices: [] as string[],
     selected_zones: [] as string[],
@@ -30,6 +31,8 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
     start_time: '',
     end_time: '',
     days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as string[],
+    access_direction: 'both' as 'entry' | 'exit' | 'both',
+    priority: 100,
   });
 
   const [expandedDepartments, setExpandedDepartments] = useState<Set<number>>(new Set());
@@ -52,6 +55,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
         setFormData({
           name: editingRule.name || '',
           description: editingRule.description || '',
+          target_type: editingRule.target_type || 'individual',
           selected_employees: employeeIds,
           selected_devices: deviceIds,
           selected_zones: [],
@@ -59,12 +63,15 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
           start_time: editingRule.start_time || '',
           end_time: editingRule.end_time || '',
           days: editingRule.days || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+          access_direction: editingRule.access_direction || 'both',
+          priority: editingRule.priority || 100,
         });
       } else {
         // Reset form for new rule
         setFormData({
           name: '',
           description: '',
+          target_type: 'individual',
           selected_employees: [],
           selected_devices: [],
           selected_zones: [],
@@ -72,6 +79,8 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
           start_time: '',
           end_time: '',
           days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+          access_direction: 'both',
+          priority: 100,
         });
       }
     }
@@ -94,14 +103,25 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
       alert('Lütfen en az bir cihaz veya bölge seçin.');
       return;
     }
+
+    const ruleData = {
+      name: formData.name,
+      description: formData.description,
+      target_type: formData.target_type,
+      start_time: formData.start_time,
+      end_time: formData.end_time,
+      days: formData.days,
+      access_direction: formData.access_direction,
+      priority: formData.priority,
+    };
     
     if (editingRule) {
       updateAccessRule.mutate({
         id: editingRule.id,
-        updates: formData
+        updates: ruleData
       });
     } else {
-      createAccessRule.mutate(formData);
+      createAccessRule.mutate(ruleData);
     }
     
     onClose();

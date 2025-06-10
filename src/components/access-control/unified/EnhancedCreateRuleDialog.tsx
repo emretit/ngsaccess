@@ -27,7 +27,7 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    target_type: 'individual',
+    target_type: 'individual' as 'all' | 'department' | 'position' | 'individual',
     selected_employees: [] as string[],
     selected_devices: [] as string[],
     selected_positions: [] as string[],
@@ -36,7 +36,7 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
     start_time: '',
     end_time: '',
     days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as string[],
-    access_direction: 'both',
+    access_direction: 'both' as 'entry' | 'exit' | 'both',
     priority: 100,
   });
 
@@ -109,14 +109,25 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
       alert('Lütfen en az bir cihaz, bölge veya kapı seçin.');
       return;
     }
+
+    const ruleData = {
+      name: formData.name,
+      description: formData.description,
+      target_type: formData.target_type,
+      start_time: formData.start_time,
+      end_time: formData.end_time,
+      days: formData.days,
+      access_direction: formData.access_direction,
+      priority: formData.priority,
+    };
     
     if (editingRule) {
       updateAccessRule.mutate({
         id: editingRule.id,
-        updates: formData
+        updates: ruleData
       });
     } else {
-      createAccessRule.mutate(formData);
+      createAccessRule.mutate(ruleData);
     }
     
     onClose();
@@ -125,7 +136,7 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
   const handleTargetTypeChange = (value: string) => {
     setFormData(prev => ({
       ...prev,
-      target_type: value,
+      target_type: value as 'all' | 'department' | 'position' | 'individual',
       selected_employees: value === 'all' ? [] : prev.selected_employees
     }));
   };
@@ -387,7 +398,7 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
                   <div className="space-y-2">
                     <Label htmlFor="access_direction">Erişim Yönü</Label>
                     <Select value={formData.access_direction} onValueChange={(value) => 
-                      setFormData(prev => ({ ...prev, access_direction: value }))
+                      setFormData(prev => ({ ...prev, access_direction: value as 'entry' | 'exit' | 'both' }))
                     }>
                       <SelectTrigger>
                         <SelectValue placeholder="Erişim yönünü seçin" />
