@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from "react";
 import DepartmentTree from "@/components/departments/DepartmentTree";
 import SlideOverPanel from "@/components/employees/SlideOverPanel";
@@ -71,6 +70,27 @@ export default function Employees() {
     console.log('Delete employee:', employee);
   };
 
+  const handleSaveEmployee = (savedEmployee: Employee) => {
+    console.log('Employee saved:', savedEmployee);
+    
+    if (viewMode) {
+      // If in view mode, just switch to edit mode
+      setViewMode(false);
+    } else {
+      // If editing/creating, refresh data and close panel
+      refetch();
+      setIsPanelOpen(false);
+      setEditingEmployee(null);
+    }
+  };
+
+  const handleNewEmployee = () => {
+    console.log('Creating new employee');
+    setEditingEmployee(null);
+    setViewMode(false);
+    setIsPanelOpen(true);
+  };
+
   if (!hasProjectAccess) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -119,11 +139,7 @@ export default function Employees() {
             setItemsPerPage(value);
             setCurrentPage(1);
           }}
-          onNewEmployee={() => {
-            setEditingEmployee(null);
-            setViewMode(false);
-            setIsPanelOpen(true);
-          }}
+          onNewEmployee={handleNewEmployee}
         />
 
         <EmployeeStats employees={employees} />
@@ -146,17 +162,14 @@ export default function Employees() {
 
         <SlideOverPanel
           isOpen={isPanelOpen}
-          onClose={() => setIsPanelOpen(false)}
+          onClose={() => {
+            setIsPanelOpen(false);
+            setEditingEmployee(null);
+            setViewMode(false);
+          }}
           employee={editingEmployee}
           viewMode={viewMode}
-          onSave={(employee) => {
-            if (viewMode) {
-              setViewMode(false);
-            } else {
-              refetch();
-              setIsPanelOpen(false);
-            }
-          }}
+          onSave={handleSaveEmployee}
         />
       </div>
     </div>

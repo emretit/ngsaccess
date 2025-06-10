@@ -14,6 +14,9 @@ interface EmployeeFormProps {
 }
 
 export default function EmployeeForm({ employee, onClose, onSave }: EmployeeFormProps) {
+  console.log('=== EMPLOYEE FORM RENDER ===');
+  console.log('Employee prop:', employee);
+  
   const {
     formData,
     setFormData,
@@ -45,8 +48,11 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form onSubmit called');
     handleSubmit(formData);
   };
+
+  console.log('Current form data:', formData);
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
