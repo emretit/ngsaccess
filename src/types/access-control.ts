@@ -49,8 +49,6 @@ export interface AccessRule {
   name: string;
   description?: string;
   target_type: 'all' | 'department' | 'position' | 'individual';
-  employee_id?: number;
-  device_id?: number;
   start_time?: string;
   end_time?: string;
   days: string[];

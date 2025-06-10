@@ -168,8 +168,6 @@ export type Database = {
           created_at: string | null
           days: string[] | null
           description: string | null
-          device_id: number | null
-          employee_id: number | null
           end_time: string | null
           id: number
           is_active: boolean | null
@@ -187,8 +185,6 @@ export type Database = {
           created_at?: string | null
           days?: string[] | null
           description?: string | null
-          device_id?: number | null
-          employee_id?: number | null
           end_time?: string | null
           id?: number
           is_active?: boolean | null
@@ -206,8 +202,6 @@ export type Database = {
           created_at?: string | null
           days?: string[] | null
           description?: string | null
-          device_id?: number | null
-          employee_id?: number | null
           end_time?: string | null
           id?: number
           is_active?: boolean | null
@@ -220,36 +214,7 @@ export type Database = {
           template_name?: string | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "access_rules_device_id_fkey"
-            columns: ["device_id"]
-            isOneToOne: false
-            referencedRelation: "device_locations"
-            referencedColumns: ["device_id"]
-          },
-          {
-            foreignKeyName: "access_rules_device_id_fkey"
-            columns: ["device_id"]
-            isOneToOne: false
-            referencedRelation: "devices"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "access_rules_device_id_fkey"
-            columns: ["device_id"]
-            isOneToOne: false
-            referencedRelation: "devices_with_latest_readings"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "access_rules_employee_id_fkey"
-            columns: ["employee_id"]
-            isOneToOne: false
-            referencedRelation: "employees"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       ai_report_queries: {
         Row: {
@@ -1008,6 +973,34 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_group_devices_device_id"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "device_locations"
+            referencedColumns: ["device_id"]
+          },
+          {
+            foreignKeyName: "fk_group_devices_device_id"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_group_devices_device_id"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "devices_with_latest_readings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_group_devices_group_id"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "access_rules"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "group_devices_device_id_fkey"
             columns: ["device_id"]
             isOneToOne: false
@@ -1067,6 +1060,20 @@ export type Database = {
           project_id?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_group_members_employee_id"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_group_members_group_id"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "access_rules"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "group_members_employee_id_fkey"
             columns: ["employee_id"]
