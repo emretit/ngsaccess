@@ -1,4 +1,3 @@
-
 export interface CardReading {
     id: number;
     card_no: string;
@@ -44,6 +43,34 @@ export interface Door {
   updated_at?: string;
 }
 
+export interface GroupMember {
+  id: number;
+  group_id: number;
+  employee_id: number;
+  project_id?: number;
+  created_at: string;
+  employees?: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    email?: string;
+  };
+}
+
+export interface GroupDevice {
+  id: number;
+  group_id: number;
+  device_id: number;
+  project_id?: number;
+  created_at: string;
+  devices?: {
+    id: number;
+    name: string;
+    location: string;
+    serial?: string;
+  };
+}
+
 export interface AccessRule {
   id: number;
   name: string;
@@ -60,7 +87,10 @@ export interface AccessRule {
   project_id?: number;
   created_at: string;
   updated_at: string;
-  // Relations
+  // New group-based relations
+  group_members?: GroupMember[];
+  group_devices?: GroupDevice[];
+  // Legacy relations (keeping for backward compatibility)
   rule_employees?: Array<{
     employees: {
       id: number;

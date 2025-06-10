@@ -1025,7 +1025,7 @@ export type Database = {
             foreignKeyName: "group_devices_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
-            referencedRelation: "access_groups"
+            referencedRelation: "access_rules"
             referencedColumns: ["id"]
           },
           {
@@ -1085,7 +1085,7 @@ export type Database = {
             foreignKeyName: "group_members_group_id_fkey"
             columns: ["group_id"]
             isOneToOne: false
-            referencedRelation: "access_groups"
+            referencedRelation: "access_rules"
             referencedColumns: ["id"]
           },
           {
