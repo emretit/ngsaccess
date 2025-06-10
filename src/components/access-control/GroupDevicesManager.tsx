@@ -19,8 +19,8 @@ export function GroupDevicesManager({ rule, projectId }: GroupDevicesManagerProp
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   
-  const { devices } = useDevices(projectId);
-  const { addGroupDevice, removeGroupDevice } = useAccessRules(projectId);
+  const { devices } = useDevices();
+  const { addGroupDevice, removeGroupDevice } = useAccessRules();
 
   const filteredDevices = devices?.filter(device => 
     device.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -97,7 +97,9 @@ export function GroupDevicesManager({ rule, projectId }: GroupDevicesManagerProp
                 </div>
                 <div className="text-sm text-muted-foreground">
                   {groupDevice.devices?.location}
-                  {groupDevice.devices?.serial && ` • ${groupDevice.devices.serial}`}
+                  {(groupDevice.devices?.serial || groupDevice.devices?.serial_number) && 
+                    ` • ${groupDevice.devices.serial || groupDevice.devices.serial_number}`
+                  }
                 </div>
               </div>
               <Button

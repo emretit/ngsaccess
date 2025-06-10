@@ -32,7 +32,7 @@ interface AccessRulesListProps {
 }
 
 const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => {
-  const { rules, isLoading, toggleRule, isToggling, deleteRule, isDeleting } = useAccessRules();
+  const { rules, isLoading, updateAccessRule, deleteAccessRule, isDeleting } = useAccessRules();
   const [expandedRules, setExpandedRules] = useState<Set<number>>(new Set());
 
   const toggleExpanded = (ruleId: number) => {
@@ -48,7 +48,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
   };
 
   const handleDeleteRule = (ruleId: number) => {
-    deleteRule(ruleId);
+    deleteAccessRule.mutate(ruleId);
   };
 
   const handleEditRule = (rule: any) => {
@@ -100,8 +100,8 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
   };
 
   const renderEmployees = (rule: any) => {
-    // Always get employees from junction table relations
-    const employees = rule.rule_employees?.map((re: any) => re.employees).filter(Boolean) || [];
+    // Get employees from group_members relations
+    const employees = rule.group_members?.map((gm: any) => gm.employees).filter(Boolean) || [];
     
     if (employees.length === 0) {
       return (
@@ -136,8 +136,8 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
   };
 
   const renderDevices = (rule: any) => {
-    // Always get devices from junction table relations
-    const devices = rule.rule_devices?.map((rd: any) => rd.devices).filter(Boolean) || [];
+    // Get devices from group_devices relations
+    const devices = rule.group_devices?.map((gd: any) => gd.devices).filter(Boolean) || [];
     
     if (devices.length === 0) {
       return (
@@ -235,9 +235,9 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                     <Switch
                       checked={rule.is_active}
                       onCheckedChange={(checked) => 
-                        toggleRule({ id: rule.id, is_active: checked })
+                        updateAccessRule.mutate({ id: rule.id, updates: { is_active: checked } })
                       }
-                      disabled={isToggling}
+                      disabled={updateAccessRule.isPending}
                     />
                   </TableCell>
                   <TableCell>
@@ -308,10 +308,10 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                               <div>
                                 <span className="text-sm font-medium text-gray-700">Çalışanlar:</span>
                                 <div className="mt-1 space-y-1">
-                                  {rule.rule_employees?.length > 0 ? (
-                                    rule.rule_employees.map((re: any, index: number) => (
+                                  {rule.group_members?.length > 0 ? (
+                                    rule.group_members.map((gm: any, index: number) => (
                                       <div key={index} className="text-sm text-gray-600">
-                                        • {re.employees?.first_name} {re.employees?.last_name}
+                                        • {gm.employees?.first_name} {gm.employees?.last_name}
                                       </div>
                                     ))
                                   ) : (
@@ -323,10 +323,10 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                               <div>
                                 <span className="text-sm font-medium text-gray-700">Cihazlar:</span>
                                 <div className="mt-1 space-y-1">
-                                  {rule.rule_devices?.length > 0 ? (
-                                    rule.rule_devices.map((rd: any, index: number) => (
+                                  {rule.group_devices?.length > 0 ? (
+                                    rule.group_devices.map((gd: any, index: number) => (
                                       <div key={index} className="text-sm text-gray-600">
-                                        • {rd.devices?.name} ({rd.devices?.location})
+                                        • {gd.devices?.name} ({gd.devices?.location})
                                       </div>
                                     ))
                                   ) : (

@@ -19,8 +19,8 @@ export function GroupMembersManager({ rule, projectId }: GroupMembersManagerProp
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   
-  const { employees } = useEmployees(projectId);
-  const { addGroupMember, removeGroupMember } = useAccessRules(projectId);
+  const { employees } = useEmployees();
+  const { addGroupMember, removeGroupMember } = useAccessRules();
 
   const filteredEmployees = employees?.filter(emp => 
     `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase())

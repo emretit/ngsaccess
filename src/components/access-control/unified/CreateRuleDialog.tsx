@@ -39,23 +39,22 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
   const { devices } = useDevices();
   const { departments } = useDepartments();
   const { zones } = useZonesAndDoors();
-  const { createRule, isCreating, updateRule, isUpdating } = useAccessRules();
+  const { createAccessRule, updateAccessRule } = useAccessRules();
 
   // Reset form when dialog opens/closes or editing rule changes
   useEffect(() => {
     if (open) {
       if (editingRule) {
-        // Extract employee IDs from junction table relations
-        const employeeIds = editingRule.rule_employees?.map((re: any) => re.employees?.id?.toString()).filter(Boolean) || [];
-        const deviceIds = editingRule.rule_devices?.map((rd: any) => rd.devices?.id?.toString()).filter(Boolean) || [];
-        const zoneIds = editingRule.rule_zones?.map((rz: any) => rz.zones?.id?.toString()).filter(Boolean) || [];
+        // Extract employee IDs from group_members relations
+        const employeeIds = editingRule.group_members?.map((gm: any) => gm.employee_id?.toString()).filter(Boolean) || [];
+        const deviceIds = editingRule.group_devices?.map((gd: any) => gd.device_id?.toString()).filter(Boolean) || [];
 
         setFormData({
           name: editingRule.name || '',
           description: editingRule.description || '',
           selected_employees: employeeIds,
           selected_devices: deviceIds,
-          selected_zones: zoneIds,
+          selected_zones: [],
           selected_departments: [],
           start_time: editingRule.start_time || '',
           end_time: editingRule.end_time || '',
@@ -97,12 +96,12 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
     }
     
     if (editingRule) {
-      updateRule({
+      updateAccessRule.mutate({
         id: editingRule.id,
-        ruleData: formData
+        updates: formData
       });
     } else {
-      createRule(formData);
+      createAccessRule.mutate(formData);
     }
     
     onClose();
@@ -549,8 +548,8 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
             <Button type="button" variant="outline" onClick={onClose}>
               İptal
             </Button>
-            <Button type="submit" disabled={isCreating || isUpdating}>
-              {isCreating || isUpdating ? (
+            <Button type="submit" disabled={createAccessRule.isPending || updateAccessRule.isPending}>
+              {createAccessRule.isPending || updateAccessRule.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   {editingRule ? 'Güncelleniyor...' : 'Oluşturuluyor...'}

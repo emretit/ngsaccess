@@ -17,7 +17,10 @@ export const useAccessRules = (projectId?: number) => {
           *,
           group_members!group_members_group_id_fkey (
             id,
+            group_id,
             employee_id,
+            project_id,
+            created_at,
             employees (
               id,
               first_name,
@@ -27,7 +30,10 @@ export const useAccessRules = (projectId?: number) => {
           ),
           group_devices!group_devices_group_id_fkey (
             id,
+            group_id,
             device_id,
+            project_id,
+            created_at,
             devices (
               id,
               name,
