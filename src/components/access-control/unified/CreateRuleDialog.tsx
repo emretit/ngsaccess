@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -46,11 +45,9 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
   useEffect(() => {
     if (open) {
       if (editingRule) {
-        // Populate form with editing rule data
-        const employeeIds = editingRule.rule_employees?.map((re: any) => re.employees?.id?.toString()).filter(Boolean) || 
-                           (editingRule.employee_id ? [editingRule.employee_id.toString()] : []);
-        const deviceIds = editingRule.rule_devices?.map((rd: any) => rd.devices?.id?.toString()).filter(Boolean) || 
-                         (editingRule.device_id ? [editingRule.device_id.toString()] : []);
+        // Extract employee IDs from junction table relations
+        const employeeIds = editingRule.rule_employees?.map((re: any) => re.employees?.id?.toString()).filter(Boolean) || [];
+        const deviceIds = editingRule.rule_devices?.map((rd: any) => rd.devices?.id?.toString()).filter(Boolean) || [];
         const zoneIds = editingRule.rule_zones?.map((rz: any) => rz.zones?.id?.toString()).filter(Boolean) || [];
 
         setFormData({

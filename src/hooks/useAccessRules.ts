@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -12,74 +13,77 @@ export const useAccessRules = () => {
   const { data: rules = [], isLoading } = useQuery({
     queryKey: ['access-rules'],
     queryFn: async () => {
-      console.log('Fetching enhanced access rules...');
-      const { data, error } = await supabase
+      console.log('Fetching access rules with pure junction table approach...');
+      
+      // Get all access rules for the project
+      const { data: rulesData, error: rulesError } = await supabase
         .from('access_rules')
         .select('*')
+        .in('project_id', projectIds)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching access rules:', error);
-        throw error;
+      if (rulesError) {
+        console.error('Error fetching access rules:', rulesError);
+        throw rulesError;
       }
 
-      // Fetch related data for each rule
-      const rulesWithRelations = await Promise.all(
-        (data || []).map(async (rule) => {
-          // Get employee relations
-          let employeeRelations = [];
-          if (rule.employee_id) {
-            const { data: employee } = await supabase
-              .from('employees')
-              .select('id, first_name, last_name')
-              .eq('id', rule.employee_id)
-              .single();
-            if (employee) employeeRelations = [{ employees: employee }];
-          } else {
-            const { data: groupMembers } = await supabase
-              .from('group_members')
-              .select(`employees:employee_id (id, first_name, last_name)`)
-              .eq('group_id', rule.id);
-            employeeRelations = groupMembers || [];
-          }
+      // Get employee relations for all rules
+      const { data: employeeRelations, error: empError } = await supabase
+        .from('group_members')
+        .select(`
+          group_id,
+          employees:employee_id (id, first_name, last_name)
+        `)
+        .in('project_id', projectIds);
 
-          // Get device relations
-          let deviceRelations = [];
-          if (rule.device_id) {
-            const { data: device } = await supabase
-              .from('devices')
-              .select('id, name, location')
-              .eq('id', rule.device_id)
-              .single();
-            if (device) deviceRelations = [{ devices: device }];
-          } else {
-            const { data: groupDevices } = await supabase
-              .from('group_devices')
-              .select(`devices:device_id (id, name, location)`)
-              .eq('group_id', rule.id);
-            deviceRelations = groupDevices || [];
-          }
+      if (empError) {
+        console.error('Error fetching employee relations:', empError);
+        throw empError;
+      }
 
-          return {
-            ...rule,
-            // Veritabanındaki yeni alanları kullan, eski kodla uyumlu kalması için fallback'ler
-            target_type: rule.target_type || 'individual',
-            access_direction: rule.access_direction || 'both',
-            priority: rule.priority || 100,
-            is_template: rule.is_template || false,
-            template_name: rule.template_name || null,
-            rule_employees: employeeRelations,
-            rule_devices: deviceRelations,
-            rule_positions: [],
-            rule_zones: [],
-            rule_doors: [],
-          };
-        })
-      );
+      // Get device relations for all rules
+      const { data: deviceRelations, error: devError } = await supabase
+        .from('group_devices')
+        .select(`
+          group_id,
+          devices:device_id (id, name, location)
+        `)
+        .in('project_id', projectIds);
 
-      console.log('Enhanced access rules loaded:', rulesWithRelations);
+      if (devError) {
+        console.error('Error fetching device relations:', devError);
+        throw devError;
+      }
+
+      // Combine data
+      const rulesWithRelations = (rulesData || []).map(rule => {
+        const ruleEmployees = (employeeRelations || [])
+          .filter(rel => rel.group_id === rule.id)
+          .map(rel => ({ employees: rel.employees }));
+
+        const ruleDevices = (deviceRelations || [])
+          .filter(rel => rel.group_id === rule.id)
+          .map(rel => ({ devices: rel.devices }));
+
+        return {
+          ...rule,
+          target_type: rule.target_type || 'individual',
+          access_direction: rule.access_direction || 'both',
+          priority: rule.priority || 100,
+          is_template: rule.is_template || false,
+          template_name: rule.template_name || null,
+          rule_employees: ruleEmployees,
+          rule_devices: ruleDevices,
+          rule_positions: [],
+          rule_zones: [],
+          rule_doors: [],
+        };
+      });
+
+      console.log('Access rules with relations loaded:', rulesWithRelations);
       return rulesWithRelations;
     },
+    enabled: projectIds.length > 0,
   });
 
   const createRuleMutation = useMutation({
@@ -93,29 +97,24 @@ export const useAccessRules = () => {
       end_time?: string;
       days: string[];
     }) => {
-      console.log('Creating simplified access rule:', ruleData);
+      console.log('Creating access rule with pure junction approach:', ruleData);
       
       const projectId = projectIds.length > 0 ? projectIds[0] : null;
 
-      // Create the main rule with default values for removed fields
+      // Create the main rule
       const { data: rule, error: ruleError } = await supabase
         .from('access_rules')
         .insert([{
           name: ruleData.name,
           description: ruleData.description || null,
-          target_type: 'individual', // Default value
-          access_direction: 'both', // Default value
-          priority: 100, // Default value
+          target_type: 'individual',
+          access_direction: 'both',
+          priority: 100,
           start_time: ruleData.start_time || null,
           end_time: ruleData.end_time || null,
           days: ruleData.days,
           is_active: true,
           project_id: projectId,
-          // Only set single employee_id if there's exactly one employee selected
-          employee_id: ruleData.selected_employees?.length === 1 
-            ? parseInt(ruleData.selected_employees[0]) : null,
-          device_id: ruleData.selected_devices?.length === 1 
-            ? parseInt(ruleData.selected_devices[0]) : null,
         }])
         .select()
         .single();
@@ -125,11 +124,11 @@ export const useAccessRules = () => {
         throw ruleError;
       }
 
-      // Create junction table relations for multiple employees
+      // Create junction table relations
       const promises = [];
 
-      // For multiple employees, use group_members
-      if (ruleData.selected_employees?.length && ruleData.selected_employees.length > 1) {
+      // Employee relations - always use junction table
+      if (ruleData.selected_employees?.length) {
         const employeeRelations = ruleData.selected_employees.map(empId => ({
           group_id: rule.id,
           employee_id: parseInt(empId),
@@ -138,8 +137,8 @@ export const useAccessRules = () => {
         promises.push(supabase.from('group_members').insert(employeeRelations));
       }
 
-      // Device relations (for multiple devices)
-      if (ruleData.selected_devices && ruleData.selected_devices.length > 1) {
+      // Device relations - always use junction table
+      if (ruleData.selected_devices?.length) {
         const deviceRelations = ruleData.selected_devices.map(deviceId => ({
           group_id: rule.id,
           device_id: parseInt(deviceId),
@@ -150,7 +149,13 @@ export const useAccessRules = () => {
 
       // Execute all relation inserts
       if (promises.length > 0) {
-        await Promise.all(promises);
+        const results = await Promise.all(promises);
+        results.forEach((result, index) => {
+          if (result.error) {
+            console.error(`Error creating relation ${index}:`, result.error);
+            throw result.error;
+          }
+        });
       }
 
       return rule;
@@ -265,27 +270,22 @@ export const useAccessRules = () => {
         days: string[];
       };
     }) => {
-      console.log('Updating simplified access rule:', id, ruleData);
+      console.log('Updating access rule with pure junction approach:', id, ruleData);
       
       const projectId = projectIds.length > 0 ? projectIds[0] : null;
 
-      // Update the main rule with default values for removed fields
+      // Update the main rule
       const { data: rule, error: ruleError } = await supabase
         .from('access_rules')
         .update({
           name: ruleData.name,
           description: ruleData.description || null,
-          target_type: 'individual', // Default value
-          access_direction: 'both', // Default value
-          priority: 100, // Default value
+          target_type: 'individual',
+          access_direction: 'both',
+          priority: 100,
           start_time: ruleData.start_time || null,
           end_time: ruleData.end_time || null,
           days: ruleData.days,
-          // Only set single employee_id if there's exactly one employee selected
-          employee_id: ruleData.selected_employees?.length === 1 
-            ? parseInt(ruleData.selected_employees[0]) : null,
-          device_id: ruleData.selected_devices?.length === 1 
-            ? parseInt(ruleData.selected_devices[0]) : null,
         })
         .eq('id', id)
         .select()
@@ -305,7 +305,8 @@ export const useAccessRules = () => {
       // Recreate relations
       const promises = [];
 
-      if (ruleData.selected_employees?.length && ruleData.selected_employees.length > 1) {
+      // Employee relations - always use junction table
+      if (ruleData.selected_employees?.length) {
         const employeeRelations = ruleData.selected_employees.map(empId => ({
           group_id: rule.id,
           employee_id: parseInt(empId),
@@ -314,7 +315,8 @@ export const useAccessRules = () => {
         promises.push(supabase.from('group_members').insert(employeeRelations));
       }
 
-      if (ruleData.selected_devices && ruleData.selected_devices.length > 1) {
+      // Device relations - always use junction table  
+      if (ruleData.selected_devices?.length) {
         const deviceRelations = ruleData.selected_devices.map(deviceId => ({
           group_id: rule.id,
           device_id: parseInt(deviceId),
@@ -324,7 +326,13 @@ export const useAccessRules = () => {
       }
 
       if (promises.length > 0) {
-        await Promise.all(promises);
+        const results = await Promise.all(promises);
+        results.forEach((result, index) => {
+          if (result.error) {
+            console.error(`Error creating relation ${index}:`, result.error);
+            throw result.error;
+          }
+        });
       }
 
       return rule;

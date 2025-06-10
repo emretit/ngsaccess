@@ -100,6 +100,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
   };
 
   const renderEmployees = (rule: any) => {
+    // Always get employees from junction table relations
     const employees = rule.rule_employees?.map((re: any) => re.employees).filter(Boolean) || [];
     
     if (employees.length === 0) {
@@ -135,6 +136,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
   };
 
   const renderDevices = (rule: any) => {
+    // Always get devices from junction table relations
     const devices = rule.rule_devices?.map((rd: any) => rd.devices).filter(Boolean) || [];
     
     if (devices.length === 0) {
