@@ -42,7 +42,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
   const { devices } = useDevices();
   const { departments } = useDepartments();
   const { zones } = useZonesAndDoors();
-  const { createAccessRule, updateAccessRule } = useAccessRules();
+  const { createAccessRuleWithMembers, updateAccessRule } = useAccessRules();
 
   // Reset form when dialog opens/closes or editing rule changes
   useEffect(() => {
@@ -121,7 +121,18 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
         updates: ruleData
       });
     } else {
-      createAccessRule.mutate(ruleData);
+      // Use the new batch creation function
+      console.log('Submitting new rule with batch creation:', {
+        rule: ruleData,
+        employeeIds: formData.selected_employees.map(id => parseInt(id)),
+        deviceIds: formData.selected_devices.map(id => parseInt(id))
+      });
+
+      createAccessRuleWithMembers.mutate({
+        rule: ruleData,
+        employeeIds: formData.selected_employees.map(id => parseInt(id)),
+        deviceIds: formData.selected_devices.map(id => parseInt(id))
+      });
     }
     
     onClose();
@@ -568,8 +579,8 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
             <Button type="button" variant="outline" onClick={onClose}>
               İptal
             </Button>
-            <Button type="submit" disabled={createAccessRule.isPending || updateAccessRule.isPending}>
-              {createAccessRule.isPending || updateAccessRule.isPending ? (
+            <Button type="submit" disabled={createAccessRuleWithMembers.isPending || updateAccessRule.isPending}>
+              {createAccessRuleWithMembers.isPending || updateAccessRule.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   {editingRule ? 'Güncelleniyor...' : 'Oluşturuluyor...'}

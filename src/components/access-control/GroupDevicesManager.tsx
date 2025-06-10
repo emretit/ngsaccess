@@ -28,7 +28,7 @@ export function GroupDevicesManager({ rule, projectId }: GroupDevicesManagerProp
   ) || [];
 
   const availableDevices = filteredDevices.filter(device => 
-    !rule.group_devices?.some(groupDevice => groupDevice.device_id === device.id)
+    !rule.group_devices?.some(groupDevice => groupDevice.device_id === Number(device.id))
   );
 
   const handleAddDevice = () => {

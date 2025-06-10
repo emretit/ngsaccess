@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AccessRule, GroupMember, GroupDevice } from "@/types/access-control";
@@ -56,6 +55,99 @@ export const useAccessRules = (projectId?: number) => {
       }
 
       return data as AccessRule[];
+    }
+  });
+
+  const createAccessRuleWithMembers = useMutation({
+    mutationFn: async (params: { 
+      rule: {
+        name: string;
+        description?: string;
+        target_type: string;
+        start_time?: string;
+        end_time?: string;
+        days: string[];
+        access_direction: string;
+        priority: number;
+        project_id?: number;
+      };
+      employeeIds?: number[];
+      deviceIds?: number[];
+    }) => {
+      console.log('Creating access rule with members:', params);
+      
+      // First create the access rule
+      const { data: ruleData, error: ruleError } = await supabase
+        .from('access_rules')
+        .insert([params.rule])
+        .select()
+        .single();
+
+      if (ruleError) throw ruleError;
+
+      console.log('Created rule:', ruleData);
+
+      const promises = [];
+
+      // Add group members if provided
+      if (params.employeeIds && params.employeeIds.length > 0) {
+        const memberInserts = params.employeeIds.map(employeeId => ({
+          group_id: ruleData.id,
+          employee_id: employeeId,
+          project_id: params.rule.project_id
+        }));
+
+        console.log('Adding group members:', memberInserts);
+
+        const memberPromise = supabase
+          .from('group_members')
+          .insert(memberInserts);
+        promises.push(memberPromise);
+      }
+
+      // Add group devices if provided
+      if (params.deviceIds && params.deviceIds.length > 0) {
+        const deviceInserts = params.deviceIds.map(deviceId => ({
+          group_id: ruleData.id,
+          device_id: deviceId,
+          project_id: params.rule.project_id
+        }));
+
+        console.log('Adding group devices:', deviceInserts);
+
+        const devicePromise = supabase
+          .from('group_devices')
+          .insert(deviceInserts);
+        promises.push(devicePromise);
+      }
+
+      // Execute all inserts
+      const results = await Promise.all(promises);
+      
+      // Check for errors in batch operations
+      results.forEach((result, index) => {
+        if (result.error) {
+          console.error(`Error in batch operation ${index}:`, result.error);
+          throw result.error;
+        }
+      });
+
+      return ruleData;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['access-rules'] });
+      toast({
+        title: "Başarılı",
+        description: "Erişim kuralı ve üyeleri oluşturuldu.",
+      });
+    },
+    onError: (error) => {
+      console.error('Error creating access rule with members:', error);
+      toast({
+        variant: "destructive",
+        title: "Hata",
+        description: "Erişim kuralı oluşturulurken bir hata oluştu.",
+      });
     }
   });
 
@@ -277,6 +369,7 @@ export const useAccessRules = (projectId?: number) => {
     isLoading,
     error,
     createAccessRule,
+    createAccessRuleWithMembers,
     createRule, // Legacy alias
     isCreating,
     updateAccessRule,
