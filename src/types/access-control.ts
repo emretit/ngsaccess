@@ -68,6 +68,7 @@ export interface GroupDevice {
     name: string;
     location: string;
     serial?: string;
+    serial_number?: string;
   };
 }
 

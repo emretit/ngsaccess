@@ -15,7 +15,7 @@ export const useAccessRules = (projectId?: number) => {
         .from('access_rules')
         .select(`
           *,
-          group_members (
+          group_members!group_members_group_id_fkey (
             id,
             employee_id,
             employees (
@@ -25,14 +25,14 @@ export const useAccessRules = (projectId?: number) => {
               email
             )
           ),
-          group_devices (
+          group_devices!group_devices_group_id_fkey (
             id,
             device_id,
             devices (
               id,
               name,
               location,
-              serial
+              serial_number
             )
           )
         `)
@@ -244,13 +244,33 @@ export const useAccessRules = (projectId?: number) => {
     }
   });
 
+  // Legacy API compatibility - aliasing new names to old ones
+  const rules = accessRules || [];
+  const createRule = createAccessRule;
+  const isCreating = createAccessRule.isPending;
+  const updateRule = updateAccessRule;
+  const isUpdating = updateAccessRule.isPending;
+  const deleteRule = deleteAccessRule;
+  const isDeleting = deleteAccessRule.isPending;
+  const toggleRule = updateAccessRule;
+  const isToggling = updateAccessRule.isPending;
+
   return {
     accessRules,
+    rules, // Legacy alias
     isLoading,
     error,
     createAccessRule,
+    createRule, // Legacy alias
+    isCreating,
     updateAccessRule,
+    updateRule, // Legacy alias
+    isUpdating,
     deleteAccessRule,
+    deleteRule, // Legacy alias
+    isDeleting,
+    toggleRule, // Legacy alias
+    isToggling,
     addGroupMember,
     removeGroupMember,
     addGroupDevice,
