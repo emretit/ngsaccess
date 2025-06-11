@@ -3,6 +3,7 @@ import React, { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Header from '@/components/Header';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -23,16 +24,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   // Show loading screen if checking auth
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-center">
-          <div className="w-12 h-12 bg-[#711A1A] rounded-md flex items-center justify-center text-white font-bold mx-auto mb-4">
-            P
-          </div>
-          <p className="text-lg font-medium">Yükleniyor...</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner text="Sistem hazırlanıyor..." />;
   }
   
   // If not logged in and not on login/register page, useEffect will redirect

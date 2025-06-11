@@ -14,6 +14,7 @@ import { useDeviceActions } from '@/components/devices/useDeviceActions';
 import { useDeviceTable } from '@/hooks/useDeviceTable';
 import { Device } from '@/types/device';
 import { useProjectAccess } from '@/hooks/useProjectAccess';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 const Devices = () => {
   const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
@@ -67,11 +68,7 @@ const Devices = () => {
 
   // Loading durumunda (hem project hem devices loading) loading göster
   if (projectLoading || isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[200px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-      </div>
-    );
+    return <LoadingSpinner text="Cihazlar yükleniyor..." />;
   }
 
   // Proje erişimi yoksa ve loading de tamamlandıysa mesaj göster

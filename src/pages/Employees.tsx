@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from "react";
 import DepartmentTree from "@/components/departments/DepartmentTree";
 import SlideOverPanel from "@/components/employees/SlideOverPanel";
@@ -9,6 +8,7 @@ import { EmployeeFilters } from "@/components/employees/EmployeeFilters";
 import { EmployeePagination } from "@/components/employees/EmployeePagination";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export default function Employees() {
   const { loading: projectLoading } = useProjectAccess();
@@ -101,11 +101,7 @@ export default function Employees() {
 
   // Loading durumunda (hem project hem employees loading) loading göster
   if (projectLoading || isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-      </div>
-    );
+    return <LoadingSpinner text="Personel bilgileri yükleniyor..." />;
   }
 
   // Proje erişimi yoksa ve loading de tamamlandıysa mesaj göster

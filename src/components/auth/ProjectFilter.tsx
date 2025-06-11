@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { useProjectAccess } from '@/hooks/useProjectAccess';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 interface ProjectFilterProps {
   children: React.ReactNode;
@@ -17,11 +18,7 @@ const ProjectFilter: React.FC<ProjectFilterProps> = ({
 
   // Loading sırasında loading göster
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[200px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-      </div>
-    );
+    return <LoadingSpinner text="Proje erişimi kontrol ediliyor..." />;
   }
 
   // Loading tamamlandıktan sonra erişim kontrolü yap

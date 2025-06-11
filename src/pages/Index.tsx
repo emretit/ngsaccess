@@ -1,3 +1,4 @@
+
 import { useDashboard } from '@/hooks/useDashboard';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import StatsGrid from '@/components/dashboard/StatsGrid';
@@ -5,6 +6,7 @@ import ActivitySummaryCard from '@/components/dashboard/ActivitySummaryCard';
 import CalendarCard from '@/components/dashboard/CalendarCard';
 import RecentReadingsTable from '@/components/dashboard/RecentReadingsTable';
 import QuickLinksGrid from '@/components/dashboard/QuickLinksGrid';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 export default function Index() {
   const {
@@ -18,14 +20,7 @@ export default function Index() {
 
   // If not authenticated yet (loading state), show a simple loading screen
   if (!session && loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[80vh]">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold mb-2">Yükleniyor...</h2>
-          <p className="text-muted-foreground">Lütfen bekleyin, dashboard hazırlanıyor.</p>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner text="Dashboard hazırlanıyor..." />;
   }
 
   return (
