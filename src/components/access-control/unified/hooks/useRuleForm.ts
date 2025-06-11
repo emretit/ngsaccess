@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useAccessRules } from "@/hooks/useAccessRules";
@@ -42,6 +43,10 @@ export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void
       if (editingRule) {
         const employeeIds = editingRule.group_members?.map((gm: any) => gm.employee_id?.toString()).filter(Boolean) || [];
         const deviceIds = editingRule.group_devices?.map((gd: any) => gd.device_id?.toString()).filter(Boolean) || [];
+
+        console.log('Loading existing rule data:');
+        console.log('Existing employees:', employeeIds);
+        console.log('Existing devices:', deviceIds);
 
         setFormData({
           name: editingRule.name || '',
@@ -121,7 +126,7 @@ export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void
       };
       
       if (editingRule) {
-        console.log('Updating existing rule with additional members:', {
+        console.log('Updating existing rule with additional members and devices:', {
           ruleId: editingRule.id,
           updates: ruleData,
           newEmployeeIds: formData.selected_employees.map(id => parseInt(id)),
