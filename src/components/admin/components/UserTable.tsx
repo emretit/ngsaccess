@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/table';
 import { User } from '../types/user-types';
 import { UserPasswordResetDialog } from './UserPasswordResetDialog';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 interface UserTableProps {
   users: User[];
@@ -27,6 +29,26 @@ export const UserTable: React.FC<UserTableProps> = ({
 }) => {
   const [selectedUserForReset, setSelectedUserForReset] = useState<User | null>(null);
   const [showPasswordResetDialog, setShowPasswordResetDialog] = useState(false);
+
+  // Fetch user projects for each user
+  const { data: userProjects = [] } = useQuery({
+    queryKey: ['admin', 'user-projects'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_projects')
+        .select(`
+          user_id,
+          project_id,
+          projects:project_id (
+            id,
+            name
+          )
+        `);
+
+      if (error) throw error;
+      return data;
+    }
+  });
 
   const handlePasswordResetClick = (user: User) => {
     setSelectedUserForReset(user);
@@ -46,6 +68,27 @@ export const UserTable: React.FC<UserTableProps> = ({
     }
   };
 
+  const getUserProjects = (userId: string) => {
+    const projects = userProjects.filter(up => up.user_id === userId);
+    if (projects.length === 0) {
+      return <span className="text-purple-400 text-sm">Proje atanmamış</span>;
+    }
+    
+    return (
+      <div className="flex flex-wrap gap-1">
+        {projects.map((up) => (
+          <Badge 
+            key={up.project_id} 
+            variant="outline" 
+            className="text-xs bg-purple-500/20 text-purple-300 border-purple-500/30"
+          >
+            ID: {up.project_id} - {up.projects?.name || 'Bilinmiyor'}
+          </Badge>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <>
       <div className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-3xl overflow-hidden shadow-2xl">
@@ -55,13 +98,14 @@ export const UserTable: React.FC<UserTableProps> = ({
               <TableRow className="border-white/20 hover:bg-white/5">
                 <TableHead className="text-purple-200 font-bold text-lg">E-posta</TableHead>
                 <TableHead className="text-purple-200 font-bold text-lg">Rol</TableHead>
+                <TableHead className="text-purple-200 font-bold text-lg">Projeler</TableHead>
                 <TableHead className="text-right text-purple-200 font-bold text-lg">İşlemler</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {users.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center py-16 text-purple-300 text-lg">
+                  <TableCell colSpan={4} className="text-center py-16 text-purple-300 text-lg">
                     <div className="flex flex-col items-center space-y-4">
                       <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center">
                         <UserPlus className="w-8 h-8 text-purple-400" />
@@ -77,6 +121,9 @@ export const UserTable: React.FC<UserTableProps> = ({
                       {user.email}
                     </TableCell>
                     <TableCell>{getRoleDisplay(user.role)}</TableCell>
+                    <TableCell className="max-w-xs">
+                      {getUserProjects(user.id)}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end space-x-2">
                         <Button 
