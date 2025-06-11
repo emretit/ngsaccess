@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useAccessRules } from "@/hooks/useAccessRules";
@@ -122,50 +121,19 @@ export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void
       };
       
       if (editingRule) {
-        // Mevcut çalışan ve cihaz ID'lerini al
-        const existingEmployeeIds = editingRule.group_members?.map((gm: any) => gm.employee_id?.toString()).filter(Boolean) || [];
-        const existingDeviceIds = editingRule.group_devices?.map((gd: any) => gd.device_id?.toString()).filter(Boolean) || [];
-        
-        // Sadece yeni çalışanları ve cihazları belirle
-        const newEmployeeIds = formData.selected_employees.filter(id => !existingEmployeeIds.includes(id));
-        const newDeviceIds = formData.selected_devices.filter(id => !existingDeviceIds.includes(id));
-        
-        console.log('Updating existing rule with additional members and devices:', {
+        console.log('Updating existing rule with additional members:', {
           ruleId: editingRule.id,
           updates: ruleData,
-          existingEmployeeIds,
-          newEmployeeIds,
-          existingDeviceIds,
-          newDeviceIds
+          newEmployeeIds: formData.selected_employees.map(id => parseInt(id)),
+          newDeviceIds: formData.selected_devices.map(id => parseInt(id))
         });
 
         await updateAccessRuleWithAdditionalMembers.mutateAsync({
           id: editingRule.id,
           updates: ruleData,
-          employeeIds: newEmployeeIds.map(id => parseInt(id)),
-          deviceIds: newDeviceIds.map(id => parseInt(id))
+          employeeIds: formData.selected_employees.map(id => parseInt(id)),
+          deviceIds: formData.selected_devices.map(id => parseInt(id))
         });
-        
-        // Kullanıcıya hangi yeni öğelerin eklendiğini bildir
-        const addedItems = [];
-        if (newEmployeeIds.length > 0) {
-          addedItems.push(`${newEmployeeIds.length} yeni çalışan`);
-        }
-        if (newDeviceIds.length > 0) {
-          addedItems.push(`${newDeviceIds.length} yeni cihaz`);
-        }
-        
-        if (addedItems.length > 0) {
-          toast({
-            title: "Başarılı",
-            description: `Kural güncellendi ve ${addedItems.join(', ')} eklendi.`,
-          });
-        } else {
-          toast({
-            title: "Bilgi",
-            description: "Kural güncellendi. Yeni üye veya cihaz eklenmedi.",
-          });
-        }
       } else {
         console.log('Creating new rule with batch operation:', {
           rule: ruleData,

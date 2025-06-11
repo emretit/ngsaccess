@@ -16,11 +16,11 @@ interface GroupDevicesManagerProps {
 }
 
 export function GroupDevicesManager({ rule, projectId }: GroupDevicesManagerProps) {
-  const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   
   const { devices } = useDevices();
-  const { updateAccessRuleWithAdditionalMembers, removeGroupDevice } = useAccessRules();
+  const { addGroupDevice, removeGroupDevice } = useAccessRules();
 
   const filteredDevices = devices?.filter(device => 
     device.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -31,47 +31,19 @@ export function GroupDevicesManager({ rule, projectId }: GroupDevicesManagerProp
     !rule.group_devices?.some(groupDevice => groupDevice.device_id === Number(device.id))
   );
 
-  const handleAddDevices = async () => {
-    if (selectedDeviceIds.length === 0) return;
-    
-    // Mevcut cihaz ID'lerini al
-    const existingDeviceIds = rule.group_devices?.map(gd => gd.device_id?.toString()).filter(Boolean) || [];
-    
-    // Sadece yeni cihazları belirle
-    const newDeviceIds = selectedDeviceIds.filter(id => !existingDeviceIds.includes(id));
-    
-    if (newDeviceIds.length === 0) {
-      console.log('Seçilen cihazlar zaten grupta mevcut');
-      return;
-    }
-
-    try {
-      await updateAccessRuleWithAdditionalMembers.mutateAsync({
-        id: rule.id,
-        updates: {}, // Sadece cihaz ekliyoruz, kural güncellemesi yok
-        employeeIds: [], // Çalışan ekleme yok
-        deviceIds: newDeviceIds.map(id => parseInt(id))
+  const handleAddDevice = () => {
+    if (selectedDeviceId) {
+      addGroupDevice.mutate({
+        groupId: rule.id,
+        deviceId: parseInt(selectedDeviceId),
+        projectId
       });
-      
-      setSelectedDeviceIds([]);
-      console.log(`${newDeviceIds.length} yeni cihaz gruba eklendi`);
-    } catch (error) {
-      console.error('Cihaz ekleme hatası:', error);
+      setSelectedDeviceId("");
     }
   };
 
   const handleRemoveDevice = (groupDeviceId: number) => {
     removeGroupDevice.mutate(groupDeviceId);
-  };
-
-  const handleDeviceSelection = (deviceId: string) => {
-    setSelectedDeviceIds(prev => {
-      if (prev.includes(deviceId)) {
-        return prev.filter(id => id !== deviceId);
-      } else {
-        return [...prev, deviceId];
-      }
-    });
   };
 
   return (
@@ -83,83 +55,64 @@ export function GroupDevicesManager({ rule, projectId }: GroupDevicesManagerProp
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Add new devices */}
-        <div className="space-y-3">
-          <Input
-            placeholder="Cihaz ara..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-          
-          <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
-            {availableDevices.length === 0 ? (
-              <div className="text-center text-muted-foreground py-4">
-                {searchTerm ? "Arama kriterine uygun cihaz bulunamadı" : "Eklenebilecek cihaz yok"}
-              </div>
-            ) : (
-              availableDevices.map((device) => (
-                <div 
-                  key={device.id} 
-                  className="flex items-center space-x-2 p-2 hover:bg-muted rounded cursor-pointer"
-                  onClick={() => handleDeviceSelection(device.id.toString())}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedDeviceIds.includes(device.id.toString())}
-                    onChange={() => handleDeviceSelection(device.id.toString())}
-                    className="rounded"
-                  />
-                  <div className="flex-1">
-                    <div className="font-medium">{device.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {device.location}
-                      {device.serial_number && ` • ${device.serial_number}`}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
+        {/* Add new device */}
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <Input
+              placeholder="Cihaz ara..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="mb-2"
+            />
+            <Select value={selectedDeviceId} onValueChange={setSelectedDeviceId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Cihaz seçin" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableDevices.map((device) => (
+                  <SelectItem key={device.id} value={device.id.toString()}>
+                    {device.name} - {device.location}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          
           <Button 
-            onClick={handleAddDevices}
-            disabled={selectedDeviceIds.length === 0 || updateAccessRuleWithAdditionalMembers.isPending}
-            className="w-full"
+            onClick={handleAddDevice}
+            disabled={!selectedDeviceId || addGroupDevice.isPending}
+            className="mt-8"
           >
-            <Plus className="w-4 h-4 mr-2" />
-            Seçili Cihazları Ekle ({selectedDeviceIds.length})
+            <Plus className="w-4 h-4 mr-1" />
+            Ekle
           </Button>
         </div>
 
         {/* Current devices */}
         <div className="space-y-2">
-          <h4 className="font-medium">Mevcut Cihazlar</h4>
-          {rule.group_devices && rule.group_devices.length > 0 ? (
-            rule.group_devices.map((groupDevice) => (
-              <div key={groupDevice.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                <div>
-                  <div className="font-medium">
-                    {groupDevice.devices?.name}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {groupDevice.devices?.location}
-                    {(groupDevice.devices?.serial || groupDevice.devices?.serial_number) && 
-                      ` • ${groupDevice.devices.serial || groupDevice.devices.serial_number}`
-                    }
-                  </div>
+          {rule.group_devices?.map((groupDevice) => (
+            <div key={groupDevice.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+              <div>
+                <div className="font-medium">
+                  {groupDevice.devices?.name}
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleRemoveDevice(groupDevice.id)}
-                  disabled={removeGroupDevice.isPending}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                <div className="text-sm text-muted-foreground">
+                  {groupDevice.devices?.location}
+                  {(groupDevice.devices?.serial || groupDevice.devices?.serial_number) && 
+                    ` • ${groupDevice.devices.serial || groupDevice.devices.serial_number}`
+                  }
+                </div>
               </div>
-            ))
-          ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleRemoveDevice(groupDevice.id)}
+                disabled={removeGroupDevice.isPending}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          )) || (
             <div className="text-center text-muted-foreground py-4">
               Bu gruba henüz cihaz eklenmemiş
             </div>
