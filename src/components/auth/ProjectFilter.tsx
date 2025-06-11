@@ -15,6 +15,7 @@ const ProjectFilter: React.FC<ProjectFilterProps> = ({
 }) => {
   const { projectIds, isSuperAdmin, loading } = useProjectAccess();
 
+  // Loading sırasında loading göster
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
@@ -23,8 +24,9 @@ const ProjectFilter: React.FC<ProjectFilterProps> = ({
     );
   }
 
+  // Loading tamamlandıktan sonra erişim kontrolü yap
   // Eğer super admin değilse ve hiç proje erişimi yoksa
-  if (!isSuperAdmin && projectIds.length === 0) {
+  if (!loading && !isSuperAdmin && projectIds.length === 0) {
     if (!showNoAccess) return null;
     
     return (

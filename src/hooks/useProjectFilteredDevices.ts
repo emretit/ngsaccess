@@ -56,6 +56,7 @@ export const useProjectFilteredDevices = () => {
     isLoading: isLoading || projectLoading,
     error,
     refetch,
-    hasProjectAccess: isSuperAdmin || projectIds.length > 0
+    // Loading sırasında hasProjectAccess true dönsün ki "Proje Erişimi Yok" mesajı görünmesin
+    hasProjectAccess: projectLoading || isSuperAdmin || projectIds.length > 0
   };
 };

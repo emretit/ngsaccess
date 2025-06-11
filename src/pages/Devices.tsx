@@ -1,158 +1,145 @@
 
-import { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { DevicesContent } from "@/components/devices/DevicesContent";
-import { DeviceDetailsPanel } from "@/components/devices/DeviceDetailsPanel";
-import { QRCodeDialog } from "@/components/devices/QRCodeDialog";
-import { DeviceDeleteDialog } from "@/components/devices/DeviceDeleteDialog";
-import { AssignLocationForm } from "@/components/devices/AssignLocationForm";
-import { ZoneDoorTreePanel } from "@/components/access-control/ZoneDoorTreePanel";
-import { useProjectFilteredDevices } from "@/hooks/useProjectFilteredDevices";
-import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
-import { useDeviceActions } from "@/components/devices/useDeviceActions";
-import { useQRCodeDialog } from "@/components/devices/useQRCodeDialog";
-import { Device } from "@/types/device";
+import { useState, useEffect } from 'react';
+import { DevicesContent } from '@/components/devices/DevicesContent';
+import { ZoneDoorTreePanel } from '@/components/access-control/ZoneDoorTreePanel';
+import { DeviceForm } from '@/components/devices/DeviceForm';
+import { QRCodeDialog } from '@/components/devices/QRCodeDialog';
+import { DeviceDeleteDialog } from '@/components/devices/DeviceDeleteDialog';
+import { AssignLocationForm } from '@/components/devices/AssignLocationForm';
+import { useProjectFilteredDevices } from '@/hooks/useProjectFilteredDevices';
+import { useZonesAndDoors } from '@/hooks/useZonesAndDoors';
+import { useQRCodeDialog } from '@/components/devices/useQRCodeDialog';
+import { useLocationForm } from '@/components/devices/useLocationForm';
+import { useDeviceActions } from '@/components/devices/useDeviceActions';
+import { useDeviceTable } from '@/hooks/useDeviceTable';
+import { Device } from '@/types/device';
+import ProjectFilter from '@/components/auth/ProjectFilter';
 
-export default function Devices() {
-  const { devices, isLoading, refetch, hasProjectAccess } = useProjectFilteredDevices();
+const Devices = () => {
+  const { devices, isLoading, hasProjectAccess } = useProjectFilteredDevices();
   const { zones, doors } = useZonesAndDoors();
-  
-  const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isAssignLocationOpen, setIsAssignLocationOpen] = useState(false);
-  const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null);
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [selectedDoorId, setSelectedDoorId] = useState<number | null>(null);
-
+  
+  // Device form state
+  const [showDeviceForm, setShowDeviceForm] = useState(false);
+  const [editingDevice, setEditingDevice] = useState<Device | null>(null);
+  
+  // QR Dialog
   const { selectedQR, handleQRClick, handleDownloadQR, closeQRDialog } = useQRCodeDialog();
+  
+  // Location form
+  const { showLocationForm, openLocationForm, closeLocationForm, handleAssignLocation } = useLocationForm();
+  
+  // Device actions
   const { handleDeleteDevice } = useDeviceActions();
+  
+  // Device table selection
+  const { showDeleteDialog, setShowDeleteDialog, handleBulkDelete } = useDeviceTable(devices);
 
-  if (!hasProjectAccess) {
+  // Clear selections when zone/door changes
+  useEffect(() => {
+    if (selectedZoneId) {
+      setSelectedDoorId(null);
+    }
+  }, [selectedZoneId]);
+
+  const handleNewDevice = () => {
+    setEditingDevice(null);
+    setShowDeviceForm(true);
+  };
+
+  const handleEditDevice = (device: Device) => {
+    setEditingDevice(device);
+    setShowDeviceForm(true);
+  };
+
+  const closeDeviceForm = () => {
+    setShowDeviceForm(false);
+    setEditingDevice(null);
+  };
+
+  const onDeviceFormSuccess = () => {
+    closeDeviceForm();
+    // Refresh will be handled by React Query
+  };
+
+  // Loading durumunda loading göster
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto">
-            <span className="text-2xl">🔒</span>
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Proje Erişimi Yok</h3>
-            <p className="text-gray-600 mt-2">
-              Bu sayfaya erişim için size atanmış bir proje bulunmuyor. 
-              Lütfen sistem yöneticinizle iletişime geçin.
-            </p>
-          </div>
-        </div>
+      <div className="flex items-center justify-center min-h-[200px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
       </div>
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-      </div>
-    );
+  // Proje erişimi yoksa ve loading de tamamlandıysa ProjectFilter kullan
+  if (!hasProjectAccess) {
+    return <ProjectFilter>Content will not be shown</ProjectFilter>;
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] gap-6 p-6">
-      {/* Left sidebar with zone/door tree */}
-      <ZoneDoorTreePanel 
-        onSelectZone={setSelectedZoneId}
-        onSelectDoor={setSelectedDoorId}
+    <div className="flex h-full">
+      <ZoneDoorTreePanel
+        zones={zones}
+        doors={doors}
+        selectedZoneId={selectedZoneId}
+        selectedDoorId={selectedDoorId}
+        onZoneSelect={setSelectedZoneId}
+        onDoorSelect={setSelectedDoorId}
       />
-
-      {/* Main content area */}
-      <div className="flex-1 space-y-6">
-        <DevicesContent
-          devices={devices}
-          isLoading={isLoading}
-          zones={zones}
-          doors={doors}
-          selectedZoneId={selectedZoneId}
-          selectedDoorId={selectedDoorId}
-          onQRClick={handleQRClick}
-          onDeleteDevice={(deviceId) => {
-            const device = devices.find(d => d.id.toString() === deviceId);
-            if (device) {
-              setDeviceToDelete(device);
-              setIsDeleteDialogOpen(true);
-            }
-          }}
-          onAssignLocation={(device) => {
-            setSelectedDevice(device);
-            setIsAssignLocationOpen(true);
-          }}
-          onEditDevice={(device) => {
-            setSelectedDevice(device);
-            setIsPanelOpen(true);
-          }}
-          onNewDevice={() => {
-            setSelectedDevice(null);
-            setIsPanelOpen(true);
-          }}
-        />
+      
+      <div className="flex-1 overflow-hidden">
+        <div className="p-4 md:p-8">
+          <DevicesContent
+            devices={devices}
+            isLoading={isLoading}
+            zones={zones}
+            doors={doors}
+            selectedZoneId={selectedZoneId}
+            selectedDoorId={selectedDoorId}
+            onQRClick={handleQRClick}
+            onDeleteDevice={handleDeleteDevice}
+            onAssignLocation={openLocationForm}
+            onEditDevice={handleEditDevice}
+            onNewDevice={handleNewDevice}
+          />
+        </div>
       </div>
 
-      <DeviceDetailsPanel
-        open={isPanelOpen}
-        onClose={() => setIsPanelOpen(false)}
-        selectedDevice={selectedDevice ? {
-          id: selectedDevice.id,
-          name: selectedDevice.device_name || selectedDevice.name || '',
-          serial_number: selectedDevice.device_serial || selectedDevice.serial_number || '',
-          device_model_enum: "Other" as const,
-          date_added: selectedDevice.created_at || new Date().toISOString(),
-          status: selectedDevice.status,
-          zone_id: selectedDevice.zone_id,
-          door_id: selectedDevice.door_id
-        } : null}
-        onSuccess={() => {
-          refetch();
-          setIsPanelOpen(false);
-        }}
+      {/* Device Form Dialog */}
+      <DeviceForm
+        open={showDeviceForm}
+        onOpenChange={setShowDeviceForm}
+        device={editingDevice}
+        onSuccess={onDeviceFormSuccess}
       />
 
+      {/* QR Code Dialog */}
       <QRCodeDialog
-        open={!!selectedQR}
-        onOpenChange={closeQRDialog}
-        qrData={selectedQR}
+        selectedQR={selectedQR}
+        onClose={closeQRDialog}
         onDownload={handleDownloadQR}
       />
 
+      {/* Delete Dialog */}
       <DeviceDeleteDialog
-        isOpen={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-        selectedCount={1}
-        onConfirm={async () => {
-          if (deviceToDelete) {
-            await handleDeleteDevice(deviceToDelete.id.toString());
-            setIsDeleteDialogOpen(false);
-            setDeviceToDelete(null);
-          }
-        }}
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        onConfirm={handleBulkDelete}
       />
 
+      {/* Location Assignment Form */}
       <AssignLocationForm
-        open={isAssignLocationOpen}
-        onClose={() => setIsAssignLocationOpen(false)}
-        onSubmit={async (zoneId: number, doorId: number) => {
-          // TODO: Implement location assignment logic
-          console.log('Assigning location:', { zoneId, doorId });
-        }}
-        deviceName={selectedDevice?.device_name || selectedDevice?.name || ''}
-        device={selectedDevice ? {
-          id: selectedDevice.id,
-          name: selectedDevice.device_name || selectedDevice.name || '',
-          serial_number: selectedDevice.device_serial || selectedDevice.serial_number || '',
-          device_model_enum: "Other" as const,
-          date_added: selectedDevice.created_at || new Date().toISOString(),
-          status: selectedDevice.status,
-          zone_id: selectedDevice.zone_id,
-          door_id: selectedDevice.door_id
-        } : undefined}
+        open={showLocationForm.open}
+        onOpenChange={(open) => open ? null : closeLocationForm()}
+        device={showLocationForm.device}
+        zones={zones}
+        doors={doors}
+        onAssign={handleAssignLocation}
       />
     </div>
   );
-}
+};
+
+export default Devices;
