@@ -5,6 +5,7 @@ import { DepartmentTreeItem } from "./DepartmentTreeItem";
 import { AddDepartmentDialog } from "./AddDepartmentDialog";
 import { DepartmentProjectHeader } from "./DepartmentProjectHeader";
 import { useDepartments } from "@/hooks/useDepartments";
+import { useProjectAccess } from "@/hooks/useProjectAccess";
 
 interface DepartmentTreeProps {
   onSelectDepartment: (id: number | null) => void;
@@ -12,6 +13,7 @@ interface DepartmentTreeProps {
 
 export default function DepartmentTree({ onSelectDepartment }: DepartmentTreeProps) {
   const { departments, addDepartment, deleteDepartment } = useDepartments();
+  const { projectIds, isSuperAdmin } = useProjectAccess();
   const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAddTopLevelDialog, setShowAddTopLevelDialog] = useState(false);
@@ -20,22 +22,40 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
 
   useEffect(() => {
     fetchProjectName();
-  }, []);
+  }, [projectIds, isSuperAdmin]);
 
   const fetchProjectName = async () => {
-    const { data, error } = await supabase
-      .from("projects")
-      .select("name")
-      .eq("is_active", true)
-      .single();
+    try {
+      if (isSuperAdmin) {
+        setProjectName("Tüm Projeler");
+        return;
+      }
 
-    if (error) {
-      console.error("Error fetching project name:", error);
-      return;
-    }
+      if (projectIds.length > 0) {
+        const { data, error } = await supabase
+          .from("projects")
+          .select("name")
+          .eq("id", projectIds[0])
+          .eq("is_active", true)
+          .maybeSingle();
 
-    if (data) {
-      setProjectName(data.name);
+        if (error) {
+          console.error("Error fetching project name:", error);
+          setProjectName("Proje");
+          return;
+        }
+
+        if (data) {
+          setProjectName(data.name);
+        } else {
+          setProjectName("Proje");
+        }
+      } else {
+        setProjectName("Proje Bulunamadı");
+      }
+    } catch (error) {
+      console.error("Error in fetchProjectName:", error);
+      setProjectName("Ana Proje");
     }
   };
 
