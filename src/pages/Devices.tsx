@@ -142,17 +142,16 @@ const Devices = () => {
       {/* Location Assignment Form */}
       <AssignLocationForm
         open={showLocationForm.open}
-        onOpenChange={(open) => open ? null : closeLocationForm()}
+        onClose={closeLocationForm}
+        onSubmit={handleAssignLocation}
+        deviceName={showLocationForm.device?.name || showLocationForm.device?.device_name || 'Unknown Device'}
         device={showLocationForm.device ? {
           ...showLocationForm.device,
           name: showLocationForm.device.name || showLocationForm.device.device_name || 'Unknown Device',
           serial_number: showLocationForm.device.serial_number || showLocationForm.device.device_serial || '',
           device_model_enum: "Other" as const,
           date_added: new Date().toISOString()
-        } : null}
-        zones={zones}
-        doors={doors}
-        onAssign={handleAssignLocation}
+        } : undefined}
       />
     </div>
   );
