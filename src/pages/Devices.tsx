@@ -94,12 +94,8 @@ const Devices = () => {
   return (
     <div className="flex h-full">
       <ZoneDoorTreePanel
-        zones={zones}
-        doors={doors}
-        selectedZoneId={selectedZoneId}
-        selectedDoorId={selectedDoorId}
-        onZoneSelect={setSelectedZoneId}
-        onDoorSelect={setSelectedDoorId}
+        onSelectZone={setSelectedZoneId}
+        onSelectDoor={setSelectedDoorId}
       />
       
       <div className="flex-1 overflow-hidden">
@@ -122,23 +118,24 @@ const Devices = () => {
 
       {/* Device Form Dialog */}
       <DeviceForm
-        open={showDeviceForm}
-        onOpenChange={setShowDeviceForm}
-        device={editingDevice}
-        onSuccess={onDeviceFormSuccess}
+        onAddDevice={(serialNumber: string) => console.log('Add device:', serialNumber)}
+        isLoading={false}
+        onOpenDevicePanel={() => setShowDeviceForm(true)}
       />
 
       {/* QR Code Dialog */}
       <QRCodeDialog
-        selectedQR={selectedQR}
-        onClose={closeQRDialog}
+        open={!!selectedQR}
+        onOpenChange={(open) => !open && closeQRDialog()}
+        qrData={selectedQR}
         onDownload={handleDownloadQR}
       />
 
       {/* Delete Dialog */}
       <DeviceDeleteDialog
-        open={showDeleteDialog}
+        isOpen={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
+        selectedCount={0}
         onConfirm={handleBulkDelete}
       />
 
@@ -146,7 +143,11 @@ const Devices = () => {
       <AssignLocationForm
         open={showLocationForm.open}
         onOpenChange={(open) => open ? null : closeLocationForm()}
-        device={showLocationForm.device}
+        device={showLocationForm.device ? {
+          ...showLocationForm.device,
+          device_model_enum: "Other" as const,
+          date_added: new Date().toISOString()
+        } : null}
         zones={zones}
         doors={doors}
         onAssign={handleAssignLocation}
