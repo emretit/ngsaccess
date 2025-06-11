@@ -114,12 +114,16 @@ export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void
         return;
       }
 
+      // Time alanları için null kontrolü ve düzeltme
+      const processedStartTime = formData.start_time.trim() === '' ? null : formData.start_time;
+      const processedEndTime = formData.end_time.trim() === '' ? null : formData.end_time;
+
       const ruleData = {
         name: formData.name,
         description: formData.description,
         target_type: formData.target_type,
-        start_time: formData.start_time,
-        end_time: formData.end_time,
+        start_time: processedStartTime,
+        end_time: processedEndTime,
         days: formData.days,
         access_direction: formData.access_direction,
         priority: formData.priority,
