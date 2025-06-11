@@ -11,6 +11,7 @@ import { useDepartments } from "@/hooks/useDepartments";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { useAccessRules } from "@/hooks/useAccessRules";
 import { Loader2, ChevronRight, ChevronDown, Users, User, MapPin, Building2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface CreateRuleDialogProps {
   open: boolean;
@@ -20,6 +21,8 @@ interface CreateRuleDialogProps {
 }
 
 const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRuleDialogProps) => {
+  const { toast } = useToast();
+  
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -86,56 +89,81 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
     }
   }, [open, editingRule]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.name.trim()) {
-      alert('Lütfen kural adı girin.');
-      return;
-    }
-
-    if (formData.selected_employees.length === 0) {
-      alert('Lütfen en az bir çalışan seçin.');
-      return;
-    }
+    console.log('Form submission started:', formData);
     
-    if (formData.selected_devices.length === 0 && formData.selected_zones.length === 0) {
-      alert('Lütfen en az bir cihaz veya bölge seçin.');
-      return;
-    }
+    try {
+      // Validation
+      if (!formData.name.trim()) {
+        toast({
+          variant: "destructive",
+          title: "Hata",
+          description: "Lütfen kural adı girin.",
+        });
+        return;
+      }
 
-    const ruleData = {
-      name: formData.name,
-      description: formData.description,
-      target_type: formData.target_type,
-      start_time: formData.start_time,
-      end_time: formData.end_time,
-      days: formData.days,
-      access_direction: formData.access_direction,
-      priority: formData.priority,
-    };
-    
-    if (editingRule) {
-      updateAccessRule.mutate({
-        id: editingRule.id,
-        updates: ruleData
-      });
-    } else {
-      // Use the new batch creation function
-      console.log('Submitting new rule with batch creation:', {
-        rule: ruleData,
-        employeeIds: formData.selected_employees.map(id => parseInt(id)),
-        deviceIds: formData.selected_devices.map(id => parseInt(id))
-      });
+      if (formData.selected_employees.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Hata",
+          description: "Lütfen en az bir çalışan seçin.",
+        });
+        return;
+      }
+      
+      if (formData.selected_devices.length === 0 && formData.selected_zones.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "Hata",
+          description: "Lütfen en az bir cihaz veya bölge seçin.",
+        });
+        return;
+      }
 
-      createAccessRuleWithMembers.mutate({
-        rule: ruleData,
-        employeeIds: formData.selected_employees.map(id => parseInt(id)),
-        deviceIds: formData.selected_devices.map(id => parseInt(id))
+      const ruleData = {
+        name: formData.name,
+        description: formData.description,
+        target_type: formData.target_type,
+        start_time: formData.start_time,
+        end_time: formData.end_time,
+        days: formData.days,
+        access_direction: formData.access_direction,
+        priority: formData.priority,
+      };
+      
+      if (editingRule) {
+        await updateAccessRule.mutateAsync({
+          id: editingRule.id,
+          updates: ruleData
+        });
+      } else {
+        console.log('Creating new rule with batch operation:', {
+          rule: ruleData,
+          employeeIds: formData.selected_employees.map(id => parseInt(id)),
+          deviceIds: formData.selected_devices.map(id => parseInt(id))
+        });
+
+        await createAccessRuleWithMembers.mutateAsync({
+          rule: ruleData,
+          employeeIds: formData.selected_employees.map(id => parseInt(id)),
+          deviceIds: formData.selected_devices.map(id => parseInt(id))
+        });
+      }
+      
+      // Close dialog on success
+      onClose();
+      
+    } catch (error) {
+      console.error('Form submission error:', error);
+      toast({
+        variant: "destructive",
+        title: "Hata",
+        description: "Bir hata oluştu. Lütfen tekrar deneyin.",
       });
     }
-    
-    onClose();
   };
 
   const handleEmployeeChange = (employeeId: string, checked: boolean) => {
@@ -264,12 +292,13 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
       const isSelected = isDepartmentSelected(department.id);
       
       return (
-        <div key={department.id} className="space-y-1">
+        <div key={`dept-${department.id}`} className="space-y-1">
           <div 
             className="flex items-center space-x-2"
             style={{ paddingLeft: `${level * 16}px` }}
           >
             <Button
+              type="button"
               variant="ghost"
               size="sm"
               className="h-5 w-5 p-0"
@@ -304,7 +333,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
               {/* Departman çalışanları */}
               {departmentEmployees.map(employee => (
                 <div 
-                  key={employee.id}
+                  key={`emp-${employee.id}`}
                   className="flex items-center space-x-2"
                   style={{ paddingLeft: `${(level + 1) * 16 + 20}px` }}
                 >
@@ -341,9 +370,10 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
       const isSelected = isZoneSelected(zone.id);
       
       return (
-        <div key={zone.id} className="space-y-1">
+        <div key={`zone-${zone.id}`} className="space-y-1">
           <div className="flex items-center space-x-2">
             <Button
+              type="button"
               variant="ghost"
               size="sm"
               className="h-5 w-5 p-0"
@@ -378,7 +408,7 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
               {/* Bölgedeki cihazlar */}
               {zoneDevices.map(device => (
                 <div 
-                  key={device.id}
+                  key={`device-${device.id}`}
                   className="flex items-center space-x-2"
                   style={{ paddingLeft: '36px' }}
                 >
@@ -579,7 +609,10 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
             <Button type="button" variant="outline" onClick={onClose}>
               İptal
             </Button>
-            <Button type="submit" disabled={createAccessRuleWithMembers.isPending || updateAccessRule.isPending}>
+            <Button 
+              type="submit" 
+              disabled={createAccessRuleWithMembers.isPending || updateAccessRule.isPending}
+            >
               {createAccessRuleWithMembers.isPending || updateAccessRule.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -597,3 +630,5 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
 };
 
 export default CreateRuleDialog;
+
+</edits_to_apply>
