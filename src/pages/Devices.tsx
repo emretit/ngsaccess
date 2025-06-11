@@ -145,6 +145,8 @@ const Devices = () => {
         onOpenChange={(open) => open ? null : closeLocationForm()}
         device={showLocationForm.device ? {
           ...showLocationForm.device,
+          name: showLocationForm.device.name || showLocationForm.device.device_name || 'Unknown Device',
+          serial_number: showLocationForm.device.serial_number || showLocationForm.device.device_serial || '',
           device_model_enum: "Other" as const,
           date_added: new Date().toISOString()
         } : null}
