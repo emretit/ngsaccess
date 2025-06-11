@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useAccessRules } from "@/hooks/useAccessRules";
@@ -20,7 +19,7 @@ interface RuleFormData {
 
 export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void) => {
   const { toast } = useToast();
-  const { createAccessRuleWithMembers, updateAccessRule } = useAccessRules();
+  const { createAccessRuleWithMembers, updateAccessRuleWithAdditionalMembers } = useAccessRules();
 
   const [formData, setFormData] = useState<RuleFormData>({
     name: '',
@@ -122,9 +121,18 @@ export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void
       };
       
       if (editingRule) {
-        await updateAccessRule.mutateAsync({
+        console.log('Updating existing rule with additional members:', {
+          ruleId: editingRule.id,
+          updates: ruleData,
+          newEmployeeIds: formData.selected_employees.map(id => parseInt(id)),
+          newDeviceIds: formData.selected_devices.map(id => parseInt(id))
+        });
+
+        await updateAccessRuleWithAdditionalMembers.mutateAsync({
           id: editingRule.id,
-          updates: ruleData
+          updates: ruleData,
+          employeeIds: formData.selected_employees.map(id => parseInt(id)),
+          deviceIds: formData.selected_devices.map(id => parseInt(id))
         });
       } else {
         console.log('Creating new rule with batch operation:', {
@@ -156,6 +164,6 @@ export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void
     formData,
     setFormData,
     handleSubmit,
-    isSubmitting: createAccessRuleWithMembers.isPending || updateAccessRule.isPending
+    isSubmitting: createAccessRuleWithMembers.isPending || updateAccessRuleWithAdditionalMembers.isPending
   };
 };
