@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -87,7 +88,7 @@ const AdminProjectsPanel = () => {
         .select(`
           project_id,
           user_id,
-          users!inner (
+          users (
             id,
             email,
             role
@@ -98,7 +99,7 @@ const AdminProjectsPanel = () => {
         console.error('Error fetching project users:', error);
         return [];
       }
-      return data as ProjectUser[];
+      return data as any[];
     }
   });
 
@@ -371,19 +372,19 @@ const AdminProjectsPanel = () => {
                                 <p className="text-purple-400 text-sm italic">Bu projeye atanmış kullanıcı bulunmamaktadır</p>
                               ) : (
                                 <div className="grid gap-3">
-                                  {projectUsersList.map((pu) => (
+                                  {projectUsersList.map((pu: any) => (
                                     <div key={pu.user_id} className="flex items-center justify-between bg-white/5 rounded-lg p-3 border border-white/10">
                                       <div className="flex items-center space-x-3">
                                         <div className="w-8 h-8 bg-purple-500/30 rounded-full flex items-center justify-center">
                                           <Users className="h-4 w-4 text-purple-300" />
                                         </div>
                                         <div>
-                                          <p className="text-white font-medium">{pu.users.email}</p>
+                                          <p className="text-white font-medium">{pu.users?.email}</p>
                                           <p className="text-purple-300 text-xs">ID: {pu.user_id}</p>
                                         </div>
                                       </div>
                                       <div>
-                                        {getRoleDisplay(pu.users.role)}
+                                        {getRoleDisplay(pu.users?.role || 'project_user')}
                                       </div>
                                     </div>
                                   ))}
