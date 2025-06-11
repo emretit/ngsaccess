@@ -8,8 +8,10 @@ import { EmployeeStats } from "@/components/employees/EmployeeStats";
 import { EmployeeFilters } from "@/components/employees/EmployeeFilters";
 import { EmployeePagination } from "@/components/employees/EmployeePagination";
 import { useEmployees } from "@/hooks/useEmployees";
+import { useProjectAccess } from "@/hooks/useProjectAccess";
 
 export default function Employees() {
+  const { loading: projectLoading } = useProjectAccess();
   const { employees, isLoading, error, refetch, hasProjectAccess } = useEmployees();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -97,7 +99,17 @@ export default function Employees() {
     setIsPanelOpen(true);
   };
 
-  if (!hasProjectAccess) {
+  // Loading durumunda (hem project hem employees loading) loading göster
+  if (projectLoading || isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  // Proje erişimi yoksa ve loading de tamamlandıysa mesaj göster
+  if (!projectLoading && !isLoading && !hasProjectAccess) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center space-y-4">
@@ -112,14 +124,6 @@ export default function Employees() {
             </p>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
       </div>
     );
   }
