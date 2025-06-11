@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from "react";
 import DepartmentTree from "@/components/departments/DepartmentTree";
 import SlideOverPanel from "@/components/employees/SlideOverPanel";
@@ -10,7 +11,6 @@ import { useEmployees } from "@/hooks/useEmployees";
 
 export default function Employees() {
   const { employees, isLoading, error, refetch, hasProjectAccess } = useEmployees();
-  const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -25,7 +25,8 @@ export default function Employees() {
     inactive: employees.filter(emp => !emp.is_active).length
   }), [employees]);
 
-  useEffect(() => {
+  // Filtreleme işlemini useMemo ile optimize et
+  const filteredEmployees = useMemo(() => {
     let filtered = employees;
 
     if (selectedDepartment) {
@@ -43,16 +44,21 @@ export default function Employees() {
       );
     }
 
-    setFilteredEmployees(filtered);
-    setCurrentPage(1);
+    return filtered;
   }, [employees, searchQuery, selectedDepartment]);
 
+  // Sayfalama için useMemo kullan
   const paginatedEmployees = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredEmployees.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredEmployees, currentPage, itemsPerPage]);
 
   const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
+
+  // Filtreleme değiştiğinde sayfa numarasını sıfırla
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedDepartment]);
 
   const handleEditEmployee = (employee: Employee) => {
     setEditingEmployee(employee);

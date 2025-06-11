@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,17 +25,6 @@ import { Badge } from '@/components/ui/badge';
 import { Edit, Plus, Trash2, Hash, Users, ChevronDown, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { useToast } from '@/components/ui/use-toast';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 
 interface Project {
   id: number;
@@ -44,6 +32,16 @@ interface Project {
   description: string;
   created_at: string;
   is_active: boolean;
+}
+
+interface ProjectUser {
+  project_id: number;
+  user_id: string;
+  users: {
+    id: string;
+    email: string;
+    role: string;
+  };
 }
 
 const AdminProjectsPanel = () => {
@@ -80,7 +78,7 @@ const AdminProjectsPanel = () => {
     }
   });
 
-  // Fetch users for projects
+  // Fetch users for projects - düzeltilmiş sorgu
   const { data: projectUsers = [] } = useQuery({
     queryKey: ['admin', 'project-users'],
     queryFn: async () => {
@@ -89,15 +87,18 @@ const AdminProjectsPanel = () => {
         .select(`
           project_id,
           user_id,
-          users:user_id (
+          users!inner (
             id,
             email,
             role
           )
         `);
 
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error('Error fetching project users:', error);
+        return [];
+      }
+      return data as ProjectUser[];
     }
   });
 
@@ -377,12 +378,12 @@ const AdminProjectsPanel = () => {
                                           <Users className="h-4 w-4 text-purple-300" />
                                         </div>
                                         <div>
-                                          <p className="text-white font-medium">{pu.users?.email}</p>
+                                          <p className="text-white font-medium">{pu.users.email}</p>
                                           <p className="text-purple-300 text-xs">ID: {pu.user_id}</p>
                                         </div>
                                       </div>
                                       <div>
-                                        {getRoleDisplay(pu.users?.role || 'project_user')}
+                                        {getRoleDisplay(pu.users.role)}
                                       </div>
                                     </div>
                                   ))}
