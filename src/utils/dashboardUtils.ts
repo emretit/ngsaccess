@@ -1,4 +1,3 @@
-
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CardReading } from '@/types/access-control';
@@ -25,7 +24,7 @@ export const fetchDashboardStats = async (projectIds: number[], isSuperAdmin: bo
       .select('*')
       .gte('access_time', today.toISOString())
       .lt('access_time', tomorrow.toISOString());
-    let pendingRequestsQuery = supabase.from('access_permissions').select('*').eq('has_access', false);
+    let pendingRequestsQuery = supabase.from('access_rules').select('*').eq('is_active', false);
 
     // Apply project filtering if not super admin
     if (!isSuperAdmin && projectIds.length > 0) {
