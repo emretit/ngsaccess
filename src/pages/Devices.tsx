@@ -6,15 +6,18 @@ import { DeviceForm } from '@/components/devices/DeviceForm';
 import { QRCodeDialog } from '@/components/devices/QRCodeDialog';
 import { DeviceDeleteDialog } from '@/components/devices/DeviceDeleteDialog';
 import { AssignLocationForm } from '@/components/devices/AssignLocationForm';
+import { DeviceDetailsPanel } from '@/components/devices/DeviceDetailsPanel';
 import { useProjectFilteredDevices } from '@/hooks/useProjectFilteredDevices';
 import { useZonesAndDoors } from '@/hooks/useZonesAndDoors';
 import { useQRCodeDialog } from '@/components/devices/useQRCodeDialog';
 import { useLocationForm } from '@/components/devices/useLocationForm';
 import { useDeviceActions } from '@/components/devices/useDeviceActions';
 import { useDeviceTable } from '@/hooks/useDeviceTable';
-import { Device } from '@/types/device';
+import { Device, ServerDevice } from '@/types/device';
 import { useProjectAccess } from '@/hooks/useProjectAccess';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
 
 const Devices = () => {
   const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
@@ -23,9 +26,17 @@ const Devices = () => {
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [selectedDoorId, setSelectedDoorId] = useState<number | null>(null);
   
-  // Device form state
-  const [showDeviceForm, setShowDeviceForm] = useState(false);
-  const [editingDevice, setEditingDevice] = useState<Device | null>(null);
+  // Device panel state
+  const [devicePanel, setDevicePanel] = useState<{
+    open: boolean;
+    device: ServerDevice | null;
+  }>({
+    open: false,
+    device: null
+  });
+  
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   
   // QR Dialog
   const { selectedQR, handleQRClick, handleDownloadQR, closeQRDialog } = useQRCodeDialog();
@@ -47,23 +58,43 @@ const Devices = () => {
   }, [selectedZoneId]);
 
   const handleNewDevice = () => {
-    setEditingDevice(null);
-    setShowDeviceForm(true);
+    setDevicePanel({
+      open: true,
+      device: null
+    });
   };
 
   const handleEditDevice = (device: Device) => {
-    setEditingDevice(device);
-    setShowDeviceForm(true);
+    // Convert regular device to server device format for the form
+    const serverDevice: ServerDevice = {
+      id: device.id,
+      name: device.name || device.device_name || '',
+      serial_number: device.serial_number || device.device_serial || '',
+      device_model_enum: "Other",
+      date_added: device.created_at || new Date().toISOString(),
+      status: device.status || 'online',
+      zone_id: device.zone_id,
+      door_id: device.door_id
+    };
+    
+    setDevicePanel({
+      open: true,
+      device: serverDevice
+    });
   };
 
-  const closeDeviceForm = () => {
-    setShowDeviceForm(false);
-    setEditingDevice(null);
+  const handleDevicePanelClose = () => {
+    setDevicePanel({ open: false, device: null });
   };
 
-  const onDeviceFormSuccess = () => {
-    closeDeviceForm();
-    // Refresh will be handled by React Query
+  const handleDevicePanelSuccess = () => {
+    setDevicePanel({ open: false, device: null });
+    queryClient.invalidateQueries({ queryKey: ['devices'] });
+    
+    toast({
+      title: "İşlem başarılı",
+      description: "Cihaz bilgileri kaydedildi",
+    });
   };
 
   // Loading durumunda (hem project hem devices loading) loading göster
@@ -120,11 +151,12 @@ const Devices = () => {
         </div>
       </div>
 
-      {/* Device Form Dialog */}
-      <DeviceForm
-        onAddDevice={(serialNumber: string) => console.log('Add device:', serialNumber)}
-        isLoading={false}
-        onOpenDevicePanel={() => setShowDeviceForm(true)}
+      {/* Device Details Panel */}
+      <DeviceDetailsPanel
+        open={devicePanel.open}
+        onClose={handleDevicePanelClose}
+        selectedDevice={devicePanel.device}
+        onSuccess={handleDevicePanelSuccess}
       />
 
       {/* QR Code Dialog */}

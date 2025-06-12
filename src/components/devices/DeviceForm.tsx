@@ -3,12 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 
 interface DeviceFormProps {
-  onAddDevice: (serialNumber: string) => void;
-  isLoading: boolean;
   onOpenDevicePanel: () => void;
 }
 
-export function DeviceForm({ onAddDevice, isLoading, onOpenDevicePanel }: DeviceFormProps) {
+export function DeviceForm({ onOpenDevicePanel }: DeviceFormProps) {
   return (
     <Button 
       onClick={onOpenDevicePanel}

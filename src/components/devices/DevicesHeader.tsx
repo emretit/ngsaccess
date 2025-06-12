@@ -4,16 +4,12 @@ import { DeviceForm } from "@/components/devices/DeviceForm";
 interface DevicesHeaderProps {
   deviceCount: number;
   filteredCount: number;
-  onAddDevice: (serialNumber: string) => void;
-  isAddingDevice: boolean;
   onOpenDevicePanel: () => void;
 }
 
 export function DevicesHeader({
   deviceCount,
   filteredCount,
-  onAddDevice,
-  isAddingDevice,
   onOpenDevicePanel
 }: DevicesHeaderProps) {
   return (
@@ -25,7 +21,7 @@ export function DevicesHeader({
         </p>
       </div>
       <div>
-        <DeviceForm onAddDevice={onAddDevice} isLoading={isAddingDevice} onOpenDevicePanel={onOpenDevicePanel} />
+        <DeviceForm onOpenDevicePanel={onOpenDevicePanel} />
       </div>
     </div>
   );
