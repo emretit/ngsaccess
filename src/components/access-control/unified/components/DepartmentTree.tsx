@@ -33,6 +33,38 @@ export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) =
     });
   };
 
+  const handleSelectAllEmployees = () => {
+    const allEmployeeIds = employees.map(emp => emp.id.toString());
+    const allSelected = allEmployeeIds.every(id => formData.selected_employees.includes(id));
+    
+    setFormData(prev => ({
+      ...prev,
+      selected_employees: allSelected ? [] : allEmployeeIds
+    }));
+  };
+
+  const handleSelectAllDepartments = () => {
+    const allDepartmentIds = departments.map(dept => dept.id.toString());
+    const allSelected = allDepartmentIds.every(id => formData.selected_departments.includes(id));
+    
+    if (allSelected) {
+      // Deselect all departments and their employees
+      setFormData(prev => ({
+        ...prev,
+        selected_departments: [],
+        selected_employees: []
+      }));
+    } else {
+      // Select all departments and their employees
+      const allEmployeeIds = employees.map(emp => emp.id.toString());
+      setFormData(prev => ({
+        ...prev,
+        selected_departments: allDepartmentIds,
+        selected_employees: allEmployeeIds
+      }));
+    }
+  };
+
   const getEmployeesForDepartment = (departmentId: number) => {
     return employees.filter(emp => emp.department_id === departmentId);
   };
@@ -73,6 +105,14 @@ export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) =
   const isDepartmentSelected = (departmentId: number) => {
     return formData.selected_departments.includes(departmentId.toString());
   };
+
+  const allEmployeesSelected = employees.length > 0 && employees.every(emp => 
+    formData.selected_employees.includes(emp.id.toString())
+  );
+
+  const allDepartmentsSelected = departments.length > 0 && departments.every(dept => 
+    formData.selected_departments.includes(dept.id.toString())
+  );
 
   const renderDepartmentTree = (parentId: number | null = null, level: number = 0) => {
     const children = departments.filter(dept => dept.parent_id === parentId);
@@ -159,7 +199,29 @@ export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) =
 
   return (
     <div className="space-y-3">
-      <Label>Kim Erişebilecek?</Label>
+      <div className="flex items-center justify-between">
+        <Label>Kim Erişebilecek?</Label>
+        <div className="flex space-x-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleSelectAllDepartments}
+            className="text-xs"
+          >
+            {allDepartmentsSelected ? 'Tüm Departmanları Kaldır' : 'Tüm Departmanları Seç'}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleSelectAllEmployees}
+            className="text-xs"
+          >
+            {allEmployeesSelected ? 'Tüm Çalışanları Kaldır' : 'Tüm Çalışanları Seç'}
+          </Button>
+        </div>
+      </div>
       <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-1">
         {renderDepartmentTree()}
         
