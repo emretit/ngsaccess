@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -142,92 +141,13 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
     }));
   };
 
-  // Select All functionality for employees
-  const handleSelectAllEmployees = (checked: boolean) => {
-    if (checked) {
-      const allEmployeeIds = employees.map(emp => emp.id.toString());
-      setFormData(prev => ({
-        ...prev,
-        selected_employees: allEmployeeIds
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        selected_employees: []
-      }));
-    }
-  };
-
-  // Select All functionality for devices
-  const handleSelectAllDevices = (checked: boolean) => {
-    if (checked) {
-      const allDeviceIds = devices.map(device => device.id.toString());
-      setFormData(prev => ({
-        ...prev,
-        selected_devices: allDeviceIds
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        selected_devices: []
-      }));
-    }
-  };
-
-  // Select All functionality for zones
-  const handleSelectAllZones = (checked: boolean) => {
-    if (checked) {
-      const allZoneIds = zones.map(zone => zone.id.toString());
-      setFormData(prev => ({
-        ...prev,
-        selected_zones: allZoneIds
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        selected_zones: []
-      }));
-    }
-  };
-
-  // Select All functionality for doors
-  const handleSelectAllDoors = (checked: boolean) => {
-    if (checked) {
-      const allDoorIds = doors.map(door => door.id.toString());
-      setFormData(prev => ({
-        ...prev,
-        selected_doors: allDoorIds
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        selected_doors: []
-      }));
-    }
-  };
-
   const renderTargetSelection = () => {
     switch (formData.target_type) {
       case 'individual':
-        const allEmployeesSelected = employees.length > 0 && formData.selected_employees.length === employees.length;
-        
         return (
           <div className="space-y-3">
             <Label>Çalışanlar</Label>
             <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-              {/* Select All Checkbox */}
-              <div className="flex items-center space-x-2 border-b pb-2 mb-2">
-                <Checkbox
-                  id="select-all-employees"
-                  checked={allEmployeesSelected}
-                  onCheckedChange={handleSelectAllEmployees}
-                />
-                <Users className="h-4 w-4 text-blue-500" />
-                <Label htmlFor="select-all-employees" className="text-sm font-medium cursor-pointer">
-                  Tümünü Seç ({employees.length} çalışan)
-                </Label>
-              </div>
-              
               {employees.map((employee) => (
                 <div key={employee.id} className="flex items-center space-x-2">
                   <Checkbox
@@ -303,135 +223,90 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
     }
   };
 
-  const renderAccessPointSelection = () => {
-    const allDevicesSelected = devices.length > 0 && formData.selected_devices.length === devices.length;
-    const allZonesSelected = zones.length > 0 && formData.selected_zones.length === zones.length;
-    const allDoorsSelected = doors.length > 0 && formData.selected_doors.length === doors.length;
-
-    return (
-      <Tabs defaultValue="devices" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="devices">Cihazlar</TabsTrigger>
-          <TabsTrigger value="zones">Bölgeler</TabsTrigger>
-          <TabsTrigger value="doors">Kapılar</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="devices" className="space-y-3">
-          <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-            {/* Select All Devices */}
-            <div className="flex items-center space-x-2 border-b pb-2 mb-2">
+  const renderAccessPointSelection = () => (
+    <Tabs defaultValue="devices" className="w-full">
+      <TabsList className="grid w-full grid-cols-3">
+        <TabsTrigger value="devices">Cihazlar</TabsTrigger>
+        <TabsTrigger value="zones">Bölgeler</TabsTrigger>
+        <TabsTrigger value="doors">Kapılar</TabsTrigger>
+      </TabsList>
+      
+      <TabsContent value="devices" className="space-y-3">
+        <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
+          {devices.map((device) => (
+            <div key={device.id} className="flex items-center space-x-2">
               <Checkbox
-                id="select-all-devices"
-                checked={allDevicesSelected}
-                onCheckedChange={handleSelectAllDevices}
+                id={`device-${device.id}`}
+                checked={formData.selected_devices.includes(device.id.toString())}
+                onCheckedChange={(checked) => 
+                  setFormData(prev => ({
+                    ...prev,
+                    selected_devices: checked 
+                      ? [...prev.selected_devices, device.id.toString()]
+                      : prev.selected_devices.filter(id => id !== device.id.toString())
+                  }))
+                }
               />
               <MapPin className="h-4 w-4 text-green-500" />
-              <Label htmlFor="select-all-devices" className="text-sm font-medium cursor-pointer">
-                Tümünü Seç ({devices.length} cihaz)
+              <Label htmlFor={`device-${device.id}`} className="text-sm cursor-pointer">
+                {device.name} ({device.location})
               </Label>
             </div>
-            
-            {devices.map((device) => (
-              <div key={device.id} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`device-${device.id}`}
-                  checked={formData.selected_devices.includes(device.id.toString())}
-                  onCheckedChange={(checked) => 
-                    setFormData(prev => ({
-                      ...prev,
-                      selected_devices: checked 
-                        ? [...prev.selected_devices, device.id.toString()]
-                        : prev.selected_devices.filter(id => id !== device.id.toString())
-                    }))
-                  }
-                />
-                <MapPin className="h-4 w-4 text-green-500" />
-                <Label htmlFor={`device-${device.id}`} className="text-sm cursor-pointer">
-                  {device.name} ({device.location})
-                </Label>
-              </div>
-            ))}
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="zones" className="space-y-3">
-          <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-            {/* Select All Zones */}
-            <div className="flex items-center space-x-2 border-b pb-2 mb-2">
+          ))}
+        </div>
+      </TabsContent>
+      
+      <TabsContent value="zones" className="space-y-3">
+        <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
+          {zones.map((zone) => (
+            <div key={zone.id} className="flex items-center space-x-2">
               <Checkbox
-                id="select-all-zones"
-                checked={allZonesSelected}
-                onCheckedChange={handleSelectAllZones}
+                id={`zone-${zone.id}`}
+                checked={formData.selected_zones.includes(zone.id.toString())}
+                onCheckedChange={(checked) => 
+                  setFormData(prev => ({
+                    ...prev,
+                    selected_zones: checked 
+                      ? [...prev.selected_zones, zone.id.toString()]
+                      : prev.selected_zones.filter(id => id !== zone.id.toString())
+                  }))
+                }
               />
               <Building2 className="h-4 w-4 text-purple-500" />
-              <Label htmlFor="select-all-zones" className="text-sm font-medium cursor-pointer">
-                Tümünü Seç ({zones.length} bölge)
+              <Label htmlFor={`zone-${zone.id}`} className="text-sm cursor-pointer">
+                {zone.name}
               </Label>
             </div>
-            
-            {zones.map((zone) => (
-              <div key={zone.id} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`zone-${zone.id}`}
-                  checked={formData.selected_zones.includes(zone.id.toString())}
-                  onCheckedChange={(checked) => 
-                    setFormData(prev => ({
-                      ...prev,
-                      selected_zones: checked 
-                        ? [...prev.selected_zones, zone.id.toString()]
-                        : prev.selected_zones.filter(id => id !== zone.id.toString())
-                    }))
-                  }
-                />
-                <Building2 className="h-4 w-4 text-purple-500" />
-                <Label htmlFor={`zone-${zone.id}`} className="text-sm cursor-pointer">
-                  {zone.name}
-                </Label>
-              </div>
-            ))}
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="doors" className="space-y-3">
-          <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-            {/* Select All Doors */}
-            <div className="flex items-center space-x-2 border-b pb-2 mb-2">
+          ))}
+        </div>
+      </TabsContent>
+      
+      <TabsContent value="doors" className="space-y-3">
+        <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
+          {doors.map((door) => (
+            <div key={door.id} className="flex items-center space-x-2">
               <Checkbox
-                id="select-all-doors"
-                checked={allDoorsSelected}
-                onCheckedChange={handleSelectAllDoors}
+                id={`door-${door.id}`}
+                checked={formData.selected_doors.includes(door.id.toString())}
+                onCheckedChange={(checked) => 
+                  setFormData(prev => ({
+                    ...prev,
+                    selected_doors: checked 
+                      ? [...prev.selected_doors, door.id.toString()]
+                      : prev.selected_doors.filter(id => id !== door.id.toString())
+                  }))
+                }
               />
               <MapPin className="h-4 w-4 text-orange-500" />
-              <Label htmlFor="select-all-doors" className="text-sm font-medium cursor-pointer">
-                Tümünü Seç ({doors.length} kapı)
+              <Label htmlFor={`door-${door.id}`} className="text-sm cursor-pointer">
+                {door.name}
               </Label>
             </div>
-            
-            {doors.map((door) => (
-              <div key={door.id} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`door-${door.id}`}
-                  checked={formData.selected_doors.includes(door.id.toString())}
-                  onCheckedChange={(checked) => 
-                    setFormData(prev => ({
-                      ...prev,
-                      selected_doors: checked 
-                        ? [...prev.selected_doors, door.id.toString()]
-                        : prev.selected_doors.filter(id => id !== door.id.toString())
-                    }))
-                  }
-                />
-                <MapPin className="h-4 w-4 text-orange-500" />
-                <Label htmlFor={`door-${door.id}`} className="text-sm cursor-pointer">
-                  {door.name}
-                </Label>
-              </div>
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
-    );
-  };
+          ))}
+        </div>
+      </TabsContent>
+    </Tabs>
+  );
 
   const weekDays = [
     { value: 'Monday', label: 'Pazartesi' },
