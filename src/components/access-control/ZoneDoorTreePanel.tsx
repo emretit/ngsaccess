@@ -40,25 +40,29 @@ export function ZoneDoorTreePanel({ onSelectZone, onSelectDoor }: ZoneDoorTreePa
 
   return (
     <>
-      <div className="h-full w-[280px] bg-card rounded-lg border shadow">
-        <div className="p-4 border-b space-y-1.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold text-primary">{projectName}</h2>
+      <div className="h-full w-[320px] bg-white rounded-xl border border-gray-200 shadow-sm">
+        <div className="p-6 border-b border-gray-100">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                <Building2 className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">{projectName}</h2>
+                <p className="text-sm text-gray-500">Bölgeler & Kapılar</p>
+              </div>
             </div>
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-8 w-8 hover:bg-gray-100"
               onClick={handleAddZone}
             >
               <Plus className="h-4 w-4" />
             </Button>
           </div>
-          <p className="text-sm text-muted-foreground">Bölgeler &amp; Kapılar</p>
         </div>
-        <div className="p-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
+        <div className="p-4 max-h-[calc(100vh-16rem)] overflow-y-auto">
           <ZoneDoorTree 
             key={refreshKey}
             onSelectZone={onSelectZone}

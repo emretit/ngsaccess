@@ -92,14 +92,18 @@ const Devices = () => {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] w-full">
-      <ZoneDoorTreePanel
-        onSelectZone={setSelectedZoneId}
-        onSelectDoor={setSelectedDoorId}
-      />
-      
-      <div className="flex-1 overflow-hidden">
-        <div className="p-4 md:p-6 lg:p-8 h-full">
+    <div className="h-[calc(100vh-4rem)] w-full bg-gray-50">
+      <div className="flex h-full gap-6 p-6">
+        {/* Sidebar - Zone/Door Tree */}
+        <div className="flex-shrink-0">
+          <ZoneDoorTreePanel
+            onSelectZone={setSelectedZoneId}
+            onSelectDoor={setSelectedDoorId}
+          />
+        </div>
+        
+        {/* Main Content Area */}
+        <div className="flex-1 overflow-hidden">
           <DevicesContent
             devices={devices}
             isLoading={isLoading}
