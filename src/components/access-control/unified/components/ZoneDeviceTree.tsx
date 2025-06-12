@@ -50,6 +50,17 @@ export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) =
     });
   };
 
+  const handleSelectAllDevices = () => {
+    const allDeviceIds = devices.map(device => device.id.toString());
+    const allSelected = allDeviceIds.every(id => formData.selected_devices.includes(id));
+    
+    setFormData(prev => ({
+      ...prev,
+      selected_devices: allSelected ? [] : allDeviceIds,
+      selected_zones: allSelected ? [] : zones.map(zone => zone.id.toString())
+    }));
+  };
+
   const toggleZoneExpansion = (zoneId: number) => {
     setExpandedZones(prev => {
       const newSet = new Set(prev);
@@ -69,6 +80,10 @@ export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) =
   const isZoneSelected = (zoneId: number) => {
     return formData.selected_zones.includes(zoneId.toString());
   };
+
+  const allDevicesSelected = devices.length > 0 && devices.every(device => 
+    formData.selected_devices.includes(device.id.toString())
+  );
 
   const renderZoneTree = () => {
     return zones.map(zone => {
@@ -145,7 +160,18 @@ export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) =
 
   return (
     <div className="space-y-3">
-      <Label>Hangi Bölge ve Cihazlarda?</Label>
+      <div className="flex items-center justify-between">
+        <Label>Hangi Bölge ve Cihazlarda?</Label>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleSelectAllDevices}
+          className="text-xs"
+        >
+          {allDevicesSelected ? 'Tümünü Kaldır' : 'Tümünü Seç'}
+        </Button>
+      </div>
       <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-1">
         {renderZoneTree()}
         
