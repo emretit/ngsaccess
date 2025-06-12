@@ -93,7 +93,7 @@ const Devices = () => {
 
   return (
     <div className="h-[calc(100vh-4rem)] w-full bg-gray-50">
-      <div className="flex h-full gap-6 p-6">
+      <div className="flex h-full gap-4 p-4">
         {/* Sidebar - Zone/Door Tree */}
         <div className="flex-shrink-0">
           <ZoneDoorTreePanel

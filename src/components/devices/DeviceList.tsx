@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Device } from "@/types/device";
 import { Zone, Door } from "@/hooks/useZonesAndDoors";
 import { DeviceTableRow } from "@/components/devices/DeviceTableRow";
-import { Loader2 } from "lucide-react";
+import { Loader2, Smartphone } from "lucide-react";
 import { DeviceBulkActions } from "./DeviceBulkActions";
 import { DeviceDeleteDialog } from "./DeviceDeleteDialog";
 import { useDeviceTable } from "@/hooks/useDeviceTable";
