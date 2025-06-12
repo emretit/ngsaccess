@@ -2,16 +2,9 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useAccessRules } from "@/hooks/useAccessRules";
-import { Loader2, Plus, Users, Monitor, ChevronDown, ChevronUp, Edit, Trash2 } from "lucide-react";
+import { Loader2, Plus, Users, Monitor, ChevronDown, ChevronUp, Edit, Trash2, Clock, Calendar } from "lucide-react";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -100,251 +93,239 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
   };
 
   const renderEmployees = (rule: any) => {
-    // Get employees from group_members relations
     const employees = rule.group_members?.map((gm: any) => gm.employees).filter(Boolean) || [];
     
     if (employees.length === 0) {
       return (
-        <div className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-blue-500" />
-          <span className="text-sm text-gray-500">Çalışan seçilmemiş</span>
+        <div className="flex items-center gap-2 text-gray-500">
+          <Users className="h-4 w-4" />
+          <span className="text-sm">Çalışan seçilmemiş</span>
         </div>
       );
     }
 
-    if (employees.length === 1) {
-      return (
-        <div className="flex items-center gap-2">
-          <Users className="h-4 w-4 text-blue-500" />
-          <span className="text-sm">{employees[0].first_name} {employees[0].last_name}</span>
-        </div>
-      );
-    }
-
-    const firstEmployee = employees[0];
     return (
       <div className="flex items-center gap-2">
         <Users className="h-4 w-4 text-blue-500" />
         <div className="flex flex-col">
-          <span className="text-sm">{firstEmployee.first_name} {firstEmployee.last_name}</span>
-          <Badge variant="secondary" className="text-xs mt-1 w-fit">
-            +{employees.length - 1} diğer çalışan
-          </Badge>
+          <span className="text-sm font-medium">{employees.length} çalışan</span>
+          <span className="text-xs text-gray-500">
+            {employees.slice(0, 2).map((emp: any) => `${emp.first_name} ${emp.last_name}`).join(', ')}
+            {employees.length > 2 && ` +${employees.length - 2} diğer`}
+          </span>
         </div>
       </div>
     );
   };
 
   const renderDevices = (rule: any) => {
-    // Get devices from group_devices relations
     const devices = rule.group_devices?.map((gd: any) => gd.devices).filter(Boolean) || [];
     
     if (devices.length === 0) {
       return (
-        <div className="flex items-center gap-2">
-          <Monitor className="h-4 w-4 text-green-500" />
-          <span className="text-sm text-gray-500">Cihaz seçilmemiş</span>
+        <div className="flex items-center gap-2 text-gray-500">
+          <Monitor className="h-4 w-4" />
+          <span className="text-sm">Cihaz seçilmemiş</span>
         </div>
       );
     }
 
-    if (devices.length === 1) {
-      return (
-        <div className="flex items-center gap-2">
-          <Monitor className="h-4 w-4 text-green-500" />
-          <span className="text-sm">{devices[0].name}</span>
-        </div>
-      );
-    }
-
-    const firstDevice = devices[0];
     return (
       <div className="flex items-center gap-2">
         <Monitor className="h-4 w-4 text-green-500" />
         <div className="flex flex-col">
-          <span className="text-sm">{firstDevice.name}</span>
-          <Badge variant="secondary" className="text-xs mt-1 w-fit">
-            +{devices.length - 1} diğer cihaz
-          </Badge>
+          <span className="text-sm font-medium">{devices.length} cihaz</span>
+          <span className="text-xs text-gray-500">
+            {devices.slice(0, 2).map((device: any) => device.name).join(', ')}
+            {devices.length > 2 && ` +${devices.length - 2} diğer`}
+          </span>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold">Erişim Kuralları</h2>
-        <Button onClick={onCreateRule}>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Erişim Kuralları</h2>
+          <p className="text-gray-600 mt-1">Çalışan erişim kurallarını yönetin ve düzenleyin</p>
+        </div>
+        <Button onClick={onCreateRule} className="bg-primary hover:bg-primary/90">
           <Plus className="h-4 w-4 mr-2" />
           Yeni Kural
         </Button>
       </div>
 
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12"></TableHead>
-              <TableHead>Kural Adı</TableHead>
-              <TableHead>Çalışanlar</TableHead>
-              <TableHead>Cihazlar</TableHead>
-              <TableHead>Saat Aralığı</TableHead>
-              <TableHead>Günler</TableHead>
-              <TableHead>Aktif</TableHead>
-              <TableHead className="w-24">İşlemler</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rules.map((rule: any) => (
-              <>
-                <TableRow key={rule.id} className="group">
-                  <TableCell>
-                    <Collapsible>
-                      <CollapsibleTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => toggleExpanded(rule.id)}
-                          className="p-1 h-8 w-8"
-                        >
-                          {expandedRules.has(rule.id) ? (
-                            <ChevronUp className="h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </CollapsibleTrigger>
-                    </Collapsible>
-                  </TableCell>
-                  <TableCell className="font-medium">{rule.name}</TableCell>
-                  <TableCell>{renderEmployees(rule)}</TableCell>
-                  <TableCell>{renderDevices(rule)}</TableCell>
-                  <TableCell>
-                    {rule.start_time && rule.end_time 
-                      ? `${rule.start_time} - ${rule.end_time}`
-                      : '24 saat'
+      <div className="space-y-4">
+        {rules.map((rule: any) => (
+          <Card key={rule.id} className="border border-gray-200 hover:shadow-md transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-gray-900">{rule.name}</h3>
+                    <Badge variant={rule.is_active ? "default" : "secondary"}>
+                      {rule.is_active ? "Aktif" : "Pasif"}
+                    </Badge>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={rule.is_active}
+                    onCheckedChange={(checked) => 
+                      updateAccessRule.mutate({ id: rule.id, updates: { is_active: checked } })
                     }
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm text-gray-600">
-                      {formatDays(rule.days || [])}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <Switch
-                      checked={rule.is_active}
-                      onCheckedChange={(checked) => 
-                        updateAccessRule.mutate({ id: rule.id, updates: { is_active: checked } })
-                      }
-                      disabled={updateAccessRule.isPending}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
+                    disabled={updateAccessRule.isPending}
+                  />
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEditRule(rule)}
+                    className="h-8 w-8 p-0"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleEditRule(rule)}
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Kuralı Sil</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Bu erişim kuralını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>İptal</AlertDialogCancel>
+                        <AlertDialogAction 
+                          onClick={() => handleDeleteRule(rule.id)}
+                          disabled={isDeleting}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          {isDeleting ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Siliniyor...
+                            </>
+                          ) : (
+                            'Sil'
+                          )}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                  
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleExpanded(rule.id)}
                         className="h-8 w-8 p-0"
                       >
-                        <Edit className="h-4 w-4" />
+                        {expandedRules.has(rule.id) ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
                       </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Kuralı Sil</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Bu erişim kuralını silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>İptal</AlertDialogCancel>
-                            <AlertDialogAction 
-                              onClick={() => handleDeleteRule(rule.id)}
-                              disabled={isDeleting}
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            >
-                              {isDeleting ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                  Siliniyor...
-                                </>
-                              ) : (
-                                'Sil'
-                              )}
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                    </CollapsibleTrigger>
+                  </Collapsible>
+                </div>
+              </div>
+              
+              {rule.description && (
+                <p className="text-sm text-gray-600 mt-2">{rule.description}</p>
+              )}
+            </CardHeader>
+            
+            <CardContent className="pt-0">
+              {/* Quick Info Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-orange-500" />
+                  <div>
+                    <span className="text-sm font-medium">Zaman</span>
+                    <p className="text-xs text-gray-500">
+                      {rule.start_time && rule.end_time 
+                        ? `${rule.start_time} - ${rule.end_time}`
+                        : '24 saat'
+                      }
+                    </p>
+                  </div>
+                </div>
                 
-                {expandedRules.has(rule.id) && (
-                  <TableRow>
-                    <TableCell></TableCell>
-                    <TableCell colSpan={7}>
-                      <Collapsible open={expandedRules.has(rule.id)}>
-                        <CollapsibleContent>
-                          <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                            {rule.description && (
-                              <div>
-                                <span className="text-sm font-medium text-gray-700">Açıklama:</span>
-                                <p className="text-sm text-gray-600 mt-1">{rule.description}</p>
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-purple-500" />
+                  <div>
+                    <span className="text-sm font-medium">Günler</span>
+                    <p className="text-xs text-gray-500">
+                      {formatDays(rule.days || [])}
+                    </p>
+                  </div>
+                </div>
+                
+                <div>{renderEmployees(rule)}</div>
+                <div>{renderDevices(rule)}</div>
+              </div>
+
+              {/* Expandable Details */}
+              <Collapsible open={expandedRules.has(rule.id)}>
+                <CollapsibleContent>
+                  <div className="border-t border-gray-100 pt-4 mt-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900 mb-3">Çalışanlar</h4>
+                        <div className="space-y-2">
+                          {rule.group_members?.length > 0 ? (
+                            rule.group_members.map((gm: any, index: number) => (
+                              <div key={index} className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
+                                <Users className="h-4 w-4 text-blue-500" />
+                                <span className="text-sm">{gm.employees?.first_name} {gm.employees?.last_name}</span>
                               </div>
-                            )}
-                            
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <span className="text-sm font-medium text-gray-700">Çalışanlar:</span>
-                                <div className="mt-1 space-y-1">
-                                  {rule.group_members?.length > 0 ? (
-                                    rule.group_members.map((gm: any, index: number) => (
-                                      <div key={index} className="text-sm text-gray-600">
-                                        • {gm.employees?.first_name} {gm.employees?.last_name}
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <div className="text-sm text-gray-500">Çalışan seçilmemiş</div>
-                                  )}
+                            ))
+                          ) : (
+                            <div className="text-sm text-gray-500 italic">Çalışan seçilmemiş</div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-900 mb-3">Cihazlar</h4>
+                        <div className="space-y-2">
+                          {rule.group_devices?.length > 0 ? (
+                            rule.group_devices.map((gd: any, index: number) => (
+                              <div key={index} className="flex items-center gap-2 p-2 bg-green-50 rounded-lg">
+                                <Monitor className="h-4 w-4 text-green-500" />
+                                <div>
+                                  <span className="text-sm font-medium">{gd.devices?.name}</span>
+                                  <p className="text-xs text-gray-500">{gd.devices?.location}</p>
                                 </div>
                               </div>
-                              
-                              <div>
-                                <span className="text-sm font-medium text-gray-700">Cihazlar:</span>
-                                <div className="mt-1 space-y-1">
-                                  {rule.group_devices?.length > 0 ? (
-                                    rule.group_devices.map((gd: any, index: number) => (
-                                      <div key={index} className="text-sm text-gray-600">
-                                        • {gd.devices?.name} ({gd.devices?.location})
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <div className="text-sm text-gray-500">Cihaz seçilmemiş</div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </CollapsibleContent>
-                      </Collapsible>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </>
-            ))}
-          </TableBody>
-        </Table>
+                            ))
+                          ) : (
+                            <div className="text-sm text-gray-500 italic">Cihaz seçilmemiş</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   );
