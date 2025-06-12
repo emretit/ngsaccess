@@ -95,6 +95,11 @@ export const useProjectFilteredCardReadings = (pageSize: number = 100) => {
       };
     },
     enabled: !projectLoading && (isSuperAdmin || projectIds.length > 0),
+    staleTime: 2 * 60 * 1000, // 2 dakika boyunca veri fresh kabul edilir (card readings daha dinamik)
+    gcTime: 5 * 60 * 1000, // 5 dakika cache'de kalır
+    refetchOnWindowFocus: false, // Pencere focus'a geldiğinde yeniden fetch etme
+    refetchOnMount: false, // Component mount olduğunda cache varsa yeniden fetch etme
+    retry: 1, // Hata durumunda sadece 1 kez retry
   });
 
   const handleRefresh = () => {

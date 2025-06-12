@@ -1,18 +1,17 @@
 
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Department } from "@/types/department";
 import { toast } from "sonner";
 import { useProjectAccess } from "./useProjectAccess";
 
 export function useDepartments() {
-  const [departments, setDepartments] = useState<Department[]>([]);
   const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
 
-  const fetchDepartments = async () => {
-    if (projectLoading) return;
-    
-    try {
+  const { data: departments = [], isLoading, error, refetch } = useQuery({
+    queryKey: ['departments', projectIds],
+    queryFn: async (): Promise<Department[]> => {
       let query = supabase
         .from("departments")
         .select("*")
@@ -24,24 +23,25 @@ export function useDepartments() {
         query = query.in('project_id', projectIds);
       } else if (!isSuperAdmin && projectIds.length === 0) {
         // Kullanıcının hiç projesi yoksa boş sonuç döndür
-        setDepartments([]);
-        return;
+        return [];
       }
 
       const { data, error } = await query;
 
       if (error) {
         console.error("Error fetching departments:", error);
-        toast.error("Departman listesi alınamadı");
-        return;
+        throw error;
       }
 
-      setDepartments(data || []);
-    } catch (error) {
-      console.error("Error in fetchDepartments:", error);
-      toast.error("Departman listesi alınamadı");
-    }
-  };
+      return data || [];
+    },
+    enabled: !projectLoading && (isSuperAdmin || projectIds.length > 0),
+    staleTime: 10 * 60 * 1000, // 10 dakika boyunca veri fresh kabul edilir (departments çok az değişir)
+    gcTime: 30 * 60 * 1000, // 30 dakika cache'de kalır
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    retry: 1,
+  });
 
   const addDepartment = async (name: string, parentId: number | null = null) => {
     if (!name.trim()) return;
@@ -68,7 +68,7 @@ export function useDepartments() {
     }
 
     toast.success("Departman başarıyla eklendi");
-    await fetchDepartments();
+    await refetch();
     return true;
   };
 
@@ -85,20 +85,16 @@ export function useDepartments() {
     }
 
     toast.success("Departman başarıyla silindi");
-    await fetchDepartments();
+    await refetch();
     return true;
   };
 
-  useEffect(() => {
-    if (!projectLoading) {
-      fetchDepartments();
-    }
-  }, [projectIds, isSuperAdmin, projectLoading]);
-
   return {
     departments,
+    isLoading: isLoading || projectLoading,
+    error,
     addDepartment,
     deleteDepartment,
-    fetchDepartments
+    fetchDepartments: refetch
   };
 }

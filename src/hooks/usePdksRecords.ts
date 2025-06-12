@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useProjectAccess } from '@/hooks/useProjectAccess';
 
@@ -14,23 +15,15 @@ export interface PDKSRecord {
 }
 
 export function usePdksRecords() {
-  const [records, setRecords] = useState<PDKSRecord[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   
   // Get project access information
   const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
 
-  useEffect(() => {
-    if (!projectLoading) {
-      fetchRecords();
-    }
-  }, [projectIds, isSuperAdmin, projectLoading]);
-
-  async function fetchRecords() {
-    setLoading(true);
-    try {
+  const { data: records = [], isLoading, error, refetch } = useQuery({
+    queryKey: ['pdksRecords', projectIds],
+    queryFn: async (): Promise<PDKSRecord[]> => {
       let query = supabase
         .from('pdks_records')
         .select('*')
@@ -41,21 +34,21 @@ export function usePdksRecords() {
         query = query.in('project_id', projectIds);
       } else if (!isSuperAdmin && projectIds.length === 0) {
         // User has no project access, return empty array
-        setRecords([]);
-        setLoading(false);
-        return;
+        return [];
       }
 
       const { data, error } = await query;
 
       if (error) throw error;
-      setRecords(data || []);
-    } catch (error) {
-      console.error('Error fetching PDKS records:', error);
-    } finally {
-      setLoading(false);
-    }
-  }
+      return data || [];
+    },
+    enabled: !projectLoading && (isSuperAdmin || projectIds.length > 0),
+    staleTime: 3 * 60 * 1000, // 3 dakika fresh
+    gcTime: 8 * 60 * 1000, // 8 dakika cache
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    retry: 1,
+  });
 
   const filteredRecords = records.filter(record => {
     const fullName = `${record.employee_first_name} ${record.employee_last_name}`.toLowerCase();
@@ -65,13 +58,13 @@ export function usePdksRecords() {
   });
 
   const handleRefresh = () => {
-    fetchRecords();
+    refetch();
   };
 
   return {
     records,
     filteredRecords,
-    loading: loading || projectLoading,
+    loading: isLoading || projectLoading,
     searchTerm,
     setSearchTerm,
     statusFilter,

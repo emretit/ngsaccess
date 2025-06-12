@@ -6,22 +6,36 @@ import { CardReading } from '@/types/access-control';
 import { toast } from '@/hooks/use-toast';
 import { fetchDashboardStats, DashboardStats, fetchRecentReadings } from '@/utils/dashboardUtils';
 import { useProjectAccess } from '@/hooks/useProjectAccess';
+import { useQuery } from '@tanstack/react-query';
 
 export const useDashboard = () => {
-  const [stats, setStats] = useState<DashboardStats>({
-    employees: 0,
-    devices: 0,
-    cardReadings: 0,
-    pendingRequests: 0,
-  });
-  const [recentReadings, setRecentReadings] = useState<CardReading[]>([]);
-  const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("Kullanıcı");
   const [session, setSession] = useState<any>(null);
   const navigate = useNavigate();
   
   // Get project access information
   const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
+
+  // Dashboard stats ve recent readings için React Query kullanın
+  const { data: stats = { employees: 0, devices: 0, cardReadings: 0, pendingRequests: 0 }, isLoading: statsLoading, refetch: refetchStats } = useQuery({
+    queryKey: ['dashboardStats', projectIds],
+    queryFn: () => fetchDashboardStats(projectIds, isSuperAdmin),
+    enabled: !!session && !projectLoading && (isSuperAdmin || projectIds.length > 0),
+    staleTime: 5 * 60 * 1000, // 5 dakika fresh
+    gcTime: 10 * 60 * 1000, // 10 dakika cache
+    refetchOnWindowFocus: false,
+    refetchInterval: 60 * 1000, // 1 dakikada bir otomatik güncelleme
+  });
+
+  const { data: recentReadings = [], isLoading: readingsLoading, refetch: refetchReadings } = useQuery({
+    queryKey: ['dashboardReadings', projectIds],
+    queryFn: () => fetchRecentReadings(projectIds, isSuperAdmin),
+    enabled: !!session && !projectLoading && (isSuperAdmin || projectIds.length > 0),
+    staleTime: 2 * 60 * 1000, // 2 dakika fresh
+    gcTime: 5 * 60 * 1000, // 5 dakika cache
+    refetchOnWindowFocus: false,
+    refetchInterval: 30 * 1000, // 30 saniyede bir otomatik güncelleme
+  });
 
   // Check authentication status
   useEffect(() => {
@@ -63,45 +77,11 @@ export const useDashboard = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  // Fetch dashboard data
-  useEffect(() => {
-    const loadDashboardData = async () => {
-      if (!session || projectLoading) return;
-      
-      try {
-        const [statsData, readingsData] = await Promise.all([
-          fetchDashboardStats(projectIds, isSuperAdmin),
-          fetchRecentReadings(projectIds, isSuperAdmin)
-        ]);
-        
-        setStats(statsData);
-        setRecentReadings(readingsData);
-      } catch (error) {
-        console.error('Error loading dashboard data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (session && !projectLoading) {
-      loadDashboardData();
-      const interval = setInterval(loadDashboardData, 30000);
-      return () => clearInterval(interval);
-    }
-  }, [session, projectIds, isSuperAdmin, projectLoading]);
-
   const refreshData = async () => {
     if (projectLoading) return;
     
-    setLoading(true);
     try {
-      const [statsData, readingsData] = await Promise.all([
-        fetchDashboardStats(projectIds, isSuperAdmin),
-        fetchRecentReadings(projectIds, isSuperAdmin)
-      ]);
-      
-      setStats(statsData);
-      setRecentReadings(readingsData);
+      await Promise.all([refetchStats(), refetchReadings()]);
       
       toast({
         title: "Veriler güncellendi",
@@ -115,15 +95,13 @@ export const useDashboard = () => {
         description: "Dashboard verisi yüklenirken bir hata oluştu.",
         variant: "destructive"
       });
-    } finally {
-      setLoading(false);
     }
   };
 
   return {
     stats,
     recentReadings,
-    loading: loading || projectLoading,
+    loading: statsLoading || readingsLoading || projectLoading,
     userName,
     session,
     refreshData

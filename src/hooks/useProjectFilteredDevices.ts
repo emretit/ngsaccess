@@ -49,6 +49,12 @@ export const useProjectFilteredDevices = () => {
       });
     },
     enabled: !projectLoading && (isSuperAdmin || projectIds.length > 0),
+    staleTime: 3 * 60 * 1000, // 3 dakika boyunca veri fresh kabul edilir (devices daha dinamik)
+    gcTime: 8 * 60 * 1000, // 8 dakika cache'de kalır
+    refetchOnWindowFocus: false, // Pencere focus'a geldiğinde yeniden fetch etme
+    refetchOnMount: false, // Component mount olduğunda cache varsa yeniden fetch etme
+    retry: 1, // Hata durumunda sadece 1 kez retry
+    refetchInterval: 2 * 60 * 1000, // Device durumları için 2 dakikada bir otomatik güncelleme
   });
 
   return {

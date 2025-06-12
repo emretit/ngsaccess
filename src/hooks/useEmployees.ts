@@ -40,6 +40,11 @@ export const useEmployees = () => {
       return data || [];
     },
     enabled: !projectLoading && (isSuperAdmin || projectIds.length > 0),
+    staleTime: 5 * 60 * 1000, // 5 dakika boyunca veri fresh kabul edilir
+    gcTime: 10 * 60 * 1000, // 10 dakika cache'de kalır
+    refetchOnWindowFocus: false, // Pencere focus'a geldiğinde yeniden fetch etme
+    refetchOnMount: false, // Component mount olduğunda cache varsa yeniden fetch etme
+    retry: 1, // Hata durumunda sadece 1 kez retry
   });
 
   return {
