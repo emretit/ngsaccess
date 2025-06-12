@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -201,26 +200,15 @@ export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) =
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <Label>Kim Erişebilecek?</Label>
-        <div className="flex space-x-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleSelectAllDepartments}
-            className="text-xs"
-          >
-            {allDepartmentsSelected ? 'Tüm Departmanları Kaldır' : 'Tüm Departmanları Seç'}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleSelectAllEmployees}
-            className="text-xs"
-          >
-            {allEmployeesSelected ? 'Tüm Çalışanları Kaldır' : 'Tüm Çalışanları Seç'}
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleSelectAllEmployees}
+          className="text-xs"
+        >
+          {allEmployeesSelected ? 'Tümünü Kaldır' : 'Tümünü Seç'}
+        </Button>
       </div>
       <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-1">
         {renderDepartmentTree()}
