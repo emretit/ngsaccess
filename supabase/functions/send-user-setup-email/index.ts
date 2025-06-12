@@ -51,7 +51,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Failed to store setup token');
     }
 
-    // Create setup URL - use your domain instead of localhost
+    // Create setup URL - production domain kullan
     const setupUrl = `https://ngsplus.app/user-setup?token=${token}`;
 
     // Role display names
