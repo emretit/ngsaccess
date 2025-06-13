@@ -22,7 +22,7 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
     setFormData,
     departments,
     companies,
-    shifts,
+    accessRules,
     positions,
     photoPreview,
     setPhotoPreview,
@@ -67,7 +67,7 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
           setFormData={setFormData}
           companies={companies}
           departments={departments}
-          shifts={shifts}
+          accessRules={accessRules}
           positions={positions}
         />
       </div>

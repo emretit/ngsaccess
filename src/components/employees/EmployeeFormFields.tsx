@@ -7,7 +7,7 @@ interface EmployeeFormFieldsProps {
   setFormData: (data: EmployeeFormData) => void;
   companies: { id: number; name: string }[];
   departments: { id: number; name: string }[];
-  shifts: { id: number; name: string }[];
+  accessRules: { id: number; name: string }[];
   positions?: { id: number; name: string }[];
 }
 
@@ -16,7 +16,7 @@ export default function EmployeeFormFields({
   setFormData,
   companies,
   departments,
-  shifts,
+  accessRules,
   positions = []
 }: EmployeeFormFieldsProps) {
   return (
@@ -101,11 +101,19 @@ export default function EmployeeFormFields({
       />
 
       <FormSelectField
-        label="Vardiya"
-        name="shift"
-        value={formData.shift || ''}
-        onChange={(value) => setFormData({ ...formData, shift: value })}
-        options={shifts}
+        label="Erişim Kuralı"
+        name="access_rule"
+        value={formData.access_rule_id?.toString() || ''}
+        onChange={(value) => {
+          const selectedRule = accessRules.find(r => r.id.toString() === value);
+          setFormData({ 
+            ...formData, 
+            access_rule_id: parseInt(value) || null,
+            access_rule: selectedRule ? selectedRule.name : ''
+          });
+        }}
+        options={accessRules}
+        placeholder="Erişim kuralı seçiniz"
       />
 
       <FormTextField

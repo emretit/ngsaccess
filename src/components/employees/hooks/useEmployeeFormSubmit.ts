@@ -81,6 +81,7 @@ export const useEmployeeFormSubmit = (
         company_id: formData.company_id || null,
         department_id: formData.department_id || null,
         position_id: formData.position_id || null,
+        access_rule_id: formData.access_rule_id || null,
         shift: formData.shift || null,
         shift_id: formData.shift_id || null,
         photo_url: formData.photo_url || null,

@@ -9,6 +9,8 @@ export type EmployeeFormData = Partial<Employee> & {
   notes?: string;
   department_id?: number | null;
   position_id?: number | null;
+  access_rule_id?: number | null;
+  access_rule?: string;
 };
 
 export function useEmployeeFormData(employee?: Employee | null) {
@@ -27,11 +29,13 @@ export function useEmployeeFormData(employee?: Employee | null) {
     notes: '',
     department_id: null,
     position_id: null,
+    access_rule_id: null,
+    access_rule: '',
   });
 
   const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
   const [companies, setCompanies] = useState<{ id: number; name: string }[]>([]);
-  const [shifts, setShifts] = useState<{ id: number; name: string }[]>([]);
+  const [accessRules, setAccessRules] = useState<{ id: number; name: string }[]>([]);
   const [positions, setPositions] = useState<{ id: number; name: string }[]>([]);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
@@ -48,6 +52,8 @@ export function useEmployeeFormData(employee?: Employee | null) {
         position: positionName,
         department_id: employee.department_id,
         position_id: employee.position_id,
+        access_rule_id: employee.access_rule_id || null,
+        access_rule: employee.access_rule || '',
         notes: employee.notes || '',
       });
 
@@ -57,7 +63,7 @@ export function useEmployeeFormData(employee?: Employee | null) {
     }
     fetchDepartments();
     fetchCompanies();
-    fetchShifts();
+    fetchAccessRules();
     fetchPositions();
   }, [employee]);
 
@@ -77,12 +83,16 @@ export function useEmployeeFormData(employee?: Employee | null) {
     }
   };
 
-  const fetchShifts = async () => {
-    const { data, error } = await supabase.from('shifts').select('id, name');
+  const fetchAccessRules = async () => {
+    const { data, error } = await supabase
+      .from('access_rules')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name');
     if (!error && data) {
-      setShifts(data);
+      setAccessRules(data);
     } else {
-      setShifts([]);
+      setAccessRules([]);
     }
   };
 
@@ -100,7 +110,7 @@ export function useEmployeeFormData(employee?: Employee | null) {
     setFormData,
     departments,
     companies,
-    shifts,
+    accessRules,
     positions,
     photoPreview,
     setPhotoPreview,
