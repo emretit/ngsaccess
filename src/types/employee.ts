@@ -13,6 +13,8 @@ export interface Employee {
     department_id: number;
     position_id: number | null;
     shift_id: number | null;
+    access_rule_id: number | null;
+    access_rule?: string;
     created_at: string;
     updated_at: string;
     is_active: boolean;
