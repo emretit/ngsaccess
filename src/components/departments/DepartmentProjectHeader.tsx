@@ -14,7 +14,7 @@ export function DepartmentProjectHeader({
   onAddClick 
 }: DepartmentProjectHeaderProps) {
   return (
-    <div className="p-4 border-b space-y-1.5">
+    <div className="p-6 border-b border-gray-100">
       <div 
         className="flex items-center gap-2 cursor-pointer hover:text-primary/90 transition-colors"
         onClick={onProjectClick}
@@ -33,7 +33,7 @@ export function DepartmentProjectHeader({
           <Plus className="h-4 w-4" />
         </Button>
       </div>
-      <p className="text-sm text-muted-foreground">Departmanlar</p>
+      <p className="text-sm text-muted-foreground mt-1.5">Departmanlar</p>
     </div>
   );
 }
