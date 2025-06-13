@@ -30,11 +30,12 @@ export const useProjectFilteredCardReadings = (pageSize: number = 100) => {
       const from = (currentPage - 1) * pageSize;
       const to = from + pageSize - 1;
 
-      // Build query
+      // Build query - include the new access_rule_granted field
       let query = supabase
         .from("card_readings")
         .select(`
           *,
+          access_rule_granted,
           employees (
             departments (name)
           )
@@ -66,11 +67,11 @@ export const useProjectFilteredCardReadings = (pageSize: number = 100) => {
           .lte('access_time', endDate.toISOString());
       }
       
-      // Apply access status filter
+      // Apply access status filter - use access_rule_granted if available
       if (accessFilter === 'granted') {
-        query = query.eq('access_granted', true);
+        query = query.or('access_rule_granted.eq.true,access_granted.eq.true');
       } else if (accessFilter === 'denied') {
-        query = query.eq('access_granted', false);
+        query = query.or('access_rule_granted.eq.false,access_granted.eq.false');
       }
       
       // Apply sorting and pagination
@@ -86,7 +87,7 @@ export const useProjectFilteredCardReadings = (pageSize: number = 100) => {
       // Convert the response to match CardReading type
       const cardReadings: CardReading[] = data.map((item: any) => ({
         ...item,
-        status: item.access_granted ? 'success' : 'denied'
+        status: (item.access_rule_granted !== null ? item.access_rule_granted : item.access_granted) ? 'success' : 'denied'
       }));
       
       return {

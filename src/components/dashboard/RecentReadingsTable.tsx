@@ -20,6 +20,19 @@ interface RecentReadingsTableProps {
 }
 
 const RecentReadingsTable: React.FC<RecentReadingsTableProps> = ({ readings, loading }) => {
+  const getStatusBadge = (reading: CardReading) => {
+    // Use access_rule_granted if available, otherwise fall back to access_granted or status
+    const hasAccess = reading.access_rule_granted !== undefined 
+      ? reading.access_rule_granted 
+      : reading.status === 'success' || reading.access_granted;
+      
+    return (
+      <Badge variant={hasAccess ? 'success' : 'destructive'}>
+        {hasAccess ? 'İzin Verildi' : 'Reddedildi'}
+      </Badge>
+    );
+  };
+
   return (
     <div className="bg-card rounded-lg shadow-md">
       <div className="p-6">
@@ -65,11 +78,7 @@ const RecentReadingsTable: React.FC<RecentReadingsTableProps> = ({ readings, loa
                     </TableCell>
                     <TableCell>{reading.employee_name}</TableCell>
                     <TableCell>{reading.device_name || '-'}</TableCell>
-                    <TableCell>
-                      <Badge variant={reading.status === 'success' ? 'success' : 'destructive'}>
-                        {reading.status === 'success' ? 'İzin Verildi' : 'Reddedildi'}
-                      </Badge>
-                    </TableCell>
+                    <TableCell>{getStatusBadge(reading)}</TableCell>
                   </TableRow>
                 ))
               )}
