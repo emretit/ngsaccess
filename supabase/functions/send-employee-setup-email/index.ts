@@ -94,8 +94,8 @@ const handler = async (req: Request): Promise<Response> => {
           <style>
             * { margin: 0; padding: 0; box-sizing: border-box; }
             body { 
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+              background: linear-gradient(135deg, #711A1A 0%, #9a2828 100%);
               min-height: 100vh;
               padding: 20px;
             }
@@ -105,10 +105,10 @@ const handler = async (req: Request): Promise<Response> => {
               background: white;
               border-radius: 16px;
               overflow: hidden;
-              box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+              box-shadow: 0 20px 40px rgba(113, 26, 26, 0.3);
             }
             .header { 
-              background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+              background: linear-gradient(135deg, #711A1A 0%, #B93232 100%);
               padding: 40px 30px;
               text-align: center;
               color: white;
@@ -159,7 +159,7 @@ const handler = async (req: Request): Promise<Response> => {
             .info-title {
               font-size: 14px;
               font-weight: 600;
-              color: #2c3e50;
+              color: #711A1A;
               margin-bottom: 12px;
             }
             .info-item {
@@ -177,7 +177,7 @@ const handler = async (req: Request): Promise<Response> => {
             }
             .button { 
               display: inline-block;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              background: linear-gradient(135deg, #711A1A 0%, #B93232 100%);
               color: white;
               padding: 16px 32px;
               text-decoration: none;
@@ -186,13 +186,15 @@ const handler = async (req: Request): Promise<Response> => {
               font-size: 16px;
               margin: 20px 0;
               transition: transform 0.2s;
+              box-shadow: 0 4px 15px rgba(113, 26, 26, 0.3);
             }
             .button:hover {
               transform: translateY(-2px);
+              box-shadow: 0 6px 20px rgba(113, 26, 26, 0.4);
             }
             .warning {
-              background: #fff3cd;
-              border: 1px solid #ffeaa7;
+              background: #FFF3CD;
+              border-left: 4px solid #711A1A;
               border-radius: 8px;
               padding: 16px;
               margin: 20px 0;
@@ -202,6 +204,7 @@ const handler = async (req: Request): Promise<Response> => {
             .warning-title {
               font-weight: 600;
               margin-bottom: 8px;
+              color: #711A1A;
             }
             .footer {
               text-align: center;
@@ -209,6 +212,10 @@ const handler = async (req: Request): Promise<Response> => {
               font-size: 12px;
               color: #95a5a6;
               border-top: 1px solid #ecf0f1;
+            }
+            .logo {
+              font-weight: 700;
+              color: #711A1A;
             }
             @media only screen and (max-width: 480px) {
               body { padding: 10px; }
@@ -254,7 +261,7 @@ const handler = async (req: Request): Promise<Response> => {
             </div>
             <div class="footer">
               Bu email otomatik olarak gönderilmiştir.<br>
-              NGSPlus.App - ngsplus.app
+              <span class="logo">NGSPlus.App</span> - ngsplus.app
             </div>
           </div>
         </body>
