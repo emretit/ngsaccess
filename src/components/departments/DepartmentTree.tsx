@@ -18,44 +18,44 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAddTopLevelDialog, setShowAddTopLevelDialog] = useState(false);
   const [addingToParentId, setAddingToParentId] = useState<number | null>(null);
-  const [projectName, setProjectName] = useState("Ana Proje");
+  const [companyName, setCompanyName] = useState("Ana Proje");
 
   useEffect(() => {
-    fetchProjectName();
+    fetchCompanyName();
   }, [projectIds, isSuperAdmin]);
 
-  const fetchProjectName = async () => {
+  const fetchCompanyName = async () => {
     try {
       if (isSuperAdmin) {
-        setProjectName("Tüm Projeler");
+        setCompanyName("Tüm Projeler");
         return;
       }
 
       if (projectIds.length > 0) {
-        const { data, error } = await supabase
-          .from("projects")
+        // İlk şirket bilgisini al
+        const { data: company, error } = await supabase
+          .from("companies")
           .select("name")
-          .eq("id", projectIds[0])
-          .eq("is_active", true)
+          .limit(1)
           .maybeSingle();
 
         if (error) {
-          console.error("Error fetching project name:", error);
-          setProjectName("Proje");
+          console.error("Error fetching company name:", error);
+          setCompanyName("Şirket");
           return;
         }
 
-        if (data) {
-          setProjectName(data.name);
+        if (company) {
+          setCompanyName(company.name);
         } else {
-          setProjectName("Proje");
+          setCompanyName("Şirket");
         }
       } else {
-        setProjectName("Proje Bulunamadı");
+        setCompanyName("Şirket Bulunamadı");
       }
     } catch (error) {
-      console.error("Error in fetchProjectName:", error);
-      setProjectName("Ana Proje");
+      console.error("Error in fetchCompanyName:", error);
+      setCompanyName("Ana Proje");
     }
   };
 
@@ -115,7 +115,7 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
   return (
     <div className="h-full w-[280px] bg-card rounded-lg border shadow">
       <DepartmentProjectHeader
-        projectName={projectName}
+        projectName={companyName}
         onProjectClick={handleProjectHeaderClick}
         onAddClick={() => setShowAddTopLevelDialog(true)}
       />

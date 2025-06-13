@@ -6,6 +6,7 @@ import { ZoneDoorTree } from "./ZoneDoorTree";
 import { AddZoneDialog } from "./AddZoneDialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { useProjectAccess } from "@/hooks/useProjectAccess";
 
 interface ZoneDoorTreePanelProps {
   onSelectZone?: (zoneId: number | null) => void;
@@ -13,22 +14,49 @@ interface ZoneDoorTreePanelProps {
 }
 
 export function ZoneDoorTreePanel({ onSelectZone, onSelectDoor }: ZoneDoorTreePanelProps) {
-  const [projectName, setProjectName] = useState("Ana Proje");
+  const { projectIds, isSuperAdmin } = useProjectAccess();
+  const [companyName, setCompanyName] = useState("Ana Proje");
   const [showAddZoneDialog, setShowAddZoneDialog] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    async function fetchProjectName() {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("name")
-        .eq("is_active", true)
-        .single();
+    fetchCompanyName();
+  }, [projectIds, isSuperAdmin]);
 
-      if (!error && data?.name) setProjectName(data.name);
+  const fetchCompanyName = async () => {
+    try {
+      if (isSuperAdmin) {
+        setCompanyName("Tüm Projeler");
+        return;
+      }
+
+      if (projectIds.length > 0) {
+        // İlk şirket bilgisini al
+        const { data: company, error } = await supabase
+          .from("companies")
+          .select("name")
+          .limit(1)
+          .maybeSingle();
+
+        if (error) {
+          console.error("Error fetching company name:", error);
+          setCompanyName("Şirket");
+          return;
+        }
+
+        if (company) {
+          setCompanyName(company.name);
+        } else {
+          setCompanyName("Şirket");
+        }
+      } else {
+        setCompanyName("Şirket Bulunamadı");
+      }
+    } catch (error) {
+      console.error("Error in fetchCompanyName:", error);
+      setCompanyName("Ana Proje");
     }
-    fetchProjectName();
-  }, []);
+  };
 
   const handleAddZone = () => {
     setShowAddZoneDialog(true);
@@ -48,7 +76,7 @@ export function ZoneDoorTreePanel({ onSelectZone, onSelectDoor }: ZoneDoorTreePa
                 <Building2 className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <h2 className="text-base font-semibold text-gray-900">{projectName}</h2>
+                <h2 className="text-base font-semibold text-gray-900">{companyName}</h2>
                 <p className="text-xs text-gray-500">Bölgeler & Kapılar</p>
               </div>
             </div>
