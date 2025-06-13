@@ -11,11 +11,11 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-interface SetupEmailRequest {
-  user_id: string;
+interface EmployeeSetupEmailRequest {
+  employee_id: string;
   email: string;
-  role: string;
-  project_name?: string;
+  first_name: string;
+  last_name: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -25,7 +25,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { user_id, email, role, project_name }: SetupEmailRequest = await req.json();
+    const { employee_id, email, first_name, last_name }: EmployeeSetupEmailRequest = await req.json();
     
     // Create Supabase client for service role operations
     const supabase = createClient(
@@ -37,34 +37,29 @@ const handler = async (req: Request): Promise<Response> => {
     const token = crypto.randomUUID();
     const expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
 
-    // Store setup token in users table
+    // Store setup token in employee_auth table
     const { error: updateError } = await supabase
-      .from('users')
-      .update({
+      .from('employee_auth')
+      .upsert({
+        employee_id: employee_id,
+        email: email,
         setup_token: token,
-        token_expires_at: expires_at.toISOString()
-      })
-      .eq('id', user_id);
+        token_expires_at: expires_at.toISOString(),
+        password_hash: null
+      });
 
     if (updateError) {
-      console.error('Error storing setup token:', updateError);
-      throw new Error('Failed to store setup token');
+      console.error('Error storing employee setup token:', updateError);
+      throw new Error('Failed to store employee setup token');
     }
 
     // Create setup URL - production domain kullan
-    const setupUrl = `https://ngsplus.app/user-setup?token=${token}`;
-
-    // Role display names
-    const roleNames = {
-      'super_admin': 'Süper Admin',
-      'project_admin': 'Proje Yöneticisi',
-      'project_user': 'Kullanıcı'
-    };
+    const setupUrl = `https://ngsplus.app/employee-setup?token=${token}`;
 
     const emailResponse = await resend.emails.send({
       from: "NGSPlus.App <noreply@ngsplus.app>",
       to: [email],
-      subject: "NGSPlus.App'e hoş geldiniz - Hesap Kurulumu",
+      subject: "NGSPlus.App Personel Hesap Kurulumu",
       html: `
         <!DOCTYPE html>
         <html>
@@ -93,19 +88,18 @@ const handler = async (req: Request): Promise<Response> => {
           <div class="container">
             <div class="header">
               <h1>🎉 NGSPlus.App'e hoş geldiniz</h1>
-              <p>Kullanıcı Yönetim Sistemi</p>
+              <p>Personel Takip ve Kontrol Sistemi</p>
             </div>
             <div class="content">
-              <h2>Merhaba,</h2>
+              <h2>Merhaba ${first_name} ${last_name},</h2>
               
-              <p>NGSPlus.App sistemine hoş geldiniz! Size bir kullanıcı hesabı oluşturulmuş ve şifrenizi belirlemeniz için davet ediliyorsunuz.</p>
+              <p>NGSPlus.App sistemine hoş geldiniz! Size bir personel hesabı oluşturulmuş ve şifrenizi belirlemeniz için davet ediliyorsunuz.</p>
               
               <div class="info-box">
                 <strong>📋 Hesap Bilgileriniz:</strong>
                 <ul>
+                  <li><strong>Ad Soyad:</strong> ${first_name} ${last_name}</li>
                   <li><strong>E-posta:</strong> ${email}</li>
-                  <li><strong>Rol:</strong> ${roleNames[role as keyof typeof roleNames] || role}</li>
-                  ${project_name ? `<li><strong>Proje:</strong> ${project_name}</li>` : ''}
                 </ul>
               </div>
               
@@ -138,11 +132,11 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
-    console.log("Setup email sent successfully:", emailResponse);
+    console.log("Employee setup email sent successfully:", emailResponse);
 
     return new Response(JSON.stringify({ 
       success: true, 
-      message: "Setup email sent successfully",
+      message: "Employee setup email sent successfully",
       expires_at: expires_at.toISOString()
     }), {
       status: 200,
@@ -152,7 +146,7 @@ const handler = async (req: Request): Promise<Response> => {
       },
     });
   } catch (error: any) {
-    console.error("Error in send-user-setup-email function:", error);
+    console.error("Error in send-employee-setup-email function:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {
