@@ -14,6 +14,46 @@ export const useEmployeeFormSubmit = (
 ) => {
   const [isLoading, setIsLoading] = useState(false);
 
+  const sendEmployeeSetupEmail = async (employeeData: any) => {
+    try {
+      console.log('Sending setup email to:', employeeData.email);
+      
+      const { data, error } = await supabase.functions.invoke('send-employee-setup-email', {
+        body: {
+          employee_id: employeeData.id.toString(),
+          email: employeeData.email,
+          first_name: employeeData.first_name,
+          last_name: employeeData.last_name
+        }
+      });
+
+      if (error) {
+        console.error('Email sending error:', error);
+        toast({
+          title: "Uyarı",
+          description: "Personel başarıyla eklendi ancak kurulum e-postası gönderilemedi. E-postayı manuel olarak gönderebilirsiniz.",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      console.log('Setup email sent successfully:', data);
+      toast({
+        title: "Başarılı",
+        description: "Personel eklendi ve kurulum e-postası gönderildi",
+      });
+      return true;
+    } catch (error) {
+      console.error('Unexpected error sending email:', error);
+      toast({
+        title: "Uyarı",
+        description: "Personel başarıyla eklendi ancak kurulum e-postası gönderilemedi",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
   const handleSubmit = async (formData: EmployeeFormData) => {
     if (isLoading) return;
     
@@ -93,6 +133,7 @@ export const useEmployeeFormSubmit = (
       console.log('Submit data prepared:', submitData);
 
       let result;
+      let isNewEmployee = false;
       
       if (employee?.id) {
         // Update existing employee
@@ -106,6 +147,7 @@ export const useEmployeeFormSubmit = (
       } else {
         // Create new employee - check for duplicates first
         console.log('Checking for existing employee with same TC or card number...');
+        isNewEmployee = true;
         
         const { data: existingEmployee } = await supabase
           .from('employees')
@@ -150,10 +192,16 @@ export const useEmployeeFormSubmit = (
         throw new Error('No data returned from database operation');
       }
 
-      toast({
-        title: "Başarılı",
-        description: employee?.id ? "Çalışan bilgileri güncellendi" : "Yeni çalışan eklendi",
-      });
+      // If this is a new employee, send setup email
+      if (isNewEmployee) {
+        console.log('New employee created, sending setup email...');
+        await sendEmployeeSetupEmail(result.data);
+      } else {
+        toast({
+          title: "Başarılı",
+          description: "Çalışan bilgileri güncellendi",
+        });
+      }
 
       console.log('Operation successful, calling onSave with:', result.data);
       onSave(result.data);
