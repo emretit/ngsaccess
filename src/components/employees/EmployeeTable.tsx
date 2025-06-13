@@ -113,34 +113,34 @@ export default function EmployeeTable({
 
       <div className="rounded-md border">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 bg-white border-b-2 border-gray-200">
             <TableRow>
-              <TableHead className="w-[50px]">
+              <TableHead className="w-[50px] bg-gray-50 font-semibold">
                 <Checkbox
                   checked={selectedEmployees.length === employees.length}
                   onCheckedChange={handleSelectAll}
                 />
               </TableHead>
-              <TableHead>Fotoğraf</TableHead>
-              <TableHead onClick={() => requestSort('first_name')} className="cursor-pointer">
+              <TableHead className="bg-gray-50 font-semibold">Fotoğraf</TableHead>
+              <TableHead onClick={() => requestSort('first_name')} className="cursor-pointer bg-gray-50 font-semibold">
                 Ad Soyad
               </TableHead>
-              <TableHead onClick={() => requestSort('email')} className="cursor-pointer">
+              <TableHead onClick={() => requestSort('email')} className="cursor-pointer bg-gray-50 font-semibold">
                 E-posta
               </TableHead>
-              <TableHead onClick={() => requestSort('department_id')} className="cursor-pointer">
+              <TableHead onClick={() => requestSort('department_id')} className="cursor-pointer bg-gray-50 font-semibold">
                 Departman
               </TableHead>
-              <TableHead onClick={() => requestSort('position_id')} className="cursor-pointer">
+              <TableHead onClick={() => requestSort('position_id')} className="cursor-pointer bg-gray-50 font-semibold">
                 Pozisyon
               </TableHead>
-              <TableHead onClick={() => requestSort('card_number')} className="cursor-pointer">
+              <TableHead onClick={() => requestSort('card_number')} className="cursor-pointer bg-gray-50 font-semibold">
                 Kart No
               </TableHead>
-              <TableHead onClick={() => requestSort('is_active')} className="cursor-pointer">
+              <TableHead onClick={() => requestSort('is_active')} className="cursor-pointer bg-gray-50 font-semibold">
                 Durum
               </TableHead>
-              <TableHead className="text-right">İşlemler</TableHead>
+              <TableHead className="text-right bg-gray-50 font-semibold">İşlemler</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
