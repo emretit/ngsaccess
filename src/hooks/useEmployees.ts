@@ -37,11 +37,30 @@ export const useEmployees = () => {
         throw error;
       }
 
-      // Ensure access_rule_id is included in the returned data
-      return (data || []).map(employee => ({
-        ...employee,
-        access_rule_id: employee.access_rule_id || null
-      }));
+      // Veritabanından gelen veriyi Employee tipine uygun hale getir
+      return (data || []).map((employee: any) => ({
+        id: employee.id,
+        first_name: employee.first_name,
+        last_name: employee.last_name,
+        email: employee.email,
+        tc_no: employee.tc_no,
+        card_number: employee.card_number,
+        access_permission: employee.access_permission,
+        photo_url: employee.photo_url,
+        shift: employee.shift,
+        company_id: employee.company_id,
+        department_id: employee.department_id,
+        position_id: employee.position_id,
+        shift_id: employee.shift_id,
+        access_rule_id: employee.access_rule_id || null,
+        access_rule: employee.access_rule || '',
+        created_at: employee.created_at,
+        updated_at: employee.updated_at,
+        is_active: employee.is_active,
+        notes: employee.notes || '',
+        departments: employee.departments,
+        positions: employee.positions
+      } as Employee));
     },
     enabled: !projectLoading && (isSuperAdmin || projectIds.length > 0),
     staleTime: 5 * 60 * 1000, // 5 dakika boyunca veri fresh kabul edilir

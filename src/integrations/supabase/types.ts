@@ -480,6 +480,7 @@ export type Database = {
       employees: {
         Row: {
           access_permission: boolean | null
+          access_rule_id: number | null
           card_number: string
           company_id: number | null
           created_at: string | null
@@ -501,6 +502,7 @@ export type Database = {
         }
         Insert: {
           access_permission?: boolean | null
+          access_rule_id?: number | null
           card_number: string
           company_id?: number | null
           created_at?: string | null
@@ -522,6 +524,7 @@ export type Database = {
         }
         Update: {
           access_permission?: boolean | null
+          access_rule_id?: number | null
           card_number?: string
           company_id?: number | null
           created_at?: string | null
@@ -542,6 +545,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "employees_access_rule_id_fkey"
+            columns: ["access_rule_id"]
+            isOneToOne: false
+            referencedRelation: "access_rules"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "employees_project_id_fkey"
             columns: ["project_id"]
