@@ -1,4 +1,5 @@
 
+
 export interface Employee {
     id: number;
     first_name: string;
@@ -28,3 +29,4 @@ export interface Employee {
         name: string;
     } | null;
 }
+

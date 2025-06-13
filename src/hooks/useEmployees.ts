@@ -37,7 +37,11 @@ export const useEmployees = () => {
         throw error;
       }
 
-      return data || [];
+      // Ensure access_rule_id is included in the returned data
+      return (data || []).map(employee => ({
+        ...employee,
+        access_rule_id: employee.access_rule_id || null
+      }));
     },
     enabled: !projectLoading && (isSuperAdmin || projectIds.length > 0),
     staleTime: 5 * 60 * 1000, // 5 dakika boyunca veri fresh kabul edilir
