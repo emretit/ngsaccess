@@ -19,6 +19,7 @@ import Profile from '@/pages/Profile';
 import SystemAdmin from '@/pages/SystemAdmin';
 import EngineeringDepartment from '@/pages/EngineeringDepartment';
 import UserSetup from '@/pages/UserSetup';
+import EmployeeSetup from '@/pages/EmployeeSetup';
 import LandingPage from '@/pages/LandingPage';
 import DemoRequest from '@/pages/DemoRequest';
 import NotFound from '@/pages/NotFound';
@@ -38,6 +39,7 @@ function App() {
             <Route path="/auth" element={<Auth />} />
             <Route path="/demo-request" element={<DemoRequest />} />
             <Route path="/user-setup" element={<UserSetup />} />
+            <Route path="/employee-setup" element={<EmployeeSetup />} />
             <Route path="/system-admin" element={<SystemAdmin />} />
             <Route 
               path="/home" 

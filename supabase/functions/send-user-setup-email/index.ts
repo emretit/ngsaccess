@@ -51,7 +51,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Failed to store setup token');
     }
 
-    // Create setup URL - production domain kullan
+    // Create setup URL
     const setupUrl = `https://ngsplus.app/user-setup?token=${token}`;
 
     // Role display names
@@ -64,7 +64,7 @@ const handler = async (req: Request): Promise<Response> => {
     const emailResponse = await resend.emails.send({
       from: "NGSPlus.App <noreply@ngsplus.app>",
       to: [email],
-      subject: "NGSPlus.App'e hoş geldiniz - Hesap Kurulumu",
+      subject: "Şifre Belirleme",
       html: `
         <!DOCTYPE html>
         <html>
@@ -72,76 +72,175 @@ const handler = async (req: Request): Promise<Response> => {
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #711A1A; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
-            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
-            .button { 
-              display: inline-block; 
-              background: #711A1A; 
-              color: white; 
-              padding: 15px 30px; 
-              text-decoration: none; 
-              border-radius: 5px; 
-              margin: 20px 0;
-              font-weight: bold;
-              font-size: 16px;
-              text-align: center;
-              min-width: 200px;
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              min-height: 100vh;
+              padding: 20px;
             }
-            .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
-            .info-box { background: #e3f2fd; border: 1px solid #90caf9; padding: 15px; border-radius: 5px; margin: 20px 0; }
-            @media only screen and (max-width: 600px) {
-              .container { padding: 10px; }
-              .content { padding: 20px; }
-              .button { display: block; width: 100%; box-sizing: border-box; }
+            .container { 
+              max-width: 400px; 
+              margin: 0 auto; 
+              background: white;
+              border-radius: 16px;
+              overflow: hidden;
+              box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            }
+            .header { 
+              background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+              padding: 40px 30px;
+              text-align: center;
+              color: white;
+            }
+            .security-icon {
+              width: 60px;
+              height: 60px;
+              background: rgba(255,255,255,0.2);
+              border-radius: 50%;
+              margin: 0 auto 20px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 28px;
+            }
+            .header h1 { 
+              font-size: 24px; 
+              font-weight: 600;
+              margin-bottom: 8px;
+            }
+            .header p { 
+              font-size: 14px; 
+              opacity: 0.9;
+            }
+            .content { 
+              padding: 40px 30px;
+              text-align: center;
+            }
+            .greeting {
+              font-size: 18px;
+              font-weight: 600;
+              color: #2c3e50;
+              margin-bottom: 16px;
+            }
+            .message {
+              font-size: 14px;
+              color: #7f8c8d;
+              line-height: 1.6;
+              margin-bottom: 30px;
+            }
+            .info-card {
+              background: #f8f9fa;
+              border-radius: 12px;
+              padding: 20px;
+              margin: 20px 0;
+              text-align: left;
+            }
+            .info-title {
+              font-size: 14px;
+              font-weight: 600;
+              color: #2c3e50;
+              margin-bottom: 12px;
+            }
+            .info-item {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 8px;
+              font-size: 13px;
+            }
+            .info-label {
+              color: #7f8c8d;
+            }
+            .info-value {
+              color: #2c3e50;
+              font-weight: 500;
+            }
+            .button { 
+              display: inline-block;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+              padding: 16px 32px;
+              text-decoration: none;
+              border-radius: 25px;
+              font-weight: 600;
+              font-size: 16px;
+              margin: 20px 0;
+              transition: transform 0.2s;
+            }
+            .button:hover {
+              transform: translateY(-2px);
+            }
+            .warning {
+              background: #fff3cd;
+              border: 1px solid #ffeaa7;
+              border-radius: 8px;
+              padding: 16px;
+              margin: 20px 0;
+              font-size: 12px;
+              color: #856404;
+            }
+            .warning-title {
+              font-weight: 600;
+              margin-bottom: 8px;
+            }
+            .footer {
+              text-align: center;
+              padding: 20px;
+              font-size: 12px;
+              color: #95a5a6;
+              border-top: 1px solid #ecf0f1;
+            }
+            @media only screen and (max-width: 480px) {
+              body { padding: 10px; }
+              .container { margin: 0; }
+              .content { padding: 30px 20px; }
+              .header { padding: 30px 20px; }
             }
           </style>
         </head>
         <body>
           <div class="container">
             <div class="header">
-              <h1>🎉 NGSPlus.App'e hoş geldiniz</h1>
-              <p>Kullanıcı Yönetim Sistemi</p>
+              <div class="security-icon">🔐</div>
+              <h1>Şifre Belirleme</h1>
+              <p>Hesabınızı güvenli hale getirin</p>
             </div>
             <div class="content">
-              <h2>Merhaba,</h2>
-              
-              <p>NGSPlus.App sistemine hoş geldiniz! Size bir kullanıcı hesabı oluşturulmuş ve şifrenizi belirlemeniz için davet ediliyorsunuz.</p>
-              
-              <div class="info-box">
-                <strong>📋 Hesap Bilgileriniz:</strong>
-                <ul>
-                  <li><strong>E-posta:</strong> ${email}</li>
-                  <li><strong>Rol:</strong> ${roleNames[role as keyof typeof roleNames] || role}</li>
-                  ${project_name ? `<li><strong>Proje:</strong> ${project_name}</li>` : ''}
-                </ul>
+              <div class="greeting">Merhaba!</div>
+              <div class="message">
+                NGSPlus.App sistemine hoş geldiniz. Hesabınızı aktifleştirmek için şifrenizi belirleyin.
               </div>
               
-              <p><strong>Hesabınızı aktifleştirmek ve şifrenizi belirlemek için aşağıdaki butona tıklayın:</strong></p>
-              
-              <div style="text-align: center;">
-                <a href="${setupUrl}" class="button">Hesabımı Aktifleştir</a>
+              <div class="info-card">
+                <div class="info-title">Hesap Bilgileri</div>
+                <div class="info-item">
+                  <span class="info-label">E-posta:</span>
+                  <span class="info-value">${email}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Rol:</span>
+                  <span class="info-value">${roleNames[role as keyof typeof roleNames] || role}</span>
+                </div>
+                ${project_name ? `
+                <div class="info-item">
+                  <span class="info-label">Proje:</span>
+                  <span class="info-value">${project_name}</span>
+                </div>
+                ` : ''}
               </div>
+              
+              <a href="${setupUrl}" class="button">Şifremi Belirle</a>
               
               <div class="warning">
-                <strong>⚠️ Önemli Güvenlik Bilgileri:</strong>
-                <ul>
-                  <li>Bu bağlantı 24 saat geçerlidir</li>
-                  <li>Bağlantıyı sadece siz kullanabilirsiniz</li>
-                  <li>Güçlü bir şifre seçiniz (en az 8 karakter, büyük/küçük harf, rakam)</li>
-                  <li>Şifrenizi kimseyle paylaşmayınız</li>
-                </ul>
+                <div class="warning-title">⚠️ Güvenlik Uyarısı</div>
+                • Bu bağlantı 24 saat geçerlidir<br>
+                • Güçlü bir şifre kullanın<br>
+                • Şifrenizi kimseyle paylaşmayın
               </div>
-              
-              <p>Eğer bu email'i beklemiyordunuz, lütfen sistem yöneticiniz ile iletişime geçiniz.</p>
-              
-              <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
-              
-              <p style="font-size: 12px; color: #666;">
-                Bu email otomatik olarak gönderilmiştir. Lütfen yanıtlamayınız.<br>
-                NGSPlus.App - ngsplus.app
-              </p>
+            </div>
+            <div class="footer">
+              Bu email otomatik olarak gönderilmiştir.<br>
+              NGSPlus.App - ngsplus.app
             </div>
           </div>
         </body>
