@@ -1,36 +1,43 @@
 
 import { useState, useEffect } from 'react';
-import { Employee } from '@/types/employee';
 import { supabase } from '@/integrations/supabase/client';
+import { Employee } from '@/types/employee';
 
-export type EmployeeFormData = Partial<Employee> & {
-  department?: string;
-  position?: string;
-  notes?: string;
-  department_id?: number | null;
-  position_id?: number | null;
-  access_rule_id?: number | null;
-  access_rule?: string;
-};
+export interface EmployeeFormData {
+  first_name: string;
+  last_name: string;
+  email: string;
+  tc_no: string;
+  card_number: string;
+  company_id: number | null;
+  department_id: number | null;
+  position_id: number | null;
+  access_rule_id: number | null;
+  shift: string | null;
+  shift_id: number | null;
+  photo_url: string | null;
+  notes: string;
+  is_active: boolean;
+  access_permission: boolean;
+}
 
-export function useEmployeeFormData(employee?: Employee | null) {
+export const useEmployeeFormData = (employee?: Employee | null) => {
   const [formData, setFormData] = useState<EmployeeFormData>({
     first_name: '',
     last_name: '',
     email: '',
-    department: '',
-    position: '',
-    card_number: '',
-    is_active: true,
-    photo_url: '',
     tc_no: '',
-    shift: '',
+    card_number: '',
     company_id: null,
-    notes: '',
     department_id: null,
     position_id: null,
     access_rule_id: null,
-    access_rule: '',
+    shift: null,
+    shift_id: null,
+    photo_url: null,
+    notes: '',
+    is_active: true,
+    access_permission: true,
   });
 
   const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
@@ -39,71 +46,127 @@ export function useEmployeeFormData(employee?: Employee | null) {
   const [positions, setPositions] = useState<{ id: number; name: string }[]>([]);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
+  // Initialize form data when employee prop changes
   useEffect(() => {
     if (employee) {
-      console.log("Yüklenen çalışan verisi:", employee);
-
-      const departmentName = employee.departments?.name || '';
-      const positionName = employee.positions?.name || '';
-
+      console.log('Initializing form with employee data:', employee);
       setFormData({
-        ...employee,
-        department: departmentName,
-        position: positionName,
-        department_id: employee.department_id,
-        position_id: employee.position_id,
+        first_name: employee.first_name || '',
+        last_name: employee.last_name || '',
+        email: employee.email || '',
+        tc_no: employee.tc_no || '',
+        card_number: employee.card_number || '',
+        company_id: employee.company_id || null,
+        department_id: employee.department_id || null,
+        position_id: employee.position_id || null,
         access_rule_id: employee.access_rule_id || null,
-        access_rule: employee.access_rule || '',
+        shift: employee.shift || null,
+        shift_id: employee.shift_id || null,
+        photo_url: employee.photo_url || null,
         notes: employee.notes || '',
+        is_active: employee.is_active ?? true,
+        access_permission: employee.access_permission ?? true,
       });
-
-      if (employee.photo_url) {
-        setPhotoPreview(employee.photo_url);
-      }
+      setPhotoPreview(employee.photo_url || null);
+    } else {
+      // Reset form for new employee
+      setFormData({
+        first_name: '',
+        last_name: '',
+        email: '',
+        tc_no: '',
+        card_number: '',
+        company_id: null,
+        department_id: null,
+        position_id: null,
+        access_rule_id: null,
+        shift: null,
+        shift_id: null,
+        photo_url: null,
+        notes: '',
+        is_active: true,
+        access_permission: true,
+      });
+      setPhotoPreview(null);
     }
-    fetchDepartments();
-    fetchCompanies();
-    fetchAccessRules();
-    fetchPositions();
   }, [employee]);
 
-  const fetchDepartments = async () => {
-    const { data, error } = await supabase.from('departments').select('id, name');
-    if (!error && data) {
-      setDepartments(data);
-    }
-  };
+  // Fetch departments
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('departments')
+          .select('id, name')
+          .order('name');
 
-  const fetchCompanies = async () => {
-    const { data, error } = await supabase.from('companies').select('id, name');
-    if (!error && data) {
-      setCompanies(data);
-    } else {
-      setCompanies([]);
-    }
-  };
+        if (error) throw error;
+        setDepartments(data || []);
+      } catch (error) {
+        console.error('Error fetching departments:', error);
+      }
+    };
 
-  const fetchAccessRules = async () => {
-    const { data, error } = await supabase
-      .from('access_rules')
-      .select('id, name')
-      .eq('is_active', true)
-      .order('name');
-    if (!error && data) {
-      setAccessRules(data);
-    } else {
-      setAccessRules([]);
-    }
-  };
+    fetchDepartments();
+  }, []);
 
-  const fetchPositions = async () => {
-    const { data, error } = await supabase.from('positions').select('id, name');
-    if (!error && data) {
-      setPositions(data);
-    } else {
-      setPositions([]);
-    }
-  };
+  // Fetch companies
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('companies')
+          .select('id, name')
+          .order('name');
+
+        if (error) throw error;
+        setCompanies(data || []);
+      } catch (error) {
+        console.error('Error fetching companies:', error);
+      }
+    };
+
+    fetchCompanies();
+  }, []);
+
+  // Fetch access rules
+  useEffect(() => {
+    const fetchAccessRules = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('access_rules')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name');
+
+        if (error) throw error;
+        setAccessRules(data || []);
+      } catch (error) {
+        console.error('Error fetching access rules:', error);
+      }
+    };
+
+    fetchAccessRules();
+  }, []);
+
+  // Fetch positions
+  useEffect(() => {
+    const fetchPositions = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('positions')
+          .select('id, name')
+          .order('name');
+
+        if (error) throw error;
+        setPositions(data || []);
+      } catch (error) {
+        console.error('Error fetching positions:', error);
+      }
+    };
+
+    fetchPositions();
+  }, []);
 
   return {
     formData,
@@ -115,4 +178,4 @@ export function useEmployeeFormData(employee?: Employee | null) {
     photoPreview,
     setPhotoPreview,
   };
-}
+};
