@@ -70,8 +70,9 @@ const handler = async (req: Request): Promise<Response> => {
         <html>
         <head>
           <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
             .header { background: #711A1A; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
             .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
@@ -79,14 +80,22 @@ const handler = async (req: Request): Promise<Response> => {
               display: inline-block; 
               background: #711A1A; 
               color: white; 
-              padding: 12px 30px; 
+              padding: 15px 30px; 
               text-decoration: none; 
               border-radius: 5px; 
               margin: 20px 0;
               font-weight: bold;
+              font-size: 16px;
+              text-align: center;
+              min-width: 200px;
             }
             .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }
             .info-box { background: #e3f2fd; border: 1px solid #90caf9; padding: 15px; border-radius: 5px; margin: 20px 0; }
+            @media only screen and (max-width: 600px) {
+              .container { padding: 10px; }
+              .content { padding: 20px; }
+              .button { display: block; width: 100%; box-sizing: border-box; }
+            }
           </style>
         </head>
         <body>
@@ -111,7 +120,9 @@ const handler = async (req: Request): Promise<Response> => {
               
               <p><strong>Hesabınızı aktifleştirmek ve şifrenizi belirlemek için aşağıdaki butona tıklayın:</strong></p>
               
-              <a href="${setupUrl}" class="button">Hesabımı Aktifleştir</a>
+              <div style="text-align: center;">
+                <a href="${setupUrl}" class="button">Hesabımı Aktifleştir</a>
+              </div>
               
               <div class="warning">
                 <strong>⚠️ Önemli Güvenlik Bilgileri:</strong>
