@@ -91,11 +91,13 @@ export function ServerDeviceForm({
     try {
       const deviceData = {
         name: values.name,
+        location: values.name, // location alanı için name kullanıyoruz
+        type: values.device_model_enum, // type alanı için device_model_enum kullanıyoruz
         serial_number: values.serial_number,
         device_model_enum: values.device_model_enum,
-        project_id: values.project_id,
-        zone_id: values.zone_id,
-        door_id: values.door_id,
+        project_id: values.project_id || null,
+        zone_id: values.zone_id || null,
+        door_id: values.door_id || null,
         access_direction: values.access_direction,
         device_mac: values.device_mac || null,
         device_ip: values.device_ip || null,
@@ -146,12 +148,27 @@ export function ServerDeviceForm({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <DeviceBasicInfo 
-          form={form}
-          projects={projects}
+          name={form.watch("name")}
+          onNameChange={(value) => form.setValue("name", value)}
+          serialNumber={form.watch("serial_number")}
+          onSerialNumberChange={(value) => form.setValue("serial_number", value)}
+          deviceModel={form.watch("device_model_enum")}
+          onDeviceModelChange={(value) => form.setValue("device_model_enum", value)}
+          isActive={form.watch("status") === "active"}
+          onIsActiveChange={(value) => form.setValue("status", value ? "active" : "inactive")}
         />
         
         <DeviceLocationInfo 
-          form={form}
+          projectId={form.watch("project_id")?.toString() || ""}
+          onProjectChange={(value) => form.setValue("project_id", value ? parseInt(value) : undefined)}
+          zoneId={form.watch("zone_id")?.toString() || ""}
+          onZoneChange={(value) => form.setValue("zone_id", value ? parseInt(value) : undefined)}
+          doorId={form.watch("door_id")?.toString() || ""}
+          onDoorChange={(value) => form.setValue("door_id", value ? parseInt(value) : undefined)}
+          projects={projects}
+          zones={[]}
+          doors={[]}
+          loading={false}
         />
 
         <DeviceAccessInfo
@@ -160,11 +177,19 @@ export function ServerDeviceForm({
         />
         
         <DeviceNetworkInfo 
-          form={form}
+          ipAddress={form.watch("device_ip") || ""}
+          onIpAddressChange={(value) => form.setValue("device_ip", value)}
+          macAddress={form.watch("device_mac") || ""}
+          onMacAddressChange={(value) => form.setValue("device_mac", value)}
+          firmwareVersion={form.watch("device_firmware") || ""}
+          onFirmwareVersionChange={(value) => form.setValue("device_firmware", value)}
         />
         
         <DeviceAdditionalInfo 
-          form={form}
+          description=""
+          onDescriptionChange={() => {}}
+          expiryDate=""
+          onExpiryDateChange={() => {}}
         />
 
         <div className="flex justify-end space-x-2 pt-4 border-t">
