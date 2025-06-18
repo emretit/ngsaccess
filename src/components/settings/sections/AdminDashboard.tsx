@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users, Building2, Activity, Settings, Shield, TrendingUp, Clock, Monitor } from 'lucide-react';
 import AdminProjectsPanel from '@/components/admin/AdminProjectsPanel';
-import AdminDevicesPanel from '@/components/admin/AdminDevicesPanel';
+import { AdminDevicesPanel } from '@/components/admin/AdminDevicesPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function AdminDashboard() {

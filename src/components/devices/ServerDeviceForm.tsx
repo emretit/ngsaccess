@@ -108,7 +108,7 @@ export function ServerDeviceForm({
         const { error } = await supabase
           .from("devices")
           .update(deviceData)
-          .eq("id", device.id);
+          .eq("id", parseInt(device.id));
 
         if (error) throw error;
         

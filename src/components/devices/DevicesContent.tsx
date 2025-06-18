@@ -13,7 +13,6 @@ interface DevicesContentProps {
   doors: Door[];
   selectedZoneId: number | null;
   selectedDoorId: number | null;
-  onQRClick: (device: Device) => void;
   onDeleteDevice: (deviceId: string) => void;
   onAssignLocation: (device: Device) => void;
   onEditDevice: (device: Device) => void;
@@ -27,7 +26,6 @@ export function DevicesContent({
   doors,
   selectedZoneId,
   selectedDoorId,
-  onQRClick,
   onDeleteDevice,
   onAssignLocation,
   onEditDevice,
@@ -76,7 +74,6 @@ export function DevicesContent({
           isLoading={isLoading}
           zones={zones}
           doors={doors}
-          onQRClick={onQRClick}
           onDeleteDevice={onDeleteDevice}
           onAssignLocation={onAssignLocation}
           onEditDevice={onEditDevice}

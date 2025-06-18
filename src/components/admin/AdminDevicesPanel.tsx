@@ -67,7 +67,7 @@ export function AdminDevicesPanel() {
       const { error } = await supabase
         .from('devices')
         .delete()
-        .eq('id', deviceId);
+        .eq('id', parseInt(deviceId));
       
       if (error) throw error;
       
@@ -98,12 +98,6 @@ export function AdminDevicesPanel() {
         typeFilter={typeFilter}
         onTypeFilterChange={setTypeFilter}
         deviceTypes={deviceTypes}
-        selectedZoneId={selectedZoneId}
-        onZoneChange={setSelectedZoneId}
-        selectedDoorId={selectedDoorId}
-        onDoorChange={setSelectedDoorId}
-        zones={zones}
-        doors={doors}
       />
       
       <DeviceList
