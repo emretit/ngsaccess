@@ -125,7 +125,7 @@ export function ServerDeviceForm({
         if (error) throw error;
         
         toast({
-          title: "Cihaz eklendi",
+          title: "Cihaz eklendi",  
           description: "Yeni cihaz başarıyla eklendi",
         });
       }
