@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ChevronRight, ChevronDown, Building2, MapPin } from "lucide-react";
 import { useDevices } from "@/hooks/useDevices";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
+import { useLocationUtils } from "@/hooks/useLocationUtils";
 
 interface ZoneDeviceTreeProps {
   formData: {
@@ -19,6 +20,7 @@ export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) =
   const [expandedZones, setExpandedZones] = useState<Set<number>>(new Set());
   const { devices } = useDevices();
   const { zones } = useZonesAndDoors();
+  const { getDeviceLocationDisplay } = useLocationUtils();
 
   const handleDeviceChange = (deviceId: string, checked: boolean) => {
     setFormData(prev => ({
@@ -145,7 +147,7 @@ export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) =
                     htmlFor={`device-${device.id}`}
                     className="text-sm font-normal cursor-pointer"
                   >
-                    {device.name} ({device.location})
+                    {device.name} ({getDeviceLocationDisplay(device)})
                   </Label>
                 </div>
               ))}
@@ -197,7 +199,7 @@ export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) =
                   htmlFor={`orphan-device-${device.id}`}
                   className="text-sm font-normal cursor-pointer"
                 >
-                  {device.name} ({device.location})
+                  {device.name} ({getDeviceLocationDisplay(device)})
                 </Label>
               </div>
             ))}

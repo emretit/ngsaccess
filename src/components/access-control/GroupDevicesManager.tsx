@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AccessRule, GroupDevice } from "@/types/access-control";
 import { useDevices } from "@/hooks/useDevices";
 import { useAccessRules } from "@/hooks/useAccessRules";
+import { useLocationUtils } from "@/hooks/useLocationUtils";
 
 interface GroupDevicesManagerProps {
   rule: AccessRule;
@@ -21,10 +22,11 @@ export function GroupDevicesManager({ rule, projectId }: GroupDevicesManagerProp
   
   const { devices } = useDevices();
   const { addGroupDevice, removeGroupDevice } = useAccessRules();
+  const { getDeviceLocationDisplay } = useLocationUtils();
 
   const filteredDevices = devices?.filter(device => 
     device.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    device.location?.toLowerCase().includes(searchTerm.toLowerCase())
+    getDeviceLocationDisplay(device).toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
   const availableDevices = filteredDevices.filter(device => 
@@ -71,7 +73,7 @@ export function GroupDevicesManager({ rule, projectId }: GroupDevicesManagerProp
               <SelectContent>
                 {availableDevices.map((device) => (
                   <SelectItem key={device.id} value={device.id.toString()}>
-                    {device.name} - {device.location}
+                    {device.name} - {getDeviceLocationDisplay(device)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -89,30 +91,33 @@ export function GroupDevicesManager({ rule, projectId }: GroupDevicesManagerProp
 
         {/* Current devices */}
         <div className="space-y-2">
-          {rule.group_devices?.map((groupDevice) => (
-            <div key={groupDevice.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-              <div>
-                <div className="font-medium">
-                  {groupDevice.devices?.name}
+          {rule.group_devices?.map((groupDevice) => {
+            const device = devices.find(d => d.id === groupDevice.device_id.toString());
+            return (
+              <div key={groupDevice.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                <div>
+                  <div className="font-medium">
+                    {groupDevice.devices?.name}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {device ? getDeviceLocationDisplay(device) : 'Konum Bilinmiyor'}
+                    {(groupDevice.devices?.serial || groupDevice.devices?.serial_number) && 
+                      ` • ${groupDevice.devices.serial || groupDevice.devices.serial_number}`
+                    }
+                  </div>
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {groupDevice.devices?.location}
-                  {(groupDevice.devices?.serial || groupDevice.devices?.serial_number) && 
-                    ` • ${groupDevice.devices.serial || groupDevice.devices.serial_number}`
-                  }
-                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleRemoveDevice(groupDevice.id)}
+                  disabled={removeGroupDevice.isPending}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleRemoveDevice(groupDevice.id)}
-                disabled={removeGroupDevice.isPending}
-                className="text-destructive hover:text-destructive"
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
-          )) || (
+            );
+          }) || (
             <div className="text-center text-muted-foreground py-4">
               Bu gruba henüz cihaz eklenmemiş
             </div>

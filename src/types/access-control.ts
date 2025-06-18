@@ -1,4 +1,3 @@
-
 export interface CardReading {
     id: number;
     card_no: string;
@@ -68,9 +67,10 @@ export interface GroupDevice {
   devices?: {
     id: number;
     name: string;
-    location: string;
     serial?: string;
     serial_number?: string;
+    zone_id?: number;
+    door_id?: number;
   };
 }
 

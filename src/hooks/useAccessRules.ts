@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AccessRule, GroupMember, GroupDevice } from "@/types/access-control";
@@ -36,8 +37,9 @@ export const useAccessRules = (projectId?: number) => {
             devices!group_devices_device_id_fkey (
               id,
               name,
-              location,
-              serial_number
+              serial_number,
+              zone_id,
+              door_id
             )
           )
         `)
@@ -484,22 +486,22 @@ export const useAccessRules = (projectId?: number) => {
 
   return {
     accessRules,
-    rules, // Legacy alias
+    rules: accessRules || [], // Legacy alias
     isLoading,
     error,
     createAccessRule,
     createAccessRuleWithMembers,
-    createRule, // Legacy alias
-    isCreating,
+    createRule: createAccessRule, // Legacy alias
+    isCreating: createAccessRule.isPending,
     updateAccessRule,
-    updateAccessRuleWithAdditionalMembers, // New function
-    updateRule, // Legacy alias
-    isUpdating,
+    updateAccessRuleWithAdditionalMembers,
+    updateRule: updateAccessRule, // Legacy alias
+    isUpdating: updateAccessRule.isPending || updateAccessRuleWithAdditionalMembers.isPending,
     deleteAccessRule,
-    deleteRule, // Legacy alias
-    isDeleting,
-    toggleRule, // Legacy alias
-    isToggling,
+    deleteRule: deleteAccessRule, // Legacy alias
+    isDeleting: deleteAccessRule.isPending,
+    toggleRule: updateAccessRule, // Legacy alias
+    isToggling: updateAccessRule.isPending,
     addGroupMember,
     removeGroupMember,
     addGroupDevice,

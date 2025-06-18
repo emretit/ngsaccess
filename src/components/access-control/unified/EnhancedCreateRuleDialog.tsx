@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import { useDevices } from "@/hooks/useDevices";
 import { useDepartments } from "@/hooks/useDepartments";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { useAccessRules } from "@/hooks/useAccessRules";
+import { useLocationUtils } from "@/hooks/useLocationUtils";
 import { Loader2, Users, Building2, MapPin, Clock, Shield, AlertTriangle } from "lucide-react";
 
 interface EnhancedCreateRuleDialogProps {
@@ -48,6 +50,7 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
   const { departments } = useDepartments();
   const { zones, doors } = useZonesAndDoors();
   const { createAccessRule, isCreating, updateAccessRule, isUpdating } = useAccessRules();
+  const { getDeviceLocationDisplay } = useLocationUtils();
 
   // Reset form when dialog opens/closes or editing rule changes
   useEffect(() => {
@@ -249,7 +252,7 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
               />
               <MapPin className="h-4 w-4 text-green-500" />
               <Label htmlFor={`device-${device.id}`} className="text-sm cursor-pointer">
-                {device.name} ({device.location})
+                {device.name} ({getDeviceLocationDisplay(device)})
               </Label>
             </div>
           ))}
@@ -550,48 +553,24 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
               </Card>
             </TabsContent>
 
-            <div className="flex justify-between pt-4">
+            <div className="flex justify-end space-x-4 pt-4 border-t">
               <Button type="button" variant="outline" onClick={onClose}>
                 İptal
               </Button>
-              <div className="space-x-2">
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  onClick={() => {
-                    const currentIndex = ['basic', 'targets', 'access', 'schedule'].indexOf(activeTab);
-                    if (currentIndex > 0) {
-                      setActiveTab(['basic', 'targets', 'access', 'schedule'][currentIndex - 1]);
-                    }
-                  }}
-                  disabled={activeTab === 'basic'}
-                >
-                  Önceki
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="outline"
-                  onClick={() => {
-                    const currentIndex = ['basic', 'targets', 'access', 'schedule'].indexOf(activeTab);
-                    if (currentIndex < 3) {
-                      setActiveTab(['basic', 'targets', 'access', 'schedule'][currentIndex + 1]);
-                    }
-                  }}
-                  disabled={activeTab === 'schedule'}
-                >
-                  Sonraki
-                </Button>
-                <Button type="submit" disabled={isCreating || isUpdating}>
-                  {isCreating || isUpdating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      {editingRule ? 'Güncelleniyor...' : 'Oluşturuluyor...'}
-                    </>
-                  ) : (
-                    editingRule ? 'Güncelle' : 'Oluştur'
-                  )}
-                </Button>
-              </div>
+              <Button 
+                type="submit" 
+                disabled={isCreating || isUpdating}
+                className="bg-primary hover:bg-primary/90"
+              >
+                {isCreating || isUpdating ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {editingRule ? 'Güncelleniyor...' : 'Oluşturuluyor...'}
+                  </>
+                ) : (
+                  editingRule ? 'Kuralı Güncelle' : 'Kural Oluştur'
+                )}
+              </Button>
             </div>
           </form>
         </Tabs>
