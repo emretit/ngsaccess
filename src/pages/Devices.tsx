@@ -142,7 +142,6 @@ const Devices = () => {
             doors={doors}
             selectedZoneId={selectedZoneId}
             selectedDoorId={selectedDoorId}
-            onQRClick={handleQRClick}
             onDeleteDevice={handleDeleteDevice}
             onAssignLocation={openLocationForm}
             onEditDevice={handleEditDevice}

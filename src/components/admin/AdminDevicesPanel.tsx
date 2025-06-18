@@ -88,6 +88,11 @@ export function AdminDevicesPanel() {
     console.log('Edit device:', device);
   };
 
+  const handleNewDevice = () => {
+    // TODO: Implement new device creation
+    console.log('Add new device');
+  };
+
   return (
     <div className="space-y-6">
       <DeviceFilters
@@ -98,6 +103,9 @@ export function AdminDevicesPanel() {
         typeFilter={typeFilter}
         onTypeFilterChange={setTypeFilter}
         deviceTypes={deviceTypes}
+        onNewDevice={handleNewDevice}
+        deviceCount={rawDevices.length}
+        filteredCount={filteredDevices.length}
       />
       
       <DeviceList
