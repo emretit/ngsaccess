@@ -35,19 +35,6 @@ export function DeviceTableRow({
     ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
     : 'bg-gray-100 text-gray-500 border-gray-200';
 
-  const getAccessDirectionBadge = (accessDirection?: string) => {
-    switch (accessDirection) {
-      case 'entry':
-        return <Badge className="bg-green-500/10 text-green-600 border-green-500/20">Giriş</Badge>;
-      case 'exit':
-        return <Badge className="bg-blue-500/10 text-blue-600 border-blue-500/20">Çıkış</Badge>;
-      case 'both':
-        return <Badge className="bg-purple-500/10 text-purple-600 border-purple-500/20">Her İkisi</Badge>;
-      default:
-        return <Badge variant="outline">-</Badge>;
-    }
-  };
-
   return (
     <TableRow className="hover:bg-muted/30 transition-colors">
       <TableCell>
@@ -74,7 +61,6 @@ export function DeviceTableRow({
       <TableCell className="font-medium">{device.device_name || device.name || '-'}</TableCell>
       <TableCell className="font-mono text-xs">{device.device_serial || device.serial_number || '-'}</TableCell>
       <TableCell>{locationString || '-'}</TableCell>
-      <TableCell>{device.device_type || device.type || '-'}</TableCell>
       <TableCell>
         <Badge 
           className={`${statusColor} py-1 px-3`}
@@ -82,12 +68,6 @@ export function DeviceTableRow({
         >
           {device.status === 'online' ? 'Aktif' : 'Pasif'}
         </Badge>
-      </TableCell>
-      <TableCell>{getAccessDirectionBadge(device.access_direction)}</TableCell>
-      <TableCell>{device.device_mac || '-'}</TableCell>
-      <TableCell>{device.device_ip || '-'}</TableCell>
-      <TableCell>
-        {device.last_used_at ? format(new Date(device.last_used_at), 'dd.MM.yyyy HH:mm') : '-'}
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1">

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -160,11 +159,11 @@ export function ServerDeviceForm({
         
         <DeviceLocationInfo 
           projectId={form.watch("project_id")?.toString() || ""}
-          onProjectChange={(value) => form.setValue("project_id", value ? parseInt(value) : undefined)}
+          onProjectChange={(value) => form.setValue("project_id", value ? Number(value) : undefined)}
           zoneId={form.watch("zone_id")?.toString() || ""}
-          onZoneChange={(value) => form.setValue("zone_id", value ? parseInt(value) : undefined)}
+          onZoneChange={(value) => form.setValue("zone_id", value ? Number(value) : undefined)}
           doorId={form.watch("door_id")?.toString() || ""}
-          onDoorChange={(value) => form.setValue("door_id", value ? parseInt(value) : undefined)}
+          onDoorChange={(value) => form.setValue("door_id", value ? Number(value) : undefined)}
           projects={projects}
           zones={[]}
           doors={[]}

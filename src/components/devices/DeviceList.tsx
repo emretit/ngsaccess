@@ -86,19 +86,14 @@ export function DeviceList({
               <TableHead className="bg-gray-50 font-semibold">İsim</TableHead>
               <TableHead className="bg-gray-50 font-semibold">Seri No</TableHead>
               <TableHead className="bg-gray-50 font-semibold">Konum</TableHead>
-              <TableHead className="bg-gray-50 font-semibold">Tip</TableHead>
               <TableHead className="bg-gray-50 font-semibold">Durum</TableHead>
-              <TableHead className="bg-gray-50 font-semibold">Erişim Yönü</TableHead>
-              <TableHead className="bg-gray-50 font-semibold">MAC</TableHead>
-              <TableHead className="bg-gray-50 font-semibold">IP</TableHead>
-              <TableHead className="bg-gray-50 font-semibold">Son Görülme</TableHead>
               <TableHead className="text-right bg-gray-50 font-semibold">İşlemler</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={12} className="text-center py-16">
+                <TableCell colSpan={7} className="text-center py-16">
                   <div className="flex flex-col items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
                     <span className="text-muted-foreground font-medium">Cihazlar yükleniyor...</span>
@@ -121,7 +116,7 @@ export function DeviceList({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={12} className="text-center py-16">
+                <TableCell colSpan={7} className="text-center py-16">
                   <div className="flex flex-col items-center justify-center space-y-4">
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
                       <Smartphone className="h-8 w-8 text-gray-400" />
