@@ -250,6 +250,9 @@ export type Database = {
       }
       devices: {
         Row: {
+          access_direction:
+            | Database["public"]["Enums"]["access_direction_enum"]
+            | null
           created_at: string
           description: string | null
           device_firmware: string | null
@@ -276,6 +279,9 @@ export type Database = {
           zone_id: number | null
         }
         Insert: {
+          access_direction?:
+            | Database["public"]["Enums"]["access_direction_enum"]
+            | null
           created_at?: string
           description?: string | null
           device_firmware?: string | null
@@ -302,6 +308,9 @@ export type Database = {
           zone_id?: number | null
         }
         Update: {
+          access_direction?:
+            | Database["public"]["Enums"]["access_direction_enum"]
+            | null
           created_at?: string
           description?: string | null
           device_firmware?: string | null
@@ -1333,6 +1342,7 @@ export type Database = {
       }
     }
     Enums: {
+      access_direction_enum: "entry" | "exit" | "both"
       device_model_type:
         | "QR Reader"
         | "Fingerprint Reader"
@@ -1455,6 +1465,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      access_direction_enum: ["entry", "exit", "both"],
       device_model_type: [
         "QR Reader",
         "Fingerprint Reader",

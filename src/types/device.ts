@@ -1,4 +1,6 @@
 
+export type AccessDirection = 'entry' | 'exit' | 'both';
+
 export interface Device {
   id: string;
   device_name?: string;
@@ -17,6 +19,12 @@ export interface Device {
   // Add zone_id and door_id for location display
   zone_id?: number;
   door_id?: number;
+  // New access direction field
+  access_direction?: AccessDirection;
+  // Additional network and hardware info
+  device_mac?: string;
+  device_ip?: string;
+  device_firmware?: string;
 }
 
 export interface Project {
@@ -49,4 +57,6 @@ export interface ServerDevice {
   device_ip?: string;
   device_mac?: string;
   device_firmware?: string;
+  // New access direction field
+  access_direction?: AccessDirection;
 }
