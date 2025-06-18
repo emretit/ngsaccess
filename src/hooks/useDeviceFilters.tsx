@@ -40,7 +40,7 @@ export function useDeviceFilters(
         return (
           (device.device_name || device.name || '').toLowerCase().includes(searchLower) ||
           (device.device_serial || device.serial_number || '').toLowerCase().includes(searchLower) ||
-          (device.device_location || device.location || '').toLowerCase().includes(searchLower)
+          (device.device_location || '').toLowerCase().includes(searchLower)
         );
       };
 

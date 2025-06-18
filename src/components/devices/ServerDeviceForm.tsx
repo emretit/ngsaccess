@@ -91,7 +91,7 @@ export function ServerDeviceForm({
     try {
       const deviceData = {
         name: values.name,
-        type: values.device_model_enum, // type alanı için device_model_enum kullanıyoruz
+        type: values.device_model_enum,
         serial_number: values.serial_number,
         device_model_enum: values.device_model_enum,
         project_id: values.project_id || null,

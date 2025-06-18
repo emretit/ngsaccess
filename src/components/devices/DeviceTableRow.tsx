@@ -4,15 +4,14 @@ import { Button } from "@/components/ui/button";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Device } from "@/types/device";
-import QRCode from 'qrcode.react';
 import { Edit, Trash2, MapPin } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
 
 interface DeviceTableRowProps {
   device: Device;
-  locationString: string;
-  onQRClick: (device: Device) => void;
+  zoneName?: string;
+  doorName?: string;
   onDeleteDevice: (deviceId: string) => void;
   onAssignLocation: (device: Device) => void;
   onEditDevice: (device: Device) => void;
@@ -22,8 +21,8 @@ interface DeviceTableRowProps {
 
 export function DeviceTableRow({
   device,
-  locationString,
-  onQRClick,
+  zoneName,
+  doorName,
   onDeleteDevice,
   onAssignLocation,
   onEditDevice,
@@ -35,6 +34,15 @@ export function DeviceTableRow({
     ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
     : 'bg-gray-100 text-gray-500 border-gray-200';
 
+  const getAccessDirectionText = (direction?: string) => {
+    switch (direction) {
+      case 'entry': return 'Giriş';
+      case 'exit': return 'Çıkış';
+      case 'both': return 'Her İkisi';
+      default: return 'Her İkisi';
+    }
+  };
+
   return (
     <TableRow className="hover:bg-muted/30 transition-colors">
       <TableCell>
@@ -43,24 +51,16 @@ export function DeviceTableRow({
           onCheckedChange={(checked) => onSelect(!!checked, device.id)}
         />
       </TableCell>
-      <TableCell>
-        <div 
-          className="cursor-pointer hover:opacity-80 transition-opacity"
-          onClick={() => onQRClick(device)}
-        >
-          <QRCode
-            value={device.device_serial || device.serial_number || ''}
-            size={64}
-            level="H"
-            className="rounded"
-            bgColor="#ffffff"
-            fgColor="#000000"
-          />
-        </div>
-      </TableCell>
+      <TableCell className="font-mono text-xs">{device.id}</TableCell>
       <TableCell className="font-medium">{device.device_name || device.name || '-'}</TableCell>
-      <TableCell className="font-mono text-xs">{device.device_serial || device.serial_number || '-'}</TableCell>
-      <TableCell>{locationString || '-'}</TableCell>
+      <TableCell>{device.device_model || device.type || '-'}</TableCell>
+      <TableCell>{zoneName || '-'}</TableCell>
+      <TableCell>{doorName || '-'}</TableCell>
+      <TableCell>
+        <Badge variant="outline" className="text-xs">
+          {getAccessDirectionText(device.access_direction)}
+        </Badge>
+      </TableCell>
       <TableCell>
         <Badge 
           className={`${statusColor} py-1 px-3`}

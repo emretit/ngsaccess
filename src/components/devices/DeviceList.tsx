@@ -50,15 +50,14 @@ export function DeviceList({
     handleBulkDelete
   } = useDeviceTable(filteredDevices);
 
-  function getLocationString(device: Device) {
+  function getZoneName(device: Device) {
     const zone = zones.find(z => String(z.id) === String(device.zone_id));
+    return zone?.name;
+  }
+
+  function getDoorName(device: Device) {
     const door = doors.find(d => String(d.id) === String(device.door_id));
-    
-    if (zone && door) return `${zone.name} / ${door.name}`;
-    if (zone) return zone.name;
-    if (door) return door.name;
-    
-    return device.device_location || device.location || '-';
+    return door?.name;
   }
 
   return (
@@ -82,10 +81,12 @@ export function DeviceList({
                   onCheckedChange={handleSelectAll}
                 />
               </TableHead>
-              <TableHead className="bg-gray-50 font-semibold">QR Kod</TableHead>
+              <TableHead className="bg-gray-50 font-semibold">ID</TableHead>
               <TableHead className="bg-gray-50 font-semibold">İsim</TableHead>
-              <TableHead className="bg-gray-50 font-semibold">Seri No</TableHead>
-              <TableHead className="bg-gray-50 font-semibold">Konum</TableHead>
+              <TableHead className="bg-gray-50 font-semibold">Cihaz Modeli</TableHead>
+              <TableHead className="bg-gray-50 font-semibold">Bölge</TableHead>
+              <TableHead className="bg-gray-50 font-semibold">Kapı</TableHead>
+              <TableHead className="bg-gray-50 font-semibold">Erişim Yönü</TableHead>
               <TableHead className="bg-gray-50 font-semibold">Durum</TableHead>
               <TableHead className="text-right bg-gray-50 font-semibold">İşlemler</TableHead>
             </TableRow>
@@ -93,7 +94,7 @@ export function DeviceList({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-16">
+                <TableCell colSpan={9} className="text-center py-16">
                   <div className="flex flex-col items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
                     <span className="text-muted-foreground font-medium">Cihazlar yükleniyor...</span>
@@ -105,7 +106,8 @@ export function DeviceList({
                 <DeviceTableRow
                   key={device.id}
                   device={device}
-                  locationString={getLocationString(device)}
+                  zoneName={getZoneName(device)}
+                  doorName={getDoorName(device)}
                   onQRClick={onQRClick}
                   onDeleteDevice={onDeleteDevice}
                   onAssignLocation={onAssignLocation}
@@ -116,7 +118,7 @@ export function DeviceList({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-16">
+                <TableCell colSpan={9} className="text-center py-16">
                   <div className="flex flex-col items-center justify-center space-y-4">
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
                       <Smartphone className="h-8 w-8 text-gray-400" />
