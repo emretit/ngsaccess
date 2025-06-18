@@ -14,7 +14,6 @@ export interface Device {
   created_at?: string;
   last_used_at?: string | null;
   // Added required fields from DB schema
-  location?: string;
   type?: string;
   // Add zone_id and door_id for location display
   zone_id?: number;

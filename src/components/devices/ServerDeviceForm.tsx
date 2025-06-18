@@ -91,7 +91,6 @@ export function ServerDeviceForm({
     try {
       const deviceData = {
         name: values.name,
-        location: values.name, // location alanı için name kullanıyoruz
         type: values.device_model_enum, // type alanı için device_model_enum kullanıyoruz
         serial_number: values.serial_number,
         device_model_enum: values.device_model_enum,
@@ -160,11 +159,20 @@ export function ServerDeviceForm({
         
         <DeviceLocationInfo 
           projectId={form.watch("project_id")?.toString() || ""}
-          onProjectChange={(value) => form.setValue("project_id", value ? parseInt(value) : undefined)}
+          onProjectChange={(value) => {
+            const numValue = value ? parseInt(value, 10) : undefined;
+            form.setValue("project_id", numValue);
+          }}
           zoneId={form.watch("zone_id")?.toString() || ""}
-          onZoneChange={(value) => form.setValue("zone_id", value ? parseInt(value) : undefined)}
+          onZoneChange={(value) => {
+            const numValue = value ? parseInt(value, 10) : undefined;
+            form.setValue("zone_id", numValue);
+          }}
           doorId={form.watch("door_id")?.toString() || ""}
-          onDoorChange={(value) => form.setValue("door_id", value ? parseInt(value) : undefined)}
+          onDoorChange={(value) => {
+            const numValue = value ? parseInt(value, 10) : undefined;
+            form.setValue("door_id", numValue);
+          }}
           projects={projects}
           zones={[]}
           doors={[]}

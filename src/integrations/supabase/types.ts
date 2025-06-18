@@ -269,7 +269,6 @@ export type Database = {
           last_connection: string | null
           last_seen: string | null
           last_sync: string | null
-          location: string
           name: string
           project_id: number | null
           serial_number: string | null
@@ -298,7 +297,6 @@ export type Database = {
           last_connection?: string | null
           last_seen?: string | null
           last_sync?: string | null
-          location: string
           name: string
           project_id?: number | null
           serial_number?: string | null
@@ -327,7 +325,6 @@ export type Database = {
           last_connection?: string | null
           last_seen?: string | null
           last_sync?: string | null
-          location?: string
           name?: string
           project_id?: number | null
           serial_number?: string | null
@@ -1240,6 +1237,9 @@ export type Database = {
       }
       devices_with_latest_readings: {
         Row: {
+          access_direction:
+            | Database["public"]["Enums"]["access_direction_enum"]
+            | null
           actual_last_seen: string | null
           created_at: string | null
           description: string | null
@@ -1251,25 +1251,54 @@ export type Database = {
           device_serial: string | null
           device_status: string | null
           device_type: string | null
+          door_id: number | null
           id: number | null
           is_active: boolean | null
           last_connection: string | null
           last_seen: string | null
           last_sync: string | null
-          location: string | null
           name: string | null
           project_id: number | null
           serial_number: string | null
           status: string | null
           type: string | null
           updated_at: string | null
+          zone_id: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "devices_door_id_fkey"
+            columns: ["door_id"]
+            isOneToOne: false
+            referencedRelation: "device_locations"
+            referencedColumns: ["door_id"]
+          },
+          {
+            foreignKeyName: "devices_door_id_fkey"
+            columns: ["door_id"]
+            isOneToOne: false
+            referencedRelation: "doors"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "devices_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devices_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "device_locations"
+            referencedColumns: ["zone_id"]
+          },
+          {
+            foreignKeyName: "devices_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
             referencedColumns: ["id"]
           },
         ]

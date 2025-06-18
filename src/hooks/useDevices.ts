@@ -63,14 +63,13 @@ export function useDevices() {
       const serverDevice = existingDevice as ServerDevice;
 
       // If it exists, add it to devices table
-      // Using fields that match the database schema
+      // Using fields that match the database schema (without location column)
       const { error: insertError } = await supabase
         .from('devices')
         .insert({ 
           name: serverDevice.name,
           serial_number: serverDevice.serial_number,
-          location: "",  // Required field based on schema
-          type: "",      // Required field based on schema
+          type: serverDevice.device_model_enum || "",      // Required field based on schema
           device_model: serverDevice.device_model || "",
           device_type: serverDevice.device_type || "",
           device_serial: serverDevice.serial_number,
