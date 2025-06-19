@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Device } from "@/types/device";
-import { Edit, Trash2, MapPin } from "lucide-react";
+import { Edit, Trash2, MapPin, QrCode } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -15,6 +15,7 @@ interface DeviceTableRowProps {
   onDeleteDevice: (deviceId: string) => void;
   onAssignLocation: (device: Device) => void;
   onEditDevice: (device: Device) => void;
+  onQRClick?: (device: Device) => void;
   selected: boolean;
   onSelect: (checked: boolean, deviceId: string) => void;
 }
@@ -26,6 +27,7 @@ export function DeviceTableRow({
   onDeleteDevice,
   onAssignLocation,
   onEditDevice,
+  onQRClick,
   selected,
   onSelect
 }: DeviceTableRowProps) {
@@ -72,6 +74,25 @@ export function DeviceTableRow({
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1">
           <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full hover:bg-muted"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onQRClick?.(device);
+                  }}
+                >
+                  <QrCode className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>QR Kod</p>
+              </TooltipContent>
+            </Tooltip>
+
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button

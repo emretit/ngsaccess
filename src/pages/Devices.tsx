@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { DevicesContent } from '@/components/devices/DevicesContent';
 import { ZoneDoorTreePanel } from '@/components/access-control/ZoneDoorTreePanel';
@@ -146,6 +145,7 @@ const Devices = () => {
             onAssignLocation={openLocationForm}
             onEditDevice={handleEditDevice}
             onNewDevice={handleNewDevice}
+            onQRClick={handleQRClick}
           />
         </div>
       </div>

@@ -1,3 +1,4 @@
+
 import { format } from 'date-fns';
 import {
   Table,
@@ -26,6 +27,7 @@ interface DeviceListProps {
   onDeleteDevice: (deviceId: string) => void;
   onAssignLocation: (device: Device) => void;
   onEditDevice: (device: Device) => void;
+  onQRClick?: (device: Device) => void;
 }
 
 export function DeviceList({
@@ -36,7 +38,8 @@ export function DeviceList({
   doors,
   onDeleteDevice,
   onAssignLocation,
-  onEditDevice
+  onEditDevice,
+  onQRClick
 }: DeviceListProps) {
   const {
     selectedDevices,
@@ -108,6 +111,7 @@ export function DeviceList({
                   onDeleteDevice={onDeleteDevice}
                   onAssignLocation={onAssignLocation}
                   onEditDevice={onEditDevice}
+                  onQRClick={onQRClick}
                   selected={selectedDevices.includes(device.id)}
                   onSelect={handleSelectDevice}
                 />

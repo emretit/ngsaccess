@@ -17,6 +17,7 @@ interface DevicesContentProps {
   onAssignLocation: (device: Device) => void;
   onEditDevice: (device: Device) => void;
   onNewDevice: () => void;
+  onQRClick?: (device: Device) => void;
 }
 
 export function DevicesContent({
@@ -29,7 +30,8 @@ export function DevicesContent({
   onDeleteDevice,
   onAssignLocation,
   onEditDevice,
-  onNewDevice
+  onNewDevice,
+  onQRClick
 }: DevicesContentProps) {
   // Use the extracted filter hook
   const {
@@ -77,6 +79,7 @@ export function DevicesContent({
           onDeleteDevice={onDeleteDevice}
           onAssignLocation={onAssignLocation}
           onEditDevice={onEditDevice}
+          onQRClick={onQRClick}
         />
       </div>
     </div>
