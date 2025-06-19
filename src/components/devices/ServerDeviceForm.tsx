@@ -13,6 +13,7 @@ import { DeviceLocationInfo } from "./form-fields/DeviceLocationInfo";
 import { DeviceNetworkInfo } from "./form-fields/DeviceNetworkInfo";
 import { DeviceAccessInfo } from "./form-fields/DeviceAccessInfo";
 import { DeviceAdditionalInfo } from "./form-fields/DeviceAdditionalInfo";
+import { deviceTypeMapping, DatabaseDeviceType } from "@/utils/deviceTypeMapping";
 
 const formSchema = z.object({
   name: z.string().min(1, "Cihaz adı gereklidir"),
@@ -89,10 +90,12 @@ export function ServerDeviceForm({
     setIsLoading(true);
     
     try {
+      const deviceType = deviceTypeMapping[values.device_model_enum] as DatabaseDeviceType;
+      
       const deviceData = {
         name: values.name,
-        type: values.device_model_enum,
-        serial_number: values.serial_number,
+        type: deviceType,
+        device_serial: values.serial_number,
         device_model_enum: values.device_model_enum,
         project_id: values.project_id || null,
         zone_id: values.zone_id || null,

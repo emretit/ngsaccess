@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Device, ServerDevice } from "@/types/device";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { deviceTypeMapping, DatabaseDeviceType } from "@/utils/deviceTypeMapping";
 
 export function useDevices() {
   const queryClient = useQueryClient();
@@ -62,19 +63,18 @@ export function useDevices() {
       // Type assertion to include zone_id and door_id
       const serverDevice = existingDevice as ServerDevice;
 
+      // Map the device type to database enum
+      const deviceType = deviceTypeMapping[serverDevice.device_model_enum || "Other"] as DatabaseDeviceType;
+
       // If it exists, add it to devices table
-      // Using fields that match the database schema (without location column)
       const { error: insertError } = await supabase
         .from('devices')
         .insert({ 
           name: serverDevice.name,
-          serial_number: serverDevice.serial_number,
-          type: serverDevice.device_model_enum || "",      // Required field based on schema
-          device_model: serverDevice.device_model || "",
-          device_type: serverDevice.device_type || "",
           device_serial: serverDevice.serial_number,
+          type: deviceType,
+          device_model: serverDevice.device_model || "",
           device_location: "",
-          // Add zone_id and door_id for location display
           zone_id: serverDevice.zone_id,
           door_id: serverDevice.door_id
         });

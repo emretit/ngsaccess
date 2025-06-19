@@ -38,7 +38,7 @@ export const useAccessRules = (projectId?: number) => {
             devices!group_devices_device_id_fkey (
               id,
               name,
-              serial_number,
+              device_serial,
               zone_id,
               door_id
             )

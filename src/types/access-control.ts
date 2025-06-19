@@ -67,8 +67,7 @@ export interface GroupDevice {
   devices?: {
     id: number;
     name: string;
-    serial?: string;
-    serial_number?: string;
+    device_serial?: string;
     zone_id?: number;
     door_id?: number;
   };
