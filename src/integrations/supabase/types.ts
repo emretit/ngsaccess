@@ -257,6 +257,7 @@ export type Database = {
           description: string | null
           device_firmware: string | null
           device_hardware: string | null
+          device_ip: string | null
           device_location: string | null
           device_mac: string | null
           device_model: string | null
@@ -283,6 +284,7 @@ export type Database = {
           description?: string | null
           device_firmware?: string | null
           device_hardware?: string | null
+          device_ip?: string | null
           device_location?: string | null
           device_mac?: string | null
           device_model?: string | null
@@ -309,6 +311,7 @@ export type Database = {
           description?: string | null
           device_firmware?: string | null
           device_hardware?: string | null
+          device_ip?: string | null
           device_location?: string | null
           device_mac?: string | null
           device_model?: string | null
