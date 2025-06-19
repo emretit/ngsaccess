@@ -101,8 +101,8 @@ export function GroupDevicesManager({ rule, projectId }: GroupDevicesManagerProp
                   </div>
                   <div className="text-sm text-muted-foreground">
                     {device ? getDeviceLocationDisplay(device) : 'Konum Bilinmiyor'}
-                    {(groupDevice.devices?.serial || groupDevice.devices?.serial_number) && 
-                      ` • ${groupDevice.devices.serial || groupDevice.devices.serial_number}`
+                    {groupDevice.devices?.device_serial && 
+                      ` • ${groupDevice.devices.device_serial}`
                     }
                   </div>
                 </div>
