@@ -261,8 +261,6 @@ export type Database = {
           device_mac: string | null
           device_model: string | null
           device_serial: string | null
-          device_status: string | null
-          device_type: string | null
           door_id: number | null
           id: number
           is_active: boolean | null
@@ -270,10 +268,10 @@ export type Database = {
           last_seen: string | null
           last_sync: string | null
           name: string
+          old_type: string | null
           project_id: number | null
-          serial_number: string | null
           status: string | null
-          type: string
+          type: Database["public"]["Enums"]["device_type_enum"]
           updated_at: string
           zone_id: number | null
         }
@@ -289,8 +287,6 @@ export type Database = {
           device_mac?: string | null
           device_model?: string | null
           device_serial?: string | null
-          device_status?: string | null
-          device_type?: string | null
           door_id?: number | null
           id?: number
           is_active?: boolean | null
@@ -298,10 +294,10 @@ export type Database = {
           last_seen?: string | null
           last_sync?: string | null
           name: string
+          old_type?: string | null
           project_id?: number | null
-          serial_number?: string | null
           status?: string | null
-          type: string
+          type?: Database["public"]["Enums"]["device_type_enum"]
           updated_at?: string
           zone_id?: number | null
         }
@@ -317,8 +313,6 @@ export type Database = {
           device_mac?: string | null
           device_model?: string | null
           device_serial?: string | null
-          device_status?: string | null
-          device_type?: string | null
           door_id?: number | null
           id?: number
           is_active?: boolean | null
@@ -326,10 +320,10 @@ export type Database = {
           last_seen?: string | null
           last_sync?: string | null
           name?: string
+          old_type?: string | null
           project_id?: number | null
-          serial_number?: string | null
           status?: string | null
-          type?: string
+          type?: Database["public"]["Enums"]["device_type_enum"]
           updated_at?: string
           zone_id?: number | null
         }
@@ -1249,8 +1243,6 @@ export type Database = {
           device_mac: string | null
           device_model: string | null
           device_serial: string | null
-          device_status: string | null
-          device_type: string | null
           door_id: number | null
           id: number | null
           is_active: boolean | null
@@ -1259,9 +1251,8 @@ export type Database = {
           last_sync: string | null
           name: string | null
           project_id: number | null
-          serial_number: string | null
           status: string | null
-          type: string | null
+          type: Database["public"]["Enums"]["device_type_enum"] | null
           updated_at: string | null
           zone_id: number | null
         }
@@ -1378,6 +1369,15 @@ export type Database = {
         | "RFID Reader"
         | "Access Control Terminal"
         | "Other"
+      device_type_enum:
+        | "fingerprint_reader"
+        | "card_reader"
+        | "face_recognition"
+        | "qr_reader"
+        | "access_terminal"
+        | "turnstile"
+        | "door_controller"
+        | "other"
       user_role: "super_admin" | "project_admin" | "project_user"
     }
     CompositeTypes: {
@@ -1501,6 +1501,16 @@ export const Constants = {
         "RFID Reader",
         "Access Control Terminal",
         "Other",
+      ],
+      device_type_enum: [
+        "fingerprint_reader",
+        "card_reader",
+        "face_recognition",
+        "qr_reader",
+        "access_terminal",
+        "turnstile",
+        "door_controller",
+        "other",
       ],
       user_role: ["super_admin", "project_admin", "project_user"],
     },

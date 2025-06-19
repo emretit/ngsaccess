@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AccessRule, GroupMember, GroupDevice } from "@/types/access-control";
@@ -11,6 +10,8 @@ export const useAccessRules = (projectId?: number) => {
   const { data: accessRules, isLoading, error } = useQuery({
     queryKey: ['access-rules', projectId],
     queryFn: async () => {
+      console.log('useAccessRules - Fetching access rules for project:', projectId);
+      
       let query = supabase
         .from('access_rules')
         .select(`
@@ -56,6 +57,7 @@ export const useAccessRules = (projectId?: number) => {
         throw error;
       }
 
+      console.log('useAccessRules - Fetched data:', data);
       return data as AccessRule[];
     }
   });

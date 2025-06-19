@@ -5,8 +5,9 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useAccessRules } from "@/hooks/useAccessRules";
 import { Loader2, Plus, Users, Monitor, ChevronDown, ChevronUp, Edit, Trash2, Clock, Calendar } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useLocationUtils } from "@/hooks/useLocationUtils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,8 +26,16 @@ interface AccessRulesListProps {
 }
 
 const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => {
-  const { rules, isLoading, updateAccessRule, deleteAccessRule, isDeleting } = useAccessRules();
+  const { rules, isLoading, error, updateAccessRule, deleteAccessRule, isDeleting } = useAccessRules();
   const [expandedRules, setExpandedRules] = useState<Set<number>>(new Set());
+  const { getDeviceLocationDisplay } = useLocationUtils();
+
+  // Debug için log ekleyelim
+  useEffect(() => {
+    console.log('AccessRulesList - Rules:', rules);
+    console.log('AccessRulesList - Loading:', isLoading);
+    console.log('AccessRulesList - Error:', error);
+  }, [rules, isLoading, error]);
 
   const toggleExpanded = (ruleId: number) => {
     setExpandedRules(prev => {
@@ -59,7 +68,26 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
     );
   }
 
-  if (rules.length === 0) {
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-2xl">⚠️</span>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          Hata Oluştu
+        </h3>
+        <p className="text-gray-600 mb-4">
+          Erişim kuralları yüklenirken bir hata oluştu: {error.message}
+        </p>
+        <Button onClick={() => window.location.reload()}>
+          Yeniden Dene
+        </Button>
+      </div>
+    );
+  }
+
+  if (!rules || rules.length === 0) {
     return (
       <div className="text-center py-12">
         <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -310,7 +338,14 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                                 <Monitor className="h-4 w-4 text-green-500" />
                                 <div>
                                   <span className="text-sm font-medium">{gd.devices?.name}</span>
-                                  <p className="text-xs text-gray-500">{gd.devices?.location}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {gd.devices ? getDeviceLocationDisplay({
+                                      id: gd.devices.id.toString(),
+                                      name: gd.devices.name,
+                                      zone_id: gd.devices.zone_id,
+                                      door_id: gd.devices.door_id
+                                    } as any) : 'Konum Bilinmiyor'}
+                                  </p>
                                 </div>
                               </div>
                             ))
