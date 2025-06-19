@@ -261,6 +261,9 @@ export type Database = {
           device_location: string | null
           device_mac: string | null
           device_model: string | null
+          device_model_enum:
+            | Database["public"]["Enums"]["device_model_enum"]
+            | null
           device_serial: string | null
           door_id: number | null
           id: number
@@ -288,6 +291,9 @@ export type Database = {
           device_location?: string | null
           device_mac?: string | null
           device_model?: string | null
+          device_model_enum?:
+            | Database["public"]["Enums"]["device_model_enum"]
+            | null
           device_serial?: string | null
           door_id?: number | null
           id?: number
@@ -315,6 +321,9 @@ export type Database = {
           device_location?: string | null
           device_mac?: string | null
           device_model?: string | null
+          device_model_enum?:
+            | Database["public"]["Enums"]["device_model_enum"]
+            | null
           device_serial?: string | null
           door_id?: number | null
           id?: number
@@ -1366,6 +1375,12 @@ export type Database = {
     }
     Enums: {
       access_direction_enum: "entry" | "exit" | "both"
+      device_model_enum:
+        | "QR Reader"
+        | "Fingerprint Reader"
+        | "RFID Reader"
+        | "Access Control Terminal"
+        | "Other"
       device_model_type:
         | "QR Reader"
         | "Fingerprint Reader"
@@ -1498,6 +1513,13 @@ export const Constants = {
   public: {
     Enums: {
       access_direction_enum: ["entry", "exit", "both"],
+      device_model_enum: [
+        "QR Reader",
+        "Fingerprint Reader",
+        "RFID Reader",
+        "Access Control Terminal",
+        "Other",
+      ],
       device_model_type: [
         "QR Reader",
         "Fingerprint Reader",
