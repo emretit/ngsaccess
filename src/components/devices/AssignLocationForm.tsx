@@ -1,22 +1,26 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Device, ServerDevice } from "@/types/device";
-import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
-import { supabase } from "@/integrations/supabase/client";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { DeviceAccessInfo } from "./form-fields/DeviceAccessInfo";
+import { useZonesAndDoors } from "@/hooks/useZonesAndDoors"; 
+import { ServerDevice } from '@/types/device';
 
 interface AssignLocationFormProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (device: Device, locationData: any) => void;
+  onSubmit: (zoneId: number, doorId: number) => Promise<void>;
   deviceName: string;
-  device?: ServerDevice;
+  device?: ServerDevice; // Making device optional to maintain backward compatibility
 }
 
 export function AssignLocationForm({
@@ -26,80 +30,64 @@ export function AssignLocationForm({
   deviceName,
   device
 }: AssignLocationFormProps) {
+  const { toast } = useToast();
+  const { zones, doors, loading } = useZonesAndDoors();
   const [selectedZoneId, setSelectedZoneId] = useState<string>("");
   const [selectedDoorId, setSelectedDoorId] = useState<string>("");
-  const [accessDirection, setAccessDirection] = useState<"entry" | "exit" | "both">("both");
+  const [filteredDoors, setFilteredDoors] = useState<typeof doors>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const { zones, doors, loading } = useZonesAndDoors();
-  const { toast } = useToast();
 
-  // Reset form when dialog opens with device data
+  // Set initial values if device has zone_id or door_id
   useEffect(() => {
-    if (open && device) {
-      console.log('Setting initial values for device:', device);
-      setSelectedZoneId(device.zone_id?.toString() || "");
-      setSelectedDoorId(device.door_id?.toString() || "");
-      setAccessDirection(device.access_direction || "both");
-    } else if (open) {
-      // Reset form for new assignment
-      setSelectedZoneId("");
-      setSelectedDoorId("");
-      setAccessDirection("both");
+    if (device) {
+      if (device.zone_id) {
+        setSelectedZoneId(device.zone_id.toString());
+      }
+      if (device.door_id) {
+        setSelectedDoorId(device.door_id.toString());
+      }
     }
-  }, [open, device?.id]); // Only depend on open and device.id to prevent loops
+  }, [device]);
+
+  // Filter doors when zone changes
+  useEffect(() => {
+    if (selectedZoneId) {
+      // Convert string to number for comparison
+      const zoneIdNumber = parseInt(selectedZoneId, 10);
+      setFilteredDoors(doors.filter(door => door.zone_id === zoneIdNumber));
+      setSelectedDoorId(""); // Reset door selection when zone changes
+    } else {
+      setFilteredDoors([]);
+      setSelectedDoorId("");
+    }
+  }, [selectedZoneId, doors]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!device) {
+    if (!selectedZoneId || !selectedDoorId) {
       toast({
-        title: "Hata",
-        description: "Cihaz bilgisi bulunamadı",
+        title: "Validation Error",
+        description: "Please select both zone and door",
         variant: "destructive",
       });
       return;
     }
-
+    
     setIsSubmitting(true);
-
+    
     try {
-      const updateData = {
-        zone_id: selectedZoneId ? parseInt(selectedZoneId) : null,
-        door_id: selectedDoorId ? parseInt(selectedDoorId) : null,
-        access_direction: accessDirection,
-      };
-
-      const { error } = await supabase
-        .from('devices')
-        .update(updateData)
-        .eq('id', parseInt(device.id));
-
-      if (error) throw error;
-
+      // Convert string IDs to numbers
+      await onSubmit(parseInt(selectedZoneId, 10), parseInt(selectedDoorId, 10));
       toast({
-        title: "Başarılı",
-        description: "Cihaz konumu ve erişim yönü güncellendi",
+        title: "Location assigned",
+        description: `${deviceName} has been assigned to the selected location.`,
       });
-
       onClose();
-      
-      // Convert to Device format for callback
-      const deviceData: Device = {
-        id: device.id,
-        name: device.name,
-        zone_id: updateData.zone_id || undefined,
-        door_id: updateData.door_id || undefined,
-        access_direction: accessDirection,
-        status: device.status || 'online'
-      };
-      
-      onSubmit(deviceData, updateData);
-    } catch (error: any) {
-      console.error('Error updating device location:', error);
+    } catch (error) {
       toast({
-        title: "Hata",
-        description: error.message || "Konum güncellenirken hata oluştu",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to assign location",
         variant: "destructive",
       });
     } finally {
@@ -107,73 +95,65 @@ export function AssignLocationForm({
     }
   };
 
-  const filteredDoors = doors.filter(door => 
-    !selectedZoneId || door.zone_id?.toString() === selectedZoneId
-  );
-
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Konum Ata: {deviceName}</DialogTitle>
-          <DialogDescription>
-            Cihaza konum ve erişim yönü atayın
-          </DialogDescription>
+          <DialogTitle>Assign Location to {deviceName}</DialogTitle>
         </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="zone">Bölge</Label>
-            <Select value={selectedZoneId} onValueChange={setSelectedZoneId} disabled={loading}>
-              <SelectTrigger>
-                <SelectValue placeholder="Bölge seçin" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Bölge seçmeyin</SelectItem>
-                {zones.map((zone) => (
-                  <SelectItem key={zone.id} value={zone.id.toString()}>
-                    {zone.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="zone" className="text-right">
+                Zone
+              </Label>
+              <Select
+                value={selectedZoneId}
+                onValueChange={setSelectedZoneId}
+                disabled={loading}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select a zone" />
+                </SelectTrigger>
+                <SelectContent>
+                  {zones.map((zone) => (
+                    <SelectItem key={zone.id} value={zone.id.toString()}>
+                      {zone.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="door" className="text-right">
+                Door
+              </Label>
+              <Select
+                value={selectedDoorId}
+                onValueChange={setSelectedDoorId}
+                disabled={!selectedZoneId || loading}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select a door" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredDoors.map((door) => (
+                    <SelectItem key={door.id} value={door.id.toString()}>
+                      {door.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="door">Kapı</Label>
-            <Select 
-              value={selectedDoorId} 
-              onValueChange={setSelectedDoorId} 
-              disabled={loading || !selectedZoneId}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Kapı seçin" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Kapı seçmeyin</SelectItem>
-                {filteredDoors.map((door) => (
-                  <SelectItem key={door.id} value={door.id.toString()}>
-                    {door.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <DeviceAccessInfo
-            accessDirection={accessDirection}
-            onAccessDirectionChange={setAccessDirection}
-            disabled={isSubmitting}
-          />
-
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-              İptal
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Kaydediliyor..." : "Kaydet"}
+            <Button type="submit" disabled={isSubmitting || !selectedZoneId || !selectedDoorId}>
+              {isSubmitting ? "Assigning..." : "Assign Location"}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

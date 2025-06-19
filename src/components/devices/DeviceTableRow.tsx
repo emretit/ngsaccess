@@ -45,15 +45,6 @@ export function DeviceTableRow({
     }
   };
 
-  const getAccessDirectionColor = (direction?: string) => {
-    switch (direction) {
-      case 'entry': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'exit': return 'bg-orange-50 text-orange-700 border-orange-200';
-      case 'both': return 'bg-green-50 text-green-700 border-green-200';
-      default: return 'bg-green-50 text-green-700 border-green-200';
-    }
-  };
-
   return (
     <TableRow className="hover:bg-muted/30 transition-colors">
       <TableCell>
@@ -68,10 +59,7 @@ export function DeviceTableRow({
       <TableCell>{zoneName || '-'}</TableCell>
       <TableCell>{doorName || '-'}</TableCell>
       <TableCell>
-        <Badge 
-          variant="outline" 
-          className={`text-xs ${getAccessDirectionColor(device.access_direction)}`}
-        >
+        <Badge variant="outline" className="text-xs">
           {getAccessDirectionText(device.access_direction)}
         </Badge>
       </TableCell>

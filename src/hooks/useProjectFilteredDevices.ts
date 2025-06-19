@@ -1,127 +1,68 @@
 
-import { useQuery } from "@tanstack/react-query";
-import { useProjectAccess } from "./useProjectAccess";
-import { supabase } from "@/integrations/supabase/client";
-import { Device } from "@/types/device";
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Device } from '@/types/device';
+import { useProjectAccess } from './useProjectAccess';
 
 export const useProjectFilteredDevices = () => {
   const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
 
-  const { data: devices = [], isLoading, hasProjectAccess } = useQuery({
+  const { data: devices = [], isLoading, error, refetch } = useQuery({
     queryKey: ['devices', projectIds],
-    queryFn: async () => {
+    queryFn: async (): Promise<Device[]> => {
       console.log('Fetching devices for projects:', projectIds);
       
-      if (isSuperAdmin) {
-        const { data, error } = await supabase
-          .from('devices')
-          .select(`
-            id,
-            name,
-            device_serial,
-            device_model,
-            device_location,
-            type,
-            status,
-            created_at,
-            last_used_at,
-            zone_id,
-            door_id,
-            access_direction,
-            device_mac,
-            device_ip,
-            device_firmware,
-            device_model_enum
-          `)
-          .order('created_at', { ascending: false });
+      let query = supabase
+        .from('devices')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-        if (error) {
-          console.error('Error fetching devices (super admin):', error);
-          throw error;
-        }
-
-        return data?.map((device): Device => ({
-          id: device.id.toString(),
-          device_name: device.name,
-          name: device.name,
-          device_serial: device.device_serial,
-          serial_number: device.device_serial,
-          device_model: device.device_model,
-          device_location: device.device_location,
-          device_type: device.type,
-          type: device.type,
-          status: device.status === 'active' ? 'online' : 'offline',
-          created_at: device.created_at,
-          last_used_at: device.last_used_at,
-          zone_id: device.zone_id,
-          door_id: device.door_id,
-          access_direction: device.access_direction,
-          device_mac: device.device_mac,
-          device_ip: device.device_ip,
-          device_firmware: device.device_firmware,
-        })) || [];
-      }
-
-      if (!projectIds || projectIds.length === 0) {
+      // Super admin değilse proje filtrelemesi uygula
+      if (!isSuperAdmin && projectIds.length > 0) {
+        query = query.in('project_id', projectIds);
+      } else if (!isSuperAdmin && projectIds.length === 0) {
+        // Kullanıcının hiç projesi yoksa boş sonuç döndür
         return [];
       }
 
-      const { data, error } = await supabase
-        .from('devices')
-        .select(`
-          id,
-          name,
-          device_serial,
-          device_model,
-          device_location,
-          type,
-          status,
-          created_at,
-          last_used_at,
-          project_id,
-          zone_id,
-          door_id,
-          access_direction,
-          device_mac,
-          device_ip,
-          device_firmware,
-          device_model_enum
-        `)
-        .in('project_id', projectIds)
-        .order('created_at', { ascending: false });
+      const { data, error } = await query;
 
       if (error) {
-        console.error('Error fetching filtered devices:', error);
+        console.error('Error fetching devices:', error);
         throw error;
       }
 
-      return data?.map((device): Device => ({
-        id: device.id.toString(),
-        device_name: device.name,
-        name: device.name,
-        device_serial: device.device_serial,
-        serial_number: device.device_serial,
-        device_model: device.device_model,
-        device_location: device.device_location,
-        device_type: device.type,
-        type: device.type,
-        status: device.status === 'active' ? 'online' : 'offline',
-        created_at: device.created_at,
-        last_used_at: device.last_used_at,
-        zone_id: device.zone_id,
-        door_id: device.door_id,
-        access_direction: device.access_direction,
-        device_mac: device.device_mac,
-        device_ip: device.device_ip,
-        device_firmware: device.device_firmware,
-      })) || [];
+      // Device status'larını hesapla
+      return (data || []).map((device: any): Device => {
+        let status: 'online' | 'offline' | 'expired' = 'offline';
+        
+        if (device.last_seen) {
+          const lastSeen = new Date(device.last_seen);
+          const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+          status = lastSeen > fiveMinutesAgo ? 'online' : 'offline';
+        }
+        
+        return { 
+          ...device,
+          status
+        };
+      });
     },
-    enabled: !projectLoading && (isSuperAdmin || (projectIds && projectIds.length > 0)),
+    enabled: !projectLoading && (isSuperAdmin || projectIds.length > 0),
+    staleTime: 3 * 60 * 1000, // 3 dakika boyunca veri fresh kabul edilir (devices daha dinamik)
+    gcTime: 8 * 60 * 1000, // 8 dakika cache'de kalır
+    refetchOnWindowFocus: false, // Pencere focus'a geldiğinde yeniden fetch etme
+    refetchOnMount: false, // Component mount olduğunda cache varsa yeniden fetch etme
+    retry: 1, // Hata durumunda sadece 1 kez retry
+    refetchInterval: 2 * 60 * 1000, // Device durumları için 2 dakikada bir otomatik güncelleme
   });
 
   return {
     devices,
-    isLoading: projectLoading || isLoading,
-    hasProjectAccess: isSuperAdmin || hasProjectAccess
+    isLoading: isLoading || projectLoading,
+    error,
+    refetch,
+    // Loading sırasında hasProjectAccess true dönsün ki "Proje Erişimi Yok" mesajı görünmesin
+    hasProjectAccess: projectLoading || isSuperAdmin || projectIds.length > 0
   };
 };
