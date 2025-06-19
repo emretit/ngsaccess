@@ -13,6 +13,7 @@ interface DeviceLocationInfoProps {
   zones: Zone[];
   doors: Door[];
   loading: boolean;
+  hideProjectSelection?: boolean;
 }
 
 export function DeviceLocationInfo({
@@ -25,24 +26,27 @@ export function DeviceLocationInfo({
   projects,
   zones,
   doors,
-  loading
+  loading,
+  hideProjectSelection = false
 }: DeviceLocationInfoProps) {
   // Filter doors based on selected zone
   const filteredDoors = doors.filter(door => String(door.zone_id) === zoneId);
 
   return (
     <>
-      <FormSelectField
-        label="Proje"
-        name="project"
-        value={projectId}
-        onChange={onProjectChange}
-        options={projects.map(project => ({
-          id: project.id.toString(),
-          name: project.name
-        }))}
-        placeholder="Proje Seçiniz"
-      />
+      {!hideProjectSelection && (
+        <FormSelectField
+          label="Proje"
+          name="project"
+          value={projectId}
+          onChange={onProjectChange}
+          options={projects.map(project => ({
+            id: project.id.toString(),
+            name: project.name
+          }))}
+          placeholder="Proje Seçiniz"
+        />
+      )}
 
       <FormSelectField
         label="Bölge"

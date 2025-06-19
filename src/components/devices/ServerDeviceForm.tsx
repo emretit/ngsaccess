@@ -14,12 +14,12 @@ import { DeviceNetworkInfo } from "./form-fields/DeviceNetworkInfo";
 import { DeviceAccessInfo } from "./form-fields/DeviceAccessInfo";
 import { DeviceAdditionalInfo } from "./form-fields/DeviceAdditionalInfo";
 import { deviceTypeMapping, DatabaseDeviceType } from "@/utils/deviceTypeMapping";
+import { useProjectAccess } from "@/hooks/useProjectAccess";
 
 const formSchema = z.object({
   name: z.string().min(1, "Cihaz adı gereklidir"),
   serial_number: z.string().min(1, "Seri numarası gereklidir"),
   device_model_enum: z.enum(["QR Reader", "Fingerprint Reader", "RFID Reader", "Access Control Terminal", "Other"]),
-  project_id: z.number().optional(),
   zone_id: z.number().optional(),
   door_id: z.number().optional(),
   access_direction: z.enum(["entry", "exit", "both"]).default("both"),
@@ -48,6 +48,10 @@ export function ServerDeviceForm({
 }: ServerDeviceFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const { projectIds } = useProjectAccess();
+  
+  // Use the first available project ID
+  const currentProjectId = projectIds[0] || null;
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -66,7 +70,6 @@ export function ServerDeviceForm({
         name: device.name || "",
         serial_number: device.serial_number || "",
         device_model_enum: device.device_model_enum || "Other",
-        project_id: device.project_id,
         zone_id: device.zone_id,
         door_id: device.door_id,
         access_direction: (device.access_direction as AccessDirection) || "both",
@@ -97,7 +100,7 @@ export function ServerDeviceForm({
         type: deviceType,
         device_serial: values.serial_number,
         device_model_enum: values.device_model_enum,
-        project_id: values.project_id || null,
+        project_id: currentProjectId,
         zone_id: values.zone_id || null,
         door_id: values.door_id || null,
         access_direction: values.access_direction,
@@ -161,11 +164,8 @@ export function ServerDeviceForm({
         />
         
         <DeviceLocationInfo 
-          projectId={form.watch("project_id")?.toString() || ""}
-          onProjectChange={(value) => {
-            const numValue = value ? parseInt(value, 10) : undefined;
-            form.setValue("project_id", numValue);
-          }}
+          projectId={currentProjectId?.toString() || ""}
+          onProjectChange={() => {}} // No-op since project is fixed
           zoneId={form.watch("zone_id")?.toString() || ""}
           onZoneChange={(value) => {
             const numValue = value ? parseInt(value, 10) : undefined;
@@ -180,6 +180,7 @@ export function ServerDeviceForm({
           zones={[]}
           doors={[]}
           loading={false}
+          hideProjectSelection={true}
         />
 
         <DeviceAccessInfo
