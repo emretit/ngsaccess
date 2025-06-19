@@ -45,6 +45,35 @@ export function DeviceTableRow({
     }
   };
 
+  const getAccessDirectionBadge = (direction?: string) => {
+    switch (direction) {
+      case 'entry':
+        return (
+          <Badge className="bg-blue-500 text-white border-blue-500 hover:bg-blue-600">
+            Giriş
+          </Badge>
+        );
+      case 'exit':
+        return (
+          <Badge className="bg-orange-500 text-white border-orange-500 hover:bg-orange-600">
+            Çıkış
+          </Badge>
+        );
+      case 'both':
+        return (
+          <Badge className="bg-purple-500 text-white border-purple-500 hover:bg-purple-600">
+            Her İkisi
+          </Badge>
+        );
+      default:
+        return (
+          <Badge className="bg-purple-500 text-white border-purple-500 hover:bg-purple-600">
+            Her İkisi
+          </Badge>
+        );
+    }
+  };
+
   return (
     <TableRow className="hover:bg-muted/30 transition-colors">
       <TableCell>
@@ -59,9 +88,7 @@ export function DeviceTableRow({
       <TableCell>{zoneName || '-'}</TableCell>
       <TableCell>{doorName || '-'}</TableCell>
       <TableCell>
-        <Badge variant="outline" className="text-xs">
-          {getAccessDirectionText(device.access_direction)}
-        </Badge>
+        {getAccessDirectionBadge(device.access_direction)}
       </TableCell>
       <TableCell>
         <Badge 
