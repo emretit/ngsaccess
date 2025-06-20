@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Device } from '@/types/device';
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export function useDeviceTable(devices: Device[]) {
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
@@ -28,9 +29,18 @@ export function useDeviceTable(devices: Device[]) {
 
   const handleBulkDelete = async () => {
     try {
-      // Process each device deletion sequentially
-      for (const deviceId of selectedDevices) {
-        await fetch(`/api/devices/${deviceId}`, { method: 'DELETE' });
+      // Process each device deletion
+      const deletePromises = selectedDevices.map(deviceId => 
+        supabase.from('devices').delete().eq('id', deviceId)
+      );
+
+      const results = await Promise.all(deletePromises);
+      
+      // Check for errors
+      const errors = results.filter(result => result.error);
+      if (errors.length > 0) {
+        console.error('Bulk delete errors:', errors);
+        throw new Error(`${errors.length} cihaz silinemedi`);
       }
 
       toast({
@@ -43,10 +53,11 @@ export function useDeviceTable(devices: Device[]) {
       
       setSelectedDevices([]);
       setShowDeleteDialog(false);
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Bulk delete error:', error);
       toast({
         title: "Hata",
-        description: "Cihazlar silinirken bir hata oluştu",
+        description: error.message || "Cihazlar silinirken bir hata oluştu",
         variant: "destructive",
       });
     }

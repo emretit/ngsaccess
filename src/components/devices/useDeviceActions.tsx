@@ -1,6 +1,7 @@
 
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 export function useDeviceActions() {
   const { toast } = useToast();
@@ -8,17 +9,28 @@ export function useDeviceActions() {
 
   const handleDeleteDevice = async (deviceId: string) => {
     try {
-      await fetch(`/api/devices/${deviceId}`, { method: 'DELETE' });
+      const { error } = await supabase
+        .from('devices')
+        .delete()
+        .eq('id', deviceId);
+
+      if (error) {
+        console.error('Delete error:', error);
+        throw error;
+      }
+
       toast({
         title: "Cihaz silindi",
         description: "Cihaz başarıyla silindi",
       });
+      
       // Refresh devices data
       queryClient.invalidateQueries({ queryKey: ['devices'] });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Delete device error:', error);
       toast({
         title: "Hata",
-        description: "Cihaz silinirken bir hata oluştu",
+        description: error.message || "Cihaz silinirken bir hata oluştu",
         variant: "destructive",
       });
     }
