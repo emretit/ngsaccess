@@ -31,7 +31,7 @@ export function useDeviceTable(devices: Device[]) {
     try {
       // Process each device deletion
       const deletePromises = selectedDevices.map(deviceId => 
-        supabase.from('devices').delete().eq('id', deviceId)
+        supabase.from('devices').delete().eq('id', parseInt(deviceId))
       );
 
       const results = await Promise.all(deletePromises);

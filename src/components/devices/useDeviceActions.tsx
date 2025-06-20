@@ -12,7 +12,7 @@ export function useDeviceActions() {
       const { error } = await supabase
         .from('devices')
         .delete()
-        .eq('id', deviceId);
+        .eq('id', parseInt(deviceId));
 
       if (error) {
         console.error('Delete error:', error);
