@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { DevicesContent } from '@/components/devices/DevicesContent';
 import { ZoneDoorTreePanel } from '@/components/access-control/ZoneDoorTreePanel';
@@ -122,32 +123,28 @@ const Devices = () => {
   }
 
   return (
-    <div className="h-[calc(100vh-4rem)] w-full bg-gray-50">
-      <div className="flex h-full gap-4 p-4">
-        {/* Sidebar - Zone/Door Tree */}
-        <div className="flex-shrink-0">
-          <ZoneDoorTreePanel
-            onSelectZone={setSelectedZoneId}
-            onSelectDoor={setSelectedDoorId}
-          />
-        </div>
-        
-        {/* Main Content Area */}
-        <div className="flex-1 overflow-hidden">
-          <DevicesContent
-            devices={devices}
-            isLoading={isLoading}
-            zones={zones}
-            doors={doors}
-            selectedZoneId={selectedZoneId}
-            selectedDoorId={selectedDoorId}
-            onDeleteDevice={handleDeleteDevice}
-            onAssignLocation={openLocationForm}
-            onEditDevice={handleEditDevice}
-            onNewDevice={handleNewDevice}
-            onQRClick={handleQRClick}
-          />
-        </div>
+    <div className="flex min-h-[calc(100vh-4rem)] gap-6 p-6">
+      <div className="flex-shrink-0">
+        <ZoneDoorTreePanel
+          onSelectZone={setSelectedZoneId}
+          onSelectDoor={setSelectedDoorId}
+        />
+      </div>
+      
+      <div className="flex-1 space-y-6">
+        <DevicesContent
+          devices={devices}
+          isLoading={isLoading}
+          zones={zones}
+          doors={doors}
+          selectedZoneId={selectedZoneId}
+          selectedDoorId={selectedDoorId}
+          onDeleteDevice={handleDeleteDevice}
+          onAssignLocation={openLocationForm}
+          onEditDevice={handleEditDevice}
+          onNewDevice={handleNewDevice}
+          onQRClick={handleQRClick}
+        />
       </div>
 
       {/* Device Details Panel */}

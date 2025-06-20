@@ -61,21 +61,19 @@ export function DeviceList({
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="space-y-4">
       {selectedDevices.length > 0 && (
-        <div className="p-4 border-b border-gray-100 bg-blue-50">
-          <DeviceBulkActions
-            selectedCount={selectedDevices.length}
-            onDelete={() => setShowDeleteDialog(true)}
-          />
-        </div>
+        <DeviceBulkActions
+          selectedCount={selectedDevices.length}
+          onDelete={() => setShowDeleteDialog(true)}
+        />
       )}
       
-      <div className="flex-1 overflow-auto">
+      <div className="rounded-md border">
         <Table>
           <TableHeader className="sticky top-0 bg-white border-b-2 border-gray-200">
             <TableRow>
-              <TableHead className="w-[50px] bg-gray-50">
+              <TableHead className="w-[50px] bg-gray-50 font-semibold">
                 <Checkbox 
                   checked={filteredDevices.length > 0 && selectedDevices.length === filteredDevices.length} 
                   onCheckedChange={handleSelectAll}

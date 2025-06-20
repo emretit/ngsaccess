@@ -46,30 +46,23 @@ export function DevicesContent({
   } = useDeviceFilters(devices, selectedZoneId, selectedDoorId);
 
   return (
-    <div className="h-full flex flex-col bg-white rounded-xl border border-gray-200 shadow-sm">
-      {/* Header Section */}
-      <div className="p-6 border-b border-gray-100">
-        <DeviceFilters 
-          search={search}
-          onSearchChange={setSearch}
-          statusFilter={statusFilter}
-          onStatusFilterChange={setStatusFilter}
-          typeFilter={typeFilter}
-          onTypeFilterChange={setTypeFilter}
-          deviceTypes={deviceTypes}
-          onNewDevice={onNewDevice}
-          deviceCount={devices.length}
-          filteredCount={filteredDevices.length}
-        />
-      </div>
+    <div className="space-y-6">
+      <DeviceFilters 
+        search={search}
+        onSearchChange={setSearch}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        typeFilter={typeFilter}
+        onTypeFilterChange={setTypeFilter}
+        deviceTypes={deviceTypes}
+        onNewDevice={onNewDevice}
+        deviceCount={devices.length}
+        filteredCount={filteredDevices.length}
+      />
 
-      {/* Stats Section */}
-      <div className="px-6 py-4 border-b border-gray-100">
-        <DeviceStats devices={filteredDevices} />
-      </div>
+      <DeviceStats devices={filteredDevices} />
 
-      {/* Table Section */}
-      <div className="flex-1 overflow-hidden">
+      <div className="glass-card overflow-hidden">
         <DeviceList 
           devices={devices}
           filteredDevices={filteredDevices}
