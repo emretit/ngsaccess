@@ -62,6 +62,7 @@ export function useDeviceFormSubmission({
         await queryClient.invalidateQueries({ queryKey: ['devices'] });
         await queryClient.invalidateQueries({ queryKey: ['admin-devices'] });
         await queryClient.invalidateQueries({ queryKey: ['devices', projectIds] });
+        await queryClient.invalidateQueries({ queryKey: ['server-devices'] });
         
         toast({
           title: "Başarılı",
@@ -79,6 +80,7 @@ export function useDeviceFormSubmission({
         await queryClient.invalidateQueries({ queryKey: ['devices'] });
         await queryClient.invalidateQueries({ queryKey: ['admin-devices'] });
         await queryClient.invalidateQueries({ queryKey: ['devices', projectIds] });
+        await queryClient.invalidateQueries({ queryKey: ['server-devices'] });
         
         toast({
           title: "Başarılı",

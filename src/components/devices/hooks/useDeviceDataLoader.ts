@@ -43,7 +43,7 @@ export function useDeviceDataLoader({ device, open, form }: UseDeviceDataLoaderP
           }
         }
         
-        const formData = {
+        const formData: FormValues = {
           name: deviceData.name || "",
           serial_number: deviceData.serial_number || "",
           device_model_enum: deviceData.device_model_enum || "Other",
