@@ -45,16 +45,14 @@ export function useDeviceDataLoader({ device, open, form }: UseDeviceDataLoaderP
         
         const formData: FormValues = {
           name: deviceData.name || "",
-          serial_number: deviceData.serial_number || "",
-          device_model_enum: deviceData.device_model_enum || "Other",
+          device_serial: deviceData.serial_number || deviceData.device_serial || "",
+          device_type: (deviceData.device_type as any) || "Kart Okuyucu",
           zone_id: deviceData.zone_id || undefined,
           door_id: deviceData.door_id || undefined,
           access_direction: (deviceData.access_direction as AccessDirection) || "both",
-          device_mac: deviceData.device_mac || "",
           device_ip: deviceData.device_ip || "",
-          device_firmware: deviceData.device_firmware || "",
-          status: (deviceData.status === "active" || deviceData.status === "inactive") ? deviceData.status : "active",
           description: deviceData.description || "",
+          status: (deviceData.status === "active" || deviceData.status === "inactive") ? deviceData.status : "active",
         };
         
         console.log('Setting form data:', formData);
@@ -64,8 +62,8 @@ export function useDeviceDataLoader({ device, open, form }: UseDeviceDataLoaderP
         console.log('Resetting form for new device');
         form.reset({
           name: "",
-          serial_number: "",
-          device_model_enum: "Other",
+          device_serial: "",
+          device_type: "Kart Okuyucu",
           zone_id: undefined,
           door_id: undefined,
           access_direction: "both",

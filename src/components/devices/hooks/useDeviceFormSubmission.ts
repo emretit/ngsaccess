@@ -4,7 +4,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ServerDevice } from "@/types/device";
-import { deviceTypeMapping, DatabaseDeviceType } from "@/utils/deviceTypeMapping";
 import { FormValues } from "./useDeviceFormSchema";
 
 interface UseDeviceFormSubmissionProps {
@@ -29,22 +28,17 @@ export function useDeviceFormSubmission({
     console.log('Submitting form with values:', values);
     
     try {
-      const deviceType = deviceTypeMapping[values.device_model_enum] as DatabaseDeviceType;
-      
       const deviceData = {
         name: values.name,
-        type: deviceType,
-        device_serial: values.serial_number,
-        device_model_enum: values.device_model_enum,
+        device_serial: values.device_serial,
+        device_type: values.device_type,
         project_id: currentProjectId,
         zone_id: values.zone_id || null,
         door_id: values.door_id || null,
         access_direction: values.access_direction,
-        device_mac: values.device_mac || null,
         device_ip: values.device_ip || null,
-        device_firmware: values.device_firmware || null,
-        status: values.status,
         description: values.description || null,
+        status: values.status,
       };
 
       console.log('Device data to be saved:', deviceData);
@@ -59,11 +53,6 @@ export function useDeviceFormSubmission({
         
         console.log('Device updated successfully');
         
-        await queryClient.invalidateQueries({ queryKey: ['devices'] });
-        await queryClient.invalidateQueries({ queryKey: ['admin-devices'] });
-        await queryClient.invalidateQueries({ queryKey: ['devices', projectIds] });
-        await queryClient.invalidateQueries({ queryKey: ['server-devices'] });
-        
         toast({
           title: "Başarılı",
           description: "Cihaz bilgileri güncellendi",
@@ -77,16 +66,16 @@ export function useDeviceFormSubmission({
         
         console.log('Device created successfully');
         
-        await queryClient.invalidateQueries({ queryKey: ['devices'] });
-        await queryClient.invalidateQueries({ queryKey: ['admin-devices'] });
-        await queryClient.invalidateQueries({ queryKey: ['devices', projectIds] });
-        await queryClient.invalidateQueries({ queryKey: ['server-devices'] });
-        
         toast({
           title: "Başarılı",
           description: "Yeni cihaz eklendi",
         });
       }
+
+      await queryClient.invalidateQueries({ queryKey: ['devices'] });
+      await queryClient.invalidateQueries({ queryKey: ['admin-devices'] });
+      await queryClient.invalidateQueries({ queryKey: ['devices', projectIds] });
+      await queryClient.invalidateQueries({ queryKey: ['server-devices'] });
 
       onSuccess();
     } catch (error: any) {

@@ -250,7 +250,7 @@ export type Database = {
           description: string | null
           device_ip: string | null
           device_serial: string | null
-          device_type: Database["public"]["Enums"]["device_type_unified"] | null
+          device_type: Database["public"]["Enums"]["device_type_turkish"] | null
           door_id: number | null
           id: number
           is_active: boolean | null
@@ -270,7 +270,7 @@ export type Database = {
           device_ip?: string | null
           device_serial?: string | null
           device_type?:
-            | Database["public"]["Enums"]["device_type_unified"]
+            | Database["public"]["Enums"]["device_type_turkish"]
             | null
           door_id?: number | null
           id?: number
@@ -291,7 +291,7 @@ export type Database = {
           device_ip?: string | null
           device_serial?: string | null
           device_type?:
-            | Database["public"]["Enums"]["device_type_unified"]
+            | Database["public"]["Enums"]["device_type_turkish"]
             | null
           door_id?: number | null
           id?: number
@@ -1251,16 +1251,16 @@ export type Database = {
     }
     Enums: {
       access_direction_enum: "entry" | "exit" | "both"
-      device_type_unified:
-        | "card_reader"
-        | "fingerprint_reader"
-        | "face_recognition"
-        | "qr_reader"
-        | "rfid_reader"
-        | "access_terminal"
-        | "turnstile"
-        | "door_controller"
-        | "other"
+      device_type_turkish:
+        | "Kart Okuyucu"
+        | "Parmak İzi Okuyucu"
+        | "Yüz Tanıma"
+        | "QR Kod Okuyucu"
+        | "RFID Okuyucu"
+        | "Erişim Terminali"
+        | "Turnike"
+        | "Kapı Kontrolörü"
+        | "Diğer"
       user_role: "super_admin" | "project_admin" | "project_user"
     }
     CompositeTypes: {
@@ -1378,16 +1378,16 @@ export const Constants = {
   public: {
     Enums: {
       access_direction_enum: ["entry", "exit", "both"],
-      device_type_unified: [
-        "card_reader",
-        "fingerprint_reader",
-        "face_recognition",
-        "qr_reader",
-        "rfid_reader",
-        "access_terminal",
-        "turnstile",
-        "door_controller",
-        "other",
+      device_type_turkish: [
+        "Kart Okuyucu",
+        "Parmak İzi Okuyucu",
+        "Yüz Tanıma",
+        "QR Kod Okuyucu",
+        "RFID Okuyucu",
+        "Erişim Terminali",
+        "Turnike",
+        "Kapı Kontrolörü",
+        "Diğer",
       ],
       user_role: ["super_admin", "project_admin", "project_user"],
     },

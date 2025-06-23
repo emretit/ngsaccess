@@ -14,40 +14,12 @@ export function DeviceNetworkSection({ form }: DeviceNetworkSectionProps) {
       
       <FormField
         control={form.control}
-        name="device_mac"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>MAC Adresi</FormLabel>
-            <FormControl>
-              <Input placeholder="00:00:00:00:00:00" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={form.control}
         name="device_ip"
         render={({ field }) => (
           <FormItem>
             <FormLabel>IP Adresi</FormLabel>
             <FormControl>
               <Input placeholder="192.168.1.100" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={form.control}
-        name="device_firmware"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Firmware Versiyonu</FormLabel>
-            <FormControl>
-              <Input placeholder="v1.0.0" {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>

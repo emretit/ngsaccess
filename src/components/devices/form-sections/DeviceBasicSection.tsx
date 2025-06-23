@@ -8,6 +8,18 @@ interface DeviceBasicSectionProps {
   form: UseFormReturn<any>;
 }
 
+const DEVICE_TYPES = [
+  "Kart Okuyucu",
+  "Parmak İzi Okuyucu", 
+  "Yüz Tanıma",
+  "QR Kod Okuyucu",
+  "RFID Okuyucu",
+  "Erişim Terminali",
+  "Turnike",
+  "Kapı Kontrolörü",
+  "Diğer"
+] as const;
+
 export function DeviceBasicSection({ form }: DeviceBasicSectionProps) {
   return (
     <div className="space-y-4">
@@ -18,7 +30,7 @@ export function DeviceBasicSection({ form }: DeviceBasicSectionProps) {
         name="name"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Cihaz Adı *</FormLabel>
+            <FormLabel>Cihaz Adı</FormLabel>
             <FormControl>
               <Input placeholder="Cihaz adını giriniz" {...field} />
             </FormControl>
@@ -29,10 +41,10 @@ export function DeviceBasicSection({ form }: DeviceBasicSectionProps) {
 
       <FormField
         control={form.control}
-        name="serial_number"
+        name="device_serial"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Seri Numarası *</FormLabel>
+            <FormLabel>Seri Numarası</FormLabel>
             <FormControl>
               <Input placeholder="Seri numarasını giriniz" {...field} />
             </FormControl>
@@ -43,22 +55,45 @@ export function DeviceBasicSection({ form }: DeviceBasicSectionProps) {
 
       <FormField
         control={form.control}
-        name="device_model_enum"
+        name="device_type"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Cihaz Modeli *</FormLabel>
-            <Select value={field.value} onValueChange={field.onChange}>
+            <FormLabel>Cihaz Tipi</FormLabel>
+            <Select onValueChange={field.onChange} value={field.value}>
               <FormControl>
                 <SelectTrigger>
-                  <SelectValue placeholder="Cihaz modelini seçiniz" />
+                  <SelectValue placeholder="Cihaz tipini seçiniz" />
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
-                <SelectItem value="QR Reader">QR Okuyucu</SelectItem>
-                <SelectItem value="Fingerprint Reader">Parmak İzi Okuyucu</SelectItem>
-                <SelectItem value="RFID Reader">RFID Kart Okuyucu</SelectItem>
-                <SelectItem value="Access Control Terminal">Geçiş Kontrol Terminali</SelectItem>
-                <SelectItem value="Other">Diğer</SelectItem>
+                {DEVICE_TYPES.map(type => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={form.control}
+        name="access_direction"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Erişim Yönü</FormLabel>
+            <Select onValueChange={field.onChange} value={field.value}>
+              <FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder="Erişim yönünü seçiniz" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value="entry">Giriş</SelectItem>
+                <SelectItem value="exit">Çıkış</SelectItem>
+                <SelectItem value="both">Her İkisi</SelectItem>
               </SelectContent>
             </Select>
             <FormMessage />
