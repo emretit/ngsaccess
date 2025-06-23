@@ -4,17 +4,18 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Form } from "@/components/ui/form";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ServerDevice, Project, AccessDirection } from "@/types/device";
-import { DeviceBasicInfo } from "./form-fields/DeviceBasicInfo";
-import { DeviceLocationInfo } from "./form-fields/DeviceLocationInfo";
-import { DeviceNetworkInfo } from "./form-fields/DeviceNetworkInfo";
-import { DeviceAccessInfo } from "./form-fields/DeviceAccessInfo";
-import { DeviceAdditionalInfo } from "./form-fields/DeviceAdditionalInfo";
 import { deviceTypeMapping, DatabaseDeviceType } from "@/utils/deviceTypeMapping";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 
 const formSchema = z.object({
   name: z.string().min(1, "Cihaz adı gereklidir"),
@@ -49,8 +50,8 @@ export function DeviceForm({
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const { projectIds } = useProjectAccess();
+  const { zones, doors, loading: locationLoading } = useZonesAndDoors();
   
-  // Use the first available project ID
   const currentProjectId = projectIds[0] || null;
   
   const form = useForm<FormValues>({
@@ -63,6 +64,9 @@ export function DeviceForm({
       status: "active",
     },
   });
+
+  const selectedZoneId = form.watch("zone_id");
+  const filteredDoors = doors.filter(door => door.zone_id === selectedZoneId);
 
   useEffect(() => {
     if (device && open) {
@@ -150,68 +154,295 @@ export function DeviceForm({
   if (!open) return null;
 
   return (
-    <div className="p-6">
+    <div className="h-full flex flex-col">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <DeviceBasicInfo 
-            name={form.watch("name")}
-            onNameChange={(value) => form.setValue("name", value)}
-            serialNumber={form.watch("serial_number")}
-            onSerialNumberChange={(value) => form.setValue("serial_number", value)}
-            deviceModel={form.watch("device_model_enum")}
-            onDeviceModelChange={(value) => form.setValue("device_model_enum", value)}
-            isActive={form.watch("status") === "active"}
-            onIsActiveChange={(value) => form.setValue("status", value ? "active" : "inactive")}
-          />
-          
-          <DeviceLocationInfo 
-            projectId={currentProjectId?.toString() || ""}
-            onProjectChange={() => {}} // No-op since project is fixed
-            zoneId={form.watch("zone_id")?.toString() || ""}
-            onZoneChange={(value) => {
-              const numValue = value ? parseInt(value, 10) : undefined;
-              form.setValue("zone_id", numValue);
-            }}
-            doorId={form.watch("door_id")?.toString() || ""}
-            onDoorChange={(value) => {
-              const numValue = value ? parseInt(value, 10) : undefined;
-              form.setValue("door_id", numValue);
-            }}
-            projects={projects}
-            zones={[]}
-            doors={[]}
-            loading={false}
-            hideProjectSelection={true}
-          />
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col">
+          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            {/* Cihaz Durumu */}
+            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+              <div>
+                <h3 className="font-medium">Cihaz Durumu</h3>
+                <p className="text-sm text-muted-foreground">
+                  Cihazın aktif durumunu belirleyin
+                </p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center space-x-2">
+                      <FormControl>
+                        <Switch
+                          checked={field.value === "active"}
+                          onCheckedChange={(checked) => 
+                            field.onChange(checked ? "active" : "inactive")
+                          }
+                        />
+                      </FormControl>
+                      <Label className="text-sm">
+                        {field.value === "active" ? "Aktif" : "Pasif"}
+                      </Label>
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
 
-          <DeviceAccessInfo
-            accessDirection={form.watch("access_direction")}
-            onAccessDirectionChange={(value) => form.setValue("access_direction", value)}
-          />
-          
-          <DeviceNetworkInfo 
-            ipAddress={form.watch("device_ip") || ""}
-            onIpAddressChange={(value) => form.setValue("device_ip", value)}
-            macAddress={form.watch("device_mac") || ""}
-            onMacAddressChange={(value) => form.setValue("device_mac", value)}
-            firmwareVersion={form.watch("device_firmware") || ""}
-            onFirmwareVersionChange={(value) => form.setValue("device_firmware", value)}
-          />
-          
-          <DeviceAdditionalInfo 
-            description=""
-            onDescriptionChange={() => {}}
-            expiryDate=""
-            onExpiryDateChange={() => {}}
-          />
+            {/* Temel Bilgiler */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium border-b pb-2">Temel Bilgiler</h3>
+              
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cihaz Adı *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Cihaz adını giriniz" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <div className="flex justify-end space-x-3 pb-6">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
-              İptal
-            </Button>
-            <Button type="submit" disabled={isLoading} className="bg-burgundy hover:bg-burgundy/90">
-              {isLoading ? "Kaydediliyor..." : device ? "Güncelle" : "Kaydet"}
-            </Button>
+              <FormField
+                control={form.control}
+                name="serial_number"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Seri Numarası *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Seri numarasını giriniz" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="device_model_enum"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cihaz Modeli *</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Cihaz modelini seçiniz" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="QR Reader">QR Okuyucu</SelectItem>
+                        <SelectItem value="Fingerprint Reader">Parmak İzi Okuyucu</SelectItem>
+                        <SelectItem value="RFID Reader">RFID Kart Okuyucu</SelectItem>
+                        <SelectItem value="Access Control Terminal">Geçiş Kontrol Terminali</SelectItem>
+                        <SelectItem value="Other">Diğer</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Konum Bilgileri */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium border-b pb-2">Konum Bilgileri</h3>
+              
+              <FormField
+                control={form.control}
+                name="zone_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bölge</FormLabel>
+                    <Select 
+                      value={field.value?.toString() || ""} 
+                      onValueChange={(value) => {
+                        field.onChange(value ? parseInt(value) : undefined);
+                        // Bölge değiştiğinde kapı seçimini sıfırla
+                        form.setValue("door_id", undefined);
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={locationLoading ? "Yükleniyor..." : "Bölge seçiniz"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {zones.map(zone => (
+                          <SelectItem key={zone.id} value={zone.id.toString()}>
+                            {zone.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="door_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Kapı</FormLabel>
+                    <Select 
+                      value={field.value?.toString() || ""} 
+                      onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
+                      disabled={!selectedZoneId || locationLoading}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue 
+                            placeholder={
+                              !selectedZoneId 
+                                ? "Önce bölge seçiniz" 
+                                : filteredDoors.length === 0 
+                                  ? "Seçili bölgede kapı yok" 
+                                  : "Kapı seçiniz"
+                            } 
+                          />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {filteredDoors.map(door => (
+                          <SelectItem key={door.id} value={door.id.toString()}>
+                            {door.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Erişim Yönü */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium border-b pb-2">Erişim Kontrolü</h3>
+              
+              <FormField
+                control={form.control}
+                name="access_direction"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Erişim Yönü</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        className="space-y-3"
+                      >
+                        <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                          <RadioGroupItem value="entry" id="entry" />
+                          <div className="flex-1">
+                            <Label htmlFor="entry" className="font-medium cursor-pointer">
+                              Giriş
+                            </Label>
+                            <p className="text-sm text-muted-foreground">
+                              Sadece giriş kontrolü yapar
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                          <RadioGroupItem value="exit" id="exit" />
+                          <div className="flex-1">
+                            <Label htmlFor="exit" className="font-medium cursor-pointer">
+                              Çıkış
+                            </Label>
+                            <p className="text-sm text-muted-foreground">
+                              Sadece çıkış kontrolü yapar
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                          <RadioGroupItem value="both" id="both" />
+                          <div className="flex-1">
+                            <Label htmlFor="both" className="font-medium cursor-pointer">
+                              Her İkisi
+                            </Label>
+                            <p className="text-sm text-muted-foreground">
+                              Hem giriş hem çıkış kontrolü yapar
+                            </p>
+                          </div>
+                        </div>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Ağ ve Donanım Bilgileri */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium border-b pb-2">Ağ ve Donanım Bilgileri</h3>
+              <p className="text-sm text-muted-foreground">
+                Cihazın ağ ve donanım bilgilerini giriniz (isteğe bağlı)
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="device_mac"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>MAC Adresi</FormLabel>
+                      <FormControl>
+                        <Input placeholder="00:00:00:00:00:00" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="device_ip"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>IP Adresi</FormLabel>
+                      <FormControl>
+                        <Input placeholder="192.168.1.100" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="device_firmware"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Firmware Versiyonu</FormLabel>
+                    <FormControl>
+                      <Input placeholder="v1.0.0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+
+          {/* Form Actions */}
+          <div className="border-t bg-background p-6">
+            <div className="flex justify-end space-x-3">
+              <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+                İptal
+              </Button>
+              <Button type="submit" disabled={isLoading} className="bg-burgundy hover:bg-burgundy/90">
+                {isLoading ? "Kaydediliyor..." : device ? "Güncelle" : "Kaydet"}
+              </Button>
+            </div>
           </div>
         </form>
       </Form>
