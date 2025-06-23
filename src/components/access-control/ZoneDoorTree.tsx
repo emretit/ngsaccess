@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ChevronRight, Grid, Plus, Trash2, DoorClosed } from "lucide-react";
+import { ChevronRight, Building2, Plus, Trash2, DoorClosed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { AddDoorDialog } from "./AddDoorDialog";
@@ -151,7 +151,7 @@ export const ZoneDoorTree = ({
                   />
                 </Button>
 
-                <Grid className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="flex-1 truncate text-sm">{zone.name}</span>
 
                 <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
