@@ -150,69 +150,73 @@ export function ServerDeviceForm({
   if (!open) return null;
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <DeviceBasicInfo 
-          name={form.watch("name")}
-          onNameChange={(value) => form.setValue("name", value)}
-          serialNumber={form.watch("serial_number")}
-          onSerialNumberChange={(value) => form.setValue("serial_number", value)}
-          deviceModel={form.watch("device_model_enum")}
-          onDeviceModelChange={(value) => form.setValue("device_model_enum", value)}
-          isActive={form.watch("status") === "active"}
-          onIsActiveChange={(value) => form.setValue("status", value ? "active" : "inactive")}
-        />
-        
-        <DeviceLocationInfo 
-          projectId={currentProjectId?.toString() || ""}
-          onProjectChange={() => {}} // No-op since project is fixed
-          zoneId={form.watch("zone_id")?.toString() || ""}
-          onZoneChange={(value) => {
-            const numValue = value ? parseInt(value, 10) : undefined;
-            form.setValue("zone_id", numValue);
-          }}
-          doorId={form.watch("door_id")?.toString() || ""}
-          onDoorChange={(value) => {
-            const numValue = value ? parseInt(value, 10) : undefined;
-            form.setValue("door_id", numValue);
-          }}
-          projects={projects}
-          zones={[]}
-          doors={[]}
-          loading={false}
-          hideProjectSelection={true}
-        />
+    <div className="space-y-6">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <div className="space-y-6">
+            <DeviceBasicInfo 
+              name={form.watch("name")}
+              onNameChange={(value) => form.setValue("name", value)}
+              serialNumber={form.watch("serial_number")}
+              onSerialNumberChange={(value) => form.setValue("serial_number", value)}
+              deviceModel={form.watch("device_model_enum")}
+              onDeviceModelChange={(value) => form.setValue("device_model_enum", value)}
+              isActive={form.watch("status") === "active"}
+              onIsActiveChange={(value) => form.setValue("status", value ? "active" : "inactive")}
+            />
+            
+            <DeviceLocationInfo 
+              projectId={currentProjectId?.toString() || ""}
+              onProjectChange={() => {}} // No-op since project is fixed
+              zoneId={form.watch("zone_id")?.toString() || ""}
+              onZoneChange={(value) => {
+                const numValue = value ? parseInt(value, 10) : undefined;
+                form.setValue("zone_id", numValue);
+              }}
+              doorId={form.watch("door_id")?.toString() || ""}
+              onDoorChange={(value) => {
+                const numValue = value ? parseInt(value, 10) : undefined;
+                form.setValue("door_id", numValue);
+              }}
+              projects={projects}
+              zones={[]}
+              doors={[]}
+              loading={false}
+              hideProjectSelection={true}
+            />
 
-        <DeviceAccessInfo
-          accessDirection={form.watch("access_direction")}
-          onAccessDirectionChange={(value) => form.setValue("access_direction", value)}
-        />
-        
-        <DeviceNetworkInfo 
-          ipAddress={form.watch("device_ip") || ""}
-          onIpAddressChange={(value) => form.setValue("device_ip", value)}
-          macAddress={form.watch("device_mac") || ""}
-          onMacAddressChange={(value) => form.setValue("device_mac", value)}
-          firmwareVersion={form.watch("device_firmware") || ""}
-          onFirmwareVersionChange={(value) => form.setValue("device_firmware", value)}
-        />
-        
-        <DeviceAdditionalInfo 
-          description=""
-          onDescriptionChange={() => {}}
-          expiryDate=""
-          onExpiryDateChange={() => {}}
-        />
+            <DeviceAccessInfo
+              accessDirection={form.watch("access_direction")}
+              onAccessDirectionChange={(value) => form.setValue("access_direction", value)}
+            />
+            
+            <DeviceNetworkInfo 
+              ipAddress={form.watch("device_ip") || ""}
+              onIpAddressChange={(value) => form.setValue("device_ip", value)}
+              macAddress={form.watch("device_mac") || ""}
+              onMacAddressChange={(value) => form.setValue("device_mac", value)}
+              firmwareVersion={form.watch("device_firmware") || ""}
+              onFirmwareVersionChange={(value) => form.setValue("device_firmware", value)}
+            />
+            
+            <DeviceAdditionalInfo 
+              description=""
+              onDescriptionChange={() => {}}
+              expiryDate=""
+              onExpiryDateChange={() => {}}
+            />
+          </div>
 
-        <div className="flex justify-end space-x-2 pt-4 border-t">
-          <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
-            İptal
-          </Button>
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? "Kaydediliyor..." : device ? "Güncelle" : "Kaydet"}
-          </Button>
-        </div>
-      </form>
-    </Form>
+          <div className="flex justify-end space-x-3 pt-6 border-t bg-gray-50 -mx-6 px-6 py-4 sticky bottom-0">
+            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+              İptal
+            </Button>
+            <Button type="submit" disabled={isLoading} className="bg-burgundy hover:bg-burgundy/90">
+              {isLoading ? "Kaydediliyor..." : device ? "Güncelle" : "Kaydet"}
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </div>
   );
 }
