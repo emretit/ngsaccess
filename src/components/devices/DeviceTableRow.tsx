@@ -1,11 +1,10 @@
 
 import { format } from 'date-fns';
-import { Button } from "@/components/ui/button";
-import { TableRow, TableCell } from "@/components/ui/table";
+import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Device } from "@/types/device";
-import { Edit, Trash2, MapPin, QrCode } from "lucide-react";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Edit2, Trash2, MapPin, QrCode } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 
 interface DeviceTableRowProps {
@@ -31,152 +30,94 @@ export function DeviceTableRow({
   selected,
   onSelect
 }: DeviceTableRowProps) {
-
-  const statusColor = device.status === 'online' 
-    ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
-    : 'bg-gray-100 text-gray-500 border-gray-200';
-
-  const getAccessDirectionText = (direction?: string) => {
-    switch (direction) {
-      case 'entry': return 'Giriş';
-      case 'exit': return 'Çıkış';
-      case 'both': return 'Her İkisi';
-      default: return 'Her İkisi';
+  const getStatusBadge = (status: 'online' | 'offline' | 'expired') => {
+    switch (status) {
+      case 'online':
+        return <Badge variant="success">Çevrimiçi</Badge>;
+      case 'offline':
+        return <Badge variant="secondary">Çevrimdışı</Badge>;
+      case 'expired':
+        return <Badge variant="destructive">Süresi Dolmuş</Badge>;
+      default:
+        return <Badge variant="secondary">Bilinmiyor</Badge>;
     }
   };
 
-  const getAccessDirectionBadge = (direction?: string) => {
+  const getAccessDirectionText = (direction?: string) => {
     switch (direction) {
       case 'entry':
-        return (
-          <Badge className="bg-blue-500 text-white border-blue-500 hover:bg-blue-600">
-            Giriş
-          </Badge>
-        );
+        return 'Giriş';
       case 'exit':
-        return (
-          <Badge className="bg-orange-500 text-white border-orange-500 hover:bg-orange-600">
-            Çıkış
-          </Badge>
-        );
+        return 'Çıkış';
       case 'both':
-        return (
-          <Badge className="bg-purple-500 text-white border-purple-500 hover:bg-purple-600">
-            Her İkisi
-          </Badge>
-        );
+        return 'Giriş/Çıkış';
       default:
-        return (
-          <Badge className="bg-purple-500 text-white border-purple-500 hover:bg-purple-600">
-            Her İkisi
-          </Badge>
-        );
+        return '-';
     }
   };
 
   return (
-    <TableRow className="hover:bg-muted/30 transition-colors">
-      <TableCell>
+    <TableRow 
+      className="cursor-pointer hover:bg-muted/50"
+      onClick={(e) => {
+        // Prevent row click when clicking on checkbox or buttons
+        if ((e.target as HTMLElement).closest('button, input[type="checkbox"]')) return;
+        onEditDevice(device);
+      }}
+    >
+      <TableCell onClick={(e) => e.stopPropagation()}>
         <Checkbox
           checked={selected}
-          onCheckedChange={(checked) => onSelect(!!checked, device.id)}
+          onCheckedChange={(checked) => onSelect(checked as boolean, device.id)}
         />
       </TableCell>
-      <TableCell className="font-mono text-xs">{device.id}</TableCell>
-      <TableCell className="font-medium">{device.device_name || device.name || '-'}</TableCell>
-      <TableCell>{device.device_model || device.type || '-'}</TableCell>
+      <TableCell className="font-medium">{device.id}</TableCell>
+      <TableCell>{device.name || device.device_name || '-'}</TableCell>
+      <TableCell>{device.device_model || device.device_type || '-'}</TableCell>
       <TableCell>{zoneName || '-'}</TableCell>
       <TableCell>{doorName || '-'}</TableCell>
-      <TableCell>
-        {getAccessDirectionBadge(device.access_direction)}
-      </TableCell>
-      <TableCell>
-        <Badge 
-          className={`${statusColor} py-1 px-3`}
-          variant="outline"
-        >
-          {device.status === 'online' ? 'Aktif' : 'Pasif'}
-        </Badge>
-      </TableCell>
-      <TableCell className="text-right">
+      <TableCell>{getAccessDirectionText(device.access_direction)}</TableCell>
+      <TableCell>{getStatusBadge(device.status)}</TableCell>
+      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-1">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-full hover:bg-muted"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onQRClick?.(device);
-                  }}
-                >
-                  <QrCode className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p>QR Kod</p>
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-full hover:bg-muted"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEditDevice(device);
-                  }}
-                >
-                  <Edit className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p>Düzenle</p>
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-full hover:bg-muted"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onAssignLocation(device);
-                  }}
-                >
-                  <MapPin className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p>Konum Ata</p>
-              </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 rounded-full hover:bg-muted text-destructive hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteDevice(device.id);
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="top">
-                <p>Sil</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          {onQRClick && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onQRClick(device)}
+              className="h-8 w-8"
+              title="QR Kod"
+            >
+              <QrCode className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onAssignLocation(device)}
+            className="h-8 w-8"
+            title="Konum Ata"
+          >
+            <MapPin className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onEditDevice(device)}
+            className="h-8 w-8"
+            title="Düzenle"
+          >
+            <Edit2 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onDeleteDevice(device.id)}
+            className="h-8 w-8 text-destructive hover:text-destructive"
+            title="Sil"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       </TableCell>
     </TableRow>
