@@ -17,14 +17,9 @@ interface CardReadingsTableProps {
 }
 
 export const CardReadingsTable = ({ readings }: CardReadingsTableProps) => {
-  // Helper function to get status badge based on access rules
+  // Helper function to get status badge - only use access_granted
   const getStatusBadge = (reading: CardReading) => {
-    // Use access_rule_granted if available, otherwise fall back to access_granted
-    const hasAccess = reading.access_rule_granted !== undefined 
-      ? reading.access_rule_granted 
-      : reading.access_granted;
-      
-    if (hasAccess) {
+    if (reading.access_granted) {
       return <Badge variant="success">İzin Verildi</Badge>;
     } else {
       return <Badge variant="destructive">Reddedildi</Badge>;

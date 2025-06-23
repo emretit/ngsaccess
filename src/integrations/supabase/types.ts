@@ -66,16 +66,10 @@ export type Database = {
       card_readings: {
         Row: {
           access_granted: boolean
-          access_rule_granted: boolean | null
           access_time: string
           card_no: string
           created_at: string | null
           device_id: number | null
-          device_ip: string | null
-          device_location: string | null
-          device_mac: string | null
-          device_name: string | null
-          device_serial: string | null
           employee_id: number | null
           employee_name: string | null
           employee_photo_url: string | null
@@ -89,16 +83,10 @@ export type Database = {
         }
         Insert: {
           access_granted?: boolean
-          access_rule_granted?: boolean | null
           access_time?: string
           card_no: string
           created_at?: string | null
           device_id?: number | null
-          device_ip?: string | null
-          device_location?: string | null
-          device_mac?: string | null
-          device_name?: string | null
-          device_serial?: string | null
           employee_id?: number | null
           employee_name?: string | null
           employee_photo_url?: string | null
@@ -112,16 +100,10 @@ export type Database = {
         }
         Update: {
           access_granted?: boolean
-          access_rule_granted?: boolean | null
           access_time?: string
           card_no?: string
           created_at?: string | null
           device_id?: number | null
-          device_ip?: string | null
-          device_location?: string | null
-          device_mac?: string | null
-          device_name?: string | null
-          device_serial?: string | null
           employee_id?: number | null
           employee_name?: string | null
           employee_photo_url?: string | null
@@ -458,7 +440,6 @@ export type Database = {
       }
       employees: {
         Row: {
-          access_permission: boolean | null
           access_rule_id: number | null
           card_number: string
           company_id: number | null
@@ -480,7 +461,6 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          access_permission?: boolean | null
           access_rule_id?: number | null
           card_number: string
           company_id?: number | null
@@ -502,7 +482,6 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          access_permission?: boolean | null
           access_rule_id?: number | null
           card_number?: string
           company_id?: number | null
@@ -1182,23 +1161,8 @@ export type Database = {
         }
         Relationships: []
       }
-      latest_device_readings: {
-        Row: {
-          device_serial: string | null
-          last_seen: string | null
-        }
-        Relationships: []
-      }
     }
     Functions: {
-      check_employee_access: {
-        Args: {
-          p_employee_id: number
-          p_device_id: number
-          p_access_time?: string
-        }
-        Returns: boolean
-      }
       employee_login: {
         Args: { email_or_phone: string; password: string }
         Returns: Json

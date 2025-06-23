@@ -1,3 +1,4 @@
+
 export interface CardReading {
     id: number;
     card_no: string;
@@ -12,7 +13,6 @@ export interface CardReading {
     device_ip: string;
     device_serial: string;
     status: 'success' | 'denied' | 'unknown';
-    access_rule_granted?: boolean;
     read_type?: string;
     raw_data?: string;
     created_at?: string;

@@ -48,7 +48,7 @@ export const useCardReadings = (pageSize: number = 100) => {
       const from = (currentPage - 1) * pageSize;
       const to = from + pageSize - 1;
 
-      // Build query
+      // Build query - removed access_rule_granted field
       let query = supabase
         .from("card_readings")
         .select(`
@@ -76,7 +76,7 @@ export const useCardReadings = (pageSize: number = 100) => {
           .lte('access_time', endDate.toISOString());
       }
       
-      // Apply access status filter
+      // Apply access status filter - only use access_granted
       if (accessFilter === 'granted') {
         query = query.eq('access_granted', true);
       } else if (accessFilter === 'denied') {
