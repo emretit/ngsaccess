@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuthState } from "@/hooks/useAuthState";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { ServerDevice } from "@/types/device";
 import { formSchema, FormValues } from "./useDeviceFormSchema";
 import { useDeviceDataLoader } from "./useDeviceDataLoader";
@@ -16,7 +17,11 @@ interface UseDeviceFormLogicProps {
 
 export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLogicProps) {
   const { user } = useAuthState();
-  const { currentProjectId, projectIds } = useProjectAccess();
+  const { projectIds } = useProjectAccess();
+  const { zones, doors, loading: locationLoading } = useZonesAndDoors();
+
+  // Get the first project ID as current project ID
+  const currentProjectId = projectIds.length > 0 ? projectIds[0] : null;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -31,6 +36,10 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
       description: "",
     },
   });
+
+  // Watch zone selection for filtering doors
+  const selectedZoneId = form.watch("zone_id");
+  const filteredDoors = doors.filter(door => door.zone_id === selectedZoneId);
 
   // Load device data when dialog opens
   useDeviceDataLoader({ device, open, form });
@@ -49,5 +58,10 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
     isLoading,
     user,
     currentProjectId,
+    zones,
+    doors,
+    locationLoading,
+    selectedZoneId,
+    filteredDoors,
   };
 }
