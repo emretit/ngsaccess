@@ -42,11 +42,11 @@ export function DeviceForm({
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full">
           {/* Scrollable Content */}
           <div className="flex-1 overflow-y-auto">
-            <div className="p-6">
-              {/* Main Two-Column Layout */}
-              <div className="grid grid-cols-2 gap-6">
+            <div className="p-8">
+              {/* Modern Two-Column Equal Layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Left Column */}
-                <div className="space-y-6">
+                <div className="space-y-8">
                   <DeviceBasicSection form={form} />
                   <DeviceLocationSection 
                     form={form}
@@ -56,32 +56,33 @@ export function DeviceForm({
                     selectedZoneId={selectedZoneId}
                     filteredDoors={filteredDoors}
                   />
-                  <DeviceNetworkSection form={form} />
                 </div>
 
                 {/* Right Column */}
-                <div className="space-y-6">
+                <div className="space-y-8">
+                  <DeviceNetworkSection form={form} />
                   <DeviceStatusSection form={form} />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Fixed Footer */}
-          <div className="border-t bg-white p-6 flex-shrink-0">
-            <div className="flex justify-end space-x-3">
+          {/* Modern Fixed Footer */}
+          <div className="border-t bg-white/80 backdrop-blur-sm p-8 flex-shrink-0">
+            <div className="flex justify-end space-x-4">
               <Button 
                 type="button" 
                 variant="outline" 
                 onClick={onClose} 
                 disabled={isLoading}
+                className="px-6 py-2.5 font-medium"
               >
                 İptal
               </Button>
               <Button 
                 type="submit" 
                 disabled={isLoading} 
-                className="bg-burgundy hover:bg-burgundy/90"
+                className="bg-burgundy hover:bg-burgundy/90 px-6 py-2.5 font-medium shadow-lg hover:shadow-xl transition-all duration-200"
               >
                 {isLoading ? "Kaydediliyor..." : device ? "Güncelle" : "Kaydet"}
               </Button>

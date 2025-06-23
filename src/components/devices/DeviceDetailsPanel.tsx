@@ -40,22 +40,29 @@ export function DeviceDetailsPanel({
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-6 py-4 border-b bg-gray-50/50">
-          <SheetTitle className="text-lg font-semibold text-gray-900">
+      <SheetContent className="sm:max-w-4xl w-full p-0 flex flex-col">
+        <SheetHeader className="px-8 py-6 border-b bg-gradient-to-r from-gray-50 to-gray-100/50">
+          <SheetTitle className="text-xl font-bold text-gray-900 flex items-center gap-3">
+            <div className="w-2 h-8 bg-burgundy rounded-full"></div>
             {selectedDevice ? 'Cihazı Düzenle' : 'Yeni Cihaz Ekle'}
           </SheetTitle>
         </SheetHeader>
 
         {projectsLoading ? (
-          <div className="flex items-center justify-center flex-1">
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Yükleniyor...</span>
+          <div className="flex items-center justify-center flex-1 bg-gray-50/30">
+            <div className="flex flex-col items-center gap-4 p-8">
+              <div className="relative">
+                <Loader2 className="h-10 w-10 animate-spin text-burgundy" />
+                <div className="absolute inset-0 h-10 w-10 border-2 border-burgundy/20 rounded-full"></div>
+              </div>
+              <div className="text-center">
+                <span className="text-base font-medium text-gray-700">Yükleniyor...</span>
+                <p className="text-sm text-gray-500 mt-1">Proje bilgileri getiriliyor</p>
+              </div>
             </div>
           </div>
         ) : (
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden bg-gradient-to-br from-white to-gray-50/30">
             <DeviceForm
               open={true}
               onClose={onClose}
