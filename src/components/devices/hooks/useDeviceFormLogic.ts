@@ -62,8 +62,8 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
       console.log('Setting form data with device:', device);
       console.log('Device zone_id:', device.zone_id, 'Device door_id:', device.door_id);
       
-      // Mevcut cihazın zone_id ve door_id değerlerini koruyarak form'u reset et
-      const resetData = {
+      // Önce tüm değerleri hazırla
+      const formData = {
         name: device.name || "",
         serial_number: device.serial_number || "",
         device_model_enum: device.device_model_enum || "Other",
@@ -77,21 +77,23 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
         description: device.description || "",
       };
       
-      console.log('Reset data for form:', resetData);
+      console.log('Form data to be set:', formData);
       
-      // Form'u reset et
-      form.reset(resetData);
+      // Form'u sıfırla ve tüm değerleri set et
+      form.reset(formData);
       
-      // Zone ve door değerlerini ayrı ayrı set et (güvenlik için)
-      if (device.zone_id !== undefined) {
-        console.log('Setting zone_id explicitly:', device.zone_id);
-        form.setValue("zone_id", device.zone_id);
-      }
-      
-      if (device.door_id !== undefined) {
-        console.log('Setting door_id explicitly:', device.door_id);
-        form.setValue("door_id", device.door_id);
-      }
+      // Kritik zone ve door değerlerini açıkça set et
+      setTimeout(() => {
+        if (device.zone_id !== undefined && device.zone_id !== null) {
+          console.log('Explicitly setting zone_id to:', device.zone_id);
+          form.setValue("zone_id", device.zone_id, { shouldValidate: true });
+        }
+        
+        if (device.door_id !== undefined && device.door_id !== null) {
+          console.log('Explicitly setting door_id to:', device.door_id);
+          form.setValue("door_id", device.door_id, { shouldValidate: true });
+        }
+      }, 50);
       
     } else if (open && !device) {
       console.log('Resetting form for new device');

@@ -3,7 +3,7 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UseFormReturn } from "react-hook-form";
 import { Zone, Door } from "@/hooks/useZonesAndDoors";
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 
 interface DeviceLocationSectionProps {
   form: UseFormReturn<any>;
@@ -21,8 +21,18 @@ export function DeviceLocationSection({
   selectedZoneId, 
   filteredDoors 
 }: DeviceLocationSectionProps) {
-  // Kullanıcının aktif olarak bölge değiştirdiğini takip etmek için ref kullanıyoruz
-  const userInitiatedZoneChange = useRef(false);
+  // Form ilk yüklendiğinde kontrol etmek için
+  const isInitialLoad = useRef(true);
+  const userChangedZone = useRef(false);
+
+  // Form değerleri değiştiğinde initial load flag'ini sıfırla
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      isInitialLoad.current = false;
+    }, 200);
+    
+    return () => clearTimeout(timeout);
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -39,19 +49,21 @@ export function DeviceLocationSection({
               onValueChange={(value) => {
                 const newZoneId = value ? parseInt(value) : undefined;
                 console.log('Zone changing from', selectedZoneId, 'to', newZoneId);
-                console.log('User initiated change:', userInitiatedZoneChange.current);
+                console.log('Is initial load:', isInitialLoad.current);
                 
-                // Kullanıcının aktif olarak bölge değiştirdiğini işaretle
-                userInitiatedZoneChange.current = true;
+                // Kullanıcının manuel değişiklik yaptığını işaretle
+                if (!isInitialLoad.current) {
+                  userChangedZone.current = true;
+                }
                 
                 field.onChange(newZoneId);
                 
-                // Sadece kullanıcı aktif olarak bölge değiştiriyorsa ve yeni bölge farklıysa kapı seçimini kontrol et
-                if (userInitiatedZoneChange.current && newZoneId !== selectedZoneId) {
+                // Sadece kullanıcı manuel değişiklik yaptıysa ve bölge farklıysa kapıyı kontrol et
+                if (userChangedZone.current && newZoneId !== selectedZoneId) {
                   const currentDoorId = form.getValues("door_id");
                   console.log('Current door_id:', currentDoorId);
                   
-                  // Mevcut kapı seçili bölgeye ait değilse sıfırla
+                  // Mevcut kapı yeni bölgeye ait değilse sıfırla
                   if (currentDoorId) {
                     const doorBelongsToNewZone = filteredDoors.some(door => door.id === currentDoorId);
                     console.log('Door belongs to new zone:', doorBelongsToNewZone);
@@ -63,10 +75,8 @@ export function DeviceLocationSection({
                   }
                 }
                 
-                // Bir sonraki değişiklik için reset et
-                setTimeout(() => {
-                  userInitiatedZoneChange.current = false;
-                }, 100);
+                // Flag'i reset et
+                userChangedZone.current = false;
               }}
             >
               <FormControl>
