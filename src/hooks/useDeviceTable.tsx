@@ -28,7 +28,7 @@ export function useDeviceTable(devices: Device[]) {
   };
 
   const handleBulkDelete = async () => {
-    console.log('Attempting to bulk delete devices:', selectedDevices);
+    console.log('🔄 Starting bulk delete for devices:', selectedDevices);
     
     try {
       // Device ID'leri number array'ine çevir
@@ -40,43 +40,73 @@ export function useDeviceTable(devices: Device[]) {
         return numericId;
       });
       
-      console.log('Device IDs to delete:', { original: selectedDevices, parsed: deviceIds });
+      console.log('🔍 Parsed device IDs:', { original: selectedDevices, parsed: deviceIds });
+
+      // Önce seçili cihazların gerçekten var olup olmadığını kontrol et
+      const { data: existingDevices, error: checkError } = await supabase
+        .from('devices')
+        .select('id, name')
+        .in('id', deviceIds);
+
+      console.log('📋 Existing devices check:', { devices: existingDevices, error: checkError });
+
+      if (checkError) {
+        throw new Error(`Cihazlar kontrol edilirken hata: ${checkError.message}`);
+      }
+
+      if (!existingDevices || existingDevices.length === 0) {
+        throw new Error('Seçilen cihazlar bulunamadı');
+      }
+
+      console.log(`📊 Found ${existingDevices.length} out of ${deviceIds.length} devices`);
 
       // Önce tüm seçili cihazlara ait card_readings kayıtlarını sil
-      const { error: cardReadingsError } = await supabase
+      console.log('🗑️ Deleting related card readings...');
+      const { error: cardReadingsError, count: deletedReadingsCount } = await supabase
         .from('card_readings')
-        .delete()
+        .delete({ count: 'exact' })
         .in('device_id', deviceIds);
 
+      console.log('📊 Card readings deletion result:', { 
+        error: cardReadingsError, 
+        deletedCount: deletedReadingsCount 
+      });
+
       if (cardReadingsError) {
-        console.error('Error deleting related card readings:', cardReadingsError);
+        console.error('⚠️ Error deleting related card readings:', cardReadingsError);
         // Card readings silme hatası kritik değil, devam et
       }
 
-      // Şimdi cihazları sil - numeric ID array kullan
-      const { error: devicesError, data: deletedData } = await supabase
+      // Şimdi cihazları sil
+      console.log('🗑️ Deleting devices...');
+      const { error: devicesError, data: deletedData, count: deletedCount } = await supabase
         .from('devices')
-        .delete()
-        .in('id', deviceIds) // Numeric array kullan
-        .select(); // Silinen kayıtları görmek için select ekle
+        .delete({ count: 'exact' })
+        .in('id', deviceIds)
+        .select();
 
-      console.log('Bulk delete operation result:', { error: devicesError, data: deletedData });
+      console.log('📊 Bulk delete result:', { 
+        error: devicesError, 
+        data: deletedData, 
+        deletedCount: deletedCount 
+      });
 
       if (devicesError) {
-        console.error('Bulk delete devices error:', devicesError);
+        console.error('❌ Bulk delete devices error:', devicesError);
         throw new Error(`Cihazlar silinirken hata oluştu: ${devicesError.message}`);
       }
 
       // Eğer hiçbir kayıt silinmediyse
-      if (!deletedData || deletedData.length === 0) {
-        throw new Error('Seçilen cihazlar bulunamadı veya silinemedi');
+      if (!deletedData || deletedData.length === 0 || deletedCount === 0) {
+        console.error('❌ No devices were deleted');
+        throw new Error('Seçilen cihazlar silinemedi - herhangi bir kayıt etkilenmedi');
       }
 
-      console.log('Bulk delete successful:', deletedData);
+      console.log('✅ Bulk delete successful:', { deletedData, deletedCount });
 
       toast({
         title: "Başarılı",
-        description: `${deletedData.length} cihaz başarıyla silindi`,
+        description: `${deletedCount} cihaz başarıyla silindi`,
       });
       
       // Refresh devices data
@@ -86,7 +116,7 @@ export function useDeviceTable(devices: Device[]) {
       setShowDeleteDialog(false);
       
     } catch (error: any) {
-      console.error('Bulk delete error:', error);
+      console.error('💥 Bulk delete error:', error);
       toast({
         title: "Hata",
         description: error.message || "Cihazlar silinirken bir hata oluştu",
