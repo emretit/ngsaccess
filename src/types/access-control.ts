@@ -23,6 +23,10 @@ export interface CardReading {
             name: string;
         } | null;
     } | null;
+    devices?: {
+        name: string;
+        device_serial?: string;
+    } | null;
 }
 
 export interface Zone {

@@ -48,13 +48,17 @@ export const useCardReadings = (pageSize: number = 100) => {
       const from = (currentPage - 1) * pageSize;
       const to = from + pageSize - 1;
 
-      // Build query - using access_status instead of access_granted
+      // Build query - using access_status instead of access_granted and properly join devices
       let query = supabase
         .from("card_readings")
         .select(`
           *,
           employees (
             departments (name)
+          ),
+          devices (
+            name,
+            device_serial
           )
         `, { count: "exact" });
       
@@ -100,10 +104,11 @@ export const useCardReadings = (pageSize: number = 100) => {
         ...item,
         access_granted: item.access_status === 'izin_verildi', // Convert enum to boolean
         status: item.access_status === 'izin_verildi' ? 'success' : 'denied',
-        device_name: 'Bilinmeyen Cihaz', // Default value
+        device_name: item.devices?.name || 'Bilinmeyen Cihaz', // Get from devices table
         device_location: '-', // Default value
         device_ip: '-', // Default value
-        device_serial: '-' // Default value
+        device_serial: item.devices?.device_serial || '-', // Get from devices table
+        devices: item.devices // Keep the devices relation
       }));
       
       return {

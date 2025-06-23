@@ -26,6 +26,20 @@ export const CardReadingsTable = ({ readings }: CardReadingsTableProps) => {
     }
   };
 
+  // Helper function to get device display name
+  const getDeviceDisplay = (reading: CardReading) => {
+    // First try to get device name from devices relation
+    if (reading.devices?.name) {
+      return reading.devices.name;
+    }
+    // If no device name, try serial number
+    if (reading.devices?.device_serial) {
+      return reading.devices.device_serial;
+    }
+    // Fallback to default
+    return "Bilinmeyen Cihaz";
+  };
+
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -48,7 +62,7 @@ export const CardReadingsTable = ({ readings }: CardReadingsTableProps) => {
                 {format(new Date(reading.access_time), "dd.MM.yyyy HH:mm:ss", { locale: tr })}
               </TableCell>
               <TableCell>{reading.employees?.departments?.name || "-"}</TableCell>
-              <TableCell>{reading.device_name || "Bilinmeyen Cihaz"}</TableCell>
+              <TableCell>{getDeviceDisplay(reading)}</TableCell>
               <TableCell>{getStatusBadge(reading)}</TableCell>
             </TableRow>
           ))}
