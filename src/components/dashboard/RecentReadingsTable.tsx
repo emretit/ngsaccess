@@ -21,8 +21,8 @@ interface RecentReadingsTableProps {
 
 const RecentReadingsTable: React.FC<RecentReadingsTableProps> = ({ readings, loading }) => {
   const getStatusBadge = (reading: CardReading) => {
-    // Use access_granted or status for badge determination
-    const hasAccess = reading.status === 'success' || reading.access_granted;
+    // Use access_granted for badge determination
+    const hasAccess = reading.access_granted;
       
     return (
       <Badge variant={hasAccess ? 'success' : 'destructive'}>

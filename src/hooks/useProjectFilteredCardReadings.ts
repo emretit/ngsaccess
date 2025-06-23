@@ -30,7 +30,7 @@ export const useProjectFilteredCardReadings = (pageSize: number = 100) => {
       const from = (currentPage - 1) * pageSize;
       const to = from + pageSize - 1;
 
-      // Build query - removed access_rule_granted field
+      // Build query - using access_status instead of access_granted
       let query = supabase
         .from("card_readings")
         .select(`
@@ -50,7 +50,7 @@ export const useProjectFilteredCardReadings = (pageSize: number = 100) => {
       
       // Apply search filter
       if (searchTerm) {
-        query = query.or(`employee_name.ilike.%${searchTerm}%,card_no.ilike.%${searchTerm}%,device_name.ilike.%${searchTerm}%`);
+        query = query.or(`employee_name.ilike.%${searchTerm}%,card_no.ilike.%${searchTerm}%`);
       }
       
       // Apply date filter
@@ -66,11 +66,11 @@ export const useProjectFilteredCardReadings = (pageSize: number = 100) => {
           .lte('access_time', endDate.toISOString());
       }
       
-      // Apply access status filter - only use access_granted
+      // Apply access status filter - using access_status enum
       if (accessFilter === 'granted') {
-        query = query.eq('access_granted', true);
+        query = query.eq('access_status', 'izin_verildi');
       } else if (accessFilter === 'denied') {
-        query = query.eq('access_granted', false);
+        query = query.eq('access_status', 'reddedildi');
       }
       
       // Apply sorting and pagination
@@ -86,7 +86,12 @@ export const useProjectFilteredCardReadings = (pageSize: number = 100) => {
       // Convert the response to match CardReading type
       const cardReadings: CardReading[] = data.map((item: any) => ({
         ...item,
-        status: item.access_granted ? 'success' : 'denied'
+        access_granted: item.access_status === 'izin_verildi', // Convert enum to boolean for compatibility
+        status: item.access_status === 'izin_verildi' ? 'success' : 'denied',
+        device_name: 'Bilinmeyen Cihaz', // Default value since column doesn't exist
+        device_location: '-', // Default value since column doesn't exist
+        device_ip: '-', // Default value
+        device_serial: '-' // Default value
       }));
       
       return {
@@ -95,11 +100,11 @@ export const useProjectFilteredCardReadings = (pageSize: number = 100) => {
       };
     },
     enabled: !projectLoading && (isSuperAdmin || projectIds.length > 0),
-    staleTime: 2 * 60 * 1000, // 2 dakika boyunca veri fresh kabul edilir (card readings daha dinamik)
+    staleTime: 2 * 60 * 1000, // 2 dakika boyunca veri fresh kabul edilir
     gcTime: 5 * 60 * 1000, // 5 dakika cache'de kalır
-    refetchOnWindowFocus: false, // Pencere focus'a geldiğinde yeniden fetch etme
-    refetchOnMount: false, // Component mount olduğunda cache varsa yeniden fetch etme
-    retry: 1, // Hata durumunda sadece 1 kez retry
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    retry: 1,
   });
 
   const handleRefresh = () => {

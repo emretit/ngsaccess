@@ -13,6 +13,7 @@ export async function fetchCardReadings(params: QueryParams): Promise<MessageDat
         id,
         access_time,
         employee_name,
+        access_status,
         employees (
           first_name,
           last_name,
@@ -21,7 +22,8 @@ export async function fetchCardReadings(params: QueryParams): Promise<MessageDat
         ),
         devices (
           name,
-          location
+          device_ip,
+          device_serial
         )
       `)
       .order('access_time', { ascending: true });
@@ -63,7 +65,7 @@ export async function fetchCardReadings(params: QueryParams): Promise<MessageDat
       check_out: null, // Card readings don't have exit time by default
       department: record.employees?.departments?.name || 'Bilinmeyen',
       device: record.devices?.name || '-',
-      location: record.devices?.location || '-'
+      location: record.devices?.device_ip || '-' // Using device_ip as location since location column doesn't exist
     }));
     
     return messageData;

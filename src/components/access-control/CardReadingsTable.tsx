@@ -17,7 +17,7 @@ interface CardReadingsTableProps {
 }
 
 export const CardReadingsTable = ({ readings }: CardReadingsTableProps) => {
-  // Helper function to get status badge - only use access_granted
+  // Helper function to get status badge - using access_granted
   const getStatusBadge = (reading: CardReading) => {
     if (reading.access_granted) {
       return <Badge variant="success">İzin Verildi</Badge>;
@@ -36,7 +36,6 @@ export const CardReadingsTable = ({ readings }: CardReadingsTableProps) => {
             <TableHead>Zaman</TableHead>
             <TableHead>Departman</TableHead>
             <TableHead>Cihaz</TableHead>
-            <TableHead>Konum</TableHead>
             <TableHead>Durum</TableHead>
           </TableRow>
         </TableHeader>
@@ -50,7 +49,6 @@ export const CardReadingsTable = ({ readings }: CardReadingsTableProps) => {
               </TableCell>
               <TableCell>{reading.employees?.departments?.name || "-"}</TableCell>
               <TableCell>{reading.device_name || "Bilinmeyen Cihaz"}</TableCell>
-              <TableCell>{reading.device_location || "-"}</TableCell>
               <TableCell>{getStatusBadge(reading)}</TableCell>
             </TableRow>
           ))}

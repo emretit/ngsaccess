@@ -48,7 +48,7 @@ export const useCardReadings = (pageSize: number = 100) => {
       const from = (currentPage - 1) * pageSize;
       const to = from + pageSize - 1;
 
-      // Build query - removed access_rule_granted field
+      // Build query - using access_status instead of access_granted
       let query = supabase
         .from("card_readings")
         .select(`
@@ -60,7 +60,7 @@ export const useCardReadings = (pageSize: number = 100) => {
       
       // Apply search filter
       if (searchTerm) {
-        query = query.or(`employee_name.ilike.%${searchTerm}%,card_no.ilike.%${searchTerm}%,device_name.ilike.%${searchTerm}%`);
+        query = query.or(`employee_name.ilike.%${searchTerm}%,card_no.ilike.%${searchTerm}%`);
       }
       
       // Apply date filter
@@ -76,11 +76,11 @@ export const useCardReadings = (pageSize: number = 100) => {
           .lte('access_time', endDate.toISOString());
       }
       
-      // Apply access status filter - only use access_granted
+      // Apply access status filter - using access_status enum
       if (accessFilter === 'granted') {
-        query = query.eq('access_granted', true);
+        query = query.eq('access_status', 'izin_verildi');
       } else if (accessFilter === 'denied') {
-        query = query.eq('access_granted', false);
+        query = query.eq('access_status', 'reddedildi');
       }
       
       // Apply sorting and pagination
@@ -98,8 +98,12 @@ export const useCardReadings = (pageSize: number = 100) => {
       // Convert the response to match CardReading type
       const cardReadings: CardReading[] = data.map((item: any) => ({
         ...item,
-        // Ensure status is one of the allowed values in CardReading type
-        status: item.access_granted ? 'success' : 'denied'
+        access_granted: item.access_status === 'izin_verildi', // Convert enum to boolean
+        status: item.access_status === 'izin_verildi' ? 'success' : 'denied',
+        device_name: 'Bilinmeyen Cihaz', // Default value
+        device_location: '-', // Default value
+        device_ip: '-', // Default value
+        device_serial: '-' // Default value
       }));
       
       return {
