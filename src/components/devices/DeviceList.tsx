@@ -80,7 +80,7 @@ export function DeviceList({
                 />
               </TableHead>
               <TableHead className="bg-gray-50 font-semibold">ID</TableHead>
-              <TableHead className="bg-gray-50 font-semibold">İsim</TableHead>
+              <TableHead className="bg-gray-50 font-semibold">Cihaz Seri No</TableHead>
               <TableHead className="bg-gray-50 font-semibold">Cihaz Modeli</TableHead>
               <TableHead className="bg-gray-50 font-semibold">Bölge</TableHead>
               <TableHead className="bg-gray-50 font-semibold">Kapı</TableHead>

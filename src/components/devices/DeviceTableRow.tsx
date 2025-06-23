@@ -79,7 +79,7 @@ export function DeviceTableRow({
         />
       </TableCell>
       <TableCell className="font-medium">{device.id}</TableCell>
-      <TableCell>{device.name || device.device_name || '-'}</TableCell>
+      <TableCell>{device.device_serial || device.serial_number || '-'}</TableCell>
       <TableCell>{device.device_model || device.device_type || '-'}</TableCell>
       <TableCell>{zoneName || '-'}</TableCell>
       <TableCell>{doorName || '-'}</TableCell>
