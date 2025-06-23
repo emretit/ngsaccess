@@ -151,7 +151,7 @@ export default function EmployeeTable({
                 onClick={(e) => {
                   // Prevent row click when clicking on checkbox or buttons
                   if ((e.target as HTMLElement).closest('button, input[type="checkbox"]')) return;
-                  onViewDetails(employee);
+                  onEdit(employee);
                 }}
               >
                 <TableCell onClick={(e) => e.stopPropagation()}>
