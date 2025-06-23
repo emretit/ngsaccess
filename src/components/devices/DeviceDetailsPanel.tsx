@@ -2,7 +2,6 @@
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -42,13 +41,11 @@ export function DeviceDetailsPanel({
   return (
     <Sheet open={open} onOpenChange={onClose}>
       <SheetContent className="sm:max-w-md md:max-w-lg w-full p-0">
-        <div className="p-6 border-b">
-          <SheetHeader>
-            <SheetTitle>
-              {selectedDevice ? 'Cihazı Düzenle' : 'Yeni Cihaz Ekle'}
-            </SheetTitle>
-          </SheetHeader>
-        </div>
+        <SheetHeader className="p-6 border-b">
+          <SheetTitle>
+            {selectedDevice ? 'Cihazı Düzenle' : 'Yeni Cihaz Ekle'}
+          </SheetTitle>
+        </SheetHeader>
 
         {projectsLoading ? (
           <div className="flex items-center justify-center h-[calc(100vh-120px)]">

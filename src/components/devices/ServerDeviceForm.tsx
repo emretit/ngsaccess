@@ -205,7 +205,7 @@ export function ServerDeviceForm({
             onExpiryDateChange={() => {}}
           />
 
-          <div className="flex justify-end space-x-3 pt-6">
+          <div className="flex justify-end space-x-3 pb-6">
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
               İptal
             </Button>
