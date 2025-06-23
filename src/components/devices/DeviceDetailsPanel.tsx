@@ -40,7 +40,7 @@ export function DeviceDetailsPanel({
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="sm:max-w-4xl w-full p-0 flex flex-col">
+      <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
         <SheetHeader className="px-8 py-6 border-b bg-gradient-to-r from-gray-50 to-gray-100/50">
           <SheetTitle className="text-xl font-bold text-gray-900 flex items-center gap-3">
             <div className="w-2 h-8 bg-burgundy rounded-full"></div>
