@@ -6,7 +6,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ServerDeviceForm } from "@/components/devices/ServerDeviceForm";
+import { DeviceForm } from "@/components/devices/DeviceForm";
 import { ServerDevice, Project } from "@/types/device";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,7 +56,7 @@ export function DeviceDetailsPanel({
           </div>
         ) : (
           <ScrollArea className="h-[calc(100vh-120px)]">
-            <ServerDeviceForm
+            <DeviceForm
               open={true}
               onClose={onClose}
               device={selectedDevice}
