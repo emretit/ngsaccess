@@ -65,54 +65,42 @@ export type Database = {
       }
       card_readings: {
         Row: {
-          access_granted: boolean
+          access_status: Database["public"]["Enums"]["access_status_enum"]
           access_time: string
           card_no: string
           created_at: string | null
           device_id: number | null
           employee_id: number | null
           employee_name: string | null
-          employee_photo_url: string | null
           id: number
           project_id: number | null
           raw_data: string | null
-          read_time: string | null
-          read_type: string | null
-          status: string
           updated_at: string | null
         }
         Insert: {
-          access_granted?: boolean
+          access_status?: Database["public"]["Enums"]["access_status_enum"]
           access_time?: string
           card_no: string
           created_at?: string | null
           device_id?: number | null
           employee_id?: number | null
           employee_name?: string | null
-          employee_photo_url?: string | null
           id?: number
           project_id?: number | null
           raw_data?: string | null
-          read_time?: string | null
-          read_type?: string | null
-          status?: string
           updated_at?: string | null
         }
         Update: {
-          access_granted?: boolean
+          access_status?: Database["public"]["Enums"]["access_status_enum"]
           access_time?: string
           card_no?: string
           created_at?: string | null
           device_id?: number | null
           employee_id?: number | null
           employee_name?: string | null
-          employee_photo_url?: string | null
           id?: number
           project_id?: number | null
           raw_data?: string | null
-          read_time?: string | null
-          read_type?: string | null
-          status?: string
           updated_at?: string | null
         }
         Relationships: [
@@ -1215,6 +1203,7 @@ export type Database = {
     }
     Enums: {
       access_direction_enum: "entry" | "exit" | "both"
+      access_status_enum: "izin_verildi" | "reddedildi"
       device_type_turkish:
         | "Kart Okuyucu"
         | "Parmak İzi Okuyucu"
@@ -1342,6 +1331,7 @@ export const Constants = {
   public: {
     Enums: {
       access_direction_enum: ["entry", "exit", "both"],
+      access_status_enum: ["izin_verildi", "reddedildi"],
       device_type_turkish: [
         "Kart Okuyucu",
         "Parmak İzi Okuyucu",

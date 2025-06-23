@@ -19,8 +19,10 @@ export async function fetchCardReadings(params: QueryParams): Promise<MessageDat
           department_id,
           departments (id, name)
         ),
-        device_name,
-        device_location
+        devices (
+          name,
+          location
+        )
       `)
       .order('access_time', { ascending: true });
     
@@ -60,8 +62,8 @@ export async function fetchCardReadings(params: QueryParams): Promise<MessageDat
       check_in: new Date(record.access_time).toLocaleString('tr-TR'),
       check_out: null, // Card readings don't have exit time by default
       department: record.employees?.departments?.name || 'Bilinmeyen',
-      device: record.device_name || '-',
-      location: record.device_location || '-'
+      device: record.devices?.name || '-',
+      location: record.devices?.location || '-'
     }));
     
     return messageData;
