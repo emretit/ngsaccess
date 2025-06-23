@@ -48,6 +48,11 @@ export function DeviceForm({
                 {/* Left Column */}
                 <div className="space-y-8">
                   <DeviceBasicSection form={form} />
+                  <DeviceNetworkSection form={form} />
+                </div>
+
+                {/* Right Column */}
+                <div className="space-y-8">
                   <DeviceLocationSection 
                     form={form}
                     zones={zones}
@@ -56,11 +61,6 @@ export function DeviceForm({
                     selectedZoneId={selectedZoneId}
                     filteredDoors={filteredDoors}
                   />
-                </div>
-
-                {/* Right Column */}
-                <div className="space-y-8">
-                  <DeviceNetworkSection form={form} />
                   <DeviceStatusSection form={form} />
                 </div>
               </div>
