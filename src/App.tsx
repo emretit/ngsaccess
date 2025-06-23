@@ -2,6 +2,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import Layout from '@/components/Layout';
 import Index from '@/pages/Index';
@@ -30,102 +31,104 @@ const queryClient = new QueryClient();
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Router future={{ v7_relativeSplatPath: true }}>
-        <AuthProvider>
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/demo-request" element={<DemoRequest />} />
-            <Route path="/user-setup" element={<UserSetup />} />
-            <Route path="/employee-setup" element={<EmployeeSetup />} />
-            <Route path="/system-admin" element={<SystemAdmin />} />
-            <Route 
-              path="/home" 
-              element={
-                <Layout>
-                  <Index />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/employees" 
-              element={
-                <Layout>
-                  <Employees />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/devices" 
-              element={
-                <Layout>
-                  <Devices />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/server-devices" 
-              element={
-                <Layout>
-                  <ServerDevices />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/virtual-readers" 
-              element={
-                <Layout>
-                  <VirtualReaders />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/access-control" 
-              element={
-                <Layout>
-                  <AccessControl />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/pdks-records" 
-              element={
-                <Layout>
-                  <PDKSRecords />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/settings" 
-              element={
-                <Layout>
-                  <Settings />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/profile" 
-              element={
-                <Layout>
-                  <Profile />
-                </Layout>
-              } 
-            />
-            <Route 
-              path="/engineering-department" 
-              element={
-                <Layout>
-                  <EngineeringDepartment />
-                </Layout>
-              } 
-            />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <Toaster />
-        </AuthProvider>
-      </Router>
+      <TooltipProvider>
+        <Router future={{ v7_relativeSplatPath: true }}>
+          <AuthProvider>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/demo-request" element={<DemoRequest />} />
+              <Route path="/user-setup" element={<UserSetup />} />
+              <Route path="/employee-setup" element={<EmployeeSetup />} />
+              <Route path="/system-admin" element={<SystemAdmin />} />
+              <Route 
+                path="/home" 
+                element={
+                  <Layout>
+                    <Index />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/employees" 
+                element={
+                  <Layout>
+                    <Employees />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/devices" 
+                element={
+                  <Layout>
+                    <Devices />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/server-devices" 
+                element={
+                  <Layout>
+                    <ServerDevices />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/virtual-readers" 
+                element={
+                  <Layout>
+                    <VirtualReaders />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/access-control" 
+                element={
+                  <Layout>
+                    <AccessControl />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/pdks-records" 
+                element={
+                  <Layout>
+                    <PDKSRecords />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/settings" 
+                element={
+                  <Layout>
+                    <Settings />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/profile" 
+                element={
+                  <Layout>
+                    <Profile />
+                  </Layout>
+                } 
+              />
+              <Route 
+                path="/engineering-department" 
+                element={
+                  <Layout>
+                    <EngineeringDepartment />
+                  </Layout>
+                } 
+              />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <Toaster />
+          </AuthProvider>
+        </Router>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }
