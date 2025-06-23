@@ -56,6 +56,13 @@ export function DeviceTableRow({
     }
   };
 
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('Delete button clicked for device:', device.id);
+    onDeleteDevice(device.id);
+  };
+
   return (
     <TableRow 
       className="cursor-pointer hover:bg-muted/50"
@@ -112,7 +119,7 @@ export function DeviceTableRow({
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => onDeleteDevice(device.id)}
+            onClick={handleDeleteClick}
             className="h-8 w-8 text-destructive hover:text-destructive"
             title="Sil"
           >

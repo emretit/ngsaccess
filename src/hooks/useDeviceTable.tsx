@@ -28,20 +28,34 @@ export function useDeviceTable(devices: Device[]) {
   };
 
   const handleBulkDelete = async () => {
+    console.log('Attempting to bulk delete devices:', selectedDevices);
+    
     try {
-      // Process each device deletion
-      const deletePromises = selectedDevices.map(deviceId => 
-        supabase.from('devices').delete().eq('id', parseInt(deviceId))
-      );
-
-      const results = await Promise.all(deletePromises);
+      // Önce tüm seçili cihazlara ait card_readings kayıtlarını sil
+      const deviceIds = selectedDevices.map(id => parseInt(id));
       
-      // Check for errors
-      const errors = results.filter(result => result.error);
-      if (errors.length > 0) {
-        console.error('Bulk delete errors:', errors);
-        throw new Error(`${errors.length} cihaz silinemedi`);
+      const { error: cardReadingsError } = await supabase
+        .from('card_readings')
+        .delete()
+        .in('device_id', deviceIds);
+
+      if (cardReadingsError) {
+        console.error('Error deleting related card readings:', cardReadingsError);
+        // Card readings silme hatası kritik değil, devam et
       }
+
+      // Şimdi cihazları sil
+      const { error: devicesError } = await supabase
+        .from('devices')
+        .delete()
+        .in('id', deviceIds);
+
+      if (devicesError) {
+        console.error('Bulk delete devices error:', devicesError);
+        throw new Error(`Cihazlar silinirken hata oluştu: ${devicesError.message}`);
+      }
+
+      console.log('Bulk delete successful');
 
       toast({
         title: "Başarılı",
@@ -53,6 +67,7 @@ export function useDeviceTable(devices: Device[]) {
       
       setSelectedDevices([]);
       setShowDeleteDialog(false);
+      
     } catch (error: any) {
       console.error('Bulk delete error:', error);
       toast({
