@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -59,6 +60,7 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
   useEffect(() => {
     if (device && open) {
       console.log('Setting form data with device:', device);
+      console.log('Device zone_id:', device.zone_id, 'Device door_id:', device.door_id);
       
       // Mevcut cihazın zone_id ve door_id değerlerini koruyarak form'u reset et
       const resetData = {
@@ -75,9 +77,24 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
         description: device.description || "",
       };
       
-      console.log('Reset data:', resetData);
+      console.log('Reset data for form:', resetData);
+      
+      // Form'u reset et
       form.reset(resetData);
+      
+      // Zone ve door değerlerini ayrı ayrı set et (güvenlik için)
+      if (device.zone_id !== undefined) {
+        console.log('Setting zone_id explicitly:', device.zone_id);
+        form.setValue("zone_id", device.zone_id);
+      }
+      
+      if (device.door_id !== undefined) {
+        console.log('Setting door_id explicitly:', device.door_id);
+        form.setValue("door_id", device.door_id);
+      }
+      
     } else if (open && !device) {
+      console.log('Resetting form for new device');
       // Yeni cihaz için form'u temizle
       form.reset({
         name: "",
