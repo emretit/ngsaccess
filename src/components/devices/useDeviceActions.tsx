@@ -11,22 +11,29 @@ export function useDeviceActions() {
     console.log('Attempting to delete device with ID:', deviceId);
     
     try {
+      // Device ID'yi number'a çevir
+      const numericDeviceId = parseInt(deviceId);
+      
+      if (isNaN(numericDeviceId)) {
+        throw new Error('Geçersiz cihaz ID\'si');
+      }
+
       // Önce card_readings tablosundaki ilişkili kayıtları sil
       const { error: cardReadingsError } = await supabase
         .from('card_readings')
         .delete()
-        .eq('device_id', parseInt(deviceId));
+        .eq('device_id', numericDeviceId);
 
       if (cardReadingsError) {
         console.error('Error deleting card readings:', cardReadingsError);
         // Card readings silme hatası kritik değil, devam et
       }
 
-      // Şimdi cihazı sil - ID'yi string olarak kullan
+      // Şimdi cihazı sil - numeric ID kullan
       const { error: deviceError, data: deletedData } = await supabase
         .from('devices')
         .delete()
-        .eq('id', deviceId)
+        .eq('id', numericDeviceId)
         .select(); // Silinen kayıtları görmek için select ekle
 
       console.log('Delete operation result:', { error: deviceError, data: deletedData });

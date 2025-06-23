@@ -31,8 +31,14 @@ export function useDeviceTable(devices: Device[]) {
     console.log('Attempting to bulk delete devices:', selectedDevices);
     
     try {
-      // Device ID'leri hem string hem integer formatında hazırla
-      const deviceIds = selectedDevices.map(id => parseInt(id));
+      // Device ID'leri number array'ine çevir
+      const deviceIds = selectedDevices.map(id => {
+        const numericId = parseInt(id);
+        if (isNaN(numericId)) {
+          throw new Error(`Geçersiz cihaz ID'si: ${id}`);
+        }
+        return numericId;
+      });
       
       console.log('Device IDs to delete:', { original: selectedDevices, parsed: deviceIds });
 
@@ -47,11 +53,11 @@ export function useDeviceTable(devices: Device[]) {
         // Card readings silme hatası kritik değil, devam et
       }
 
-      // Şimdi cihazları sil - String ID'leri kullan
+      // Şimdi cihazları sil - numeric ID array kullan
       const { error: devicesError, data: deletedData } = await supabase
         .from('devices')
         .delete()
-        .in('id', selectedDevices) // String array kullan
+        .in('id', deviceIds) // Numeric array kullan
         .select(); // Silinen kayıtları görmek için select ekle
 
       console.log('Bulk delete operation result:', { error: devicesError, data: deletedData });
