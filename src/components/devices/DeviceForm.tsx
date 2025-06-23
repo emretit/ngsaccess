@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,6 +17,7 @@ import { ServerDevice, Project, AccessDirection } from "@/types/device";
 import { deviceTypeMapping, DatabaseDeviceType } from "@/utils/deviceTypeMapping";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
+import { useQueryClient } from "@tanstack/react-query";
 
 const formSchema = z.object({
   name: z.string().min(1, "Cihaz adı gereklidir"),
@@ -52,6 +54,7 @@ export function DeviceForm({
   const { toast } = useToast();
   const { projectIds } = useProjectAccess();
   const { zones, doors, loading: locationLoading } = useZonesAndDoors();
+  const queryClient = useQueryClient();
   
   const currentProjectId = projectIds[0] || null;
   
@@ -72,6 +75,7 @@ export function DeviceForm({
 
   useEffect(() => {
     if (device && open) {
+      console.log('Setting form data with device:', device);
       form.reset({
         name: device.name || "",
         serial_number: device.serial_number || "",
@@ -99,6 +103,7 @@ export function DeviceForm({
 
   const onSubmit = async (values: FormValues) => {
     setIsLoading(true);
+    console.log('Submitting form with values:', values);
     
     try {
       const deviceType = deviceTypeMapping[values.device_model_enum] as DatabaseDeviceType;
@@ -119,6 +124,8 @@ export function DeviceForm({
         description: values.description || null,
       };
 
+      console.log('Device data to be saved:', deviceData);
+
       if (device?.id) {
         const { error } = await supabase
           .from("devices")
@@ -126,6 +133,13 @@ export function DeviceForm({
           .eq("id", parseInt(device.id));
 
         if (error) throw error;
+        
+        console.log('Device updated successfully');
+        
+        // Cache'i invalidate et
+        await queryClient.invalidateQueries({ queryKey: ['devices'] });
+        await queryClient.invalidateQueries({ queryKey: ['admin-devices'] });
+        await queryClient.invalidateQueries({ queryKey: ['devices', projectIds] });
         
         toast({
           title: "Başarılı",
@@ -138,6 +152,13 @@ export function DeviceForm({
 
         if (error) throw error;
         
+        console.log('Device created successfully');
+        
+        // Cache'i invalidate et
+        await queryClient.invalidateQueries({ queryKey: ['devices'] });
+        await queryClient.invalidateQueries({ queryKey: ['admin-devices'] });
+        await queryClient.invalidateQueries({ queryKey: ['devices', projectIds] });
+        
         toast({
           title: "Başarılı",
           description: "Yeni cihaz eklendi",
@@ -146,6 +167,7 @@ export function DeviceForm({
 
       onSuccess();
     } catch (error: any) {
+      console.error('Error saving device:', error);
       toast({
         title: "Hata",
         description: error.message || "Bir hata oluştu",
