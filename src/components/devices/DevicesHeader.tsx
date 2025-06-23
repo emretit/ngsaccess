@@ -1,5 +1,5 @@
 
-import { DeviceForm } from "@/components/devices/DeviceForm";
+import { DeviceFormButton } from "@/components/devices/DeviceFormButton";
 
 interface DevicesHeaderProps {
   deviceCount: number;
@@ -21,7 +21,7 @@ export function DevicesHeader({
         </p>
       </div>
       <div>
-        <DeviceForm onOpenDevicePanel={onOpenDevicePanel} />
+        <DeviceFormButton onOpenDevicePanel={onOpenDevicePanel} />
       </div>
     </div>
   );

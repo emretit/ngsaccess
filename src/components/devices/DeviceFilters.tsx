@@ -2,7 +2,7 @@
 import { Search, Filter } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DeviceForm } from "./DeviceForm";
+import { DeviceFormButton } from "./DeviceFormButton";
 
 interface DeviceFiltersProps {
   search: string;
@@ -38,7 +38,7 @@ export function DeviceFilters({
             {deviceCount} cihaz bulundu, {filteredCount} tanesi gösteriliyor
           </p>
         </div>
-        <DeviceForm onOpenDevicePanel={onNewDevice} />
+        <DeviceFormButton onOpenDevicePanel={onNewDevice} />
       </div>
 
       <div className="flex gap-4 items-center">

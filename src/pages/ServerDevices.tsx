@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { ServerDevice } from '@/types/device';
-import { ServerDeviceForm } from '@/components/devices/ServerDeviceForm';
+import { DeviceDetailsPanel } from '@/components/devices/DeviceDetailsPanel';
 import { ServerDeviceTable } from '@/components/devices/ServerDeviceTable';
 import { ServerDeviceFilters } from '@/components/devices/ServerDeviceFilters';
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
@@ -63,6 +63,11 @@ export default function ServerDevices() {
   // Add: get zones and doors data
   const { zones, doors } = useZonesAndDoors();
 
+  const handleDeviceSuccess = () => {
+    setShowAddDevice(false);
+    setEditDevice(null);
+  };
+
   return (
     <main className="flex-1 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -117,18 +122,14 @@ export default function ServerDevices() {
         </Pagination>
       </div>
 
-      <ServerDeviceForm
+      <DeviceDetailsPanel
         open={showAddDevice || !!editDevice}
         onClose={() => {
           setShowAddDevice(false);
           setEditDevice(null);
         }}
-        device={editDevice}
-        projects={projects}
-        onSuccess={() => {
-          setShowAddDevice(false);
-          setEditDevice(null);
-        }}
+        selectedDevice={editDevice}
+        onSuccess={handleDeviceSuccess}
       />
     </main>
   );
