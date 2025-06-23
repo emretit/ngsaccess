@@ -205,7 +205,7 @@ export const ZoneDoorTree = ({
                           onSelectDoor?.(door.id === selectedDoor ? null : door.id);
                         }}
                       >
-                        <Grid className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <door-closed className="h-4 w-4 shrink-0 text-muted-foreground" />
                         <span className="flex-1 truncate text-sm">{door.name}</span>
 
                         <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
