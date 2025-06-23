@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { ChevronRight, Building2, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, Users, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Department } from "@/types/department";
@@ -73,7 +73,7 @@ export function DepartmentTreeItem({
           />
         </Button>
 
-        <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="flex-1 truncate text-sm">{department.name}</span>
 
         <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
