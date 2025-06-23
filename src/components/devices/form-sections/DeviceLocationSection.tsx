@@ -21,18 +21,17 @@ export function DeviceLocationSection({
   selectedZoneId, 
   filteredDoors 
 }: DeviceLocationSectionProps) {
-  // Form ilk yüklendiğinde kontrol etmek için
-  const isInitialLoad = useRef(true);
   const userChangedZone = useRef(false);
+  const initialZoneId = useRef<number | undefined>(undefined);
 
-  // Form değerleri değiştiğinde initial load flag'ini sıfırla
+  // Form değerleri ilk yüklendiğinde initial zone'u kaydet
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      isInitialLoad.current = false;
-    }, 200);
-    
-    return () => clearTimeout(timeout);
-  }, []);
+    const currentZoneId = form.getValues("zone_id");
+    if (currentZoneId && initialZoneId.current === undefined) {
+      initialZoneId.current = currentZoneId;
+      console.log('Initial zone_id set to:', currentZoneId);
+    }
+  }, [form]);
 
   return (
     <div className="space-y-4">
@@ -49,16 +48,13 @@ export function DeviceLocationSection({
               onValueChange={(value) => {
                 const newZoneId = value ? parseInt(value) : undefined;
                 console.log('Zone changing from', selectedZoneId, 'to', newZoneId);
-                console.log('Is initial load:', isInitialLoad.current);
                 
                 // Kullanıcının manuel değişiklik yaptığını işaretle
-                if (!isInitialLoad.current) {
-                  userChangedZone.current = true;
-                }
+                userChangedZone.current = true;
                 
                 field.onChange(newZoneId);
                 
-                // Sadece kullanıcı manuel değişiklik yaptıysa ve bölge farklıysa kapıyı kontrol et
+                // Sadece kullanıcı manuel değişiklik yaptıysa ve bölge gerçekten değişmişse kapıyı kontrol et
                 if (userChangedZone.current && newZoneId !== selectedZoneId) {
                   const currentDoorId = form.getValues("door_id");
                   console.log('Current door_id:', currentDoorId);

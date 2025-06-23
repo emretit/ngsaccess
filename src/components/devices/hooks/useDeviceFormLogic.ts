@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -58,57 +57,68 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
   const filteredDoors = doors.filter(door => door.zone_id === selectedZoneId);
 
   useEffect(() => {
-    if (device && open) {
-      console.log('Setting form data with device:', device);
-      console.log('Device zone_id:', device.zone_id, 'Device door_id:', device.door_id);
-      
-      // Önce tüm değerleri hazırla
-      const formData = {
-        name: device.name || "",
-        serial_number: device.serial_number || "",
-        device_model_enum: device.device_model_enum || "Other",
-        zone_id: device.zone_id,
-        door_id: device.door_id,
-        access_direction: (device.access_direction as AccessDirection) || "both",
-        device_mac: device.device_mac || "",
-        device_ip: device.device_ip || "",
-        device_firmware: device.device_firmware || "",
-        status: (device.status === "active" || device.status === "inactive") ? device.status : "active",
-        description: device.description || "",
-      };
-      
-      console.log('Form data to be set:', formData);
-      
-      // Form'u sıfırla ve tüm değerleri set et
-      form.reset(formData);
-      
-      // Kritik zone ve door değerlerini açıkça set et
-      setTimeout(() => {
-        if (device.zone_id !== undefined && device.zone_id !== null) {
-          console.log('Explicitly setting zone_id to:', device.zone_id);
-          form.setValue("zone_id", device.zone_id, { shouldValidate: true });
+    const loadDeviceData = async () => {
+      if (device && open) {
+        console.log('Loading device data:', device);
+        
+        // Eğer device'da zone_id veya door_id yoksa, Supabase'den tam veriyi al
+        if (device.id && (!device.zone_id && !device.door_id)) {
+          try {
+            const { data: fullDevice, error } = await supabase
+              .from('devices')
+              .select('*')
+              .eq('id', parseInt(device.id))
+              .single();
+              
+            if (error) {
+              console.error('Error fetching full device data:', error);
+            } else if (fullDevice) {
+              console.log('Fetched full device data from Supabase:', fullDevice);
+              // Tam veriyi kullan
+              device = {
+                ...device,
+                zone_id: fullDevice.zone_id,
+                door_id: fullDevice.door_id,
+              };
+            }
+          } catch (error) {
+            console.error('Error in device data fetch:', error);
+          }
         }
         
-        if (device.door_id !== undefined && device.door_id !== null) {
-          console.log('Explicitly setting door_id to:', device.door_id);
-          form.setValue("door_id", device.door_id, { shouldValidate: true });
-        }
-      }, 50);
-      
-    } else if (open && !device) {
-      console.log('Resetting form for new device');
-      // Yeni cihaz için form'u temizle
-      form.reset({
-        name: "",
-        serial_number: "",
-        device_model_enum: "Other",
-        zone_id: undefined,
-        door_id: undefined,
-        access_direction: "both",
-        status: "active",
-        description: "",
-      });
-    }
+        const formData = {
+          name: device.name || "",
+          serial_number: device.serial_number || "",
+          device_model_enum: device.device_model_enum || "Other",
+          zone_id: device.zone_id || undefined,
+          door_id: device.door_id || undefined,
+          access_direction: (device.access_direction as AccessDirection) || "both",
+          device_mac: device.device_mac || "",
+          device_ip: device.device_ip || "",
+          device_firmware: device.device_firmware || "",
+          status: (device.status === "active" || device.status === "inactive") ? device.status : "active",
+          description: device.description || "",
+        };
+        
+        console.log('Setting form data:', formData);
+        form.reset(formData);
+        
+      } else if (open && !device) {
+        console.log('Resetting form for new device');
+        form.reset({
+          name: "",
+          serial_number: "",
+          device_model_enum: "Other",
+          zone_id: undefined,
+          door_id: undefined,
+          access_direction: "both",
+          status: "active",
+          description: "",
+        });
+      }
+    };
+
+    loadDeviceData();
   }, [device, open, form]);
 
   const onSubmit = async (values: FormValues) => {
