@@ -42,10 +42,10 @@ export function useDeviceTable(devices: Device[]) {
       
       console.log('🔍 Parsed device IDs:', { original: selectedDevices, parsed: deviceIds });
 
-      // Önce seçili cihazların gerçekten var olup olmadığını kontrol et
+      // Önce seçili cihazların mevcut olup olmadığını kontrol et
       const { data: existingDevices, error: checkError } = await supabase
         .from('devices')
-        .select('id, name')
+        .select('id, name, project_id')
         .in('id', deviceIds);
 
       console.log('📋 Existing devices check:', { devices: existingDevices, error: checkError });
@@ -55,7 +55,7 @@ export function useDeviceTable(devices: Device[]) {
       }
 
       if (!existingDevices || existingDevices.length === 0) {
-        throw new Error('Seçilen cihazlar bulunamadı');
+        throw new Error('Seçilen cihazlar bulunamadı veya erişim yetkiniz yok');
       }
 
       console.log(`📊 Found ${existingDevices.length} out of ${deviceIds.length} devices`);
@@ -77,7 +77,7 @@ export function useDeviceTable(devices: Device[]) {
         // Card readings silme hatası kritik değil, devam et
       }
 
-      // Şimdi cihazları sil
+      // Şimdi cihazları sil - RLS politikaları otomatik olarak proje kontrolü yapacak
       console.log('🗑️ Deleting devices...');
       const { error: devicesError, data: deletedData, count: deletedCount } = await supabase
         .from('devices')
@@ -99,7 +99,7 @@ export function useDeviceTable(devices: Device[]) {
       // Eğer hiçbir kayıt silinmediyse
       if (!deletedData || deletedData.length === 0 || deletedCount === 0) {
         console.error('❌ No devices were deleted');
-        throw new Error('Seçilen cihazlar silinemedi - herhangi bir kayıt etkilenmedi');
+        throw new Error('Seçilen cihazlar silinemedi - erişim yetkiniz olmayabilir');
       }
 
       console.log('✅ Bulk delete successful:', { deletedData, deletedCount });

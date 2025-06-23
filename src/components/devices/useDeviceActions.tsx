@@ -20,17 +20,17 @@ export function useDeviceActions() {
 
       console.log('🔍 Parsed device ID:', numericDeviceId);
 
-      // Önce cihazın gerçekten var olup olmadığını kontrol et
+      // Önce cihazın mevcut olup olmadığını ve kullanıcının erişim hakkı olup olmadığını kontrol et
       const { data: existingDevice, error: checkError } = await supabase
         .from('devices')
-        .select('id, name')
+        .select('id, name, project_id')
         .eq('id', numericDeviceId)
         .single();
 
       console.log('📋 Device exists check:', { device: existingDevice, error: checkError });
 
       if (checkError || !existingDevice) {
-        throw new Error('Cihaz bulunamadı');
+        throw new Error('Cihaz bulunamadı veya erişim yetkiniz yok');
       }
 
       // Önce card_readings tablosundaki ilişkili kayıtları sil
@@ -50,7 +50,7 @@ export function useDeviceActions() {
         // Card readings silme hatası kritik değil, devam et
       }
 
-      // Şimdi cihazı sil
+      // Şimdi cihazı sil - RLS politikaları otomatik olarak proje kontrolü yapacak
       console.log('🗑️ Deleting device...');
       const { error: deviceError, data: deletedData, count: deletedCount } = await supabase
         .from('devices')
@@ -72,7 +72,7 @@ export function useDeviceActions() {
       // Eğer hiçbir kayıt silinmediyse
       if (!deletedData || deletedData.length === 0 || deletedCount === 0) {
         console.error('❌ No device was deleted');
-        throw new Error('Cihaz silinemedi - herhangi bir kayıt etkilenmedi');
+        throw new Error('Cihaz silinemedi - erişim yetkiniz olmayabilir');
       }
 
       console.log('✅ Device deleted successfully:', deletedData);
