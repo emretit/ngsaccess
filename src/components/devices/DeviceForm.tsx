@@ -193,13 +193,13 @@ export function DeviceForm({
                 />
               </div>
 
-              {/* Basic Information */}
+              {/* Basic Information - Two Column Grid */}
               <div className="space-y-4">
                 <div className="border-b pb-2">
                   <h3 className="text-lg font-medium">Temel Bilgiler</h3>
                 </div>
                 
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="name"
@@ -232,7 +232,7 @@ export function DeviceForm({
                     control={form.control}
                     name="device_model_enum"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="col-span-2">
                         <FormLabel>Cihaz Modeli *</FormLabel>
                         <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
@@ -252,34 +252,16 @@ export function DeviceForm({
                       </FormItem>
                     )}
                   />
-
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Açıklama</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Cihaz hakkında açıklama yazın..." 
-                            rows={3}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                 </div>
               </div>
 
-              {/* Location Information */}
+              {/* Location Information - Two Column Grid */}
               <div className="space-y-4">
                 <div className="border-b pb-2">
                   <h3 className="text-lg font-medium">Konum Bilgileri</h3>
                 </div>
                 
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="zone_id"
@@ -366,7 +348,7 @@ export function DeviceForm({
                         <RadioGroup
                           value={field.value}
                           onValueChange={field.onChange}
-                          className="space-y-2"
+                          className="grid grid-cols-3 gap-4"
                         >
                           <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
                             <RadioGroupItem value="entry" id="entry" />
@@ -375,7 +357,7 @@ export function DeviceForm({
                                 Giriş
                               </Label>
                               <p className="text-xs text-gray-500 mt-1">
-                                Sadece giriş kontrolü yapar
+                                Sadece giriş kontrolü
                               </p>
                             </div>
                           </div>
@@ -387,7 +369,7 @@ export function DeviceForm({
                                 Çıkış
                               </Label>
                               <p className="text-xs text-gray-500 mt-1">
-                                Sadece çıkış kontrolü yapar
+                                Sadece çıkış kontrolü
                               </p>
                             </div>
                           </div>
@@ -399,7 +381,7 @@ export function DeviceForm({
                                 Her İkisi
                               </Label>
                               <p className="text-xs text-gray-500 mt-1">
-                                Hem giriş hem çıkış kontrolü yapar
+                                Giriş ve çıkış kontrolü
                               </p>
                             </div>
                           </div>
@@ -411,14 +393,14 @@ export function DeviceForm({
                 />
               </div>
 
-              {/* Network Information */}
+              {/* Network Information - Two Column Grid */}
               <div className="space-y-4">
                 <div className="border-b pb-2">
                   <h3 className="text-lg font-medium">Ağ ve Donanım Bilgileri</h3>
                   <p className="text-sm text-gray-500 mt-1">İsteğe bağlı teknik bilgiler</p>
                 </div>
                 
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="device_mac"
@@ -451,7 +433,7 @@ export function DeviceForm({
                     control={form.control}
                     name="device_firmware"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="col-span-2">
                         <FormLabel>Firmware Versiyonu</FormLabel>
                         <FormControl>
                           <Input placeholder="v1.0.0" {...field} />
@@ -461,6 +443,30 @@ export function DeviceForm({
                     )}
                   />
                 </div>
+              </div>
+
+              {/* Description - Full Width */}
+              <div className="space-y-4">
+                <div className="border-b pb-2">
+                  <h3 className="text-lg font-medium">Açıklama</h3>
+                </div>
+                
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Cihaz hakkında açıklama yazın..." 
+                          rows={3}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             </div>
           </div>
