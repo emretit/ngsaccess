@@ -149,13 +149,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "card_readings_device_id_fkey"
-            columns: ["device_id"]
-            isOneToOne: false
-            referencedRelation: "devices_with_latest_readings"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "card_readings_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
@@ -255,26 +248,16 @@ export type Database = {
             | null
           created_at: string
           description: string | null
-          device_firmware: string | null
-          device_hardware: string | null
           device_ip: string | null
-          device_location: string | null
-          device_mac: string | null
-          device_model: string | null
-          device_model_enum:
-            | Database["public"]["Enums"]["device_model_enum"]
-            | null
           device_serial: string | null
+          device_type: Database["public"]["Enums"]["device_type_unified"] | null
           door_id: number | null
           id: number
           is_active: boolean | null
-          last_connection: string | null
           last_seen: string | null
-          last_sync: string | null
           name: string
           project_id: number | null
           status: string | null
-          type: Database["public"]["Enums"]["device_type_enum"]
           updated_at: string
           zone_id: number | null
         }
@@ -284,26 +267,18 @@ export type Database = {
             | null
           created_at?: string
           description?: string | null
-          device_firmware?: string | null
-          device_hardware?: string | null
           device_ip?: string | null
-          device_location?: string | null
-          device_mac?: string | null
-          device_model?: string | null
-          device_model_enum?:
-            | Database["public"]["Enums"]["device_model_enum"]
-            | null
           device_serial?: string | null
+          device_type?:
+            | Database["public"]["Enums"]["device_type_unified"]
+            | null
           door_id?: number | null
           id?: number
           is_active?: boolean | null
-          last_connection?: string | null
           last_seen?: string | null
-          last_sync?: string | null
           name: string
           project_id?: number | null
           status?: string | null
-          type?: Database["public"]["Enums"]["device_type_enum"]
           updated_at?: string
           zone_id?: number | null
         }
@@ -313,26 +288,18 @@ export type Database = {
             | null
           created_at?: string
           description?: string | null
-          device_firmware?: string | null
-          device_hardware?: string | null
           device_ip?: string | null
-          device_location?: string | null
-          device_mac?: string | null
-          device_model?: string | null
-          device_model_enum?:
-            | Database["public"]["Enums"]["device_model_enum"]
-            | null
           device_serial?: string | null
+          device_type?:
+            | Database["public"]["Enums"]["device_type_unified"]
+            | null
           door_id?: number | null
           id?: number
           is_active?: boolean | null
-          last_connection?: string | null
           last_seen?: string | null
-          last_sync?: string | null
           name?: string
           project_id?: number | null
           status?: string | null
-          type?: Database["public"]["Enums"]["device_type_enum"]
           updated_at?: string
           zone_id?: number | null
         }
@@ -711,13 +678,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "fk_group_devices_device_id"
-            columns: ["device_id"]
-            isOneToOne: false
-            referencedRelation: "devices_with_latest_readings"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "fk_group_devices_group_id"
             columns: ["group_id"]
             isOneToOne: false
@@ -736,13 +696,6 @@ export type Database = {
             columns: ["device_id"]
             isOneToOne: false
             referencedRelation: "devices"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "group_devices_device_id_fkey"
-            columns: ["device_id"]
-            isOneToOne: false
-            referencedRelation: "devices_with_latest_readings"
             referencedColumns: ["id"]
           },
           {
@@ -980,9 +933,6 @@ export type Database = {
           created_at: string | null
           date_added: string | null
           device_model: string | null
-          device_model_enum:
-            | Database["public"]["Enums"]["device_model_type"]
-            | null
           device_type: string | null
           expiry_date: string | null
           id: string
@@ -997,9 +947,6 @@ export type Database = {
           created_at?: string | null
           date_added?: string | null
           device_model?: string | null
-          device_model_enum?:
-            | Database["public"]["Enums"]["device_model_type"]
-            | null
           device_type?: string | null
           expiry_date?: string | null
           id?: string
@@ -1014,9 +961,6 @@ export type Database = {
           created_at?: string | null
           date_added?: string | null
           device_model?: string | null
-          device_model_enum?:
-            | Database["public"]["Enums"]["device_model_type"]
-            | null
           device_type?: string | null
           expiry_date?: string | null
           id?: string
@@ -1238,71 +1182,6 @@ export type Database = {
         }
         Relationships: []
       }
-      devices_with_latest_readings: {
-        Row: {
-          access_direction:
-            | Database["public"]["Enums"]["access_direction_enum"]
-            | null
-          actual_last_seen: string | null
-          created_at: string | null
-          description: string | null
-          device_firmware: string | null
-          device_hardware: string | null
-          device_location: string | null
-          device_mac: string | null
-          device_model: string | null
-          device_serial: string | null
-          door_id: number | null
-          id: number | null
-          is_active: boolean | null
-          last_connection: string | null
-          last_seen: string | null
-          last_sync: string | null
-          name: string | null
-          project_id: number | null
-          status: string | null
-          type: Database["public"]["Enums"]["device_type_enum"] | null
-          updated_at: string | null
-          zone_id: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "devices_door_id_fkey"
-            columns: ["door_id"]
-            isOneToOne: false
-            referencedRelation: "device_locations"
-            referencedColumns: ["door_id"]
-          },
-          {
-            foreignKeyName: "devices_door_id_fkey"
-            columns: ["door_id"]
-            isOneToOne: false
-            referencedRelation: "doors"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "devices_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "devices_zone_id_fkey"
-            columns: ["zone_id"]
-            isOneToOne: false
-            referencedRelation: "device_locations"
-            referencedColumns: ["zone_id"]
-          },
-          {
-            foreignKeyName: "devices_zone_id_fkey"
-            columns: ["zone_id"]
-            isOneToOne: false
-            referencedRelation: "zones"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       latest_device_readings: {
         Row: {
           device_serial: string | null
@@ -1372,23 +1251,12 @@ export type Database = {
     }
     Enums: {
       access_direction_enum: "entry" | "exit" | "both"
-      device_model_enum:
-        | "QR Reader"
-        | "Fingerprint Reader"
-        | "RFID Reader"
-        | "Access Control Terminal"
-        | "Other"
-      device_model_type:
-        | "QR Reader"
-        | "Fingerprint Reader"
-        | "RFID Reader"
-        | "Access Control Terminal"
-        | "Other"
-      device_type_enum:
-        | "fingerprint_reader"
+      device_type_unified:
         | "card_reader"
+        | "fingerprint_reader"
         | "face_recognition"
         | "qr_reader"
+        | "rfid_reader"
         | "access_terminal"
         | "turnstile"
         | "door_controller"
@@ -1510,25 +1378,12 @@ export const Constants = {
   public: {
     Enums: {
       access_direction_enum: ["entry", "exit", "both"],
-      device_model_enum: [
-        "QR Reader",
-        "Fingerprint Reader",
-        "RFID Reader",
-        "Access Control Terminal",
-        "Other",
-      ],
-      device_model_type: [
-        "QR Reader",
-        "Fingerprint Reader",
-        "RFID Reader",
-        "Access Control Terminal",
-        "Other",
-      ],
-      device_type_enum: [
-        "fingerprint_reader",
+      device_type_unified: [
         "card_reader",
+        "fingerprint_reader",
         "face_recognition",
         "qr_reader",
+        "rfid_reader",
         "access_terminal",
         "turnstile",
         "door_controller",
