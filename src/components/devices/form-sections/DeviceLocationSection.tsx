@@ -33,8 +33,20 @@ export function DeviceLocationSection({
             <Select 
               value={field.value?.toString() || ""} 
               onValueChange={(value) => {
-                field.onChange(value ? parseInt(value) : undefined);
-                form.setValue("door_id", undefined);
+                const newZoneId = value ? parseInt(value) : undefined;
+                field.onChange(newZoneId);
+                
+                // Sadece bölge gerçekten değiştiyse kapı seçimini sıfırla
+                if (newZoneId !== selectedZoneId) {
+                  const currentDoorId = form.getValues("door_id");
+                  // Mevcut kapı seçili bölgeye ait değilse sıfırla
+                  if (currentDoorId) {
+                    const doorBelongsToNewZone = filteredDoors.some(door => door.id === currentDoorId);
+                    if (!doorBelongsToNewZone) {
+                      form.setValue("door_id", undefined);
+                    }
+                  }
+                }
               }}
             >
               <FormControl>

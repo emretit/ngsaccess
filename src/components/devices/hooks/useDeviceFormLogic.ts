@@ -60,24 +60,32 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
   useEffect(() => {
     if (device && open) {
       console.log('Setting form data with device:', device);
-      form.reset({
+      
+      // Mevcut cihazın zone_id ve door_id değerlerini koruyarak form'u reset et
+      const resetData = {
         name: device.name || "",
         serial_number: device.serial_number || "",
         device_model_enum: device.device_model_enum || "Other",
-        zone_id: device.zone_id,
-        door_id: device.door_id,
+        zone_id: device.zone_id || undefined,
+        door_id: device.door_id || undefined,
         access_direction: (device.access_direction as AccessDirection) || "both",
         device_mac: device.device_mac || "",
         device_ip: device.device_ip || "",
         device_firmware: device.device_firmware || "",
         status: (device.status === "active" || device.status === "inactive") ? device.status : "active",
         description: device.description || "",
-      });
-    } else if (open) {
+      };
+      
+      console.log('Reset data:', resetData);
+      form.reset(resetData);
+    } else if (open && !device) {
+      // Yeni cihaz için form'u temizle
       form.reset({
         name: "",
         serial_number: "",
         device_model_enum: "Other",
+        zone_id: undefined,
+        door_id: undefined,
         access_direction: "both",
         status: "active",
         description: "",
