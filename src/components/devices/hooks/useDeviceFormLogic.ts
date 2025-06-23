@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -66,8 +65,8 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
         name: device.name || "",
         serial_number: device.serial_number || "",
         device_model_enum: device.device_model_enum || "Other",
-        zone_id: device.zone_id || undefined,
-        door_id: device.door_id || undefined,
+        zone_id: device.zone_id,
+        door_id: device.door_id,
         access_direction: (device.access_direction as AccessDirection) || "both",
         device_mac: device.device_mac || "",
         device_ip: device.device_ip || "",
