@@ -45,7 +45,7 @@ export function useDeviceDataLoader({ device, open, form }: UseDeviceDataLoaderP
         
         const formData: FormValues = {
           name: deviceData.name || "",
-          device_serial: deviceData.serial_number || deviceData.device_serial || "",
+          device_serial: deviceData.serial_number || "",
           device_type: (deviceData.device_type as any) || "Kart Okuyucu",
           zone_id: deviceData.zone_id || undefined,
           door_id: deviceData.door_id || undefined,

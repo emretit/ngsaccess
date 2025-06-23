@@ -11,7 +11,6 @@ import Register from '@/pages/Register';
 import Auth from '@/pages/Auth';
 import Employees from '@/pages/Employees';
 import Devices from '@/pages/Devices';
-import ServerDevices from '@/pages/ServerDevices';
 import VirtualReaders from '@/pages/VirtualReaders';
 import AccessControl from '@/pages/AccessControl';
 import PDKSRecords from '@/pages/PDKSRecords';
@@ -64,14 +63,6 @@ function App() {
                 element={
                   <Layout>
                     <Devices />
-                  </Layout>
-                } 
-              />
-              <Route 
-                path="/server-devices" 
-                element={
-                  <Layout>
-                    <ServerDevices />
                   </Layout>
                 } 
               />

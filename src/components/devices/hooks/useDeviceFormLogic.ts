@@ -1,9 +1,9 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ServerDevice } from "@/types/device";
+import { useAuthState } from "@/hooks/useAuthState";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
-import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
+import { ServerDevice } from "@/types/device";
 import { formSchema, FormValues } from "./useDeviceFormSchema";
 import { useDeviceDataLoader } from "./useDeviceDataLoader";
 import { useDeviceFormSubmission } from "./useDeviceFormSubmission";
@@ -15,27 +15,24 @@ interface UseDeviceFormLogicProps {
 }
 
 export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLogicProps) {
-  const { projectIds } = useProjectAccess();
-  const { zones, doors, loading: locationLoading } = useZonesAndDoors();
-  
-  const currentProjectId = projectIds[0] || null;
-  
+  const { user } = useAuthState();
+  const { currentProjectId, projectIds } = useProjectAccess();
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      serial_number: "",
-      device_model_enum: "Other",
+      device_serial: "",
+      device_type: "Kart Okuyucu",
+      zone_id: undefined,
+      door_id: undefined,
       access_direction: "both",
       status: "active",
       description: "",
     },
   });
 
-  const selectedZoneId = form.watch("zone_id");
-  const filteredDoors = doors.filter(door => door.zone_id === selectedZoneId);
-
-  // Load device data when form opens
+  // Load device data when dialog opens
   useDeviceDataLoader({ device, open, form });
 
   // Handle form submission
@@ -48,12 +45,9 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
 
   return {
     form,
-    isLoading,
-    zones,
-    doors,
-    locationLoading,
-    selectedZoneId,
-    filteredDoors,
     onSubmit,
+    isLoading,
+    user,
+    currentProjectId,
   };
 }
