@@ -36,15 +36,17 @@ export function DeviceLocationSection({
                 const newZoneId = value ? parseInt(value) : undefined;
                 field.onChange(newZoneId);
                 
-                // Sadece bölge gerçekten değiştiyse kapı seçimini sıfırla
-                if (newZoneId !== selectedZoneId) {
-                  const currentDoorId = form.getValues("door_id");
-                  // Mevcut kapı seçili bölgeye ait değilse sıfırla
-                  if (currentDoorId) {
-                    const doorBelongsToNewZone = filteredDoors.some(door => door.id === currentDoorId);
-                    if (!doorBelongsToNewZone) {
-                      form.setValue("door_id", undefined);
-                    }
+                // Kapı seçimini sıfırlama - sadece mevcut kapı yeni bölgeye ait değilse
+                const currentDoorId = form.getValues("door_id");
+                if (currentDoorId && newZoneId !== selectedZoneId) {
+                  // Mevcut kapının yeni bölgeye ait olup olmadığını kontrol et
+                  const doorBelongsToNewZone = filteredDoors.some(door => 
+                    door.id === currentDoorId && door.zone_id === newZoneId
+                  );
+                  
+                  // Eğer kapı yeni bölgeye ait değilse sıfırla
+                  if (!doorBelongsToNewZone) {
+                    form.setValue("door_id", undefined);
                   }
                 }
               }}
