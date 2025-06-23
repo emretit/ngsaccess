@@ -31,9 +31,12 @@ export function useDeviceTable(devices: Device[]) {
     console.log('Attempting to bulk delete devices:', selectedDevices);
     
     try {
-      // Önce tüm seçili cihazlara ait card_readings kayıtlarını sil
+      // Device ID'leri hem string hem integer formatında hazırla
       const deviceIds = selectedDevices.map(id => parseInt(id));
       
+      console.log('Device IDs to delete:', { original: selectedDevices, parsed: deviceIds });
+
+      // Önce tüm seçili cihazlara ait card_readings kayıtlarını sil
       const { error: cardReadingsError } = await supabase
         .from('card_readings')
         .delete()
@@ -44,26 +47,34 @@ export function useDeviceTable(devices: Device[]) {
         // Card readings silme hatası kritik değil, devam et
       }
 
-      // Şimdi cihazları sil
-      const { error: devicesError } = await supabase
+      // Şimdi cihazları sil - String ID'leri kullan
+      const { error: devicesError, data: deletedData } = await supabase
         .from('devices')
         .delete()
-        .in('id', deviceIds);
+        .in('id', selectedDevices) // String array kullan
+        .select(); // Silinen kayıtları görmek için select ekle
+
+      console.log('Bulk delete operation result:', { error: devicesError, data: deletedData });
 
       if (devicesError) {
         console.error('Bulk delete devices error:', devicesError);
         throw new Error(`Cihazlar silinirken hata oluştu: ${devicesError.message}`);
       }
 
-      console.log('Bulk delete successful');
+      // Eğer hiçbir kayıt silinmediyse
+      if (!deletedData || deletedData.length === 0) {
+        throw new Error('Seçilen cihazlar bulunamadı veya silinemedi');
+      }
+
+      console.log('Bulk delete successful:', deletedData);
 
       toast({
         title: "Başarılı",
-        description: `${selectedDevices.length} cihaz başarıyla silindi`,
+        description: `${deletedData.length} cihaz başarıyla silindi`,
       });
       
       // Refresh devices data
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
+      await queryClient.invalidateQueries({ queryKey: ['devices'] });
       
       setSelectedDevices([]);
       setShowDeleteDialog(false);

@@ -22,18 +22,26 @@ export function useDeviceActions() {
         // Card readings silme hatası kritik değil, devam et
       }
 
-      // Şimdi cihazı sil
-      const { error: deviceError } = await supabase
+      // Şimdi cihazı sil - ID'yi string olarak kullan
+      const { error: deviceError, data: deletedData } = await supabase
         .from('devices')
         .delete()
-        .eq('id', parseInt(deviceId));
+        .eq('id', deviceId)
+        .select(); // Silinen kayıtları görmek için select ekle
+
+      console.log('Delete operation result:', { error: deviceError, data: deletedData });
 
       if (deviceError) {
         console.error('Delete device error:', deviceError);
         throw new Error(`Cihaz silinirken hata oluştu: ${deviceError.message}`);
       }
 
-      console.log('Device deleted successfully');
+      // Eğer hiçbir kayıt silinmediyse
+      if (!deletedData || deletedData.length === 0) {
+        throw new Error('Cihaz bulunamadı veya silinemedi');
+      }
+
+      console.log('Device deleted successfully:', deletedData);
 
       toast({
         title: "Başarılı",
@@ -41,7 +49,7 @@ export function useDeviceActions() {
       });
       
       // Refresh devices data
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
+      await queryClient.invalidateQueries({ queryKey: ['devices'] });
       
     } catch (error: any) {
       console.error('Delete device error:', error);
