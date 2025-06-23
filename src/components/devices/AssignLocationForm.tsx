@@ -20,7 +20,7 @@ interface AssignLocationFormProps {
   onClose: () => void;
   onSubmit: (zoneId: number, doorId: number) => Promise<void>;
   deviceName: string;
-  device?: ServerDevice; // Making device optional to maintain backward compatibility
+  device?: ServerDevice;
 }
 
 export function AssignLocationForm({
@@ -37,30 +37,43 @@ export function AssignLocationForm({
   const [filteredDoors, setFilteredDoors] = useState<typeof doors>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Set initial values if device has zone_id or door_id
+  // Set initial values only when dialog opens and device changes
   useEffect(() => {
-    if (device) {
-      if (device.zone_id) {
-        setSelectedZoneId(device.zone_id.toString());
+    if (open && device) {
+      const zoneValue = device.zone_id ? device.zone_id.toString() : "";
+      const doorValue = device.door_id ? device.door_id.toString() : "";
+      
+      if (selectedZoneId !== zoneValue) {
+        setSelectedZoneId(zoneValue);
       }
-      if (device.door_id) {
-        setSelectedDoorId(device.door_id.toString());
+      if (selectedDoorId !== doorValue) {
+        setSelectedDoorId(doorValue);
       }
-    }
-  }, [device]);
-
-  // Filter doors when zone changes
-  useEffect(() => {
-    if (selectedZoneId) {
-      // Convert string to number for comparison
-      const zoneIdNumber = parseInt(selectedZoneId, 10);
-      setFilteredDoors(doors.filter(door => door.zone_id === zoneIdNumber));
-      setSelectedDoorId(""); // Reset door selection when zone changes
-    } else {
-      setFilteredDoors([]);
+    } else if (open && !device) {
+      // Reset form when opening for a new device
+      setSelectedZoneId("");
       setSelectedDoorId("");
     }
-  }, [selectedZoneId, doors]);
+  }, [open, device?.zone_id, device?.door_id]); // Only depend on open state and device IDs
+
+  // Filter doors when zone changes or doors data updates
+  useEffect(() => {
+    if (selectedZoneId && doors.length > 0) {
+      const zoneIdNumber = parseInt(selectedZoneId, 10);
+      const filtered = doors.filter(door => door.zone_id === zoneIdNumber);
+      setFilteredDoors(filtered);
+      
+      // Only reset door selection if current door is not in the filtered list
+      if (selectedDoorId && !filtered.some(door => door.id.toString() === selectedDoorId)) {
+        setSelectedDoorId("");
+      }
+    } else {
+      setFilteredDoors([]);
+      if (selectedDoorId) {
+        setSelectedDoorId("");
+      }
+    }
+  }, [selectedZoneId, doors]); // Removed selectedDoorId from dependencies to prevent loop
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +90,6 @@ export function AssignLocationForm({
     setIsSubmitting(true);
     
     try {
-      // Convert string IDs to numbers
       await onSubmit(parseInt(selectedZoneId, 10), parseInt(selectedDoorId, 10));
       toast({
         title: "Location assigned",
