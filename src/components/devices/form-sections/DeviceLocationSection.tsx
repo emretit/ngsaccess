@@ -22,14 +22,19 @@ export function DeviceLocationSection({
   filteredDoors 
 }: DeviceLocationSectionProps) {
   const userChangedZone = useRef(false);
-  const initialZoneId = useRef<number | undefined>(undefined);
+  const initialFormData = useRef<{ zone_id?: number; door_id?: number }>({});
 
-  // Form değerleri ilk yüklendiğinde initial zone'u kaydet
+  // Form değerleri ilk yüklendiğinde kaydet
   useEffect(() => {
     const currentZoneId = form.getValues("zone_id");
-    if (currentZoneId && initialZoneId.current === undefined) {
-      initialZoneId.current = currentZoneId;
-      console.log('Initial zone_id set to:', currentZoneId);
+    const currentDoorId = form.getValues("door_id");
+    
+    if (currentZoneId && !initialFormData.current.zone_id) {
+      initialFormData.current = {
+        zone_id: currentZoneId,
+        door_id: currentDoorId
+      };
+      console.log('Initial form data saved:', initialFormData.current);
     }
   }, [form]);
 
@@ -44,34 +49,37 @@ export function DeviceLocationSection({
           <FormItem>
             <FormLabel>Bölge</FormLabel>
             <Select 
-              value={field.value?.toString() || ""} 
+              value={field.value ? field.value.toString() : ""} 
               onValueChange={(value) => {
-                const newZoneId = value ? parseInt(value) : undefined;
-                console.log('Zone changing from', selectedZoneId, 'to', newZoneId);
+                if (!value) return;
+                
+                const newZoneId = parseInt(value);
+                console.log('Zone selection changed to:', newZoneId);
                 
                 // Kullanıcının manuel değişiklik yaptığını işaretle
                 userChangedZone.current = true;
                 
-                field.onChange(newZoneId);
-                
-                // Sadece kullanıcı manuel değişiklik yaptıysa ve bölge gerçekten değişmişse kapıyı kontrol et
-                if (userChangedZone.current && newZoneId !== selectedZoneId) {
-                  const currentDoorId = form.getValues("door_id");
-                  console.log('Current door_id:', currentDoorId);
+                // Sadece değer gerçekten değişmişse güncelle
+                if (newZoneId !== field.value) {
+                  field.onChange(newZoneId);
                   
-                  // Mevcut kapı yeni bölgeye ait değilse sıfırla
-                  if (currentDoorId) {
-                    const doorBelongsToNewZone = filteredDoors.some(door => door.id === currentDoorId);
-                    console.log('Door belongs to new zone:', doorBelongsToNewZone);
+                  // Eğer kullanıcı manuel değişiklik yaptıysa kapı kontrolü yap
+                  if (userChangedZone.current) {
+                    const currentDoorId = form.getValues("door_id");
                     
-                    if (!doorBelongsToNewZone) {
-                      console.log('Clearing door_id because it does not belong to new zone');
-                      form.setValue("door_id", undefined);
+                    if (currentDoorId) {
+                      const doorBelongsToNewZone = filteredDoors.some(door => door.id === currentDoorId);
+                      console.log('Checking if door belongs to new zone:', doorBelongsToNewZone);
+                      
+                      if (!doorBelongsToNewZone) {
+                        console.log('Clearing door_id because it does not belong to new zone');
+                        form.setValue("door_id", undefined);
+                      }
                     }
                   }
                 }
                 
-                // Flag'i reset et
+                // Reset flag
                 userChangedZone.current = false;
               }}
             >
@@ -100,7 +108,7 @@ export function DeviceLocationSection({
           <FormItem>
             <FormLabel>Kapı</FormLabel>
             <Select 
-              value={field.value?.toString() || ""} 
+              value={field.value ? field.value.toString() : ""} 
               onValueChange={(value) => {
                 console.log('Door changing to:', value);
                 field.onChange(value ? parseInt(value) : undefined);

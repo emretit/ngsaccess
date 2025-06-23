@@ -272,7 +272,6 @@ export type Database = {
           last_seen: string | null
           last_sync: string | null
           name: string
-          old_type: string | null
           project_id: number | null
           status: string | null
           type: Database["public"]["Enums"]["device_type_enum"]
@@ -302,7 +301,6 @@ export type Database = {
           last_seen?: string | null
           last_sync?: string | null
           name: string
-          old_type?: string | null
           project_id?: number | null
           status?: string | null
           type?: Database["public"]["Enums"]["device_type_enum"]
@@ -332,7 +330,6 @@ export type Database = {
           last_seen?: string | null
           last_sync?: string | null
           name?: string
-          old_type?: string | null
           project_id?: number | null
           status?: string | null
           type?: Database["public"]["Enums"]["device_type_enum"]
