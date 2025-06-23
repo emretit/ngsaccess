@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { ServerDevice, Project, AccessDirection } from "@/types/device";
@@ -28,6 +29,7 @@ const formSchema = z.object({
   device_ip: z.string().optional(),
   device_firmware: z.string().optional(),
   status: z.enum(["active", "inactive"]).default("active"),
+  description: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -62,6 +64,7 @@ export function DeviceForm({
       device_model_enum: "Other",
       access_direction: "both",
       status: "active",
+      description: "",
     },
   });
 
@@ -81,6 +84,7 @@ export function DeviceForm({
         device_ip: device.device_ip || "",
         device_firmware: device.device_firmware || "",
         status: (device.status === "active" || device.status === "inactive") ? device.status : "active",
+        description: device.description || "",
       });
     } else if (open) {
       form.reset({
@@ -89,6 +93,7 @@ export function DeviceForm({
         device_model_enum: "Other",
         access_direction: "both",
         status: "active",
+        description: "",
       });
     }
   }, [device, open, form]);
@@ -112,6 +117,7 @@ export function DeviceForm({
         device_ip: values.device_ip || null,
         device_firmware: values.device_firmware || null,
         status: values.status,
+        description: values.description || null,
       };
 
       if (device?.id) {
@@ -123,8 +129,8 @@ export function DeviceForm({
         if (error) throw error;
         
         toast({
-          title: "Cihaz güncellendi",
-          description: "Cihaz bilgileri başarıyla güncellendi",
+          title: "Başarılı",
+          description: "Cihaz bilgileri güncellendi",
         });
       } else {
         const { error } = await supabase
@@ -134,8 +140,8 @@ export function DeviceForm({
         if (error) throw error;
         
         toast({
-          title: "Cihaz eklendi",  
-          description: "Yeni cihaz başarıyla eklendi",
+          title: "Başarılı",
+          description: "Yeni cihaz eklendi",
         });
       }
 
@@ -157,16 +163,14 @@ export function DeviceForm({
     <div className="h-full flex flex-col">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 flex flex-col">
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-            {/* Cihaz Durumu */}
-            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-              <div>
-                <h3 className="font-medium">Cihaz Durumu</h3>
-                <p className="text-sm text-muted-foreground">
-                  Cihazın aktif durumunu belirleyin
-                </p>
-              </div>
-              <div className="flex items-center space-x-2">
+          <div className="flex-1 overflow-y-auto p-6 space-y-8">
+            {/* Device Status Section */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-900">Cihaz Durumu</h3>
+                  <p className="text-sm text-gray-500">Cihazın aktif durumunu belirleyin</p>
+                </div>
                 <FormField
                   control={form.control}
                   name="status"
@@ -180,7 +184,7 @@ export function DeviceForm({
                           }
                         />
                       </FormControl>
-                      <Label className="text-sm">
+                      <Label className="text-sm font-medium">
                         {field.value === "active" ? "Aktif" : "Pasif"}
                       </Label>
                     </FormItem>
@@ -189,185 +193,221 @@ export function DeviceForm({
               </div>
             </div>
 
-            {/* Temel Bilgiler */}
+            {/* Basic Information */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium border-b pb-2">Temel Bilgiler</h3>
+              <div className="border-b border-gray-200 pb-2">
+                <h3 className="text-lg font-medium text-gray-900">Temel Bilgiler</h3>
+              </div>
               
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cihaz Adı *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Cihaz adını giriniz" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="serial_number"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Seri Numarası *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Seri numarasını giriniz" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="device_model_enum"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cihaz Modeli *</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
+              <div className="grid grid-cols-1 gap-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium text-gray-700">Cihaz Adı *</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Cihaz modelini seçiniz" />
-                        </SelectTrigger>
+                        <Input 
+                          placeholder="Cihaz adını giriniz" 
+                          {...field} 
+                          className="mt-1"
+                        />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="QR Reader">QR Okuyucu</SelectItem>
-                        <SelectItem value="Fingerprint Reader">Parmak İzi Okuyucu</SelectItem>
-                        <SelectItem value="RFID Reader">RFID Kart Okuyucu</SelectItem>
-                        <SelectItem value="Access Control Terminal">Geçiş Kontrol Terminali</SelectItem>
-                        <SelectItem value="Other">Diğer</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="serial_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium text-gray-700">Seri Numarası *</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Seri numarasını giriniz" 
+                          {...field} 
+                          className="mt-1"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="device_model_enum"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium text-gray-700">Cihaz Modeli *</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder="Cihaz modelini seçiniz" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="QR Reader">QR Okuyucu</SelectItem>
+                          <SelectItem value="Fingerprint Reader">Parmak İzi Okuyucu</SelectItem>
+                          <SelectItem value="RFID Reader">RFID Kart Okuyucu</SelectItem>
+                          <SelectItem value="Access Control Terminal">Geçiş Kontrol Terminali</SelectItem>
+                          <SelectItem value="Other">Diğer</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium text-gray-700">Açıklama</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Cihaz hakkında açıklama yazın..." 
+                          className="mt-1"
+                          rows={3}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
-            {/* Konum Bilgileri */}
+            {/* Location Information */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium border-b pb-2">Konum Bilgileri</h3>
+              <div className="border-b border-gray-200 pb-2">
+                <h3 className="text-lg font-medium text-gray-900">Konum Bilgileri</h3>
+              </div>
               
-              <FormField
-                control={form.control}
-                name="zone_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Bölge</FormLabel>
-                    <Select 
-                      value={field.value?.toString() || ""} 
-                      onValueChange={(value) => {
-                        field.onChange(value ? parseInt(value) : undefined);
-                        // Bölge değiştiğinde kapı seçimini sıfırla
-                        form.setValue("door_id", undefined);
-                      }}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={locationLoading ? "Yükleniyor..." : "Bölge seçiniz"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {zones.map(zone => (
-                          <SelectItem key={zone.id} value={zone.id.toString()}>
-                            {zone.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-1 gap-4">
+                <FormField
+                  control={form.control}
+                  name="zone_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium text-gray-700">Bölge</FormLabel>
+                      <Select 
+                        value={field.value?.toString() || ""} 
+                        onValueChange={(value) => {
+                          field.onChange(value ? parseInt(value) : undefined);
+                          form.setValue("door_id", undefined);
+                        }}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder={locationLoading ? "Yükleniyor..." : "Bölge seçiniz"} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {zones.map(zone => (
+                            <SelectItem key={zone.id} value={zone.id.toString()}>
+                              {zone.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="door_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Kapı</FormLabel>
-                    <Select 
-                      value={field.value?.toString() || ""} 
-                      onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
-                      disabled={!selectedZoneId || locationLoading}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue 
-                            placeholder={
-                              !selectedZoneId 
-                                ? "Önce bölge seçiniz" 
-                                : filteredDoors.length === 0 
-                                  ? "Seçili bölgede kapı yok" 
-                                  : "Kapı seçiniz"
-                            } 
-                          />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {filteredDoors.map(door => (
-                          <SelectItem key={door.id} value={door.id.toString()}>
-                            {door.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="door_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium text-gray-700">Kapı</FormLabel>
+                      <Select 
+                        value={field.value?.toString() || ""} 
+                        onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
+                        disabled={!selectedZoneId || locationLoading}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue 
+                              placeholder={
+                                !selectedZoneId 
+                                  ? "Önce bölge seçiniz" 
+                                  : filteredDoors.length === 0 
+                                    ? "Seçili bölgede kapı yok" 
+                                    : "Kapı seçiniz"
+                              } 
+                            />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {filteredDoors.map(door => (
+                            <SelectItem key={door.id} value={door.id.toString()}>
+                              {door.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
-            {/* Erişim Yönü */}
+            {/* Access Control */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium border-b pb-2">Erişim Kontrolü</h3>
+              <div className="border-b border-gray-200 pb-2">
+                <h3 className="text-lg font-medium text-gray-900">Erişim Kontrolü</h3>
+              </div>
               
               <FormField
                 control={form.control}
                 name="access_direction"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Erişim Yönü</FormLabel>
+                    <FormLabel className="text-sm font-medium text-gray-700">Erişim Yönü</FormLabel>
                     <FormControl>
                       <RadioGroup
                         value={field.value}
                         onValueChange={field.onChange}
-                        className="space-y-3"
+                        className="mt-2 space-y-2"
                       >
-                        <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
                           <RadioGroupItem value="entry" id="entry" />
                           <div className="flex-1">
-                            <Label htmlFor="entry" className="font-medium cursor-pointer">
+                            <Label htmlFor="entry" className="font-medium cursor-pointer text-sm">
                               Giriş
                             </Label>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-xs text-gray-500 mt-1">
                               Sadece giriş kontrolü yapar
                             </p>
                           </div>
                         </div>
                         
-                        <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
                           <RadioGroupItem value="exit" id="exit" />
                           <div className="flex-1">
-                            <Label htmlFor="exit" className="font-medium cursor-pointer">
+                            <Label htmlFor="exit" className="font-medium cursor-pointer text-sm">
                               Çıkış
                             </Label>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-xs text-gray-500 mt-1">
                               Sadece çıkış kontrolü yapar
                             </p>
                           </div>
                         </div>
                         
-                        <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
                           <RadioGroupItem value="both" id="both" />
                           <div className="flex-1">
-                            <Label htmlFor="both" className="font-medium cursor-pointer">
+                            <Label htmlFor="both" className="font-medium cursor-pointer text-sm">
                               Her İkisi
                             </Label>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-xs text-gray-500 mt-1">
                               Hem giriş hem çıkış kontrolü yapar
                             </p>
                           </div>
@@ -380,22 +420,26 @@ export function DeviceForm({
               />
             </div>
 
-            {/* Ağ ve Donanım Bilgileri */}
+            {/* Network Information */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium border-b pb-2">Ağ ve Donanım Bilgileri</h3>
-              <p className="text-sm text-muted-foreground">
-                Cihazın ağ ve donanım bilgilerini giriniz (isteğe bağlı)
-              </p>
+              <div className="border-b border-gray-200 pb-2">
+                <h3 className="text-lg font-medium text-gray-900">Ağ ve Donanım Bilgileri</h3>
+                <p className="text-sm text-gray-500 mt-1">İsteğe bağlı teknik bilgiler</p>
+              </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <FormField
                   control={form.control}
                   name="device_mac"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>MAC Adresi</FormLabel>
+                      <FormLabel className="text-sm font-medium text-gray-700">MAC Adresi</FormLabel>
                       <FormControl>
-                        <Input placeholder="00:00:00:00:00:00" {...field} />
+                        <Input 
+                          placeholder="00:00:00:00:00:00" 
+                          {...field} 
+                          className="mt-1"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -407,39 +451,57 @@ export function DeviceForm({
                   name="device_ip"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>IP Adresi</FormLabel>
+                      <FormLabel className="text-sm font-medium text-gray-700">IP Adresi</FormLabel>
                       <FormControl>
-                        <Input placeholder="192.168.1.100" {...field} />
+                        <Input 
+                          placeholder="192.168.1.100" 
+                          {...field} 
+                          className="mt-1"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="device_firmware"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-medium text-gray-700">Firmware Versiyonu</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="v1.0.0" 
+                          {...field} 
+                          className="mt-1"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-
-              <FormField
-                control={form.control}
-                name="device_firmware"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Firmware Versiyonu</FormLabel>
-                    <FormControl>
-                      <Input placeholder="v1.0.0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
           </div>
 
-          {/* Form Actions */}
-          <div className="border-t bg-background p-6">
+          {/* Fixed Footer */}
+          <div className="border-t bg-white p-6">
             <div className="flex justify-end space-x-3">
-              <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={onClose} 
+                disabled={isLoading}
+                className="px-6"
+              >
                 İptal
               </Button>
-              <Button type="submit" disabled={isLoading} className="bg-burgundy hover:bg-burgundy/90">
+              <Button 
+                type="submit" 
+                disabled={isLoading} 
+                className="bg-burgundy hover:bg-burgundy/90 px-6"
+              >
                 {isLoading ? "Kaydediliyor..." : device ? "Güncelle" : "Kaydet"}
               </Button>
             </div>
