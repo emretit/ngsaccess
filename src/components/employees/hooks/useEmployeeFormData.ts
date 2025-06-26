@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Employee } from '@/types/employee';
@@ -18,7 +17,6 @@ export interface EmployeeFormData {
   photo_url: string | null;
   notes: string;
   is_active: boolean;
-  access_permission: boolean;
 }
 
 export const useEmployeeFormData = (employee?: Employee | null) => {
@@ -37,7 +35,6 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
     photo_url: null,
     notes: '',
     is_active: true,
-    access_permission: true,
   });
 
   const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
@@ -65,7 +62,6 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
         photo_url: employee.photo_url || null,
         notes: employee.notes || '',
         is_active: employee.is_active ?? true,
-        access_permission: employee.access_permission ?? true,
       });
       setPhotoPreview(employee.photo_url || null);
     } else {
@@ -85,7 +81,6 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
         photo_url: null,
         notes: '',
         is_active: true,
-        access_permission: true,
       });
       setPhotoPreview(null);
     }
