@@ -57,6 +57,7 @@ export default function EmployeeDetails({ employee, onEdit }: EmployeeDetailProp
           <DetailItem label="Departman" value={employee.departments?.name || '-'} />
           <DetailItem label="Pozisyon" value={employee.positions?.name || '-'} />
           <DetailItem label="Vardiya" value={employee.shift || '-'} />
+          <DetailItem label="Erişim Kuralı" value={employee.access_rule || '-'} />
         </div>
       </div>
 
