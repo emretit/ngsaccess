@@ -1,4 +1,3 @@
-
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,6 +5,8 @@ import { EmployeePagination } from "@/components/employees/EmployeePagination";
 import { useProjectFilteredCardReadings } from "@/hooks/useProjectFilteredCardReadings";
 import { CardReadingsFilters } from "./CardReadingsFilters";
 import { CardReadingsTable } from "./CardReadingsTable";
+import { useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const CardReadings = () => {
   const { 
@@ -26,6 +27,41 @@ const CardReadings = () => {
     pageSize,
     hasProjectAccess
   } = useProjectFilteredCardReadings(100);
+
+  // Real-time updates for card_readings table
+  useEffect(() => {
+    const channel = supabase
+      .channel('card-readings-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'card_readings'
+        },
+        (payload) => {
+          console.log('New card reading inserted:', payload);
+          handleRefresh();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'card_readings'
+        },
+        (payload) => {
+          console.log('Card reading updated:', payload);
+          handleRefresh();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [handleRefresh]);
 
   if (!hasProjectAccess) {
     return (
