@@ -127,7 +127,6 @@ export const useEmployeeFormSubmit = (
         photo_url: formData.photo_url || null,
         notes: formData.notes?.trim() || null,
         is_active: formData.is_active ?? true,
-        access_permission: formData.access_permission ?? true,
       };
 
       console.log('Submit data prepared:', submitData);
