@@ -1,5 +1,4 @@
 
-
 export interface Employee {
     id: number;
     first_name: string;
@@ -7,7 +6,6 @@ export interface Employee {
     email: string;
     tc_no: string;
     card_number: string;
-    access_permission: boolean;
     photo_url: string | null;
     shift: string | null;
     company_id: number | null;
@@ -29,4 +27,3 @@ export interface Employee {
         name: string;
     } | null;
 }
-

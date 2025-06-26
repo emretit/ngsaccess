@@ -188,24 +188,13 @@ export default function EmployeeFormFields({
           />
         </div>
 
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="is_active"
-              checked={formData.is_active}
-              onCheckedChange={(checked) => handleInputChange('is_active', checked)}
-            />
-            <Label htmlFor="is_active">Aktif</Label>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="access_permission"
-              checked={formData.access_permission}
-              onCheckedChange={(checked) => handleInputChange('access_permission', checked)}
-            />
-            <Label htmlFor="access_permission">Erişim İzni</Label>
-          </div>
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="is_active"
+            checked={formData.is_active}
+            onCheckedChange={(checked) => handleInputChange('is_active', checked)}
+          />
+          <Label htmlFor="is_active">Aktif</Label>
         </div>
       </div>
     </div>

@@ -50,11 +50,6 @@ export default function EmployeeDetails({ employee, onEdit }: EmployeeDetailProp
           <h4 className="text-sm font-medium">Kişisel Bilgiler</h4>
           <DetailItem label="TC No" value={employee.tc_no} />
           <DetailItem label="Kart No" value={employee.card_number} />
-          <DetailItem 
-            label="Erişim İzni" 
-            value={employee.access_permission ? 'Var' : 'Yok'} 
-            valueClass={employee.access_permission ? 'text-green-600' : 'text-red-600'} 
-          />
         </div>
 
         <div className="space-y-3">
