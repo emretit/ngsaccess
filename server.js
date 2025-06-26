@@ -1,3 +1,4 @@
+
 import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
@@ -67,7 +68,7 @@ app.post('/api/card-reader', async (req, res) => {
         console.log('Çalışan kontrolü yapılıyor:', user_id);
         const { data: employee, error: empErr } = await serviceClient
             .from('employees')
-            .select('id, first_name, last_name, access_permission')
+            .select('id, first_name, last_name, is_active')
             .eq('card_number', user_id)
             .single();
 
@@ -81,8 +82,8 @@ app.post('/api/card-reader', async (req, res) => {
             return res.json({ response: 'close_relay' });
         }
 
-        if (!employee.access_permission) {
-            console.log('Çalışanın erişim izni yok:', user_id);
+        if (!employee.is_active) {
+            console.log('Çalışan aktif değil:', user_id);
             return res.json({ response: 'close_relay' });
         }
 
@@ -92,8 +93,8 @@ app.post('/api/card-reader', async (req, res) => {
         console.log('Cihaz bilgisi alınıyor:', serial);
         const { data: device, error: deviceErr } = await serviceClient
             .from('devices')
-            .select('name')
-            .eq('serial_number', serial)
+            .select('id, name, device_serial')
+            .eq('device_serial', serial)
             .single();
 
         if (deviceErr) {
@@ -108,16 +109,33 @@ app.post('/api/card-reader', async (req, res) => {
 
         console.log('Cihaz bulundu:', device);
 
+        // Erişim kontrolü fonksiyonunu çağır
+        console.log('Erişim kontrolü yapılıyor...');
+        const { data: accessResult, error: accessErr } = await serviceClient
+            .rpc('check_employee_device_access', {
+                p_employee_id: employee.id,
+                p_device_id: device.id,
+                p_access_time: new Date().toISOString()
+            });
+
+        if (accessErr) {
+            console.error('Erişim kontrolü hatası:', accessErr);
+            return res.json({ response: 'close_relay' });
+        }
+
+        const hasAccess = accessResult === true;
+        console.log('Erişim kontrolü sonucu:', hasAccess);
+
         // Kart geçiş kaydını oluştur
         const { error: logError } = await serviceClient
             .from('card_readings')
             .insert({
                 employee_id: employee.id,
                 card_no: user_id,
-                device_serial: serial,
-                status: 'success',
+                device_id: device.id,
+                access_time: new Date().toISOString(),
                 employee_name: `${employee.first_name} ${employee.last_name}`,
-                device_name: device.name
+                raw_data: JSON.stringify(body)
             });
 
         if (logError) {
@@ -126,7 +144,14 @@ app.post('/api/card-reader', async (req, res) => {
             console.log('Kart okuma kaydı başarıyla oluşturuldu');
         }
 
-        return res.json({ response: 'open_relay' });
+        // Erişim sonucuna göre relay kontrol
+        if (hasAccess) {
+            console.log('Erişim izni verildi');
+            return res.json({ response: 'open_relay' });
+        } else {
+            console.log('Erişim reddedildi');
+            return res.json({ response: 'close_relay' });
+        }
 
     } catch (error) {
         console.error('Sistem hatası:', error);
@@ -152,4 +177,4 @@ app.post('/api/confirm-relay', (req, res) => {
 // Sunucuyu başlat
 app.listen(PORT, () => {
     console.log(`Sunucu ${PORT} portunda çalışıyor`);
-}); 
+});
