@@ -1,3 +1,4 @@
+
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,7 @@ const CardReadings = () => {
   // Real-time updates for card_readings table
   useEffect(() => {
     const channel = supabase
-      .channel('card-readings-updates')
+      .channel('card-readings-realtime')
       .on(
         'postgres_changes',
         {
