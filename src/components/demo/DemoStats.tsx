@@ -1,0 +1,62 @@
+
+import { Card, CardContent } from "@/components/ui/card";
+
+const stats = [
+  {
+    number: "500+",
+    label: "Aktif Müşteri",
+    description: "Türkiye genelinde"
+  },
+  {
+    number: "50K+",
+    label: "Kayıtlı Personel",
+    description: "Sistemde tanımlı"
+  },
+  {
+    number: "99.9%",
+    label: "Uptime Oranı",
+    description: "Kesintisiz hizmet"
+  },
+  {
+    number: "24/7",
+    label: "Teknik Destek",
+    description: "Her zaman yanınızda"
+  }
+];
+
+const DemoStats = () => {
+  return (
+    <div className="py-16 px-4 bg-white">
+      <div className="max-w-6xl mx-auto">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+            Rakamlarla PDKS Sistemi
+          </h2>
+          <p className="text-lg text-gray-600">
+            Binlerce işletmenin tercihi, güvenilir çözüm
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          {stats.map((stat, index) => (
+            <Card key={index} className="border-0 shadow-lg text-center">
+              <CardContent className="p-6">
+                <div className="text-4xl font-bold text-[#711A1A] mb-2">
+                  {stat.number}
+                </div>
+                <div className="text-xl font-semibold text-gray-900 mb-1">
+                  {stat.label}
+                </div>
+                <div className="text-sm text-gray-600">
+                  {stat.description}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default DemoStats;
