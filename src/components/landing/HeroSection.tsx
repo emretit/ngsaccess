@@ -19,7 +19,7 @@ const HeroSection = () => {
             </p>
             <div className="mt-10 flex flex-col sm:flex-row gap-4">
               <Button size="lg" className="text-lg" asChild>
-                <Link to="/register">
+                <Link to="/demo-request">
                   Demo İsteyin <ChevronRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
