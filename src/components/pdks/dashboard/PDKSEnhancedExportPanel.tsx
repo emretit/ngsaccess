@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Download, Mail, Calendar, FileText, FileSpreadsheet, FilePdf } from "lucide-react";
+import { Download, Mail, Calendar, FileText, FileSpreadsheet, FileType } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -72,7 +72,7 @@ export function PDKSEnhancedExportPanel() {
                 Excel (.xlsx)
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleExport("PDF")}>
-                <FilePdf className="mr-2 h-4 w-4 text-red-600" />
+                <FileType className="mr-2 h-4 w-4 text-red-600" />
                 PDF Raporu
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleExport("CSV")}>

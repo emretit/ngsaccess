@@ -17,23 +17,16 @@ export function useAiChat() {
   const { formatReportData, handleExportExcel, handleExportPDF } = useExportUtils();
   const { messages, input, setInput, isLoading, handleSendMessage: originalSendMessage } = useMessageHandler();
 
-  // Özel mesaj gönderme fonksiyonu, opsiyonel olarak özelleştirilmiş içerikle
-  const handleSendMessage = (e: React.FormEvent, customContent?: string) => {
+  // Enhanced message sending function with custom content support
+  const handleSendMessage = async (e: React.FormEvent, customContent?: string) => {
+    e.preventDefault();
+    
     if (customContent) {
-      // Eğer özelleştirilmiş bir içerik varsa, o içerikle gönder
-      const originalInput = input;
-      setInput(customContent);
-      
-      e.preventDefault();  // Formun normal davranışını engelle
-      
-      // Bir sonraki tick'te mesajı gönder ve sonra input'u eski haline getir
-      setTimeout(() => {
-        originalSendMessage(new Event('submit') as any);
-        setInput(originalInput);
-      }, 0);
+      // Use custom content for sending
+      await originalSendMessage(customContent);
     } else {
-      // Normal mesaj gönderme işlemini yap
-      originalSendMessage(e);
+      // Use current input value
+      await originalSendMessage(input);
     }
   };
 
