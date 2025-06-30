@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Download } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Search, Filter } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +45,8 @@ interface PDKSTableViewProps {
 
 export function PDKSTableView({ records, loading = false }: PDKSTableViewProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const toggleRowExpansion = (id: string) => {
     const newExpanded = new Set(expandedRows);
@@ -57,27 +60,34 @@ export function PDKSTableView({ records, loading = false }: PDKSTableViewProps) 
 
   const getStatusBadge = (status: string) => {
     const variants = {
-      present: { variant: "default" as const, label: "Mevcut", color: "bg-green-100 text-green-800" },
-      late: { variant: "secondary" as const, label: "Geç", color: "bg-yellow-100 text-yellow-800" },
-      absent: { variant: "destructive" as const, label: "Yok", color: "bg-red-100 text-red-800" },
-      leave: { variant: "outline" as const, label: "İzinli", color: "bg-blue-100 text-blue-800" }
+      present: { label: "Mevcut", className: "bg-green-100 text-green-800 border-green-200" },
+      late: { label: "Geç", className: "bg-yellow-100 text-yellow-800 border-yellow-200" },
+      absent: { label: "Yok", className: "bg-red-100 text-red-800 border-red-200" },
+      leave: { label: "İzinli", className: "bg-blue-100 text-blue-800 border-blue-200" }
     };
     
     const config = variants[status as keyof typeof variants] || variants.present;
     return (
-      <Badge className={config.color}>
+      <Badge className={`${config.className} border font-medium`}>
         {config.label}
       </Badge>
     );
   };
 
+  const filteredRecords = records.filter(record => {
+    const matchesSearch = record.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         record.employeeId.includes(searchTerm);
+    const matchesStatus = statusFilter === "all" || record.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   if (loading) {
     return (
-      <Card>
-        <CardContent className="p-8">
-          <div className="flex justify-center items-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#711A1A]"></div>
-            <span className="ml-2">Yükleniyor...</span>
+      <Card className="shadow-lg border-0">
+        <CardContent className="p-12">
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#711A1A]"></div>
+            <p className="text-gray-500 font-medium">Veriler yükleniyor...</p>
           </div>
         </CardContent>
       </Card>
@@ -85,79 +95,148 @@ export function PDKSTableView({ records, loading = false }: PDKSTableViewProps) 
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex justify-between items-center">
-          <CardTitle>Çalışan Kayıtları</CardTitle>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Download className="mr-2 h-4 w-4" />
-                İndir
-                <ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem>Excel (.xlsx)</DropdownMenuItem>
-              <DropdownMenuItem>PDF</DropdownMenuItem>
-              <DropdownMenuItem>CSV</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+    <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+      <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200 rounded-t-lg">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            📊 Çalışan Kayıtları
+            <span className="text-sm font-normal text-gray-500">
+              ({filteredRecords.length} kayıt)
+            </span>
+          </CardTitle>
+          
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Çalışan ara..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 w-48"
+              />
+            </div>
+            
+            {/* Status Filter */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="border-gray-300">
+                  <Filter className="mr-2 h-4 w-4" />
+                  Durum Filtresi
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => setStatusFilter("all")}>
+                  Tümü
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStatusFilter("present")}>
+                  Mevcut
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStatusFilter("late")}>
+                  Geç
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStatusFilter("absent")}>
+                  Yok
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setStatusFilter("leave")}>
+                  İzinli
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* Download */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="bg-[#711A1A] hover:bg-[#711A1A]/90 text-white">
+                  <Download className="mr-2 h-4 w-4" />
+                  İndir
+                  <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem>📊 Excel (.xlsx)</DropdownMenuItem>
+                <DropdownMenuItem>📄 PDF</DropdownMenuItem>
+                <DropdownMenuItem>📝 CSV</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </CardHeader>
-      <CardContent>
+      
+      <CardContent className="p-0">
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]"></TableHead>
-                <TableHead>Çalışan Adı</TableHead>
-                <TableHead>ID</TableHead>
-                <TableHead>Departman</TableHead>
-                <TableHead>İlk Giriş</TableHead>
-                <TableHead>Son Çıkış</TableHead>
-                <TableHead>Toplam Saat</TableHead>
-                <TableHead>Mesai</TableHead>
-                <TableHead>İzin Türü</TableHead>
-                <TableHead>Durum</TableHead>
+            <TableHeader className="bg-gray-50/80">
+              <TableRow className="border-gray-200">
+                <TableHead className="w-[50px] font-semibold text-gray-700"></TableHead>
+                <TableHead className="font-semibold text-gray-700">Çalışan</TableHead>
+                <TableHead className="font-semibold text-gray-700">ID</TableHead>
+                <TableHead className="font-semibold text-gray-700">Departman</TableHead>
+                <TableHead className="font-semibold text-gray-700">İlk Giriş</TableHead>
+                <TableHead className="font-semibold text-gray-700">Son Çıkış</TableHead>
+                <TableHead className="font-semibold text-gray-700">Toplam</TableHead>
+                <TableHead className="font-semibold text-gray-700">Mesai</TableHead>
+                <TableHead className="font-semibold text-gray-700">İzin</TableHead>
+                <TableHead className="font-semibold text-gray-700">Durum</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {records.map((record) => (
+              {filteredRecords.map((record, index) => (
                 <>
                   <TableRow 
                     key={record.id} 
-                    className="hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
+                    className={`
+                      hover:bg-blue-50/50 transition-colors cursor-pointer border-b border-gray-100
+                      ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}
+                    `}
                     onClick={() => toggleRowExpansion(record.id)}
                   >
-                    <TableCell>
+                    <TableCell className="text-center">
                       {expandedRows.has(record.id) ? (
-                        <ChevronDown className="h-4 w-4" />
+                        <ChevronDown className="h-4 w-4 text-[#711A1A]" />
                       ) : (
-                        <ChevronRight className="h-4 w-4" />
+                        <ChevronRight className="h-4 w-4 text-gray-400" />
                       )}
                     </TableCell>
-                    <TableCell className="font-medium">{record.name}</TableCell>
-                    <TableCell>{record.employeeId}</TableCell>
-                    <TableCell>{record.department}</TableCell>
-                    <TableCell>{record.firstEntry}</TableCell>
-                    <TableCell>{record.lastExit}</TableCell>
-                    <TableCell>{record.totalHours}</TableCell>
-                    <TableCell>{record.overtime}</TableCell>
+                    <TableCell className="font-medium text-gray-900">{record.name}</TableCell>
+                    <TableCell className="text-gray-600">{record.employeeId}</TableCell>
+                    <TableCell>
+                      <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                        {record.department}
+                      </span>
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">{record.firstEntry}</TableCell>
+                    <TableCell className="font-mono text-sm">{record.lastExit}</TableCell>
+                    <TableCell className="font-semibold text-green-700">{record.totalHours}</TableCell>
+                    <TableCell className="font-semibold text-purple-700">{record.overtime}</TableCell>
                     <TableCell>{record.leaveType}</TableCell>
                     <TableCell>{getStatusBadge(record.status)}</TableCell>
                   </TableRow>
+                  
                   {expandedRows.has(record.id) && record.detailedLogs && (
                     <TableRow>
-                      <TableCell colSpan={10} className="bg-gray-50 dark:bg-gray-800/30">
-                        <div className="p-4">
-                          <h4 className="font-semibold mb-3 text-sm">Günlük Detaylı Kayıtlar</h4>
-                          <div className="space-y-2">
-                            {record.detailedLogs.map((log, index) => (
-                              <div key={index} className="flex justify-between items-center text-sm py-1 px-2 bg-white dark:bg-gray-700 rounded">
-                                <span className="font-medium">{log.time}</span>
-                                <span>{log.action}</span>
-                                <span className="text-gray-500">{log.location}</span>
+                      <TableCell colSpan={10} className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-[#711A1A]">
+                        <div className="p-6">
+                          <h4 className="font-bold mb-4 text-gray-800 flex items-center gap-2">
+                            🕐 Günlük Detaylı Kayıtlar - {record.name}
+                          </h4>
+                          <div className="grid gap-3">
+                            {record.detailedLogs.map((log, logIndex) => (
+                              <div 
+                                key={logIndex} 
+                                className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
+                              >
+                                <span className="font-bold text-[#711A1A] text-lg">{log.time}</span>
+                                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                  log.action === 'Giriş' 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {log.action}
+                                </span>
+                                <span className="text-gray-600 bg-gray-100 px-3 py-1 rounded-full text-sm">
+                                  📍 {log.location}
+                                </span>
                               </div>
                             ))}
                           </div>

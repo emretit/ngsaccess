@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { CalendarIcon, Filter, Download } from "lucide-react";
+import { CalendarIcon, Filter, Download, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -55,95 +55,149 @@ export function PDKSFilterBar({ onFiltersChange }: PDKSFilterBarProps) {
   };
 
   return (
-    <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-4 space-y-4">
-      <div className="flex flex-wrap items-center gap-4">
-        {/* Date Range Picker */}
-        <div className="flex items-center space-x-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "w-[280px] justify-start text-left font-normal",
-                  !dateRange.from && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateRange.from ? (
-                  dateRange.to ? (
-                    <>
-                      {format(dateRange.from, "dd MMM yyyy", { locale: tr })} -{" "}
-                      {format(dateRange.to, "dd MMM yyyy", { locale: tr })}
-                    </>
+    <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-4 lg:p-6">
+      <div className="flex flex-col gap-4">
+        {/* Filter Title */}
+        <div className="flex items-center gap-2 mb-2">
+          <Filter className="h-5 w-5 text-[#711A1A]" />
+          <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+            Filtreler ve Arama
+          </h3>
+        </div>
+        
+        {/* Filter Controls */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Date Range Picker */}
+          <div className="lg:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Tarih Aralığı
+            </label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal h-10",
+                    !dateRange.from && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateRange.from ? (
+                    dateRange.to ? (
+                      <>
+                        {format(dateRange.from, "dd MMM yyyy", { locale: tr })} -{" "}
+                        {format(dateRange.to, "dd MMM yyyy", { locale: tr })}
+                      </>
+                    ) : (
+                      format(dateRange.from, "dd MMM yyyy", { locale: tr })
+                    )
                   ) : (
-                    format(dateRange.from, "dd MMM yyyy", { locale: tr })
-                  )
-                ) : (
-                  <span>Tarih aralığı seçin</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                initialFocus
-                mode="range"
-                defaultMonth={dateRange.from}
-                selected={dateRange}
-                onSelect={handleDateRangeChange}
-                numberOfMonths={2}
-                className="pointer-events-auto"
+                    <span>Tarih aralığı seçin</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={dateRange.from}
+                  selected={dateRange}
+                  onSelect={handleDateRangeChange}
+                  numberOfMonths={2}
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Department Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Departman
+            </label>
+            <Select value={department} onValueChange={setDepartment}>
+              <SelectTrigger className="h-10">
+                <SelectValue placeholder="Departman seçin" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tüm Departmanlar</SelectItem>
+                <SelectItem value="IT">Bilgi İşlem</SelectItem>
+                <SelectItem value="HR">İnsan Kaynakları</SelectItem>
+                <SelectItem value="Finance">Finans</SelectItem>
+                <SelectItem value="Operations">Operasyon</SelectItem>
+                <SelectItem value="Sales">Satış</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Person Search */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Personel Arama
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Ad, soyad ara..."
+                value={person}
+                onChange={(e) => setPerson(e.target.value)}
+                className="pl-10 h-10"
               />
-            </PopoverContent>
-          </Popover>
+            </div>
+          </div>
+
+          {/* Report Type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Rapor Türü
+            </label>
+            <Select value={reportType} onValueChange={setReportType}>
+              <SelectTrigger className="h-10">
+                <SelectValue placeholder="Rapor türü" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="daily">📅 Günlük</SelectItem>
+                <SelectItem value="monthly">📊 Aylık</SelectItem>
+                <SelectItem value="overtime">⏰ Mesai</SelectItem>
+                <SelectItem value="leave">🏖️ İzin</SelectItem>
+                <SelectItem value="entry-exit">🚪 Giriş/Çıkış</SelectItem>
+                <SelectItem value="late">⏱️ Geç Kalma</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        {/* Department Filter */}
-        <Select value={department} onValueChange={setDepartment}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Departman" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tüm Departmanlar</SelectItem>
-            <SelectItem value="IT">IT</SelectItem>
-            <SelectItem value="HR">İnsan Kaynakları</SelectItem>
-            <SelectItem value="Finance">Finans</SelectItem>
-            <SelectItem value="Operations">Operasyon</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* Person Search */}
-        <Input
-          placeholder="Personel ara..."
-          value={person}
-          onChange={(e) => setPerson(e.target.value)}
-          className="w-[200px]"
-        />
-
-        {/* Report Type */}
-        <Select value={reportType} onValueChange={setReportType}>
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="Rapor Tipi" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="daily">Günlük</SelectItem>
-            <SelectItem value="monthly">Aylık</SelectItem>
-            <SelectItem value="overtime">Mesai</SelectItem>
-            <SelectItem value="leave">İzin</SelectItem>
-            <SelectItem value="entry-exit">Giriş/Çıkış</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {/* Apply Filter Button */}
-        <Button onClick={handleApplyFilters} className="bg-[#711A1A] hover:bg-[#711A1A]/90">
-          <Filter className="mr-2 h-4 w-4" />
-          Filtrele
-        </Button>
-
-        {/* Export Button */}
-        <Button variant="outline">
-          <Download className="mr-2 h-4 w-4" />
-          Dışa Aktar
-        </Button>
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          <Button 
+            onClick={handleApplyFilters} 
+            className="bg-[#711A1A] hover:bg-[#711A1A]/90 text-white shadow-md hover:shadow-lg transition-all duration-200"
+          >
+            <Filter className="mr-2 h-4 w-4" />
+            Filtreleri Uygula
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            className="border-[#711A1A] text-[#711A1A] hover:bg-[#711A1A]/5"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Hızlı Dışa Aktar
+          </Button>
+          
+          <Button 
+            variant="ghost" 
+            onClick={() => {
+              setDateRange({ from: undefined, to: undefined });
+              setDepartment("all");
+              setPerson("");
+              setReportType("daily");
+            }}
+            className="text-gray-600 hover:text-gray-800"
+          >
+            Filtreleri Temizle
+          </Button>
+        </div>
       </div>
     </div>
   );
