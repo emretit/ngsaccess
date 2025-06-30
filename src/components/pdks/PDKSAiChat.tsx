@@ -3,18 +3,21 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { RefreshCcw } from "lucide-react";
+import { RefreshCcw, Zap } from "lucide-react";
 import { AiChatMessage } from "./chat/AiChatMessage";
 import { AiChatInput } from "./chat/AiChatInput";
 import { AiModelStatus } from "./chat/AiModelStatus";
+import { SampleQueries } from "./chat/SampleQueries";
 import { useAiChat } from "./chat/useAiChat";
 import { useToast } from "@/hooks/use-toast";
 import { OpenAiKeyInput } from "./chat/OpenAiKeyInput";
 import { useDepartments } from "@/hooks/useDepartments";
+import { Badge } from "@/components/ui/badge";
 
 export function PDKSAiChat() {
   const { toast } = useToast();
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [useNaturalLanguage, setUseNaturalLanguage] = useState(true);
   const { departments } = useDepartments();
   
   const {
@@ -59,8 +62,8 @@ export function PDKSAiChat() {
   const handleRefreshModelStatus = () => {
     checkOpenAIStatus();
     toast({
-      title: "OpenAI bağlantısı kontrol ediliyor",
-      description: "API bağlantısı yeniden kontrol ediliyor.",
+      title: "AI bağlantısı kontrol ediliyor",
+      description: "AI servisi durumu yeniden kontrol ediliyor.",
     });
   };
 
@@ -112,13 +115,51 @@ export function PDKSAiChat() {
     }
   };
 
+  const handleSampleQuerySelect = (query: string) => {
+    setInput(query);
+  };
+
+  const toggleNaturalLanguage = () => {
+    setUseNaturalLanguage(!useNaturalLanguage);
+    toast({
+      title: useNaturalLanguage ? "OpenAI Modu Aktif" : "Doğal Dil Modu Aktif",
+      description: useNaturalLanguage 
+        ? "Artık OpenAI kullanılacak (API key gerekli)" 
+        : "Artık yerli doğal dil işleme kullanılacak (daha hızlı)",
+    });
+  };
+
+  // Eğer doğal dil modu aktifse API key kontrolü yapma
+  const shouldShowApiKeyInput = !useNaturalLanguage && showApiKeyInput;
+
   return (
     <Card className="w-full h-[calc(100vh-12rem)] shadow-lg">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-lg font-medium">
-          PDKS AI Asistanı
-        </CardTitle>
         <div className="flex items-center gap-2">
+          <CardTitle className="text-lg font-medium">
+            PDKS AI Asistanı
+          </CardTitle>
+          {useNaturalLanguage ? (
+            <Badge variant="default" className="bg-green-500">
+              <Zap className="h-3 w-3 mr-1" />
+              Yerli AI
+            </Badge>
+          ) : (
+            <Badge variant="secondary">
+              OpenAI
+            </Badge>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={toggleNaturalLanguage}
+            className="h-7 px-2"
+          >
+            <Zap className="h-4 w-4 mr-1" />
+            {useNaturalLanguage ? "OpenAI" : "Yerli AI"}
+          </Button>
           <Button 
             variant="ghost" 
             size="sm" 
@@ -127,15 +168,19 @@ export function PDKSAiChat() {
           >
             <RefreshCcw className="h-4 w-4" />
           </Button>
-          <AiModelStatus isConnected={isOpenAIConnected} />
+          {!useNaturalLanguage && <AiModelStatus isConnected={isOpenAIConnected} />}
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {showApiKeyInput ? (
+          {shouldShowApiKeyInput ? (
             <OpenAiKeyInput onComplete={handleApiKeyComplete} />
           ) : (
             <>
+              <SampleQueries 
+                onQuerySelect={handleSampleQuerySelect}
+                isVisible={messages.length === 0}
+              />
               <ScrollArea className="h-[calc(100vh-20rem)] pr-4">
                 <div className="space-y-4">
                   {messages.map((message) => (
@@ -160,7 +205,7 @@ export function PDKSAiChat() {
               <AiChatInput
                 input={input}
                 isLoading={isLoading}
-                isModelConnected={isOpenAIConnected}
+                isModelConnected={useNaturalLanguage || isOpenAIConnected}
                 isSaving={isSaving}
                 onInputChange={setInput}
                 onSubmit={handleSendWithDepartmentContext}

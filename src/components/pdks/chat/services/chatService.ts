@@ -2,19 +2,25 @@
 import { parseQuery } from './parsers/queryParser';
 import { fetchCardReadings, fetchDatabaseContext } from './database/cardReadingsService';
 import { processWithOpenAI } from './openai/openaiService';
+import { NaturalLanguageService } from './naturalLanguageService';
 
 export async function sendChatMessage(input: string) {
   console.log("Processing chat message:", input);
   
   try {
-    // Mesajı işleme için log ekle
-    console.log("İncelenen mesaj içeriği:", input);
+    // Önce doğal dil servisimizle deneyelim
+    console.log("Doğal dil servisi ile işleniyor...");
     
-    // Departman bilgileri içeren bir mesaj mı kontrol et
-    const containsDepartmentInfo = input.includes("Mevcut departmanlar:");
-    if (containsDepartmentInfo) {
-      console.log("Mesaj departman bilgileri içeriyor, bağlam zenginleştirmesi yapıldı.");
+    const nlResult = await NaturalLanguageService.processQuery(input);
+    
+    // Eğer doğal dil servisi başarıyla sonuç döndürdüyse onu kullan
+    if (nlResult.source !== 'error' && (nlResult.data?.length || 0) > 0) {
+      console.log("Doğal dil servisi başarılı sonuç döndürdü");
+      return nlResult;
     }
+    
+    // Eğer doğal dil servisi sonuç bulamadıysa eski sistemi dene
+    console.log("Doğal dil servisi sonuç bulamadı, eski parser'a geçiliyor...");
     
     // Check if this is a query that can be handled by the natural language parser
     const queryParams = parseQuery(input);
