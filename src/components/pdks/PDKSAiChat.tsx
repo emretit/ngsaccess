@@ -14,16 +14,28 @@ import { AiChatMessage } from "./chat/AiChatMessage";
 export function PDKSAiChat() {
   const [aiMode, setAiMode] = useState<'native' | 'openai'>('native');
   const { messages, addMessage } = useMessages();
-  const { input, setInput, handleSubmit } = useInput();
+  const { input, setInput } = useInput();
   const { handleSendMessage, isLoading } = useMessageHandler(addMessage);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await handleSubmit(e, handleSendMessage);
+    if (!input.trim()) return;
+    
+    const userMessage = input.trim();
+    setInput('');
+    await handleSendMessage(userMessage);
   };
 
   const handleQuerySelect = (query: string) => {
     setInput(query);
+  };
+
+  const handleExportExcel = () => {
+    console.log('Export to Excel');
+  };
+
+  const handleExportPDF = () => {
+    console.log('Export to PDF');
   };
 
   return (
@@ -81,7 +93,12 @@ export function PDKSAiChat() {
         ) : (
           <>
             {messages.map((message, index) => (
-              <AiChatMessage key={index} message={message} />
+              <AiChatMessage 
+                key={index} 
+                message={message} 
+                onExportExcel={handleExportExcel}
+                onExportPDF={handleExportPDF}
+              />
             ))}
             {aiMode === 'native' && messages.length > 0 && (
               <SampleQueries onQuerySelect={handleQuerySelect} isVisible={false} />
