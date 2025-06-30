@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { TurkishNlpParser } from "./parsers/turkishNlpParser";
 import { SqlQueryBuilder } from "./sqlQueryBuilder";
@@ -36,8 +35,11 @@ export class NaturalLanguageService {
         throw error;
       }
       
+      // Ensure data is an array
+      const resultArray = Array.isArray(data) ? data : [];
+      
       // Sonuçları formatla
-      const formattedData = this.formatResults(data, nlQuery);
+      const formattedData = this.formatResults(resultArray, nlQuery);
       const responseMessage = this.generateResponse(nlQuery, formattedData);
       
       return {
