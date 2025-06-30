@@ -7,15 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SampleQueries } from "./chat/SampleQueries";
 import { useMessageHandler } from "./chat/hooks/useMessageHandler";
-import { useMessages } from "./chat/hooks/useMessages";
-import { useInput } from "./chat/hooks/useInput";
 import { AiChatMessage } from "./chat/AiChatMessage";
 
 export function PDKSAiChat() {
   const [aiMode, setAiMode] = useState<'native' | 'openai'>('native');
-  const { messages, addMessage } = useMessages();
-  const { input, setInput } = useInput();
-  const { handleSendMessage, isLoading } = useMessageHandler(addMessage);
+  const { messages, input, setInput, isLoading, handleSendMessage } = useMessageHandler();
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

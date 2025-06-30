@@ -10,12 +10,7 @@ export function useMessageHandler() {
   const { messages, addMessage } = useMessages();
   const { input, setInput, isLoading, setIsLoading } = useInput();
 
-  const handleSendMessage = async (e: React.FormEvent, customContent?: string) => {
-    e.preventDefault();
-    
-    // Kullanılacak içerik - özelleştirilmiş içerik veya normal input
-    const messageContent = customContent || input;
-    
+  const handleSendMessage = async (messageContent: string) => {
     if (!messageContent.trim() || isLoading) return;
 
     const userMessage: Message = {
@@ -25,11 +20,6 @@ export function useMessageHandler() {
     };
 
     addMessage(userMessage);
-    
-    if (!customContent) {
-      setInput(''); // Sadece normal input ise temizle, özelleştirilmiş içerik kullanıldığında temizleme
-    }
-    
     setIsLoading(true);
 
     try {
@@ -39,7 +29,7 @@ export function useMessageHandler() {
         id: `response-${userMessage.id}`,
         type: 'assistant',
         content: response.content,
-        data: response.data // Include the data if it exists
+        data: response.data || undefined
       };
       
       addMessage(aiMessage);

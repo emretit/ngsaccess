@@ -96,7 +96,7 @@ export function PDKSSummaryCards({ data }: PDKSSummaryCardsProps) {
                 <div className={`
                   text-xs font-medium
                   ${card.changeType === 'positive' ? 'text-green-600' : 
-                    card.changeType === 'negative' ? 'text-red-600' : 'text-gray-500'}
+                    card.changeType === 'neutral' ? 'text-gray-500' : 'text-red-600'}
                 `}>
                   {card.change}
                 </div>

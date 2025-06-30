@@ -6,17 +6,16 @@ import { PDKSSummaryCards } from "@/components/pdks/dashboard/PDKSSummaryCards";
 import { PDKSTableView } from "@/components/pdks/dashboard/PDKSTableView";
 import { PDKSChartView } from "@/components/pdks/dashboard/PDKSChartView";
 import { PDKSRealTimeWidget } from "@/components/pdks/dashboard/PDKSRealTimeWidget";
-import { PDKSExportPanel } from "@/components/pdks/dashboard/PDKSExportPanel";
+import { PDKSEnhancedExportPanel } from "@/components/pdks/dashboard/PDKSEnhancedExportPanel";
+import { PDKSMobileDrawer } from "@/components/pdks/dashboard/PDKSMobileDrawer";
 import { PDKSAiChat } from "@/components/pdks/PDKSAiChat";
 import { usePdksRecords } from "@/hooks/usePdksRecords";
 import { Button } from "@/components/ui/button";
-import { X, MessageSquare, Menu } from "lucide-react";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { X, MessageSquare, BarChart3, Table2 } from "lucide-react";
 
 export default function PDKSRecords() {
   const [activeTab, setActiveTab] = useState("table");
   const [showAiChat, setShowAiChat] = useState(false);
-  const [showMobileFilters, setShowMobileFilters] = useState(false);
   
   const { 
     records, 
@@ -63,36 +62,28 @@ export default function PDKSRecords() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30 dark:from-gray-900 dark:to-gray-800">
-      {/* Header Section */}
-      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 shadow-sm">
+      {/* Modern Header Section */}
+      <div className="bg-white/80 backdrop-blur-sm dark:bg-gray-900/80 border-b border-gray-200 dark:border-gray-800 shadow-sm sticky top-0 z-40">
         <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-gray-100 dark:to-gray-400 bg-clip-text text-transparent">
                 PDKS Dashboard
               </h1>
-              <p className="text-sm text-gray-500 mt-1">
-                Personel Devam Kontrol Sistemi - Anlık Takip ve Raporlama
+              <p className="text-sm text-gray-500 mt-1 font-medium">
+                📊 Personel Devam Kontrol Sistemi - Anlık Takip ve Raporlama
               </p>
             </div>
             
-            {/* Mobile Menu Button */}
-            <div className="flex items-center gap-2 lg:hidden">
-              <Sheet open={showMobileFilters} onOpenChange={setShowMobileFilters}>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Menu className="h-4 w-4" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="top" className="h-auto">
-                  <PDKSFilterBar onFiltersChange={handleFiltersChange} />
-                </SheetContent>
-              </Sheet>
+            {/* Header Actions */}
+            <div className="flex items-center gap-3">
+              <PDKSMobileDrawer onFiltersChange={handleFiltersChange} />
               
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowAiChat(!showAiChat)}
+                className="lg:hidden border-[#711A1A] text-[#711A1A] hover:bg-[#711A1A]/5"
               >
                 <MessageSquare className="h-4 w-4" />
               </Button>
@@ -101,32 +92,37 @@ export default function PDKSRecords() {
         </div>
         
         {/* Desktop Filter Bar */}
-        <div className="hidden lg:block">
+        <div className="hidden lg:block border-t border-gray-100 dark:border-gray-800">
           <PDKSFilterBar onFiltersChange={handleFiltersChange} />
         </div>
       </div>
       
-      {/* Summary Cards */}
-      <PDKSSummaryCards data={summaryData} />
+      {/* Enhanced Summary Cards */}
+      <div className="relative z-30">
+        <PDKSSummaryCards data={summaryData} />
+      </div>
       
-      {/* Main Content Area */}
+      {/* Main Content Layout */}
       <div className="flex gap-6 px-6 pb-6 relative">
-        {/* Left Content - Main Dashboard */}
+        {/* Main Dashboard Content */}
         <div className={`flex-1 transition-all duration-300 ${showAiChat ? 'lg:mr-80' : ''}`}>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-6">
-              <TabsList className="grid w-full grid-cols-2 max-w-md bg-gray-100 dark:bg-gray-800">
+            {/* Enhanced Tab Navigation */}
+            <div className="bg-white/90 backdrop-blur-sm dark:bg-gray-900/90 rounded-2xl shadow-xl border border-gray-200/50 dark:border-gray-800/50 p-6">
+              <TabsList className="grid w-full grid-cols-2 max-w-md bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700 rounded-xl p-1 shadow-inner">
                 <TabsTrigger 
                   value="table" 
-                  className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-[#711A1A]"
+                  className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-[#711A1A] data-[state=active]:shadow-md rounded-lg transition-all duration-200"
                 >
-                  📊 Tablo Görünümü
+                  <Table2 className="h-4 w-4" />
+                  Tablo Görünümü
                 </TabsTrigger>
                 <TabsTrigger 
                   value="charts" 
-                  className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-[#711A1A]"
+                  className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-[#711A1A] data-[state=active]:shadow-md rounded-lg transition-all duration-200"
                 >
-                  📈 Grafik Görünümü
+                  <BarChart3 className="h-4 w-4" />
+                  Grafik Görünümü
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -141,76 +137,86 @@ export default function PDKSRecords() {
           </Tabs>
         </div>
         
-        {/* Right Sidebar - Only show when AI chat is closed */}
+        {/* Enhanced Right Sidebar */}
         {!showAiChat && (
           <div className="hidden lg:block w-80 space-y-6">
             <PDKSRealTimeWidget />
-            <PDKSExportPanel />
+            <PDKSEnhancedExportPanel />
             
             <Button
               onClick={() => setShowAiChat(true)}
-              className="w-full bg-[#711A1A] hover:bg-[#711A1A]/90 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+              className="w-full bg-gradient-to-r from-[#711A1A] to-[#8B1C26] hover:from-[#711A1A]/90 hover:to-[#8B1C26]/90 text-white shadow-lg hover:shadow-xl transition-all duration-200 rounded-xl py-3"
             >
-              <MessageSquare className="mr-2 h-4 w-4" />
+              <MessageSquare className="mr-2 h-5 w-5" />
               AI Asistan
             </Button>
           </div>
         )}
       </div>
       
-      {/* AI Chat - Fixed Sidebar (Desktop) */}
+      {/* Enhanced AI Chat - Fixed Sidebar (Desktop) */}
       {showAiChat && (
-        <div className="hidden lg:block fixed right-0 top-0 h-full w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 z-50 shadow-2xl">
+        <div className="hidden lg:block fixed right-0 top-0 h-full w-80 bg-white/95 backdrop-blur-sm dark:bg-gray-900/95 border-l border-gray-200 dark:border-gray-800 z-50 shadow-2xl">
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-[#711A1A] to-[#8B1C26] text-white">
-            <div className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              <h3 className="font-semibold">AI Asistan</h3>
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 p-2 rounded-lg">
+                <MessageSquare className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold">AI Asistan</h3>
+                <p className="text-xs text-white/80">PDKS Veri Analizi</p>
+              </div>
             </div>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setShowAiChat(false)}
-              className="h-8 w-8 p-0 text-white hover:bg-white/20"
+              className="h-8 w-8 p-0 text-white hover:bg-white/20 rounded-lg"
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <div className="h-[calc(100vh-4rem)]">
+          <div className="h-[calc(100vh-5rem)]">
             <PDKSAiChat />
           </div>
         </div>
       )}
       
-      {/* Mobile AI Chat Modal */}
+      {/* Enhanced Mobile AI Chat Modal */}
       {showAiChat && (
-        <div className="lg:hidden fixed inset-0 bg-black/50 z-50">
-          <div className="absolute right-0 top-0 h-full w-full max-w-sm bg-white dark:bg-gray-900 shadow-2xl">
+        <div className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50">
+          <div className="absolute right-0 top-0 h-full w-full max-w-sm bg-white/95 backdrop-blur-sm dark:bg-gray-900/95 shadow-2xl">
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-[#711A1A] to-[#8B1C26] text-white">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5" />
-                <h3 className="font-semibold">AI Asistan</h3>
+              <div className="flex items-center gap-3">
+                <div className="bg-white/20 p-2 rounded-lg">
+                  <MessageSquare className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold">AI Asistan</h3>
+                  <p className="text-xs text-white/80">PDKS Veri Analizi</p>
+                </div>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowAiChat(false)}
-                className="h-8 w-8 p-0 text-white hover:bg-white/20"
+                className="h-8 w-8 p-0 text-white hover:bg-white/20 rounded-lg"
               >
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            <div className="h-[calc(100vh-4rem)]">
+            <div className="h-[calc(100vh-5rem)]">
               <PDKSAiChat />
             </div>
           </div>
         </div>
       )}
       
-      {/* Mobile Floating Action Button */}
+      {/* Enhanced Mobile Floating Action Button */}
       <div className="lg:hidden fixed bottom-6 right-6 z-40">
         <Button
           onClick={() => setShowAiChat(!showAiChat)}
-          className="bg-[#711A1A] hover:bg-[#711A1A]/90 text-white rounded-full h-14 w-14 p-0 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110"
+          className="bg-gradient-to-r from-[#711A1A] to-[#8B1C26] hover:from-[#711A1A]/90 hover:to-[#8B1C26]/90 text-white rounded-full h-16 w-16 p-0 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110"
         >
           {showAiChat ? <X className="h-6 w-6" /> : <MessageSquare className="h-6 w-6" />}
         </Button>
