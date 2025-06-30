@@ -33,10 +33,10 @@ const absenceTypeData = [
 
 export function PDKSChartView() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Chart Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -48,7 +48,7 @@ export function PDKSChartView() {
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-lg transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -60,7 +60,7 @@ export function PDKSChartView() {
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200">
+        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200 hover:shadow-lg transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -72,7 +72,7 @@ export function PDKSChartView() {
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200">
+        <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200 hover:shadow-lg transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -88,7 +88,7 @@ export function PDKSChartView() {
       {/* Main Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Daily Attendance Bar Chart */}
-        <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+        <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
           <CardHeader>
             <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
               📊 Haftalık Devam Durumu
@@ -108,16 +108,16 @@ export function PDKSChartView() {
                     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
                   }}
                 />
-                <Bar dataKey="present" fill="#10B981" name="Mevcut" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="late" fill="#F59E0B" name="Geç" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="absent" fill="#EF4444" name="Yok" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="present" fill="#10B981" name="Mevcut" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="late" fill="#F59E0B" name="Geç" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="absent" fill="#EF4444" name="Yok" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
         {/* Hourly Check-in Trend */}
-        <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+        <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
           <CardHeader>
             <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
               ⏰ Saatlik Giriş Trendi
@@ -154,7 +154,7 @@ export function PDKSChartView() {
       {/* Bottom Row - Pie Chart and Additional Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Absence Types Pie Chart */}
-        <Card className="lg:col-span-2 shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+        <Card className="lg:col-span-2 shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
           <CardHeader>
             <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
               🥧 İzin Türleri Dağılımı
@@ -191,24 +191,24 @@ export function PDKSChartView() {
         </Card>
 
         {/* Quick Stats */}
-        <Card className="shadow-lg border-0 bg-gradient-to-br from-gray-50 to-white">
+        <Card className="shadow-xl border-0 bg-gradient-to-br from-gray-50 to-white hover:shadow-2xl transition-all duration-300">
           <CardHeader>
             <CardTitle className="text-lg font-bold text-gray-900">📈 Hızlı İstatistikler</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+            <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
               <span className="text-sm font-medium text-gray-700">Toplam Çalışma Saati</span>
               <span className="text-lg font-bold text-blue-600">1,248h</span>
             </div>
-            <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+            <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
               <span className="text-sm font-medium text-gray-700">Mesai Saatleri</span>
               <span className="text-lg font-bold text-green-600">156h</span>
             </div>
-            <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
+            <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors">
               <span className="text-sm font-medium text-gray-700">Ortalama Giriş</span>
               <span className="text-lg font-bold text-yellow-600">08:45</span>
             </div>
-            <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+            <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors">
               <span className="text-sm font-medium text-gray-700">Ortalama Çıkış</span>
               <span className="text-lg font-bold text-purple-600">18:15</span>
             </div>
