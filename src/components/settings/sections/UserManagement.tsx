@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,7 +44,11 @@ interface User {
   created_at: string;
 }
 
-export function UserManagement() {
+interface UserManagementProps {
+  onComplete?: () => void;
+}
+
+export function UserManagement({ onComplete }: UserManagementProps) {
   const { checkUserRole } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -181,6 +184,15 @@ export function UserManagement() {
           description: error.message || "Kullanıcı silinirken bir hata oluştu.",
         });
       }
+    }
+  };
+
+  const handleUserCreated = () => {
+    // ... keep existing code for user creation
+    
+    // Call completion callback when a user is successfully created
+    if (onComplete) {
+      onComplete();
     }
   };
 

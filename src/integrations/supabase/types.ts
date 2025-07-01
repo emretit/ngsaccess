@@ -973,59 +973,6 @@ export type Database = {
         }
         Relationships: []
       }
-      server_devices: {
-        Row: {
-          created_at: string | null
-          date_added: string | null
-          device_model: string | null
-          device_type: string | null
-          expiry_date: string | null
-          id: string
-          last_used_at: string | null
-          name: string
-          project_id: number | null
-          serial_number: string
-          status: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          date_added?: string | null
-          device_model?: string | null
-          device_type?: string | null
-          expiry_date?: string | null
-          id?: string
-          last_used_at?: string | null
-          name: string
-          project_id?: number | null
-          serial_number: string
-          status?: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          date_added?: string | null
-          device_model?: string | null
-          device_type?: string | null
-          expiry_date?: string | null
-          id?: string
-          last_used_at?: string | null
-          name?: string
-          project_id?: number | null
-          serial_number?: string
-          status?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "server_devices_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       settings: {
         Row: {
           allow_late_entry: boolean | null

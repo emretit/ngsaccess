@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,7 +39,11 @@ const mockShifts = [
   },
 ];
 
-export function ShiftSettings() {
+interface ShiftSettingsProps {
+  onComplete?: () => void;
+}
+
+export function ShiftSettings({ onComplete }: ShiftSettingsProps) {
   const [shifts, setShifts] = useState(mockShifts);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingShift, setEditingShift] = useState(null);
@@ -53,6 +56,11 @@ export function ShiftSettings() {
     };
     setShifts([...shifts, shift]);
     setIsAddDialogOpen(false);
+    
+    // Call completion callback when first shift is added
+    if (onComplete && shifts.length === 0) {
+      onComplete();
+    }
   };
 
   const handleEditShift = (shift: any) => {

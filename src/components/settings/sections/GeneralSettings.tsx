@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -30,7 +29,11 @@ interface GeneralSettings {
   working_hours_end?: string;
 }
 
-export function GeneralSettings() {
+interface GeneralSettingsProps {
+  onComplete?: () => void;
+}
+
+export function GeneralSettings({ onComplete }: GeneralSettingsProps) {
   const { toast } = useToast();
   const [settings, setSettings] = useState<GeneralSettings | null>(null);
 
@@ -67,6 +70,11 @@ export function GeneralSettings() {
         title: "Ayarlar güncellendi",
         description: "Tüm değişiklikler başarıyla kaydedildi.",
       });
+
+      // Call completion callback
+      if (onComplete) {
+        onComplete();
+      }
     } catch (error) {
       toast({
         title: "Hata",
