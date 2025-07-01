@@ -19,7 +19,7 @@ const sidebarItems = [
   },
   {
     key: "schedule",
-    label: "Çalışma Saatleri", 
+    label: "Vardiya Ayarları", 
     icon: Clock
   },
   {

@@ -8,7 +8,7 @@ export function WorkScheduleSettings() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Çalışma Saatleri Ayarları</CardTitle>
+        <CardTitle>Vardiya Ayarları</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid grid-cols-2 gap-4">

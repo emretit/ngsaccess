@@ -17,7 +17,7 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
       <TabsList>
         <TabsTrigger value="general">Genel</TabsTrigger>
         <TabsTrigger value="users">Kullanıcı Yönetimi</TabsTrigger>
-        <TabsTrigger value="schedule">Çalışma Saatleri</TabsTrigger>
+        <TabsTrigger value="schedule">Vardiya Ayarları</TabsTrigger>
         <TabsTrigger value="mail">Mail Ayarları</TabsTrigger>
         <TabsTrigger value="notifications">Bildirimler</TabsTrigger>
       </TabsList>
