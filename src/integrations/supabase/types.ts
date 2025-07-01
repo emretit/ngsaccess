@@ -741,84 +741,6 @@ export type Database = {
           },
         ]
       }
-      leave_requests: {
-        Row: {
-          approved_at: string | null
-          approved_by: number | null
-          created_at: string | null
-          employee_id: number
-          end_date: string
-          id: number
-          leave_type_id: number
-          project_id: number | null
-          reason: string | null
-          start_date: string
-          status: string | null
-          total_days: number
-          updated_at: string | null
-        }
-        Insert: {
-          approved_at?: string | null
-          approved_by?: number | null
-          created_at?: string | null
-          employee_id: number
-          end_date: string
-          id?: never
-          leave_type_id: number
-          project_id?: number | null
-          reason?: string | null
-          start_date: string
-          status?: string | null
-          total_days: number
-          updated_at?: string | null
-        }
-        Update: {
-          approved_at?: string | null
-          approved_by?: number | null
-          created_at?: string | null
-          employee_id?: number
-          end_date?: string
-          id?: never
-          leave_type_id?: number
-          project_id?: number | null
-          reason?: string | null
-          start_date?: string
-          status?: string | null
-          total_days?: number
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      leave_types: {
-        Row: {
-          code: string
-          created_at: string | null
-          id: number
-          is_paid: boolean | null
-          max_days_per_year: number | null
-          name: string
-          project_id: number | null
-        }
-        Insert: {
-          code: string
-          created_at?: string | null
-          id?: never
-          is_paid?: boolean | null
-          max_days_per_year?: number | null
-          name: string
-          project_id?: number | null
-        }
-        Update: {
-          code?: string
-          created_at?: string | null
-          id?: never
-          is_paid?: boolean | null
-          max_days_per_year?: number | null
-          name?: string
-          project_id?: number | null
-        }
-        Relationships: []
-      }
       pdks_records: {
         Row: {
           created_at: string
@@ -1070,42 +992,6 @@ export type Database = {
           },
         ]
       }
-      shift_assignments: {
-        Row: {
-          created_at: string | null
-          employee_id: number
-          end_date: string | null
-          id: number
-          is_active: boolean | null
-          project_id: number | null
-          shift_id: number
-          start_date: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          employee_id: number
-          end_date?: string | null
-          id?: never
-          is_active?: boolean | null
-          project_id?: number | null
-          shift_id: number
-          start_date: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          employee_id?: number
-          end_date?: string | null
-          id?: never
-          is_active?: boolean | null
-          project_id?: number | null
-          shift_id?: number
-          start_date?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       shifts: {
         Row: {
           break_end: string | null
@@ -1212,75 +1098,6 @@ export type Database = {
           setup_token?: string | null
           token_expires_at?: string | null
           updated_at?: string
-        }
-        Relationships: []
-      }
-      work_hours_summary: {
-        Row: {
-          actual_end_time: string | null
-          actual_start_time: string | null
-          created_at: string | null
-          date: string
-          early_leave_minutes: number | null
-          employee_id: number
-          expected_end_time: string | null
-          expected_start_time: string | null
-          id: number
-          is_holiday: boolean | null
-          is_weekend: boolean | null
-          late_minutes: number | null
-          leave_type_id: number | null
-          overtime_hours: number | null
-          project_id: number | null
-          regular_hours: number | null
-          shift_id: number | null
-          status: string | null
-          undertime_hours: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          actual_end_time?: string | null
-          actual_start_time?: string | null
-          created_at?: string | null
-          date: string
-          early_leave_minutes?: number | null
-          employee_id: number
-          expected_end_time?: string | null
-          expected_start_time?: string | null
-          id?: never
-          is_holiday?: boolean | null
-          is_weekend?: boolean | null
-          late_minutes?: number | null
-          leave_type_id?: number | null
-          overtime_hours?: number | null
-          project_id?: number | null
-          regular_hours?: number | null
-          shift_id?: number | null
-          status?: string | null
-          undertime_hours?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          actual_end_time?: string | null
-          actual_start_time?: string | null
-          created_at?: string | null
-          date?: string
-          early_leave_minutes?: number | null
-          employee_id?: number
-          expected_end_time?: string | null
-          expected_start_time?: string | null
-          id?: never
-          is_holiday?: boolean | null
-          is_weekend?: boolean | null
-          late_minutes?: number | null
-          leave_type_id?: number | null
-          overtime_hours?: number | null
-          project_id?: number | null
-          regular_hours?: number | null
-          shift_id?: number | null
-          status?: string | null
-          undertime_hours?: number | null
-          updated_at?: string | null
         }
         Relationships: []
       }
