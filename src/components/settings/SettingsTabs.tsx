@@ -1,7 +1,7 @@
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GeneralSettings } from "./sections/GeneralSettings";
-import { WorkScheduleSettings } from "./sections/WorkScheduleSettings";
+import { ShiftSettings } from "./sections/ShiftSettings";
 import { NotificationSettings } from "./sections/NotificationSettings";
 import { MailSettings } from "./sections/MailSettings";
 import { UserManagement } from "./sections/UserManagement";
@@ -31,7 +31,7 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
       </TabsContent>
       
       <TabsContent value="schedule">
-        <WorkScheduleSettings />
+        <ShiftSettings />
       </TabsContent>
 
       <TabsContent value="mail">

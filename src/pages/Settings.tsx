@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { SettingsSidebar } from "@/components/settings/SettingsSidebar";
 import { GeneralSettings } from "@/components/settings/sections/GeneralSettings";
-import { WorkScheduleSettings } from "@/components/settings/sections/WorkScheduleSettings";
+import { ShiftSettings } from "@/components/settings/sections/ShiftSettings";
 import { NotificationSettings } from "@/components/settings/sections/NotificationSettings";
 import { MailSettings } from "@/components/settings/sections/MailSettings";
 import { UserManagement } from "@/components/settings/sections/UserManagement";
@@ -17,7 +17,7 @@ export default function Settings() {
       case "users":
         return <UserManagement />;
       case "schedule":
-        return <WorkScheduleSettings />;
+        return <ShiftSettings />;
       case "mail":
         return <MailSettings />;
       case "notifications":
