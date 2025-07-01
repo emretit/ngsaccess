@@ -157,71 +157,60 @@ export default function PDKSRecords() {
         <PDKSSummaryCards data={summaryData} />
       </div>
       
-      {/* Main Content Layout - Fixed to prevent collapse when table is empty */}
-      <div className="px-4 sm:px-6 pb-6 relative">
-        <div className="flex gap-6 min-h-[600px]">
-          {/* Main Dashboard Content - Ensure minimum height */}
-          <div className={`flex-1 transition-all duration-300 ${showAiChat ? 'lg:mr-80' : ''}`}>
-            <Card className="bg-white/95 backdrop-blur-sm dark:bg-gray-900/95 rounded-2xl shadow-2xl border-0 overflow-hidden h-full">
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full h-full flex flex-col">
-                {/* Enhanced Tab Navigation */}
-                <div className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 p-4 sm:p-6 border-b border-gray-200/50 flex-shrink-0">
-                  <TabsList className="grid w-full grid-cols-2 max-w-md bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700 rounded-xl p-1 shadow-inner h-12">
-                    <TabsTrigger 
-                      value="table" 
-                      className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-[#711A1A] data-[state=active]:shadow-md rounded-lg transition-all duration-200 text-sm font-medium"
-                    >
-                      <Table2 className="h-4 w-4" />
-                      <span className="hidden sm:inline">Tablo</span>
-                    </TabsTrigger>
-                    <TabsTrigger 
-                      value="charts" 
-                      className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-[#711A1A] data-[state=active]:shadow-md rounded-lg transition-all duration-200 text-sm font-medium"
-                    >
-                      <BarChart3 className="h-4 w-4" />
-                      <span className="hidden sm:inline">Grafikler</span>
-                    </TabsTrigger>
-                  </TabsList>
-                </div>
-                
-                {/* Tab Content - Flex-grow to fill remaining space */}
-                <div className="p-4 sm:p-6 flex-1 min-h-0">
-                  <TabsContent value="table" className="mt-0 h-full">
-                    <div className="h-full min-h-[400px]">
-                      <PDKSTableView records={tableRecords} loading={loading} />
-                    </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="charts" className="mt-0 h-full">
-                    <div className="h-full min-h-[400px]">
-                      <PDKSChartView />
-                    </div>
-                  </TabsContent>
-                </div>
-              </Tabs>
-            </Card>
-          </div>
-          
-          {/* Enhanced Right Sidebar - Fixed positioning */}
-          {!showAiChat && (
-            <div className="hidden lg:flex w-80 flex-col space-y-6 flex-shrink-0">
-              <div className="sticky top-32">
-                <PDKSRealTimeWidget />
-              </div>
-              <div className="sticky top-[500px]">
-                <PDKSEnhancedExportPanel />
+      {/* Main Content Layout */}
+      <div className="flex gap-6 px-4 sm:px-6 pb-6 relative">
+        {/* Main Dashboard Content */}
+        <div className={`flex-1 transition-all duration-300 ${showAiChat ? 'lg:mr-80' : ''}`}>
+          <Card className="bg-white/95 backdrop-blur-sm dark:bg-gray-900/95 rounded-2xl shadow-2xl border-0 overflow-hidden">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              {/* Enhanced Tab Navigation */}
+              <div className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 p-4 sm:p-6 border-b border-gray-200/50">
+                <TabsList className="grid w-full grid-cols-2 max-w-md bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700 rounded-xl p-1 shadow-inner h-12">
+                  <TabsTrigger 
+                    value="table" 
+                    className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-[#711A1A] data-[state=active]:shadow-md rounded-lg transition-all duration-200 text-sm font-medium"
+                  >
+                    <Table2 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Tablo</span>
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="charts" 
+                    className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-[#711A1A] data-[state=active]:shadow-md rounded-lg transition-all duration-200 text-sm font-medium"
+                  >
+                    <BarChart3 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Grafikler</span>
+                  </TabsTrigger>
+                </TabsList>
               </div>
               
-              <Button
-                onClick={() => setShowAiChat(true)}
-                className="w-full bg-gradient-to-r from-[#711A1A] to-[#8B1C26] hover:from-[#711A1A]/90 hover:to-[#8B1C26]/90 text-white shadow-lg hover:shadow-xl transition-all duration-200 rounded-xl py-3 h-12 sticky top-[700px]"
-              >
-                <MessageSquare className="mr-2 h-5 w-5" />
-                AI Asistan
-              </Button>
-            </div>
-          )}
+              <div className="p-4 sm:p-6">
+                <TabsContent value="table" className="space-y-6 mt-0">
+                  <PDKSTableView records={tableRecords} loading={loading} />
+                </TabsContent>
+                
+                <TabsContent value="charts" className="space-y-6 mt-0">
+                  <PDKSChartView />
+                </TabsContent>
+              </div>
+            </Tabs>
+          </Card>
         </div>
+        
+        {/* Enhanced Right Sidebar */}
+        {!showAiChat && (
+          <div className="hidden lg:block w-80 space-y-6">
+            <PDKSRealTimeWidget />
+            <PDKSEnhancedExportPanel />
+            
+            <Button
+              onClick={() => setShowAiChat(true)}
+              className="w-full bg-gradient-to-r from-[#711A1A] to-[#8B1C26] hover:from-[#711A1A]/90 hover:to-[#8B1C26]/90 text-white shadow-lg hover:shadow-xl transition-all duration-200 rounded-xl py-3 h-12"
+            >
+              <MessageSquare className="mr-2 h-5 w-5" />
+              AI Asistan
+            </Button>
+          </div>
+        )}
       </div>
       
       {/* Enhanced AI Chat - Fixed Sidebar (Desktop) */}
