@@ -13,6 +13,9 @@ export interface Message {
   type: 'user' | 'assistant';
   content: string;
   data?: MessageData[];
+  timestamp?: Date;
+  hasTable?: boolean;
+  query?: string;
 }
 
 export interface QueryParams {

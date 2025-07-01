@@ -1,16 +1,13 @@
 
 import { useState } from 'react';
 import { Message, MessageData } from '../types';
-import { chatService } from '../services/chatService';
+import { sendChatMessage } from '../services/chatService';
+import { useMessages } from './useMessages';
+import { useInput } from './useInput';
 
-interface UseMessageHandlerProps {
-  messages: Message[];
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  addMessage: (message: Message) => void;
-}
-
-export function useMessageHandler({ messages, setMessages, addMessage }: UseMessageHandlerProps) {
-  const [isLoading, setIsLoading] = useState(false);
+export function useMessageHandler() {
+  const { messages, addMessage } = useMessages();
+  const { input, setInput, isLoading, setIsLoading } = useInput();
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
@@ -18,7 +15,7 @@ export function useMessageHandler({ messages, setMessages, addMessage }: UseMess
     const userMessage: Message = {
       id: Date.now().toString(),
       content,
-      role: 'user',
+      type: 'user',
       timestamp: new Date(),
     };
 
@@ -26,12 +23,12 @@ export function useMessageHandler({ messages, setMessages, addMessage }: UseMess
     setIsLoading(true);
 
     try {
-      const response = await chatService.sendMessage(content);
+      const response = await sendChatMessage(content);
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: response.content,
-        role: 'assistant',
+        type: 'assistant',
         timestamp: new Date(),
         // Sadece response'da data varsa ekle
         data: 'data' in response && response.data ? response.data : undefined,
@@ -47,7 +44,7 @@ export function useMessageHandler({ messages, setMessages, addMessage }: UseMess
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: 'Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.',
-        role: 'assistant',
+        type: 'assistant',
         timestamp: new Date(),
       };
       addMessage(errorMessage);
@@ -57,7 +54,10 @@ export function useMessageHandler({ messages, setMessages, addMessage }: UseMess
   };
 
   return {
-    handleSendMessage,
+    messages,
+    input,
+    setInput,
     isLoading,
+    handleSendMessage,
   };
 }

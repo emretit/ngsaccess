@@ -103,3 +103,8 @@ export async function sendChatMessage(input: string) {
     };
   }
 }
+
+// Create a chatService object for compatibility
+export const chatService = {
+  sendMessage: sendChatMessage
+};
