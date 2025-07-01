@@ -1,71 +1,63 @@
 
-import { useToast } from "@/hooks/use-toast";
-import { Message } from '../types';
-import { sendChatMessage } from '../services/chatService';
-import { useMessages } from './useMessages';
-import { useInput } from './useInput';
+import { useState } from 'react';
+import { Message, MessageData } from '../types';
+import { chatService } from '../services/chatService';
 
-export function useMessageHandler() {
-  const { toast } = useToast();
-  const { messages, addMessage } = useMessages();
-  const { input, setInput, isLoading, setIsLoading } = useInput();
+interface UseMessageHandlerProps {
+  messages: Message[];
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  addMessage: (message: Message) => void;
+}
 
-  const handleSendMessage = async (messageContent: string) => {
-    if (!messageContent.trim() || isLoading) return;
+export function useMessageHandler({ messages, setMessages, addMessage }: UseMessageHandlerProps) {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSendMessage = async (content: string) => {
+    if (!content.trim()) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      type: 'user',
-      content: messageContent
+      content,
+      role: 'user',
+      timestamp: new Date(),
     };
 
     addMessage(userMessage);
     setIsLoading(true);
 
     try {
-      const response = await sendChatMessage(messageContent);
+      const response = await chatService.sendMessage(content);
       
       const aiMessage: Message = {
-        id: `response-${userMessage.id}`,
-        type: 'assistant',
+        id: (Date.now() + 1).toString(),
         content: response.content,
-        data: response.data || undefined
+        role: 'assistant',
+        timestamp: new Date(),
+        // Sadece response'da data varsa ekle
+        data: 'data' in response && response.data ? response.data : undefined,
+        hasTable: 'data' in response && response.data ? response.data.length > 0 : false,
+        query: 'data' in response && response.data && response.data.length > 0 
+          ? `Generated query for: ${content}` 
+          : undefined
       };
-      
+
       addMessage(aiMessage);
-      
-      if (response.data && response.data.length > 0) {
-        toast({
-          title: "Veri başarıyla getirildi",
-          description: `${response.data.length} kayıt bulundu.`,
-        });
-      }
     } catch (error) {
-      console.error('AI chat error:', error);
-      
+      console.error('Error sending message:', error);
       const errorMessage: Message = {
-        id: `error-${userMessage.id}`,
-        type: 'assistant',
-        content: `Üzgünüm, bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}.`
+        id: (Date.now() + 1).toString(),
+        content: 'Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.',
+        role: 'assistant',
+        timestamp: new Date(),
       };
-      
       addMessage(errorMessage);
-      
-      toast({
-        title: "Hata",
-        description: "Mesaj işlenirken bir hata oluştu.",
-        variant: "destructive"
-      });
     } finally {
       setIsLoading(false);
     }
   };
 
   return {
-    messages,
-    input, 
-    setInput,
+    handleSendMessage,
     isLoading,
-    handleSendMessage
   };
 }
