@@ -30,11 +30,7 @@ interface GeneralSettings {
   working_hours_end?: string;
 }
 
-interface GeneralSettingsProps {
-  onComplete?: () => void;
-}
-
-export function GeneralSettings({ onComplete }: GeneralSettingsProps) {
+export function GeneralSettings() {
   const { toast } = useToast();
   const [settings, setSettings] = useState<GeneralSettings | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -91,11 +87,6 @@ export function GeneralSettings({ onComplete }: GeneralSettingsProps) {
         title: "Ayarlar güncellendi",
         description: "Tüm değişiklikler başarıyla kaydedildi.",
       });
-
-      // Call completion callback
-      if (onComplete) {
-        onComplete();
-      }
     } catch (error) {
       toast({
         title: "Hata",
