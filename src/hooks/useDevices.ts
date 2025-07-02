@@ -41,7 +41,12 @@ export function useDevices() {
         
         return { 
           ...device,
-          status
+          status,
+          // Map database field names to Device interface
+          device_name: device.name,
+          device_serial: device.device_serial,
+          device_type: device.device_type,
+          device_location: device.description
         };
       });
     }
@@ -50,9 +55,23 @@ export function useDevices() {
   // Function to add a device directly
   const addDeviceMutation = useMutation({
     mutationFn: async (deviceData: Partial<Device>) => {
+      // Map Device interface fields to database fields
+      const dbData = {
+        name: deviceData.name || deviceData.device_name,
+        device_serial: deviceData.device_serial || deviceData.serial_number,
+        device_type: deviceData.device_type,
+        device_ip: deviceData.device_ip,
+        description: deviceData.description || deviceData.device_location,
+        zone_id: deviceData.zone_id,
+        door_id: deviceData.door_id,
+        access_direction: deviceData.access_direction || 'both',
+        status: 'active',
+        is_active: true
+      };
+
       const { error } = await supabase
         .from('devices')
-        .insert(deviceData);
+        .insert(dbData);
 
       if (error) {
         throw new Error("Cihaz eklenirken hata oluştu. Lütfen tekrar deneyin.");
