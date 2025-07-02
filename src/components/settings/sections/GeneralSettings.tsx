@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -36,6 +37,23 @@ interface GeneralSettingsProps {
 export function GeneralSettings({ onComplete }: GeneralSettingsProps) {
   const { toast } = useToast();
   const [settings, setSettings] = useState<GeneralSettings | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Dark mode toggle function
+  const toggleDarkMode = (enabled: boolean) => {
+    setIsDarkMode(enabled);
+    if (enabled) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    
+    // Update the form checkbox
+    const darkModeCheckbox = document.querySelector('[name="darkMode"]') as HTMLInputElement;
+    if (darkModeCheckbox) {
+      darkModeCheckbox.checked = enabled;
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -65,6 +83,9 @@ export function GeneralSettings({ onComplete }: GeneralSettingsProps) {
         .upsert(settingsData);
 
       if (error) throw error;
+
+      // Apply dark mode setting immediately
+      toggleDarkMode(settingsData.dark_mode || false);
 
       toast({
         title: "Ayarlar güncellendi",
@@ -99,6 +120,11 @@ export function GeneralSettings({ onComplete }: GeneralSettingsProps) {
       if (data) {
         setSettings(data);
         
+        // Apply dark mode setting immediately when loaded
+        const darkModeEnabled = data.dark_mode || false;
+        setIsDarkMode(darkModeEnabled);
+        toggleDarkMode(darkModeEnabled);
+        
         // Map database fields to form fields
         const formElements = {
           companyName: data.company_name,
@@ -111,7 +137,7 @@ export function GeneralSettings({ onComplete }: GeneralSettingsProps) {
           timezone: data.timezone || 'Europe/Istanbul',
           dateFormat: data.date_format || 'DD.MM.YYYY',
           currency: data.currency || 'TRY',
-          darkMode: data.dark_mode || false,
+          darkMode: darkModeEnabled,
           notifications: data.notifications_enabled || false,
           workingHoursStart: data.working_hours_start || '09:00',
           workingHoursEnd: data.working_hours_end || '18:00',
@@ -284,7 +310,12 @@ export function GeneralSettings({ onComplete }: GeneralSettingsProps) {
                   Sistem arayüzünü karanlık temada görüntüle
                 </div>
               </div>
-              <Switch id="darkMode" name="darkMode" />
+              <Switch 
+                id="darkMode" 
+                name="darkMode" 
+                checked={isDarkMode}
+                onCheckedChange={toggleDarkMode}
+              />
             </div>
 
             <div className="flex items-center justify-between">

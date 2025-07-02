@@ -23,9 +23,100 @@ import EmployeeSetup from '@/pages/EmployeeSetup';
 import LandingPage from '@/pages/LandingPage';
 import DemoRequest from '@/pages/DemoRequest';
 import NotFound from '@/pages/NotFound';
+import { useDarkMode } from '@/hooks/useDarkMode';
 import './App.css';
 
 const queryClient = new QueryClient();
+
+function AppContent() {
+  useDarkMode(); // Initialize dark mode on app start
+  
+  return (
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/auth" element={<Auth />} />
+      <Route path="/demo-request" element={<DemoRequest />} />
+      <Route path="/user-setup" element={<UserSetup />} />
+      <Route path="/employee-setup" element={<EmployeeSetup />} />
+      <Route path="/system-admin" element={<SystemAdmin />} />
+      <Route 
+        path="/home" 
+        element={
+          <Layout>
+            <Index />
+          </Layout>
+        } 
+      />
+      <Route 
+        path="/employees" 
+        element={
+          <Layout>
+            <Employees />
+          </Layout>
+        } 
+      />
+      <Route 
+        path="/devices" 
+        element={
+          <Layout>
+            <Devices />
+          </Layout>
+        } 
+      />
+      <Route 
+        path="/virtual-readers" 
+        element={
+          <Layout>
+            <VirtualReaders />
+          </Layout>
+        } 
+      />
+      <Route 
+        path="/access-control" 
+        element={
+          <Layout>
+            <AccessControl />
+          </Layout>
+        } 
+      />
+      <Route 
+        path="/pdks-records" 
+        element={
+          <Layout>
+            <PDKSRecords />
+          </Layout>
+        } 
+      />
+      <Route 
+        path="/settings" 
+        element={
+          <Layout>
+            <Settings />
+          </Layout>
+        } 
+      />
+      <Route 
+        path="/profile" 
+        element={
+          <Layout>
+            <Profile />
+          </Layout>
+        } 
+      />
+      <Route 
+        path="/engineering-department" 
+        element={
+          <Layout>
+            <EngineeringDepartment />
+          </Layout>
+        } 
+      />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
 
 function App() {
   return (
@@ -33,89 +124,7 @@ function App() {
       <TooltipProvider>
         <Router future={{ v7_relativeSplatPath: true }}>
           <AuthProvider>
-            <Routes>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/demo-request" element={<DemoRequest />} />
-              <Route path="/user-setup" element={<UserSetup />} />
-              <Route path="/employee-setup" element={<EmployeeSetup />} />
-              <Route path="/system-admin" element={<SystemAdmin />} />
-              <Route 
-                path="/home" 
-                element={
-                  <Layout>
-                    <Index />
-                  </Layout>
-                } 
-              />
-              <Route 
-                path="/employees" 
-                element={
-                  <Layout>
-                    <Employees />
-                  </Layout>
-                } 
-              />
-              <Route 
-                path="/devices" 
-                element={
-                  <Layout>
-                    <Devices />
-                  </Layout>
-                } 
-              />
-              <Route 
-                path="/virtual-readers" 
-                element={
-                  <Layout>
-                    <VirtualReaders />
-                  </Layout>
-                } 
-              />
-              <Route 
-                path="/access-control" 
-                element={
-                  <Layout>
-                    <AccessControl />
-                  </Layout>
-                } 
-              />
-              <Route 
-                path="/pdks-records" 
-                element={
-                  <Layout>
-                    <PDKSRecords />
-                  </Layout>
-                } 
-              />
-              <Route 
-                path="/settings" 
-                element={
-                  <Layout>
-                    <Settings />
-                  </Layout>
-                } 
-              />
-              <Route 
-                path="/profile" 
-                element={
-                  <Layout>
-                    <Profile />
-                  </Layout>
-                } 
-              />
-              <Route 
-                path="/engineering-department" 
-                element={
-                  <Layout>
-                    <EngineeringDepartment />
-                  </Layout>
-                } 
-              />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <AppContent />
             <Toaster />
           </AuthProvider>
         </Router>
