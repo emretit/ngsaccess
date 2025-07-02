@@ -1,10 +1,9 @@
 
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Device, ServerDevice } from "@/types/device";
+import { Device } from "@/types/device";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { deviceTypeMapping, DatabaseDeviceType } from "@/utils/deviceTypeMapping";
 
 export function useDevices() {
   const queryClient = useQueryClient();
@@ -33,9 +32,11 @@ export function useDevices() {
       return (data || []).map((device: any): Device => {
         let status: 'online' | 'offline' | 'expired' = 'offline';
         
-        // For demonstration, we'll randomly set some devices as online
-        if (Math.random() > 0.5) {
-          status = 'online';
+        // Check if device was seen in the last 5 minutes
+        if (device.last_seen) {
+          const lastSeen = new Date(device.last_seen);
+          const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+          status = lastSeen > fiveMinutesAgo ? 'online' : 'offline';
         }
         
         return { 
@@ -46,57 +47,31 @@ export function useDevices() {
     }
   });
 
-  // Function to validate and add a device by serial number
+  // Function to add a device directly
   const addDeviceMutation = useMutation({
-    mutationFn: async (serialNumber: string) => {
-      // First, check if the device exists in server_devices
-      const { data: existingDevice, error: lookupError } = await supabase
-        .from('server_devices')
-        .select('*')
-        .eq('serial_number', serialNumber)
-        .single();
-
-      if (lookupError) {
-        throw new Error("Device not found. Please check serial number or contact support.");
-      }
-
-      // Type assertion to include zone_id and door_id
-      const serverDevice = existingDevice as ServerDevice;
-
-      // Map the device type to database enum
-      const deviceType = deviceTypeMapping[serverDevice.device_model_enum || "Other"] as DatabaseDeviceType;
-
-      // If it exists, add it to devices table
-      const { error: insertError } = await supabase
+    mutationFn: async (deviceData: Partial<Device>) => {
+      const { error } = await supabase
         .from('devices')
-        .insert({ 
-          name: serverDevice.name,
-          device_serial: serverDevice.serial_number,
-          type: deviceType,
-          device_model: serverDevice.device_model || "",
-          device_location: "",
-          zone_id: serverDevice.zone_id,
-          door_id: serverDevice.door_id
-        });
+        .insert(deviceData);
 
-      if (insertError) {
-        throw new Error("Failed to add device. Please try again.");
+      if (error) {
+        throw new Error("Cihaz eklenirken hata oluştu. Lütfen tekrar deneyin.");
       }
 
-      return serverDevice;
+      return deviceData;
     },
     onSuccess: () => {
       // Refresh the devices list
       queryClient.invalidateQueries({ queryKey: ['devices'] });
       toast({
-        title: "Device added successfully",
-        description: "The device has been added",
+        title: "Cihaz başarıyla eklendi",
+        description: "Cihaz sisteme kaydedildi",
         variant: "default"
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Error adding device",
+        title: "Cihaz eklenirken hata oluştu",
         description: error.message,
         variant: "destructive"
       });
