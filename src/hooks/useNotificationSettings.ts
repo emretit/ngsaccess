@@ -27,7 +27,7 @@ export function useNotificationSettings() {
         .from('notification_settings')
         .select('*')
         .in('project_id', projectIds)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
         throw error;

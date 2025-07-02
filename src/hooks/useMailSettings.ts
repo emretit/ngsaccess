@@ -31,7 +31,7 @@ export function useMailSettings() {
         .from('mail_settings')
         .select('*')
         .in('project_id', projectIds)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
         throw error;
