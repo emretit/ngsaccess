@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { DepartmentTreeItem } from "./DepartmentTreeItem";
@@ -31,25 +30,21 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
         return;
       }
 
-      if (projectIds.length > 0) {
-        // İlk şirket bilgisini al
-        const { data: company, error } = await supabase
-          .from("companies")
-          .select("name")
-          .limit(1)
-          .maybeSingle();
+      // Fetch company name from general_settings instead of companies table
+      const { data: settings, error } = await supabase
+        .from("general_settings")
+        .select("company_name")
+        .limit(1)
+        .maybeSingle();
 
-        if (error) {
-          console.error("Error fetching company name:", error);
-          setCompanyName("Şirket");
-          return;
-        }
+      if (error) {
+        console.error("Error fetching company name:", error);
+        setCompanyName("Şirket");
+        return;
+      }
 
-        if (company) {
-          setCompanyName(company.name);
-        } else {
-          setCompanyName("Şirket");
-        }
+      if (settings && settings.company_name) {
+        setCompanyName(settings.company_name);
       } else {
         setCompanyName("Şirket Bulunamadı");
       }
