@@ -59,9 +59,9 @@ export function useDevices() {
       const dbData = {
         name: deviceData.name || deviceData.device_name,
         device_serial: deviceData.device_serial || deviceData.serial_number,
-        device_type: deviceData.device_type,
+        device_type: deviceData.device_type as any, // Cast to handle type mismatch
         device_ip: deviceData.device_ip,
-        description: deviceData.description || deviceData.device_location,
+        description: deviceData.device_location, // Use device_location instead of description
         zone_id: deviceData.zone_id,
         door_id: deviceData.door_id,
         access_direction: deviceData.access_direction || 'both',
