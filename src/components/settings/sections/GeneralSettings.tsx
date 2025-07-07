@@ -55,6 +55,12 @@ export function GeneralSettings() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
+    // Website URL'ini normalize et
+    let websiteUrl = formData.get('website') as string;
+    if (websiteUrl && !websiteUrl.startsWith('http://') && !websiteUrl.startsWith('https://')) {
+      websiteUrl = 'https://' + websiteUrl;
+    }
+    
     // Convert FormData values to appropriate types for our schema
     const settingsData: GeneralSettings = {
       company_name: formData.get('companyName') as string,
@@ -62,7 +68,7 @@ export function GeneralSettings() {
       address: formData.get('address') as string,
       email: formData.get('email') as string,
       phone: formData.get('phone') as string,
-      website: formData.get('website') as string,
+      website: websiteUrl,
       system_language: formData.get('language') as string,
       timezone: formData.get('timezone') as string,
       date_format: formData.get('dateFormat') as string,
@@ -74,6 +80,7 @@ export function GeneralSettings() {
     };
 
     try {
+      // General settings kaydet
       const { data, error } = await supabase
         .from('general_settings')
         .upsert(settingsData, {
@@ -84,6 +91,22 @@ export function GeneralSettings() {
 
       if (error) throw error;
 
+      // Companies tablosuna da kaydet/güncelle
+      if (settingsData.company_name) {
+        const { error: companyError } = await supabase
+          .from('companies')
+          .upsert({
+            name: settingsData.company_name,
+            project_id: 1 // Mevcut projeye göre ayarla
+          }, {
+            onConflict: 'name'
+          });
+
+        if (companyError) {
+          console.error('Company save error:', companyError);
+        }
+      }
+
       setSettings(data);
       
       // Apply dark mode setting immediately
@@ -91,7 +114,7 @@ export function GeneralSettings() {
 
       toast({
         title: "✅ Ayarlar güncellendi",
-        description: "Tüm değişiklikler başarıyla kaydedildi.",
+        description: "Şirket bilgileri ve ayarlar başarıyla kaydedildi.",
       });
     } catch (error) {
       console.error('Settings save error:', error);
@@ -222,8 +245,8 @@ export function GeneralSettings() {
               <Input 
                 id="website" 
                 name="website" 
-                type="url" 
-                placeholder="https://www.sirket.com"
+                type="text" 
+                placeholder="www.sirket.com veya https://www.sirket.com"
                 defaultValue={settings?.website || ''}
                 className="focus:ring-2 focus:ring-primary/20"
               />
