@@ -97,6 +97,8 @@ app.post('/api/card-reader', async (req, res) => {
             .eq('device_serial', serial)
             .single();
 
+        console.log('Cihaz sorgusu sonucu:', { device, deviceErr });
+
         if (deviceErr) {
             console.error('Cihaz sorgusu hatası:', deviceErr);
             return res.json({ response: 'close_relay' });
