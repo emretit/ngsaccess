@@ -47,10 +47,17 @@ app.post('/api/card-reader', async (req, res) => {
             const [cardNumber, deviceSerial] = body['user_id,serial'].split(',');
             user_id = cardNumber;
             serial = deviceSerial;
+        } else if (body.CARD_NO) {
+            // Yeni format: CARD_NO içinde hem kart hem serial var
+            const [cardNumber, deviceSerial] = body.CARD_NO.split(',');
+            user_id = cardNumber;
+            serial = deviceSerial;
         } else {
             user_id = body.user_id;
             serial = body.serial;
         }
+        
+        console.log('Parsing sonucu:', { user_id, serial, original_body: body });
 
         // Eksik alan kontrolü
         if (!user_id) {
