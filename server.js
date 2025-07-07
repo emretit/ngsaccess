@@ -124,22 +124,26 @@ app.post('/api/card-reader', async (req, res) => {
 
         console.log('Cihaz bulundu:', device);
 
-        // Erişim kontrolü fonksiyonunu çağır
+        // Basit erişim kontrolü - çalışan herhangi bir erişim kuralında bu cihaza erişimi var mı?
         console.log('Erişim kontrolü yapılıyor...');
-        const { data: accessResult, error: accessErr } = await serviceClient
-            .rpc('check_employee_device_access', {
-                p_employee_id: employee.id,
-                p_device_id: device.id,
-                p_access_time: new Date().toISOString()
-            });
+        const { data: accessCheck, error: accessErr } = await serviceClient
+            .from('group_members')
+            .select(`
+                id,
+                group_devices!inner(device_id),
+                access_rules!inner(is_active)
+            `)
+            .eq('employee_id', employee.id)
+            .eq('group_devices.device_id', device.id)
+            .eq('access_rules.is_active', true);
 
         if (accessErr) {
             console.error('Erişim kontrolü hatası:', accessErr);
             return res.json({ response: 'close_relay' });
         }
 
-        const hasAccess = accessResult === true;
-        console.log('Erişim kontrolü fonksiyon sonucu:', accessResult);
+        const hasAccess = accessCheck && accessCheck.length > 0;
+        console.log('Erişim kontrolü sonucu:', { accessCheck, hasAccess });
         console.log('Erişim izni durumu:', hasAccess);
 
         // Kart geçiş kaydını oluştur - access_status alanını da ekle
