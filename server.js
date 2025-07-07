@@ -34,7 +34,7 @@ app.get('/', (req, res) => {
 });
 
 // POST: Cihazdan gelen kart okuma isteklerini işler
-app.post('/api/card-reader', async (req, res) => {
+app.post('/card-reader', async (req, res) => {
     try {
         console.log('API isteği alındı');
         const serviceClient = createServiceRoleClient();
@@ -62,11 +62,11 @@ app.post('/api/card-reader', async (req, res) => {
         // Eksik alan kontrolü
         if (!user_id) {
             console.log('user_id eksik');
-            return res.status(400).json({ response: 'close_relay', error: 'user_id missing' });
+            return res.status(400).json({ cevap: 'error', error: 'user_id missing' });
         }
         if (!serial) {
             console.log('serial eksik');
-            return res.status(400).json({ response: 'close_relay', error: 'serial missing' });
+            return res.status(400).json({ cevap: 'error', error: 'serial missing' });
         }
 
         console.log('İşlenmiş veri:', { user_id, serial });
@@ -74,7 +74,7 @@ app.post('/api/card-reader', async (req, res) => {
         // Eğer serial yoksa devam etme
         if (!serial) {
             console.log('Serial numarası bulunamadı, erişim reddediliyor');
-            return res.json({ response: 'close_relay' });
+            return res.json({ cevap: 'error' });
         }
 
         // Kartın employees tablosunda kayıtlı olup olmadığını kontrol et
@@ -87,17 +87,17 @@ app.post('/api/card-reader', async (req, res) => {
 
         if (empErr) {
             console.error('Çalışan sorgusu hatası:', empErr);
-            return res.json({ response: 'close_relay' });
+            return res.json({ cevap: 'error' });
         }
 
         if (!employee) {
             console.log('Çalışan bulunamadı:', user_id);
-            return res.json({ response: 'close_relay' });
+            return res.json({ cevap: 'error' });
         }
 
         if (!employee.is_active) {
             console.log('Çalışan aktif değil:', user_id);
-            return res.json({ response: 'close_relay' });
+            return res.json({ cevap: 'error' });
         }
 
         console.log('Çalışan bulundu:', employee);
@@ -114,12 +114,12 @@ app.post('/api/card-reader', async (req, res) => {
 
         if (deviceErr) {
             console.error('Cihaz sorgusu hatası:', deviceErr);
-            return res.json({ response: 'close_relay' });
+            return res.json({ cevap: 'error' });
         }
 
         if (!device) {
             console.log('Cihaz bulunamadı:', serial);
-            return res.json({ response: 'close_relay' });
+            return res.json({ cevap: 'error' });
         }
 
         console.log('Cihaz bulundu:', device);
@@ -139,7 +139,7 @@ app.post('/api/card-reader', async (req, res) => {
 
         if (accessErr) {
             console.error('Erişim kontrolü hatası:', accessErr);
-            return res.json({ response: 'close_relay' });
+            return res.json({ cevap: 'error' });
         }
 
         const hasAccess = accessCheck && accessCheck.length > 0;
@@ -168,30 +168,30 @@ app.post('/api/card-reader', async (req, res) => {
         // Erişim sonucuna göre relay kontrol
         if (hasAccess) {
             console.log('Erişim izni verildi');
-            return res.json({ response: 'open_relay' });
+            return res.json({ cevap: 'ok' });
         } else {
             console.log('Erişim reddedildi');
-            return res.json({ response: 'close_relay' });
+            return res.json({ cevap: 'error' });
         }
 
     } catch (error) {
         console.error('Sistem hatası:', error);
         return res.json({
-            response: 'close_relay',
+            cevap: 'error',
             error: 'system error'
         });
     }
 });
 
 // Relay açıldığını onaylama
-app.post('/api/confirm-relay', (req, res) => {
+app.post('/confirm-relay', (req, res) => {
     try {
         console.log('Relay onay isteği alındı:', req.body);
         // Burada ekstra işlemler yapılabilir (log kaydetme vb.)
-        return res.json({ confirmation: 'relay_opened' });
+        return res.json({ onay: 'ok' });
     } catch (error) {
         console.error('Relay onay hatası:', error);
-        return res.status(500).json({ error: 'system error' });
+        return res.status(500).json({ onay: 'error' });
     }
 });
 
