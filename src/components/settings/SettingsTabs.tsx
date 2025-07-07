@@ -4,7 +4,7 @@ import { GeneralSettings } from "./sections/GeneralSettings";
 import { ShiftSettings } from "./sections/ShiftSettings";
 import { NotificationSettings } from "./sections/NotificationSettings";
 import { MailSettings } from "./sections/MailSettings";
-import { UserManagement } from "./sections/UserManagement";
+import AdminUsersPanel from "../admin/AdminUsersPanel";
 
 interface SettingsTabsProps {
   activeTab: string;
@@ -27,7 +27,7 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
       </TabsContent>
 
       <TabsContent value="users">
-        <UserManagement />
+        <AdminUsersPanel />
       </TabsContent>
       
       <TabsContent value="schedule">

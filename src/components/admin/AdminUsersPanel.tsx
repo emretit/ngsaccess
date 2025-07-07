@@ -60,7 +60,7 @@ const AdminUsersPanel = () => {
   };
 
   return (
-    <ProjectFilter requiredRole="super_admin">
+    <ProjectFilter requiredRole="admin">
       <div className="space-y-8">
         <UserTableHeader
           searchQuery={searchQuery}

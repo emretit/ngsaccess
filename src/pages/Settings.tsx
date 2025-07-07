@@ -5,7 +5,7 @@ import { GeneralSettings } from "@/components/settings/sections/GeneralSettings"
 import { ShiftSettings } from "@/components/settings/sections/ShiftSettings";
 import { NotificationSettings } from "@/components/settings/sections/NotificationSettings";
 import { MailSettings } from "@/components/settings/sections/MailSettings";
-import { UserManagement } from "@/components/settings/sections/UserManagement";
+import AdminUsersPanel from "@/components/admin/AdminUsersPanel";
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("general");
@@ -15,7 +15,7 @@ export default function Settings() {
       case "general":
         return <GeneralSettings />;
       case "users":
-        return <UserManagement />;
+        return <AdminUsersPanel />;
       case "schedule":
         return <ShiftSettings />;
       case "mail":

@@ -5,7 +5,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 interface ProjectFilterProps {
   children: React.ReactNode;
-  requiredRole?: 'super_admin' | 'project_admin' | 'project_user';
+  requiredRole?: 'super_admin' | 'project_admin' | 'project_user' | 'admin';
   showNoAccess?: boolean;
 }
 
@@ -19,6 +19,31 @@ const ProjectFilter: React.FC<ProjectFilterProps> = ({
   // Loading sırasında loading göster
   if (loading) {
     return <LoadingSpinner text="Proje erişimi kontrol ediliyor..." />;
+  }
+
+  // Admin role için özel kontrol (super_admin veya project_admin)
+  if (requiredRole === 'admin') {
+    const hasAdminAccess = isSuperAdmin || projectIds.length > 0;
+    if (!hasAdminAccess) {
+      if (!showNoAccess) return null;
+      
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto">
+              <span className="text-2xl">🔒</span>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Yönetici Erişimi Gerekli</h3>
+              <p className="text-gray-600 mt-2">
+                Bu sayfaya erişim için yönetici yetkisine sahip olmanız gerekiyor.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return <>{children}</>;
   }
 
   // Loading tamamlandıktan sonra erişim kontrolü yap
