@@ -71,36 +71,78 @@ export const useGeneralSettings = () => {
         return false;
       }
 
-      // Save system settings (include company name as required field)
-      const { data: savedSettings, error: settingsError } = await supabase
-        .from('general_settings')
-        .upsert({
-          company_name: companyData.name, // Required field
-          system_language: settingsData.system_language,
-          timezone: settingsData.timezone,
-          date_format: settingsData.date_format,
-          dark_mode: settingsData.dark_mode,
-          notifications_enabled: settingsData.notifications_enabled,
-          working_hours_start: settingsData.working_hours_start,
-          working_hours_end: settingsData.working_hours_end,
-        }, {
-          onConflict: 'id'
-        })
-        .select()
-        .single();
-
-      if (settingsError) throw settingsError;
-
-      // Save company info
-      const { data: savedCompany, error: companyError } = await supabase
+      // Save or update company info
+      let savedCompany;
+      const { data: existingCompany } = await supabase
         .from('companies')
-        .upsert(companyData, {
-          onConflict: 'project_id'
-        })
-        .select()
+        .select('*')
+        .eq('project_id', 1)
         .single();
 
-      if (companyError) throw companyError;
+      if (existingCompany) {
+        // Update existing company
+        const { data, error } = await supabase
+          .from('companies')
+          .update(companyData)
+          .eq('id', existingCompany.id)
+          .select()
+          .single();
+          
+        if (error) throw error;
+        savedCompany = data;
+      } else {
+        // Insert new company
+        const { data, error } = await supabase
+          .from('companies')
+          .insert(companyData)
+          .select()
+          .single();
+          
+        if (error) throw error;
+        savedCompany = data;
+      }
+
+      // Save or update system settings
+      let savedSettings;
+      const { data: existingSettings } = await supabase
+        .from('general_settings')
+        .select('*')
+        .limit(1)
+        .single();
+
+      const settingsPayload = {
+        company_name: companyData.name, // Required field
+        system_language: settingsData.system_language,
+        timezone: settingsData.timezone,
+        date_format: settingsData.date_format,
+        dark_mode: settingsData.dark_mode,
+        notifications_enabled: settingsData.notifications_enabled,
+        working_hours_start: settingsData.working_hours_start,
+        working_hours_end: settingsData.working_hours_end,
+      };
+
+      if (existingSettings) {
+        // Update existing settings
+        const { data, error } = await supabase
+          .from('general_settings')
+          .update(settingsPayload)
+          .eq('id', existingSettings.id)
+          .select()
+          .single();
+          
+        if (error) throw error;
+        savedSettings = data;
+      } else {
+        // Insert new settings
+        const { data, error } = await supabase
+          .from('general_settings')
+          .insert(settingsPayload)
+          .select()
+          .single();
+          
+        if (error) throw error;
+        savedSettings = data;
+      }
 
       setSettings(savedSettings);
       setCompany(savedCompany);
