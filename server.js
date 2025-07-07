@@ -124,7 +124,8 @@ app.post('/api/card-reader', async (req, res) => {
         }
 
         const hasAccess = accessResult === true;
-        console.log('Erişim kontrolü sonucu:', hasAccess);
+        console.log('Erişim kontrolü fonksiyon sonucu:', accessResult);
+        console.log('Erişim izni durumu:', hasAccess);
 
         // Kart geçiş kaydını oluştur - access_status alanını da ekle
         const { error: logError } = await serviceClient
@@ -136,7 +137,7 @@ app.post('/api/card-reader', async (req, res) => {
                 access_time: new Date().toISOString(),
                 employee_name: `${employee.first_name} ${employee.last_name}`,
                 raw_data: JSON.stringify(body),
-                access_status: hasAccess ? 'kabul_edildi' : 'reddedildi'
+                access_status: hasAccess ? 'izin_verildi' : 'reddedildi'
             });
 
         if (logError) {
