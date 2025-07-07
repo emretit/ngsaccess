@@ -152,7 +152,7 @@ app.post('/card-reader', async (req, res) => {
             .insert({
                 employee_id: employee.id,
                 card_no: user_id,
-                device_id: device.id,
+                device_id: parseInt(device.id),
                 access_time: new Date().toISOString(),
                 employee_name: `${employee.first_name} ${employee.last_name}`,
                 raw_data: JSON.stringify(body),
