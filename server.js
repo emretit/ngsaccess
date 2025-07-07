@@ -64,6 +64,12 @@ app.post('/api/card-reader', async (req, res) => {
 
         console.log('İşlenmiş veri:', { user_id, serial });
 
+        // Eğer serial yoksa devam etme
+        if (!serial) {
+            console.log('Serial numarası bulunamadı, erişim reddediliyor');
+            return res.json({ response: 'close_relay' });
+        }
+
         // Kartın employees tablosunda kayıtlı olup olmadığını kontrol et
         console.log('Çalışan kontrolü yapılıyor:', user_id);
         const { data: employee, error: empErr } = await serviceClient
