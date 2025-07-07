@@ -4,7 +4,7 @@ import { useGeneralSettings, useDarkMode } from "./hooks";
 import { CompanyInfoForm, SystemSettingsForm, FormSubmitButton } from "./general";
 
 export function GeneralSettings() {
-  const { settings, loading, saving, saveSettings } = useGeneralSettings();
+  const { settings, company, loading, saving, saveSettings } = useGeneralSettings();
   const { isDarkMode, applyDarkMode } = useDarkMode();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -35,7 +35,7 @@ export function GeneralSettings() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <CompanyInfoForm settings={settings} />
+      <CompanyInfoForm company={company} />
       
       <SystemSettingsForm 
         settings={settings} 

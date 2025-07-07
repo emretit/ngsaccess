@@ -16,6 +16,21 @@ export interface GeneralSettings {
   working_hours_end?: string;
 }
 
+export interface CompanyInfo {
+  id?: number;
+  name: string;
+  tax_number?: string;
+  address?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  currency?: string;
+  logo_url?: string;
+  project_id?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface GeneralSettingsFormData {
   companyName: string;
   taxNumber: string;

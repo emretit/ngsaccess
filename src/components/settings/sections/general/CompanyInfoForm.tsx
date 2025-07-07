@@ -4,13 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, Mail, Phone, CreditCard } from "lucide-react";
-import { GeneralSettings } from "../types/generalSettings";
+import { CompanyInfo } from "../types/generalSettings";
 
 interface CompanyInfoFormProps {
-  settings: GeneralSettings | null;
+  company: CompanyInfo | null;
 }
 
-export const CompanyInfoForm = ({ settings }: CompanyInfoFormProps) => {
+export const CompanyInfoForm = ({ company }: CompanyInfoFormProps) => {
   return (
     <Card>
       <CardHeader>
@@ -27,7 +27,7 @@ export const CompanyInfoForm = ({ settings }: CompanyInfoFormProps) => {
               id="companyName" 
               name="companyName" 
               placeholder="Şirket adını girin" 
-              defaultValue={settings?.company_name || ''}
+              defaultValue={company?.name || ''}
               required 
               className="focus:ring-2 focus:ring-primary/20"
             />
@@ -38,7 +38,7 @@ export const CompanyInfoForm = ({ settings }: CompanyInfoFormProps) => {
               id="taxNumber" 
               name="taxNumber" 
               placeholder="Vergi numarasını girin"
-              defaultValue={settings?.tax_number || ''}
+              defaultValue={company?.tax_number || ''}
               className="focus:ring-2 focus:ring-primary/20"
             />
           </div>
@@ -48,7 +48,7 @@ export const CompanyInfoForm = ({ settings }: CompanyInfoFormProps) => {
               id="address" 
               name="address" 
               placeholder="Şirket adresini girin"
-              defaultValue={settings?.address || ''}
+              defaultValue={company?.address || ''}
               className="focus:ring-2 focus:ring-primary/20 min-h-[80px]"
             />
           </div>
@@ -61,7 +61,7 @@ export const CompanyInfoForm = ({ settings }: CompanyInfoFormProps) => {
                 name="email" 
                 type="email" 
                 placeholder="ornek@sirket.com"
-                defaultValue={settings?.email || ''}
+                defaultValue={company?.email || ''}
                 className="focus:ring-2 focus:ring-primary/20"
               />
             </div>
@@ -75,7 +75,7 @@ export const CompanyInfoForm = ({ settings }: CompanyInfoFormProps) => {
                 name="phone" 
                 type="tel" 
                 placeholder="+90 (555) 123 45 67"
-                defaultValue={settings?.phone || ''}
+                defaultValue={company?.phone || ''}
                 className="focus:ring-2 focus:ring-primary/20"
               />
             </div>
@@ -87,7 +87,7 @@ export const CompanyInfoForm = ({ settings }: CompanyInfoFormProps) => {
               name="website" 
               type="text" 
               placeholder="www.sirket.com veya https://www.sirket.com"
-              defaultValue={settings?.website || ''}
+              defaultValue={company?.website || ''}
               className="focus:ring-2 focus:ring-primary/20"
             />
           </div>
@@ -95,7 +95,7 @@ export const CompanyInfoForm = ({ settings }: CompanyInfoFormProps) => {
             <Label htmlFor="currency">Para Birimi</Label>
             <div className="flex items-center space-x-2">
               <CreditCard className="w-4 h-4 text-muted-foreground" />
-              <Select name="currency" defaultValue={settings?.currency || "TRY"}>
+              <Select name="currency" defaultValue={company?.currency || "TRY"}>
                 <SelectTrigger className="focus:ring-2 focus:ring-primary/20">
                   <SelectValue placeholder="Para birimi seçin" />
                 </SelectTrigger>

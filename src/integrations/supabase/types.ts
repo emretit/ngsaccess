@@ -141,25 +141,46 @@ export type Database = {
       }
       companies: {
         Row: {
+          address: string | null
           created_at: string | null
+          currency: string | null
+          email: string | null
           id: number
+          logo_url: string | null
           name: string
+          phone: string | null
           project_id: number | null
+          tax_number: string | null
           updated_at: string | null
+          website: string | null
         }
         Insert: {
+          address?: string | null
           created_at?: string | null
+          currency?: string | null
+          email?: string | null
           id?: number
+          logo_url?: string | null
           name: string
+          phone?: string | null
           project_id?: number | null
+          tax_number?: string | null
           updated_at?: string | null
+          website?: string | null
         }
         Update: {
+          address?: string | null
           created_at?: string | null
+          currency?: string | null
+          email?: string | null
           id?: number
+          logo_url?: string | null
           name?: string
+          phone?: string | null
           project_id?: number | null
+          tax_number?: string | null
           updated_at?: string | null
+          website?: string | null
         }
         Relationships: [
           {

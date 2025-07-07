@@ -1,4 +1,4 @@
-import { GeneralSettings, GeneralSettingsFormData } from '../types/generalSettings';
+import { GeneralSettings, GeneralSettingsFormData, CompanyInfo } from '../types/generalSettings';
 
 export const normalizeWebsiteUrl = (url: string): string => {
   if (!url) return url;
@@ -28,6 +28,21 @@ export const convertFormDataToSettings = (formData: FormData): GeneralSettings =
     notifications_enabled: formData.get('notifications') === 'on',
     working_hours_start: formData.get('workingHoursStart') as string,
     working_hours_end: formData.get('workingHoursEnd') as string,
+  };
+};
+
+export const convertFormDataToCompany = (formData: FormData): Omit<CompanyInfo, 'id' | 'created_at' | 'updated_at'> => {
+  const websiteUrl = normalizeWebsiteUrl(formData.get('website') as string);
+  
+  return {
+    name: formData.get('companyName') as string,
+    tax_number: formData.get('taxNumber') as string,
+    address: formData.get('address') as string,
+    email: formData.get('email') as string,
+    phone: formData.get('phone') as string,
+    website: websiteUrl,
+    currency: formData.get('currency') as string,
+    project_id: 1, // TODO: Get from context
   };
 };
 
