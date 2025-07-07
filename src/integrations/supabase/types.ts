@@ -1401,6 +1401,14 @@ export type Database = {
       }
     }
     Functions: {
+      check_employee_device_access: {
+        Args: {
+          p_employee_id: number
+          p_device_id: number
+          p_access_time: string
+        }
+        Returns: boolean
+      }
       employee_login: {
         Args: { email_or_phone: string; password: string }
         Returns: Json

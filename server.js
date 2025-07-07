@@ -126,7 +126,7 @@ app.post('/api/card-reader', async (req, res) => {
         const hasAccess = accessResult === true;
         console.log('Erişim kontrolü sonucu:', hasAccess);
 
-        // Kart geçiş kaydını oluştur
+        // Kart geçiş kaydını oluştur - access_status alanını da ekle
         const { error: logError } = await serviceClient
             .from('card_readings')
             .insert({
@@ -135,7 +135,8 @@ app.post('/api/card-reader', async (req, res) => {
                 device_id: device.id,
                 access_time: new Date().toISOString(),
                 employee_name: `${employee.first_name} ${employee.last_name}`,
-                raw_data: JSON.stringify(body)
+                raw_data: JSON.stringify(body),
+                access_status: hasAccess ? 'kabul_edildi' : 'reddedildi'
             });
 
         if (logError) {
