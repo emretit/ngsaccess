@@ -74,22 +74,29 @@ export function GeneralSettings() {
     };
 
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('general_settings')
-        .upsert(settingsData);
+        .upsert(settingsData, {
+          onConflict: 'id'
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
+      setSettings(data);
+      
       // Apply dark mode setting immediately
       toggleDarkMode(settingsData.dark_mode || false);
 
       toast({
-        title: "Ayarlar güncellendi",
+        title: "✅ Ayarlar güncellendi",
         description: "Tüm değişiklikler başarıyla kaydedildi.",
       });
     } catch (error) {
+      console.error('Settings save error:', error);
       toast({
-        title: "Hata",
+        title: "❌ Hata",
         description: "Ayarlar güncellenirken bir hata oluştu.",
         variant: "destructive",
       });
@@ -101,7 +108,8 @@ export function GeneralSettings() {
       const { data, error } = await supabase
         .from('general_settings')
         .select('*')
-        .maybeSingle();
+        .limit(1)
+        .single();
 
       if (error) {
         console.error('Error loading settings:', error);
@@ -116,35 +124,23 @@ export function GeneralSettings() {
         setIsDarkMode(darkModeEnabled);
         toggleDarkMode(darkModeEnabled);
         
-        // Map database fields to form fields
-        const formElements = {
-          companyName: data.company_name,
-          taxNumber: data.tax_number || '',
-          address: data.address || '',
-          email: data.email || '',
-          phone: data.phone || '',
-          website: data.website || '',
-          language: data.system_language || 'tr',
-          timezone: data.timezone || 'Europe/Istanbul',
-          dateFormat: data.date_format || 'DD.MM.YYYY',
-          currency: data.currency || 'TRY',
-          darkMode: darkModeEnabled,
-          notifications: data.notifications_enabled || false,
-          workingHoursStart: data.working_hours_start || '09:00',
-          workingHoursEnd: data.working_hours_end || '18:00',
-        };
-
-        // Set form values
-        Object.entries(formElements).forEach(([key, value]) => {
-          const element = document.querySelector(`[name="${key}"]`) as HTMLInputElement | null;
-          if (element) {
-            if (typeof value === 'boolean') {
-              element.checked = value;
-            } else if (value !== null && value !== undefined) {
-              element.value = String(value);
-            }
+        // Set form values directly using controlled components
+        setTimeout(() => {
+          const form = document.querySelector('form') as HTMLFormElement;
+          if (form) {
+            // Company info
+            (form.elements.namedItem('companyName') as HTMLInputElement).value = data.company_name || '';
+            (form.elements.namedItem('taxNumber') as HTMLInputElement).value = data.tax_number || '';
+            (form.elements.namedItem('address') as HTMLTextAreaElement).value = data.address || '';
+            (form.elements.namedItem('email') as HTMLInputElement).value = data.email || '';
+            (form.elements.namedItem('phone') as HTMLInputElement).value = data.phone || '';
+            (form.elements.namedItem('website') as HTMLInputElement).value = data.website || '';
+            
+            // System settings
+            (form.elements.namedItem('workingHoursStart') as HTMLInputElement).value = data.working_hours_start || '09:00';
+            (form.elements.namedItem('workingHoursEnd') as HTMLInputElement).value = data.working_hours_end || '18:00';
           }
-        });
+        }, 100);
       }
     };
 
@@ -163,47 +159,87 @@ export function GeneralSettings() {
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="companyName">Şirket Adı</Label>
-              <Input id="companyName" name="companyName" placeholder="Şirket adını girin" required />
+              <Label htmlFor="companyName">Şirket Adı *</Label>
+              <Input 
+                id="companyName" 
+                name="companyName" 
+                placeholder="Şirket adını girin" 
+                defaultValue={settings?.company_name || ''}
+                required 
+                className="focus:ring-2 focus:ring-primary/20"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="taxNumber">Vergi Numarası</Label>
-              <Input id="taxNumber" name="taxNumber" placeholder="Vergi numarasını girin" />
+              <Input 
+                id="taxNumber" 
+                name="taxNumber" 
+                placeholder="Vergi numarasını girin"
+                defaultValue={settings?.tax_number || ''}
+                className="focus:ring-2 focus:ring-primary/20"
+              />
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="address">Şirket Adresi</Label>
-              <Textarea id="address" name="address" placeholder="Şirket adresini girin" />
+              <Textarea 
+                id="address" 
+                name="address" 
+                placeholder="Şirket adresini girin"
+                defaultValue={settings?.address || ''}
+                className="focus:ring-2 focus:ring-primary/20 min-h-[80px]"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">E-posta Adresi</Label>
               <div className="flex items-center space-x-2">
                 <Mail className="w-4 h-4 text-muted-foreground" />
-                <Input id="email" name="email" type="email" placeholder="ornek@sirket.com" />
+                <Input 
+                  id="email" 
+                  name="email" 
+                  type="email" 
+                  placeholder="ornek@sirket.com"
+                  defaultValue={settings?.email || ''}
+                  className="focus:ring-2 focus:ring-primary/20"
+                />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Telefon Numarası</Label>
               <div className="flex items-center space-x-2">
                 <Phone className="w-4 h-4 text-muted-foreground" />
-                <Input id="phone" name="phone" type="tel" placeholder="+90" />
+                <Input 
+                  id="phone" 
+                  name="phone" 
+                  type="tel" 
+                  placeholder="+90 (555) 123 45 67"
+                  defaultValue={settings?.phone || ''}
+                  className="focus:ring-2 focus:ring-primary/20"
+                />
               </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="website">Web Sitesi</Label>
-              <Input id="website" name="website" type="url" placeholder="https://www.sirket.com" />
+              <Input 
+                id="website" 
+                name="website" 
+                type="url" 
+                placeholder="https://www.sirket.com"
+                defaultValue={settings?.website || ''}
+                className="focus:ring-2 focus:ring-primary/20"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="currency">Para Birimi</Label>
               <div className="flex items-center space-x-2">
                 <CreditCard className="w-4 h-4 text-muted-foreground" />
-                <Select name="currency" defaultValue="TRY">
-                  <SelectTrigger>
+                <Select name="currency" defaultValue={settings?.currency || "TRY"}>
+                  <SelectTrigger className="focus:ring-2 focus:ring-primary/20">
                     <SelectValue placeholder="Para birimi seçin" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="TRY">Türk Lirası (₺)</SelectItem>
-                    <SelectItem value="USD">US Dollar ($)</SelectItem>
-                    <SelectItem value="EUR">Euro (€)</SelectItem>
+                    <SelectItem value="TRY">🇹🇷 Türk Lirası (₺)</SelectItem>
+                    <SelectItem value="USD">🇺🇸 US Dollar ($)</SelectItem>
+                    <SelectItem value="EUR">🇪🇺 Euro (€)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -223,13 +259,13 @@ export function GeneralSettings() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="language">Sistem Dili</Label>
-              <Select name="language" defaultValue="tr">
-                <SelectTrigger>
+              <Select name="language" defaultValue={settings?.system_language || "tr"}>
+                <SelectTrigger className="focus:ring-2 focus:ring-primary/20">
                   <SelectValue placeholder="Dil seçin" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="tr">Türkçe</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="tr">🇹🇷 Türkçe</SelectItem>
+                  <SelectItem value="en">🇺🇸 English</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -238,14 +274,14 @@ export function GeneralSettings() {
               <Label htmlFor="timezone">Saat Dilimi</Label>
               <div className="flex items-center space-x-2">
                 <Clock className="w-4 h-4 text-muted-foreground" />
-                <Select name="timezone" defaultValue="Europe/Istanbul">
-                  <SelectTrigger>
+                <Select name="timezone" defaultValue={settings?.timezone || "Europe/Istanbul"}>
+                  <SelectTrigger className="focus:ring-2 focus:ring-primary/20">
                     <SelectValue placeholder="Saat dilimi seçin" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Europe/Istanbul">İstanbul (UTC+3)</SelectItem>
-                    <SelectItem value="Europe/London">Londra (UTC+0)</SelectItem>
-                    <SelectItem value="America/New_York">New York (UTC-5)</SelectItem>
+                    <SelectItem value="Europe/Istanbul">🇹🇷 İstanbul (UTC+3)</SelectItem>
+                    <SelectItem value="Europe/London">🇬🇧 Londra (UTC+0)</SelectItem>
+                    <SelectItem value="America/New_York">🇺🇸 New York (UTC-5)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -255,14 +291,14 @@ export function GeneralSettings() {
               <Label htmlFor="dateFormat">Tarih Formatı</Label>
               <div className="flex items-center space-x-2">
                 <Calendar className="w-4 h-4 text-muted-foreground" />
-                <Select name="dateFormat" defaultValue="DD.MM.YYYY">
-                  <SelectTrigger>
+                <Select name="dateFormat" defaultValue={settings?.date_format || "DD.MM.YYYY"}>
+                  <SelectTrigger className="focus:ring-2 focus:ring-primary/20">
                     <SelectValue placeholder="Tarih formatı seçin" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="DD.MM.YYYY">DD.MM.YYYY</SelectItem>
-                    <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
-                    <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
+                    <SelectItem value="DD.MM.YYYY">📅 DD.MM.YYYY (07.01.2025)</SelectItem>
+                    <SelectItem value="MM/DD/YYYY">📅 MM/DD/YYYY (01/07/2025)</SelectItem>
+                    <SelectItem value="YYYY-MM-DD">📅 YYYY-MM-DD (2025-01-07)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -275,14 +311,16 @@ export function GeneralSettings() {
                   id="workingHoursStart"
                   name="workingHoursStart"
                   type="time"
-                  defaultValue="09:00"
+                  defaultValue={settings?.working_hours_start || "09:00"}
+                  className="focus:ring-2 focus:ring-primary/20"
                 />
-                <span>-</span>
+                <span className="text-muted-foreground font-medium">-</span>
                 <Input
                   id="workingHoursEnd"
                   name="workingHoursEnd"
                   type="time"
-                  defaultValue="18:00"
+                  defaultValue={settings?.working_hours_end || "18:00"}
+                  className="focus:ring-2 focus:ring-primary/20"
                 />
               </div>
             </div>
@@ -316,15 +354,23 @@ export function GeneralSettings() {
                   Önemli sistem bildirimlerini göster
                 </div>
               </div>
-              <Switch id="notifications" name="notifications" defaultChecked />
+              <Switch 
+                id="notifications" 
+                name="notifications" 
+                checked={settings?.notifications_enabled || true}
+              />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="flex justify-end">
-        <Button type="submit" size="lg">
-          Değişiklikleri Kaydet
+      <div className="flex justify-end pt-4 border-t">
+        <Button 
+          type="submit" 
+          size="lg"
+          className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-3 font-semibold"
+        >
+          💾 Değişiklikleri Kaydet
         </Button>
       </div>
     </form>
