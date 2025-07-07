@@ -146,13 +146,13 @@ app.post('/card-reader', async (req, res) => {
         console.log('Erişim kontrolü sonucu:', { accessCheck, hasAccess });
         console.log('Erişim izni durumu:', hasAccess);
 
-        // Kart geçiş kaydını oluştur - access_status alanını da ekle
+        // Kart geçiş kaydını oluştur - device_serial kullan
         const { error: logError } = await serviceClient
             .from('card_readings')
             .insert({
                 employee_id: employee.id,
                 card_no: user_id,
-                device_id: parseInt(device.id),
+                device_serial: serial,
                 access_time: new Date().toISOString(),
                 employee_name: `${employee.first_name} ${employee.last_name}`,
                 raw_data: JSON.stringify(body),
