@@ -71,36 +71,19 @@ export const useGeneralSettings = () => {
         return false;
       }
 
-      // Save or update company info
-      let savedCompany;
-      const { data: existingCompany } = await supabase
+      // Save or update company info using upsert
+      const { data: savedCompany, error: companyError } = await supabase
         .from('companies')
-        .select('*')
-        .eq('project_id', 1)
+        .upsert({
+          ...companyData,
+          project_id: 1
+        }, {
+          onConflict: 'project_id'
+        })
+        .select()
         .single();
-
-      if (existingCompany) {
-        // Update existing company
-        const { data, error } = await supabase
-          .from('companies')
-          .update(companyData)
-          .eq('id', existingCompany.id)
-          .select()
-          .single();
-          
-        if (error) throw error;
-        savedCompany = data;
-      } else {
-        // Insert new company
-        const { data, error } = await supabase
-          .from('companies')
-          .insert(companyData)
-          .select()
-          .single();
-          
-        if (error) throw error;
-        savedCompany = data;
-      }
+        
+      if (companyError) throw companyError;
 
       // Save or update system settings
       let savedSettings;
