@@ -6,9 +6,16 @@ import { ShiftSettings } from "@/components/settings/sections/ShiftSettings";
 import { NotificationSettings } from "@/components/settings/sections/NotificationSettings";
 import { MailSettings } from "@/components/settings/sections/MailSettings";
 import AdminUsersPanel from "@/components/admin/AdminUsersPanel";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { useGeneralSettings } from "@/components/settings/sections/hooks/useGeneralSettings";
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("general");
+  const { loading } = useGeneralSettings();
+
+  if (loading) {
+    return <LoadingSpinner text="Ayarlar yükleniyor..." />;
+  }
 
   const renderActiveContent = () => {
     switch (activeTab) {

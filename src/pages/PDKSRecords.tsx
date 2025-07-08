@@ -14,6 +14,7 @@ import { usePdksRecords } from "@/hooks/usePdksRecords";
 import { Button } from "@/components/ui/button";
 import { X, MessageSquare, BarChart3, Table2, RefreshCw, Menu, Activity, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 export default function PDKSRecords() {
   const [activeTab, setActiveTab] = useState("table");
@@ -74,23 +75,7 @@ export default function PDKSRecords() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30 dark:from-gray-900 dark:to-gray-800">
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center space-y-4">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-[#711A1A]/10 rounded-full">
-              <RefreshCw className="w-8 h-8 text-[#711A1A] animate-spin" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                Veriler Yükleniyor
-              </h3>
-              <p className="text-gray-500 mt-1">PDKS kayıtları getiriliyor...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingSpinner text="PDKS kayıtları yükleniyor..." />;
   }
 
   return (

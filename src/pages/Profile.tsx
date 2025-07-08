@@ -5,6 +5,7 @@ import ProfilePhoto from '@/components/profile/ProfilePhoto';
 import ProfileForm from '@/components/profile/ProfileForm';
 import SecurityCard from '@/components/profile/SecurityCard';
 import { useProfileUtils } from '@/hooks/useProfileUtils';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 export default function Profile() {
   const { user, profile, refreshProfile, signOut } = useAuth();
@@ -14,6 +15,10 @@ export default function Profile() {
   const handlePhotoUpdated = (newUrl: string) => {
     updateFormData('photoUrl', newUrl);
   };
+
+  if (!user || !profile) {
+    return <LoadingSpinner text="Profil bilgileri yükleniyor..." />;
+  }
 
   return (
     <div className="container mx-auto py-8">
