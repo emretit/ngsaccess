@@ -108,7 +108,7 @@ export const useComplexAccessRuleMutations = () => {
       employeeIds?: number[];
       deviceIds?: number[];
     }) => {
-      console.log('Updating access rule with additional members:', params);
+      console.log('Updating access rule with members replacement:', params);
       
       // First update the access rule
       const { data: ruleData, error: ruleError } = await supabase
@@ -124,78 +124,74 @@ export const useComplexAccessRuleMutations = () => {
 
       const promises = [];
 
-      // Add new group members if provided
-      if (params.employeeIds && params.employeeIds.length > 0) {
-        // First, get existing member IDs to avoid duplicates
-        const { data: existingMembers } = await supabase
-          .from('group_members')
-          .select('employee_id')
-          .eq('group_id', params.id);
+      // Delete all existing group members first
+      const deleteMembers = supabase
+        .from('group_members')
+        .delete()
+        .eq('group_id', params.id);
+      promises.push(deleteMembers);
 
-        const existingEmployeeIds = existingMembers?.map(m => m.employee_id) || [];
-        
-        // Filter out employees that are already members
-        const newEmployeeIds = params.employeeIds.filter(id => !existingEmployeeIds.includes(id));
-        
-        console.log('Existing employee IDs:', existingEmployeeIds);
-        console.log('New employee IDs to add:', newEmployeeIds);
+      // Delete all existing group devices first
+      const deleteDevices = supabase
+        .from('group_devices')
+        .delete()
+        .eq('group_id', params.id);
+      promises.push(deleteDevices);
 
-        if (newEmployeeIds.length > 0) {
-          const memberInserts = newEmployeeIds.map(employeeId => ({
-            group_id: params.id,
-            employee_id: employeeId,
-            project_id: params.updates.project_id
-          }));
-
-          console.log('Adding new group members:', memberInserts);
-
-          const memberPromise = supabase
-            .from('group_members')
-            .insert(memberInserts);
-          promises.push(memberPromise);
+      // Execute deletions first
+      const deleteResults = await Promise.all(promises);
+      deleteResults.forEach((result, index) => {
+        if (result.error) {
+          console.error(`Error in delete operation ${index}:`, result.error);
+          throw result.error;
         }
+      });
+
+      console.log('Deleted existing members and devices');
+
+      // Now insert the new members and devices
+      const insertPromises = [];
+
+      // Add group members if provided
+      if (params.employeeIds && params.employeeIds.length > 0) {
+        const memberInserts = params.employeeIds.map(employeeId => ({
+          group_id: params.id,
+          employee_id: employeeId,
+          project_id: params.updates.project_id
+        }));
+
+        console.log('Adding group members:', memberInserts);
+
+        const memberPromise = supabase
+          .from('group_members')
+          .insert(memberInserts);
+        insertPromises.push(memberPromise);
       }
 
-      // Add new group devices if provided
+      // Add group devices if provided
       if (params.deviceIds && params.deviceIds.length > 0) {
-        // First, get existing device IDs to avoid duplicates
-        const { data: existingDevices } = await supabase
+        const deviceInserts = params.deviceIds.map(deviceId => ({
+          group_id: params.id,
+          device_id: deviceId,
+          project_id: params.updates.project_id
+        }));
+
+        console.log('Adding group devices:', deviceInserts);
+
+        const devicePromise = supabase
           .from('group_devices')
-          .select('device_id')
-          .eq('group_id', params.id);
-
-        const existingDeviceIds = existingDevices?.map(d => d.device_id) || [];
-        
-        // Filter out devices that are already in the group
-        const newDeviceIds = params.deviceIds.filter(id => !existingDeviceIds.includes(id));
-        
-        console.log('Existing device IDs:', existingDeviceIds);
-        console.log('New device IDs to add:', newDeviceIds);
-
-        if (newDeviceIds.length > 0) {
-          const deviceInserts = newDeviceIds.map(deviceId => ({
-            group_id: params.id,
-            device_id: deviceId,
-            project_id: params.updates.project_id
-          }));
-
-          console.log('Adding new group devices:', deviceInserts);
-
-          const devicePromise = supabase
-            .from('group_devices')
-            .insert(deviceInserts);
-          promises.push(devicePromise);
-        }
+          .insert(deviceInserts);
+        insertPromises.push(devicePromise);
       }
 
       // Execute all inserts
-      if (promises.length > 0) {
-        const results = await Promise.all(promises);
+      if (insertPromises.length > 0) {
+        const insertResults = await Promise.all(insertPromises);
         
         // Check for errors in batch operations
-        results.forEach((result, index) => {
+        insertResults.forEach((result, index) => {
           if (result.error) {
-            console.error(`Error in batch operation ${index}:`, result.error);
+            console.error(`Error in insert operation ${index}:`, result.error);
             throw result.error;
           }
         });
