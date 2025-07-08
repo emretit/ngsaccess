@@ -11,6 +11,8 @@ import { PDKSEnhancedExportPanel } from "@/components/pdks/dashboard/PDKSEnhance
 import { PDKSMobileDrawer } from "@/components/pdks/dashboard/PDKSMobileDrawer";
 import { PDKSAiChat } from "@/components/pdks/PDKSAiChat";
 import { usePdksRecords } from "@/hooks/usePdksRecords";
+import { usePdksStats } from "@/hooks/usePdksStats";
+import { usePdksTableData } from "@/hooks/usePdksTableData";
 import { Button } from "@/components/ui/button";
 import { X, MessageSquare, BarChart3, Table2, RefreshCw, Menu, Activity, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -33,34 +35,11 @@ export default function PDKSRecords() {
     handleRefresh 
   } = usePdksRecords();
 
-  // Mock data for summary cards
-  const summaryData = {
-    totalEmployees: 150,
-    presentToday: 132,
-    lateArrivals: 8,
-    overtimeHours: 45,
-    insideBuilding: 42
-  };
+  // Get real statistics from database
+  const { stats: summaryData, loading: statsLoading, refetch: refetchStats } = usePdksStats();
 
-  // Transform records for table view
-  const tableRecords = filteredRecords.map(record => ({
-    id: record.id.toString(),
-    name: `${record.employee_first_name} ${record.employee_last_name}`,
-    employeeId: record.id.toString(),
-    department: "IT",
-    firstEntry: record.entry_time || "09:00",
-    lastExit: record.exit_time || "18:00",
-    totalHours: "8h 30m",
-    overtime: "30m",
-    leaveType: "-",
-    status: record.status as 'present' | 'late' | 'absent' | 'leave',
-    detailedLogs: [
-      { time: "09:00", action: "Giriş", location: "Ana Giriş" },
-      { time: "12:30", action: "Çıkış", location: "Ana Giriş" },
-      { time: "13:30", action: "Giriş", location: "Ana Giriş" },
-      { time: "18:00", action: "Çıkış", location: "Ana Giriş" }
-    ]
-  }));
+  // Get real table data from database
+  const { tableRecords, loading: tableLoading, refetch: refetchTable } = usePdksTableData();
 
   const handleFiltersChange = (filters: any) => {
     console.log("Filters changed:", filters);
@@ -68,13 +47,15 @@ export default function PDKSRecords() {
 
   const handleRefreshData = () => {
     handleRefresh();
+    refetchStats();
+    refetchTable();
     toast({
       title: "Veriler Yenilendi",
       description: "PDKS verileri başarıyla güncellendi.",
     });
   };
 
-  if (loading) {
+  if (loading || statsLoading || tableLoading) {
     return <LoadingSpinner text="PDKS kayıtları yükleniyor..." />;
   }
 
@@ -182,7 +163,7 @@ export default function PDKSRecords() {
             
             <div className="p-4 sm:p-6">
               <TabsContent value="table" className="space-y-6 mt-0">
-                <PDKSTableView records={tableRecords} loading={loading} />
+                <PDKSTableView records={tableRecords} loading={tableLoading} />
               </TabsContent>
               
               <TabsContent value="charts" className="space-y-6 mt-0">
