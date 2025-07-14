@@ -124,6 +124,37 @@ app.post('/card-reader', async (req, res) => {
 
         console.log('Cihaz bulundu:', device);
 
+        // Önce cihazın hiçbir grupta olup olmadığını kontrol et
+        console.log('Cihaz grup kontrolü yapılıyor...');
+        const { data: deviceGroups, error: deviceGroupErr } = await serviceClient
+            .from('group_devices')
+            .select('id')
+            .eq('device_id', device.id);
+
+        if (deviceGroupErr) {
+            console.error('Cihaz grup kontrolü hatası:', deviceGroupErr);
+            return res.json({ cevap: 'error' });
+        }
+
+        if (!deviceGroups || deviceGroups.length === 0) {
+            console.log('Cihaz hiçbir grupta değil, erişim reddediliyor:', device.name);
+            // Kart geçiş kaydını oluştur
+            await serviceClient
+                .from('card_readings')
+                .insert({
+                    employee_id: employee.id,
+                    card_no: user_id,
+                    device_serial: serial,
+                    access_time: new Date().toISOString(),
+                    employee_name: `${employee.first_name} ${employee.last_name}`,
+                    raw_data: JSON.stringify(body),
+                    access_status: 'reddedildi'
+                });
+            return res.json({ cevap: 'error' });
+        }
+
+        console.log('Cihaz grupları bulundu:', deviceGroups.length);
+
         // Basit erişim kontrolü - çalışan herhangi bir erişim kuralında bu cihaza erişimi var mı?
         console.log('Erişim kontrolü yapılıyor...');
         const { data: accessCheck, error: accessErr } = await serviceClient
