@@ -1,88 +1,64 @@
-
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { ServerDevice } from "@/types/device";
+import { useMutation } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import { Id } from "../../../../convex/_generated/dataModel";
 import { FormValues } from "./useDeviceFormSchema";
 
 interface UseDeviceFormSubmissionProps {
-  device?: ServerDevice | null;
-  currentProjectId: number | null;
-  projectIds: number[];
+  device?: { _id?: Id<"devices"> } | null;
+  currentProjectId: Id<"projects"> | null;
   onSuccess: () => void;
 }
 
-export function useDeviceFormSubmission({ 
-  device, 
-  currentProjectId, 
-  projectIds, 
-  onSuccess 
+export function useDeviceFormSubmission({
+  device,
+  currentProjectId,
+  onSuccess,
 }: UseDeviceFormSubmissionProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+
+  const createDevice = useMutation(api.devices.create);
+  const updateDevice = useMutation(api.devices.update);
 
   const onSubmit = async (values: FormValues) => {
     setIsLoading(true);
-    console.log('Submitting form with values:', values);
-    
     try {
-      const deviceData = {
-        name: values.name,
-        device_serial: values.device_serial,
-        device_type: values.device_type,
-        project_id: currentProjectId,
-        zone_id: values.zone_id || null,
-        door_id: values.door_id || null,
-        access_direction: values.access_direction,
-        device_ip: values.device_ip || null,
-        description: values.description || null,
-        status: values.status,
-      };
-
-      console.log('Device data to be saved:', deviceData);
-
-      if (device?.id) {
-        const { error } = await supabase
-          .from("devices")
-          .update(deviceData)
-          .eq("id", parseInt(device.id));
-
-        if (error) throw error;
-        
-        console.log('Device updated successfully');
-        
-        toast({
-          title: "Başarılı",
-          description: "Cihaz bilgileri güncellendi",
+      if (device?._id) {
+        await updateDevice({
+          deviceId: device._id,
+          name: values.name,
+          deviceSerial: values.device_serial,
+          deviceType: values.device_type,
+          zoneId: values.zone_id as Id<"zones"> | undefined,
+          doorId: values.door_id as Id<"doors"> | undefined,
+          accessDirection: values.access_direction as "entry" | "exit" | "both",
+          deviceIp: values.device_ip || undefined,
+          description: values.description || undefined,
+          status: values.status,
         });
+        toast({ title: "Başarılı", description: "Cihaz bilgileri güncellendi" });
       } else {
-        const { error } = await supabase
-          .from("devices")
-          .insert(deviceData);
-
-        if (error) throw error;
-        
-        console.log('Device created successfully');
-        
-        toast({
-          title: "Başarılı",
-          description: "Yeni cihaz eklendi",
+        await createDevice({
+          name: values.name,
+          deviceSerial: values.device_serial,
+          deviceType: values.device_type,
+          projectId: currentProjectId ?? undefined,
+          zoneId: values.zone_id as Id<"zones"> | undefined,
+          doorId: values.door_id as Id<"doors"> | undefined,
+          accessDirection: values.access_direction as "entry" | "exit" | "both",
+          deviceIp: values.device_ip || undefined,
+          description: values.description || undefined,
+          status: values.status,
         });
+        toast({ title: "Başarılı", description: "Cihaz başarıyla eklendi" });
       }
-
-      await queryClient.invalidateQueries({ queryKey: ['devices'] });
-      await queryClient.invalidateQueries({ queryKey: ['admin-devices'] });
-      await queryClient.invalidateQueries({ queryKey: ['devices', projectIds] });
-      await queryClient.invalidateQueries({ queryKey: ['server-devices'] });
-
       onSuccess();
-    } catch (error: any) {
-      console.error('Error saving device:', error);
+    } catch (error: unknown) {
       toast({
         title: "Hata",
-        description: error.message || "Bir hata oluştu",
+        description: (error as Error)?.message ?? "Cihaz kaydedilirken hata oluştu",
         variant: "destructive",
       });
     } finally {
@@ -90,8 +66,5 @@ export function useDeviceFormSubmission({
     }
   };
 
-  return {
-    onSubmit,
-    isLoading,
-  };
+  return { isLoading, onSubmit };
 }

@@ -1,4 +1,3 @@
-
 import {
   Sheet,
   SheetContent,
@@ -7,9 +6,9 @@ import {
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DeviceForm } from "@/components/devices/DeviceForm";
-import { ServerDevice, Project } from "@/types/device";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { ServerDevice } from "@/types/device";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { Loader2 } from "lucide-react";
 
 interface DeviceDetailsPanelProps {
@@ -19,24 +18,10 @@ interface DeviceDetailsPanelProps {
   onSuccess: () => void;
 }
 
-export function DeviceDetailsPanel({
-  open,
-  onClose,
-  selectedDevice,
-  onSuccess,
-}: DeviceDetailsPanelProps) {
-  const { data: projects, isLoading: projectsLoading } = useQuery({
-    queryKey: ['projects'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('*')
-        .order('name', { ascending: true });
-      
-      if (error) throw error;
-      return data as Project[];
-    }
-  });
+export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess }: DeviceDetailsPanelProps) {
+  const projectsData = useQuery(api.projects.list);
+  const projectsLoading = projectsData === undefined;
+  const projects = (projectsData ?? []).map((p: { _id: string; name: string }) => ({ id: p._id, name: p.name }));
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
@@ -44,7 +29,7 @@ export function DeviceDetailsPanel({
         <SheetHeader className="px-8 py-6 border-b bg-gradient-to-r from-gray-50 to-gray-100/50">
           <SheetTitle className="text-xl font-bold text-gray-900 flex items-center gap-3">
             <div className="w-2 h-8 bg-burgundy rounded-full"></div>
-            {selectedDevice ? 'Cihazı Düzenle' : 'Yeni Cihaz Ekle'}
+            {selectedDevice ? "Cihazı Düzenle" : "Yeni Cihaz Ekle"}
           </SheetTitle>
         </SheetHeader>
 
@@ -62,15 +47,16 @@ export function DeviceDetailsPanel({
             </div>
           </div>
         ) : (
-          <div className="flex-1 overflow-hidden bg-gradient-to-br from-white to-gray-50/30">
-            <DeviceForm
-              open={true}
-              onClose={onClose}
-              device={selectedDevice}
-              projects={projects || []}
-              onSuccess={onSuccess}
-            />
-          </div>
+          <ScrollArea className="flex-1">
+            <div className="p-8">
+              <DeviceForm
+                selectedDevice={selectedDevice}
+                projects={projects}
+                onSuccess={onSuccess}
+                onCancel={onClose}
+              />
+            </div>
+          </ScrollArea>
         )}
       </SheetContent>
     </Sheet>

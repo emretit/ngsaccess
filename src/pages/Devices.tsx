@@ -16,7 +16,6 @@ import { useDeviceTable } from '@/hooks/useDeviceTable';
 import { Device, ServerDevice } from '@/types/device';
 import { useProjectAccess } from '@/hooks/useProjectAccess';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 
 const Devices = () => {
@@ -35,7 +34,6 @@ const Devices = () => {
     device: null
   });
   
-  const queryClient = useQueryClient();
   const { toast } = useToast();
   
   // QR Dialog
@@ -89,8 +87,6 @@ const Devices = () => {
 
   const handleDevicePanelSuccess = () => {
     setDevicePanel({ open: false, device: null });
-    queryClient.invalidateQueries({ queryKey: ['devices'] });
-    
     toast({
       title: "İşlem başarılı",
       description: "Cihaz bilgileri kaydedildi",

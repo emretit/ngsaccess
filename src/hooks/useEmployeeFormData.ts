@@ -1,175 +1,133 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { Employee } from '@/types/employee';
+import { useState, useEffect } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { useProjectAccess } from "./useProjectAccess";
+import { Id } from "../../convex/_generated/dataModel";
 
 export interface EmployeeFormData {
-  first_name: string;
-  last_name: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  tc_no: string;
-  card_number: string;
-  company_id: number | null;
-  department_id: number | null;
-  position_id: number | null;
-  access_rule_id: number | null;
+  tcNo: string;
+  cardNumber: string;
+  companyId: Id<"companies"> | null;
+  departmentId: Id<"departments"> | null;
+  positionId: Id<"positions"> | null;
+  accessRuleId: Id<"accessRules"> | null;
+  shiftId: Id<"shifts"> | null;
   shift: string | null;
-  shift_id: number | null;
-  photo_url: string | null;
+  photoUrl: string | null;
   notes: string;
-  is_active: boolean;
+  isActive: boolean;
 }
 
-export const useEmployeeFormData = (employee?: Employee | null) => {
+interface EmployeeInput {
+  _id?: Id<"employees">;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  tcNo?: string;
+  cardNumber?: string;
+  companyId?: Id<"companies"> | null;
+  departmentId?: Id<"departments"> | null;
+  positionId?: Id<"positions"> | null;
+  accessRuleId?: Id<"accessRules"> | null;
+  shiftId?: Id<"shifts"> | null;
+  shift?: string | null;
+  photoUrl?: string | null;
+  notes?: string;
+  isActive?: boolean;
+}
+
+export const useEmployeeFormData = (employee?: EmployeeInput | null) => {
+  const { projectIds, isSuperAdmin } = useProjectAccess();
+
   const [formData, setFormData] = useState<EmployeeFormData>({
-    first_name: '',
-    last_name: '',
-    email: '',
-    tc_no: '',
-    card_number: '',
-    company_id: null,
-    department_id: null,
-    position_id: null,
-    access_rule_id: null,
+    firstName: "",
+    lastName: "",
+    email: "",
+    tcNo: "",
+    cardNumber: "",
+    companyId: null,
+    departmentId: null,
+    positionId: null,
+    accessRuleId: null,
+    shiftId: null,
     shift: null,
-    shift_id: null,
-    photo_url: null,
-    notes: '',
-    is_active: true,
+    photoUrl: null,
+    notes: "",
+    isActive: true,
   });
 
-  const [departments, setDepartments] = useState<{ id: number; name: string }[]>([]);
-  const [companies, setCompanies] = useState<{ id: number; name: string }[]>([]);
-  const [accessRules, setAccessRules] = useState<{ id: number; name: string }[]>([]);
-  const [positions, setPositions] = useState<{ id: number; name: string }[]>([]);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
-  // Initialize form data when employee prop changes
   useEffect(() => {
     if (employee) {
-      console.log('Initializing form with employee data:', employee);
       setFormData({
-        first_name: employee.first_name || '',
-        last_name: employee.last_name || '',
-        email: employee.email || '',
-        tc_no: employee.tc_no || '',
-        card_number: employee.card_number || '',
-        company_id: employee.company_id || null,
-        department_id: employee.department_id || null,
-        position_id: employee.position_id || null,
-        access_rule_id: employee.access_rule_id || null,
-        shift: employee.shift || null,
-        shift_id: employee.shift_id || null,
-        photo_url: employee.photo_url || null,
-        notes: employee.notes || '',
-        is_active: employee.is_active ?? true,
+        firstName: employee.firstName ?? "",
+        lastName: employee.lastName ?? "",
+        email: employee.email ?? "",
+        tcNo: employee.tcNo ?? "",
+        cardNumber: employee.cardNumber ?? "",
+        companyId: employee.companyId ?? null,
+        departmentId: employee.departmentId ?? null,
+        positionId: employee.positionId ?? null,
+        accessRuleId: employee.accessRuleId ?? null,
+        shiftId: employee.shiftId ?? null,
+        shift: employee.shift ?? null,
+        photoUrl: employee.photoUrl ?? null,
+        notes: employee.notes ?? "",
+        isActive: employee.isActive ?? true,
       });
-      setPhotoPreview(employee.photo_url || null);
+      setPhotoPreview(employee.photoUrl ?? null);
     } else {
-      // Reset form for new employee
       setFormData({
-        first_name: '',
-        last_name: '',
-        email: '',
-        tc_no: '',
-        card_number: '',
-        company_id: null,
-        department_id: null,
-        position_id: null,
-        access_rule_id: null,
+        firstName: "",
+        lastName: "",
+        email: "",
+        tcNo: "",
+        cardNumber: "",
+        companyId: null,
+        departmentId: null,
+        positionId: null,
+        accessRuleId: null,
+        shiftId: null,
         shift: null,
-        shift_id: null,
-        photo_url: null,
-        notes: '',
-        is_active: true,
+        photoUrl: null,
+        notes: "",
+        isActive: true,
       });
       setPhotoPreview(null);
     }
-  }, [employee]);
+  }, [employee?._id]);
 
-  // Fetch departments
-  useEffect(() => {
-    const fetchDepartments = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('departments')
-          .select('id, name')
-          .order('name');
+  const departments = useQuery(
+    api.departments.list,
+    projectIds.length > 0 ? { projectIds, isSuperAdmin } : "skip"
+  );
 
-        if (error) throw error;
-        setDepartments(data || []);
-      } catch (error) {
-        console.error('Error fetching departments:', error);
-      }
-    };
+  const companies = useQuery(
+    api.companies.list,
+    projectIds.length > 0 ? { projectIds, isSuperAdmin } : "skip"
+  );
 
-    fetchDepartments();
-  }, []);
+  const accessRules = useQuery(
+    api.accessRules.list,
+    projectIds.length > 0 ? { projectId: projectIds[0], isSuperAdmin } : "skip"
+  );
 
-  // Fetch companies
-  useEffect(() => {
-    const fetchCompanies = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('companies')
-          .select('id, name')
-          .order('name');
-
-        if (error) throw error;
-        setCompanies(data || []);
-      } catch (error) {
-        console.error('Error fetching companies:', error);
-      }
-    };
-
-    fetchCompanies();
-  }, []);
-
-  // Fetch access rules
-  useEffect(() => {
-    const fetchAccessRules = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('access_rules')
-          .select('id, name')
-          .eq('is_active', true)
-          .order('name');
-
-        if (error) throw error;
-        setAccessRules(data || []);
-      } catch (error) {
-        console.error('Error fetching access rules:', error);
-      }
-    };
-
-    fetchAccessRules();
-  }, []);
-
-  // Fetch positions
-  useEffect(() => {
-    const fetchPositions = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('positions')
-          .select('id, name')
-          .order('name');
-
-        if (error) throw error;
-        setPositions(data || []);
-      } catch (error) {
-        console.error('Error fetching positions:', error);
-      }
-    };
-
-    fetchPositions();
-  }, []);
+  const positions = useQuery(
+    api.positions.list,
+    projectIds.length > 0 ? { projectIds, isSuperAdmin } : "skip"
+  );
 
   return {
     formData,
     setFormData,
-    departments,
-    companies,
-    accessRules,
-    positions,
+    departments: departments ?? [],
+    companies: companies ?? [],
+    accessRules: accessRules ?? [],
+    positions: positions ?? [],
     photoPreview,
     setPhotoPreview,
   };

@@ -1,4 +1,3 @@
-
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,64 +5,33 @@ import { EmployeePagination } from "@/components/employees/EmployeePagination";
 import { useProjectFilteredCardReadings } from "@/hooks/useProjectFilteredCardReadings";
 import { CardReadingsFilters } from "./CardReadingsFilters";
 import { CardReadingsTable } from "./CardReadingsTable";
-import { useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+
+const PAGE_SIZE = 100;
 
 const CardReadings = () => {
-  const { 
-    data, 
-    isLoading, 
-    error, 
-    currentPage, 
+  const {
+    data,
+    isLoading,
+    error,
+    currentPage,
     setCurrentPage,
-    searchTerm, 
+    searchTerm,
     setSearchTerm,
-    dateFilter, 
+    dateFilter,
     setDateFilter,
-    accessFilter, 
+    accessFilter,
     setAccessFilter,
-    handleRefresh,
-    handleClearFilters,
     totalPages,
-    pageSize,
-    hasProjectAccess
-  } = useProjectFilteredCardReadings(100);
+  } = useProjectFilteredCardReadings(PAGE_SIZE);
 
-  // Real-time updates for card_readings table
-  useEffect(() => {
-    const channel = supabase
-      .channel('card-readings-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'card_readings'
-        },
-        (payload) => {
-          console.log('New card reading inserted:', payload);
-          handleRefresh();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'card_readings'
-        },
-        (payload) => {
-          console.log('Card reading updated:', payload);
-          handleRefresh();
-        }
-      )
-      .subscribe();
+  // Convex useQuery otomatik realtime sağlar — supabase.channel() gerekmez
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [handleRefresh]);
-
+  const handleRefresh = () => {};
+  const handleClearFilters = () => {
+    setSearchTerm("");
+    setDateFilter(undefined);
+    setAccessFilter("all");
+  };
 
   if (isLoading) {
     return (
@@ -78,7 +46,6 @@ const CardReadings = () => {
     return (
       <div className="p-6 text-center text-red-500">
         <p>Kart okutma kayıtları yüklenirken bir hata oluştu.</p>
-        <p>{(error as Error).message}</p>
       </div>
     );
   }
@@ -97,7 +64,7 @@ const CardReadings = () => {
         </div>
         <Card>
           <div className="p-6 text-center text-muted-foreground">
-            {searchTerm || dateFilter || accessFilter !== 'all' ? (
+            {searchTerm || dateFilter || accessFilter !== "all" ? (
               <>
                 <p>Arama kriterlerinize uygun kayıt bulunamadı.</p>
                 <Button variant="ghost" size="sm" onClick={handleClearFilters} className="mt-2">
@@ -117,7 +84,7 @@ const CardReadings = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between gap-4">
         <h2 className="text-2xl font-bold">Kart Okuma Kayıtları</h2>
-        <CardReadingsFilters 
+        <CardReadingsFilters
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
           dateFilter={dateFilter}
@@ -131,11 +98,12 @@ const CardReadings = () => {
       <Card>
         <div className="p-6">
           <div className="mb-4 text-sm text-muted-foreground">
-            {data.totalCount} kayıttan {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, data.totalCount)} arası görüntüleniyor
+            {data.totalCount} kayıttan {(currentPage - 1) * PAGE_SIZE + 1} -{" "}
+            {Math.min(currentPage * PAGE_SIZE, data.totalCount)} arası görüntüleniyor
           </div>
-          
+
           <CardReadingsTable readings={data.readings} />
-          
+
           <div className="mt-4">
             <EmployeePagination
               currentPage={currentPage}

@@ -1,84 +1,48 @@
-
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectAccess } from "./useProjectAccess";
+import { Id } from "../../convex/_generated/dataModel";
 
-interface MailSettings {
-  id?: string;
-  project_id?: number;
-  smtp_host?: string;
-  smtp_port?: number;
-  smtp_username?: string;
-  smtp_password?: string;
-  smtp_secure?: boolean;
-  from_email?: string;
-  from_name?: string;
-  is_active?: boolean;
+interface MailSettingsInput {
+  smtpHost?: string;
+  smtpPort?: number;
+  smtpUsername?: string;
+  smtpPassword?: string;
+  smtpSecure?: boolean;
+  fromEmail?: string;
+  fromName?: string;
+  isActive?: boolean;
 }
 
 export function useMailSettings() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const { projectIds } = useProjectAccess();
+  const projectId = projectIds[0] as Id<"projects"> | undefined;
 
-  const { data: mailSettings, isLoading } = useQuery({
-    queryKey: ['mail-settings', projectIds],
-    queryFn: async () => {
-      if (projectIds.length === 0) return null;
-      
-      const { data, error } = await supabase
-        .from('mail_settings')
-        .select('*')
-        .in('project_id', projectIds)
-        .maybeSingle();
+  const mailSettings = useQuery(api.settings.getMail, { projectId });
+  const upsertMail = useMutation(api.settings.upsertMail);
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      return data;
-    },
-    enabled: projectIds.length > 0
-  });
-
-  const saveMailSettings = useMutation({
-    mutationFn: async (settings: MailSettings) => {
-      const projectId = projectIds[0];
-      if (!projectId) throw new Error('Proje bulunamadı');
-
-      const { data, error } = await supabase
-        .from('mail_settings')
-        .upsert({
-          ...settings,
-          project_id: projectId
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mail-settings'] });
+  const saveMailSettings = async (settings: MailSettingsInput) => {
+    try {
+      await upsertMail({ ...settings, projectId });
       toast({
         title: "Mail ayarları kaydedildi",
         description: "Mail yapılandırması başarıyla güncellendi",
       });
-    },
-    onError: (error: any) => {
+    } catch (error: unknown) {
       toast({
         title: "Hata",
-        description: error.message || "Mail ayarları kaydedilirken hata oluştu",
+        description: (error as Error)?.message ?? "Mail ayarları kaydedilirken hata oluştu",
         variant: "destructive",
       });
     }
-  });
+  };
 
   return {
-    mailSettings,
-    isLoading,
-    saveMailSettings: saveMailSettings.mutate,
-    isSaving: saveMailSettings.isPending
+    mailSettings: mailSettings ?? null,
+    isLoading: mailSettings === undefined,
+    saveMailSettings,
+    isSaving: false,
   };
 }

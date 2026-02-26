@@ -1,62 +1,47 @@
-
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from "convex/react";
+import { useConvexAuth } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { Id } from "../../convex/_generated/dataModel";
 
 interface ProjectAccess {
-  projectIds: number[];
+  projectIds: Id<"projects">[];
   isSuperAdmin: boolean;
   loading: boolean;
 }
 
 export const useProjectAccess = (): ProjectAccess => {
-  const { user, profile } = useAuth();
-  const [projectIds, setProjectIds] = useState<number[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { profile, loading: authLoading } = useAuth();
+  const { isAuthenticated } = useConvexAuth();
 
-  useEffect(() => {
-    if (!user || !profile) {
-      setLoading(false);
-      return;
-    }
+  const userProjects = useQuery(
+    api.userProjects.getByCurrentUser,
+    isAuthenticated ? {} : "skip"
+  );
 
-    const fetchUserProjects = async () => {
-      try {
-        // Super admin tüm projelere erişebilir
-        if (profile.role === 'super_admin') {
-          const { data: allProjects, error } = await supabase
-            .from('projects')
-            .select('id')
-            .eq('is_active', true);
+  const allProjects = useQuery(
+    api.projects.listActive,
+    profile?.role === "super_admin" ? {} : "skip"
+  );
 
-          if (error) throw error;
-          
-          setProjectIds(allProjects?.map(p => p.id) || []);
-        } else {
-          // Diğer kullanıcılar sadece atandıkları projelere erişebilir
-          const { data: userProjects, error } = await supabase
-            .from('user_projects')
-            .select('project_id')
-            .eq('user_id', user.id);
+  const isSuperAdmin = profile?.role === "super_admin";
 
-          if (error) throw error;
-          
-          setProjectIds(userProjects?.map(up => up.project_id) || []);
-        }
-      } catch (error) {
-        console.error('Error fetching user projects:', error);
-        setProjectIds([]);
-      } finally {
-        setLoading(false);
-      }
+  if (isSuperAdmin) {
+    const projectIds = (allProjects ?? []).map((p: { _id: Id<"projects"> }) => p._id);
+    return {
+      projectIds,
+      isSuperAdmin: true,
+      loading: authLoading || allProjects === undefined,
     };
+  }
 
-    fetchUserProjects();
-  }, [user, profile]);
+  const projectIds = (userProjects ?? []).map(
+    (up: { projectId: Id<"projects"> }) => up.projectId
+  );
 
   return {
     projectIds,
-    isSuperAdmin: profile?.role === 'super_admin',
-    loading
+    isSuperAdmin: false,
+    loading: authLoading || (!isAuthenticated ? false : userProjects === undefined),
   };
 };

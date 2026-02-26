@@ -1,19 +1,19 @@
-
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { Id } from "../../../convex/_generated/dataModel";
 
 interface AddDoorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
-  zoneId: number;
+  zoneId: Id<"zones">;
   zoneName: string;
 }
 
@@ -24,52 +24,32 @@ export function AddDoorDialog({ open, onOpenChange, onSuccess, zoneId, zoneName 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { projectIds } = useProjectAccess();
+  const createDoor = useMutation(api.doors.create);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!name.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Hata",
-        description: "Kapı adı gereklidir.",
-      });
+      toast({ variant: "destructive", title: "Hata", description: "Kapı adı gereklidir." });
       return;
     }
-
     setIsSubmitting(true);
-
     try {
-      const { error } = await supabase
-        .from("doors")
-        .insert({
-          name: name.trim(),
-          door_code: doorCode.trim() || null,
-          location: location.trim() || null,
-          zone_id: zoneId,
-          project_id: projectIds[0] || null,
-          status: 'active'
-        });
-
-      if (error) throw error;
-
-      toast({
-        title: "Başarılı",
-        description: `${zoneName} bölgesine kapı başarıyla eklendi.`,
+      await createDoor({
+        name: name.trim(),
+        doorCode: doorCode.trim() || undefined,
+        location: location.trim() || undefined,
+        zoneId,
+        projectId: projectIds[0] as Id<"projects"> | undefined,
+        status: "active",
       });
-
+      toast({ title: "Başarılı", description: `${zoneName} bölgesine kapı başarıyla eklendi.` });
       setName("");
       setDoorCode("");
       setLocation("");
       onSuccess();
       onOpenChange(false);
-    } catch (error) {
-      console.error("Door creation error:", error);
-      toast({
-        variant: "destructive",
-        title: "Hata",
-        description: "Kapı eklenirken bir hata oluştu.",
-      });
+    } catch (error: unknown) {
+      toast({ variant: "destructive", title: "Hata", description: (error as Error)?.message ?? "Kapı eklenirken hata oluştu." });
     } finally {
       setIsSubmitting(false);
     }
@@ -84,50 +64,21 @@ export function AddDoorDialog({ open, onOpenChange, onSuccess, zoneId, zoneName 
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Ad *
-              </Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="col-span-3"
-                placeholder="Kapı adı"
-                required
-              />
+              <Label htmlFor="name" className="text-right">Ad *</Label>
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" placeholder="Kapı adı" required />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="doorCode" className="text-right">
-                Kapı Kodu
-              </Label>
-              <Input
-                id="doorCode"
-                value={doorCode}
-                onChange={(e) => setDoorCode(e.target.value)}
-                className="col-span-3"
-                placeholder="Kapı kodu (opsiyonel)"
-              />
+              <Label htmlFor="doorCode" className="text-right">Kapı Kodu</Label>
+              <Input id="doorCode" value={doorCode} onChange={(e) => setDoorCode(e.target.value)} className="col-span-3" placeholder="Kapı kodu (opsiyonel)" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="location" className="text-right">
-                Konum
-              </Label>
-              <Input
-                id="location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="col-span-3"
-                placeholder="Kapı konumu (opsiyonel)"
-              />
+              <Label htmlFor="location" className="text-right">Konum</Label>
+              <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} className="col-span-3" placeholder="Kapı konumu (opsiyonel)" />
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              İptal
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Ekleniyor..." : "Ekle"}
-            </Button>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>İptal</Button>
+            <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Ekleniyor..." : "Ekle"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

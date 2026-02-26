@@ -93,8 +93,8 @@ export function useExportUtils() {
         ])
       };
 
-      // Use the Supabase Edge Function to generate PDF
-      const response = await fetch(`https://gjudsghhwmnsnndnswho.supabase.co/functions/v1/generate-pdf`, {
+      // TODO: Migrate PDF generation to Convex Action
+      const response = await fetch(`/api/generate-pdf`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

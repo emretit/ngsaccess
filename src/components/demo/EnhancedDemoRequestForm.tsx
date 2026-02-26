@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+
 import { Building, Users, Mail, Phone, MessageSquare } from 'lucide-react';
 
 const EnhancedDemoRequestForm = () => {
@@ -48,100 +48,25 @@ const EnhancedDemoRequestForm = () => {
       if (signUpError) {
         toast({
           title: "Kayıt hatası",
-          description: signUpError.message || "Kayıt olurken bir hata oluştu.",
+          description: (signUpError as Error)?.message ?? "Kayıt olurken bir hata oluştu.",
           variant: "destructive",
         });
         return;
       }
 
-      // Demo proje bilgilerini users tablosuna ekle
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        // Kullanıcı bilgilerini güncelle
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            company_name: formData.companyName,
-            role: 'project_user'
-          })
-          .eq('id', user.id);
-
-        if (updateError) {
-          console.error('Kullanıcı bilgileri güncellenirken hata:', updateError);
-        }
-
-        // Demo projesi oluştur veya mevcut demo projesine ata
-        await assignDemoProject(user.id);
-      }
-
       toast({
         title: "Demo kaydı başarılı!",
-        description: "Demo projenize erişim hakkınız oluşturuldu. Giriş yapabilirsiniz.",
+        description: "Hesabınız oluşturuldu. Giriş yapabilirsiniz.",
       });
-      
-      navigate('/login');
-      
-    } catch (error: any) {
+      navigate("/login");
+    } catch (error: unknown) {
       toast({
         title: "Kayıt hatası",
-        description: error.message || "Kayıt olurken bir hata oluştu.",
+        description: (error as Error)?.message ?? "Kayıt olurken bir hata oluştu.",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const assignDemoProject = async (userId: string) => {
-    try {
-      // Demo projesi var mı kontrol et
-      const { data: demoProject, error: projectError } = await supabase
-        .from('projects')
-        .select('id')
-        .eq('name', 'Demo Projesi')
-        .single();
-
-      let projectId;
-
-      if (projectError || !demoProject) {
-        // Demo proje yoksa oluştur
-        const { data: newProject, error: createError } = await supabase
-          .from('projects')
-          .insert({
-            name: 'Demo Projesi',
-            description: 'PDKS sistemi demo projesi',
-            created_by: userId
-          })
-          .select('id')
-          .single();
-
-        if (createError) {
-          console.error('Demo projesi oluşturulurken hata:', createError);
-          return;
-        }
-        projectId = newProject.id;
-      } else {
-        projectId = demoProject.id;
-      }
-
-      // Kullanıcıyı demo projesine ata
-      const { error: assignError } = await supabase
-        .from('user_projects')
-        .insert({
-          user_id: userId,
-          project_id: projectId,
-          role: 'project_user'
-        });
-
-      if (assignError) {
-        console.error('Kullanıcı projeye atanırken hata:', assignError);
-      }
-
-    } catch (error) {
-      console.error('Demo proje atama hatası:', error);
     }
   };
 

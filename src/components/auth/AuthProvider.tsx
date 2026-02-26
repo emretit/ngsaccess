@@ -1,135 +1,93 @@
-
 import React, { createContext, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Session, User } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { useAuthActions } from "@convex-dev/auth/react";
+import { useConvexAuth, useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { toast } from '@/hooks/use-toast';
-import { useAuthState } from '@/hooks/useAuthState';
-import { 
-  signInWithPassword, 
-  signUpWithPassword, 
-  signOut as authSignOut,
-  redirectBasedOnRole,
-  checkUserRole as checkRole
-} from '@/services/authService';
+import { checkUserRole } from '@/services/authService';
+
+type UserRole = "super_admin" | "project_admin" | "project_user";
 
 interface AuthContextType {
-  session: Session | null;
-  user: User | null;
-  profile: any | null;
+  session: unknown | null;
+  user: unknown | null;
+  profile: unknown | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any | null }>;
-  signUp: (email: string, password: string, name?: string) => Promise<{ error: any | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: unknown | null }>;
+  signUp: (email: string, password: string, name?: string) => Promise<{ error: unknown | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-  checkUserRole: (requiredRole: 'super_admin' | 'project_admin' | 'project_user') => boolean;
+  checkUserRole: (requiredRole: UserRole) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { session, user, profile, loading, refreshProfile } = useAuthState();
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  const { signIn: convexSignIn, signOut: convexSignOut } = useAuthActions();
+  const user = useQuery(api.users.currentUser);
   const navigate = useNavigate();
   const location = useLocation();
 
-  React.useEffect(() => {
-    console.log("AuthProvider: Auth durumu kontrol ediliyor", { 
-      hasUser: !!user,
-      userEmail: user?.email,
-      hasProfile: !!profile,
-      profileRole: profile?.role,
-      pathname: location.pathname,
-      loading,
-      isSystemAdminPage: location.pathname === '/system-admin'
-    });
-    
-    // Debug: Profile ve rol bilgilerini detaylı logla
-    if (profile) {
-      console.log("AuthProvider: Kullanıcı profil detayları:", {
-        id: profile.id,
-        email: profile.email,
-        role: profile.role,
-        created_at: profile.created_at
-      });
-    }
-    
-    // System admin sayfasında özel işlem yapma, sayfa kendi kontrolünü yapacak
-    if (location.pathname === '/system-admin') {
-      console.log("AuthProvider: System admin sayfası, sayfa kendi kontrolünü yapacak");
-      return;
-    }
-    
-    // Sadece login sonrası veya kimlik doğrulama sayfalarında yönlendirme yap
-    if (profile && (location.pathname === '/login' || location.pathname === '/register')) {
-      console.log("AuthProvider: Login/register sayfasından home'a yönlendiriliyor");
-      navigate('/home');
-    }
-  }, [profile, navigate, location.pathname, user, loading]);
+  const loading = isLoading || (isAuthenticated && user === undefined);
+  const profile = user ?? null;
 
   React.useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      console.log("AuthProvider: Auth state changed", event);
-      
-      if (event === 'SIGNED_IN') {
-        toast({
-          title: "Giriş başarılı",
-          description: "Başarıyla giriş yaptınız"
-        });
-        
-        // Login sonrası home sayfasına yönlendir (system-admin değilse)
-        if (location.pathname !== '/system-admin') {
-          console.log("AuthProvider: Redirecting to home after signin");
-          navigate('/home');
-        }
-      } else if (event === 'SIGNED_OUT') {
-        toast({
-          title: "Çıkış yapıldı",
-          description: "Başarıyla çıkış yaptınız"
-        });
-        // Çıkış yapıldığında ana sayfaya yönlendir
-        navigate('/');
+    if (!isLoading && isAuthenticated && profile) {
+      if (location.pathname === '/login' || location.pathname === '/register') {
+        navigate('/home');
       }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate, location.pathname]);
+    }
+    if (!isLoading && !isAuthenticated) {
+      const publicPaths = ['/', '/login', '/register', '/auth', '/demo-request', '/user-setup', '/employee-setup', '/system-admin'];
+      if (!publicPaths.includes(location.pathname)) {
+        navigate('/login');
+      }
+    }
+  }, [isAuthenticated, isLoading, profile, location.pathname, navigate]);
 
   const signIn = async (email: string, password: string) => {
-    return await signInWithPassword(email, password);
+    try {
+      await convexSignIn("password", { email, password, flow: "signIn" });
+      toast({ title: "Giriş başarılı", description: "Başarıyla giriş yaptınız" });
+      navigate('/home');
+      return { error: null };
+    } catch (error: unknown) {
+      return { error };
+    }
   };
 
   const signUp = async (email: string, password: string, name?: string) => {
-    return await signUpWithPassword(email, password, name);
+    try {
+      await convexSignIn("password", { email, password, name: name ?? email.split('@')[0], flow: "signUp" });
+      return { error: null };
+    } catch (error: unknown) {
+      return { error };
+    }
   };
 
   const signOut = async () => {
-    await authSignOut();
+    await convexSignOut();
+    toast({ title: "Çıkış yapıldı", description: "Başarıyla çıkış yaptınız" });
+    navigate('/');
   };
 
-  const checkUserRole = (requiredRole: 'super_admin' | 'project_admin' | 'project_user'): boolean => {
-    const hasRole = checkRole(profile, requiredRole);
-    console.log("AuthProvider: checkUserRole kontrolü", {
-      requiredRole,
-      userRole: profile?.role,
-      hasRole,
-      profileExists: !!profile,
-      userEmail: user?.email
-    });
-    return hasRole;
+  const handleCheckUserRole = (requiredRole: UserRole): boolean => {
+    return checkUserRole(profile as { role?: UserRole } | null, requiredRole);
   };
 
   return (
     <AuthContext.Provider
       value={{
-        session,
-        user,
+        session: isAuthenticated ? { user } : null,
+        user: user ?? null,
         profile,
         loading,
         signIn,
         signUp,
         signOut,
-        refreshProfile,
-        checkUserRole
+        refreshProfile: async () => {},
+        checkUserRole: handleCheckUserRole,
       }}
     >
       {children}

@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+
 import { DepartmentTreeItem } from "./DepartmentTreeItem";
 import { AddDepartmentDialog } from "./AddDepartmentDialog";
 import { DepartmentProjectHeader } from "./DepartmentProjectHeader";
@@ -17,42 +19,11 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAddTopLevelDialog, setShowAddTopLevelDialog] = useState(false);
   const [addingToParentId, setAddingToParentId] = useState<number | null>(null);
-  const [companyName, setCompanyName] = useState("Ana Proje");
 
-  useEffect(() => {
-    fetchCompanyName();
-  }, [projectIds, isSuperAdmin]);
-
-  const fetchCompanyName = async () => {
-    try {
-      if (isSuperAdmin) {
-        setCompanyName("Tüm Projeler");
-        return;
-      }
-
-      // Fetch company name from general_settings instead of companies table
-      const { data: settings, error } = await supabase
-        .from("general_settings")
-        .select("company_name")
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Error fetching company name:", error);
-        setCompanyName("Şirket");
-        return;
-      }
-
-      if (settings && settings.company_name) {
-        setCompanyName(settings.company_name);
-      } else {
-        setCompanyName("Şirket Bulunamadı");
-      }
-    } catch (error) {
-      console.error("Error in fetchCompanyName:", error);
-      setCompanyName("Ana Proje");
-    }
-  };
+  const generalSettings = useQuery(api.settings.getGeneral);
+  const companyName = isSuperAdmin
+    ? "Tüm Projeler"
+    : (generalSettings?.companyName ?? "Ana Proje");
 
   const handleProjectHeaderClick = () => {
     setSelectedDepartment(null);

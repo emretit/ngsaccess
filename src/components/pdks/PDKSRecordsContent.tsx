@@ -1,12 +1,11 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { AiInsightsCard } from "@/components/pdks/AiInsightsCard";
 import { PDKSTable } from "./PDKSTable";
 import { PDKSAiChat } from "./PDKSAiChat";
-import { supabase } from "@/integrations/supabase/client";
-import { useProjectAccess } from '@/hooks/useProjectAccess';
 
 interface PDKSRecord {
-  id: number;
+  id: string;
   employee_first_name: string;
   employee_last_name: string;
   date: string;
@@ -34,59 +33,23 @@ export function PDKSRecordsContent({
   searchTerm,
   statusFilter,
   insight,
-  isLoadingInsight
+  isLoadingInsight,
 }: PDKSRecordsContentProps) {
-  const [employees, setEmployees] = useState<PDKSRecord[]>([]);
-  const [employeesLoading, setEmployeesLoading] = useState(true);
-  
-  // Get project access information
-  const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
+  const rawEmployees = useQuery(api.employees.list) ?? [];
 
-  useEffect(() => {
-    if (!projectLoading) {
-      fetchEmployees();
-    }
-  }, [projectIds, isSuperAdmin, projectLoading]);
+  const employees: PDKSRecord[] = rawEmployees
+    .filter((emp: { isActive?: boolean }) => emp.isActive !== false)
+    .map((emp: { _id: string; firstName?: string; lastName?: string }) => ({
+      id: emp._id,
+      employee_first_name: emp.firstName ?? "",
+      employee_last_name: emp.lastName ?? "",
+      date: new Date().toISOString().split("T")[0],
+      entry_time: "",
+      exit_time: "",
+      status: "present",
+    }));
 
-  async function fetchEmployees() {
-    try {
-      let query = supabase
-        .from('employees')
-        .select('*')
-        .eq('is_active', true);
-
-      // Apply project filtering if not super admin
-      if (!isSuperAdmin && projectIds.length > 0) {
-        query = query.in('project_id', projectIds);
-      } else if (!isSuperAdmin && projectIds.length === 0) {
-        // User has no project access, return empty array
-        setEmployees([]);
-        setEmployeesLoading(false);
-        return;
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      // Convert employee data to PDKSRecord format
-      const formattedRecords = data.map(emp => ({
-        id: emp.id,
-        employee_first_name: emp.first_name,
-        employee_last_name: emp.last_name,
-        date: new Date().toISOString().split('T')[0],
-        entry_time: "",  // These will be empty for new employees
-        exit_time: "",   // These will be empty for new employees
-        status: "present" // Default status
-      }));
-
-      setEmployees(formattedRecords);
-    } catch (error) {
-      console.error('Error fetching employees:', error);
-    } finally {
-      setEmployeesLoading(false);
-    }
-  }
+  const employeesLoading = rawEmployees === undefined;
 
   if (section === "summary") {
     return (
@@ -97,14 +60,12 @@ export function PDKSRecordsContent({
   }
 
   if (section === "attendance") {
-    const displayRecords = employees;
-    
     return (
       <div className="p-0">
         <div className="glass-card overflow-hidden mt-6 mx-6">
           <PDKSTable
-            records={displayRecords}
-            loading={employeesLoading || projectLoading}
+            records={employees}
+            loading={employeesLoading}
             searchTerm={searchTerm}
             statusFilter={statusFilter}
           />

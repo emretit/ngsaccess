@@ -1,78 +1,63 @@
-
 import { useEffect } from "react";
 import { UseFormReturn } from "react-hook-form";
-import { supabase } from "@/integrations/supabase/client";
-import { ServerDevice, AccessDirection } from "@/types/device";
+import { Id } from "../../../../convex/_generated/dataModel";
 import { FormValues } from "./useDeviceFormSchema";
 
+type AccessDirection = "entry" | "exit" | "both";
+
+interface DeviceData {
+  _id?: Id<"devices">;
+  name?: string;
+  deviceSerial?: string;
+  deviceType?: string;
+  zoneId?: Id<"zones">;
+  doorId?: Id<"doors">;
+  accessDirection?: AccessDirection;
+  deviceIp?: string;
+  description?: string;
+  status?: string;
+  // Legacy aliases
+  serial_number?: string;
+  device_type?: string;
+  zone_id?: Id<"zones">;
+  door_id?: Id<"doors">;
+  access_direction?: AccessDirection;
+  device_ip?: string;
+}
+
 interface UseDeviceDataLoaderProps {
-  device?: ServerDevice | null;
+  device?: DeviceData | null;
   open: boolean;
   form: UseFormReturn<FormValues>;
 }
 
 export function useDeviceDataLoader({ device, open, form }: UseDeviceDataLoaderProps) {
   useEffect(() => {
-    const loadDeviceData = async () => {
-      if (device && open) {
-        console.log('Loading device data:', device);
-        
-        let deviceData = device;
-        
-        // Eğer device'da zone_id veya door_id yoksa, Supabase'den tam veriyi al
-        if (device.id && (!device.zone_id && !device.door_id)) {
-          try {
-            const { data: fullDevice, error } = await supabase
-              .from('devices')
-              .select('*')
-              .eq('id', parseInt(device.id))
-              .single();
-              
-            if (error) {
-              console.error('Error fetching full device data:', error);
-            } else if (fullDevice) {
-              console.log('Fetched full device data from Supabase:', fullDevice);
-              deviceData = {
-                ...device,
-                zone_id: fullDevice.zone_id,
-                door_id: fullDevice.door_id,
-              };
-            }
-          } catch (error) {
-            console.error('Error in device data fetch:', error);
-          }
-        }
-        
-        const formData: FormValues = {
-          name: deviceData.name || "",
-          device_serial: deviceData.serial_number || "",
-          device_type: (deviceData.device_type as any) || "Kart Okuyucu",
-          zone_id: deviceData.zone_id || undefined,
-          door_id: deviceData.door_id || undefined,
-          access_direction: (deviceData.access_direction as AccessDirection) || "both",
-          device_ip: deviceData.device_ip || "",
-          description: deviceData.description || "",
-          status: (deviceData.status === "active" || deviceData.status === "inactive") ? deviceData.status : "active",
-        };
-        
-        console.log('Setting form data:', formData);
-        form.reset(formData);
-        
-      } else if (open && !device) {
-        console.log('Resetting form for new device');
-        form.reset({
-          name: "",
-          device_serial: "",
-          device_type: "Kart Okuyucu",
-          zone_id: undefined,
-          door_id: undefined,
-          access_direction: "both",
-          status: "active",
-          description: "",
-        });
-      }
-    };
-
-    loadDeviceData();
+    if (device && open) {
+      const formData: FormValues = {
+        name: device.name ?? "",
+        device_serial: device.deviceSerial ?? device.serial_number ?? "",
+        device_type: (device.deviceType ?? device.device_type ?? "Kart Okuyucu") as FormValues["device_type"],
+        zone_id: (device.zoneId ?? device.zone_id) as string | undefined,
+        door_id: (device.doorId ?? device.door_id) as string | undefined,
+        access_direction: (device.accessDirection ?? device.access_direction ?? "both") as AccessDirection,
+        device_ip: device.deviceIp ?? device.device_ip ?? "",
+        description: device.description ?? "",
+        status: (device.status === "active" || device.status === "inactive" ? device.status : "active") as "active" | "inactive",
+      };
+      form.reset(formData);
+    } else if (!device && open) {
+      form.reset({
+        name: "",
+        device_serial: "",
+        device_type: "Kart Okuyucu",
+        zone_id: undefined,
+        door_id: undefined,
+        access_direction: "both",
+        device_ip: "",
+        description: "",
+        status: "active",
+      });
+    }
   }, [device, open, form]);
 }

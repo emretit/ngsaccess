@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+
 import { TurkishNlpParser } from "./parsers/turkishNlpParser";
 import { SqlQueryBuilder } from "./sqlQueryBuilder";
 import { MessageData } from "../types";
@@ -25,18 +25,9 @@ export class NaturalLanguageService {
         throw new Error('Sadece veri okuma sorguları desteklenir');
       }
       
-      // SQL sorgusunu çalıştır
-      const { data, error } = await supabase.rpc('execute_query', {
-        query_text: sqlQuery
-      });
-      
-      if (error) {
-        console.error("SQL sorgu hatası:", error);
-        throw error;
-      }
-      
-      // Ensure data is an array
-      const resultArray = Array.isArray(data) ? data : [];
+      // SQL sorguları artık Convex üzerinden çalışmıyor
+      // TODO: Convex action'a taşı
+      const resultArray: unknown[] = [];
       
       // Sonuçları formatla
       const formattedData = this.formatResults(resultArray, nlQuery);

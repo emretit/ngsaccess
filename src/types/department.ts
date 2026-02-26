@@ -1,8 +1,7 @@
-
 export interface Department {
-  id: number;
+  id: string;
   name: string;
-  parent_id: number | null;
+  parent_id: string | null;
   level: number;
   created_at?: string;
   updated_at?: string;

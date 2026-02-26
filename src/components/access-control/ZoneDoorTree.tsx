@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
+
 import { ChevronRight, Building2, Plus, Trash2, DoorClosed } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { AddDoorDialog } from "./AddDoorDialog";
 import { toast } from "@/hooks/use-toast";
-import { Zone, Door } from "@/types/access-control";
 
 interface ZoneDoorTreeProps {
   onSelectDoor?: (doorId: number | null) => void;
@@ -13,121 +15,68 @@ interface ZoneDoorTreeProps {
   onZoneAdded?: () => void;
 }
 
-export const ZoneDoorTree = ({
-  onSelectDoor,
-  onSelectZone,
-  onZoneAdded,
-}: ZoneDoorTreeProps) => {
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [doors, setDoors] = useState<Door[]>([]);
-  const [selectedZone, setSelectedZone] = useState<number | null>(null);
-  const [selectedDoor, setSelectedDoor] = useState<number | null>(null);
-  const [expandedZones, setExpandedZones] = useState<number[]>([]);
+export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDoorTreeProps) => {
+  const zones = useQuery(api.zones.list) ?? [];
+  const doors = useQuery(api.doors.list) ?? [];
+
+  const removeZone = useMutation(api.zones.remove);
+  const removeDoor = useMutation(api.doors.remove);
+
+  const [selectedZone, setSelectedZone] = useState<Id<"zones"> | null>(null);
+  const [selectedDoor, setSelectedDoor] = useState<Id<"doors"> | null>(null);
+  const [expandedZones, setExpandedZones] = useState<Id<"zones">[]>([]);
   const [showAddDoorDialog, setShowAddDoorDialog] = useState(false);
-  const [selectedZoneForDoor, setSelectedZoneForDoor] = useState<{id: number, name: string} | null>(null);
+  const [selectedZoneForDoor, setSelectedZoneForDoor] = useState<{ id: Id<"zones">; name: string } | null>(null);
 
-  useEffect(() => {
-    fetchZonesAndDoors();
-  }, []);
-
-  async function fetchZonesAndDoors() {
-    const { data: zonesData } = await supabase
-      .from("zones")
-      .select("*")
-      .order("name", { ascending: true });
-
-    const { data: doorsData } = await supabase
-      .from("doors")
-      .select("*")
-      .order("name", { ascending: true });
-
-    setZones(zonesData || []);
-    setDoors(doorsData || []);
-  }
-
-  const handleDeleteZone = async (zoneId: number) => {
-    const zoneDoors = doors.filter(door => door.zone_id === zoneId);
+  const handleDeleteZone = async (zoneId: Id<"zones">) => {
+    const zoneDoors = doors.filter((door: { zoneId?: Id<"zones"> }) => door.zoneId === zoneId);
     if (zoneDoors.length > 0) {
-      toast({
-        title: "Hata",
-        description: "Bu bölgede kapılar bulunuyor. Önce kapıları silmelisiniz.",
-        variant: "destructive"
-      });
+      toast({ title: "Hata", description: "Bu bölgede kapılar bulunuyor. Önce kapıları silmelisiniz.", variant: "destructive" });
       return;
     }
-
-    const { error } = await supabase
-      .from("zones")
-      .delete()
-      .eq("id", zoneId);
-
-    if (error) {
-      toast({
-        title: "Hata",
-        description: "Bölge silinirken bir hata oluştu",
-        variant: "destructive"
-      });
-      return;
+    try {
+      await removeZone({ id: zoneId });
+      toast({ title: "Başarılı", description: "Bölge silindi" });
+      onZoneAdded?.();
+    } catch {
+      toast({ title: "Hata", description: "Bölge silinirken bir hata oluştu", variant: "destructive" });
     }
-
-    toast({
-      title: "Başarılı",
-      description: "Bölge silindi",
-    });
-    fetchZonesAndDoors();
-    onZoneAdded?.();
   };
 
-  const handleDeleteDoor = async (doorId: number) => {
-    const { error } = await supabase
-      .from("doors")
-      .delete()
-      .eq("id", doorId);
-
-    if (error) {
-      toast({
-        title: "Hata",
-        description: "Kapı silinirken bir hata oluştu",
-        variant: "destructive"
-      });
-      return;
+  const handleDeleteDoor = async (doorId: Id<"doors">) => {
+    try {
+      await removeDoor({ id: doorId });
+      toast({ title: "Başarılı", description: "Kapı silindi" });
+    } catch {
+      toast({ title: "Hata", description: "Kapı silinirken bir hata oluştu", variant: "destructive" });
     }
-
-    toast({
-      title: "Başarılı",
-      description: "Kapı silindi",
-    });
-    fetchZonesAndDoors();
   };
 
-  const handleAddDoor = (zoneId: number, zoneName: string) => {
+  const handleAddDoor = (zoneId: Id<"zones">, zoneName: string) => {
     setSelectedZoneForDoor({ id: zoneId, name: zoneName });
     setShowAddDoorDialog(true);
-  };
-
-  const handleDoorAdded = () => {
-    fetchZonesAndDoors();
   };
 
   return (
     <>
       <ul role="tree" className="space-y-0.5">
-        {zones.map((zone) => {
-          const isExpanded = expandedZones.includes(zone.id);
-          const zoneDoors = doors.filter((door) => door.zone_id === zone.id);
+        {zones.map((zone: { _id: Id<"zones">; name: string }) => {
+          const isExpanded = expandedZones.includes(zone._id);
+          const zoneDoors = doors.filter((door: { zoneId?: Id<"zones"> }) => door.zoneId === zone._id);
 
           return (
-            <li key={zone.id} role="treeitem" aria-expanded={isExpanded}>
+            <li key={zone._id} role="treeitem" aria-expanded={isExpanded}>
               <div
                 className={cn(
                   "group flex items-center gap-1 rounded-md p-2 transition-all",
                   "hover:bg-accent hover:text-accent-foreground",
-                  selectedZone === zone.id && "bg-accent/80 text-accent-foreground font-medium"
+                  selectedZone === zone._id && "bg-accent/80 text-accent-foreground font-medium"
                 )}
                 onClick={() => {
-                  setSelectedZone(zone.id === selectedZone ? null : zone.id);
+                  const next = zone._id === selectedZone ? null : zone._id;
+                  setSelectedZone(next);
                   setSelectedDoor(null);
-                  onSelectZone?.(zone.id === selectedZone ? null : zone.id);
+                  onSelectZone?.(next as unknown as number | null);
                 }}
               >
                 <Button
@@ -136,87 +85,49 @@ export const ZoneDoorTree = ({
                   className="h-5 w-5 p-0 hover:bg-transparent"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setExpandedZones(prev =>
-                      prev.includes(zone.id)
-                        ? prev.filter(id => id !== zone.id)
-                        : [...prev, zone.id]
+                    setExpandedZones((prev) =>
+                      prev.includes(zone._id) ? prev.filter((id) => id !== zone._id) : [...prev, zone._id]
                     );
                   }}
                 >
-                  <ChevronRight
-                    className={cn(
-                      "h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200",
-                      isExpanded && "rotate-90"
-                    )}
-                  />
+                  <ChevronRight className={cn("h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200", isExpanded && "rotate-90")} />
                 </Button>
 
                 <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="flex-1 truncate text-sm">{zone.name}</span>
 
                 <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 hover:bg-accent/80"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleAddDoor(zone.id, zone.name);
-                    }}
-                  >
+                  <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-accent/80" onClick={(e) => { e.stopPropagation(); handleAddDoor(zone._id, zone.name); }}>
                     <Plus className="h-3 w-3" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 hover:bg-accent/80"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteZone(zone.id);
-                    }}
-                  >
+                  <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-accent/80" onClick={(e) => { e.stopPropagation(); handleDeleteZone(zone._id); }}>
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>
               </div>
 
-              {/* Doors list */}
-              <ul
-                role="group"
-                className={cn(
-                  "overflow-hidden transition-all duration-200",
-                  isExpanded ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
-                )}
-              >
+              <ul role="group" className={cn("overflow-hidden transition-all duration-200", isExpanded ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0")}>
                 {zoneDoors.length === 0 ? (
                   <li className="text-xs text-muted-foreground pl-8 py-2">Kapı yok</li>
                 ) : (
-                  zoneDoors.map((door) => (
-                    <li key={door.id}>
+                  zoneDoors.map((door: { _id: Id<"doors">; name: string }) => (
+                    <li key={door._id}>
                       <div
                         className={cn(
                           "group flex items-center gap-1 rounded-md p-2 transition-all ml-6",
                           "hover:bg-accent hover:text-accent-foreground",
-                          selectedDoor === door.id && "bg-accent/80 text-accent-foreground font-medium"
+                          selectedDoor === door._id && "bg-accent/80 text-accent-foreground font-medium"
                         )}
                         onClick={() => {
-                          setSelectedDoor(door.id === selectedDoor ? null : door.id);
-                          onSelectDoor?.(door.id === selectedDoor ? null : door.id);
+                          const next = door._id === selectedDoor ? null : door._id;
+                          setSelectedDoor(next);
+                          onSelectDoor?.(next as unknown as number | null);
                         }}
                       >
                         <DoorClosed className="h-4 w-4 shrink-0 text-muted-foreground" />
                         <span className="flex-1 truncate text-sm">{door.name}</span>
-
                         <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 hover:bg-accent/80"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteDoor(door.id);
-                            }}
-                          >
+                          <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-accent/80" onClick={(e) => { e.stopPropagation(); handleDeleteDoor(door._id); }}>
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
@@ -234,11 +145,11 @@ export const ZoneDoorTree = ({
         <AddDoorDialog
           open={showAddDoorDialog}
           onOpenChange={setShowAddDoorDialog}
-          onSuccess={handleDoorAdded}
-          zoneId={selectedZoneForDoor.id}
+          onSuccess={() => {}}
+          zoneId={selectedZoneForDoor.id as unknown as number}
           zoneName={selectedZoneForDoor.name}
         />
       )}
     </>
   );
-}
+};

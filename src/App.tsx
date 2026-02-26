@@ -1,6 +1,4 @@
-
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider } from '@/components/auth/AuthProvider';
@@ -26,11 +24,9 @@ import NotFound from '@/pages/NotFound';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import './App.css';
 
-const queryClient = new QueryClient();
-
 function AppContent() {
-  useDarkMode(); // Initialize dark mode on app start
-  
+  useDarkMode();
+
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
@@ -41,77 +37,77 @@ function AppContent() {
       <Route path="/user-setup" element={<UserSetup />} />
       <Route path="/employee-setup" element={<EmployeeSetup />} />
       <Route path="/system-admin" element={<SystemAdmin />} />
-      <Route 
-        path="/home" 
+      <Route
+        path="/home"
         element={
           <Layout>
             <Index />
           </Layout>
-        } 
+        }
       />
-      <Route 
-        path="/employees" 
+      <Route
+        path="/employees"
         element={
           <Layout>
             <Employees />
           </Layout>
-        } 
+        }
       />
-      <Route 
-        path="/devices" 
+      <Route
+        path="/devices"
         element={
           <Layout>
             <Devices />
           </Layout>
-        } 
+        }
       />
-      <Route 
-        path="/virtual-readers" 
+      <Route
+        path="/virtual-readers"
         element={
           <Layout>
             <VirtualReaders />
           </Layout>
-        } 
+        }
       />
-      <Route 
-        path="/access-control" 
+      <Route
+        path="/access-control"
         element={
           <Layout>
             <AccessControl />
           </Layout>
-        } 
+        }
       />
-      <Route 
-        path="/pdks-records" 
+      <Route
+        path="/pdks-records"
         element={
           <Layout>
             <PDKSRecords />
           </Layout>
-        } 
+        }
       />
-      <Route 
-        path="/settings" 
+      <Route
+        path="/settings"
         element={
           <Layout>
             <Settings />
           </Layout>
-        } 
+        }
       />
-      <Route 
-        path="/profile" 
+      <Route
+        path="/profile"
         element={
           <Layout>
             <Profile />
           </Layout>
-        } 
+        }
       />
-      <Route 
-        path="/engineering-department" 
+      <Route
+        path="/engineering-department"
         element={
           <Layout>
             <EngineeringDepartment />
           </Layout>
-        } 
+        }
       />
       <Route path="*" element={<NotFound />} />
     </Routes>
@@ -120,16 +116,14 @@ function AppContent() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Router future={{ v7_relativeSplatPath: true }}>
-          <AuthProvider>
-            <AppContent />
-            <Toaster />
-          </AuthProvider>
-        </Router>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <TooltipProvider>
+      <Router future={{ v7_relativeSplatPath: true }}>
+        <AuthProvider>
+          <AppContent />
+          <Toaster />
+        </AuthProvider>
+      </Router>
+    </TooltipProvider>
   );
 }
 

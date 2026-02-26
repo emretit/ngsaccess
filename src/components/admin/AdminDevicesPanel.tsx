@@ -1,55 +1,61 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { Device } from '@/types/device';
-import { DeviceList } from '@/components/devices/DeviceList';
-import { DeviceFilters } from '@/components/devices/DeviceFilters';
-import { useDeviceFilters } from '@/hooks/useDeviceFilters';
-import { useZonesAndDoors } from '@/hooks/useZonesAndDoors';
-import { useLocationUtils } from '@/hooks/useLocationUtils';
+import { Device } from "@/types/device";
+import { DeviceList } from "@/components/devices/DeviceList";
+import { DeviceFilters } from "@/components/devices/DeviceFilters";
+import { useDeviceFilters } from "@/hooks/useDeviceFilters";
+import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 
 export function AdminDevicesPanel() {
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [selectedDoorId, setSelectedDoorId] = useState<number | null>(null);
-  
-  const { zones, doors } = useZonesAndDoors();
-  const { getDeviceLocationDisplay } = useLocationUtils();
 
-  // Fetch devices from database
-  const { data: rawDevices = [], isLoading } = useQuery({
-    queryKey: ['admin-devices'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('devices')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      
-      // Transform the data to match Device interface
-      return (data || []).map((device: any): Device => ({
-        id: device.id?.toString() || '',
-        name: device.name || '',
-        device_name: device.name,
-        serial_number: device.serial_number,
-        device_serial: device.device_serial,
-        device_model: device.device_model,
-        device_type: device.device_type,
-        type: device.type,
-        status: device.status === 'active' ? 'online' : 'offline',
-        zone_id: device.zone_id,
-        door_id: device.door_id,
-        access_direction: device.access_direction,
-        device_mac: device.device_mac,
-        device_ip: device.device_ip,
-        device_firmware: device.device_firmware,
-        created_at: device.created_at,
-        last_used_at: device.last_used_at,
-        device_location: device.device_location
-      }));
-    }
-  });
+  const { zones, doors } = useZonesAndDoors();
+  const rawDevicesData = useQuery(api.devices.list) ?? [];
+
+  const removeDevice = useMutation(api.devices.remove);
+
+  const rawDevices: Device[] = rawDevicesData.map((device: {
+    _id: Id<"devices">;
+    name?: string;
+    serialNumber?: string;
+    deviceSerial?: string;
+    deviceModel?: string;
+    deviceType?: string;
+    type?: string;
+    status?: string;
+    zoneId?: Id<"zones">;
+    doorId?: Id<"doors">;
+    accessDirection?: string;
+    deviceMac?: string;
+    deviceIp?: string;
+    deviceFirmware?: string;
+    _creationTime?: number;
+    lastUsedAt?: string;
+    deviceLocation?: string;
+  }): Device => ({
+    id: device._id,
+    name: device.name ?? "",
+    device_name: device.name,
+    serial_number: device.serialNumber,
+    device_serial: device.deviceSerial,
+    device_model: device.deviceModel,
+    device_type: device.deviceType,
+    type: device.type,
+    status: device.status === "active" ? "online" : "offline",
+    zone_id: device.zoneId as unknown as number,
+    door_id: device.doorId as unknown as number,
+    access_direction: device.accessDirection,
+    device_mac: device.deviceMac,
+    device_ip: device.deviceIp,
+    device_firmware: device.deviceFirmware,
+    created_at: device._creationTime ? new Date(device._creationTime).toISOString() : undefined,
+    last_used_at: device.lastUsedAt,
+    device_location: device.deviceLocation,
+  }));
 
   const {
     search,
@@ -59,38 +65,27 @@ export function AdminDevicesPanel() {
     typeFilter,
     setTypeFilter,
     deviceTypes,
-    filteredDevices
+    filteredDevices,
   } = useDeviceFilters(rawDevices, selectedZoneId, selectedDoorId);
 
   const handleDeleteDevice = async (deviceId: string) => {
     try {
-      const { error } = await supabase
-        .from('devices')
-        .delete()
-        .eq('id', parseInt(deviceId));
-      
-      if (error) throw error;
-      
-      // Refresh devices list
-      // The query will automatically refetch due to React Query's cache invalidation
+      await removeDevice({ id: deviceId as Id<"devices"> });
     } catch (error) {
-      console.error('Error deleting device:', error);
+      console.error("Error deleting device:", error);
     }
   };
 
   const handleAssignLocation = (device: Device) => {
-    // TODO: Implement location assignment dialog
-    console.log('Assign location for device:', device);
+    console.log("Assign location for device:", device);
   };
 
   const handleEditDevice = (device: Device) => {
-    // TODO: Implement edit device dialog
-    console.log('Edit device:', device);
+    console.log("Edit device:", device);
   };
 
   const handleNewDevice = () => {
-    // TODO: Implement new device creation
-    console.log('Add new device');
+    console.log("Add new device");
   };
 
   return (
@@ -107,11 +102,10 @@ export function AdminDevicesPanel() {
         deviceCount={rawDevices.length}
         filteredCount={filteredDevices.length}
       />
-      
       <DeviceList
         devices={rawDevices}
         filteredDevices={filteredDevices}
-        isLoading={isLoading}
+        isLoading={rawDevicesData === undefined}
         zones={zones}
         doors={doors}
         onDeleteDevice={handleDeleteDevice}

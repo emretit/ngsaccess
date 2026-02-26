@@ -2,7 +2,9 @@
 import { useState } from "react";
 import { Device } from "@/types/device";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 export function useLocationForm() {
   const [showLocationForm, setShowLocationForm] = useState<{open: boolean; device: Device | null}>({
@@ -11,49 +13,28 @@ export function useLocationForm() {
   });
   
   const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const updateDevice = useMutation(api.devices.update);
 
   const openLocationForm = (device: Device) => {
-    setShowLocationForm({open: true, device});
+    setShowLocationForm({ open: true, device });
   };
 
   const closeLocationForm = () => {
-    setShowLocationForm({open: false, device: null});
+    setShowLocationForm({ open: false, device: null });
   };
 
-  const handleAssignLocation = async (zoneId: number, doorId: number) => {
+  const handleAssignLocation = async (zoneId: string, doorId: string) => {
     if (!showLocationForm.device) return;
-    
     try {
-      // Update device location in database
-      const { error } = await fetch(`/api/devices/${showLocationForm.device.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          zone_id: zoneId,
-          door_id: doorId
-        })
-      }).then(res => res.json());
-      
-      if (error) throw new Error(error);
-
-      // Refresh devices data
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
-      
-      toast({
-        title: "Konum atandı",
-        description: "Cihaz konumu başarıyla güncellendi",
+      await updateDevice({
+        id: showLocationForm.device.id as Id<"devices">,
+        zoneId: zoneId as Id<"zones">,
+        doorId: doorId as Id<"doors">,
       });
-      
+      toast({ title: "Konum atandı", description: "Cihaz konumu başarıyla güncellendi" });
       closeLocationForm();
-    } catch (error) {
-      toast({
-        title: "Hata",
-        description: "Konum atanırken bir hata oluştu",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Hata", description: "Konum atanırken bir hata oluştu", variant: "destructive" });
     }
   };
 

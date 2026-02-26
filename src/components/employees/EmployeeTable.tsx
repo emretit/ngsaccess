@@ -1,19 +1,22 @@
 
 'use client';
 
-import { Employee } from '@/types/employee';
+import { useState } from "react";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
+
+import { Employee } from "@/types/employee";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Edit2, Trash2, Mail } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useEmployeeTable } from '@/hooks/useEmployeeTable';
-import { EmployeeBulkActions } from './EmployeeBulkActions';
-import { EmployeeDeleteDialog } from './EmployeeDeleteDialog';
-import { EmployeePasswordResetDialog } from './EmployeePasswordResetDialog';
-import { useState } from 'react';
-import { supabase } from "@/integrations/supabase/client";
+import { useEmployeeTable } from "@/hooks/useEmployeeTable";
+import { EmployeeBulkActions } from "./EmployeeBulkActions";
+import { EmployeeDeleteDialog } from "./EmployeeDeleteDialog";
+import { EmployeePasswordResetDialog } from "./EmployeePasswordResetDialog";
 import { toast } from "@/hooks/use-toast";
 
 interface EmployeeTableProps {
@@ -60,31 +63,18 @@ export default function EmployeeTable({
     setShowIndividualDeleteDialog(true);
   };
 
+  const removeEmployee = useMutation(api.employees.remove);
+
   const handleIndividualDeleteConfirm = async () => {
     if (!selectedEmployeeForDelete) return;
-
     try {
-      const { error } = await supabase
-        .from('employees')
-        .delete()
-        .eq('id', selectedEmployeeForDelete.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Başarılı",
-        description: "Personel silindi",
-      });
-      
+      await removeEmployee({ id: selectedEmployeeForDelete.id as unknown as Id<"employees"> });
+      toast({ title: "Başarılı", description: "Personel silindi" });
       setShowIndividualDeleteDialog(false);
       setSelectedEmployeeForDelete(null);
       onRefresh?.();
-    } catch (error) {
-      toast({
-        title: "Hata",
-        description: "Personel silinirken bir hata oluştu",
-        variant: "destructive",
-      });
+    } catch {
+      toast({ title: "Hata", description: "Personel silinirken bir hata oluştu", variant: "destructive" });
     }
   };
 

@@ -1,55 +1,30 @@
+import { useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { FolderTree } from 'lucide-react';
-import { 
+import { FolderTree } from "lucide-react";
+import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from '@/components/ui/sidebar';
-import { cn } from '@/lib/utils';
-
-interface Department {
-  id: number;
-  name: string;
-  parent_id: number | null;
-  level: number;
-}
+} from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 
 interface DepartmentTreeProps {
   onSelectDepartment: (id: number | null) => void;
 }
 
 export default function DepartmentTree({ onSelectDepartment }: DepartmentTreeProps) {
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
+  const departments = useQuery(api.departments.list) ?? [];
+  const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchDepartments();
-  }, []);
-
-  async function fetchDepartments() {
-    try {
-      const { data, error } = await supabase
-        .from('departments')
-        .select('*')
-        .order('level', { ascending: true })
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      setDepartments(data || []);
-    } catch (error) {
-      console.error('Error fetching departments:', error);
-    }
-  }
-
-  const handleDepartmentClick = (id: number) => {
+  const handleDepartmentClick = (id: string) => {
     const newSelectedId = selectedDepartment === id ? null : id;
     setSelectedDepartment(newSelectedId);
-    onSelectDepartment(newSelectedId);
+    onSelectDepartment(newSelectedId as unknown as number | null);
   };
 
   return (
@@ -60,15 +35,15 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
       </SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
-          {departments.map((dept) => (
-            <SidebarMenuItem key={dept.id}>
+          {departments.map((dept: { _id: string; name: string; level?: number }) => (
+            <SidebarMenuItem key={dept._id}>
               <SidebarMenuButton
-                onClick={() => handleDepartmentClick(dept.id)}
+                onClick={() => handleDepartmentClick(dept._id)}
                 className={cn(
-                  'w-full',
-                  selectedDepartment === dept.id && 'bg-burgundy/10 text-burgundy'
+                  "w-full",
+                  selectedDepartment === dept._id && "bg-burgundy/10 text-burgundy"
                 )}
-                style={{ marginLeft: `${dept.level * 12}px` }}
+                style={{ marginLeft: `${(dept.level ?? 0) * 12}px` }}
               >
                 {dept.name}
               </SidebarMenuButton>

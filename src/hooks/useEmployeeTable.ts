@@ -1,57 +1,60 @@
-
-import { useState } from 'react';
-import { Employee } from '@/types/employee';
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
+import { useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { toast } from "@/hooks/use-toast";
+import { Id } from "../../convex/_generated/dataModel";
 
-export function useEmployeeTable(employees: Employee[]) {
+interface EmployeeRow {
+  _id: Id<"employees">;
+  firstName: string;
+  lastName: string;
+  email: string;
+  tcNo: string;
+  cardNumber: string;
+  departmentId?: Id<"departments">;
+  isActive?: boolean;
+  [key: string]: unknown;
+}
+
+export function useEmployeeTable(employees: EmployeeRow[]) {
   const [sortConfig, setSortConfig] = useState<{
-    key: keyof Employee;
-    direction: 'asc' | 'desc';
+    key: keyof EmployeeRow;
+    direction: "asc" | "desc";
   } | null>(null);
 
-  const [selectedEmployees, setSelectedEmployees] = useState<number[]>([]);
+  const [selectedEmployees, setSelectedEmployees] = useState<Id<"employees">[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
+  const bulkDelete = useMutation(api.employees.bulkDelete);
+  const bulkUpdateStatus = useMutation(api.employees.bulkUpdateStatus);
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedEmployees(employees.map(emp => emp.id));
+      setSelectedEmployees(employees.map((emp) => emp._id));
     } else {
       setSelectedEmployees([]);
     }
   };
 
-  const handleSelectEmployee = (checked: boolean, employeeId: number) => {
+  const handleSelectEmployee = (checked: boolean, employeeId: Id<"employees">) => {
     if (checked) {
       setSelectedEmployees([...selectedEmployees, employeeId]);
     } else {
-      setSelectedEmployees(selectedEmployees.filter(id => id !== employeeId));
+      setSelectedEmployees(selectedEmployees.filter((id) => id !== employeeId));
     }
   };
 
   const handleBulkDelete = async () => {
     try {
-      const { error } = await supabase
-        .from('employees')
-        .delete()
-        .in('id', selectedEmployees);
-
-      if (error) throw error;
-
-      toast({
-        title: "Başarılı",
-        description: "Seçili personeller silindi",
-      });
-      
+      await bulkDelete({ employeeIds: selectedEmployees });
+      toast({ title: "Başarılı", description: "Seçili personeller silindi" });
       setSelectedEmployees([]);
       setShowDeleteDialog(false);
-      // Sayfayı yenilemek yerine callback kullanacağız
-      // window.location.reload();
-    } catch (error) {
+    } catch (error: unknown) {
       toast({
         title: "Hata",
-        description: "Personeller silinirken bir hata oluştu",
+        description: (error as Error)?.message ?? "Personeller silinirken hata oluştu",
         variant: "destructive",
       });
     }
@@ -59,53 +62,40 @@ export function useEmployeeTable(employees: Employee[]) {
 
   const handleBulkDepartmentUpdate = async () => {
     if (!selectedDepartment || selectedEmployees.length === 0) return;
-
     try {
-      const { error } = await supabase
-        .from('employees')
-        .update({ department_id: parseInt(selectedDepartment) })
-        .in('id', selectedEmployees);
-
-      if (error) throw error;
-
-      toast({
-        title: "Başarılı",
-        description: "Departman güncellendi",
-      });
-      
+      await Promise.all(
+        selectedEmployees.map((id) =>
+          fetch(`/api/employees/${id}`, { method: "PATCH", body: JSON.stringify({ departmentId: selectedDepartment }) })
+        )
+      );
+      toast({ title: "Başarılı", description: "Departman güncellendi" });
       setSelectedEmployees([]);
       setSelectedDepartment("");
-      // Sayfayı yenilemek yerine callback kullanacağız
-      // window.location.reload();
-    } catch (error) {
+    } catch (error: unknown) {
       toast({
         title: "Hata",
-        description: "Departman güncellenirken bir hata oluştu",
+        description: (error as Error)?.message ?? "Departman güncellenirken hata oluştu",
         variant: "destructive",
       });
     }
   };
 
-  const requestSort = (key: keyof Employee) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
+  const requestSort = (key: keyof EmployeeRow) => {
+    let direction: "asc" | "desc" = "asc";
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
     }
-    
     setSortConfig({ key, direction });
   };
 
   const sortedEmployees = [...employees].sort((a, b) => {
     if (!sortConfig) return 0;
     const { key, direction } = sortConfig;
-    
     const aVal = a[key];
     const bVal = b[key];
-    
-    if (aVal === null || bVal === null) return 0;
-    if (aVal < bVal) return direction === 'asc' ? -1 : 1;
-    if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+    if (aVal === null || aVal === undefined || bVal === null || bVal === undefined) return 0;
+    if (aVal < bVal) return direction === "asc" ? -1 : 1;
+    if (aVal > bVal) return direction === "asc" ? 1 : -1;
     return 0;
   });
 
@@ -120,6 +110,6 @@ export function useEmployeeTable(employees: Employee[]) {
     handleSelectEmployee,
     handleBulkDelete,
     handleBulkDepartmentUpdate,
-    requestSort
+    requestSort,
   };
 }

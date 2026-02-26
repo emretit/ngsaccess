@@ -1,223 +1,97 @@
-
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { AccessRule } from "@/types/access-control";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
+import { Id } from "../../../convex/_generated/dataModel";
+
+interface CreateRuleWithMembersParams {
+  rule: {
+    name: string;
+    description?: string;
+    targetType: string;
+    startTime?: string;
+    endTime?: string;
+    days: string[];
+    accessDirection: string;
+    priority: number;
+    projectId?: Id<"projects">;
+  };
+  employeeIds?: Id<"employees">[];
+  deviceIds?: Id<"devices">[];
+}
+
+interface UpdateRuleWithMembersParams {
+  id: Id<"accessRules">;
+  updates: {
+    name?: string;
+    description?: string;
+    targetType?: string;
+    startTime?: string;
+    endTime?: string;
+    days?: string[];
+    accessDirection?: string;
+    priority?: number;
+    projectId?: Id<"projects">;
+    isActive?: boolean;
+  };
+  employeeIds?: Id<"employees">[];
+  deviceIds?: Id<"devices">[];
+}
 
 export const useComplexAccessRuleMutations = () => {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const createAccessRuleWithMembers = useMutation({
-    mutationFn: async (params: { 
-      rule: {
-        name: string;
-        description?: string;
-        target_type: string;
-        start_time?: string;
-        end_time?: string;
-        days: string[];
-        access_direction: string;
-        priority: number;
-        project_id?: number;
-      };
-      employeeIds?: number[];
-      deviceIds?: number[];
-    }) => {
-      console.log('Creating access rule with members:', params);
-      
-      // First create the access rule
-      const { data: ruleData, error: ruleError } = await supabase
-        .from('access_rules')
-        .insert([params.rule])
-        .select()
-        .single();
+  const createWithGroups = useMutation(api.accessRules.createWithGroups);
+  const updateWithGroups = useMutation(api.accessRules.updateWithGroups);
 
-      if (ruleError) throw ruleError;
-
-      console.log('Created rule:', ruleData);
-
-      const promises = [];
-
-      // Add group members if provided
-      if (params.employeeIds && params.employeeIds.length > 0) {
-        const memberInserts = params.employeeIds.map(employeeId => ({
-          group_id: ruleData.id,
-          employee_id: employeeId,
-          project_id: params.rule.project_id
-        }));
-
-        console.log('Adding group members:', memberInserts);
-
-        const memberPromise = supabase
-          .from('group_members')
-          .insert(memberInserts);
-        promises.push(memberPromise);
-      }
-
-      // Add group devices if provided
-      if (params.deviceIds && params.deviceIds.length > 0) {
-        const deviceInserts = params.deviceIds.map(deviceId => ({
-          group_id: ruleData.id,
-          device_id: deviceId,
-          project_id: params.rule.project_id
-        }));
-
-        console.log('Adding group devices:', deviceInserts);
-
-        const devicePromise = supabase
-          .from('group_devices')
-          .insert(deviceInserts);
-        promises.push(devicePromise);
-      }
-
-      // Execute all inserts
-      const results = await Promise.all(promises);
-      
-      // Check for errors in batch operations
-      results.forEach((result, index) => {
-        if (result.error) {
-          console.error(`Error in batch operation ${index}:`, result.error);
-          throw result.error;
-        }
+  const createAccessRuleWithMembers = {
+    mutateAsync: async (params: CreateRuleWithMembersParams) => {
+      const result = await createWithGroups({
+        ...params.rule,
+        employeeIds: params.employeeIds,
+        deviceIds: params.deviceIds,
       });
-
-      return ruleData;
+      toast({ title: "Başarılı", description: "Erişim kuralı ve üyeleri oluşturuldu." });
+      return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['access-rules'] });
-      toast({
-        title: "Başarılı",
-        description: "Erişim kuralı ve üyeleri oluşturuldu.",
-      });
+    mutate: (params: CreateRuleWithMembersParams) => {
+      createWithGroups({
+        ...params.rule,
+        employeeIds: params.employeeIds,
+        deviceIds: params.deviceIds,
+      })
+        .then(() => toast({ title: "Başarılı", description: "Erişim kuralı ve üyeleri oluşturuldu." }))
+        .catch(() =>
+          toast({ variant: "destructive", title: "Hata", description: "Erişim kuralı oluşturulamadı." })
+        );
     },
-    onError: (error) => {
-      console.error('Error creating access rule with members:', error);
-      toast({
-        variant: "destructive",
-        title: "Hata",
-        description: "Erişim kuralı oluşturulurken bir hata oluştu.",
-      });
-    }
-  });
-
-  const updateAccessRuleWithAdditionalMembers = useMutation({
-    mutationFn: async (params: {
-      id: number;
-      updates: Partial<AccessRule>;
-      employeeIds?: number[];
-      deviceIds?: number[];
-    }) => {
-      console.log('Updating access rule with members replacement:', params);
-      
-      // First update the access rule
-      const { data: ruleData, error: ruleError } = await supabase
-        .from('access_rules')
-        .update(params.updates)
-        .eq('id', params.id)
-        .select()
-        .single();
-
-      if (ruleError) throw ruleError;
-
-      console.log('Updated rule:', ruleData);
-
-      const promises = [];
-
-      // Delete all existing group members first
-      const deleteMembers = supabase
-        .from('group_members')
-        .delete()
-        .eq('group_id', params.id);
-      promises.push(deleteMembers);
-
-      // Delete all existing group devices first
-      const deleteDevices = supabase
-        .from('group_devices')
-        .delete()
-        .eq('group_id', params.id);
-      promises.push(deleteDevices);
-
-      // Execute deletions first
-      const deleteResults = await Promise.all(promises);
-      deleteResults.forEach((result, index) => {
-        if (result.error) {
-          console.error(`Error in delete operation ${index}:`, result.error);
-          throw result.error;
-        }
-      });
-
-      console.log('Deleted existing members and devices');
-
-      // Now insert the new members and devices
-      const insertPromises = [];
-
-      // Add group members if provided
-      if (params.employeeIds && params.employeeIds.length > 0) {
-        const memberInserts = params.employeeIds.map(employeeId => ({
-          group_id: params.id,
-          employee_id: employeeId,
-          project_id: params.updates.project_id
-        }));
-
-        console.log('Adding group members:', memberInserts);
-
-        const memberPromise = supabase
-          .from('group_members')
-          .insert(memberInserts);
-        insertPromises.push(memberPromise);
-      }
-
-      // Add group devices if provided
-      if (params.deviceIds && params.deviceIds.length > 0) {
-        const deviceInserts = params.deviceIds.map(deviceId => ({
-          group_id: params.id,
-          device_id: deviceId,
-          project_id: params.updates.project_id
-        }));
-
-        console.log('Adding group devices:', deviceInserts);
-
-        const devicePromise = supabase
-          .from('group_devices')
-          .insert(deviceInserts);
-        insertPromises.push(devicePromise);
-      }
-
-      // Execute all inserts
-      if (insertPromises.length > 0) {
-        const insertResults = await Promise.all(insertPromises);
-        
-        // Check for errors in batch operations
-        insertResults.forEach((result, index) => {
-          if (result.error) {
-            console.error(`Error in insert operation ${index}:`, result.error);
-            throw result.error;
-          }
-        });
-      }
-
-      return ruleData;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['access-rules'] });
-      toast({
-        title: "Başarılı",
-        description: "Erişim kuralı güncellendi ve yeni üyeler eklendi.",
-      });
-    },
-    onError: (error) => {
-      console.error('Error updating access rule with additional members:', error);
-      toast({
-        variant: "destructive",
-        title: "Hata",
-        description: "Erişim kuralı güncellenirken bir hata oluştu.",
-      });
-    }
-  });
-
-  return {
-    createAccessRuleWithMembers,
-    updateAccessRuleWithAdditionalMembers
+    isPending: false,
   };
+
+  const updateAccessRuleWithAdditionalMembers = {
+    mutateAsync: async (params: UpdateRuleWithMembersParams) => {
+      const result = await updateWithGroups({
+        ruleId: params.id,
+        ...params.updates,
+        employeeIds: params.employeeIds,
+        deviceIds: params.deviceIds,
+      });
+      toast({ title: "Başarılı", description: "Erişim kuralı güncellendi." });
+      return result;
+    },
+    mutate: (params: UpdateRuleWithMembersParams) => {
+      updateWithGroups({
+        ruleId: params.id,
+        ...params.updates,
+        employeeIds: params.employeeIds,
+        deviceIds: params.deviceIds,
+      })
+        .then(() => toast({ title: "Başarılı", description: "Erişim kuralı güncellendi." }))
+        .catch(() =>
+          toast({ variant: "destructive", title: "Hata", description: "Erişim kuralı güncellenemedi." })
+        );
+    },
+    isPending: false,
+  };
+
+  return { createAccessRuleWithMembers, updateAccessRuleWithAdditionalMembers };
 };

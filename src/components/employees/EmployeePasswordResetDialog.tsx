@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -7,12 +6,22 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Employee } from '@/types/employee';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
-import { Mail, Loader2 } from 'lucide-react';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { useAction } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { Id } from "../../../convex/_generated/dataModel";
+import { toast } from "@/hooks/use-toast";
+import { Mail, Loader2 } from "lucide-react";
+
+interface Employee {
+  _id: Id<"employees">;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+}
 
 interface EmployeePasswordResetDialogProps {
   isOpen: boolean;
@@ -23,42 +32,34 @@ interface EmployeePasswordResetDialogProps {
 export function EmployeePasswordResetDialog({
   isOpen,
   onOpenChange,
-  employee
+  employee,
 }: EmployeePasswordResetDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const sendSetupEmail = useAction(api.actions.sendEmail.sendEmployeeSetupEmail);
+
+  const firstName = employee?.firstName ?? employee?.first_name ?? "";
+  const lastName = employee?.lastName ?? employee?.last_name ?? "";
+  const email = employee?.email ?? "";
 
   const handleSendResetEmail = async () => {
     if (!employee) return;
-
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('send-employee-setup-email', {
-        body: {
-          employee_id: employee.id,
-          email: employee.email,
-          first_name: employee.first_name,
-          last_name: employee.last_name
-        }
+      await sendSetupEmail({
+        employeeId: employee._id,
+        email,
+        firstName,
+        lastName,
       });
-
-      if (error) {
-        console.error('Supabase function error:', error);
-        throw error;
-      }
-
-      console.log('Email sent successfully:', data);
-
       toast({
         title: "Mail Gönderildi",
-        description: `${employee.first_name} ${employee.last_name} adlı personele şifre sıfırlama maili gönderildi.`,
+        description: `${firstName} ${lastName} adlı personele şifre sıfırlama maili gönderildi.`,
       });
-
       onOpenChange(false);
-    } catch (error: any) {
-      console.error('Error sending email:', error);
+    } catch (error: unknown) {
       toast({
         title: "Hata",
-        description: error.message || "Mail gönderilirken bir hata oluştu.",
+        description: (error as Error)?.message ?? "Mail gönderilirken hata oluştu.",
         variant: "destructive",
       });
     } finally {
@@ -77,29 +78,18 @@ export function EmployeePasswordResetDialog({
           <DialogDescription>
             {employee && (
               <>
-                <strong>{employee.first_name} {employee.last_name}</strong> adlı personele şifre sıfırlama maili göndermek istediğinize emin misiniz?
-                <br />
-                <br />
-                Mail adresi: <strong>{employee.email}</strong>
-                <br />
-                <br />
-                Bu mail, personelin mevcut şifresini sıfırlayacak ve yeni bir şifre belirlemesi için 24 saat geçerli bir bağlantı gönderecektir.
+                <strong>{firstName} {lastName}</strong> adlı personele şifre sıfırlama maili göndermek istediğinize emin misiniz?
+                <br /><br />
+                Mail adresi: <strong>{email}</strong>
               </>
             )}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button 
-            variant="outline" 
-            onClick={() => onOpenChange(false)}
-            disabled={isLoading}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             İptal
           </Button>
-          <Button 
-            onClick={handleSendResetEmail}
-            disabled={isLoading}
-          >
+          <Button onClick={handleSendResetEmail} disabled={isLoading}>
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

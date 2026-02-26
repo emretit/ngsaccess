@@ -1,113 +1,37 @@
-
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
+import { Id } from "../../convex/_generated/dataModel";
 
 export interface AuthError {
   message: string;
 }
 
-export const fetchUserProfile = async (userId: string) => {
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single();
+export type UserRole = "super_admin" | "project_admin" | "project_user";
 
-    if (error) {
-      console.error('Error fetching user profile:', error);
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error fetching profile:', error);
-    return null;
+export const checkUserRole = (
+  profile: { role?: UserRole } | null,
+  requiredRole: UserRole
+): boolean => {
+  if (!profile) return false;
+  if (profile.role === "super_admin") return true;
+  if (profile.role === "project_admin") {
+    return requiredRole === "project_admin" || requiredRole === "project_user";
   }
-};
-
-export const signInWithPassword = async (email: string, password: string) => {
-  try {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    
-    return { error };
-  } catch (error: any) {
-    return { error };
+  if (profile.role === "project_user") {
+    return requiredRole === "project_user";
   }
+  return false;
 };
 
-export const signUpWithPassword = async (email: string, password: string, name?: string) => {
-  try {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: name || email.split('@')[0]
-        }
-      }
-    });
-    
-    return { error };
-  } catch (error: any) {
-    return { error };
-  }
-};
-
-export const signOut = async () => {
-  return await supabase.auth.signOut();
-};
-
-export const redirectBasedOnRole = (role: string, navigate: Function, currentPath: string) => {
-  // Bu fonksiyon, artık her sayfa değişiminde değil,
-  // sadece giriş sonrası veya başka özel durumlarda çağrılmalı
-  
-  // Eğer kullanıcı zaten istediği sayfadaysa yönlendirme yapma
-  // Bu sayede sürekli /home'a yönlendirme sorunu çözülecek
-  if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/') {
-    console.log("Kullanıcı zaten istediği sayfada, yönlendirme yapılmıyor:", currentPath);
+export const redirectBasedOnRole = (
+  _role: string,
+  navigate: (path: string) => void,
+  currentPath: string
+) => {
+  if (
+    currentPath !== "/login" &&
+    currentPath !== "/register" &&
+    currentPath !== "/"
+  ) {
     return;
   }
-  
-  // Giriş sonrası ana sayfaya yönlendir
-  navigate('/home');
-};
-
-// Yeni güvenli super admin kontrol fonksiyonu
-export const checkIsSuperAdmin = async (): Promise<boolean> => {
-  try {
-    const { data, error } = await supabase.rpc('is_super_admin');
-    
-    if (error) {
-      console.error('Error checking super admin status:', error);
-      return false;
-    }
-    
-    return data || false;
-  } catch (error) {
-    console.error('Error in checkIsSuperAdmin:', error);
-    return false;
-  }
-};
-
-export const checkUserRole = (profile: any | null, requiredRole: 'super_admin' | 'project_admin' | 'project_user'): boolean => {
-  if (!profile) return false;
-  
-  // Super admin can do everything
-  if (profile.role === 'super_admin') return true;
-  
-  // Project admin can do project_admin and project_user tasks
-  if (profile.role === 'project_admin') {
-    return requiredRole === 'project_admin' || requiredRole === 'project_user';
-  }
-  
-  // Project user can only do project_user tasks
-  if (profile.role === 'project_user') {
-    return requiredRole === 'project_user';
-  }
-  
-  return false;
+  navigate("/home");
 };

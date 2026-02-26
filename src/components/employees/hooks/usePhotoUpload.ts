@@ -1,20 +1,25 @@
-
-import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState } from "react";
+import { useMutation } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import { Id } from "../../../../convex/_generated/dataModel";
 
 export function usePhotoUpload() {
   const [isLoading, setIsLoading] = useState(false);
 
+  const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const saveEmployeePhoto = useMutation(api.files.saveEmployeePhoto);
+
   const handleFileChange = async (
     e: React.ChangeEvent<HTMLInputElement>,
     onPhotoChange: (url: string) => void,
-    onPreviewChange: (preview: string) => void
+    onPreviewChange: (preview: string) => void,
+    employeeId?: Id<"employees">
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      alert('Dosya boyutu 5MB\'dan küçük olmalıdır');
+      alert("Dosya boyutu 5MB'dan küçük olmalıdır");
       return;
     }
 
@@ -26,28 +31,38 @@ export function usePhotoUpload() {
 
     try {
       setIsLoading(true);
-      const fileName = `${Date.now()}_${file.name}`;
-      const { data, error } = await supabase.storage
-        .from('employee-photos')
-        .upload(fileName, file);
 
-      if (error) throw error;
+      // 1. Upload URL al
+      const uploadUrl = await generateUploadUrl();
 
-      const { data: urlData } = supabase.storage
-        .from('employee-photos')
-        .getPublicUrl(fileName);
+      // 2. Dosyayı yükle
+      const result = await fetch(uploadUrl, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!result.ok) throw new Error("Dosya yüklenemedi");
+      const { storageId } = (await result.json()) as { storageId: Id<"_storage"> };
 
-      onPhotoChange(urlData.publicUrl);
+      // 3. Employee kaydını güncelle (eğer employeeId verilmişse)
+      if (employeeId) {
+        const url = await saveEmployeePhoto({ employeeId, storageId });
+        onPhotoChange(url);
+      } else {
+        // Sadece URL üret, kaydet değil
+        const urlResponse = await fetch(`/api/convex/files/${storageId}`);
+        if (urlResponse.ok) {
+          const { url } = (await urlResponse.json()) as { url: string };
+          onPhotoChange(url);
+        }
+      }
     } catch (error) {
-      console.error('Fotoğraf yüklenirken hata:', error);
-      alert('Fotoğraf yüklenemedi. Lütfen daha sonra tekrar deneyiniz.');
+      console.error("Fotoğraf yüklenirken hata:", error);
+      alert("Fotoğraf yüklenemedi. Lütfen daha sonra tekrar deneyiniz.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  return {
-    isLoading,
-    handleFileChange,
-  };
+  return { isLoading, handleFileChange };
 }

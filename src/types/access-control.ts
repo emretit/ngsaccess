@@ -1,36 +1,35 @@
-
 export interface CardReading {
-    id: number;
-    card_no: string;
-    access_granted: boolean;
-    access_time: string;
-    employee_id: number | null;
-    employee_name: string | null;
-    employee_photo_url: string | null;
-    device_id: number | string;
-    device_name: string;
-    device_location: string;
-    device_ip: string;
-    device_serial: string;
-    status: 'success' | 'denied' | 'unknown';
-    read_type?: string;
-    raw_data?: string;
-    created_at?: string;
-    updated_at?: string;
-    read_time?: string;
-    employees?: {
-        departments?: {
-            name: string;
-        } | null;
+  id: string;
+  card_no: string;
+  access_granted: boolean;
+  access_time: string;
+  employee_id: string | null;
+  employee_name: string | null;
+  employee_photo_url: string | null;
+  device_id: string;
+  device_name: string;
+  device_location: string;
+  device_ip: string;
+  device_serial: string;
+  status: "success" | "denied" | "unknown";
+  read_type?: string;
+  raw_data?: string;
+  created_at?: string;
+  updated_at?: string;
+  read_time?: string;
+  employees?: {
+    departments?: {
+      name: string;
     } | null;
-    devices?: {
-        name: string;
-        device_serial?: string;
-    } | null;
+  } | null;
+  devices?: {
+    name: string;
+    device_serial?: string;
+  } | null;
 }
 
 export interface Zone {
-  id: number;
+  id: string;
   name: string;
   description?: string;
   created_at?: string;
@@ -38,8 +37,8 @@ export interface Zone {
 }
 
 export interface Door {
-  id: number;
-  zone_id?: number;
+  id: string;
+  zone_id?: string;
   name: string;
   door_code?: string;
   location?: string;
@@ -49,13 +48,13 @@ export interface Door {
 }
 
 export interface GroupMember {
-  id: number;
-  group_id: number;
-  employee_id: number;
-  project_id?: number;
+  id: string;
+  group_id: string;
+  employee_id: string;
+  project_id?: string;
   created_at: string;
   employees?: {
-    id: number;
+    id: string;
     first_name: string;
     last_name: string;
     email?: string;
@@ -63,91 +62,89 @@ export interface GroupMember {
 }
 
 export interface GroupDevice {
-  id: number;
-  group_id: number;
-  device_id: number;
-  project_id?: number;
+  id: string;
+  group_id: string;
+  device_id: string;
+  project_id?: string;
   created_at: string;
   devices?: {
-    id: number;
+    id: string;
     name: string;
     device_serial?: string;
-    zone_id?: number;
-    door_id?: number;
+    zone_id?: string;
+    door_id?: string;
   };
 }
 
 export interface AccessRule {
-  id: number;
+  id: string;
   name: string;
   description?: string;
-  target_type: 'all' | 'department' | 'position' | 'individual';
+  target_type: "all" | "department" | "position" | "individual";
   start_time?: string;
   end_time?: string;
   days: string[];
-  access_direction: 'entry' | 'exit' | 'both';
+  access_direction: "entry" | "exit" | "both";
   priority: number;
   is_active: boolean;
   is_template: boolean;
   template_name?: string;
-  project_id?: number;
+  project_id?: string;
   created_at: string;
   updated_at: string;
-  // New group-based relations
   group_members?: GroupMember[];
   group_devices?: GroupDevice[];
-  // Legacy relations (keeping for backward compatibility)
   rule_employees?: Array<{
     employees: {
-      id: number;
+      id: string;
       first_name: string;
       last_name: string;
     };
   }>;
   rule_devices?: Array<{
     devices: {
-      id: number;
+      id: string;
       name: string;
       location: string;
     };
   }>;
   rule_positions?: Array<{
     positions: {
-      id: number;
+      id: string;
       name: string;
     };
   }>;
   rule_zones?: Array<{
     zones: {
-      id: number;
+      id: string;
       name: string;
     };
   }>;
   rule_doors?: Array<{
     doors: {
-      id: number;
+      id: string;
       name: string;
     };
   }>;
 }
 
 export interface RuleConflict {
-  id: number;
-  rule_id_1: number;
-  rule_id_2: number;
+  id: string;
+  rule_id_1: string;
+  rule_id_2: string;
   conflict_type: string;
   conflict_description: string;
-  severity: 'low' | 'medium' | 'high';
+  severity: "low" | "medium" | "high";
   resolved: boolean;
   created_at: string;
   updated_at: string;
 }
 
 export interface RuleTemplate {
-  id: number;
+  id: string;
   name: string;
   description?: string;
-  template_data: any;
+  template_data: unknown;
   category: string;
   is_system_template: boolean;
   usage_count: number;

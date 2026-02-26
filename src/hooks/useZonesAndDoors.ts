@@ -1,99 +1,46 @@
-
-import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
-import { Zone, Door } from "@/types/access-control";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { useProjectAccess } from "./useProjectAccess";
+import { Id } from "../../convex/_generated/dataModel";
 
-// Re-export the types so components importing from this file can use them
-export type { Zone, Door };
+export interface Zone {
+  _id: Id<"zones">;
+  name: string;
+  description?: string;
+  projectId?: Id<"projects">;
+}
+
+export interface Door {
+  _id: Id<"doors">;
+  name: string;
+  zoneId?: Id<"zones">;
+  location?: string;
+  status?: string;
+  projectId?: Id<"projects">;
+}
 
 export function useZonesAndDoors() {
   const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
 
-  const { 
-    data: zones = [], 
-    isLoading: zonesLoading,
-    error: zonesError,
-    refetch: refetchZones
-  } = useQuery({
-    queryKey: ['zones', projectIds],
-    queryFn: async () => {
-      console.log('Fetching zones for projects:', projectIds);
-      
-      let query = supabase
-        .from("zones")
-        .select("id, name, description")
-        .order("name", { ascending: true });
+  const zones = useQuery(
+    api.zones.list,
+    !projectLoading ? { projectIds, isSuperAdmin } : "skip"
+  );
 
-      // Super admin değilse proje filtrelemesi uygula
-      if (!isSuperAdmin && projectIds.length > 0) {
-        query = query.in('project_id', projectIds);
-      } else if (!isSuperAdmin && projectIds.length === 0) {
-        // Kullanıcının hiç projesi yoksa boş sonuç döndür
-        return [];
-      }
-        
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as Zone[] || [];
-    },
-    enabled: !projectLoading && (isSuperAdmin || projectIds.length > 0),
-    staleTime: 10 * 60 * 1000, // 10 dakika boyunca veri fresh kabul edilir
-    gcTime: 20 * 60 * 1000, // 20 dakika cache'de kalır
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    retry: 1,
-  });
+  const doors = useQuery(
+    api.doors.list,
+    !projectLoading ? { projectIds, isSuperAdmin } : "skip"
+  );
 
-  const { 
-    data: doors = [], 
-    isLoading: doorsLoading,
-    error: doorsError,
-    refetch: refetchDoors
-  } = useQuery({
-    queryKey: ['doors', projectIds],
-    queryFn: async () => {
-      console.log('Fetching doors for projects:', projectIds);
-      
-      let query = supabase
-        .from("doors")
-        .select("id, name, zone_id, location, status")
-        .order("name", { ascending: true });
+  const loading = projectLoading || zones === undefined || doors === undefined;
 
-      // Super admin değilse proje filtrelemesi uygula
-      if (!isSuperAdmin && projectIds.length > 0) {
-        query = query.in('project_id', projectIds);
-      } else if (!isSuperAdmin && projectIds.length === 0) {
-        // Kullanıcının hiç projesi yoksa boş sonuç döndür
-        return [];
-      }
-        
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as Door[] || [];
-    },
-    enabled: !projectLoading && (isSuperAdmin || projectIds.length > 0),
-    staleTime: 10 * 60 * 1000, // 10 dakika boyunca veri fresh kabul edilir
-    gcTime: 20 * 60 * 1000, // 20 dakika cache'de kalır
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    retry: 1,
-  });
+  const refreshData = () => {};
 
-  const loading = zonesLoading || doorsLoading || projectLoading;
-  
-  // Verileri yenileme fonksiyonu
-  const refreshData = () => {
-    refetchZones();
-    refetchDoors();
-  };
-
-  return { 
-    zones, 
-    doors, 
-    loading, 
-    error: zonesError || doorsError,
-    refreshData
+  return {
+    zones: (zones ?? []) as Zone[],
+    doors: (doors ?? []) as Door[],
+    loading,
+    error: null,
+    refreshData,
   };
 }

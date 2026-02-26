@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { useMutation } from 'convex/react';
+import { api } from '../../../convex/_generated/api';
 import { Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -23,6 +24,7 @@ export default function ProfileForm({ email, fullName, role, userId, onProfileUp
   const [isUpdating, setIsUpdating] = useState(false);
   const [name, setName] = useState(fullName);
   const navigate = useNavigate();
+  const updateProfile = useMutation(api.users.updateProfile);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,15 +32,7 @@ export default function ProfileForm({ email, fullName, role, userId, onProfileUp
     try {
       setIsUpdating(true);
       
-      // Profil bilgilerini güncelle
-      const { error } = await supabase
-        .from('users')
-        .update({
-          full_name: name,
-        })
-        .eq('id', userId);
-        
-      if (error) throw error;
+      await updateProfile({ fullName: name });
       
       // Context'teki profil bilgisini güncelle
       await onProfileUpdated();

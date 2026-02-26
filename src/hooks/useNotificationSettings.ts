@@ -1,80 +1,44 @@
-
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectAccess } from "./useProjectAccess";
+import { Id } from "../../convex/_generated/dataModel";
 
-interface NotificationSettings {
-  id?: string;
-  project_id?: number;
-  email_notifications?: boolean;
-  late_notifications?: boolean;
-  report_notifications?: boolean;
-  system_notifications?: boolean;
+interface NotificationSettingsInput {
+  emailNotifications?: boolean;
+  lateNotifications?: boolean;
+  reportNotifications?: boolean;
+  systemNotifications?: boolean;
 }
 
 export function useNotificationSettings() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const { projectIds } = useProjectAccess();
+  const projectId = projectIds[0] as Id<"projects"> | undefined;
 
-  const { data: notificationSettings, isLoading } = useQuery({
-    queryKey: ['notification-settings', projectIds],
-    queryFn: async () => {
-      if (projectIds.length === 0) return null;
-      
-      const { data, error } = await supabase
-        .from('notification_settings')
-        .select('*')
-        .in('project_id', projectIds)
-        .maybeSingle();
+  const notificationSettings = useQuery(api.settings.getNotification, { projectId });
+  const upsertNotification = useMutation(api.settings.upsertNotification);
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      return data;
-    },
-    enabled: projectIds.length > 0
-  });
-
-  const saveNotificationSettings = useMutation({
-    mutationFn: async (settings: NotificationSettings) => {
-      const projectId = projectIds[0];
-      if (!projectId) throw new Error('Proje bulunamadı');
-
-      const { data, error } = await supabase
-        .from('notification_settings')
-        .upsert({
-          ...settings,
-          project_id: projectId
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notification-settings'] });
+  const saveNotificationSettings = async (settings: NotificationSettingsInput) => {
+    try {
+      await upsertNotification({ ...settings, projectId });
       toast({
         title: "Bildirim ayarları kaydedildi",
         description: "Bildirim tercihleri başarıyla güncellendi",
       });
-    },
-    onError: (error: any) => {
+    } catch (error: unknown) {
       toast({
         title: "Hata",
-        description: error.message || "Bildirim ayarları kaydedilirken hata oluştu",
+        description: (error as Error)?.message ?? "Bildirim ayarları kaydedilirken hata oluştu",
         variant: "destructive",
       });
     }
-  });
+  };
 
   return {
-    notificationSettings,
-    isLoading,
-    saveNotificationSettings: saveNotificationSettings.mutate,
-    isSaving: saveNotificationSettings.isPending
+    notificationSettings: notificationSettings ?? null,
+    isLoading: notificationSettings === undefined,
+    saveNotificationSettings,
+    isSaving: false,
   };
 }

@@ -1,107 +1,136 @@
-
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Device } from "@/types/device";
-import { useEffect } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
+import { useProjectAccess } from "./useProjectAccess";
+import { Id } from "../../convex/_generated/dataModel";
+
+export interface Device {
+  _id: Id<"devices">;
+  name: string;
+  projectId?: Id<"projects">;
+  zoneId?: Id<"zones">;
+  doorId?: Id<"doors">;
+  deviceType?: string;
+  deviceIp?: string;
+  deviceSerial?: string;
+  accessDirection?: "entry" | "exit" | "both";
+  status?: string;
+  isActive?: boolean;
+  description?: string;
+  lastSeen?: string;
+  createdAt: string;
+  updatedAt: string;
+  zone?: { name: string } | null;
+  door?: { name: string } | null;
+  // Legacy aliases for compatibility
+  device_name?: string;
+  device_serial?: string;
+  device_type?: string;
+  device_location?: string;
+}
 
 export function useDevices() {
-  const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
 
-  // Setup a regular refresh for the device status
-  useEffect(() => {
-    const timer = setInterval(() => {
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
-    }, 5 * 60 * 1000); // Refresh every 5 minutes
+  const devicesRaw = useQuery(
+    api.devices.list,
+    !projectLoading ? { projectIds, isSuperAdmin } : "skip"
+  );
 
-    return () => clearInterval(timer);
-  }, [queryClient]);
+  const createDevice = useMutation(api.devices.create);
+  const updateDevice = useMutation(api.devices.update);
+  const deleteDevice = useMutation(api.devices.remove);
 
-  // Main query to get all devices
-  const devicesQuery = useQuery({
-    queryKey: ['devices'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('devices')
-        .select('*');
-      
-      if (error) throw error;
-      
-      // Process the data to determine status
-      return (data || []).map((device: any): Device => {
-        let status: 'online' | 'offline' | 'expired' = 'offline';
-        
-        // Check if device was seen in the last 5 minutes
-        if (device.last_seen) {
-          const lastSeen = new Date(device.last_seen);
-          const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-          status = lastSeen > fiveMinutesAgo ? 'online' : 'offline';
-        }
-        
-        return { 
-          ...device,
-          status,
-          // Map database field names to Device interface
-          device_name: device.name,
-          device_serial: device.device_serial,
-          device_type: device.device_type,
-          device_location: device.description
-        };
-      });
+  const devices: Device[] = (devicesRaw ?? []).map((d: unknown) => {
+    const dev = d as Device;
+    const lastSeen = dev.lastSeen;
+    let computedStatus: string = "offline";
+    if (lastSeen) {
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      computedStatus = new Date(lastSeen) > fiveMinutesAgo ? "online" : "offline";
     }
+    return {
+      ...dev,
+      status: computedStatus,
+      device_name: dev.name,
+      device_serial: dev.deviceSerial,
+      device_type: dev.deviceType,
+      device_location: dev.description,
+    };
   });
 
-  // Function to add a device directly
-  const addDeviceMutation = useMutation({
-    mutationFn: async (deviceData: Partial<Device>) => {
-      // Map Device interface fields to database fields
-      const dbData = {
-        name: deviceData.name || deviceData.device_name,
-        device_serial: deviceData.device_serial || deviceData.serial_number,
-        device_type: deviceData.device_type as any, // Cast to handle type mismatch
-        device_ip: deviceData.device_ip,
-        description: deviceData.device_location, // Use device_location instead of description
-        zone_id: deviceData.zone_id,
-        door_id: deviceData.door_id,
-        access_direction: deviceData.access_direction || 'both',
-        status: 'active',
-        is_active: true
-      };
-
-      const { error } = await supabase
-        .from('devices')
-        .insert(dbData);
-
-      if (error) {
-        throw new Error("Cihaz eklenirken hata oluştu. Lütfen tekrar deneyin.");
-      }
-
-      return deviceData;
-    },
-    onSuccess: () => {
-      // Refresh the devices list
-      queryClient.invalidateQueries({ queryKey: ['devices'] });
-      toast({
-        title: "Cihaz başarıyla eklendi",
-        description: "Cihaz sisteme kaydedildi",
-        variant: "default"
+  const addDevice = async (deviceData: Partial<Device>) => {
+    const projectId = projectIds[0] as Id<"projects"> | undefined;
+    try {
+      const id = await createDevice({
+        name: deviceData.name ?? deviceData.device_name ?? "Yeni Cihaz",
+        projectId,
+        zoneId: deviceData.zoneId,
+        doorId: deviceData.doorId,
+        deviceType: deviceData.deviceType ?? deviceData.device_type,
+        deviceIp: deviceData.deviceIp,
+        deviceSerial: deviceData.deviceSerial ?? deviceData.device_serial,
+        accessDirection: deviceData.accessDirection,
+        isActive: deviceData.isActive ?? true,
+        description: deviceData.description ?? deviceData.device_location,
       });
-    },
-    onError: (error: Error) => {
+      toast({ title: "Cihaz eklendi" });
+      return id;
+    } catch (error: unknown) {
       toast({
-        title: "Cihaz eklenirken hata oluştu",
-        description: error.message,
-        variant: "destructive"
+        title: "Hata",
+        description: (error as Error)?.message ?? "Cihaz eklenemedi",
+        variant: "destructive",
       });
     }
-  });
+  };
+
+  const editDevice = async (deviceId: Id<"devices">, updates: Partial<Device>) => {
+    try {
+      await updateDevice({
+        deviceId,
+        name: updates.name,
+        zoneId: updates.zoneId,
+        doorId: updates.doorId,
+        deviceType: updates.deviceType,
+        deviceIp: updates.deviceIp,
+        deviceSerial: updates.deviceSerial,
+        accessDirection: updates.accessDirection,
+        isActive: updates.isActive,
+        description: updates.description,
+        lastSeen: updates.lastSeen,
+      });
+      toast({ title: "Cihaz güncellendi" });
+    } catch (error: unknown) {
+      toast({
+        title: "Hata",
+        description: (error as Error)?.message ?? "Cihaz güncellenemedi",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const removeDevice = async (deviceId: Id<"devices">) => {
+    try {
+      await deleteDevice({ deviceId });
+      toast({ title: "Cihaz silindi" });
+    } catch (error: unknown) {
+      toast({
+        title: "Hata",
+        description: (error as Error)?.message ?? "Cihaz silinemedi",
+        variant: "destructive",
+      });
+    }
+  };
 
   return {
-    devices: devicesQuery.data || [],
-    isLoading: devicesQuery.isLoading,
-    error: devicesQuery.error,
-    addDevice: addDeviceMutation.mutate,
-    isAddingDevice: addDeviceMutation.isPending,
+    devices,
+    isLoading: projectLoading || devicesRaw === undefined,
+    error: null,
+    addDevice,
+    editDevice,
+    removeDevice,
+    devicesQuery: { data: devices, isLoading: devicesRaw === undefined },
   };
 }

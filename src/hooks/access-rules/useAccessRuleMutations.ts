@@ -1,109 +1,95 @@
-
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { AccessRule } from "@/types/access-control";
+import { useMutation } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
+import { Id } from "../../../convex/_generated/dataModel";
+
+interface CreateRuleInput {
+  name: string;
+  description?: string;
+  targetType: string;
+  startTime?: string;
+  endTime?: string;
+  days: string[];
+  accessDirection: string;
+  priority: number;
+  projectId?: Id<"projects">;
+}
 
 export const useAccessRuleMutations = () => {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
-  const createAccessRule = useMutation({
-    mutationFn: async (newRule: { 
-      name: string;
-      description?: string;
-      target_type: string;
-      start_time?: string;
-      end_time?: string;
-      days: string[];
-      access_direction: string;
-      priority: number;
-      project_id?: number;
-    }) => {
-      const { data, error } = await supabase
-        .from('access_rules')
-        .insert([newRule])
-        .select()
-        .single();
+  const createRule = useMutation(api.accessRules.create);
+  const updateRule = useMutation(api.accessRules.update);
+  const deleteRule = useMutation(api.accessRules.remove);
 
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['access-rules'] });
-      toast({
-        title: "Başarılı",
-        description: "Erişim kuralı oluşturuldu.",
+  const createAccessRule = {
+    mutateAsync: async (input: CreateRuleInput) => {
+      const result = await createRule({
+        name: input.name,
+        description: input.description,
+        targetType: input.targetType,
+        startTime: input.startTime,
+        endTime: input.endTime,
+        days: input.days,
+        accessDirection: input.accessDirection,
+        priority: input.priority,
+        projectId: input.projectId,
+        isActive: true,
       });
+      toast({ title: "Başarılı", description: "Erişim kuralı oluşturuldu." });
+      return result;
     },
-    onError: (error) => {
-      console.error('Error creating access rule:', error);
-      toast({
-        variant: "destructive",
-        title: "Hata",
-        description: "Erişim kuralı oluşturulurken bir hata oluştu.",
-      });
-    }
-  });
-
-  const updateAccessRule = useMutation({
-    mutationFn: async ({ id, updates }: { id: number; updates: Partial<AccessRule> }) => {
-      const { data, error } = await supabase
-        .from('access_rules')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+    mutate: (input: CreateRuleInput) => {
+      createRule({
+        name: input.name,
+        description: input.description,
+        targetType: input.targetType,
+        startTime: input.startTime,
+        endTime: input.endTime,
+        days: input.days,
+        accessDirection: input.accessDirection,
+        priority: input.priority,
+        projectId: input.projectId,
+        isActive: true,
+      })
+        .then(() => toast({ title: "Başarılı", description: "Erişim kuralı oluşturuldu." }))
+        .catch(() =>
+          toast({ variant: "destructive", title: "Hata", description: "Erişim kuralı oluşturulamadı." })
+        );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['access-rules'] });
-      toast({
-        title: "Başarılı",
-        description: "Erişim kuralı güncellendi.",
-      });
-    },
-    onError: (error) => {
-      console.error('Error updating access rule:', error);
-      toast({
-        variant: "destructive",
-        title: "Hata",
-        description: "Erişim kuralı güncellenirken bir hata oluştu.",
-      });
-    }
-  });
-
-  const deleteAccessRule = useMutation({
-    mutationFn: async (id: number) => {
-      const { error } = await supabase
-        .from('access_rules')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['access-rules'] });
-      toast({
-        title: "Başarılı",
-        description: "Erişim kuralı silindi.",
-      });
-    },
-    onError: (error) => {
-      console.error('Error deleting access rule:', error);
-      toast({
-        variant: "destructive",
-        title: "Hata",
-        description: "Erişim kuralı silinirken bir hata oluştu.",
-      });
-    }
-  });
-
-  return {
-    createAccessRule,
-    updateAccessRule,
-    deleteAccessRule
+    isPending: false,
   };
+
+  const updateAccessRule = {
+    mutateAsync: async ({ id, updates }: { id: Id<"accessRules">; updates: Partial<CreateRuleInput> }) => {
+      const result = await updateRule({ ruleId: id, ...updates });
+      toast({ title: "Başarılı", description: "Erişim kuralı güncellendi." });
+      return result;
+    },
+    mutate: ({ id, updates }: { id: Id<"accessRules">; updates: Partial<CreateRuleInput> }) => {
+      updateRule({ ruleId: id, ...updates })
+        .then(() => toast({ title: "Başarılı", description: "Erişim kuralı güncellendi." }))
+        .catch(() =>
+          toast({ variant: "destructive", title: "Hata", description: "Erişim kuralı güncellenemedi." })
+        );
+    },
+    isPending: false,
+  };
+
+  const deleteAccessRule = {
+    mutateAsync: async (id: Id<"accessRules">) => {
+      await deleteRule({ ruleId: id });
+      toast({ title: "Başarılı", description: "Erişim kuralı silindi." });
+    },
+    mutate: (id: Id<"accessRules">) => {
+      deleteRule({ ruleId: id })
+        .then(() => toast({ title: "Başarılı", description: "Erişim kuralı silindi." }))
+        .catch(() =>
+          toast({ variant: "destructive", title: "Hata", description: "Erişim kuralı silinemedi." })
+        );
+    },
+    isPending: false,
+  };
+
+  return { createAccessRule, updateAccessRule, deleteAccessRule };
 };

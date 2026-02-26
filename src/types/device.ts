@@ -1,33 +1,28 @@
-
-export type AccessDirection = 'entry' | 'exit' | 'both';
+export type AccessDirection = "entry" | "exit" | "both";
 
 export interface Device {
   id: string;
   device_name?: string;
-  name?: string; // For compatibility with existing code
+  name?: string;
   device_serial?: string;
-  serial_number?: string; // For compatibility with existing code
+  serial_number?: string;
   device_model?: string;
   device_location?: string;
   device_type?: string;
-  status: 'online' | 'offline' | 'expired';
+  status: "online" | "offline" | "expired";
   created_at?: string;
   last_used_at?: string | null;
-  // Added required fields from DB schema
   type?: string;
-  // Add zone_id and door_id for location display
-  zone_id?: number;
-  door_id?: number;
-  // New access direction field
+  zone_id?: string;
+  door_id?: string;
   access_direction?: AccessDirection;
-  // Additional network and hardware info
   device_mac?: string;
   device_ip?: string;
   device_firmware?: string;
 }
 
 export interface Project {
-  id: number;
+  id: string;
   name: string;
 }
 
@@ -35,14 +30,19 @@ export interface ServerDevice {
   id: string;
   name: string;
   serial_number: string;
-  device_model_enum: "QR Reader" | "Fingerprint Reader" | "RFID Reader" | "Access Control Terminal" | "Other";
-  project_id?: number;
+  device_model_enum:
+    | "QR Reader"
+    | "Fingerprint Reader"
+    | "RFID Reader"
+    | "Access Control Terminal"
+    | "Other";
+  project_id?: string;
   date_added: string;
   expiry_date?: string;
   projects?: {
     name: string;
   };
-  status?: 'online' | 'offline' | 'expired' | 'active' | 'inactive';
+  status?: "online" | "offline" | "expired" | "active" | "inactive";
   created_at?: string;
   device_type?: string;
   device_model?: string;
@@ -50,12 +50,11 @@ export interface ServerDevice {
   last_used_at?: string;
   updated_at?: string;
   device_location?: string;
-  zone_id?: number;
-  door_id?: number;
+  zone_id?: string;
+  door_id?: string;
   description?: string;
   device_ip?: string;
   device_mac?: string;
   device_firmware?: string;
-  // New access direction field
   access_direction?: AccessDirection;
 }

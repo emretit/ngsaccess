@@ -1,47 +1,40 @@
-
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useEffect } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { useProjectAccess } from "./useProjectAccess";
+import { Id } from "../../convex/_generated/dataModel";
 
 export function useDarkMode() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const { projectIds } = useProjectAccess();
+  const projectId = projectIds[0] as Id<"projects"> | undefined;
+
+  const darkMode = useQuery(api.settings.getDarkMode, { projectId });
+  const upsertGeneral = useMutation(api.settings.upsertGeneral);
 
   useEffect(() => {
-    const loadDarkModeSetting = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('general_settings')
-          .select('dark_mode')
-          .maybeSingle();
+    if (darkMode === true) {
+      document.documentElement.classList.add("dark");
+    } else if (darkMode === false) {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [darkMode]);
 
-        if (error) {
-          console.error('Error loading dark mode setting:', error);
-          return;
-        }
-
-        const darkModeEnabled = data?.dark_mode || false;
-        setIsDarkMode(darkModeEnabled);
-        
-        if (darkModeEnabled) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-      } catch (error) {
-        console.error('Error in loadDarkModeSetting:', error);
-      }
-    };
-
-    loadDarkModeSetting();
-  }, []);
-
-  const toggleDarkMode = (enabled: boolean) => {
-    setIsDarkMode(enabled);
+  const toggleDarkMode = async (enabled: boolean) => {
     if (enabled) {
-      document.documentElement.classList.add('dark');
+      document.documentElement.classList.add("dark");
     } else {
-      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.remove("dark");
+    }
+    try {
+      await upsertGeneral({
+        projectId,
+        companyName: "NGS Access",
+        darkMode: enabled,
+      });
+    } catch (e) {
+      // sessizce devam et
     }
   };
 
-  return { isDarkMode, toggleDarkMode };
+  return { isDarkMode: darkMode ?? false, toggleDarkMode };
 }

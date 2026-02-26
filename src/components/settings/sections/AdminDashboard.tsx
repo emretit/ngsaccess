@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from 'convex/react';
+import { api } from '../../../../convex/_generated/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Users, Building2, Activity, Settings, Shield, TrendingUp, Clock, Monitor } from 'lucide-react';
@@ -10,25 +10,16 @@ import { AdminDevicesPanel } from '@/components/admin/AdminDevicesPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function AdminDashboard() {
-  // Fetch dashboard statistics
-  const { data: stats } = useQuery({
-    queryKey: ['admin', 'dashboard-stats'],
-    queryFn: async () => {
-      const [projectsRes, usersRes, activeUsersRes] = await Promise.all([
-        supabase.from('projects').select('id, name, is_active'),
-        supabase.from('users').select('id, email, role'),
-        supabase.from('users').select('id').eq('role', 'project_user')
-      ]);
+  const allProjects = useQuery(api.projects.list);
+  const allUsers = useQuery(api.users.list);
 
-      return {
-        projects: projectsRes.data || [],
-        users: usersRes.data || [],
-        activeUsers: activeUsersRes.data?.length || 0,
-        totalProjects: projectsRes.data?.length || 0,
-        activeProjects: projectsRes.data?.filter(p => p.is_active).length || 0
-      };
-    }
-  });
+  const stats = {
+    projects: allProjects ?? [],
+    users: allUsers ?? [],
+    activeUsers: (allUsers ?? []).filter((u: { role?: string }) => u.role === "project_user").length,
+    totalProjects: (allProjects ?? []).length,
+    activeProjects: (allProjects ?? []).filter((p: { isActive?: boolean }) => p.isActive).length,
+  };
 
   return (
     <div className="space-y-10">

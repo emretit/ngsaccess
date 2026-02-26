@@ -10,7 +10,9 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { User } from '../types/user-types';
-import { supabase } from '@/integrations/supabase/client';
+import { useAction } from 'convex/react';
+import { api } from '../../../../convex/_generated/api';
+import { Id } from '../../../../convex/_generated/dataModel';
 import { useToast } from '@/hooks/use-toast';
 import { Mail, Loader2 } from 'lucide-react';
 
@@ -27,38 +29,26 @@ export function UserPasswordResetDialog({
 }: UserPasswordResetDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const sendUserSetupEmail = useAction(api.actions.sendEmail.sendUserSetupEmail);
 
   const handleSendResetEmail = async () => {
     if (!user) return;
-
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('send-user-setup-email', {
-        body: {
-          user_id: user.id,
-          email: user.email,
-          role: user.role
-        }
+      await sendUserSetupEmail({
+        userId: user.id as unknown as Id<"users">,
+        email: user.email,
+        fullName: user.email,
       });
-
-      if (error) {
-        console.error('Supabase function error:', error);
-        throw error;
-      }
-
-      console.log('Email sent successfully:', data);
-
       toast({
         title: "Mail Gönderildi",
         description: `${user.email} adresine şifre sıfırlama maili gönderildi.`,
       });
-
       onOpenChange(false);
-    } catch (error: any) {
-      console.error('Error sending email:', error);
+    } catch (error: unknown) {
       toast({
         title: "Hata",
-        description: error.message || "Mail gönderilirken bir hata oluştu.",
+        description: (error as Error)?.message ?? "Mail gönderilirken hata oluştu.",
         variant: "destructive",
       });
     } finally {

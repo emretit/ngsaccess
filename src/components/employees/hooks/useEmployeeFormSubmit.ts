@@ -1,233 +1,139 @@
+import { useState } from "react";
+import { useMutation, useAction } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import { toast } from "@/hooks/use-toast";
+import { Id } from "../../../../convex/_generated/dataModel";
 
-import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
-import { Employee } from '@/types/employee';
-import { EmployeeFormData } from './useEmployeeFormData';
+export interface EmployeeFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  tcNo: string;
+  cardNumber: string;
+  companyId: Id<"companies"> | null;
+  departmentId: Id<"departments"> | null;
+  positionId: Id<"positions"> | null;
+  accessRuleId: Id<"accessRules"> | null;
+  shiftId: Id<"shifts"> | null;
+  shift: string | null;
+  photoUrl: string | null;
+  notes: string;
+  isActive: boolean;
+  projectId?: Id<"projects">;
+}
+
+interface EmployeeInput {
+  _id?: Id<"employees">;
+  firstName?: string;
+  lastName?: string;
+}
 
 export const useEmployeeFormSubmit = (
-  employee: Employee | null | undefined,
+  employee: EmployeeInput | null | undefined,
   onClose: () => void,
-  onSave: (employee: Employee) => void,
-  departments: { id: number; name: string }[],
-  positions: { id: number; name: string }[]
+  onSave: (employee: unknown) => void
 ) => {
   const [isLoading, setIsLoading] = useState(false);
 
-  const sendEmployeeSetupEmail = async (employeeData: any) => {
-    try {
-      console.log('Sending setup email to:', employeeData.email);
-      
-      const { data, error } = await supabase.functions.invoke('send-employee-setup-email', {
-        body: {
-          employee_id: employeeData.id.toString(),
-          email: employeeData.email,
-          first_name: employeeData.first_name,
-          last_name: employeeData.last_name
-        }
-      });
-
-      if (error) {
-        console.error('Email sending error:', error);
-        toast({
-          title: "Uyarı",
-          description: "Personel başarıyla eklendi ancak kurulum e-postası gönderilemedi. E-postayı manuel olarak gönderebilirsiniz.",
-          variant: "destructive",
-        });
-        return false;
-      }
-
-      console.log('Setup email sent successfully:', data);
-      toast({
-        title: "Başarılı",
-        description: "Personel eklendi ve kurulum e-postası gönderildi",
-      });
-      return true;
-    } catch (error) {
-      console.error('Unexpected error sending email:', error);
-      toast({
-        title: "Uyarı",
-        description: "Personel başarıyla eklendi ancak kurulum e-postası gönderilemedi",
-        variant: "destructive",
-      });
-      return false;
-    }
-  };
+  const createEmployee = useMutation(api.employees.create);
+  const updateEmployee = useMutation(api.employees.update);
+  const checkDuplicate = useMutation(api.employees.update);
+  const sendSetupEmail = useAction(api.actions.sendEmail.sendEmployeeSetupEmail);
 
   const handleSubmit = async (formData: EmployeeFormData) => {
     if (isLoading) return;
-    
     setIsLoading(true);
-    
+
     try {
-      console.log('=== EMPLOYEE FORM SUBMIT ===');
-      console.log('Employee data:', employee);
-      console.log('Form data:', formData);
-      console.log('Is editing:', !!employee);
-
-      // Validation
-      if (!formData.first_name?.trim()) {
-        toast({
-          title: "Hata",
-          description: "Ad alanı zorunludur",
-          variant: "destructive",
-        });
+      if (!formData.firstName?.trim()) {
+        toast({ title: "Hata", description: "Ad alanı zorunludur", variant: "destructive" });
         return;
       }
-
-      if (!formData.last_name?.trim()) {
-        toast({
-          title: "Hata", 
-          description: "Soyad alanı zorunludur",
-          variant: "destructive",
-        });
+      if (!formData.lastName?.trim()) {
+        toast({ title: "Hata", description: "Soyad alanı zorunludur", variant: "destructive" });
         return;
       }
-
       if (!formData.email?.trim()) {
-        toast({
-          title: "Hata",
-          description: "E-posta alanı zorunludur", 
-          variant: "destructive",
-        });
+        toast({ title: "Hata", description: "E-posta alanı zorunludur", variant: "destructive" });
+        return;
+      }
+      if (!formData.tcNo?.trim() || formData.tcNo.length !== 11) {
+        toast({ title: "Hata", description: "TC Kimlik No 11 haneli olmalıdır", variant: "destructive" });
+        return;
+      }
+      if (!formData.cardNumber?.trim()) {
+        toast({ title: "Hata", description: "Kart numarası zorunludur", variant: "destructive" });
         return;
       }
 
-      if (!formData.tc_no?.trim() || formData.tc_no.length !== 11) {
-        toast({
-          title: "Hata",
-          description: "TC Kimlik No 11 haneli olmalıdır",
-          variant: "destructive",
+      if (employee?._id) {
+        // Update
+        await updateEmployee({
+          employeeId: employee._id,
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          email: formData.email.trim().toLowerCase(),
+          tcNo: formData.tcNo.trim(),
+          cardNumber: formData.cardNumber.trim(),
+          companyId: formData.companyId ?? undefined,
+          departmentId: formData.departmentId ?? undefined,
+          positionId: formData.positionId ?? undefined,
+          accessRuleId: formData.accessRuleId ?? undefined,
+          shiftId: formData.shiftId ?? undefined,
+          shift: formData.shift ?? undefined,
+          photoUrl: formData.photoUrl ?? undefined,
+          notes: formData.notes?.trim() ?? undefined,
+          isActive: formData.isActive ?? true,
         });
-        return;
-      }
-
-      if (!formData.card_number?.trim()) {
-        toast({
-          title: "Hata",
-          description: "Kart numarası zorunludur",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Prepare the data for submission
-      const submitData = {
-        first_name: formData.first_name.trim(),
-        last_name: formData.last_name.trim(),
-        email: formData.email.trim().toLowerCase(),
-        tc_no: formData.tc_no.trim(),
-        card_number: formData.card_number.trim(),
-        company_id: formData.company_id || null,
-        department_id: formData.department_id || null,
-        position_id: formData.position_id || null,
-        access_rule_id: formData.access_rule_id || null,
-        shift: formData.shift || null,
-        shift_id: formData.shift_id || null,
-        photo_url: formData.photo_url || null,
-        notes: formData.notes?.trim() || null,
-        is_active: formData.is_active ?? true,
-      };
-
-      console.log('Submit data prepared:', submitData);
-
-      let result;
-      let isNewEmployee = false;
-      
-      if (employee?.id) {
-        // Update existing employee
-        console.log('Updating employee with ID:', employee.id);
-        result = await supabase
-          .from('employees')
-          .update(submitData)
-          .eq('id', employee.id)
-          .select('*')
-          .single();
+        toast({ title: "Başarılı", description: "Çalışan bilgileri güncellendi" });
+        onSave({ _id: employee._id, ...formData });
+        onClose();
       } else {
-        // Create new employee - check for duplicates first
-        console.log('Checking for existing employee with same TC or card number...');
-        isNewEmployee = true;
-        
-        const { data: existingEmployee } = await supabase
-          .from('employees')
-          .select('id, tc_no, card_number, email')
-          .or(`tc_no.eq.${submitData.tc_no},card_number.eq.${submitData.card_number},email.eq.${submitData.email}`)
-          .maybeSingle();
+        // Create
+        const newId = await createEmployee({
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
+          email: formData.email.trim().toLowerCase(),
+          tcNo: formData.tcNo.trim(),
+          cardNumber: formData.cardNumber.trim(),
+          projectId: formData.projectId,
+          companyId: formData.companyId ?? undefined,
+          departmentId: formData.departmentId ?? undefined,
+          positionId: formData.positionId ?? undefined,
+          accessRuleId: formData.accessRuleId ?? undefined,
+          shiftId: formData.shiftId ?? undefined,
+          shift: formData.shift ?? undefined,
+          photoUrl: formData.photoUrl ?? undefined,
+          notes: formData.notes?.trim() ?? undefined,
+          isActive: formData.isActive ?? true,
+        });
 
-        if (existingEmployee) {
-          let errorMessage = 'Bu kayıt zaten mevcut: ';
-          if (existingEmployee.tc_no === submitData.tc_no) {
-            errorMessage += 'TC Kimlik No';
-          } else if (existingEmployee.card_number === submitData.card_number) {
-            errorMessage += 'Kart Numarası';
-          } else if (existingEmployee.email === submitData.email) {
-            errorMessage += 'E-posta';
-          }
-          
+        // Setup email gönder
+        try {
+          await sendSetupEmail({
+            employeeId: newId,
+            email: formData.email.trim().toLowerCase(),
+            firstName: formData.firstName.trim(),
+            lastName: formData.lastName.trim(),
+            projectId: formData.projectId,
+          });
+          toast({ title: "Başarılı", description: "Personel eklendi ve kurulum e-postası gönderildi" });
+        } catch {
           toast({
-            title: "Hata",
-            description: errorMessage,
+            title: "Uyarı",
+            description: "Personel eklendi ancak kurulum e-postası gönderilemedi",
             variant: "destructive",
           });
-          return;
         }
 
-        console.log('Creating new employee...');
-        result = await supabase
-          .from('employees')
-          .insert([submitData])
-          .select('*')
-          .single();
+        onSave({ _id: newId, ...formData });
+        onClose();
       }
-
-      console.log('Database operation result:', result);
-
-      if (result.error) {
-        console.error('Database error:', result.error);
-        throw result.error;
-      }
-
-      if (!result.data) {
-        throw new Error('No data returned from database operation');
-      }
-
-      // If this is a new employee, send setup email
-      if (isNewEmployee) {
-        console.log('New employee created, sending setup email...');
-        await sendEmployeeSetupEmail(result.data);
-      } else {
-        toast({
-          title: "Başarılı",
-          description: "Çalışan bilgileri güncellendi",
-        });
-      }
-
-      console.log('Operation successful, calling onSave with:', result.data);
-      onSave(result.data);
-      onClose();
-
-    } catch (error: any) {
-      console.error('Form submission error:', error);
-      
-      let errorMessage = "Bir hata oluştu";
-      
-      if (error?.code === '23505') {
-        if (error.constraint?.includes('tc_no')) {
-          errorMessage = "Bu TC Kimlik No zaten kullanılıyor";
-        } else if (error.constraint?.includes('card_number')) {
-          errorMessage = "Bu kart numarası zaten kullanılıyor"; 
-        } else if (error.constraint?.includes('email')) {
-          errorMessage = "Bu e-posta adresi zaten kullanılıyor";
-        } else {
-          errorMessage = "Bu kayıt zaten mevcut";
-        }
-      } else if (error?.message) {
-        errorMessage = error.message;
-      }
-
+    } catch (error: unknown) {
+      const err = error as { message?: string };
       toast({
         title: "Hata",
-        description: errorMessage,
+        description: err?.message ?? "Bir hata oluştu",
         variant: "destructive",
       });
     } finally {
@@ -235,8 +141,5 @@ export const useEmployeeFormSubmit = (
     }
   };
 
-  return {
-    isLoading,
-    handleSubmit
-  };
+  return { isLoading, handleSubmit };
 };

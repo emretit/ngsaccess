@@ -1,217 +1,78 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import { useToast } from "@/hooks/use-toast";
+import { Id } from "../../../../convex/_generated/dataModel";
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/components/ui/use-toast';
-import { User, UserFormData, Project } from '../types/user-types';
+export type UserRole = "super_admin" | "project_admin" | "project_user";
+
+export interface User {
+  _id: Id<"users">;
+  email?: string;
+  fullName?: string;
+  name?: string;
+  role?: UserRole;
+  photoUrl?: string;
+}
+
+export interface Project {
+  _id: Id<"projects">;
+  name: string;
+  isActive?: boolean;
+}
+
+export interface UserFormData {
+  email: string;
+  role: UserRole;
+  projectId?: Id<"projects">;
+}
 
 export const useUserManagement = () => {
+  const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserFormData>({
-    email: '',
-    role: 'project_user',
-    projectId: undefined
-  });
-  const { toast } = useToast();
-
-  // Fetch users
-  const { data: users = [], refetch: refetchUsers } = useQuery({
-    queryKey: ['admin', 'users'],
-    queryFn: async () => {
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('email');
-
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Kullanıcılar yüklenirken hata",
-          description: error.message
-        });
-        throw error;
-      }
-      
-      return userData as User[];
-    }
+    email: "",
+    role: "project_user",
+    projectId: undefined,
   });
 
-  // Fetch projects
-  const { data: projects = [] } = useQuery({
-    queryKey: ['admin', 'projects'],
-    queryFn: async () => {
-      const { data: projectData, error } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
+  const usersRaw = useQuery(api.users.list);
+  const projectsRaw = useQuery(api.projects.listActive);
 
-      if (error) {
-        toast({
-          variant: "destructive",
-          title: "Projeler yüklenirken hata",
-          description: error.message
-        });
-        throw error;
-      }
-      
-      return projectData as Project[];
-    }
-  });
+  const updateRoleMut = useMutation(api.users.updateRole);
+  const assignProjectMut = useMutation(api.userProjects.assign);
+  const removeProjectMut = useMutation(api.userProjects.remove);
 
-  const handleEditUser = async (user: User) => {
+  const users: User[] = (usersRaw ?? []) as User[];
+  const projects: Project[] = (projectsRaw ?? []) as Project[];
+
+  const handleEditUser = (user: User) => {
     setCurrentUser(user);
-    setFormData({
-      email: user.email,
-      role: user.role,
-      projectId: undefined
-    });
+    setFormData({ email: user.email ?? "", role: user.role ?? "project_user", projectId: undefined });
   };
 
   const handleSaveUser = async () => {
+    if (!currentUser) return false;
     try {
-      if (!formData.email) {
-        toast({
-          variant: "destructive",
-          title: "Hata",
-          description: "E-posta adresi zorunludur"
-        });
-        return false;
+      await updateRoleMut({ userId: currentUser._id, role: formData.role });
+      if (formData.projectId) {
+        await assignProjectMut({ userId: currentUser._id, projectId: formData.projectId });
       }
-
-      if ((formData.role === 'project_admin' || formData.role === 'project_user') && !formData.projectId) {
-        toast({
-          variant: "destructive",
-          title: "Hata",
-          description: "Proje seçimi zorunludur"
-        });
-        return false;
-      }
-
-      if (currentUser) {
-        // Update existing user
-        const { error } = await supabase
-          .from('users')
-          .update({
-            role: formData.role
-          })
-          .eq('id', currentUser.id);
-
-        if (error) throw error;
-        
-        toast({
-          title: "Kullanıcı güncellendi",
-          description: "Kullanıcı bilgileri başarıyla güncellendi"
-        });
-      } else {
-        // Create new user using regular signup
-        const tempPassword = Math.random().toString(36).slice(-12);
-        
-        const { data, error } = await supabase.auth.signUp({
-          email: formData.email,
-          password: tempPassword
-        });
-
-        if (error) throw error;
-
-        // Update role if not default
-        if (data.user) {
-          const { error: roleError } = await supabase
-            .from('users')
-            .update({ role: formData.role })
-            .eq('id', data.user.id);
-            
-          if (roleError) throw roleError;
-
-          // If project is selected, create user-project relationship
-          if (formData.projectId) {
-            const { error: projectError } = await supabase
-              .from('user_projects')
-              .insert({
-                user_id: data.user.id,
-                project_id: formData.projectId
-              });
-              
-            if (projectError) throw projectError;
-          }
-
-          // Send setup email using existing edge function
-          try {
-            const selectedProject = projects.find(p => p.id === formData.projectId);
-            const { error: emailError } = await supabase.functions.invoke('send-user-setup-email', {
-              body: {
-                user_id: data.user.id,
-                email: formData.email,
-                role: formData.role,
-                project_name: selectedProject?.name
-              }
-            });
-
-            if (emailError) {
-              console.error('Email sending error:', emailError);
-              toast({
-                variant: "destructive",
-                title: "Email gönderme hatası",
-                description: "Kullanıcı oluşturuldu ancak kurulum emaili gönderilemedi"
-              });
-            } else {
-              toast({
-                title: "Kullanıcı oluşturuldu",
-                description: "Yeni kullanıcı başarıyla oluşturuldu ve kurulum emaili gönderildi"
-              });
-            }
-          } catch (emailError) {
-            console.error('Email error:', emailError);
-            toast({
-              variant: "destructive",
-              title: "Email hatası",
-              description: "Kullanıcı oluşturuldu ancak email gönderilirken hata oluştu"
-            });
-          }
-        }
-      }
-
-      refetchUsers();
+      toast({ title: "Kullanıcı güncellendi" });
+      setCurrentUser(null);
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
-        variant: "destructive",
         title: "Hata",
-        description: error.message || "Kullanıcı kaydedilirken bir hata oluştu"
+        description: (error as Error)?.message ?? "Kullanıcı güncellenemedi",
+        variant: "destructive",
       });
       return false;
     }
   };
 
-  const handleDeleteUser = async (user: User) => {
-    try {
-      // Delete the user
-      const { error } = await supabase.auth.admin.deleteUser(user.id);
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Kullanıcı silindi",
-        description: "Kullanıcı başarıyla silindi"
-      });
-      
-      refetchUsers();
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Hata",
-        description: error.message || "Kullanıcı silinirken bir hata oluştu"
-      });
-    }
-  };
-
-  const resetForm = () => {
-    setCurrentUser(null);
-    setFormData({
-      email: '',
-      role: 'project_user',
-      projectId: undefined
-    });
+  const handleDeleteUser = async (_userId: Id<"users">) => {
+    toast({ title: "Bilgi", description: "Kullanıcı silme işlemi admin panelinden yapılabilir." });
   };
 
   return {
@@ -223,7 +84,7 @@ export const useUserManagement = () => {
     handleEditUser,
     handleSaveUser,
     handleDeleteUser,
-    resetForm,
-    refetchUsers
+    refetchUsers: () => {},
+    loading: usersRaw === undefined,
   };
 };

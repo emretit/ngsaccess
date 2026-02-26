@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 
 const RegisterForm = () => {
   const [firstName, setFirstName] = useState('');
@@ -28,42 +27,14 @@ const RegisterForm = () => {
       if (signUpError) {
         toast({
           title: "Kayıt hatası",
-          description: signUpError.message || "Kayıt olurken bir hata oluştu.",
+          description: (signUpError as Error)?.message ?? "Kayıt olurken bir hata oluştu.",
           variant: "destructive",
         });
         return;
       }
 
-      // Kullanıcı bilgilerini güncelle ve demo projesine ata
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (user) {
-        // Kullanıcı bilgilerini güncelle
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({
-            first_name: firstName,
-            last_name: lastName,
-            role: 'project_user'
-          })
-          .eq('id', user.id);
-
-        if (updateError) {
-          console.error('Kullanıcı bilgileri güncellenirken hata:', updateError);
-        }
-
-        // Demo projesine ata (ID: 1)
-        const { error: assignError } = await supabase
-          .from('user_projects')
-          .insert({
-            user_id: user.id,
-            project_id: 1
-          });
-
-        if (assignError) {
-          console.error('Demo projesine atama hatası:', assignError);
-        }
-      }
+      // Convex Auth kayıt sırasında kullanıcı oluşturur
+      // Rol ve proje ataması auth callback'te veya admin panelinden yapılır
 
       toast({
         title: "Kayıt başarılı!",
