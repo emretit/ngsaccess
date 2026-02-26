@@ -1,13 +1,25 @@
-
 import { useState } from 'react';
+import { useAction } from 'convex/react';
 import { Message, MessageData } from '../types';
 import { sendChatMessage } from '../services/chatService';
 import { useMessages } from './useMessages';
 import { useInput } from './useInput';
+import { api } from '../../../../../convex/_generated/api';
 
 export function useMessageHandler() {
   const { messages, addMessage } = useMessages();
   const { input, setInput, isLoading, setIsLoading } = useInput();
+  const getCardReadings = useAction(api.actions.getChatData.getCardReadings);
+  const getDatabaseContext = useAction(api.actions.getChatData.getDatabaseContext);
+
+  const fetchers = {
+    fetchCardReadings: async (params: { department?: string | null; date?: string | null }) =>
+      getCardReadings({
+        department: params.department ?? undefined,
+        date: params.date ?? undefined,
+      }),
+    fetchDatabaseContext: () => getDatabaseContext({}),
+  };
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
@@ -23,7 +35,7 @@ export function useMessageHandler() {
     setIsLoading(true);
 
     try {
-      const response = await sendChatMessage(content);
+      const response = await sendChatMessage(content, fetchers);
       
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),

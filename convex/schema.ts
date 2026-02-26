@@ -141,7 +141,8 @@ export default defineSchema({
     updatedAt: v.string(),
   })
     .index("by_project", ["projectId"])
-    .index("by_zone", ["zoneId"]),
+    .index("by_zone", ["zoneId"])
+    .index("by_device_serial", ["deviceSerial"]),
 
   accessRules: defineTable({
     name: v.string(),
@@ -291,6 +292,20 @@ export default defineSchema({
     updatedAt: v.optional(v.string()),
   }).index("by_project", ["projectId"]),
 
+  chatConversations: defineTable({
+    projectId: v.optional(v.id("projects")),
+    title: v.optional(v.string()),
+    messages: v.array(
+      v.object({
+        role: v.union(v.literal("user"), v.literal("assistant")),
+        content: v.string(),
+        data: v.optional(v.any()),
+      })
+    ),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  }).index("by_project", ["projectId"]),
+
   workSettings: defineTable({
     projectId: v.optional(v.id("projects")),
     workStartTime: v.optional(v.string()),
@@ -301,4 +316,18 @@ export default defineSchema({
     allowLateEntry: v.optional(v.boolean()),
     updatedAt: v.optional(v.string()),
   }).index("by_project", ["projectId"]),
+
+  // Kullanıcı davet sistemi - super_admin kullanıcıları projeye davet eder
+  invites: defineTable({
+    email: v.string(),
+    token: v.string(),
+    projectId: v.id("projects"),
+    role: v.union(v.literal("project_admin"), v.literal("project_user")),
+    createdBy: v.id("users"),
+    expiresAt: v.string(),
+    used: v.optional(v.boolean()),
+    createdAt: v.string(),
+  })
+    .index("by_token", ["token"])
+    .index("by_email", ["email"]),
 });

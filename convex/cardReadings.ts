@@ -1,7 +1,9 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import { authedQuery } from "./lib/customFunctions";
+import { getProjectIdsForUser } from "./lib/auth";
 
-export const list = query({
+export const list = authedQuery({
   args: {
     projectIds: v.optional(v.array(v.id("projects"))),
     isSuperAdmin: v.optional(v.boolean()),
@@ -17,16 +19,18 @@ export const list = query({
     const pageSize = args.pageSize ?? 100;
     const page = args.page ?? 1;
 
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+
     let readings;
-    if (args.isSuperAdmin) {
+    if (args.isSuperAdmin && ctx.user.role === "super_admin") {
       readings = await ctx.db
         .query("cardReadings")
         .withIndex("by_access_time")
         .order("desc")
         .collect();
-    } else if (args.projectIds && args.projectIds.length > 0) {
+    } else if (allowedProjectIds.length > 0) {
       const results = await Promise.all(
-        args.projectIds.map((pid) =>
+        allowedProjectIds.map((pid) =>
           ctx.db
             .query("cardReadings")
             .withIndex("by_project", (q) => q.eq("projectId", pid))
@@ -277,5 +281,131 @@ export const insert = mutation({
       createdAt: now,
       updatedAt: now,
     });
+  },
+});
+
+/**
+ * Kart okuyucu cihazlarından gelen istekleri işler (internal - HTTP action'dan çağrılır).
+ * Erişim kontrolü yapar ve card_readings kaydı oluşturur.
+ */
+export const processCardReading = internalMutation({
+  args: {
+    cardNo: v.string(),
+    deviceSerial: v.string(),
+    rawBody: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const accessTime = new Date().toISOString();
+
+    // 1. Çalışanı kart numarasına göre bul
+    const employee = await ctx.db
+      .query("employees")
+      .withIndex("by_card", (q) => q.eq("cardNumber", args.cardNo))
+      .first();
+
+    if (!employee) {
+      await ctx.db.insert("cardReadings", {
+        cardNo: args.cardNo,
+        accessTime,
+        accessStatus: "reddedildi",
+        rawData: args.rawBody,
+        createdAt: accessTime,
+        updatedAt: accessTime,
+      });
+      return { granted: false };
+    }
+
+    if (!employee.isActive) {
+      await ctx.db.insert("cardReadings", {
+        projectId: employee.projectId,
+        employeeId: employee._id,
+        cardNo: args.cardNo,
+        employeeName: `${employee.firstName} ${employee.lastName}`,
+        accessTime,
+        accessStatus: "reddedildi",
+        rawData: args.rawBody,
+        createdAt: accessTime,
+        updatedAt: accessTime,
+      });
+      return { granted: false };
+    }
+
+    // 2. Cihazı serial'e göre bul
+    const device = await ctx.db
+      .query("devices")
+      .withIndex("by_device_serial", (q) => q.eq("deviceSerial", args.deviceSerial))
+      .first();
+
+    if (!device) {
+      await ctx.db.insert("cardReadings", {
+        projectId: employee.projectId,
+        employeeId: employee._id,
+        cardNo: args.cardNo,
+        employeeName: `${employee.firstName} ${employee.lastName}`,
+        accessTime,
+        accessStatus: "reddedildi",
+        rawData: args.rawBody,
+        createdAt: accessTime,
+        updatedAt: accessTime,
+      });
+      return { granted: false };
+    }
+
+    // 3. Cihazın hiçbir grupta olup olmadığını kontrol et
+    const deviceGroups = await ctx.db
+      .query("groupDevices")
+      .withIndex("by_device", (q) => q.eq("deviceId", device._id))
+      .collect();
+
+    if (deviceGroups.length === 0) {
+      await ctx.db.insert("cardReadings", {
+        projectId: employee.projectId,
+        deviceId: device._id,
+        employeeId: employee._id,
+        cardNo: args.cardNo,
+        employeeName: `${employee.firstName} ${employee.lastName}`,
+        accessTime,
+        accessStatus: "reddedildi",
+        rawData: args.rawBody,
+        createdAt: accessTime,
+        updatedAt: accessTime,
+      });
+      return { granted: false };
+    }
+
+    // 4. Çalışanın bu cihaza erişimi var mı? (groupMembers + accessRules)
+    const groupIds = deviceGroups.map((gd) => gd.groupId);
+    const employeeAccessGroups = await ctx.db
+      .query("groupMembers")
+      .withIndex("by_employee", (q) => q.eq("employeeId", employee._id))
+      .collect();
+
+    const employeeGroupIds = new Set(employeeAccessGroups.map((gm) => gm.groupId));
+    const matchingGroupIds = groupIds.filter((gid) => employeeGroupIds.has(gid));
+
+    let hasAccess = false;
+    for (const groupId of matchingGroupIds) {
+      const rule = await ctx.db.get(groupId);
+      if (rule?.isActive) {
+        hasAccess = true;
+        break;
+      }
+    }
+
+    // 5. Kayıt oluştur
+    await ctx.db.insert("cardReadings", {
+      projectId: employee.projectId,
+      deviceId: device._id,
+      employeeId: employee._id,
+      cardNo: args.cardNo,
+      employeeName: `${employee.firstName} ${employee.lastName}`,
+      accessTime,
+      accessStatus: hasAccess ? "izin_verildi" : "reddedildi",
+      rawData: args.rawBody,
+      createdAt: accessTime,
+      updatedAt: accessTime,
+    });
+
+    return { granted: hasAccess };
   },
 });

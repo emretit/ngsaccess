@@ -3,7 +3,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
 /**
- * Convex Auth state hook - Supabase useAuthState'in karşılığı
+ * Convex Auth state hook
  * Convex Auth otomatik session yönetimi sağlar
  */
 export const useAuthState = () => {

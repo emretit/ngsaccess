@@ -24,7 +24,7 @@ const CardReadings = () => {
     totalPages,
   } = useProjectFilteredCardReadings(PAGE_SIZE);
 
-  // Convex useQuery otomatik realtime sağlar — supabase.channel() gerekmez
+  // Convex useQuery otomatik realtime sağlar
 
   const handleRefresh = () => {};
   const handleClearFilters = () => {

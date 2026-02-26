@@ -1,53 +1,61 @@
-
+import { useMutation } from "convex/react";
 import { useModelStatus } from './useModelStatus';
 import { useExportUtils } from './useExportUtils';
 import { useMessageHandler } from './hooks/useMessageHandler';
+import { useProjectAccess } from '@/hooks/useProjectAccess';
 import { useState } from 'react';
 
 import { useToast } from "@/hooks/use-toast";
+import { api } from "../../../convex/_generated/api";
 
 export function useAiChat() {
-  // AI chat saving state
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { projectIds, isSuperAdmin } = useProjectAccess();
+  const saveConversation = useMutation(api.chatConversations.save);
 
-  // Get all functionality from other hooks
   const { isOpenAIConnected, checkOpenAIStatus } = useModelStatus();
   const { formatReportData, handleExportExcel, handleExportPDF } = useExportUtils();
   const { messages, input, setInput, isLoading, handleSendMessage: originalSendMessage } = useMessageHandler();
 
-  // Enhanced message sending function with custom content support
   const handleSendMessage = async (e: React.FormEvent, customContent?: string) => {
     e.preventDefault();
-    
+
     if (customContent) {
-      // Use custom content for sending
       await originalSendMessage(customContent);
     } else {
-      // Use current input value
       await originalSendMessage(input);
     }
   };
 
-  // Function to save conversation (placeholder - implement with Convex action if needed)
-  const saveConversationToSupabase = async () => {
+  const saveConversationToConvex = async () => {
     if (messages.length === 0) return;
-    
+
     try {
       setIsSaving(true);
       setSaveError(null);
-      
+
+      const convexMessages = messages.map((m) => ({
+        role: m.type as "user" | "assistant",
+        content: m.content,
+        data: m.data,
+      }));
+
+      await saveConversation({
+        projectId: isSuperAdmin ? undefined : projectIds[0],
+        title: messages[0]?.content?.slice(0, 50) ?? "Sohbet",
+        messages: convexMessages,
+      });
+
       toast({
         title: "Sohbet kaydedildi",
-        description: "Sohbet başarıyla kaydedildi",
+        description: "Sohbet başarıyla Convex'e kaydedildi",
       });
-      
-      console.log('Conversation saved successfully');
     } catch (error) {
       console.error('Error saving conversation:', error);
       setSaveError('Sohbet kaydedilemedi.');
-      
+
       toast({
         title: "Hata",
         description: "Sohbet kaydedilemedi.",
@@ -68,7 +76,7 @@ export function useAiChat() {
     handleSendMessage,
     handleExportExcel,
     handleExportPDF,
-    saveConversationToSupabase,
+    saveConversation: saveConversationToConvex,
     isSaving,
     saveError
   };

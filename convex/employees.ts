@@ -1,19 +1,22 @@
-import { mutation, query } from "./_generated/server";
+import { mutation } from "./_generated/server";
 import { v } from "convex/values";
-import { Id } from "./_generated/dataModel";
+import { authedQuery, adminMutation } from "./lib/customFunctions";
+import { getProjectIdsForUser } from "./lib/auth";
 
-export const list = query({
+export const list = authedQuery({
   args: {
     projectIds: v.optional(v.array(v.id("projects"))),
     isSuperAdmin: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+
     let employees;
-    if (args.isSuperAdmin) {
+    if (args.isSuperAdmin && ctx.user.role === "super_admin") {
       employees = await ctx.db.query("employees").order("desc").collect();
-    } else if (args.projectIds && args.projectIds.length > 0) {
+    } else if (allowedProjectIds.length > 0) {
       const results = await Promise.all(
-        args.projectIds.map((pid) =>
+        allowedProjectIds.map((pid) =>
           ctx.db
             .query("employees")
             .withIndex("by_project", (q) => q.eq("projectId", pid))
@@ -47,14 +50,26 @@ export const list = query({
   },
 });
 
-export const getById = query({
+export const getById = authedQuery({
   args: { employeeId: v.id("employees") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.employeeId);
+    const emp = await ctx.db.get(args.employeeId);
+    if (!emp) return null;
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (
+      emp.projectId &&
+      !allowedProjectIds.some((id) => id === emp.projectId)
+    ) {
+      return null;
+    }
+    if (!emp.projectId && ctx.user.role !== "super_admin") {
+      return null;
+    }
+    return emp;
   },
 });
 
-export const checkDuplicate = query({
+export const checkDuplicate = authedQuery({
   args: {
     tcNo: v.string(),
     cardNumber: v.string(),
@@ -80,7 +95,7 @@ export const checkDuplicate = query({
   },
 });
 
-export const create = mutation({
+export const create = adminMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     firstName: v.string(),
@@ -99,6 +114,12 @@ export const create = mutation({
     shift: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    if (args.projectId) {
+      const allowedProjectIds = await getProjectIdsForUser(ctx);
+      if (!allowedProjectIds.some((id) => id === args.projectId)) {
+        throw new Error("Bu projeye erişim yetkiniz yok");
+      }
+    }
     const now = new Date().toISOString();
     return await ctx.db.insert("employees", {
       ...args,
@@ -107,9 +128,10 @@ export const create = mutation({
       updatedAt: now,
     });
   },
+  returns: v.id("employees"),
 });
 
-export const update = mutation({
+export const update = adminMutation({
   args: {
     employeeId: v.id("employees"),
     firstName: v.optional(v.string()),
@@ -129,19 +151,37 @@ export const update = mutation({
   },
   handler: async (ctx, args) => {
     const { employeeId, ...updates } = args;
+    const emp = await ctx.db.get(employeeId);
+    if (!emp) throw new Error("Çalışan bulunamadı");
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (
+      emp.projectId &&
+      !allowedProjectIds.some((id) => id === emp.projectId)
+    ) {
+      throw new Error("Bu çalışana erişim yetkiniz yok");
+    }
     const clean: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-    for (const [k, v] of Object.entries(updates)) {
-      if (v !== undefined) clean[k] = v;
+    for (const [k, val] of Object.entries(updates)) {
+      if (val !== undefined) clean[k] = val;
     }
     await ctx.db.patch(employeeId, clean);
     return employeeId;
   },
+  returns: v.id("employees"),
 });
 
-export const remove = mutation({
+export const remove = adminMutation({
   args: { employeeId: v.id("employees") },
   handler: async (ctx, args) => {
-    // İlişkili kayıtları temizle
+    const emp = await ctx.db.get(args.employeeId);
+    if (!emp) throw new Error("Çalışan bulunamadı");
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (
+      emp.projectId &&
+      !allowedProjectIds.some((id) => id === emp.projectId)
+    ) {
+      throw new Error("Bu çalışana erişim yetkiniz yok");
+    }
     const groupMembers = await ctx.db
       .query("groupMembers")
       .withIndex("by_employee", (q) => q.eq("employeeId", args.employeeId))
@@ -156,11 +196,19 @@ export const remove = mutation({
 
     await ctx.db.delete(args.employeeId);
   },
+  returns: v.null(),
 });
 
-export const bulkDelete = mutation({
+export const bulkDelete = adminMutation({
   args: { employeeIds: v.array(v.id("employees")) },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    for (const id of args.employeeIds) {
+      const emp = await ctx.db.get(id);
+      if (emp && emp.projectId && !allowedProjectIds.some((pid) => pid === emp.projectId)) {
+        throw new Error(`Çalışan ${emp.firstName} ${emp.lastName} için erişim yetkiniz yok`);
+      }
+    }
     await Promise.all(
       args.employeeIds.map(async (id) => {
         const groupMembers = await ctx.db
@@ -172,9 +220,10 @@ export const bulkDelete = mutation({
       })
     );
   },
+  returns: v.null(),
 });
 
-export const bulkUpdateStatus = mutation({
+export const bulkUpdateStatus = adminMutation({
   args: {
     employeeIds: v.array(v.id("employees")),
     isActive: v.boolean(),
@@ -187,4 +236,5 @@ export const bulkUpdateStatus = mutation({
       )
     );
   },
+  returns: v.null(),
 });

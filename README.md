@@ -12,7 +12,7 @@ Bu proje aşağıdaki teknolojilerle geliştirilmiştir:
 - React
 - shadcn-ui
 - Tailwind CSS
-- Supabase
+- Convex (veritabanı, auth, realtime)
 - React Query
 - React Router
 

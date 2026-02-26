@@ -1,10 +1,22 @@
-
 import { parseQuery } from './parsers/queryParser';
-import { fetchCardReadings, fetchDatabaseContext } from './database/cardReadingsService';
+import {
+  fetchCardReadings,
+  fetchDatabaseContext,
+  type FetchCardReadingsFn,
+  type FetchDatabaseContextFn,
+} from './database/cardReadingsService';
 import { processWithOpenAI } from './openai/openaiService';
 import { NaturalLanguageService } from './naturalLanguageService';
 
-export async function sendChatMessage(input: string) {
+export type ChatDataFetchers = {
+  fetchCardReadings: FetchCardReadingsFn;
+  fetchDatabaseContext: FetchDatabaseContextFn;
+};
+
+export async function sendChatMessage(
+  input: string,
+  fetchers?: ChatDataFetchers
+) {
   console.log("Processing chat message:", input);
   
   try {
@@ -36,7 +48,7 @@ export async function sendChatMessage(input: string) {
       
       try {
         // Fetch the data based on the parsed query
-        const cardReadings = await fetchCardReadings(queryParams);
+        const cardReadings = await fetchCardReadings(queryParams, fetchers?.fetchCardReadings);
         
         if (cardReadings.length === 0) {
           return {
@@ -68,7 +80,7 @@ export async function sendChatMessage(input: string) {
     // If not a report query, process with OpenAI
     try {
       // Fetch database context for AI
-      const dbContext = await fetchDatabaseContext();
+      const dbContext = await fetchDatabaseContext(fetchers?.fetchDatabaseContext);
       
       // Process with OpenAI
       return await processWithOpenAI(input, dbContext);

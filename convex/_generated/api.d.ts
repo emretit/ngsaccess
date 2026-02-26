@@ -9,10 +9,12 @@
  */
 
 import type * as accessRules from "../accessRules.js";
+import type * as actions_getChatData from "../actions/getChatData.js";
 import type * as actions_sendEmail from "../actions/sendEmail.js";
 import type * as actions_setPassword from "../actions/setPassword.js";
 import type * as auth from "../auth.js";
 import type * as cardReadings from "../cardReadings.js";
+import type * as chatConversations from "../chatConversations.js";
 import type * as companies from "../companies.js";
 import type * as dashboard from "../dashboard.js";
 import type * as departments from "../departments.js";
@@ -21,6 +23,10 @@ import type * as doors from "../doors.js";
 import type * as employeeAuth from "../employeeAuth.js";
 import type * as employees from "../employees.js";
 import type * as files from "../files.js";
+import type * as http from "../http.js";
+import type * as invites from "../invites.js";
+import type * as lib_auth from "../lib/auth.js";
+import type * as lib_customFunctions from "../lib/customFunctions.js";
 import type * as positions from "../positions.js";
 import type * as projects from "../projects.js";
 import type * as settings from "../settings.js";
@@ -37,10 +43,12 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   accessRules: typeof accessRules;
+  "actions/getChatData": typeof actions_getChatData;
   "actions/sendEmail": typeof actions_sendEmail;
   "actions/setPassword": typeof actions_setPassword;
   auth: typeof auth;
   cardReadings: typeof cardReadings;
+  chatConversations: typeof chatConversations;
   companies: typeof companies;
   dashboard: typeof dashboard;
   departments: typeof departments;
@@ -49,6 +57,10 @@ declare const fullApi: ApiFromModules<{
   employeeAuth: typeof employeeAuth;
   employees: typeof employees;
   files: typeof files;
+  http: typeof http;
+  invites: typeof invites;
+  "lib/auth": typeof lib_auth;
+  "lib/customFunctions": typeof lib_customFunctions;
   positions: typeof positions;
   projects: typeof projects;
   settings: typeof settings;
