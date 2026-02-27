@@ -5,7 +5,10 @@ import { authedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 
 export const getStats = authedQuery({
-  args: {},
+  args: {
+    projectIds: v.optional(v.array(v.id("projects"))),
+    isSuperAdmin: v.optional(v.boolean()),
+  },
   handler: async (ctx) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const today = new Date();
