@@ -11,12 +11,12 @@ export const useDashboard = () => {
 
   const stats = useQuery(
     api.dashboard.getStats,
-    !projectLoading && isAuthenticated ? { projectIds, isSuperAdmin } : "skip"
+    !projectLoading && isAuthenticated ? {} : "skip"
   );
 
   const recentReadings = useQuery(
     api.dashboard.getRecentReadings,
-    !projectLoading && isAuthenticated ? { projectIds, isSuperAdmin, limit: 10 } : "skip"
+    !projectLoading && isAuthenticated ? { limit: 10 } : "skip"
   );
 
   const userName =

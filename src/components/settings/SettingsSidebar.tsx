@@ -1,5 +1,5 @@
 
-import { Settings, Clock, Bell, Mail, Users } from "lucide-react";
+import { Settings, Clock, Bell, Mail, Users, FileBarChart } from "lucide-react";
 
 interface SettingsSidebarProps {
   selected: string;
@@ -19,8 +19,13 @@ const sidebarItems = [
   },
   {
     key: "schedule",
-    label: "Vardiya Ayarları", 
+    label: "Vardiya Ayarları",
     icon: Clock,
+  },
+  {
+    key: "reports",
+    label: "Raporlar",
+    icon: FileBarChart,
   },
   {
     key: "mail",
@@ -31,7 +36,7 @@ const sidebarItems = [
     key: "notifications",
     label: "Bildirimler",
     icon: Bell,
-  }
+  },
 ];
 
 export function SettingsSidebar({ selected, onSelect }: SettingsSidebarProps) {
@@ -47,11 +52,11 @@ export function SettingsSidebar({ selected, onSelect }: SettingsSidebarProps) {
               onClick={() => onSelect(item.key)}
               className={`flex items-center gap-3 px-6 py-3 text-left rounded-l-full transition-colors font-medium relative
                 ${isSelected 
-                  ? 'bg-[#711A1A]/10 text-[#711A1A] dark:text-[#f2b4b4] font-semibold border-r-4 border-r-[#711A1A] dark:border-r-[#f2b4b4]' 
+                  ? 'bg-primary/10 text-primary font-semibold border-r-4 border-r-primary' 
                   : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'}
               `}
             >
-              <item.icon className={`h-5 w-5 ${isSelected ? 'text-[#711A1A] dark:text-[#f2b4b4]' : ''}`} />
+              <item.icon className={`h-5 w-5 ${isSelected ? 'text-primary' : ''}`} />
               <span className="flex-1">{item.label}</span>
             </button>
           );

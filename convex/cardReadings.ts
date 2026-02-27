@@ -1,5 +1,6 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import { api } from "./_generated/api";
 import { authedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 
@@ -154,36 +155,45 @@ export const getRecentByProjects = query({
   },
 });
 
-export const getPdksTableData = query({
+export const getPdksTableData = authedQuery({
   args: {
-    projectIds: v.optional(v.array(v.id("projects"))),
-    isSuperAdmin: v.optional(v.boolean()),
     date: v.optional(v.string()),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const today = args.date ?? new Date().toISOString().split("T")[0];
-    const startISO = `${today}T00:00:00`;
-    const endISO = `${today}T23:59:59`;
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    let startISO: string;
+    let endISO: string;
+
+    if (args.startDate && args.endDate) {
+      startISO = `${args.startDate}T00:00:00.000`;
+      endISO = `${args.endDate}T23:59:59.999`;
+    } else {
+      const today = args.date ?? new Date().toISOString().split("T")[0];
+      startISO = `${today}T00:00:00.000`;
+      endISO = `${today}T23:59:59.999`;
+    }
 
     let readings;
-    if (args.isSuperAdmin) {
+    if (ctx.user.role === "super_admin") {
       readings = await ctx.db
         .query("cardReadings")
         .withIndex("by_access_time")
         .filter((q) =>
-          q.and(q.gte(q.field("accessTime"), startISO), q.lt(q.field("accessTime"), endISO))
+          q.and(q.gte(q.field("accessTime"), startISO), q.lte(q.field("accessTime"), endISO))
         )
         .collect();
-    } else if (args.projectIds && args.projectIds.length > 0) {
+    } else if (allowedProjectIds.length > 0) {
       const results = await Promise.all(
-        args.projectIds.map((pid) =>
+        allowedProjectIds.map((pid) =>
           ctx.db
             .query("cardReadings")
             .withIndex("by_project", (q) => q.eq("projectId", pid))
             .filter((q) =>
               q.and(
                 q.gte(q.field("accessTime"), startISO),
-                q.lt(q.field("accessTime"), endISO)
+                q.lte(q.field("accessTime"), endISO)
               )
             )
             .collect()
@@ -205,6 +215,22 @@ export const getPdksTableData = query({
       employeeMap.get(key)!.push(r);
     }
 
+    const STANDARD_DAY_MINUTES = 8 * 60;
+    const STANDARD_WEEK_MINUTES = 45 * 60;
+
+    const allLeaves = await ctx.db
+      .query("leaves")
+      .filter((q) => q.eq(q.field("status"), "approved"))
+      .collect();
+
+    const leaveTypeLabels: Record<string, string> = {
+      annual: "Yıllık",
+      sick: "Hastalık",
+      excuse: "Mazeret",
+      unpaid: "Ücretsiz",
+      parental: "Doğum/Ebeveyn",
+    };
+
     const tableData = await Promise.all(
       Array.from(employeeMap.entries()).map(async ([empKey, empReadings]) => {
         const first = empReadings[0];
@@ -213,12 +239,30 @@ export const getPdksTableData = query({
           ? await ctx.db.get(employee.departmentId)
           : null;
 
+        const empId = first.employeeId;
+        const dateKeys = [...new Set(empReadings.map((r) => r.accessTime.split("T")[0]))];
+        const hasLeave = empId
+          ? allLeaves.some((l) => {
+              if (l.employeeId !== empId) return false;
+              return dateKeys.some((dk) => dk >= l.startDate && dk <= l.endDate);
+            })
+          : false;
+        const leaveRecord = empId
+          ? allLeaves.find((l) => {
+              if (l.employeeId !== empId) return false;
+              return dateKeys.some((dk) => dk >= l.startDate && dk <= l.endDate);
+            })
+          : null;
+        const leaveType = leaveRecord ? leaveTypeLabels[leaveRecord.leaveType] ?? leaveRecord.leaveType : "-";
+
         const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
         const firstEntry = granted[0];
         const lastExit = granted[granted.length - 1];
 
         let status: "present" | "late" | "absent" | "leave" = "present";
-        if (firstEntry) {
+        if (hasLeave && !firstEntry) {
+          status = "leave";
+        } else if (firstEntry) {
           const h = new Date(firstEntry.accessTime).getHours();
           const m = new Date(firstEntry.accessTime).getMinutes();
           if (h > 9 || (h === 9 && m > 15)) status = "late";
@@ -226,11 +270,40 @@ export const getPdksTableData = query({
           status = "absent";
         }
 
-        let totalHours = "0h 0m";
-        if (firstEntry && lastExit && firstEntry._id !== lastExit._id) {
-          const diff = new Date(lastExit.accessTime).getTime() - new Date(firstEntry.accessTime).getTime();
-          totalHours = `${Math.floor(diff / 3600000)}h ${Math.floor((diff % 3600000) / 60000)}m`;
+        const dayReadingsMap = new Map<string, typeof granted>();
+        for (const r of granted) {
+          const dateKey = r.accessTime.split("T")[0];
+          if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
+          dayReadingsMap.get(dateKey)!.push(r);
         }
+
+        let totalMinutes = 0;
+        for (const dayReadings of dayReadingsMap.values()) {
+          dayReadings.sort(
+            (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
+          );
+          const firstOfDay = dayReadings[0];
+          const lastOfDay = dayReadings[dayReadings.length - 1];
+          if (firstOfDay._id !== lastOfDay._id) {
+            const diff =
+              new Date(lastOfDay.accessTime).getTime() - new Date(firstOfDay.accessTime).getTime();
+            totalMinutes += Math.floor(diff / 60000);
+          }
+        }
+
+        const totalHours = `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
+
+        const workDays = dayReadingsMap.size;
+        let overtimeMinutes = 0;
+        if (workDays <= 1) {
+          overtimeMinutes = Math.max(0, totalMinutes - STANDARD_DAY_MINUTES);
+        } else {
+          overtimeMinutes = Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
+        }
+        const overtime = overtimeMinutes > 0 ? `${overtimeMinutes}m` : "0m";
+        const overtimeHours = overtimeMinutes / 60;
+        const OVERTIME_MULTIPLIER = 1.5;
+        const overtimePayMultiplier = overtimeMinutes > 0 ? OVERTIME_MULTIPLIER : 0;
 
         return {
           id: empKey,
@@ -245,8 +318,11 @@ export const getPdksTableData = query({
               ? new Date(lastExit.accessTime).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
               : "-",
           totalHours,
-          overtime: "0m",
-          leaveType: "-",
+          overtime,
+          overtimeHours,
+          overtimeMultiplier: overtimePayMultiplier,
+          yearlyOvertimeLimit: 270,
+          leaveType,
           status,
           detailedLogs: empReadings.map((r) => ({
             time: new Date(r.accessTime).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
@@ -258,6 +334,201 @@ export const getPdksTableData = query({
     );
 
     return tableData;
+  },
+});
+
+/**
+ * PDKS grafik verileri - devam oranı, departman devamsızlık, geç kalma dağılımı
+ */
+export const getPdksChartData = authedQuery({
+  args: {
+    startDate: v.string(),
+    endDate: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const startISO = `${args.startDate}T00:00:00.000`;
+    const endISO = `${args.endDate}T23:59:59.999`;
+
+    let readings;
+    if (ctx.user.role === "super_admin") {
+      readings = await ctx.db
+        .query("cardReadings")
+        .withIndex("by_access_time")
+        .filter((q) =>
+          q.and(q.gte(q.field("accessTime"), startISO), q.lte(q.field("accessTime"), endISO))
+        )
+        .collect();
+    } else if (allowedProjectIds.length > 0) {
+      const results = await Promise.all(
+        allowedProjectIds.map((pid) =>
+          ctx.db
+            .query("cardReadings")
+            .withIndex("by_project", (q) => q.eq("projectId", pid))
+            .filter((q) =>
+              q.and(
+                q.gte(q.field("accessTime"), startISO),
+                q.lte(q.field("accessTime"), endISO)
+              )
+            )
+            .collect()
+        )
+      );
+      readings = results.flat();
+    } else {
+      return {
+        dailyAttendance: [],
+        departmentAbsence: [],
+        lateDistribution: [],
+        hourlyTrend: [],
+      };
+    }
+
+    readings.sort(
+      (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
+    );
+
+    const dayNames = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
+
+    const dailyMap = new Map<
+      string,
+      { present: Set<string>; late: Set<string>; absent: Set<string>; total: Set<string> }
+    >();
+    const departmentAbsenceMap = new Map<string, number>();
+    const lateByHourMap = new Map<number, number>();
+    const hourlyCheckinMap = new Map<string, number>();
+
+    const allEmployeeIds = new Set<string>();
+    for (const r of readings) {
+      const empKey = r.employeeId ?? r.cardNo;
+      allEmployeeIds.add(empKey);
+    }
+
+    const start = new Date(args.startDate);
+    const end = new Date(args.endDate);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const dateKey = d.toISOString().split("T")[0];
+      dailyMap.set(dateKey, {
+        present: new Set(),
+        late: new Set(),
+        absent: new Set(),
+        total: new Set(allEmployeeIds),
+      });
+    }
+
+    const employeeDayMap = new Map<string, Map<string, { firstEntry?: string; hasLate: boolean }>>();
+
+    for (const r of readings) {
+      const empKey = r.employeeId ?? r.cardNo;
+      const dateKey = r.accessTime.split("T")[0];
+      const dayData = dailyMap.get(dateKey);
+      if (!dayData) continue;
+
+      if (r.accessStatus === "izin_verildi") {
+        if (!employeeDayMap.has(empKey)) employeeDayMap.set(empKey, new Map());
+        const empDay = employeeDayMap.get(empKey)!;
+        if (!empDay.has(dateKey)) {
+          empDay.set(dateKey, { hasLate: false });
+        }
+        const rec = empDay.get(dateKey)!;
+        if (!rec.firstEntry) {
+          rec.firstEntry = r.accessTime;
+          const h = new Date(r.accessTime).getHours();
+          const m = new Date(r.accessTime).getMinutes();
+          rec.hasLate = h > 9 || (h === 9 && m > 15);
+        }
+      }
+    }
+
+    for (const [empKey, days] of employeeDayMap) {
+      for (const [dateKey, rec] of days) {
+        const dayData = dailyMap.get(dateKey);
+        if (!dayData) continue;
+        dayData.present.add(empKey);
+        if (rec.hasLate) {
+          dayData.late.add(empKey);
+          const firstReading = readings.find((r) => (r.employeeId ?? r.cardNo) === empKey);
+          if (firstReading?.employeeId && rec.firstEntry) {
+            const h = new Date(rec.firstEntry).getHours();
+            lateByHourMap.set(h, (lateByHourMap.get(h) ?? 0) + 1);
+          }
+        }
+      }
+    }
+
+    for (const [dateKey, dayData] of dailyMap) {
+      for (const empKey of allEmployeeIds) {
+        if (!dayData.present.has(empKey)) {
+          dayData.absent.add(empKey);
+        }
+      }
+    }
+
+    const empToDept = new Map<string, string>();
+    for (const r of readings) {
+      const empKey = r.employeeId ?? r.cardNo;
+      if (empToDept.has(empKey)) continue;
+      const emp = r.employeeId ? await ctx.db.get(r.employeeId) : null;
+      if (emp?.departmentId) {
+        const dept = await ctx.db.get(emp.departmentId);
+        empToDept.set(empKey, dept?.name ?? "Bilinmiyor");
+      } else {
+        empToDept.set(empKey, "Bilinmiyor");
+      }
+    }
+
+    for (const [, dayData] of dailyMap) {
+      for (const empKey of dayData.absent) {
+        const deptName = empToDept.get(empKey) ?? "Bilinmiyor";
+        departmentAbsenceMap.set(deptName, (departmentAbsenceMap.get(deptName) ?? 0) + 1);
+      }
+    }
+
+    const dailyAttendance = Array.from(dailyMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([dateKey, data]) => {
+        const d = new Date(dateKey);
+        return {
+          name: dayNames[d.getDay()],
+          date: dateKey,
+          present: data.present.size,
+          late: data.late.size,
+          absent: data.absent.size,
+          rate: data.total.size > 0 ? Math.round((data.present.size / data.total.size) * 100) : 0,
+        };
+      });
+
+    const departmentAbsence = Array.from(departmentAbsenceMap.entries()).map(([name, value]) => ({
+      name,
+      devamsızlık: value,
+    }));
+
+    const lateDistribution = Array.from(lateByHourMap.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([hour, count]) => ({
+        saat: `${hour}:00`,
+        sayı: count,
+      }));
+
+    for (const r of readings) {
+      if (r.accessStatus !== "izin_verildi") continue;
+      const hourKey = r.accessTime.slice(11, 13);
+      hourlyCheckinMap.set(hourKey, (hourlyCheckinMap.get(hourKey) ?? 0) + 1);
+    }
+
+    const hourlyTrend = Array.from(hourlyCheckinMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([hour, checkins]) => ({
+        hour: `${hour}:00`,
+        checkins,
+      }));
+
+    return {
+      dailyAttendance,
+      departmentAbsence,
+      lateDistribution,
+      hourlyTrend,
+    };
   },
 });
 
@@ -405,6 +676,38 @@ export const processCardReading = internalMutation({
       createdAt: accessTime,
       updatedAt: accessTime,
     });
+
+    // 6. Geç kalma bildirimi (hasAccess + geç giriş)
+    if (hasAccess) {
+      const h = new Date(accessTime).getHours();
+      const m = new Date(accessTime).getMinutes();
+      const isLate = h > 9 || (h === 9 && m > 15);
+      if (isLate && employee.projectId) {
+        const notifSettings = await ctx.db
+          .query("notificationSettings")
+          .withIndex("by_project", (q) => q.eq("projectId", employee.projectId!))
+          .first();
+        const generalSettings = await ctx.db
+          .query("generalSettings")
+          .withIndex("by_project", (q) => q.eq("projectId", employee.projectId!))
+          .first();
+        const notifyEmail = generalSettings?.email ?? process.env.NOTIFICATION_EMAIL;
+        if (
+          notifSettings?.lateNotifications !== false &&
+          notifyEmail
+        ) {
+          ctx.scheduler.runAfter(0, api.actions.sendEmail.sendLateNotification, {
+            to: notifyEmail,
+            employeeName: `${employee.firstName} ${employee.lastName}`,
+            lateTime: new Date(accessTime).toLocaleTimeString("tr-TR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            projectId: employee.projectId,
+          });
+        }
+      }
+    }
 
     return { granted: hasAccess };
   },

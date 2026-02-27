@@ -3,6 +3,7 @@ import { useState } from "react";
 import { SettingsSidebar } from "@/components/settings/SettingsSidebar";
 import { GeneralSettings } from "@/components/settings/sections/GeneralSettings";
 import { ShiftSettings } from "@/components/settings/sections/ShiftSettings";
+import { ReportsSettings } from "@/components/settings/sections/ReportsSettings";
 import { NotificationSettings } from "@/components/settings/sections/NotificationSettings";
 import { MailSettings } from "@/components/settings/sections/MailSettings";
 import AdminUsersPanel from "@/components/admin/AdminUsersPanel";
@@ -25,6 +26,8 @@ export default function Settings() {
         return <AdminUsersPanel />;
       case "schedule":
         return <ShiftSettings />;
+      case "reports":
+        return <ReportsSettings />;
       case "mail":
         return <MailSettings />;
       case "notifications":

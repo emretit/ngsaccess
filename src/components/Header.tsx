@@ -58,7 +58,7 @@ export default function Header() {
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
             <Link to="/home" className="flex items-center mr-6">
-              <div className="w-8 h-8 bg-[#711A1A] rounded-md flex items-center justify-center text-white font-bold">
+              <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center text-white font-bold">
                 P
               </div>
               <span className="ml-2 text-xl font-semibold text-gray-900 dark:text-gray-100">PDKS</span>
@@ -74,7 +74,7 @@ export default function Header() {
                     to={item.href}
                     className={`${
                       location.pathname === item.href
-                        ? 'text-[#711A1A] dark:text-[#f2b4b4] font-medium border-b-2 border-[#711A1A] dark:border-[#f2b4b4]'
+                        ? 'text-primary font-medium border-b-2 border-primary'
                         : 'text-gray-600 dark:text-gray-300 hover:text-[#711A1A] dark:hover:text-[#f2b4b4]'
                     } transition-colors flex items-center py-2 px-1`}
                   >
@@ -98,7 +98,7 @@ export default function Header() {
                 <Button variant="ghost" size="sm" className="flex items-center space-x-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={profile?.photo_url || ''} alt={getUserDisplayName()} />
-                    <AvatarFallback className="bg-[#711A1A] text-white">
+                    <AvatarFallback className="bg-primary text-white">
                       {getUserInitials()}
                     </AvatarFallback>
                   </Avatar>
@@ -158,7 +158,7 @@ export default function Header() {
                     to={item.href}
                     className={`${
                       location.pathname === item.href
-                        ? 'bg-gray-100 dark:bg-gray-800 text-[#711A1A] dark:text-[#f2b4b4] font-medium'
+                        ? 'bg-gray-100 dark:bg-gray-800 text-primary font-medium'
                         : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
                     } px-4 py-3 rounded-md transition-colors flex items-center`}
                   >

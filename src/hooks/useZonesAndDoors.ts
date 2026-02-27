@@ -22,15 +22,9 @@ export interface Door {
 export function useZonesAndDoors() {
   const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
 
-  const zones = useQuery(
-    api.zones.list,
-    !projectLoading ? { projectIds, isSuperAdmin } : "skip"
-  );
+  const zones = useQuery(api.zones.list, !projectLoading ? {} : "skip");
 
-  const doors = useQuery(
-    api.doors.list,
-    !projectLoading ? { projectIds, isSuperAdmin } : "skip"
-  );
+  const doors = useQuery(api.doors.list, !projectLoading ? {} : "skip");
 
   const loading = projectLoading || zones === undefined || doors === undefined;
 

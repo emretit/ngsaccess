@@ -1,5 +1,19 @@
 import { v } from "convex/values";
+import { query } from "./_generated/server";
 import { optionalAuthQuery, authedMutation, adminQuery, adminMutation, superAdminMutation } from "./lib/customFunctions";
+
+/** Kurulum sayfası için: Sistemde super_admin var mı? (Public - auth gerekmez) */
+export const hasSuperAdmin = query({
+  args: {},
+  returns: v.boolean(),
+  handler: async (ctx) => {
+    const admin = await ctx.db
+      .query("users")
+      .filter((q) => q.eq(q.field("role"), "super_admin"))
+      .first();
+    return !!admin;
+  },
+});
 
 export const currentUser = optionalAuthQuery({
   args: {},

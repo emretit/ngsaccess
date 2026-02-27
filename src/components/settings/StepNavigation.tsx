@@ -45,7 +45,7 @@ export function StepNavigation({ currentStep, steps, onStepChange, canProceed = 
       <Button
         onClick={handleNext}
         disabled={isLastStep || !canProceed}
-        className="flex items-center gap-2 bg-[#711A1A] hover:bg-[#5a1515]"
+        className="flex items-center gap-2 bg-primary hover:bg-primary/90"
       >
         {isLastStep ? 'Kurulumu Tamamla' : 'Sonraki Adım'}
         <ChevronRight className="w-4 h-4" />

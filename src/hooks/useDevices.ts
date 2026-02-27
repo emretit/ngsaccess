@@ -33,10 +33,7 @@ export function useDevices() {
   const { toast } = useToast();
   const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
 
-  const devicesRaw = useQuery(
-    api.devices.list,
-    !projectLoading ? { projectIds, isSuperAdmin } : "skip"
-  );
+  const devicesRaw = useQuery(api.devices.list, !projectLoading ? {} : "skip");
 
   const createDevice = useMutation(api.devices.create);
   const updateDevice = useMutation(api.devices.update);

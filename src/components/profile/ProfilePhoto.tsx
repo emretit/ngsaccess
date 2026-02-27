@@ -85,14 +85,14 @@ export default function ProfilePhoto({
         <div className="relative">
           <Avatar className="w-32 h-32">
             <AvatarImage src={photoUrl || ""} alt="Profil fotoğrafı" />
-            <AvatarFallback className="bg-[#711A1A] text-white text-2xl">
+            <AvatarFallback className="bg-primary text-white text-2xl">
               {userInitials}
             </AvatarFallback>
           </Avatar>
 
           <label
             htmlFor="photo-upload"
-            className="absolute bottom-0 right-0 p-1.5 rounded-full bg-[#711A1A] text-white cursor-pointer hover:bg-[#8a2020] transition-colors"
+            className="absolute bottom-0 right-0 p-1.5 rounded-full bg-primary text-white cursor-pointer hover:bg-primary/90 transition-colors"
           >
             {isLoading ? (
               <Loader2 className="h-5 w-5 animate-spin" />

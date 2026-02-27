@@ -1,12 +1,18 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { authedQuery, authedMutation } from "./lib/customFunctions";
+import { getProjectIdsForUser } from "./lib/auth";
 
 // === General Settings ===
-export const getGeneral = query({
+export const getGeneral = authedQuery({
   args: {
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
+      return null;
+    }
     if (!args.projectId) {
       return await ctx.db.query("generalSettings").first();
     }
@@ -17,7 +23,7 @@ export const getGeneral = query({
   },
 });
 
-export const upsertGeneral = mutation({
+export const upsertGeneral = authedMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     companyName: v.string(),
@@ -38,6 +44,10 @@ export const upsertGeneral = mutation({
     notificationsEnabled: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
+      throw new Error("Bu projeye erişim yetkiniz yok");
+    }
     const now = new Date().toISOString();
     const existing = args.projectId
       ? await ctx.db
@@ -59,9 +69,13 @@ export const upsertGeneral = mutation({
 });
 
 // === Mail Settings ===
-export const getMail = query({
+export const getMail = authedQuery({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
+      return null;
+    }
     if (!args.projectId) return await ctx.db.query("mailSettings").first();
     return await ctx.db
       .query("mailSettings")
@@ -70,7 +84,7 @@ export const getMail = query({
   },
 });
 
-export const upsertMail = mutation({
+export const upsertMail = authedMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     smtpHost: v.optional(v.string()),
@@ -83,6 +97,10 @@ export const upsertMail = mutation({
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
+      throw new Error("Bu projeye erişim yetkiniz yok");
+    }
     const now = new Date().toISOString();
     const existing = args.projectId
       ? await ctx.db
@@ -104,9 +122,13 @@ export const upsertMail = mutation({
 });
 
 // === Notification Settings ===
-export const getNotification = query({
+export const getNotification = authedQuery({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
+      return null;
+    }
     if (!args.projectId) return await ctx.db.query("notificationSettings").first();
     return await ctx.db
       .query("notificationSettings")
@@ -115,7 +137,7 @@ export const getNotification = query({
   },
 });
 
-export const upsertNotification = mutation({
+export const upsertNotification = authedMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     emailNotifications: v.optional(v.boolean()),
@@ -124,6 +146,10 @@ export const upsertNotification = mutation({
     reportNotifications: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
+      throw new Error("Bu projeye erişim yetkiniz yok");
+    }
     const now = new Date().toISOString();
     const existing = args.projectId
       ? await ctx.db
@@ -145,9 +171,13 @@ export const upsertNotification = mutation({
 });
 
 // === Work Settings ===
-export const getWork = query({
+export const getWork = authedQuery({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
+      return null;
+    }
     if (!args.projectId) return await ctx.db.query("workSettings").first();
     return await ctx.db
       .query("workSettings")
@@ -156,7 +186,7 @@ export const getWork = query({
   },
 });
 
-export const upsertWork = mutation({
+export const upsertWork = authedMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     workStartTime: v.optional(v.string()),
@@ -183,9 +213,13 @@ export const upsertWork = mutation({
   },
 });
 
-export const getDarkMode = query({
+export const getDarkMode = authedQuery({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
+      return false;
+    }
     const settings = args.projectId
       ? await ctx.db
           .query("generalSettings")

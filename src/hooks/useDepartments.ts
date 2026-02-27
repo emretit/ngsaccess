@@ -18,7 +18,7 @@ export function useDepartments() {
 
   const departments = useQuery(
     api.departments.list,
-    !projectLoading ? { projectIds, isSuperAdmin } : "skip"
+    !projectLoading ? {} : "skip"
   );
 
   const createDept = useMutation(api.departments.create);

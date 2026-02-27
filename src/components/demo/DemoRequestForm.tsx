@@ -63,7 +63,7 @@ const DemoRequestForm = () => {
             <Input id="email" type="email" placeholder="E-posta" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <Input id="companyName" type="text" placeholder="Firma Adı" value={companyName} onChange={(e) => setCompanyName(e.target.value)} required />
             <Input id="password" type="password" placeholder="Şifre" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
-            <Button type="submit" className="w-full h-11 bg-[#711A1A] hover:bg-[#5a1515]" disabled={isLoading}>
+            <Button type="submit" className="w-full h-11 bg-primary hover:bg-primary/90" disabled={isLoading}>
               {isLoading ? "Demo erişimi oluşturuluyor..." : "Demo Talep Et"}
             </Button>
           </div>
@@ -72,7 +72,7 @@ const DemoRequestForm = () => {
       <CardFooter className="flex flex-col gap-2">
         <div className="text-sm text-center text-muted-foreground">
           Zaten hesabınız var mı?{" "}
-          <button onClick={() => navigate("/login")} className="text-[#711A1A] cursor-pointer hover:underline">
+          <button onClick={() => navigate("/login")} className="text-primary cursor-pointer hover:underline">
             Giriş yapın
           </button>
         </div>

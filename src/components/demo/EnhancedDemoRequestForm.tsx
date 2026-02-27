@@ -218,7 +218,7 @@ const EnhancedDemoRequestForm = () => {
 
               <Button 
                 type="submit" 
-                className="w-full h-14 bg-[#711A1A] hover:bg-[#5a1515] text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300" 
+                className="w-full h-14 bg-primary hover:bg-primary/90 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300" 
                 disabled={isLoading}
               >
                 {isLoading ? "Demo erişimi oluşturuluyor..." : "Ücretsiz Demo Başlat"}
@@ -230,7 +230,7 @@ const EnhancedDemoRequestForm = () => {
                 Zaten hesabınız var mı?{" "}
                 <button 
                   onClick={() => navigate('/login')}
-                  className="text-[#711A1A] font-medium hover:underline"
+                  className="text-primary font-medium hover:underline"
                 >
                   Giriş yapın
                 </button>

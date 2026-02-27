@@ -1,47 +1,66 @@
-
-import React, { useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import Header from '@/components/Header';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import React, { useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/layout/AppSidebar";
+import { AppHeader } from "@/components/layout/AppHeader";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 
 interface LayoutProps {
   children: React.ReactNode;
 }
+
+const routeTitles: Record<string, string> = {
+  "/employees": "Kişiler",
+  "/devices": "Cihazlar",
+  "/access-control": "Geçiş Kontrol",
+  "/pdks-records": "PDKS Kayıtları",
+  "/shifts": "Vardiyalar",
+  "/leaves": "İzinler",
+  "/employee-portal": "Çalışan Portalı",
+  "/settings": "Ayarlar",
+  "/profile": "Profil",
+  "/home": "Ana Sayfa",
+};
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, loading, session } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
+  const pageTitle = routeTitles[location.pathname] ?? "";
+
   useEffect(() => {
-    // Sadece kullanıcı oturum açmamışsa ve login/register sayfalarında değilse yönlendir
-    if (!loading && !session && location.pathname !== '/login' && location.pathname !== '/register') {
-      console.log("Layout: No session detected, redirecting to login from:", location.pathname);
-      navigate('/login');
+    if (
+      !loading &&
+      !session &&
+      location.pathname !== "/login" &&
+      location.pathname !== "/register"
+    ) {
+      navigate("/login");
     }
   }, [user, session, loading, navigate, location.pathname]);
 
-  // Show loading screen if checking auth
   if (loading) {
     return <LoadingSpinner text="Sistem hazırlanıyor..." />;
   }
-  
-  // If not logged in and not on login/register page, useEffect will redirect
-  if (!session && location.pathname !== '/login' && location.pathname !== '/register') {
-    console.log("Layout: No session, waiting for redirect...");
+
+  if (
+    !session &&
+    location.pathname !== "/login" &&
+    location.pathname !== "/register"
+  ) {
     return null;
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <Header />
-      <main className="flex-1">
-        <div className="px-4 py-6">
-          {children}
-        </div>
-      </main>
-    </div>
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <AppHeader title={pageTitle} />
+        <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 };
 

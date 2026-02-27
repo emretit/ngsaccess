@@ -4,7 +4,7 @@ import { ArrowRight, CheckCircle } from "lucide-react";
 
 const DemoRequestHero = () => {
   return (
-    <div className="bg-gradient-to-br from-[#711A1A] to-[#5a1515] text-white py-16 px-4">
+    <div className="bg-gradient-to-br from-primary to-primary/90 text-white py-16 px-4">
       <div className="max-w-4xl mx-auto text-center">
         <div className="w-20 h-20 bg-white/10 rounded-2xl flex items-center justify-center text-white font-bold text-3xl mx-auto mb-6 backdrop-blur-sm">
           P
@@ -37,7 +37,7 @@ const DemoRequestHero = () => {
 
         <Button 
           size="lg" 
-          className="bg-white text-[#711A1A] hover:bg-gray-100 text-lg px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+          className="bg-white text-primary hover:bg-gray-100 text-lg px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
         >
           Demo Talep Et
           <ArrowRight className="ml-2 h-5 w-5" />

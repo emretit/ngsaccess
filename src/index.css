@@ -30,6 +30,15 @@
         --chart-4: 43 74% 66%;
         --chart-5: 27 87% 67%;
         --radius: 0.75rem;
+        /* Sidebar (shadcn) */
+        --sidebar-background: 0 0% 98%;
+        --sidebar-foreground: 222.2 84% 4.9%;
+        --sidebar-primary: 0 59% 28%;
+        --sidebar-primary-foreground: 0 0% 100%;
+        --sidebar-accent: 0 59% 28%;
+        --sidebar-accent-foreground: 0 0% 100%;
+        --sidebar-border: 214.3 31.8% 91.4%;
+        --sidebar-ring: 0 59% 28%;
     }
 
     .dark {
@@ -57,6 +66,15 @@
         --chart-3: 30 80% 55%;
         --chart-4: 280 65% 60%;
         --chart-5: 340 75% 55%;
+        /* Sidebar (dark) */
+        --sidebar-background: 222.2 84% 4.9%;
+        --sidebar-foreground: 210 40% 98%;
+        --sidebar-primary: 0 59% 65%;
+        --sidebar-primary-foreground: 0 0% 100%;
+        --sidebar-accent: 0 59% 65%;
+        --sidebar-accent-foreground: 0 0% 100%;
+        --sidebar-border: 217.2 32.6% 17.5%;
+        --sidebar-ring: 0 59% 65%;
     }
 }
 
@@ -95,7 +113,7 @@
     }
     
     .burgundy-gradient {
-        @apply bg-gradient-to-r from-[#711A1A] to-[#9a2828];
+        @apply bg-gradient-to-r from-primary to-primary/80;
     }
 }
 

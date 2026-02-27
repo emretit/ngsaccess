@@ -1,5 +1,4 @@
-
-import { Users, UserCheck, Clock, Timer, Building } from "lucide-react";
+import { Users, UserCheck, Clock, Timer, Building, Palmtree } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface SummaryData {
@@ -8,6 +7,10 @@ interface SummaryData {
   lateArrivals: number;
   overtimeHours: number;
   insideBuilding: number;
+  leaveToday?: number;
+  devamOrani?: number;
+  topLateDepartment?: string;
+  topLateDepartmentCount?: number;
 }
 
 interface PDKSSummaryCardsProps {
@@ -23,8 +26,8 @@ export function PDKSSummaryCards({ data }: PDKSSummaryCardsProps) {
       color: "text-blue-600",
       bgColor: "bg-gradient-to-br from-blue-50 to-blue-100",
       borderColor: "border-blue-200",
-      change: "+2 bu ay",
-      changeType: "positive" as const
+      change: "Aktif çalışan",
+      changeType: "neutral" as const,
     },
     {
       title: "Bugün Mevcut",
@@ -33,8 +36,8 @@ export function PDKSSummaryCards({ data }: PDKSSummaryCardsProps) {
       color: "text-green-600",
       bgColor: "bg-gradient-to-br from-green-50 to-green-100",
       borderColor: "border-green-200",
-      change: "88% devam oranı",
-      changeType: "positive" as const
+      change: `%${data.devamOrani ?? 0} devam oranı`,
+      changeType: "positive" as const,
     },
     {
       title: "Geç Kalanlar",
@@ -43,8 +46,11 @@ export function PDKSSummaryCards({ data }: PDKSSummaryCardsProps) {
       color: "text-orange-600",
       bgColor: "bg-gradient-to-br from-orange-50 to-orange-100",
       borderColor: "border-orange-200",
-      change: "-2 dünden",
-      changeType: "positive" as const
+      change:
+        data.topLateDepartment && data.topLateDepartment !== "-"
+          ? `En çok: ${data.topLateDepartment} (${data.topLateDepartmentCount})`
+          : "Bugün",
+      changeType: "neutral" as const,
     },
     {
       title: "Mesai Saatleri",
@@ -53,24 +59,34 @@ export function PDKSSummaryCards({ data }: PDKSSummaryCardsProps) {
       color: "text-purple-600",
       bgColor: "bg-gradient-to-br from-purple-50 to-purple-100",
       borderColor: "border-purple-200",
-      change: "+5h bu hafta",
-      changeType: "neutral" as const
+      change: "Bugün toplam",
+      changeType: "neutral" as const,
+    },
+    {
+      title: "İzindeki",
+      value: data.leaveToday ?? 0,
+      icon: Palmtree,
+      color: "text-primary",
+      bgColor: "bg-gradient-to-br from-primary/10 to-primary/5",
+      borderColor: "border-primary/30",
+      change: "Bugün izinli",
+      changeType: "neutral" as const,
     },
     {
       title: "Şu An İçeride",
       value: data.insideBuilding,
       icon: Building,
-      color: "text-[#711A1A]",
+      color: "text-primary",
       bgColor: "bg-gradient-to-br from-red-50 to-red-100",
       borderColor: "border-red-200",
       change: "Canlı veri",
-      changeType: "neutral" as const
-    }
+      changeType: "neutral" as const,
+    },
   ];
 
   return (
     <div className="px-6 py-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {cards.map((card, index) => (
           <Card 
             key={index} 

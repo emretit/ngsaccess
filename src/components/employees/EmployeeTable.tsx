@@ -101,45 +101,50 @@ export default function EmployeeTable({
         />
       )}
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader className="sticky top-0 bg-white border-b-2 border-gray-200">
-            <TableRow>
-              <TableHead className="w-[50px] bg-gray-50 font-semibold">
+      <div className="overflow-x-auto">
+        <Table className="min-w-[800px]">
+          <TableHeader>
+            <TableRow className="bg-muted/50 hover:bg-muted/50">
+              <TableHead className="w-[50px] font-semibold text-foreground">
                 <Checkbox
-                  checked={selectedEmployees.length === employees.length}
+                  checked={selectedEmployees.length === employees.length && employees.length > 0}
                   onCheckedChange={handleSelectAll}
                 />
               </TableHead>
-              <TableHead className="bg-gray-50 font-semibold">Fotoğraf</TableHead>
-              <TableHead onClick={() => requestSort('first_name')} className="cursor-pointer bg-gray-50 font-semibold">
+              <TableHead className="font-semibold text-foreground w-[56px]">Foto</TableHead>
+              <TableHead onClick={() => requestSort('first_name')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
                 Ad Soyad
               </TableHead>
-              <TableHead onClick={() => requestSort('email')} className="cursor-pointer bg-gray-50 font-semibold">
+              <TableHead onClick={() => requestSort('email')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
                 E-posta
               </TableHead>
-              <TableHead onClick={() => requestSort('department_id')} className="cursor-pointer bg-gray-50 font-semibold">
+              <TableHead onClick={() => requestSort('department_id')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
                 Departman
               </TableHead>
-              <TableHead onClick={() => requestSort('position_id')} className="cursor-pointer bg-gray-50 font-semibold">
+              <TableHead onClick={() => requestSort('position_id')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
                 Pozisyon
               </TableHead>
-              <TableHead onClick={() => requestSort('card_number')} className="cursor-pointer bg-gray-50 font-semibold">
+              <TableHead onClick={() => requestSort('card_number')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
                 Kart No
               </TableHead>
-              <TableHead onClick={() => requestSort('is_active')} className="cursor-pointer bg-gray-50 font-semibold">
+              <TableHead onClick={() => requestSort('is_active')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
                 Durum
               </TableHead>
-              <TableHead className="text-right bg-gray-50 font-semibold">İşlemler</TableHead>
+              <TableHead className="text-right font-semibold text-foreground">İşlemler</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedEmployees.map(employee => (
-              <TableRow 
+            {sortedEmployees.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground text-sm">
+                  Personel bulunamadı.
+                </TableCell>
+              </TableRow>
+            ) : sortedEmployees.map(employee => (
+              <TableRow
                 key={employee.id}
-                className="cursor-pointer"
+                className="cursor-pointer transition-colors hover:bg-muted/50"
                 onClick={(e) => {
-                  // Prevent row click when clicking on checkbox or buttons
                   if ((e.target as HTMLElement).closest('button, input[type="checkbox"]')) return;
                   onEdit(employee);
                 }}
@@ -151,28 +156,40 @@ export default function EmployeeTable({
                   />
                 </TableCell>
                 <TableCell>
-                  <Avatar>
+                  <Avatar className="h-8 w-8">
                     <AvatarImage src={employee.photo_url || ''} alt={`${employee.first_name} ${employee.last_name}`} />
-                    <AvatarFallback>{employee.first_name?.[0]}{employee.last_name?.[0]}</AvatarFallback>
+                    <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
+                      {employee.first_name?.[0]}{employee.last_name?.[0]}
+                    </AvatarFallback>
                   </Avatar>
                 </TableCell>
-                <TableCell>{employee.first_name} {employee.last_name}</TableCell>
-                <TableCell>{employee.email}</TableCell>
-                <TableCell>{employee.departments?.name}</TableCell>
-                <TableCell>{employee.positions?.name}</TableCell>
-                <TableCell>{employee.card_number}</TableCell>
+                <TableCell className="font-medium">{employee.first_name} {employee.last_name}</TableCell>
+                <TableCell className="text-muted-foreground text-sm">{employee.email}</TableCell>
                 <TableCell>
-                  <Badge variant={employee.is_active ? "success" : "secondary"}>
+                  {employee.departments?.name ? (
+                    <span className="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-950 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
+                      {employee.departments.name}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {employee.positions?.name ?? <span className="text-muted-foreground">—</span>}
+                </TableCell>
+                <TableCell className="font-mono text-sm">{employee.card_number || <span className="text-muted-foreground">—</span>}</TableCell>
+                <TableCell>
+                  <Badge variant={employee.is_active ? "success" : "secondary"} className="text-xs">
                     {employee.is_active ? 'Aktif' : 'Pasif'}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex items-center justify-end gap-1">
+                  <div className="flex items-center justify-end gap-0.5">
                     <Button
                       variant="ghost"
                       size="icon"
                       onClick={() => handlePasswordResetClick(employee)}
-                      className="h-8 w-8"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
                       title="Şifre Sıfırlama Maili Gönder"
                     >
                       <Mail className="h-4 w-4" />
@@ -181,7 +198,7 @@ export default function EmployeeTable({
                       variant="ghost"
                       size="icon"
                       onClick={() => onEdit(employee)}
-                      className="h-8 w-8"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
                     >
                       <Edit2 className="h-4 w-4" />
                     </Button>
@@ -189,7 +206,7 @@ export default function EmployeeTable({
                       variant="ghost"
                       size="icon"
                       onClick={() => handleIndividualDeleteClick(employee)}
-                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

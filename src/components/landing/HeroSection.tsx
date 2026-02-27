@@ -29,7 +29,7 @@ const HeroSection = () => {
             </div>
           </div>
           <div className="hidden md:block w-full max-w-md">
-            <div className="glass-card p-8 shadow-lg bg-card rounded-2xl rotate-3 relative">
+            <div className="rounded-2xl border bg-card shadow-lg p-8 rotate-3 relative">
               <div className="absolute -top-6 -right-6 w-12 h-12 rounded-full burgundy-gradient flex items-center justify-center text-white">
                 <QrCode className="h-6 w-6" />
               </div>

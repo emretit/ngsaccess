@@ -39,8 +39,8 @@ export function PDKSAiChat() {
       {/* Header */}
       <div className="border-b border-gray-200 dark:border-gray-800 p-4">
         <div className="flex items-center gap-3 mb-4">
-          <div className="bg-[#711A1A]/10 p-2 rounded-full">
-            <Bot className="h-5 w-5 text-[#711A1A]" />
+          <div className="bg-primary/10 p-2 rounded-full">
+            <Bot className="h-5 w-5 text-primary" />
           </div>
           <div>
             <h3 className="font-semibold text-gray-900 dark:text-gray-100">AI Asistan</h3>
@@ -54,7 +54,7 @@ export function PDKSAiChat() {
             variant={aiMode === 'native' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setAiMode('native')}
-            className={aiMode === 'native' ? 'bg-[#711A1A] hover:bg-[#711A1A]/90' : ''}
+            className={aiMode === 'native' ? 'bg-primary hover:bg-primary/90' : ''}
           >
             <Sparkles className="mr-1 h-3 w-3" />
             Yerli AI
@@ -63,7 +63,7 @@ export function PDKSAiChat() {
             variant={aiMode === 'openai' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setAiMode('openai')}
-            className={aiMode === 'openai' ? 'bg-[#711A1A] hover:bg-[#711A1A]/90' : ''}
+            className={aiMode === 'openai' ? 'bg-primary hover:bg-primary/90' : ''}
           >
             OpenAI
           </Button>
@@ -121,7 +121,7 @@ export function PDKSAiChat() {
             <Button 
               type="submit" 
               disabled={isLoading || !input.trim()}
-              className="bg-[#711A1A] hover:bg-[#711A1A]/90"
+              className="bg-primary hover:bg-primary/90"
             >
               {isLoading ? "..." : "Gönder"}
             </Button>

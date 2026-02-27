@@ -62,7 +62,7 @@ export function DevicesContent({
 
       <DeviceStats devices={filteredDevices} />
 
-      <div className="glass-card overflow-hidden">
+      <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
         <DeviceList 
           devices={devices}
           filteredDevices={filteredDevices}

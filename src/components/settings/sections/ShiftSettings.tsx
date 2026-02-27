@@ -94,7 +94,7 @@ export function ShiftSettings({ onComplete }: ShiftSettingsProps) {
         </div>
         <Button 
           onClick={() => setIsAddDialogOpen(true)}
-          className="bg-[#711A1A] hover:bg-[#5a1515] text-white"
+          className="bg-primary hover:bg-primary/90 text-white"
         >
           <Plus className="w-4 h-4 mr-2" />
           Yeni Vardiya Ekle

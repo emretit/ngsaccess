@@ -10,13 +10,12 @@ interface PdksFilters {
 }
 
 export function usePdksAi() {
-  const { projectIds, isSuperAdmin } = useProjectAccess();
   const [insight, setInsight] = useState<string | undefined>(
     "On-time rate improved by 7% since last month. Employee punctuality is trending positively."
   );
   const [isLoadingInsight, setIsLoadingInsight] = useState(false);
 
-  const departmentsRaw = useQuery(api.departments.list, { projectIds, isSuperAdmin });
+  const departmentsRaw = useQuery(api.departments.list, {});
   const departments = (departmentsRaw ?? []).map((d: { name: string }) => d.name);
 
   const fetchInsight = async (filters: PdksFilters) => {

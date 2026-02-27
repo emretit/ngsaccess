@@ -101,25 +101,16 @@ export const useEmployeeFormData = (employee?: EmployeeInput | null) => {
     }
   }, [employee?._id]);
 
-  const departments = useQuery(
-    api.departments.list,
-    projectIds.length > 0 ? { projectIds, isSuperAdmin } : "skip"
-  );
+  const departments = useQuery(api.departments.list, projectIds.length > 0 ? {} : "skip");
 
-  const companies = useQuery(
-    api.companies.list,
-    projectIds.length > 0 ? { projectIds, isSuperAdmin } : "skip"
-  );
+  const companies = useQuery(api.companies.list, projectIds.length > 0 ? {} : "skip");
 
   const accessRules = useQuery(
     api.accessRules.list,
-    projectIds.length > 0 ? { projectId: projectIds[0], isSuperAdmin } : "skip"
+    projectIds.length > 0 ? { projectId: projectIds[0] } : {}
   );
 
-  const positions = useQuery(
-    api.positions.list,
-    projectIds.length > 0 ? { projectIds, isSuperAdmin } : "skip"
-  );
+  const positions = useQuery(api.positions.list, projectIds.length > 0 ? {} : "skip");
 
   return {
     formData,

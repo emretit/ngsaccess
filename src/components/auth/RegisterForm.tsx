@@ -38,10 +38,10 @@ const RegisterForm = () => {
 
       toast({
         title: "Kayıt başarılı!",
-        description: "Demo projesine erişim hakkınız oluşturuldu. Giriş yapabilirsiniz.",
+        description: "Projeniz oluşturuldu. Giriş yapabilirsiniz.",
       });
       
-      navigate('/login');
+      navigate('/home');
       
     } catch (error: any) {
       toast({
@@ -110,7 +110,7 @@ const RegisterForm = () => {
             </div>
             <Button 
               type="submit" 
-              className="w-full h-11 bg-[#711A1A] hover:bg-[#5a1515]" 
+              className="w-full h-11 bg-primary hover:bg-primary/90" 
               disabled={isLoading}
             >
               {isLoading ? "Kayıt oluşturuluyor..." : "Kayıt Ol"}
@@ -123,7 +123,7 @@ const RegisterForm = () => {
           Zaten hesabınız var mı?{" "}
           <button 
             onClick={() => navigate('/login')}
-            className="text-[#711A1A] cursor-pointer hover:underline"
+            className="text-primary cursor-pointer hover:underline"
           >
             Giriş yapın
           </button>

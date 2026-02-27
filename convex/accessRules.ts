@@ -1,20 +1,33 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { authedQuery, authedMutation } from "./lib/customFunctions";
+import { getProjectIdsForUser } from "./lib/auth";
 
-export const list = query({
+export const list = authedQuery({
   args: {
     projectId: v.optional(v.id("projects")),
-    isSuperAdmin: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+
     let rules;
-    if (args.projectId) {
+    if (args.projectId && allowedProjectIds.some((id) => id === args.projectId)) {
       rules = await ctx.db
         .query("accessRules")
         .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
         .collect();
-    } else if (args.isSuperAdmin) {
+    } else if (ctx.user.role === "super_admin") {
       rules = await ctx.db.query("accessRules").collect();
+    } else if (allowedProjectIds.length > 0) {
+      const results = await Promise.all(
+        allowedProjectIds.map((pid) =>
+          ctx.db
+            .query("accessRules")
+            .withIndex("by_project", (q) => q.eq("projectId", pid))
+            .collect()
+        )
+      );
+      rules = results.flat();
     } else {
       return [];
     }
@@ -76,7 +89,7 @@ export const list = query({
   },
 });
 
-export const create = mutation({
+export const create = authedMutation({
   args: {
     name: v.string(),
     projectId: v.optional(v.id("projects")),
@@ -92,6 +105,10 @@ export const create = mutation({
     templateName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
+      throw new Error("Bu projeye erişim yetkiniz yok");
+    }
     const now = new Date().toISOString();
     return await ctx.db.insert("accessRules", {
       ...args,
@@ -102,7 +119,7 @@ export const create = mutation({
   },
 });
 
-export const update = mutation({
+export const update = authedMutation({
   args: {
     ruleId: v.id("accessRules"),
     name: v.optional(v.string()),
@@ -118,6 +135,12 @@ export const update = mutation({
     templateName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const rule = await ctx.db.get(args.ruleId);
+    if (!rule) throw new Error("Kural bulunamadı");
+    if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
+      throw new Error("Bu kurala erişim yetkiniz yok");
+    }
     const { ruleId, ...updates } = args;
     const clean: Record<string, unknown> = { updatedAt: new Date().toISOString() };
     for (const [k, v] of Object.entries(updates)) {
@@ -128,9 +151,15 @@ export const update = mutation({
   },
 });
 
-export const remove = mutation({
+export const remove = authedMutation({
   args: { ruleId: v.id("accessRules") },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const rule = await ctx.db.get(args.ruleId);
+    if (!rule) throw new Error("Kural bulunamadı");
+    if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
+      throw new Error("Bu kurala erişim yetkiniz yok");
+    }
     const members = await ctx.db
       .query("groupMembers")
       .withIndex("by_group", (q) => q.eq("groupId", args.ruleId))
@@ -147,7 +176,7 @@ export const remove = mutation({
   },
 });
 
-export const createWithGroups = mutation({
+export const createWithGroups = authedMutation({
   args: {
     name: v.string(),
     projectId: v.optional(v.id("projects")),
@@ -163,6 +192,10 @@ export const createWithGroups = mutation({
     deviceIds: v.optional(v.array(v.id("devices"))),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
+      throw new Error("Bu projeye erişim yetkiniz yok");
+    }
     const { employeeIds, deviceIds, ...ruleData } = args;
     const now = new Date().toISOString();
     const ruleId = await ctx.db.insert("accessRules", {
@@ -202,7 +235,7 @@ export const createWithGroups = mutation({
   },
 });
 
-export const updateWithGroups = mutation({
+export const updateWithGroups = authedMutation({
   args: {
     ruleId: v.id("accessRules"),
     name: v.optional(v.string()),
@@ -219,6 +252,15 @@ export const updateWithGroups = mutation({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const rule = await ctx.db.get(args.ruleId);
+    if (!rule) throw new Error("Kural bulunamadı");
+    if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
+      throw new Error("Bu kurala erişim yetkiniz yok");
+    }
+    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
+      throw new Error("Bu projeye erişim yetkiniz yok");
+    }
     const { ruleId, employeeIds, deviceIds, projectId, ...updates } = args;
     const now = new Date().toISOString();
     const clean: Record<string, unknown> = { updatedAt: now };
@@ -268,13 +310,19 @@ export const updateWithGroups = mutation({
 });
 
 // Group Members
-export const addGroupMember = mutation({
+export const addGroupMember = authedMutation({
   args: {
     groupId: v.id("accessRules"),
     employeeId: v.id("employees"),
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const rule = await ctx.db.get(args.groupId);
+    if (!rule) throw new Error("Kural bulunamadı");
+    if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
+      throw new Error("Bu gruba erişim yetkiniz yok");
+    }
     return await ctx.db.insert("groupMembers", {
       ...args,
       createdAt: new Date().toISOString(),
@@ -282,21 +330,33 @@ export const addGroupMember = mutation({
   },
 });
 
-export const removeGroupMember = mutation({
+export const removeGroupMember = authedMutation({
   args: { memberId: v.id("groupMembers") },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const member = await ctx.db.get(args.memberId);
+    if (!member) throw new Error("Üye bulunamadı");
+    if (member.projectId && !allowedProjectIds.some((id) => id === member.projectId)) {
+      throw new Error("Bu üyeye erişim yetkiniz yok");
+    }
     await ctx.db.delete(args.memberId);
   },
 });
 
 // Group Devices
-export const addGroupDevice = mutation({
+export const addGroupDevice = authedMutation({
   args: {
     groupId: v.id("accessRules"),
     deviceId: v.id("devices"),
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const rule = await ctx.db.get(args.groupId);
+    if (!rule) throw new Error("Kural bulunamadı");
+    if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
+      throw new Error("Bu gruba erişim yetkiniz yok");
+    }
     return await ctx.db.insert("groupDevices", {
       ...args,
       createdAt: new Date().toISOString(),
@@ -304,9 +364,15 @@ export const addGroupDevice = mutation({
   },
 });
 
-export const removeGroupDevice = mutation({
+export const removeGroupDevice = authedMutation({
   args: { groupDeviceId: v.id("groupDevices") },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const gd = await ctx.db.get(args.groupDeviceId);
+    if (!gd) throw new Error("Kayıt bulunamadı");
+    if (gd.projectId && !allowedProjectIds.some((id) => id === gd.projectId)) {
+      throw new Error("Bu kayda erişim yetkiniz yok");
+    }
     await ctx.db.delete(args.groupDeviceId);
   },
 });

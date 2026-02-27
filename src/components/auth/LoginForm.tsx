@@ -96,7 +96,7 @@ const LoginForm = () => {
           </div>
           <Button 
             type="submit" 
-            className="w-full h-11 bg-[#711A1A] hover:bg-[#5a1515]" 
+            className="w-full h-11 bg-primary hover:bg-primary/90" 
             disabled={isLoading}
           >
             {isLoading ? "Giriş yapılıyor..." : "Giriş Yap"}
@@ -108,7 +108,7 @@ const LoginForm = () => {
           Hesabınız yok mu?{" "}
           <button 
             onClick={() => navigate('/register')}
-            className="text-[#711A1A] cursor-pointer hover:underline"
+            className="text-primary cursor-pointer hover:underline"
           >
             Kayıt olun
           </button>

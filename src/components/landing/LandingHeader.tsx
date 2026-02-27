@@ -10,7 +10,7 @@ const LandingHeader = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
-            <div className="w-8 h-8 bg-[#711A1A] rounded-md flex items-center justify-center text-white font-bold mr-3">
+            <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center text-white font-bold mr-3">
               P
             </div>
             <span className="text-xl font-semibold text-gray-900">PDKS Sistemi</span>
@@ -25,7 +25,7 @@ const LandingHeader = () => {
             </Button>
             <Button 
               onClick={() => navigate('/demo-request')}
-              className="bg-[#711A1A] hover:bg-[#5a1515]"
+              className="bg-primary hover:bg-primary/90"
             >
               Demo İsteyin
             </Button>

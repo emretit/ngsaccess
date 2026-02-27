@@ -1,18 +1,19 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { authedQuery, authedMutation } from "./lib/customFunctions";
+import { getProjectIdsForUser } from "./lib/auth";
 
-export const list = query({
-  args: {
-    projectIds: v.optional(v.array(v.id("projects"))),
-    isSuperAdmin: v.optional(v.boolean()),
-  },
-  handler: async (ctx, args) => {
+export const list = authedQuery({
+  args: {},
+  handler: async (ctx) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+
     let devices;
-    if (args.isSuperAdmin) {
+    if (ctx.user.role === "super_admin") {
       devices = await ctx.db.query("devices").collect();
-    } else if (args.projectIds && args.projectIds.length > 0) {
+    } else if (allowedProjectIds.length > 0) {
       const results = await Promise.all(
-        args.projectIds.map((pid) =>
+        allowedProjectIds.map((pid) =>
           ctx.db
             .query("devices")
             .withIndex("by_project", (q) => q.eq("projectId", pid))
@@ -34,18 +35,22 @@ export const list = query({
   },
 });
 
-export const getById = query({
+export const getById = authedQuery({
   args: { deviceId: v.id("devices") },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
     const device = await ctx.db.get(args.deviceId);
     if (!device) return null;
+    if (device.projectId && !allowedProjectIds.some((id) => id === device.projectId)) {
+      throw new Error("Bu cihaza erişim yetkiniz yok");
+    }
     const zone = device.zoneId ? await ctx.db.get(device.zoneId) : null;
     const door = device.doorId ? await ctx.db.get(device.doorId) : null;
     return { ...device, zone, door };
   },
 });
 
-export const create = mutation({
+export const create = authedMutation({
   args: {
     name: v.string(),
     projectId: v.optional(v.id("projects")),
@@ -62,6 +67,10 @@ export const create = mutation({
     description: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
+      throw new Error("Bu projeye erişim yetkiniz yok");
+    }
     const now = new Date().toISOString();
     return await ctx.db.insert("devices", {
       ...args,
@@ -73,7 +82,7 @@ export const create = mutation({
   },
 });
 
-export const update = mutation({
+export const update = authedMutation({
   args: {
     deviceId: v.id("devices"),
     name: v.optional(v.string()),
@@ -91,6 +100,12 @@ export const update = mutation({
     lastSeen: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const device = await ctx.db.get(args.deviceId);
+    if (!device) throw new Error("Cihaz bulunamadı");
+    if (device.projectId && !allowedProjectIds.some((id) => id === device.projectId)) {
+      throw new Error("Bu cihaza erişim yetkiniz yok");
+    }
     const { deviceId, ...updates } = args;
     const clean: Record<string, unknown> = { updatedAt: new Date().toISOString() };
     for (const [k, v] of Object.entries(updates)) {
@@ -101,9 +116,15 @@ export const update = mutation({
   },
 });
 
-export const remove = mutation({
+export const remove = authedMutation({
   args: { deviceId: v.id("devices") },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const device = await ctx.db.get(args.deviceId);
+    if (!device) throw new Error("Cihaz bulunamadı");
+    if (device.projectId && !allowedProjectIds.some((id) => id === device.projectId)) {
+      throw new Error("Bu cihaza erişim yetkiniz yok");
+    }
     // İlişkili card readings sayısını kontrol et
     const readings = await ctx.db
       .query("cardReadings")

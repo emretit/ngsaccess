@@ -1,6 +1,7 @@
-
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Download, Search, Filter } from "lucide-react";
+import { exportToExcel, exportToCsv, exportToPdf } from "@/utils/pdksExport";
+import { useToast } from "@/hooks/use-toast";
 import {
   Table,
   TableBody,
@@ -41,12 +42,31 @@ interface EmployeeRecord {
 interface PDKSTableViewProps {
   records: EmployeeRecord[];
   loading?: boolean;
+  selectedDate?: Date;
 }
 
-export function PDKSTableView({ records, loading = false }: PDKSTableViewProps) {
+export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTableViewProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const { toast } = useToast();
+
+  const safeRecords = Array.isArray(records) ? records : [];
+
+  const handleExportExcel = () => {
+    exportToExcel(filteredRecords, { dateRange: selectedDate?.toISOString().split("T")[0] ?? "" });
+    toast({ title: "Excel indirildi", description: `${filteredRecords.length} kayıt dışa aktarıldı.` });
+  };
+
+  const handleExportCsv = () => {
+    exportToCsv(filteredRecords, { dateRange: selectedDate?.toISOString().split("T")[0] ?? "" });
+    toast({ title: "CSV indirildi", description: `${filteredRecords.length} kayıt dışa aktarıldı.` });
+  };
+
+  const handleExportPdf = () => {
+    exportToPdf(filteredRecords, { dateRange: selectedDate?.toISOString().split("T")[0] ?? "" });
+    toast({ title: "PDF indirildi", description: `${filteredRecords.length} kayıt dışa aktarıldı.` });
+  };
 
   const toggleRowExpansion = (id: string) => {
     const newExpanded = new Set(expandedRows);
@@ -74,10 +94,13 @@ export function PDKSTableView({ records, loading = false }: PDKSTableViewProps) 
     );
   };
 
-  const filteredRecords = records.filter(record => {
-    const matchesSearch = record.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         record.employeeId.includes(searchTerm);
-    const matchesStatus = statusFilter === "all" || record.status === statusFilter;
+  const filteredRecords = safeRecords.filter((record) => {
+    const name = record?.name ?? "";
+    const employeeId = record?.employeeId ?? "";
+    const matchesSearch =
+      name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      employeeId.includes(searchTerm);
+    const matchesStatus = statusFilter === "all" || record?.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -86,7 +109,7 @@ export function PDKSTableView({ records, loading = false }: PDKSTableViewProps) 
       <Card className="shadow-lg border-0">
         <CardContent className="p-12">
           <div className="flex flex-col items-center justify-center space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#711A1A]"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             <p className="text-gray-500 font-medium">Veriler yükleniyor...</p>
           </div>
         </CardContent>
@@ -147,16 +170,16 @@ export function PDKSTableView({ records, loading = false }: PDKSTableViewProps) 
             {/* Download */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button className="bg-[#711A1A] hover:bg-[#711A1A]/90 text-white">
+                <Button className="bg-primary hover:bg-primary/90 text-white">
                   <Download className="mr-2 h-4 w-4" />
                   İndir
                   <ChevronDown className="ml-2 h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem>📊 Excel (.xlsx)</DropdownMenuItem>
-                <DropdownMenuItem>📄 PDF</DropdownMenuItem>
-                <DropdownMenuItem>📝 CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportExcel}>📊 Excel (.xlsx)</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportPdf}>📄 PDF</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportCsv}>📝 CSV</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -193,7 +216,7 @@ export function PDKSTableView({ records, loading = false }: PDKSTableViewProps) 
                   >
                     <TableCell className="text-center">
                       {expandedRows.has(record.id) ? (
-                        <ChevronDown className="h-4 w-4 text-[#711A1A]" />
+                        <ChevronDown className="h-4 w-4 text-primary" />
                       ) : (
                         <ChevronRight className="h-4 w-4 text-gray-400" />
                       )}
@@ -215,7 +238,7 @@ export function PDKSTableView({ records, loading = false }: PDKSTableViewProps) 
                   
                   {expandedRows.has(record.id) && record.detailedLogs && (
                     <TableRow>
-                      <TableCell colSpan={10} className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-[#711A1A]">
+                      <TableCell colSpan={10} className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-primary">
                         <div className="p-6">
                           <h4 className="font-bold mb-4 text-gray-800 flex items-center gap-2">
                             🕐 Günlük Detaylı Kayıtlar - {record.name}
@@ -226,7 +249,7 @@ export function PDKSTableView({ records, loading = false }: PDKSTableViewProps) 
                                 key={logIndex} 
                                 className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
                               >
-                                <span className="font-bold text-[#711A1A] text-lg">{log.time}</span>
+                                <span className="font-bold text-primary text-lg">{log.time}</span>
                                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                                   log.action === 'Giriş' 
                                     ? 'bg-green-100 text-green-800' 

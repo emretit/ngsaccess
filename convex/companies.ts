@@ -1,16 +1,16 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { authedQuery, authedMutation } from "./lib/customFunctions";
+import { getProjectIdsForUser } from "./lib/auth";
 
-export const list = query({
-  args: {
-    projectIds: v.optional(v.array(v.id("projects"))),
-    isSuperAdmin: v.optional(v.boolean()),
-  },
-  handler: async (ctx, args) => {
-    if (args.isSuperAdmin) return await ctx.db.query("companies").collect();
-    if (!args.projectIds || args.projectIds.length === 0) return [];
+export const list = authedQuery({
+  args: {},
+  handler: async (ctx) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (ctx.user.role === "super_admin") return await ctx.db.query("companies").collect();
+    if (allowedProjectIds.length === 0) return [];
     const results = await Promise.all(
-      args.projectIds.map((pid) =>
+      allowedProjectIds.map((pid) =>
         ctx.db
           .query("companies")
           .withIndex("by_project", (q) => q.eq("projectId", pid))
@@ -21,7 +21,7 @@ export const list = query({
   },
 });
 
-export const create = mutation({
+export const create = authedMutation({
   args: {
     name: v.string(),
     projectId: v.optional(v.id("projects")),
@@ -34,12 +34,16 @@ export const create = mutation({
     logoUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
+      throw new Error("Bu projeye erişim yetkiniz yok");
+    }
     const now = new Date().toISOString();
     return await ctx.db.insert("companies", { ...args, createdAt: now, updatedAt: now });
   },
 });
 
-export const update = mutation({
+export const update = authedMutation({
   args: {
     companyId: v.id("companies"),
     name: v.optional(v.string()),
@@ -52,14 +56,26 @@ export const update = mutation({
     logoUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const company = await ctx.db.get(args.companyId);
+    if (!company) throw new Error("Şirket bulunamadı");
+    if (company.projectId && !allowedProjectIds.some((id) => id === company.projectId)) {
+      throw new Error("Bu şirkete erişim yetkiniz yok");
+    }
     const { companyId, ...updates } = args;
     await ctx.db.patch(companyId, { ...updates, updatedAt: new Date().toISOString() });
   },
 });
 
-export const remove = mutation({
+export const remove = authedMutation({
   args: { companyId: v.id("companies") },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const company = await ctx.db.get(args.companyId);
+    if (!company) throw new Error("Şirket bulunamadı");
+    if (company.projectId && !allowedProjectIds.some((id) => id === company.projectId)) {
+      throw new Error("Bu şirkete erişim yetkiniz yok");
+    }
     await ctx.db.delete(args.companyId);
   },
 });

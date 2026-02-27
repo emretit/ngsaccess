@@ -75,6 +75,16 @@ export default defineSchema({
     .index("by_email", ["email"])
     .index("by_card", ["cardNumber"]),
 
+  checkInTokens: defineTable({
+    employeeId: v.id("employees"),
+    token: v.string(),
+    expiresAt: v.string(),
+    usedAt: v.optional(v.string()),
+    createdAt: v.string(),
+  })
+    .index("by_token", ["token"])
+    .index("by_employee", ["employeeId"]),
+
   employeeAuth: defineTable({
     employeeId: v.id("employees"),
     projectId: v.optional(v.id("projects")),
@@ -246,6 +256,21 @@ export default defineSchema({
     updatedAt: v.string(),
   }).index("by_project", ["projectId"]),
 
+  shiftAssignments: defineTable({
+    employeeId: v.id("employees"),
+    shiftId: v.id("shifts"),
+    projectId: v.optional(v.id("projects")),
+    startDate: v.string(),
+    endDate: v.string(),
+    weekPattern: v.optional(v.array(v.string())),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_employee", ["employeeId"])
+    .index("by_shift", ["shiftId"])
+    .index("by_project", ["projectId"])
+    .index("by_dates", ["startDate", "endDate"]),
+
   generalSettings: defineTable({
     projectId: v.optional(v.id("projects")),
     companyName: v.string(),
@@ -306,6 +331,48 @@ export default defineSchema({
     updatedAt: v.string(),
   }).index("by_project", ["projectId"]),
 
+  leaves: defineTable({
+    employeeId: v.id("employees"),
+    projectId: v.optional(v.id("projects")),
+    leaveType: v.union(
+      v.literal("annual"),
+      v.literal("sick"),
+      v.literal("excuse"),
+      v.literal("unpaid"),
+      v.literal("parental")
+    ),
+    startDate: v.string(),
+    endDate: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected")
+    ),
+    approvedBy: v.optional(v.id("users")),
+    notes: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_employee", ["employeeId"])
+    .index("by_project", ["projectId"])
+    .index("by_status", ["status"])
+    .index("by_dates", ["startDate", "endDate"]),
+
+  leaveBalances: defineTable({
+    employeeId: v.id("employees"),
+    projectId: v.optional(v.id("projects")),
+    leaveType: v.string(),
+    year: v.number(),
+    totalDays: v.number(),
+    usedDays: v.number(),
+    remainingDays: v.number(),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_employee", ["employeeId"])
+    .index("by_project", ["projectId"])
+    .index("by_employee_year", ["employeeId", "year"]),
+
   workSettings: defineTable({
     projectId: v.optional(v.id("projects")),
     workStartTime: v.optional(v.string()),
@@ -314,8 +381,23 @@ export default defineSchema({
     lunchBreakEnd: v.optional(v.string()),
     maxLateMinutes: v.optional(v.number()),
     allowLateEntry: v.optional(v.boolean()),
+    annualOvertimeLimitHours: v.optional(v.number()),
+    overtimeMultiplier: v.optional(v.number()),
     updatedAt: v.optional(v.string()),
   }).index("by_project", ["projectId"]),
+
+  reportScheduleSettings: defineTable({
+    userId: v.id("users"),
+    projectId: v.optional(v.id("projects")),
+    reportType: v.string(),
+    email: v.string(),
+    enabled: v.boolean(),
+    lastSentAt: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_project", ["projectId"]),
 
   // Kullanıcı davet sistemi - super_admin kullanıcıları projeye davet eder
   invites: defineTable({

@@ -62,8 +62,8 @@ const DemoFeatures = () => {
               className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
             >
               <CardContent className="p-6 text-center">
-                <div className="w-16 h-16 bg-[#711A1A]/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <feature.icon className="h-8 w-8 text-[#711A1A]" />
+                <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <feature.icon className="h-8 w-8 text-primary" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-3">
                   {feature.title}

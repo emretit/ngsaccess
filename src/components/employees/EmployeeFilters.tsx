@@ -1,5 +1,5 @@
 
-import { UserPlus, Search } from "lucide-react";
+import { UserPlus, Search, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,42 +22,52 @@ export function EmployeeFilters({
   const PAGE_SIZE_OPTIONS = [10, 50, 100];
 
   return (
-    <div className="glass-card p-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Personel Listesi</h2>
-        <div className="flex gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Personel ara..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="w-64 pl-10"
-            />
-          </div>
-
-          <Select 
-            value={String(itemsPerPage)} 
-            onValueChange={(value) => onItemsPerPageChange(Number(value))}
-          >
-            <SelectTrigger className="w-[120px]">
-              <SelectValue placeholder="Sayfa Boyutu" />
-            </SelectTrigger>
-            <SelectContent>
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <SelectItem key={size} value={String(size)}>
-                  {size} Kayıt
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button onClick={onNewEmployee}>
-            <UserPlus className="mr-2 h-4 w-4" />
-            Yeni Personel
-          </Button>
+    <div className="flex items-center gap-3 flex-wrap">
+      {/* Sol: Başlık */}
+      <div className="flex items-center gap-2 mr-2">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+          <Users className="h-4 w-4 text-primary" />
         </div>
+        <div>
+          <h2 className="text-sm font-semibold leading-tight">Personel Listesi</h2>
+          <p className="text-xs text-muted-foreground">Tüm personelleri yönetin</p>
+        </div>
+      </div>
+
+      {/* Arama */}
+      <div className="relative flex-1 min-w-[200px] max-w-xs">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <Input
+          type="search"
+          placeholder="Ad, e-posta, TC veya kart no..."
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="pl-8 h-8 text-sm"
+        />
+      </div>
+
+      {/* Sağ: Kontroller */}
+      <div className="flex items-center gap-2 ml-auto">
+        <Select
+          value={String(itemsPerPage)}
+          onValueChange={(value) => onItemsPerPageChange(Number(value))}
+        >
+          <SelectTrigger className="w-[80px] h-8 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <SelectItem key={size} value={String(size)} className="text-xs">
+                {size} kayıt
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Button onClick={onNewEmployee} size="sm" className="h-8 gap-1.5 text-xs">
+          <UserPlus className="h-3.5 w-3.5" />
+          Yeni Personel
+        </Button>
       </div>
     </div>
   );

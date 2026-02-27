@@ -30,7 +30,7 @@ export function OnboardingProgress({ steps, currentStep }: OnboardingProgressPro
       
       <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
         <div 
-          className="bg-[#711A1A] h-2 rounded-full transition-all duration-300"
+          className="bg-primary h-2 rounded-full transition-all duration-300"
           style={{ width: `${progressPercentage}%` }}
         />
       </div>
@@ -44,7 +44,7 @@ export function OnboardingProgress({ steps, currentStep }: OnboardingProgressPro
             <div 
               key={step.key}
               className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${
-                isCurrent ? 'bg-[#711A1A]/10 border border-[#711A1A]/20' : ''
+                isCurrent ? 'bg-primary/10 border border-primary/20' : ''
               }`}
             >
               {step.completed ? (

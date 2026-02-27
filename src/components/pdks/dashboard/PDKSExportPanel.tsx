@@ -36,7 +36,7 @@ export function PDKSExportPanel() {
         {/* Export Dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button className="w-full bg-[#711A1A] hover:bg-[#711A1A]/90">
+            <Button className="w-full bg-primary hover:bg-primary/90">
               <Download className="mr-2 h-4 w-4" />
               Rapor İndir
             </Button>
@@ -82,7 +82,7 @@ export function PDKSExportPanel() {
                 <Button variant="outline" onClick={() => setIsEmailDialogOpen(false)}>
                   İptal
                 </Button>
-                <Button className="bg-[#711A1A] hover:bg-[#711A1A]/90">
+                <Button className="bg-primary hover:bg-primary/90">
                   Gönder
                 </Button>
               </div>
@@ -124,7 +124,7 @@ export function PDKSExportPanel() {
                 <Button variant="outline" onClick={() => setIsScheduleDialogOpen(false)}>
                   İptal
                 </Button>
-                <Button className="bg-[#711A1A] hover:bg-[#711A1A]/90">
+                <Button className="bg-primary hover:bg-primary/90">
                   Zamanla
                 </Button>
               </div>

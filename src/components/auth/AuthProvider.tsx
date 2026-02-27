@@ -1,7 +1,7 @@
 import React, { createContext, useContext } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useConvexAuth, useQuery } from "convex/react";
+import { useConvexAuth, useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { toast } from '@/hooks/use-toast';
 import { checkUserRole } from '@/services/authService';
@@ -26,6 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useConvexAuth();
   const { signIn: convexSignIn, signOut: convexSignOut } = useAuthActions();
   const user = useQuery(api.users.currentUser);
+  const ensureProject = useMutation(api.onboarding.ensureProjectForNewUser);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -39,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     if (!isLoading && !isAuthenticated) {
-      const publicPaths = ['/', '/login', '/register', '/auth', '/demo-request', '/user-setup', '/employee-setup', '/system-admin'];
+      const publicPaths = ['/', '/login', '/register', '/auth', '/demo-request', '/user-setup', '/admin-setup', '/employee-setup', '/system-admin'];
       if (!publicPaths.includes(location.pathname)) {
         navigate('/login');
       }
@@ -60,6 +61,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string, name?: string) => {
     try {
       await convexSignIn("password", { email, password, name: name ?? email.split('@')[0], flow: "signUp" });
+      // Yeni kullanıcı için otomatik proje oluştur (doğrudan kayıt)
+      await ensureProject();
       return { error: null };
     } catch (error: unknown) {
       return { error };

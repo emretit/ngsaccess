@@ -16,7 +16,7 @@ export function PDKSMobileDrawer({ onFiltersChange }: PDKSMobileDrawerProps) {
     <div className="lg:hidden">
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetTrigger asChild>
-          <Button variant="outline" size="sm" className="border-[#711A1A] text-[#711A1A]">
+          <Button variant="outline" size="sm" className="border-primary text-primary">
             <Menu className="h-4 w-4 mr-2" />
             Filtreler
           </Button>
@@ -24,7 +24,7 @@ export function PDKSMobileDrawer({ onFiltersChange }: PDKSMobileDrawerProps) {
         <SheetContent side="top" className="h-auto max-h-[80vh] overflow-y-auto">
           <SheetHeader className="mb-4">
             <SheetTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5 text-[#711A1A]" />
+              <Filter className="h-5 w-5 text-primary" />
               Filtreler ve Arama
             </SheetTitle>
           </SheetHeader>
@@ -32,7 +32,7 @@ export function PDKSMobileDrawer({ onFiltersChange }: PDKSMobileDrawerProps) {
           <div className="mt-6 pt-4 border-t">
             <Button 
               onClick={() => setIsOpen(false)}
-              className="w-full bg-[#711A1A] hover:bg-[#711A1A]/90"
+              className="w-full bg-primary hover:bg-primary/90"
             >
               <X className="mr-2 h-4 w-4" />
               Kapat

@@ -186,7 +186,7 @@ export function AddShiftDialog({
             </Button>
             <Button
               type="submit"
-              className="bg-[#711A1A] hover:bg-[#5a1515] text-white px-6"
+              className="bg-primary hover:bg-primary/90 text-white px-6"
             >
               {editingShift ? "Güncelle" : "Kaydet"}
             </Button>

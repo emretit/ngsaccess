@@ -50,7 +50,7 @@ export function PDKSRealTimeWidget() {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center justify-between">
             <span className="flex items-center gap-2">
-              <Building className="h-5 w-5 text-[#711A1A]" />
+              <Building className="h-5 w-5 text-primary" />
               Canlı Takip
             </span>
             <div className="flex items-center gap-2">
@@ -67,7 +67,7 @@ export function PDKSRealTimeWidget() {
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Current Time */}
-          <div className="text-center p-4 bg-gradient-to-r from-[#711A1A] to-[#8B1C26] rounded-xl text-white shadow-lg">
+          <div className="text-center p-4 bg-gradient-to-r from-primary to-primary/80 rounded-xl text-white shadow-lg">
             <div className="text-2xl font-bold font-mono">
               {currentTime.toLocaleTimeString('tr-TR', { 
                 hour: '2-digit', 
@@ -89,7 +89,7 @@ export function PDKSRealTimeWidget() {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-gray-700">Şu An İçeride</span>
-              <span className="text-2xl font-bold text-[#711A1A]">
+              <span className="text-2xl font-bold text-primary">
                 {realTimeData.currentlyInside}
               </span>
             </div>
@@ -97,7 +97,7 @@ export function PDKSRealTimeWidget() {
             {/* Occupancy Bar */}
             <div className="relative w-full bg-gray-200 rounded-full h-3 overflow-hidden">
               <div 
-                className="bg-gradient-to-r from-[#711A1A] to-[#8B1C26] h-3 rounded-full transition-all duration-500 relative"
+                className="bg-gradient-to-r from-primary to-primary/80 h-3 rounded-full transition-all duration-500 relative"
                 style={{ width: `${occupancyPercentage}%` }}
               >
                 <div className="absolute inset-0 bg-white/20 animate-pulse rounded-full"></div>
@@ -147,7 +147,7 @@ export function PDKSRealTimeWidget() {
       <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50 hover:shadow-xl transition-all duration-300">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
-            <Clock className="h-5 w-5 text-[#711A1A]" />
+            <Clock className="h-5 w-5 text-primary" />
             Son Hareketler
           </CardTitle>
         </CardHeader>

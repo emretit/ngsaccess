@@ -34,7 +34,7 @@ export function AccessControlSidebar({ selected, onSelect }: AccessControlSideba
             onClick={() => onSelect(item.key)}
             className={`flex items-center gap-3 px-6 py-3 text-left rounded-l-full transition-colors font-medium
               ${selected === item.key 
-                ? 'bg-[#711A1A]/10 text-[#711A1A] dark:text-[#f2b4b4] font-semibold' 
+                ? 'bg-primary/10 text-primary font-semibold' 
                 : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'}
             `}
           >

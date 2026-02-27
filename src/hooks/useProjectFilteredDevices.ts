@@ -6,10 +6,7 @@ import { Device } from "./useDevices";
 export const useProjectFilteredDevices = () => {
   const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
 
-  const devicesRaw = useQuery(
-    api.devices.list,
-    !projectLoading ? { projectIds, isSuperAdmin } : "skip"
-  );
+  const devicesRaw = useQuery(api.devices.list, !projectLoading ? {} : "skip");
 
   const devices: Device[] = (devicesRaw ?? []).map((d: unknown) => {
     const dev = d as Device;

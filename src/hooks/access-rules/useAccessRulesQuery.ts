@@ -9,9 +9,7 @@ export const useAccessRulesQuery = (projectId?: Id<"projects">) => {
 
   const data = useQuery(
     api.accessRules.list,
-    effectiveProjectId !== undefined
-      ? { projectId: effectiveProjectId, isSuperAdmin }
-      : { isSuperAdmin }
+    effectiveProjectId !== undefined ? { projectId: effectiveProjectId } : {}
   );
 
   return {

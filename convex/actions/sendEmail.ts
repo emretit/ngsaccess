@@ -133,3 +133,26 @@ export const sendUserSetupEmail = action({
     });
   },
 });
+
+export const sendLateNotification = action({
+  args: {
+    to: v.string(),
+    employeeName: v.string(),
+    lateTime: v.string(),
+    projectId: v.optional(v.id("projects")),
+  },
+  handler: async (ctx, args): Promise<{ success: boolean; error?: string }> => {
+    const html = `
+      <h2>Geç Kalma Bildirimi</h2>
+      <p><strong>${args.employeeName}</strong> çalışanı işe geç kalmıştır.</p>
+      <p>Giriş saati: <strong>${args.lateTime}</strong></p>
+      <p>Lütfen PDKS sisteminden kontrol ediniz.</p>
+      <p>NGS Access PDKS</p>
+    `;
+    return await sendResendEmail({
+      to: args.to,
+      subject: `PDKS - Geç Kalma: ${args.employeeName}`,
+      html,
+    });
+  },
+});

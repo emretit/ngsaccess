@@ -41,7 +41,7 @@ const DemoStats = () => {
           {stats.map((stat, index) => (
             <Card key={index} className="border-0 shadow-lg text-center">
               <CardContent className="p-6">
-                <div className="text-4xl font-bold text-[#711A1A] mb-2">
+                <div className="text-4xl font-bold text-primary mb-2">
                   {stat.number}
                 </div>
                 <div className="text-xl font-semibold text-gray-900 mb-1">

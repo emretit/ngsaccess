@@ -43,7 +43,7 @@ export function PDKSFilterBar({ onFiltersChange }: PDKSFilterBarProps) {
       dateRange,
       department,
       person,
-      reportType
+      reportType,
     });
   };
 
@@ -59,7 +59,7 @@ export function PDKSFilterBar({ onFiltersChange }: PDKSFilterBarProps) {
       <div className="flex flex-col gap-4">
         {/* Filter Title */}
         <div className="flex items-center gap-2 mb-2">
-          <Filter className="h-5 w-5 text-[#711A1A]" />
+          <Filter className="h-5 w-5 text-primary" />
           <h3 className="font-semibold text-gray-900 dark:text-gray-100">
             Filtreler ve Arama
           </h3>
@@ -151,17 +151,26 @@ export function PDKSFilterBar({ onFiltersChange }: PDKSFilterBarProps) {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Rapor Türü
             </label>
-            <Select value={reportType} onValueChange={setReportType}>
+            <Select
+              value={reportType}
+              onValueChange={(v) => {
+                setReportType(v);
+                onFiltersChange({
+                  dateRange,
+                  department,
+                  person,
+                  reportType: v,
+                });
+              }}
+            >
               <SelectTrigger className="h-10">
                 <SelectValue placeholder="Rapor türü" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="daily">📅 Günlük</SelectItem>
+                <SelectItem value="weekly">📆 Haftalık</SelectItem>
                 <SelectItem value="monthly">📊 Aylık</SelectItem>
-                <SelectItem value="overtime">⏰ Mesai</SelectItem>
-                <SelectItem value="leave">🏖️ İzin</SelectItem>
-                <SelectItem value="entry-exit">🚪 Giriş/Çıkış</SelectItem>
-                <SelectItem value="late">⏱️ Geç Kalma</SelectItem>
+                <SelectItem value="custom">📋 Özel Aralık</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -171,7 +180,7 @@ export function PDKSFilterBar({ onFiltersChange }: PDKSFilterBarProps) {
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
           <Button 
             onClick={handleApplyFilters} 
-            className="bg-[#711A1A] hover:bg-[#711A1A]/90 text-white shadow-md hover:shadow-lg transition-all duration-200"
+            className="bg-primary hover:bg-primary/90 text-white shadow-md hover:shadow-lg transition-all duration-200"
           >
             <Filter className="mr-2 h-4 w-4" />
             Filtreleri Uygula
@@ -179,7 +188,7 @@ export function PDKSFilterBar({ onFiltersChange }: PDKSFilterBarProps) {
           
           <Button 
             variant="outline" 
-            className="border-[#711A1A] text-[#711A1A] hover:bg-[#711A1A]/5"
+            className="border-primary text-primary hover:bg-primary/5"
           >
             <Download className="mr-2 h-4 w-4" />
             Hızlı Dışa Aktar

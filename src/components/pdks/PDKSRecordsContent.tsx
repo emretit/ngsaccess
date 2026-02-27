@@ -62,7 +62,7 @@ export function PDKSRecordsContent({
   if (section === "attendance") {
     return (
       <div className="p-0">
-        <div className="glass-card overflow-hidden mt-6 mx-6">
+        <div className="rounded-lg border bg-card shadow-sm overflow-hidden mt-6 mx-6">
           <PDKSTable
             records={employees}
             loading={employeesLoading}
@@ -76,7 +76,7 @@ export function PDKSRecordsContent({
 
   if (section === "department") {
     return (
-      <div className="glass-card p-6 m-6">
+      <div className="rounded-lg border bg-card shadow-sm p-6 m-6">
         <h3 className="font-medium text-lg mb-4">Departman Raporları</h3>
         <p className="text-gray-500">Bu özellik henüz geliştirilmektedir.</p>
       </div>
@@ -85,7 +85,7 @@ export function PDKSRecordsContent({
 
   if (section === "detailed") {
     return (
-      <div className="glass-card p-6 m-6">
+      <div className="rounded-lg border bg-card shadow-sm p-6 m-6">
         <h3 className="font-medium text-lg mb-4">Detaylı Raporlar</h3>
         <p className="text-gray-500">Bu özellik henüz geliştirilmektedir.</p>
       </div>
