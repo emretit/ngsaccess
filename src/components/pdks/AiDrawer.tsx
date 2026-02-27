@@ -19,7 +19,7 @@ export function AiDrawer() {
           <MessageSquare className="h-6 w-6" />
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-full sm:max-w-md md:max-w-lg lg:max-w-xl p-0" side="right">
+      <SheetContent size="full" className="p-0" side="right">
         <div className="flex flex-col h-full">
           <PDKSAiChat />
         </div>

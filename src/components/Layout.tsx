@@ -1,14 +1,10 @@
 import React, { useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-
-interface LayoutProps {
-  children: React.ReactNode;
-}
 
 const routeTitles: Record<string, string> = {
   "/employees": "Kişiler",
@@ -23,8 +19,8 @@ const routeTitles: Record<string, string> = {
   "/home": "Ana Sayfa",
 };
 
-const Layout: React.FC<LayoutProps> = ({ children }) => {
-  const { user, loading, session } = useAuth();
+export default function Layout() {
+  const { loading, session } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -39,7 +35,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     ) {
       navigate("/login");
     }
-  }, [user, session, loading, navigate, location.pathname]);
+  }, [loading, session, navigate, location.pathname]);
 
   if (loading) {
     return <LoadingSpinner text="Sistem hazırlanıyor..." />;
@@ -56,12 +52,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <SidebarInset>
+      <SidebarInset className="h-screen overflow-hidden bg-slate-100 dark:bg-slate-900/80">
         <AppHeader title={pageTitle} />
-        <main className="flex-1 overflow-auto p-4 md:p-6">{children}</main>
+        <main className="flex-1 overflow-auto p-4 md:p-6 min-w-0 bg-slate-100 dark:bg-slate-900/80">
+          <Outlet />
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );
-};
-
-export default Layout;
+}

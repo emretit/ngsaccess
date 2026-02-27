@@ -64,16 +64,16 @@ const Devices = () => {
   };
 
   const handleEditDevice = (device: Device) => {
-    // Convert regular device to server device format for the form
+    // Convert to ServerDevice format for the form (Convex uses _id, zoneId, doorId)
     const serverDevice: ServerDevice = {
-      id: device.id,
+      id: device.id || (device as { _id?: string })._id || '',
       name: device.name || device.device_name || '',
       serial_number: device.serial_number || device.device_serial || '',
       device_model_enum: "Other",
       date_added: device.created_at || new Date().toISOString(),
       status: device.status || 'online',
-      zone_id: device.zone_id,
-      door_id: device.door_id
+      zone_id: (device as { zoneId?: string }).zoneId ?? device.zone_id,
+      door_id: (device as { doorId?: string }).doorId ?? device.door_id
     };
     
     setDevicePanel({
@@ -105,15 +105,13 @@ const Devices = () => {
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-4rem)] gap-6 p-6">
-      <div className="flex-shrink-0">
-        <ZoneDoorTreePanel
+    <div className="flex gap-4 min-h-full">
+      <ZoneDoorTreePanel
           onSelectZone={setSelectedZoneId}
           onSelectDoor={setSelectedDoorId}
         />
-      </div>
-      
-      <div className="flex-1 space-y-6">
+
+      <div className="flex-1 min-w-0 space-y-3">
         <DevicesContent
           devices={devices}
           isLoading={isLoading}

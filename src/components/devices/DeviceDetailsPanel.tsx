@@ -25,9 +25,9 @@ export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess }:
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent className="sm:max-w-2xl w-full p-0 flex flex-col">
-        <SheetHeader className="px-8 py-6 border-b bg-gradient-to-r from-gray-50 to-gray-100/50">
-          <SheetTitle className="text-xl font-bold text-gray-900 flex items-center gap-3">
+      <SheetContent size="lg" className="p-0 flex flex-col max-w-2xl">
+        <SheetHeader className="px-6 py-5 border-b border-border/50 shrink-0">
+          <SheetTitle className="text-xl font-semibold text-foreground flex items-center gap-3">
             <div className="w-2 h-8 bg-burgundy rounded-full"></div>
             {selectedDevice ? "Cihazı Düzenle" : "Yeni Cihaz Ekle"}
           </SheetTitle>
@@ -48,12 +48,13 @@ export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess }:
           </div>
         ) : (
           <ScrollArea className="flex-1">
-            <div className="p-8">
+            <div className="px-6 py-5 md:px-8 md:py-6">
               <DeviceForm
-                selectedDevice={selectedDevice}
+                open={open}
+                device={selectedDevice ? { ...selectedDevice, _id: selectedDevice.id } : null}
                 projects={projects}
                 onSuccess={onSuccess}
-                onCancel={onClose}
+                onClose={onClose}
               />
             </div>
           </ScrollArea>

@@ -46,7 +46,7 @@ export function DevicesContent({
   } = useDeviceFilters(devices, selectedZoneId, selectedDoorId);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <DeviceFilters 
         search={search}
         onSearchChange={setSearch}
@@ -62,7 +62,7 @@ export function DevicesContent({
 
       <DeviceStats devices={filteredDevices} />
 
-      <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <DeviceList 
           devices={devices}
           filteredDevices={filteredDevices}

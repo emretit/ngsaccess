@@ -19,9 +19,13 @@ export const useProjectFilteredDevices = () => {
     return { ...dev, status: computedStatus };
   });
 
+  // Super admin veya en az bir projesi olan kullanıcı erişebilir
+  const hasProjectAccess = isSuperAdmin || projectIds.length > 0;
+
   return {
     devices,
     isLoading: projectLoading || devicesRaw === undefined,
+    hasProjectAccess,
     error: null,
     refetch: () => {},
   };

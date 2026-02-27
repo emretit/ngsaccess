@@ -1,4 +1,3 @@
-
 import { CardReading } from "@/types/access-control";
 import {
   Table,
@@ -11,12 +10,21 @@ import {
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 interface CardReadingsTableProps {
   readings: CardReading[];
+  emptyMessage?: string;
+  showClearFilters?: boolean;
+  onClearFilters?: () => void;
 }
 
-export const CardReadingsTable = ({ readings }: CardReadingsTableProps) => {
+export const CardReadingsTable = ({
+  readings,
+  emptyMessage = "Görüntülenecek kart okutma kaydı bulunamadı.",
+  showClearFilters = false,
+  onClearFilters,
+}: CardReadingsTableProps) => {
   // Helper function to get status badge - using access_granted
   const getStatusBadge = (reading: CardReading) => {
     if (reading.access_granted) {
@@ -54,18 +62,33 @@ export const CardReadingsTable = ({ readings }: CardReadingsTableProps) => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {readings.map((reading) => (
-            <TableRow key={reading.id}>
-              <TableCell>{reading.employee_name || "Bilinmeyen"}</TableCell>
-              <TableCell>{reading.card_no}</TableCell>
-              <TableCell>
-                {format(new Date(reading.access_time), "dd.MM.yyyy HH:mm:ss", { locale: tr })}
+          {readings.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                <div className="flex flex-col items-center gap-2">
+                  <p>{emptyMessage}</p>
+                  {showClearFilters && onClearFilters && (
+                    <Button variant="ghost" size="sm" onClick={onClearFilters}>
+                      Filtreleri Temizle
+                    </Button>
+                  )}
+                </div>
               </TableCell>
-              <TableCell>{reading.employees?.departments?.name || "-"}</TableCell>
-              <TableCell>{getDeviceDisplay(reading)}</TableCell>
-              <TableCell>{getStatusBadge(reading)}</TableCell>
             </TableRow>
-          ))}
+          ) : (
+            readings.map((reading) => (
+              <TableRow key={reading.id}>
+                <TableCell>{reading.employee_name || "Bilinmeyen"}</TableCell>
+                <TableCell>{reading.card_no}</TableCell>
+                <TableCell>
+                  {format(new Date(reading.access_time), "dd.MM.yyyy HH:mm:ss", { locale: tr })}
+                </TableCell>
+                <TableCell>{reading.employees?.departments?.name || "-"}</TableCell>
+                <TableCell>{getDeviceDisplay(reading)}</TableCell>
+                <TableCell>{getStatusBadge(reading)}</TableCell>
+              </TableRow>
+            ))
+          )}
         </TableBody>
       </Table>
     </div>

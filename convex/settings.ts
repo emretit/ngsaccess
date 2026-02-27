@@ -1,6 +1,6 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { authedQuery, authedMutation } from "./lib/customFunctions";
+import { authedQuery, authedMutation, optionalAuthQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 
 // === General Settings ===
@@ -213,9 +213,11 @@ export const upsertWork = authedMutation({
   },
 });
 
-export const getDarkMode = authedQuery({
+/** Giriş yoksa false döner (login sayfası vb. hata vermesin diye). */
+export const getDarkMode = optionalAuthQuery({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
+    if (!ctx.user) return false;
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
       return false;

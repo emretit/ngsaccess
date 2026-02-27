@@ -44,102 +44,20 @@ function AppContent() {
       <Route path="/admin-setup" element={<AdminSetup />} />
       <Route path="/employee-setup" element={<EmployeeSetup />} />
       <Route path="/system-admin" element={<SystemAdmin />} />
-      <Route
-        path="/home"
-        element={
-          <Layout>
-            <Index />
-          </Layout>
-        }
-      />
-      <Route
-        path="/employees"
-        element={
-          <Layout>
-            <Employees />
-          </Layout>
-        }
-      />
-      <Route
-        path="/devices"
-        element={
-          <Layout>
-            <Devices />
-          </Layout>
-        }
-      />
-      <Route
-        path="/virtual-readers"
-        element={
-          <Layout>
-            <VirtualReaders />
-          </Layout>
-        }
-      />
-      <Route
-        path="/access-control"
-        element={
-          <Layout>
-            <AccessControl />
-          </Layout>
-        }
-      />
-      <Route
-        path="/pdks-records"
-        element={
-          <Layout>
-            <PDKSRecords />
-          </Layout>
-        }
-      />
-      <Route
-        path="/shifts"
-        element={
-          <Layout>
-            <Shifts />
-          </Layout>
-        }
-      />
-      <Route
-        path="/leaves"
-        element={
-          <Layout>
-            <Leaves />
-          </Layout>
-        }
-      />
-      <Route
-        path="/employee-portal"
-        element={
-          <Layout>
-            <EmployeePortal />
-          </Layout>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <Layout>
-            <Settings />
-          </Layout>
-        }
-      />
-      <Route
-        path="/profile"
-        element={
-          <Layout>
-            <Profile />
-          </Layout>
-        }
-      />
-      <Route
-        path="/engineering-department"
-        element={
-          <Layout>
-            <EngineeringDepartment />
-          </Layout>
-        }
-      />
+      <Route element={<Layout />}>
+        <Route path="/home" element={<Index />} />
+        <Route path="/employees" element={<Employees />} />
+        <Route path="/devices" element={<Devices />} />
+        <Route path="/virtual-readers" element={<VirtualReaders />} />
+        <Route path="/access-control" element={<AccessControl />} />
+        <Route path="/pdks-records" element={<PDKSRecords />} />
+        <Route path="/shifts" element={<Shifts />} />
+        <Route path="/leaves" element={<Leaves />} />
+        <Route path="/employee-portal" element={<EmployeePortal />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/engineering-department" element={<EngineeringDepartment />} />
+      </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

@@ -1,46 +1,39 @@
-
+import { useRef } from "react";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UseFormReturn } from "react-hook-form";
-import { Zone, Door } from "@/hooks/useZonesAndDoors";
-import { useRef, useEffect } from "react";
-
-interface DeviceLocationSectionProps {
-  form: UseFormReturn<any>;
-  zones: Zone[];
-  doors: Door[];
-  locationLoading: boolean;
-  selectedZoneId: number | undefined;
-  filteredDoors: Door[];
+interface ZoneForForm {
+  id: string;
+  name: string;
 }
 
-export function DeviceLocationSection({ 
-  form, 
-  zones, 
-  locationLoading, 
-  selectedZoneId, 
-  filteredDoors 
+interface DoorForForm {
+  id: string;
+  name: string;
+  zone_id?: string;
+}
+
+interface DeviceLocationSectionProps {
+  form: UseFormReturn<Record<string, unknown>>;
+  zones: ZoneForForm[];
+  doors: DoorForForm[];
+  locationLoading: boolean;
+  selectedZoneId: string | undefined;
+  filteredDoors: DoorForForm[];
+}
+
+export function DeviceLocationSection({
+  form,
+  zones,
+  locationLoading,
+  selectedZoneId,
+  filteredDoors,
 }: DeviceLocationSectionProps) {
   const userChangedZone = useRef(false);
-  const initialFormData = useRef<{ zone_id?: number; door_id?: number }>({});
-
-  // Form değerleri ilk yüklendiğinde kaydet
-  useEffect(() => {
-    const currentZoneId = form.getValues("zone_id");
-    const currentDoorId = form.getValues("door_id");
-    
-    if (currentZoneId && !initialFormData.current.zone_id) {
-      initialFormData.current = {
-        zone_id: currentZoneId,
-        door_id: currentDoorId
-      };
-      console.log('Initial form data saved:', initialFormData.current);
-    }
-  }, [form]);
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-medium border-b pb-2">Konum Bilgileri</h3>
+      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide pb-2">Konum Bilgileri</h3>
       
       <FormField
         control={form.control}
@@ -48,38 +41,31 @@ export function DeviceLocationSection({
         render={({ field }) => (
           <FormItem>
             <FormLabel>Bölge</FormLabel>
-            <Select 
-              value={field.value ? field.value.toString() : ""} 
+            <Select
+              value={field.value ?? ""}
               onValueChange={(value) => {
                 if (!value) return;
-                
-                const newZoneId = parseInt(value);
-                console.log('Zone selection changed to:', newZoneId);
-                
-                // Kullanıcının manuel değişiklik yaptığını işaretle
+
                 userChangedZone.current = true;
-                
-                // Sadece değer gerçekten değişmişse güncelle
-                if (newZoneId !== field.value) {
-                  field.onChange(newZoneId);
-                  
-                  // Eğer kullanıcı manuel değişiklik yaptıysa kapı kontrolü yap
+
+                if (value !== field.value) {
+                  field.onChange(value);
+
                   if (userChangedZone.current) {
                     const currentDoorId = form.getValues("door_id");
-                    
+
                     if (currentDoorId) {
-                      const doorBelongsToNewZone = filteredDoors.some(door => door.id === currentDoorId);
-                      console.log('Checking if door belongs to new zone:', doorBelongsToNewZone);
-                      
+                      const doorBelongsToNewZone = filteredDoors.some(
+                        (door) => String(door.id) === String(currentDoorId)
+                      );
+
                       if (!doorBelongsToNewZone) {
-                        console.log('Clearing door_id because it does not belong to new zone');
                         form.setValue("door_id", undefined);
                       }
                     }
                   }
                 }
-                
-                // Reset flag
+
                 userChangedZone.current = false;
               }}
             >
@@ -89,8 +75,8 @@ export function DeviceLocationSection({
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
-                {zones.map(zone => (
-                  <SelectItem key={zone.id} value={zone.id.toString()}>
+                {zones.map((zone) => (
+                  <SelectItem key={zone.id} value={String(zone.id)}>
                     {zone.name}
                   </SelectItem>
                 ))}
@@ -107,11 +93,10 @@ export function DeviceLocationSection({
         render={({ field }) => (
           <FormItem>
             <FormLabel>Kapı</FormLabel>
-            <Select 
-              value={field.value ? field.value.toString() : ""} 
+            <Select
+              value={field.value ?? ""}
               onValueChange={(value) => {
-                console.log('Door changing to:', value);
-                field.onChange(value ? parseInt(value) : undefined);
+                field.onChange(value || undefined);
               }}
               disabled={!selectedZoneId || locationLoading}
             >
@@ -129,8 +114,8 @@ export function DeviceLocationSection({
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
-                {filteredDoors.map(door => (
-                  <SelectItem key={door.id} value={door.id.toString()}>
+                {filteredDoors.map((door) => (
+                  <SelectItem key={door.id} value={String(door.id)}>
                     {door.name}
                   </SelectItem>
                 ))}

@@ -42,7 +42,7 @@ export function AppHeader({ title, className, children }: AppHeaderProps) {
   return (
     <header
       className={cn(
-        "flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4 md:h-16",
+        "flex h-14 shrink-0 items-center gap-2 border-b bg-card/95 backdrop-blur-sm px-4 md:px-6",
         className
       )}
     >

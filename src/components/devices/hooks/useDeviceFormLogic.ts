@@ -39,7 +39,7 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
 
   // Watch zone selection for filtering doors
   const selectedZoneId = form.watch("zone_id");
-  const filteredDoors = doors.filter(door => door.zone_id === selectedZoneId);
+  const filteredDoors = doors.filter((door) => String(door.zoneId) === String(selectedZoneId));
 
   // Load device data when dialog opens
   useDeviceDataLoader({ device, open, form });

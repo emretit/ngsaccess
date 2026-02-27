@@ -28,7 +28,16 @@ export function AppSidebarNav() {
 
         return (
           <SidebarMenuItem key={item.name}>
-            <SidebarMenuButton asChild isActive={isActive} tooltip={item.name}>
+            <SidebarMenuButton
+              asChild
+              isActive={isActive}
+              tooltip={item.name}
+              className={
+                isActive
+                  ? "!bg-white/20 !text-white hover:!bg-white/30 hover:!text-white"
+                  : undefined
+              }
+            >
               <Link to={item.href}>
                 <Icon className="h-5 w-5" />
                 <span>{item.name}</span>

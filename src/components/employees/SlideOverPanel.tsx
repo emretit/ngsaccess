@@ -33,7 +33,7 @@ export default function SlideOverPanel({
 
   return (
     <Sheet open={isOpen} onOpenChange={open => !open && onClose()}>
-      <SheetContent className="sm:max-w-md md:max-w-lg p-0">
+      <SheetContent size="md" className="p-0">
         <div className="p-6 border-b">
           <SheetHeader>
             <SheetTitle>

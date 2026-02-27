@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NetworkInterface version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">
+<id>1</id>
+<IPAddress>
+<ipVersion>v4</ipVersion>
+<addressingType>static</addressingType>
+<ipAddress>192.168.1.27</ipAddress>
+<subnetMask>255.255.255.0</subnetMask>
+<DefaultGateway>
+<ipAddress>192.168.1.1</ipAddress>
+</DefaultGateway>
+<PrimaryDNS>
+<ipAddress>8.8.8.8</ipAddress>
+</PrimaryDNS>
+<SecondaryDNS>
+<ipAddress>8.8.4.4</ipAddress>
+</SecondaryDNS>
+<DNSEnable>true</DNSEnable>
+</IPAddress>
+<Link>
+<MACAddress>a4:d5:c2:6a:9d:c3</MACAddress>
+<autoNegotiation>true</autoNegotiation>
+<speed>100</speed>
+<duplex>full</duplex>
+<MTU>1500</MTU>
+</Link>
+<macAddress>a4:d5:c2:6a:9d:c3</macAddress>
+</NetworkInterface>

@@ -86,6 +86,10 @@ export const list = authedQuery({
         }
         return {
           ...r,
+          id: r._id,
+          employee_name: r.employeeName ?? null,
+          card_no: r.cardNo,
+          access_time: r.accessTime,
           access_granted: r.accessStatus === "izin_verildi",
           status: r.accessStatus === "izin_verildi" ? "success" : "denied",
           device_name: device?.name ?? "Bilinmeyen Cihaz",
@@ -563,6 +567,7 @@ export const processCardReading = internalMutation({
   args: {
     cardNo: v.string(),
     deviceSerial: v.string(),
+    deviceIp: v.optional(v.string()),
     rawBody: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -601,11 +606,20 @@ export const processCardReading = internalMutation({
       return { granted: false };
     }
 
-    // 2. Cihazı serial'e göre bul
-    const device = await ctx.db
-      .query("devices")
-      .withIndex("by_device_serial", (q) => q.eq("deviceSerial", args.deviceSerial))
-      .first();
+    // 2. Cihazı serial veya IP ile bul (event'te serial yoksa ipAddress kullanılır)
+    let device = null;
+    if (args.deviceSerial?.trim()) {
+      device = await ctx.db
+        .query("devices")
+        .withIndex("by_device_serial", (q) =>
+          q.eq("deviceSerial", args.deviceSerial!.trim())
+        )
+        .first();
+    }
+    if (!device && args.deviceIp?.trim()) {
+      const all = await ctx.db.query("devices").collect();
+      device = all.find((d) => d.deviceIp?.trim() === args.deviceIp!.trim()) ?? null;
+    }
 
     if (!device) {
       await ctx.db.insert("cardReadings", {
