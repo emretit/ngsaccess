@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { jsPDF } from "jspdf";
 
 export interface SgkReportRow {
@@ -23,7 +23,7 @@ export interface SgkReportData {
 /**
  * SGK aylık döküm raporunu Excel formatında dışa aktarır
  */
-export function exportSgkToExcel(data: SgkReportData): void {
+export async function exportSgkToExcel(data: SgkReportData): Promise<void> {
   const headers = [
     "TC Kimlik No",
     "Ad Soyad",
@@ -46,27 +46,35 @@ export function exportSgkToExcel(data: SgkReportData): void {
     r.izinGunu,
   ]);
 
-  const worksheetData = [headers, ...rows];
-  const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
-
-  const colWidths = [
-    { wch: 12 },
-    { wch: 25 },
-    { wch: 12 },
-    { wch: 18 },
-    { wch: 12 },
-    { wch: 12 },
-    { wch: 16 },
-    { wch: 10 },
-  ];
-  worksheet["!cols"] = colWidths;
-
-  const workbook = XLSX.utils.book_new();
+  const workbook = new ExcelJS.Workbook();
   const sheetName = `SGK_${data.year}_${String(data.month).padStart(2, "0")}`;
-  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+  const worksheet = workbook.addWorksheet(sheetName);
+
+  worksheet.addRow(headers);
+  rows.forEach((r) => worksheet.addRow(r));
+
+  worksheet.columns = [
+    { width: 12 },
+    { width: 25 },
+    { width: 12 },
+    { width: 18 },
+    { width: 12 },
+    { width: 12 },
+    { width: 16 },
+    { width: 10 },
+  ];
 
   const fileName = `SGK_Aylik_Dokum_${data.year}_${String(data.month).padStart(2, "0")}.xlsx`;
-  XLSX.writeFile(workbook, fileName);
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 /**

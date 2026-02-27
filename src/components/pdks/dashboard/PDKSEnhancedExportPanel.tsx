@@ -43,7 +43,7 @@ export function PDKSEnhancedExportPanel({
       const rangeLabel = dateRange || format(selectedDate, "dd-MM-yyyy", { locale: tr });
 
       if (format === "Excel") {
-        exportToExcel(records, { dateRange: rangeLabel });
+        await exportToExcel(records, { dateRange: rangeLabel });
       } else if (format === "CSV") {
         exportToCsv(records, { dateRange: rangeLabel });
       } else if (format === "PDF") {

@@ -97,15 +97,15 @@ export function ReportsSettings() {
     }
   }, [scheduleData]);
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (reportType === "sgk" && reportData && "rows" in reportData && reportData.rows.length > 0) {
-      exportSgkToExcel(reportData as SgkReportData);
+      await exportSgkToExcel(reportData as SgkReportData);
     } else if (reportType === "overtime" && overtimeData && "rows" in overtimeData) {
-      exportReportsToExcel.overtime(overtimeData);
+      await exportReportsToExcel.overtime(overtimeData);
     } else if (reportType === "attendance" && attendanceData && "rows" in attendanceData) {
-      exportReportsToExcel.attendance(attendanceData);
+      await exportReportsToExcel.attendance(attendanceData);
     } else if (reportType === "department" && departmentData && "rows" in departmentData) {
-      exportReportsToExcel.department(departmentData);
+      await exportReportsToExcel.department(departmentData);
     }
   };
 

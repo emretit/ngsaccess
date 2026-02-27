@@ -53,8 +53,8 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
 
   const safeRecords = Array.isArray(records) ? records : [];
 
-  const handleExportExcel = () => {
-    exportToExcel(filteredRecords, { dateRange: selectedDate?.toISOString().split("T")[0] ?? "" });
+  const handleExportExcel = async () => {
+    await exportToExcel(filteredRecords, { dateRange: selectedDate?.toISOString().split("T")[0] ?? "" });
     toast({ title: "Excel indirildi", description: `${filteredRecords.length} kayıt dışa aktarıldı.` });
   };
 

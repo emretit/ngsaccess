@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { jsPDF } from "jspdf";
 
 export interface PDKSExportRecord {
@@ -24,10 +24,10 @@ const STATUS_LABELS: Record<string, string> = {
 /**
  * PDKS tablo verisini Excel (.xlsx) formatında dışa aktarır
  */
-export function exportToExcel(
+export async function exportToExcel(
   records: PDKSExportRecord[],
   options: { title?: string; dateRange?: string } = {}
-): void {
+): Promise<void> {
   const { title = "PDKS Raporu", dateRange = "" } = options;
 
   const headers = [
@@ -54,27 +54,37 @@ export function exportToExcel(
     STATUS_LABELS[r.status] ?? r.status,
   ]);
 
-  const worksheetData = [headers, ...rows];
-  const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("PDKS Kayıtları", {
+    views: [{ state: "frozen", ySplit: 1 }],
+  });
 
-  const colWidths = [
-    { wch: 25 },
-    { wch: 15 },
-    { wch: 18 },
-    { wch: 10 },
-    { wch: 10 },
-    { wch: 12 },
-    { wch: 10 },
-    { wch: 12 },
-    { wch: 10 },
+  worksheet.addRow(headers);
+  rows.forEach((row) => worksheet.addRow(row));
+
+  worksheet.columns = [
+    { width: 25 },
+    { width: 15 },
+    { width: 18 },
+    { width: 10 },
+    { width: 10 },
+    { width: 12 },
+    { width: 10 },
+    { width: 12 },
+    { width: 10 },
   ];
-  worksheet["!cols"] = colWidths;
-
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "PDKS Kayıtları");
 
   const fileName = `PDKS_Raporu_${dateRange || new Date().toISOString().split("T")[0]}.xlsx`;
-  XLSX.writeFile(workbook, fileName);
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 /**

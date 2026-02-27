@@ -1,5 +1,4 @@
-
-import * as XLSX from 'xlsx';
+import ExcelJS from "exceljs";
 import { useToast } from "@/hooks/use-toast";
 import { MessageData } from './types';
 
@@ -19,8 +18,8 @@ export function useExportUtils() {
     });
   };
 
-  const handleExportExcel = (messageData: MessageData[]) => {
-    if (!messageData || !Array.isArray(messageData)) {
+  const handleExportExcel = async (messageData: MessageData[]) => {
+    if (!messageData || !Array.isArray(messageData) || messageData.length === 0) {
       console.log("Export Excel error: No data to export", messageData);
       toast({
         title: "Dışa aktarılamadı",
@@ -31,25 +30,33 @@ export function useExportUtils() {
     }
 
     try {
-      const ws = XLSX.utils.json_to_sheet(messageData);
-      
-      // Set column widths for better readability
-      const wscols = [
-        { wch: 25 },  // name
-        { wch: 25 },  // check_in
-        { wch: 25 },  // check_out
-        { wch: 20 },  // department
-        { wch: 15 },  // device
-        { wch: 20 }   // location
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("PDKS Raporu");
+      const headers: (keyof MessageData)[] = ["name", "check_in", "check_out", "department", "device", "location"];
+      worksheet.addRow(["Ad Soyad", "Giriş Saati", "Çıkış Saati", "Departman", "Cihaz", "Konum"]);
+      messageData.forEach((row) =>
+        worksheet.addRow(headers.map((h) => row[h] ?? ""))
+      );
+      worksheet.columns = [
+        { width: 25 },
+        { width: 25 },
+        { width: 25 },
+        { width: 20 },
+        { width: 15 },
+        { width: 20 },
       ];
-      
-      ws['!cols'] = wscols;
-      
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "PDKS Raporu");
-      
-      XLSX.writeFile(wb, `pdks_rapor_${new Date().toISOString().split('T')[0]}.xlsx`);
-  
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `pdks_rapor_${new Date().toISOString().split('T')[0]}.xlsx`;
+      link.click();
+      URL.revokeObjectURL(url);
+
       toast({
         title: "Excel dosyası indirildi",
         description: "Rapor başarıyla Excel formatında dışa aktarıldı.",

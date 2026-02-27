@@ -1,7 +1,20 @@
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
+
+async function downloadExcel(workbook: ExcelJS.Workbook, fileName: string): Promise<void> {
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 export const exportReportsToExcel = {
-  overtime: (data: {
+  overtime: async (data: {
     year: number;
     month?: number;
     totalOvertimeHours: number;
@@ -9,22 +22,20 @@ export const exportReportsToExcel = {
   }) => {
     const headers = ["Çalışan", "Departman", "Fazla Mesai (Saat)"];
     const rows = data.rows.map((r) => [r.name, r.department, r.overtimeHours]);
-    const ws = XLSX.utils.aoa_to_sheet([
-      ["Fazla Mesai Özet Raporu", "", ""],
-      [`Dönem: ${data.year}${data.month ? `-${String(data.month).padStart(2, "0")}` : ""}`, "", ""],
-      ["Toplam Fazla Mesai (saat):", data.totalOvertimeHours, ""],
-      [],
-      headers,
-      ...rows,
-    ]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Fazla Mesai");
-    XLSX.writeFile(
-      wb,
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet("Fazla Mesai");
+    ws.addRow(["Fazla Mesai Özet Raporu", "", ""]);
+    ws.addRow([`Dönem: ${data.year}${data.month ? `-${String(data.month).padStart(2, "0")}` : ""}`, "", ""]);
+    ws.addRow(["Toplam Fazla Mesai (saat):", data.totalOvertimeHours, ""]);
+    ws.addRow([]);
+    ws.addRow(headers);
+    rows.forEach((r) => ws.addRow(r));
+    await downloadExcel(
+      workbook,
       `Fazla_Mesai_${data.year}${data.month ? `_${String(data.month).padStart(2, "0")}` : ""}.xlsx`
     );
   },
-  attendance: (data: {
+  attendance: async (data: {
     year: number;
     month: number;
     workDaysInMonth: number;
@@ -39,19 +50,17 @@ export const exportReportsToExcel = {
       r.absentDays,
       r.devamOrani,
     ]);
-    const ws = XLSX.utils.aoa_to_sheet([
-      ["Devam ve Devamsızlık Özet Raporu", "", "", "", "", ""],
-      [`Dönem: ${data.year}-${String(data.month).padStart(2, "0")}`, "", "", "", "", ""],
-      ["İş günü sayısı:", data.workDaysInMonth, "", "", "", ""],
-      [],
-      headers,
-      ...rows,
-    ]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Devam");
-    XLSX.writeFile(wb, `Devam_Ozet_${data.year}_${String(data.month).padStart(2, "0")}.xlsx`);
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet("Devam");
+    ws.addRow(["Devam ve Devamsızlık Özet Raporu", "", "", "", "", ""]);
+    ws.addRow([`Dönem: ${data.year}-${String(data.month).padStart(2, "0")}`, "", "", "", "", ""]);
+    ws.addRow(["İş günü sayısı:", data.workDaysInMonth, "", "", "", ""]);
+    ws.addRow([]);
+    ws.addRow(headers);
+    rows.forEach((r) => ws.addRow(r));
+    await downloadExcel(workbook, `Devam_Ozet_${data.year}_${String(data.month).padStart(2, "0")}.xlsx`);
   },
-  department: (data: {
+  department: async (data: {
     year: number;
     month: number;
     hourlyRate: number;
@@ -60,16 +69,14 @@ export const exportReportsToExcel = {
   }) => {
     const headers = ["Departman", "Fazla Mesai (Saat)", "Çalışan Sayısı", "Tahmini Maliyet (₺)"];
     const rows = data.rows.map((r) => [r.department, r.overtimeHours, r.employeeCount, r.cost]);
-    const ws = XLSX.utils.aoa_to_sheet([
-      ["Departman Maliyet Analizi Raporu", "", "", ""],
-      [`Dönem: ${data.year}-${String(data.month).padStart(2, "0")}`, "", "", ""],
-      [`Saatlik ücret: ${data.hourlyRate}₺, Mesai çarpanı: ${data.overtimeMultiplier}x`, "", "", ""],
-      [],
-      headers,
-      ...rows,
-    ]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Maliyet");
-    XLSX.writeFile(wb, `Departman_Maliyet_${data.year}_${String(data.month).padStart(2, "0")}.xlsx`);
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet("Maliyet");
+    ws.addRow(["Departman Maliyet Analizi Raporu", "", "", ""]);
+    ws.addRow([`Dönem: ${data.year}-${String(data.month).padStart(2, "0")}`, "", "", ""]);
+    ws.addRow([`Saatlik ücret: ${data.hourlyRate}₺, Mesai çarpanı: ${data.overtimeMultiplier}x`, "", "", ""]);
+    ws.addRow([]);
+    ws.addRow(headers);
+    rows.forEach((r) => ws.addRow(r));
+    await downloadExcel(workbook, `Departman_Maliyet_${data.year}_${String(data.month).padStart(2, "0")}.xlsx`);
   },
 };
