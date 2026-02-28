@@ -9,6 +9,8 @@ export const formSchema = z.object({
   door_id: z.string().optional(),
   access_direction: z.enum(["entry", "exit", "both"]).default("both"),
   device_ip: z.string().optional(),
+  device_username: z.string().optional(),
+  device_password: z.string().optional(),
   description: z.string().optional(),
   status: z.enum(["active", "inactive"]).default("active"),
 });

@@ -1,4 +1,4 @@
-import { mutation } from "./_generated/server";
+import { mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { authedQuery, adminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
@@ -134,6 +134,7 @@ export const create = adminMutation({
 export const update = adminMutation({
   args: {
     employeeId: v.id("employees"),
+    projectId: v.optional(v.id("projects")),
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     email: v.optional(v.string()),
@@ -159,6 +160,12 @@ export const update = adminMutation({
       !allowedProjectIds.some((id) => id === emp.projectId)
     ) {
       throw new Error("Bu çalışana erişim yetkiniz yok");
+    }
+    if (
+      updates.projectId !== undefined &&
+      !allowedProjectIds.some((id) => id === updates.projectId)
+    ) {
+      throw new Error("Bu projeye erişim yetkiniz yok");
     }
     const clean: Record<string, unknown> = { updatedAt: new Date().toISOString() };
     for (const [k, val] of Object.entries(updates)) {
@@ -237,4 +244,19 @@ export const bulkUpdateStatus = adminMutation({
     );
   },
   returns: v.null(),
+});
+
+/** Internal: Çalışana projectId atamak için (one-off / migration) */
+export const setProjectId = internalMutation({
+  args: {
+    employeeId: v.id("employees"),
+    projectId: v.id("projects"),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.employeeId, {
+      projectId: args.projectId,
+      updatedAt: new Date().toISOString(),
+    });
+    return args.employeeId;
+  },
 });

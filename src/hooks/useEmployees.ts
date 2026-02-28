@@ -1,30 +1,7 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useProjectAccess } from "./useProjectAccess";
-import { Id } from "../../convex/_generated/dataModel";
-
-export interface Employee {
-  _id: Id<"employees">;
-  firstName: string;
-  lastName: string;
-  email: string;
-  tcNo: string;
-  cardNumber: string;
-  photoUrl?: string;
-  shift?: string | null;
-  companyId?: Id<"companies"> | null;
-  departmentId?: Id<"departments"> | null;
-  positionId?: Id<"positions"> | null;
-  shiftId?: Id<"shifts"> | null;
-  accessRuleId?: Id<"accessRules"> | null;
-  isActive?: boolean;
-  notes?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  projectId?: Id<"projects">;
-  departments?: { name: string } | null;
-  positions?: { name: string } | null;
-}
+import { Employee } from "@/types/employee";
 
 export const useEmployees = () => {
   const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
@@ -34,7 +11,33 @@ export const useEmployees = () => {
     !projectLoading ? { projectIds, isSuperAdmin } : "skip"
   );
 
-  const employees: Employee[] = (employeesRaw ?? []) as Employee[];
+  // Convex camelCase → frontend snake_case mapping
+  const employees: Employee[] = (employeesRaw ?? []).map((emp) => ({
+    id: emp._id,
+    first_name: emp.firstName,
+    last_name: emp.lastName,
+    email: emp.email,
+    tc_no: emp.tcNo,
+    card_number: emp.cardNumber,
+    photo_url: emp.photoUrl ?? null,
+    shift: emp.shift ?? null,
+    company_id: emp.companyId ?? null,
+    department_id: emp.departmentId ?? null,
+    position_id: emp.positionId ?? null,
+    shift_id: emp.shiftId ?? null,
+    access_rule_id: emp.accessRuleId ?? null,
+    is_active: emp.isActive ?? true,
+    notes: emp.notes,
+    created_at: emp.createdAt ?? "",
+    updated_at: emp.updatedAt ?? "",
+    projectId: emp.projectId,
+    departments: emp.departments
+      ? { id: String(emp.departments.id), name: emp.departments.name }
+      : null,
+    positions: emp.positions
+      ? { id: String(emp.positions.id), name: emp.positions.name }
+      : null,
+  }));
 
   return {
     employees,

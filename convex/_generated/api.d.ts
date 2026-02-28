@@ -10,6 +10,7 @@
 
 import type * as accessRules from "../accessRules.js";
 import type * as actions_getChatData from "../actions/getChatData.js";
+import type * as actions_hikvisionSync from "../actions/hikvisionSync.js";
 import type * as actions_sendEmail from "../actions/sendEmail.js";
 import type * as actions_sendScheduledReports from "../actions/sendScheduledReports.js";
 import type * as actions_setPassword from "../actions/setPassword.js";
@@ -26,6 +27,7 @@ import type * as employeeAuth from "../employeeAuth.js";
 import type * as employeeCheckIn from "../employeeCheckIn.js";
 import type * as employees from "../employees.js";
 import type * as files from "../files.js";
+import type * as hikvisionSync from "../hikvisionSync.js";
 import type * as http from "../http.js";
 import type * as invites from "../invites.js";
 import type * as leaves from "../leaves.js";
@@ -52,6 +54,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   accessRules: typeof accessRules;
   "actions/getChatData": typeof actions_getChatData;
+  "actions/hikvisionSync": typeof actions_hikvisionSync;
   "actions/sendEmail": typeof actions_sendEmail;
   "actions/sendScheduledReports": typeof actions_sendScheduledReports;
   "actions/setPassword": typeof actions_setPassword;
@@ -68,6 +71,7 @@ declare const fullApi: ApiFromModules<{
   employeeCheckIn: typeof employeeCheckIn;
   employees: typeof employees;
   files: typeof files;
+  hikvisionSync: typeof hikvisionSync;
   http: typeof http;
   invites: typeof invites;
   leaves: typeof leaves;

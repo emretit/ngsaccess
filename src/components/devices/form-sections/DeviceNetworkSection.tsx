@@ -6,7 +6,7 @@ import { Info } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
 
 interface DeviceNetworkSectionProps {
-  form: UseFormReturn<{ device_type?: string; device_ip?: string }>;
+  form: UseFormReturn<{ device_type?: string; device_ip?: string; device_username?: string; device_password?: string }>;
   isNewDevice?: boolean;
 }
 
@@ -51,6 +51,37 @@ export function DeviceNetworkSection({ form, isNewDevice }: DeviceNetworkSection
           </FormItem>
         )}
       />
+
+      {isHikvisionRelevant && (
+        <>
+          <FormField
+            control={form.control}
+            name="device_username"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Cihaz Kullanıcı Adı</FormLabel>
+                <FormControl>
+                  <Input placeholder="admin" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="device_password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Cihaz Şifresi</FormLabel>
+                <FormControl>
+                  <Input type="password" placeholder="Cihaz şifresi" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </>
+      )}
     </div>
   );
 }

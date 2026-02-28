@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Employee } from "@/types/employee";
+import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { Id } from "../../../../convex/_generated/dataModel";
 
 export interface EmployeeFormData {
   first_name: string;
@@ -18,9 +20,13 @@ export interface EmployeeFormData {
   photo_url: string | null;
   notes: string;
   is_active: boolean;
+  projectId?: Id<"projects">;
 }
 
 export const useEmployeeFormData = (employee?: Employee | null) => {
+  const { projectIds } = useProjectAccess();
+  const defaultProjectId = projectIds[0] as Id<"projects"> | undefined;
+
   const [formData, setFormData] = useState<EmployeeFormData>({
     first_name: "",
     last_name: "",
@@ -67,6 +73,7 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
         photo_url: employee.photo_url ?? null,
         notes: employee.notes || "",
         is_active: employee.is_active ?? true,
+        projectId: ((employee as Record<string, unknown>).projectId as Id<"projects">) ?? defaultProjectId,
       });
       setPhotoPreview(employee.photo_url ?? null);
     } else {
@@ -85,10 +92,11 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
         photo_url: null,
         notes: "",
         is_active: true,
+        projectId: defaultProjectId,
       });
       setPhotoPreview(null);
     }
-  }, [employee]);
+  }, [employee, defaultProjectId]);
 
   return {
     formData,

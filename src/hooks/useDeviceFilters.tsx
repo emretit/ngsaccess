@@ -14,7 +14,7 @@ export function useDeviceFilters(
   // Extract unique device types for filtering
   const deviceTypes = useMemo(() => {
     return Array.from(new Set(
-      devices.map(device => (device.device_type || device.type || ''))
+      devices.map(device => (device.device_type || (device as { deviceType?: string }).deviceType || device.type || ''))
       .filter(type => type !== '')
     ));
   }, [devices]);
@@ -24,11 +24,11 @@ export function useDeviceFilters(
     return devices.filter(device => {
       // Filter by zone/door
       const locationMatch = () => {
-        if (selectedDoorId) {
-          return device.door_id === selectedDoorId;
+        if (selectedDoorId != null) {
+          return String(device.door_id || (device as { doorId?: string }).doorId) === String(selectedDoorId);
         }
-        if (selectedZoneId) {
-          return device.zone_id === selectedZoneId;
+        if (selectedZoneId != null) {
+          return String(device.zone_id || (device as { zoneId?: string }).zoneId) === String(selectedZoneId);
         }
         return true;
       };
@@ -39,8 +39,8 @@ export function useDeviceFilters(
         const searchLower = search.toLowerCase();
         return (
           (device.device_name || device.name || '').toLowerCase().includes(searchLower) ||
-          (device.device_serial || device.serial_number || '').toLowerCase().includes(searchLower) ||
-          (device.device_location || '').toLowerCase().includes(searchLower)
+          (device.device_serial || (device as { deviceSerial?: string }).deviceSerial || device.serial_number || '').toLowerCase().includes(searchLower) ||
+          (device.device_location || (device as { description?: string }).description || '').toLowerCase().includes(searchLower)
         );
       };
 
@@ -53,7 +53,8 @@ export function useDeviceFilters(
       // Filter by type
       const typeMatch = () => {
         if (typeFilter === 'all') return true;
-        return (device.device_type || device.type || '').toLowerCase() === typeFilter.toLowerCase();
+        const deviceType = device.device_type || (device as { deviceType?: string }).deviceType || device.type || '';
+        return deviceType.toLowerCase() === typeFilter.toLowerCase();
       };
 
       return locationMatch() && searchMatch() && statusMatch() && typeMatch();

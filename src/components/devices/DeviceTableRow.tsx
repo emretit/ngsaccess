@@ -1,5 +1,3 @@
-
-import { format } from 'date-fns';
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,18 +54,17 @@ export function DeviceTableRow({
     }
   };
 
+  const deviceId = device.id || (device as { _id?: string })._id || "";
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('Delete button clicked for device:', device.id);
-    onDeleteDevice(device.id);
+    onDeleteDevice(deviceId);
   };
 
   return (
     <TableRow 
       className="cursor-pointer hover:bg-muted/50"
       onClick={(e) => {
-        // Prevent row click when clicking on checkbox or buttons
         if ((e.target as HTMLElement).closest('button, input[type="checkbox"]')) return;
         onEditDevice(device);
       }}
@@ -75,15 +72,15 @@ export function DeviceTableRow({
       <TableCell onClick={(e) => e.stopPropagation()}>
         <Checkbox
           checked={selected}
-          onCheckedChange={(checked) => onSelect(checked as boolean, device.id)}
+          onCheckedChange={(checked) => onSelect(checked as boolean, deviceId)}
         />
       </TableCell>
-      <TableCell className="font-medium">{device.id}</TableCell>
-      <TableCell>{device.device_serial || device.serial_number || '-'}</TableCell>
-      <TableCell>{device.device_model || device.device_type || '-'}</TableCell>
+      <TableCell className="font-medium">{deviceId || '-'}</TableCell>
+      <TableCell>{device.device_serial || (device as { deviceSerial?: string }).deviceSerial || device.serial_number || '-'}</TableCell>
+      <TableCell>{device.device_model || device.device_type || (device as { deviceType?: string }).deviceType || '-'}</TableCell>
       <TableCell>{zoneName || '-'}</TableCell>
       <TableCell>{doorName || '-'}</TableCell>
-      <TableCell>{getAccessDirectionText(device.access_direction)}</TableCell>
+      <TableCell>{getAccessDirectionText(device.access_direction || (device as { accessDirection?: string }).accessDirection)}</TableCell>
       <TableCell>{getStatusBadge(device.status)}</TableCell>
       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-1">

@@ -147,6 +147,8 @@ export default defineSchema({
     isActive: v.optional(v.boolean()),
     description: v.optional(v.string()),
     lastSeen: v.optional(v.string()),
+    deviceUsername: v.optional(v.string()),
+    devicePassword: v.optional(v.string()),
     createdAt: v.string(),
     updatedAt: v.string(),
   })
@@ -162,6 +164,7 @@ export default defineSchema({
     startTime: v.optional(v.string()),
     endTime: v.optional(v.string()),
     days: v.optional(v.array(v.string())),
+    hikWeekPlanNo: v.optional(v.number()),
     priority: v.optional(v.number()),
     accessDirection: v.optional(v.string()),
     isActive: v.optional(v.boolean()),

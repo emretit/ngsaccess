@@ -13,7 +13,7 @@ export function useDeviceTable(devices: Device[]) {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedDevices(devices.map((device) => device.id));
+      setSelectedDevices(devices.map((d) => d.id || (d as { _id?: string })._id || ""));
     } else {
       setSelectedDevices([]);
     }
@@ -29,7 +29,7 @@ export function useDeviceTable(devices: Device[]) {
 
   const handleBulkDelete = async () => {
     try {
-      await Promise.all(selectedDevices.map((id) => removeDevice({ id: id as Id<"devices"> })));
+      await Promise.all(selectedDevices.map((id) => removeDevice({ deviceId: id as Id<"devices"> })));
       toast({ title: "Başarılı", description: `${selectedDevices.length} cihaz başarıyla silindi` });
       setSelectedDevices([]);
       setShowDeleteDialog(false);

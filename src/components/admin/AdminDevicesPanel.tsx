@@ -70,7 +70,7 @@ export function AdminDevicesPanel() {
 
   const handleDeleteDevice = async (deviceId: string) => {
     try {
-      await removeDevice({ id: deviceId as Id<"devices"> });
+      await removeDevice({ deviceId: deviceId as Id<"devices"> });
     } catch (error) {
       console.error("Error deleting device:", error);
     }

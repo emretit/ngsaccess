@@ -5,7 +5,7 @@ import { useGroupMemberMutations } from "./access-rules/useGroupMemberMutations"
 import { useGroupDeviceMutations } from "./access-rules/useGroupDeviceMutations";
 import { useComplexAccessRuleMutations } from "./access-rules/useComplexAccessRuleMutations";
 
-export const useAccessRules = (projectId?: number) => {
+export const useAccessRules = (projectId?: any) => {
   const { data: accessRules, isLoading, error } = useAccessRulesQuery(projectId);
   
   const {

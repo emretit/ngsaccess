@@ -14,6 +14,8 @@ interface DeviceData {
   doorId?: Id<"doors">;
   accessDirection?: AccessDirection;
   deviceIp?: string;
+  deviceUsername?: string;
+  devicePassword?: string;
   description?: string;
   status?: string;
   // Legacy aliases
@@ -42,6 +44,8 @@ export function useDeviceDataLoader({ device, open, form }: UseDeviceDataLoaderP
         door_id: (device.doorId ?? device.door_id) as string | undefined,
         access_direction: (device.accessDirection ?? device.access_direction ?? "both") as AccessDirection,
         device_ip: device.deviceIp ?? device.device_ip ?? "",
+        device_username: device.deviceUsername ?? "",
+        device_password: device.devicePassword ?? "",
         description: device.description ?? "",
         status: (device.status === "active" || device.status === "inactive" ? device.status : "active") as "active" | "inactive",
       };
@@ -55,6 +59,8 @@ export function useDeviceDataLoader({ device, open, form }: UseDeviceDataLoaderP
         door_id: undefined,
         access_direction: "both",
         device_ip: "",
+        device_username: "",
+        device_password: "",
         description: "",
         status: "active",
       });

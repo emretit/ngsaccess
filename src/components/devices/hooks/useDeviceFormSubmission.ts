@@ -35,6 +35,8 @@ export function useDeviceFormSubmission({
           doorId: (values.door_id || undefined) as Id<"doors"> | undefined,
           accessDirection: values.access_direction as "entry" | "exit" | "both",
           deviceIp: values.device_ip || undefined,
+          deviceUsername: values.device_username || undefined,
+          devicePassword: values.device_password || undefined,
           description: values.description || undefined,
           status: values.status,
         });
@@ -49,6 +51,8 @@ export function useDeviceFormSubmission({
           doorId: (values.door_id || undefined) as Id<"doors"> | undefined,
           accessDirection: values.access_direction as "entry" | "exit" | "both",
           deviceIp: values.device_ip || undefined,
+          deviceUsername: values.device_username || undefined,
+          devicePassword: values.device_password || undefined,
           description: values.description || undefined,
           status: values.status,
         });

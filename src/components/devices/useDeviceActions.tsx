@@ -9,7 +9,7 @@ export function useDeviceActions() {
 
   const handleDeleteDevice = async (deviceId: string) => {
     try {
-      await removeDevice({ id: deviceId as Id<"devices"> });
+      await removeDevice({ deviceId: deviceId as Id<"devices"> });
       toast({ title: "Başarılı", description: "Cihaz başarıyla silindi" });
     } catch (error: unknown) {
       toast({

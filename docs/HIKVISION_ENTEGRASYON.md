@@ -47,6 +47,40 @@ Bu adımlardan sonra Hikvision cihazından gelen kart okuma eventleri otomatik o
 
 ---
 
+## Remote Verification (Uzak Doğrulama)
+
+**Remote Verification** modunda cihaz kart okutulduğunda **önce** sunucuya sorar; ngsaccess’in yanıtına göre kapı açılır. Bu sayede **cihazda kişi kaydetmeniz gerekmez** – tüm karar ngsaccess’te verilir.
+
+### ngsaccess Yanıt Formatı
+
+`/card-reader` endpoint’i her zaman **HTTP 200** döner. Body içeriği kapı açma kararını belirtir:
+
+| Durum | HTTP | Body |
+|-------|------|------|
+| İzin verildi | 200 | `{ "cevap": "ok", "checkResult": "success" }` |
+| İzin reddedildi | 200 | `{ "cevap": "error", "checkResult": "failed" }` |
+
+- `cevap` – ngsaccess özel alanı (geriye uyumluluk)
+- `checkResult` – Hikvision Remote Verification uyumlu (`success` / `failed`)
+
+### Cihaz Yapılandırması (Remote Verification)
+
+1. Cihaz web arayüzüne girin: `http://<cihaz-ip>`
+2. **Event** > **Linkage** bölümünde **Remote Verification** / **Uzak Doğrulama** veya **HTTP Listen ile Doğrulama** seçeneğini bulun (model/firmware’e göre menü yolu değişebilir)
+3. **Request URI** / **Server URL:** `https://<convex-deployment>.convex.site/card-reader`
+4. **checkResponseEnabled** varsa `true` bırakın (200 OK bekler)
+5. Cihazda kişi kaydı **yapmanız gerekmez**; erişim kontrolü tamamen ngsaccess üzerinden yapılır
+
+### ngsaccess Tarafında
+
+- Cihazı **Devices**’a ekleyin (seri numarası dahil)
+- Çalışanları ekleyin, kart numaralarını doğru girin
+- Erişim grupları ve kuralları tanımlayın
+
+Kaynak: Hikvision TPP → "How to Achieve Remote Verification by HTTP Listening"
+
+---
+
 ## Hikvision Entegrasyon Seçenekleri
 
 Hikvision eğitim portalı (tpp.hikvision.com) ve dokümantasyonuna göre mevcut entegrasyon yöntemleri:

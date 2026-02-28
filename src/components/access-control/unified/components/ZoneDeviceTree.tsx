@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { ChevronRight, ChevronDown, Building2, MapPin } from "lucide-react";
 import { useDevices } from "@/hooks/useDevices";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
-import { useLocationUtils } from "@/hooks/useLocationUtils";
 
 interface ZoneDeviceTreeProps {
   formData: {
@@ -17,33 +16,32 @@ interface ZoneDeviceTreeProps {
 }
 
 export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) => {
-  const [expandedZones, setExpandedZones] = useState<Set<number>>(new Set());
+  const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
   const { devices } = useDevices();
   const { zones } = useZonesAndDoors();
-  const { getDeviceLocationDisplay } = useLocationUtils();
 
   const handleDeviceChange = (deviceId: string, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
-      selected_devices: checked 
+      selected_devices: checked
         ? [...prev.selected_devices, deviceId]
         : prev.selected_devices.filter(id => id !== deviceId)
     }));
   };
 
   const handleZoneChange = (zoneId: string, checked: boolean) => {
-    const zoneDevices = devices.filter(device => device.zone_id?.toString() === zoneId);
-    const zoneDeviceIds = zoneDevices.map(device => device.id.toString());
-    
+    const zoneDevices = devices.filter(device => String(device.zoneId ?? '') === zoneId);
+    const zoneDeviceIds = zoneDevices.map(device => String(device._id));
+
     setFormData(prev => {
-      const newZones = checked 
+      const newZones = checked
         ? [...prev.selected_zones, zoneId]
         : prev.selected_zones.filter(id => id !== zoneId);
-      
+
       const newDevices = checked
         ? [...new Set([...prev.selected_devices, ...zoneDeviceIds])]
         : prev.selected_devices.filter(id => !zoneDeviceIds.includes(id));
-      
+
       return {
         ...prev,
         selected_zones: newZones,
@@ -53,17 +51,17 @@ export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) =
   };
 
   const handleSelectAllDevices = () => {
-    const allDeviceIds = devices.map(device => device.id.toString());
+    const allDeviceIds = devices.map(device => String(device._id));
     const allSelected = allDeviceIds.every(id => formData.selected_devices.includes(id));
-    
+
     setFormData(prev => ({
       ...prev,
       selected_devices: allSelected ? [] : allDeviceIds,
-      selected_zones: allSelected ? [] : zones.map(zone => zone.id.toString())
+      selected_zones: allSelected ? [] : zones.map(zone => String(zone._id))
     }));
   };
 
-  const toggleZoneExpansion = (zoneId: number) => {
+  const toggleZoneExpansion = (zoneId: string) => {
     setExpandedZones(prev => {
       const newSet = new Set(prev);
       if (newSet.has(zoneId)) {
@@ -75,33 +73,39 @@ export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) =
     });
   };
 
-  const getDevicesForZone = (zoneId: number) => {
-    return devices.filter(device => device.zone_id === zoneId);
+  const getDevicesForZone = (zoneId: string) => {
+    return devices.filter(device => String(device.zoneId ?? '') === zoneId);
   };
 
-  const isZoneSelected = (zoneId: number) => {
-    return formData.selected_zones.includes(zoneId.toString());
+  const isZoneSelected = (zoneId: string) => {
+    return formData.selected_zones.includes(zoneId);
   };
 
-  const allDevicesSelected = devices.length > 0 && devices.every(device => 
-    formData.selected_devices.includes(device.id.toString())
+  const allDevicesSelected = devices.length > 0 && devices.every(device =>
+    formData.selected_devices.includes(String(device._id))
   );
+
+  const getDeviceLocationDisplay = (device: any) => {
+    const zone = zones.find(z => String(z._id) === String(device.zoneId));
+    return zone ? zone.name : 'Konum Belirtilmemiş';
+  };
 
   const renderZoneTree = () => {
     return zones.map(zone => {
-      const zoneDevices = getDevicesForZone(zone.id);
-      const isExpanded = expandedZones.has(zone.id);
-      const isSelected = isZoneSelected(zone.id);
-      
+      const zoneId = String(zone._id);
+      const zoneDevices = getDevicesForZone(zoneId);
+      const isExpanded = expandedZones.has(zoneId);
+      const isSelected = isZoneSelected(zoneId);
+
       return (
-        <div key={`zone-${zone.id}`} className="space-y-1">
+        <div key={`zone-${zoneId}`} className="space-y-1">
           <div className="flex items-center space-x-2">
             <Button
               type="button"
               variant="ghost"
               size="sm"
               className="h-5 w-5 p-0"
-              onClick={() => toggleZoneExpansion(zone.id)}
+              onClick={() => toggleZoneExpansion(zoneId)}
             >
               {isExpanded ? (
                 <ChevronDown className="h-3 w-3" />
@@ -109,48 +113,51 @@ export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) =
                 <ChevronRight className="h-3 w-3" />
               )}
             </Button>
-            
+
             <Checkbox
-              id={`zone-${zone.id}`}
+              id={`zone-${zoneId}`}
               checked={isSelected}
               onCheckedChange={(checked) => {
-                handleZoneChange(zone.id.toString(), Boolean(checked));
+                handleZoneChange(zoneId, Boolean(checked));
               }}
             />
-            
+
             <Building2 className="h-4 w-4 text-purple-500" />
-            <Label 
-              htmlFor={`zone-${zone.id}`}
+            <Label
+              htmlFor={`zone-${zoneId}`}
               className="text-sm font-medium cursor-pointer flex-1"
             >
               {zone.name} ({zoneDevices.length} cihaz)
             </Label>
           </div>
-          
+
           {isExpanded && (
             <div className="space-y-1">
-              {zoneDevices.map(device => (
-                <div 
-                  key={`device-${device.id}`}
-                  className="flex items-center space-x-2"
-                  style={{ paddingLeft: '36px' }}
-                >
-                  <Checkbox
-                    id={`device-${device.id}`}
-                    checked={formData.selected_devices.includes(device.id.toString())}
-                    onCheckedChange={(checked) => {
-                      handleDeviceChange(device.id.toString(), Boolean(checked));
-                    }}
-                  />
-                  <MapPin className="h-3 w-3 text-green-500" />
-                  <Label 
-                    htmlFor={`device-${device.id}`}
-                    className="text-sm font-normal cursor-pointer"
+              {zoneDevices.map(device => {
+                const deviceId = String(device._id);
+                return (
+                  <div
+                    key={`device-${deviceId}`}
+                    className="flex items-center space-x-2"
+                    style={{ paddingLeft: '36px' }}
                   >
-                    {device.name} ({getDeviceLocationDisplay(device)})
-                  </Label>
-                </div>
-              ))}
+                    <Checkbox
+                      id={`device-${deviceId}`}
+                      checked={formData.selected_devices.includes(deviceId)}
+                      onCheckedChange={(checked) => {
+                        handleDeviceChange(deviceId, Boolean(checked));
+                      }}
+                    />
+                    <MapPin className="h-3 w-3 text-green-500" />
+                    <Label
+                      htmlFor={`device-${deviceId}`}
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      {device.name} ({getDeviceLocationDisplay(device)})
+                    </Label>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -158,7 +165,7 @@ export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) =
     });
   };
 
-  const orphanDevices = devices.filter(device => !device.zone_id);
+  const orphanDevices = devices.filter(device => !device.zoneId);
 
   return (
     <div className="space-y-3">
@@ -176,7 +183,7 @@ export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) =
       </div>
       <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-1">
         {renderZoneTree()}
-        
+
         {orphanDevices.length > 0 && (
           <div className="mt-4 pt-4 border-t">
             <div className="flex items-center space-x-2 mb-2">
@@ -185,24 +192,27 @@ export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) =
                 Bölgesi Olmayan Cihazlar ({orphanDevices.length})
               </Label>
             </div>
-            {orphanDevices.map(device => (
-              <div key={device.id} className="flex items-center space-x-2 ml-6">
-                <Checkbox
-                  id={`orphan-device-${device.id}`}
-                  checked={formData.selected_devices.includes(device.id.toString())}
-                  onCheckedChange={(checked) => {
-                    handleDeviceChange(device.id.toString(), Boolean(checked));
-                  }}
-                />
-                <MapPin className="h-3 w-3 text-green-500" />
-                <Label 
-                  htmlFor={`orphan-device-${device.id}`}
-                  className="text-sm font-normal cursor-pointer"
-                >
-                  {device.name} ({getDeviceLocationDisplay(device)})
-                </Label>
-              </div>
-            ))}
+            {orphanDevices.map(device => {
+              const deviceId = String(device._id);
+              return (
+                <div key={deviceId} className="flex items-center space-x-2 ml-6">
+                  <Checkbox
+                    id={`orphan-device-${deviceId}`}
+                    checked={formData.selected_devices.includes(deviceId)}
+                    onCheckedChange={(checked) => {
+                      handleDeviceChange(deviceId, Boolean(checked));
+                    }}
+                  />
+                  <MapPin className="h-3 w-3 text-green-500" />
+                  <Label
+                    htmlFor={`orphan-device-${deviceId}`}
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    {device.name} ({getDeviceLocationDisplay(device)})
+                  </Label>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

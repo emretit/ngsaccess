@@ -35,6 +35,7 @@ http.route({
           | undefined;
       const subEventType = accessEvent?.subEventType;
 
+      const rawBodyPreview = raw.length > 500 ? raw.slice(0, 500) + "..." : raw;
       const parsedList = {
         "Kart no (cardNo)": user_id ?? "(yok)",
         "Cihaz seri (serial)": serial ?? "(yok)",
@@ -42,6 +43,8 @@ http.route({
         "Event tipi": eventType ?? "(yok)",
         "Alt tip (subEventType)": subEventType ?? "(yok)",
         "Tarih/saat": dateTime ?? "(yok)",
+        "Content-Type": contentType ?? "(yok)",
+        "Raw body": rawBodyPreview,
       };
       console.log("[card-reader] parse sonucu (liste):");
       Object.entries(parsedList).forEach(([k, v]) =>
@@ -87,13 +90,15 @@ http.route({
         "[card-reader] sonuç:",
         result.granted ? "izin_verildi" : "reddedildi"
       );
-      return new Response(
-        JSON.stringify({ cevap: result.granted ? "ok" : "error" }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+      // Remote Verification: Hikvision checkResult ("success"|"failed") + cevap (geriye uyumluluk)
+      const payload = {
+        cevap: result.granted ? "ok" : "error",
+        checkResult: result.granted ? "success" : "failed",
+      };
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     } catch (error) {
       console.error("Card reader error:", error);
       return new Response(

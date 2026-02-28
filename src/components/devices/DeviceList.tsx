@@ -50,13 +50,19 @@ export function DeviceList({
     handleBulkDelete
   } = useDeviceTable(filteredDevices);
 
-  function getZoneName(device: Device) {
-    const zone = zones.find(z => String(z.id) === String(device.zone_id));
+  function getZoneName(device: Device & { zone?: { name?: string }; zoneId?: string }) {
+    const zoneId = device.zone_id || device.zoneId;
+    if (device.zone?.name) return device.zone.name;
+    if (!zoneId) return undefined;
+    const zone = zones.find(z => String(z._id ?? (z as { id?: string }).id) === String(zoneId));
     return zone?.name;
   }
 
-  function getDoorName(device: Device) {
-    const door = doors.find(d => String(d.id) === String(device.door_id));
+  function getDoorName(device: Device & { door?: { name?: string }; doorId?: string }) {
+    const doorId = device.door_id || device.doorId;
+    if (device.door?.name) return device.door.name;
+    if (!doorId) return undefined;
+    const door = doors.find(d => String(d._id ?? (d as { id?: string }).id) === String(doorId));
     return door?.name;
   }
 
@@ -100,9 +106,9 @@ export function DeviceList({
                 </TableCell>
               </TableRow>
             ) : filteredDevices.length > 0 ? (
-              filteredDevices.map((device) => (
+              filteredDevices.map((device, i) => (
                 <DeviceTableRow
-                  key={device.id}
+                  key={device.id || (device as { _id?: string })._id || `device-${i}`}
                   device={device}
                   zoneName={getZoneName(device)}
                   doorName={getDoorName(device)}
@@ -110,7 +116,7 @@ export function DeviceList({
                   onAssignLocation={onAssignLocation}
                   onEditDevice={onEditDevice}
                   onQRClick={onQRClick}
-                  selected={selectedDevices.includes(device.id)}
+                  selected={selectedDevices.includes(device.id || (device as { _id?: string })._id || "")}
                   onSelect={handleSelectDevice}
                 />
               ))

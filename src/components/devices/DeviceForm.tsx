@@ -49,7 +49,7 @@ export function DeviceForm({
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full">
           {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto px-6 py-5 md:px-8 md:py-6">
             <div className="space-y-6">
               {/* Two-Column Layout */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6">

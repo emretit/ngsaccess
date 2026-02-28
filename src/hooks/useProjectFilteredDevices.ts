@@ -9,14 +9,24 @@ export const useProjectFilteredDevices = () => {
   const devicesRaw = useQuery(api.devices.list, !projectLoading ? {} : "skip");
 
   const devices: Device[] = (devicesRaw ?? []).map((d: unknown) => {
-    const dev = d as Device;
+    const dev = d as Record<string, unknown> & { _id?: string; lastSeen?: string };
     const lastSeen = dev.lastSeen;
-    let computedStatus = "offline";
+    let computedStatus: "online" | "offline" | "expired" = "offline";
     if (lastSeen) {
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
       computedStatus = new Date(lastSeen) > fiveMinutesAgo ? "online" : "offline";
     }
-    return { ...dev, status: computedStatus };
+    return {
+      ...dev,
+      id: String(dev._id ?? dev.id ?? ""),
+      zone_id: String(dev.zoneId ?? dev.zone_id ?? ""),
+      door_id: String(dev.doorId ?? dev.door_id ?? ""),
+      device_serial: dev.deviceSerial ?? dev.device_serial ?? dev.serial_number ?? "",
+      device_type: dev.deviceType ?? dev.device_type ?? "",
+      access_direction: dev.accessDirection ?? dev.access_direction ?? "both",
+      device_name: dev.name ?? dev.device_name ?? "",
+      status: computedStatus,
+    } as Device;
   });
 
   // Super admin veya en az bir projesi olan kullanıcı erişebilir

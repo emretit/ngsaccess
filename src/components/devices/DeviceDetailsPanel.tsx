@@ -4,7 +4,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { DeviceForm } from "@/components/devices/DeviceForm";
 import { ServerDevice } from "@/types/device";
 import { useQuery } from "convex/react";
@@ -47,17 +46,15 @@ export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess }:
             </div>
           </div>
         ) : (
-          <ScrollArea className="flex-1">
-            <div className="px-6 py-5 md:px-8 md:py-6">
-              <DeviceForm
-                open={open}
-                device={selectedDevice ? { ...selectedDevice, _id: selectedDevice.id } : null}
-                projects={projects}
-                onSuccess={onSuccess}
-                onClose={onClose}
-              />
-            </div>
-          </ScrollArea>
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <DeviceForm
+              open={open}
+              device={selectedDevice ? { ...selectedDevice, _id: selectedDevice.id } : null}
+              projects={projects}
+              onSuccess={onSuccess}
+              onClose={onClose}
+            />
+          </div>
         )}
       </SheetContent>
     </Sheet>

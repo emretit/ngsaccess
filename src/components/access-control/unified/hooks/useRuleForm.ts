@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useAccessRules } from "@/hooks/useAccessRules";
+import { useProjectAccess } from "@/hooks/useProjectAccess";
+import type { Id } from "../../../../convex/_generated/dataModel";
 
 interface RuleFormData {
   name: string;
@@ -20,6 +22,7 @@ interface RuleFormData {
 
 export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void) => {
   const { toast } = useToast();
+  const { projectIds } = useProjectAccess();
   const { createAccessRuleWithMembers, updateAccessRuleWithAdditionalMembers } = useAccessRules();
 
   const [formData, setFormData] = useState<RuleFormData>({
@@ -41,25 +44,24 @@ export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void
   useEffect(() => {
     if (open) {
       if (editingRule) {
-        const employeeIds = editingRule.group_members?.map((gm: any) => gm.employee_id?.toString()).filter(Boolean) || [];
-        const deviceIds = editingRule.group_devices?.map((gd: any) => gd.device_id?.toString()).filter(Boolean) || [];
-
-        console.log('Loading existing rule data:');
-        console.log('Existing employees:', employeeIds);
-        console.log('Existing devices:', deviceIds);
+        // Convex returns camelCase: employeeId, deviceId
+        const employeeIds = editingRule.group_members
+          ?.map((gm: any) => String(gm.employeeId || gm.employee_id || '')).filter(Boolean) || [];
+        const deviceIds = editingRule.group_devices
+          ?.map((gd: any) => String(gd.deviceId || gd.device_id || '')).filter(Boolean) || [];
 
         setFormData({
           name: editingRule.name || '',
           description: editingRule.description || '',
-          target_type: editingRule.target_type || 'individual',
+          target_type: editingRule.targetType || editingRule.target_type || 'individual',
           selected_employees: employeeIds,
           selected_devices: deviceIds,
           selected_zones: [],
           selected_departments: [],
-          start_time: editingRule.start_time || '',
-          end_time: editingRule.end_time || '',
+          start_time: editingRule.startTime || editingRule.start_time || '',
+          end_time: editingRule.endTime || editingRule.end_time || '',
           days: editingRule.days || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-          access_direction: editingRule.access_direction || 'both',
+          access_direction: editingRule.accessDirection || editingRule.access_direction || 'both',
           priority: editingRule.priority || 100,
         });
       } else {
@@ -83,9 +85,7 @@ export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    console.log('Form submission started:', formData);
-    
+
     try {
       if (!formData.name.trim()) {
         toast({
@@ -104,7 +104,7 @@ export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void
         });
         return;
       }
-      
+
       if (formData.selected_devices.length === 0 && formData.selected_zones.length === 0) {
         toast({
           variant: "destructive",
@@ -114,51 +114,45 @@ export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void
         return;
       }
 
-      // Time alanları için null kontrolü ve düzeltme
-      const processedStartTime = formData.start_time.trim() === '' ? null : formData.start_time;
-      const processedEndTime = formData.end_time.trim() === '' ? null : formData.end_time;
+      // Time alanları için undefined kontrolü
+      const processedStartTime = formData.start_time.trim() === '' ? undefined : formData.start_time;
+      const processedEndTime = formData.end_time.trim() === '' ? undefined : formData.end_time;
 
+      // Convex expects camelCase field names
       const ruleData = {
         name: formData.name,
         description: formData.description,
-        target_type: formData.target_type,
-        start_time: processedStartTime,
-        end_time: processedEndTime,
+        targetType: formData.target_type,
+        startTime: processedStartTime,
+        endTime: processedEndTime,
         days: formData.days,
-        access_direction: formData.access_direction,
+        accessDirection: formData.access_direction,
         priority: formData.priority,
+        projectId: projectIds[0] as Id<"projects"> | undefined,
       };
-      
-      if (editingRule) {
-        console.log('Updating existing rule with additional members and devices:', {
-          ruleId: editingRule.id,
-          updates: ruleData,
-          newEmployeeIds: formData.selected_employees.map(id => parseInt(id)),
-          newDeviceIds: formData.selected_devices.map(id => parseInt(id))
-        });
 
+      // IDs are Convex string IDs, pass as-is (not parseInt)
+      const employeeIds = formData.selected_employees as Id<"employees">[];
+      const deviceIds = formData.selected_devices as Id<"devices">[];
+
+      if (editingRule) {
+        const ruleId = (editingRule._id || editingRule.id) as Id<"accessRules">;
         await updateAccessRuleWithAdditionalMembers.mutateAsync({
-          id: editingRule.id,
+          id: ruleId,
           updates: ruleData,
-          employeeIds: formData.selected_employees.map(id => parseInt(id)),
-          deviceIds: formData.selected_devices.map(id => parseInt(id))
+          employeeIds,
+          deviceIds,
         });
       } else {
-        console.log('Creating new rule with batch operation:', {
-          rule: ruleData,
-          employeeIds: formData.selected_employees.map(id => parseInt(id)),
-          deviceIds: formData.selected_devices.map(id => parseInt(id))
-        });
-
         await createAccessRuleWithMembers.mutateAsync({
           rule: ruleData,
-          employeeIds: formData.selected_employees.map(id => parseInt(id)),
-          deviceIds: formData.selected_devices.map(id => parseInt(id))
+          employeeIds,
+          deviceIds,
         });
       }
-      
+
       onClose();
-      
+
     } catch (error) {
       console.error('Form submission error:', error);
       toast({

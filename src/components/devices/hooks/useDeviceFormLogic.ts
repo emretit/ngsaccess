@@ -33,6 +33,8 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
       door_id: undefined,
       access_direction: "both",
       status: "active",
+      device_username: "",
+      device_password: "",
       description: "",
     },
   });

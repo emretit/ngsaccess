@@ -65,6 +65,8 @@ export const create = authedMutation({
     status: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
     description: v.optional(v.string()),
+    deviceUsername: v.optional(v.string()),
+    devicePassword: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -98,6 +100,8 @@ export const update = authedMutation({
     isActive: v.optional(v.boolean()),
     description: v.optional(v.string()),
     lastSeen: v.optional(v.string()),
+    deviceUsername: v.optional(v.string()),
+    devicePassword: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);

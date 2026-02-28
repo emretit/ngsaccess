@@ -5,20 +5,20 @@ import { toast } from "@/hooks/use-toast";
 import { Id } from "../../../../convex/_generated/dataModel";
 
 export interface EmployeeFormData {
-  firstName: string;
-  lastName: string;
+  first_name: string;
+  last_name: string;
   email: string;
-  tcNo: string;
-  cardNumber: string;
-  companyId: Id<"companies"> | null;
-  departmentId: Id<"departments"> | null;
-  positionId: Id<"positions"> | null;
-  accessRuleId: Id<"accessRules"> | null;
-  shiftId: Id<"shifts"> | null;
+  tc_no: string;
+  card_number: string;
+  company_id: string | null;
+  department_id: string | null;
+  position_id: string | null;
+  access_rule_id: string | null;
+  shift_id: string | null;
   shift: string | null;
-  photoUrl: string | null;
+  photo_url: string | null;
   notes: string;
-  isActive: boolean;
+  is_active: boolean;
   projectId?: Id<"projects">;
 }
 
@@ -39,17 +39,18 @@ export const useEmployeeFormSubmit = (
   const updateEmployee = useMutation(api.employees.update);
   const checkDuplicate = useMutation(api.employees.update);
   const sendSetupEmail = useAction(api.actions.sendEmail.sendEmployeeSetupEmail);
+  const syncToDevices = useAction(api.actions.hikvisionSync.syncEmployeeToDevices);
 
   const handleSubmit = async (formData: EmployeeFormData) => {
     if (isLoading) return;
     setIsLoading(true);
 
     try {
-      if (!formData.firstName?.trim()) {
+      if (!formData.first_name?.trim()) {
         toast({ title: "Hata", description: "Ad alanı zorunludur", variant: "destructive" });
         return;
       }
-      if (!formData.lastName?.trim()) {
+      if (!formData.last_name?.trim()) {
         toast({ title: "Hata", description: "Soyad alanı zorunludur", variant: "destructive" });
         return;
       }
@@ -57,11 +58,11 @@ export const useEmployeeFormSubmit = (
         toast({ title: "Hata", description: "E-posta alanı zorunludur", variant: "destructive" });
         return;
       }
-      if (!formData.tcNo?.trim() || formData.tcNo.length !== 11) {
+      if (!formData.tc_no?.trim() || formData.tc_no.length !== 11) {
         toast({ title: "Hata", description: "TC Kimlik No 11 haneli olmalıdır", variant: "destructive" });
         return;
       }
-      if (!formData.cardNumber?.trim()) {
+      if (!formData.card_number?.trim()) {
         toast({ title: "Hata", description: "Kart numarası zorunludur", variant: "destructive" });
         return;
       }
@@ -70,42 +71,56 @@ export const useEmployeeFormSubmit = (
         // Update
         await updateEmployee({
           employeeId: employee._id,
-          firstName: formData.firstName.trim(),
-          lastName: formData.lastName.trim(),
+          firstName: formData.first_name.trim(),
+          lastName: formData.last_name.trim(),
           email: formData.email.trim().toLowerCase(),
-          tcNo: formData.tcNo.trim(),
-          cardNumber: formData.cardNumber.trim(),
-          companyId: formData.companyId ?? undefined,
-          departmentId: formData.departmentId ?? undefined,
-          positionId: formData.positionId ?? undefined,
-          accessRuleId: formData.accessRuleId ?? undefined,
-          shiftId: formData.shiftId ?? undefined,
+          tcNo: formData.tc_no.trim(),
+          cardNumber: formData.card_number.trim(),
+          companyId: (formData.company_id ?? undefined) as Id<"companies"> | undefined,
+          departmentId: (formData.department_id ?? undefined) as Id<"departments"> | undefined,
+          positionId: (formData.position_id ?? undefined) as Id<"positions"> | undefined,
+          accessRuleId: (formData.access_rule_id ?? undefined) as Id<"accessRules"> | undefined,
+          shiftId: (formData.shift_id ?? undefined) as Id<"shifts"> | undefined,
           shift: formData.shift ?? undefined,
-          photoUrl: formData.photoUrl ?? undefined,
+          photoUrl: formData.photo_url ?? undefined,
           notes: formData.notes?.trim() ?? undefined,
-          isActive: formData.isActive ?? true,
+          isActive: formData.is_active ?? true,
         });
         toast({ title: "Başarılı", description: "Çalışan bilgileri güncellendi" });
+
+        // Hikvision cihazlarına senkronize et
+        try {
+          const syncResult = await syncToDevices({ employeeId: employee._id });
+          if (syncResult.synced > 0) {
+            toast({ title: "Cihaz Senkronizasyonu", description: `${syncResult.synced} cihaza senkronize edildi` });
+          }
+          if (syncResult.failed > 0) {
+            toast({ title: "Senkronizasyon Uyarısı", description: `${syncResult.failed} cihaza gönderilemedi`, variant: "destructive" });
+          }
+        } catch {
+          // Sync hatası çalışan kaydını engellemez
+        }
+
         onSave({ _id: employee._id, ...formData });
         onClose();
       } else {
         // Create
         const newId = await createEmployee({
-          firstName: formData.firstName.trim(),
-          lastName: formData.lastName.trim(),
+          firstName: formData.first_name.trim(),
+          lastName: formData.last_name.trim(),
           email: formData.email.trim().toLowerCase(),
-          tcNo: formData.tcNo.trim(),
-          cardNumber: formData.cardNumber.trim(),
+          tcNo: formData.tc_no.trim(),
+          cardNumber: formData.card_number.trim(),
           projectId: formData.projectId,
-          companyId: formData.companyId ?? undefined,
-          departmentId: formData.departmentId ?? undefined,
-          positionId: formData.positionId ?? undefined,
-          accessRuleId: formData.accessRuleId ?? undefined,
-          shiftId: formData.shiftId ?? undefined,
+          companyId: (formData.company_id ?? undefined) as Id<"companies"> | undefined,
+          departmentId: (formData.department_id ?? undefined) as Id<"departments"> | undefined,
+          positionId: (formData.position_id ?? undefined) as Id<"positions"> | undefined,
+          accessRuleId: (formData.access_rule_id ?? undefined) as Id<"accessRules"> | undefined,
+          shiftId: (formData.shift_id ?? undefined) as Id<"shifts"> | undefined,
           shift: formData.shift ?? undefined,
-          photoUrl: formData.photoUrl ?? undefined,
+          photoUrl: formData.photo_url ?? undefined,
           notes: formData.notes?.trim() ?? undefined,
-          isActive: formData.isActive ?? true,
+          isActive: formData.is_active ?? true,
         });
 
         // Setup email gönder
@@ -113,8 +128,8 @@ export const useEmployeeFormSubmit = (
           await sendSetupEmail({
             employeeId: newId,
             email: formData.email.trim().toLowerCase(),
-            firstName: formData.firstName.trim(),
-            lastName: formData.lastName.trim(),
+            firstName: formData.first_name.trim(),
+            lastName: formData.last_name.trim(),
             projectId: formData.projectId,
           });
           toast({ title: "Başarılı", description: "Personel eklendi ve kurulum e-postası gönderildi" });
@@ -124,6 +139,19 @@ export const useEmployeeFormSubmit = (
             description: "Personel eklendi ancak kurulum e-postası gönderilemedi",
             variant: "destructive",
           });
+        }
+
+        // Hikvision cihazlarına senkronize et
+        try {
+          const syncResult = await syncToDevices({ employeeId: newId });
+          if (syncResult.synced > 0) {
+            toast({ title: "Cihaz Senkronizasyonu", description: `${syncResult.synced} cihaza senkronize edildi` });
+          }
+          if (syncResult.failed > 0) {
+            toast({ title: "Senkronizasyon Uyarısı", description: `${syncResult.failed} cihaza gönderilemedi`, variant: "destructive" });
+          }
+        } catch {
+          // Sync hatası çalışan kaydını engellemez
         }
 
         onSave({ _id: newId, ...formData });

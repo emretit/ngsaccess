@@ -1,4 +1,4 @@
-import { useMutation } from "convex/react";
+import { useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
 import { Id } from "../../../convex/_generated/dataModel";
@@ -42,6 +42,7 @@ export const useComplexAccessRuleMutations = () => {
 
   const createWithGroups = useMutation(api.accessRules.createWithGroups);
   const updateWithGroups = useMutation(api.accessRules.updateWithGroups);
+  const syncWeekPlan = useAction(api.actions.hikvisionSync.syncWeekPlanToDevices);
 
   const createAccessRuleWithMembers = {
     mutateAsync: async (params: CreateRuleWithMembersParams) => {
@@ -51,6 +52,17 @@ export const useComplexAccessRuleMutations = () => {
         deviceIds: params.deviceIds,
       });
       toast({ title: "Başarılı", description: "Erişim kuralı ve üyeleri oluşturuldu." });
+
+      // Hikvision cihazlarına zaman planı + kişileri senkronize et
+      try {
+        const syncResult = await syncWeekPlan({ accessRuleId: result });
+        if (syncResult.synced > 0) {
+          toast({ title: "Cihaz Senkronizasyonu", description: `${syncResult.synced} cihaza zaman planı gönderildi, ${syncResult.employeesSynced} kişi senkronize edildi` });
+        }
+      } catch {
+        // Sync hatası kural kaydını engellemez
+      }
+
       return result;
     },
     mutate: (params: CreateRuleWithMembersParams) => {
@@ -59,7 +71,10 @@ export const useComplexAccessRuleMutations = () => {
         employeeIds: params.employeeIds,
         deviceIds: params.deviceIds,
       })
-        .then(() => toast({ title: "Başarılı", description: "Erişim kuralı ve üyeleri oluşturuldu." }))
+        .then((ruleId) => {
+          toast({ title: "Başarılı", description: "Erişim kuralı ve üyeleri oluşturuldu." });
+          syncWeekPlan({ accessRuleId: ruleId }).catch(() => {});
+        })
         .catch(() =>
           toast({ variant: "destructive", title: "Hata", description: "Erişim kuralı oluşturulamadı." })
         );
@@ -76,6 +91,17 @@ export const useComplexAccessRuleMutations = () => {
         deviceIds: params.deviceIds,
       });
       toast({ title: "Başarılı", description: "Erişim kuralı güncellendi." });
+
+      // Hikvision cihazlarına zaman planı + kişileri senkronize et
+      try {
+        const syncResult = await syncWeekPlan({ accessRuleId: params.id });
+        if (syncResult.synced > 0) {
+          toast({ title: "Cihaz Senkronizasyonu", description: `${syncResult.synced} cihaza zaman planı gönderildi, ${syncResult.employeesSynced} kişi senkronize edildi` });
+        }
+      } catch {
+        // Sync hatası kural kaydını engellemez
+      }
+
       return result;
     },
     mutate: (params: UpdateRuleWithMembersParams) => {
@@ -85,7 +111,10 @@ export const useComplexAccessRuleMutations = () => {
         employeeIds: params.employeeIds,
         deviceIds: params.deviceIds,
       })
-        .then(() => toast({ title: "Başarılı", description: "Erişim kuralı güncellendi." }))
+        .then(() => {
+          toast({ title: "Başarılı", description: "Erişim kuralı güncellendi." });
+          syncWeekPlan({ accessRuleId: params.id }).catch(() => {});
+        })
         .catch(() =>
           toast({ variant: "destructive", title: "Hata", description: "Erişim kuralı güncellenemedi." })
         );

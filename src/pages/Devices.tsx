@@ -64,18 +64,22 @@ const Devices = () => {
   };
 
   const handleEditDevice = (device: Device) => {
-    // Convert to ServerDevice format for the form (Convex uses _id, zoneId, doorId)
+    const dev = device as Record<string, unknown>;
     const serverDevice: ServerDevice = {
-      id: device.id || (device as { _id?: string })._id || '',
-      name: device.name || device.device_name || '',
-      serial_number: device.serial_number || device.device_serial || '',
+      id: String(dev._id || dev.id || ''),
+      name: String(dev.name || dev.device_name || ''),
+      serial_number: String(dev.deviceSerial || dev.device_serial || dev.serial_number || ''),
       device_model_enum: "Other",
-      date_added: device.created_at || new Date().toISOString(),
-      status: device.status || 'online',
-      zone_id: (device as { zoneId?: string }).zoneId ?? device.zone_id,
-      door_id: (device as { doorId?: string }).doorId ?? device.door_id
+      date_added: String(dev.createdAt || dev.created_at || new Date().toISOString()),
+      status: (dev.status as ServerDevice["status"]) || 'active',
+      zone_id: String(dev.zoneId || dev.zone_id || ''),
+      door_id: String(dev.doorId || dev.door_id || ''),
+      device_ip: String(dev.deviceIp || dev.device_ip || ''),
+      device_type: String(dev.deviceType || dev.device_type || ''),
+      description: String(dev.description || ''),
+      access_direction: (dev.accessDirection || dev.access_direction || 'both') as ServerDevice["access_direction"],
     };
-    
+
     setDevicePanel({
       open: true,
       device: serverDevice
