@@ -85,20 +85,26 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
             <div className="grid gap-2">
               <Label htmlFor="project">Proje*</Label>
               <Select 
-                value={formData.projectId?.toString()} 
+                value={formData.projectId != null ? String(formData.projectId) : ""} 
                 onValueChange={(value) => 
-                  onFormDataChange({ ...formData, projectId: parseInt(value) })}
+                  onFormDataChange({ ...formData, projectId: value || undefined })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Proje seçin" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id.toString()}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
+                    {(projects ?? [])
+                      .filter((p) => (p as { _id?: string; id?: number })._id ?? (p as { id?: number }).id)
+                      .map((project) => {
+                        const projectId = (project as { _id?: string; id?: number })._id ?? (project as { id?: number }).id;
+                        const value = String(projectId);
+                        return (
+                          <SelectItem key={value} value={value}>
+                            {project.name}
+                          </SelectItem>
+                        );
+                      })}
                   </SelectGroup>
                 </SelectContent>
               </Select>

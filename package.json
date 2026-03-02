@@ -7,6 +7,7 @@
     "node": ">=18.0.0 <19.0.0"
   },
   "scripts": {
+    "check": "npm run build && npx tsc --noEmit",
     "dev": "vite",
     "dev:convex": "convex dev",
     "build": "vite build",
@@ -87,7 +88,7 @@
     "@types/node": "^22.15.17",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react-swc": "^3.5.0",
+    "@vitejs/plugin-react-swc": "^4.2.3",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",

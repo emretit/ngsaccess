@@ -72,8 +72,8 @@ export const UserTable: React.FC<UserTableProps> = ({
                 </TableCell>
               </TableRow>
             ) : (
-              users.map((user) => (
-                <TableRow key={user.id}>
+              users.map((user, index) => (
+                <TableRow key={String((user as User & { _id?: string }).id ?? (user as User & { _id?: string })._id ?? user.email ?? index)}>
                   <TableCell className="font-medium">
                     {user.email}
                   </TableCell>
