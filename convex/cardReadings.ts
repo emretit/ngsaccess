@@ -573,7 +573,22 @@ export const processCardReading = internalMutation({
   handler: async (ctx, args) => {
     const accessTime = new Date().toISOString();
 
-    // 1. Çalışanı kart numarasına göre bul
+    // 1. Cihazı serial veya IP ile bul (her zaman - kayıt için gerekli)
+    let device = null;
+    if (args.deviceSerial?.trim()) {
+      device = await ctx.db
+        .query("devices")
+        .withIndex("by_device_serial", (q) =>
+          q.eq("deviceSerial", args.deviceSerial!.trim())
+        )
+        .first();
+    }
+    if (!device && args.deviceIp?.trim()) {
+      const all = await ctx.db.query("devices").collect();
+      device = all.find((d) => d.deviceIp?.trim() === args.deviceIp!.trim()) ?? null;
+    }
+
+    // 2. Çalışanı kart numarasına göre bul
     const employee = await ctx.db
       .query("employees")
       .withIndex("by_card", (q) => q.eq("cardNumber", args.cardNo))
@@ -581,6 +596,8 @@ export const processCardReading = internalMutation({
 
     if (!employee) {
       await ctx.db.insert("cardReadings", {
+        projectId: device?.projectId,
+        deviceId: device?._id,
         cardNo: args.cardNo,
         accessTime,
         accessStatus: "reddedildi",
@@ -594,6 +611,7 @@ export const processCardReading = internalMutation({
     if (!employee.isActive) {
       await ctx.db.insert("cardReadings", {
         projectId: employee.projectId,
+        deviceId: device?._id,
         employeeId: employee._id,
         cardNo: args.cardNo,
         employeeName: `${employee.firstName} ${employee.lastName}`,
@@ -604,21 +622,6 @@ export const processCardReading = internalMutation({
         updatedAt: accessTime,
       });
       return { granted: false };
-    }
-
-    // 2. Cihazı serial veya IP ile bul (event'te serial yoksa ipAddress kullanılır)
-    let device = null;
-    if (args.deviceSerial?.trim()) {
-      device = await ctx.db
-        .query("devices")
-        .withIndex("by_device_serial", (q) =>
-          q.eq("deviceSerial", args.deviceSerial!.trim())
-        )
-        .first();
-    }
-    if (!device && args.deviceIp?.trim()) {
-      const all = await ctx.db.query("devices").collect();
-      device = all.find((d) => d.deviceIp?.trim() === args.deviceIp!.trim()) ?? null;
     }
 
     if (!device) {
