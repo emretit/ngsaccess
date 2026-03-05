@@ -14,6 +14,7 @@ const routeTitles: Record<string, string> = {
   "/shifts": "Vardiyalar",
   "/leaves": "İzinler",
   "/employee-portal": "Çalışan Portalı",
+  "/siparis": "Siparis",
   "/settings": "Ayarlar",
   "/profile": "Profil",
   "/home": "Ana Sayfa",

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Users, Dices, Shield, FileText, CalendarClock, Palmtree, UserCircle, Settings } from "lucide-react";
+import { Users, Dices, Shield, FileText, CalendarClock, Palmtree, UserCircle, Settings, ShoppingCart } from "lucide-react";
 import {
   SidebarMenu,
   SidebarMenuItem,
@@ -14,6 +14,7 @@ const navItems = [
   { name: "Vardiyalar", href: "/shifts", icon: CalendarClock },
   { name: "İzinler", href: "/leaves", icon: Palmtree },
   { name: "Çalışan Portalı", href: "/employee-portal", icon: UserCircle },
+  { name: "Siparis", href: "/siparis", icon: ShoppingCart },
   { name: "Ayarlar", href: "/settings", icon: Settings },
 ];
 

@@ -20,6 +20,7 @@ import Settings from '@/pages/Settings';
 import Profile from '@/pages/Profile';
 import SystemAdmin from '@/pages/SystemAdmin';
 import EngineeringDepartment from '@/pages/EngineeringDepartment';
+import Siparis from '@/pages/Siparis';
 import UserSetup from '@/pages/UserSetup';
 import EmployeeSetup from '@/pages/EmployeeSetup';
 import AdminSetup from '@/pages/AdminSetup';
@@ -54,6 +55,7 @@ function AppContent() {
         <Route path="/shifts" element={<Shifts />} />
         <Route path="/leaves" element={<Leaves />} />
         <Route path="/employee-portal" element={<EmployeePortal />} />
+        <Route path="/siparis" element={<Siparis />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/engineering-department" element={<EngineeringDepartment />} />
