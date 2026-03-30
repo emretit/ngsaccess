@@ -16,8 +16,8 @@ interface ZoneDoorTreeProps {
 }
 
 export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDoorTreeProps) => {
-  const zones = useQuery(api.zones.list) ?? [];
-  const doors = useQuery(api.doors.list) ?? [];
+  const zones = useQuery(api.zones.list, {}) ?? [];
+  const doors = useQuery(api.doors.list, {}) ?? [];
 
   const removeZone = useMutation(api.zones.remove);
   const removeDoor = useMutation(api.doors.remove);
