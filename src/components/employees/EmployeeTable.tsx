@@ -39,6 +39,42 @@ export default function EmployeeTable({
   const [showPasswordResetDialog, setShowPasswordResetDialog] = useState(false);
   const [showIndividualDeleteDialog, setShowIndividualDeleteDialog] = useState(false);
   const [selectedEmployeeForDelete, setSelectedEmployeeForDelete] = useState<Employee | null>(null);
+  const [syncingEmployeeId, setSyncingEmployeeId] = useState<string | null>(null);
+
+  const syncEmployeeToDevices = useAction(api.actions.hikvisionSync.syncEmployeeToDevices);
+
+  const handleSyncToDevice = async (employee: Employee) => {
+    const empId = (employee._id || employee.id) as unknown as Id<"employees">;
+    setSyncingEmployeeId(empId);
+    try {
+      const result = await syncEmployeeToDevices({ employeeId: empId });
+      if (result.synced > 0) {
+        toast({
+          title: "Senkronizasyon Başarılı",
+          description: `${employee.first_name || employee.firstName} ${employee.last_name || employee.lastName} — ${result.synced} cihaza gönderildi.`,
+        });
+      } else if (result.errors.length > 0) {
+        toast({
+          title: "Senkronizasyon Hatası",
+          description: result.errors.join(", "),
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Bilgi",
+          description: "Bu çalışanın bağlı olduğu cihaz veya kart numarası bulunamadı.",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Hata",
+        description: (err as Error).message || "Senkronizasyon sırasında bir hata oluştu.",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingEmployeeId(null);
+    }
+  };
   
   const {
     sortedEmployees,
