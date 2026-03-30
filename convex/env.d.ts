@@ -1,9 +1,7 @@
-declare const process: {
-  env: Record<string, string | undefined>;
-};
-
-declare const crypto: {
-  randomUUID(): string;
-  getRandomValues<T extends ArrayBufferView>(array: T): T;
-  subtle: SubtleCrypto;
-};
+declare global {
+  var process: {
+    env: Record<string, string | undefined>;
+  };
+  var crypto: typeof import("crypto");
+}
+export {};
