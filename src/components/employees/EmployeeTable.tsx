@@ -126,6 +126,43 @@ export default function EmployeeTable({
     onRefresh?.();
   };
 
+  const [isBulkSyncing, setIsBulkSyncing] = useState(false);
+  const handleBulkSyncToDevices = async () => {
+    setIsBulkSyncing(true);
+    let totalSynced = 0;
+    let totalFailed = 0;
+    const allErrors: string[] = [];
+
+    for (const empId of selectedEmployees) {
+      try {
+        const result = await syncEmployeeToDevices({ employeeId: empId as Id<"employees"> });
+        totalSynced += result.synced;
+        totalFailed += result.failed;
+        allErrors.push(...result.errors);
+      } catch (err) {
+        totalFailed++;
+        allErrors.push((err as Error).message);
+      }
+    }
+
+    setIsBulkSyncing(false);
+
+    if (totalSynced > 0) {
+      toast({
+        title: "Toplu Senkronizasyon Tamamlandı",
+        description: `${totalSynced} cihaza gönderildi${totalFailed > 0 ? `, ${totalFailed} hata` : ""}.`,
+      });
+    } else if (allErrors.length > 0) {
+      toast({
+        title: "Senkronizasyon Hatası",
+        description: allErrors.slice(0, 3).join("; "),
+        variant: "destructive",
+      });
+    } else {
+      toast({ title: "Bilgi", description: "Seçili çalışanlar için bağlı cihaz bulunamadı." });
+    }
+  };
+
   return (
     <div className="space-y-4">
       {selectedEmployees.length > 0 && (
@@ -136,6 +173,8 @@ export default function EmployeeTable({
           onDepartmentChange={setSelectedDepartment}
           onUpdateDepartment={handleBulkDepartmentUpdate}
           onDelete={() => setShowDeleteDialog(true)}
+          onSyncToDevices={handleBulkSyncToDevices}
+          isSyncing={isBulkSyncing}
         />
       )}
 
