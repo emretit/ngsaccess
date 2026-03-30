@@ -1,7 +1,8 @@
 export type AccessDirection = "entry" | "exit" | "both";
 
 export interface Device {
-  id: string;
+  _id?: string;
+  id?: string;
   device_name?: string;
   name?: string;
   device_serial?: string;
@@ -9,7 +10,7 @@ export interface Device {
   device_model?: string;
   device_location?: string;
   device_type?: string;
-  status: "online" | "offline" | "expired";
+  status?: "online" | "offline" | "expired" | "active" | "inactive";
   created_at?: string;
   last_used_at?: string | null;
   type?: string;
@@ -19,15 +20,21 @@ export interface Device {
   device_mac?: string;
   device_ip?: string;
   device_firmware?: string;
+  projectId?: string;
+  [key: string]: unknown;
 }
 
 export interface Project {
-  id: string;
+  _id?: string;
+  id?: string;
   name: string;
+  is_active?: boolean;
+  [key: string]: unknown;
 }
 
 export interface ServerDevice {
-  id: string;
+  _id?: string;
+  id?: string;
   name: string;
   serial_number: string;
   device_model_enum:
@@ -57,4 +64,5 @@ export interface ServerDevice {
   device_mac?: string;
   device_firmware?: string;
   access_direction?: AccessDirection;
+  [key: string]: unknown;
 }
