@@ -19,6 +19,9 @@
     },
     {
       "path": "./tsconfig.node.json"
+    },
+    {
+      "path": "./convex/tsconfig.json"
     }
   ]
 }
