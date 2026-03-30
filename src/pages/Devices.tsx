@@ -47,7 +47,7 @@ const Devices = () => {
   const { handleDeleteDevice } = useDeviceActions();
   
   // Device table selection
-  const { showDeleteDialog, setShowDeleteDialog, handleBulkDelete } = useDeviceTable(devices);
+  const { showDeleteDialog, setShowDeleteDialog, handleBulkDelete } = useDeviceTable(devices as any);
 
   // Clear selections when zone/door changes
   useEffect(() => {
