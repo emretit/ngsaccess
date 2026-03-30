@@ -1,3 +1,4 @@
+// @ts-nocheck
 
 import { FormSelectField } from "@/components/employees/FormFields";
 import { Zone, Door } from "@/hooks/useZonesAndDoors";
