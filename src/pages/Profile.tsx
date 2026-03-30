@@ -8,7 +8,7 @@ import { useProfileUtils } from '@/hooks/useProfileUtils';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 export default function Profile() {
-  const { user, profile, refreshProfile, signOut } = useAuth();
+  const { user, profile, refreshProfile, signOut } = useAuth() as { user: any; profile: any; refreshProfile: () => Promise<void>; signOut: () => Promise<void> };
   const { formData, getUserInitials, updateFormData } = useProfileUtils();
   const navigate = useNavigate();
 
@@ -29,7 +29,7 @@ export default function Profile() {
         <ProfilePhoto 
           photoUrl={formData.photoUrl} 
           userInitials={getUserInitials()} 
-          userId={user!.id}
+          userId={String(user?.id ?? user?._id ?? '')}
           onPhotoUpdated={handlePhotoUpdated}
         />
         
@@ -38,7 +38,7 @@ export default function Profile() {
           email={formData.email}
           fullName={formData.fullName}
           role={profile?.role || 'Kullanıcı'}
-          userId={user!.id}
+          userId={String(user?.id ?? user?._id ?? '')}
           onProfileUpdated={refreshProfile}
           onSignOut={signOut}
         />

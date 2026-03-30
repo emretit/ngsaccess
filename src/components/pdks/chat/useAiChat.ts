@@ -7,7 +7,7 @@ import { useProjectAccess } from '@/hooks/useProjectAccess';
 import { useState } from 'react';
 
 import { useToast } from "@/hooks/use-toast";
-import { api } from "../../../convex/_generated/api";
+import { api } from "@/lib/convexApi";
 
 export function useAiChat() {
   const [isSaving, setIsSaving] = useState(false);
@@ -37,7 +37,7 @@ export function useAiChat() {
       setIsSaving(true);
       setSaveError(null);
 
-      const convexMessages = messages.map((m) => ({
+      const convexMessages = messages.map((m: any) => ({
         role: m.type as "user" | "assistant",
         content: m.content,
         data: m.data,

@@ -6,8 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export function EngineeringDepartmentView() {
-  const allDepartments = useQuery(api.departments.list) ?? [];
-  const allEmployees = useQuery(api.employees.list) ?? [];
+  const allDepartments = useQuery(api.departments.list, {}) ?? [];
+  const allEmployees = useQuery(api.employees.list, {}) ?? [];
 
   const engineeringDept = allDepartments.find((d: { name: string }) => d.name === "Engineering");
   const employees = engineeringDept

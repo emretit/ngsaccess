@@ -12,11 +12,16 @@ export default function Index() {
   const {
     stats,
     recentReadings,
-    loading,
+    statsLoading,
+    readingsLoading,
     userName,
     session,
-    refreshData
+    refetchStats,
+    refetchReadings
   } = useDashboard();
+
+  const loading = statsLoading || readingsLoading;
+  const refreshData = () => { refetchStats(); refetchReadings(); };
 
   // If not authenticated yet (loading state), show a simple loading screen
   if (!session && loading) {

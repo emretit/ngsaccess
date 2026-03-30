@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,27 +14,27 @@ export function MailSettings({ onComplete }: MailSettingsProps) {
   const { mailSettings, isLoading, saveMailSettings, isSaving } = useMailSettings();
   
   const [formData, setFormData] = useState({
-    smtp_host: '',
-    smtp_port: 587,
-    smtp_username: '',
-    smtp_password: '',
-    smtp_secure: true,
-    from_email: '',
-    from_name: '',
-    is_active: true
+    smtpHost: '',
+    smtpPort: 587,
+    smtpUsername: '',
+    smtpPassword: '',
+    smtpSecure: true,
+    fromEmail: '',
+    fromName: '',
+    isActive: true
   });
 
   useEffect(() => {
     if (mailSettings) {
       setFormData({
-        smtp_host: mailSettings.smtp_host || '',
-        smtp_port: mailSettings.smtp_port || 587,
-        smtp_username: mailSettings.smtp_username || '',
-        smtp_password: mailSettings.smtp_password || '',
-        smtp_secure: mailSettings.smtp_secure ?? true,
-        from_email: mailSettings.from_email || '',
-        from_name: mailSettings.from_name || '',
-        is_active: mailSettings.is_active ?? true
+        smtpHost: mailSettings.smtpHost || '',
+        smtpPort: mailSettings.smtpPort || 587,
+        smtpUsername: mailSettings.smtpUsername || '',
+        smtpPassword: mailSettings.smtpPassword || '',
+        smtpSecure: mailSettings.smtpSecure ?? true,
+        fromEmail: mailSettings.fromEmail || '',
+        fromName: mailSettings.fromName || '',
+        isActive: mailSettings.isActive ?? true
       });
     }
   }, [mailSettings]);
@@ -48,7 +46,7 @@ export function MailSettings({ onComplete }: MailSettingsProps) {
     }
   };
 
-  const handleInputChange = (field: string, value: any) => {
+  const handleInputChange = (field: string, value: string | number | boolean) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -70,8 +68,8 @@ export function MailSettings({ onComplete }: MailSettingsProps) {
             <Label htmlFor="smtpHost">SMTP Host</Label>
             <Input 
               id="smtpHost" 
-              value={formData.smtp_host}
-              onChange={(e) => handleInputChange('smtp_host', e.target.value)}
+              value={formData.smtpHost}
+              onChange={(e) => handleInputChange('smtpHost', e.target.value)}
               placeholder="SMTP host adresini girin" 
             />
           </div>
@@ -81,8 +79,8 @@ export function MailSettings({ onComplete }: MailSettingsProps) {
             <Input 
               id="smtpPort" 
               type="number" 
-              value={formData.smtp_port}
-              onChange={(e) => handleInputChange('smtp_port', parseInt(e.target.value))}
+              value={formData.smtpPort}
+              onChange={(e) => handleInputChange('smtpPort', parseInt(e.target.value))}
               placeholder="SMTP port numarasını girin" 
             />
           </div>
@@ -91,8 +89,8 @@ export function MailSettings({ onComplete }: MailSettingsProps) {
             <Label htmlFor="smtpUsername">SMTP Kullanıcı Adı</Label>
             <Input 
               id="smtpUsername" 
-              value={formData.smtp_username}
-              onChange={(e) => handleInputChange('smtp_username', e.target.value)}
+              value={formData.smtpUsername}
+              onChange={(e) => handleInputChange('smtpUsername', e.target.value)}
               placeholder="SMTP kullanıcı adını girin" 
             />
           </div>
@@ -102,8 +100,8 @@ export function MailSettings({ onComplete }: MailSettingsProps) {
             <Input 
               id="smtpPassword" 
               type="password" 
-              value={formData.smtp_password}
-              onChange={(e) => handleInputChange('smtp_password', e.target.value)}
+              value={formData.smtpPassword}
+              onChange={(e) => handleInputChange('smtpPassword', e.target.value)}
               placeholder="SMTP şifresini girin" 
             />
           </div>
@@ -113,8 +111,8 @@ export function MailSettings({ onComplete }: MailSettingsProps) {
             <Input 
               id="fromEmail" 
               type="email"
-              value={formData.from_email}
-              onChange={(e) => handleInputChange('from_email', e.target.value)}
+              value={formData.fromEmail}
+              onChange={(e) => handleInputChange('fromEmail', e.target.value)}
               placeholder="Gönderen e-posta adresini girin" 
             />
           </div>
@@ -123,8 +121,8 @@ export function MailSettings({ onComplete }: MailSettingsProps) {
             <Label htmlFor="fromName">Gönderen Adı</Label>
             <Input 
               id="fromName" 
-              value={formData.from_name}
-              onChange={(e) => handleInputChange('from_name', e.target.value)}
+              value={formData.fromName}
+              onChange={(e) => handleInputChange('fromName', e.target.value)}
               placeholder="Gönderen adını girin" 
             />
           </div>
@@ -133,8 +131,8 @@ export function MailSettings({ onComplete }: MailSettingsProps) {
             <Label htmlFor="smtpSecure">SSL/TLS Güvenlik</Label>
             <Switch 
               id="smtpSecure" 
-              checked={formData.smtp_secure}
-              onCheckedChange={(checked) => handleInputChange('smtp_secure', checked)}
+              checked={formData.smtpSecure}
+              onCheckedChange={(checked) => handleInputChange('smtpSecure', checked)}
             />
           </div>
 
@@ -142,8 +140,8 @@ export function MailSettings({ onComplete }: MailSettingsProps) {
             <Label htmlFor="isActive">Mail Gönderimi Aktif</Label>
             <Switch 
               id="isActive" 
-              checked={formData.is_active}
-              onCheckedChange={(checked) => handleInputChange('is_active', checked)}
+              checked={formData.isActive}
+              onCheckedChange={(checked) => handleInputChange('isActive', checked)}
             />
           </div>
         </CardContent>

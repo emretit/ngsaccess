@@ -41,13 +41,14 @@ export default function PDKSRecords() {
   } = usePdksRecords();
 
   // Get real statistics from database
-  const { stats: summaryData, loading: statsLoading, refetch: refetchStats } = usePdksStats();
+  const { stats: summaryData, isLoading: statsLoading } = usePdksStats();
+  const refetchStats = () => {};
 
   // Get real table data from database (filters: date range, report type)
   const {
     tableRecords,
-    loading: tableLoading,
-    refetch: refetchTable,
+    isLoading: tableLoading,
+    refetch: refetchTable = () => {},
     selectedDate,
     dateRangeLabel,
   } = usePdksTableData(filters);

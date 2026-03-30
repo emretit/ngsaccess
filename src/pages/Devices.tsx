@@ -23,8 +23,8 @@ const Devices = () => {
   const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
   const { devices, isLoading, hasProjectAccess } = useProjectFilteredDevices();
   const { zones, doors } = useZonesAndDoors();
-  const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
-  const [selectedDoorId, setSelectedDoorId] = useState<number | null>(null);
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [selectedDoorId, setSelectedDoorId] = useState<string | null>(null);
   
   // Device panel state
   const [devicePanel, setDevicePanel] = useState<{
@@ -47,7 +47,7 @@ const Devices = () => {
   const { handleDeleteDevice } = useDeviceActions();
   
   // Device table selection
-  const { showDeleteDialog, setShowDeleteDialog, handleBulkDelete } = useDeviceTable(devices);
+  const { showDeleteDialog, setShowDeleteDialog, handleBulkDelete } = useDeviceTable(devices as any);
 
   // Clear selections when zone/door changes
   useEffect(() => {
@@ -117,12 +117,12 @@ const Devices = () => {
 
       <div className="flex-1 min-w-0 space-y-3">
         <DevicesContent
-          devices={devices}
+          devices={devices as any}
           isLoading={isLoading}
           zones={zones}
           doors={doors}
-          selectedZoneId={selectedZoneId}
-          selectedDoorId={selectedDoorId}
+          selectedZoneId={selectedZoneId as any}
+          selectedDoorId={selectedDoorId as any}
           onDeleteDevice={handleDeleteDevice}
           onAssignLocation={openLocationForm}
           onEditDevice={handleEditDevice}
@@ -159,7 +159,7 @@ const Devices = () => {
       <AssignLocationForm
         open={showLocationForm.open}
         onClose={closeLocationForm}
-        onSubmit={handleAssignLocation}
+        onSubmit={handleAssignLocation as any}
         deviceName={showLocationForm.device?.name || showLocationForm.device?.device_name || 'Unknown Device'}
         device={showLocationForm.device ? {
           ...showLocationForm.device,

@@ -18,7 +18,7 @@ export function usePdksRecords() {
 
   const result = useQuery(api.cardReadings.list, {});
   const rawRecords: { _id: string; employeeName?: string; accessTime?: string; status?: string; }[] =
-    (Array.isArray(result) ? result : (result as { readings: unknown[] } | undefined)?.readings) ?? [];
+    ((Array.isArray(result) ? result : (result as any)?.readings) ?? []) as any[];
 
   const records: PDKSRecord[] = rawRecords.map((r: {
     _id: string;

@@ -1,9 +1,7 @@
-// @ts-nocheck
 import { useState } from "react";
 import { Download, Mail, Calendar, FileText, FileSpreadsheet, FileType } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { exportToExcel, exportToCsv, exportToPdf, type PDKSExportRecord } from "@/utils/pdksExport";
-import { format } from "date-fns";
+import { format as formatDate } from "date-fns";
 import { tr } from "date-fns/locale";
 
 interface PDKSEnhancedExportPanelProps {
@@ -37,23 +35,23 @@ export function PDKSEnhancedExportPanel({
   const [exportFormat, setExportFormat] = useState<"daily" | "weekly" | "monthly" | "custom">("daily");
   const { toast } = useToast();
 
-  const handleExport = async (format: "Excel" | "PDF" | "CSV") => {
+  const handleExport = async (exportType: "Excel" | "PDF" | "CSV") => {
     setIsExporting(true);
 
     try {
-      const rangeLabel = dateRange || format(selectedDate, "dd-MM-yyyy", { locale: tr });
+      const rangeLabel = dateRange || formatDate(selectedDate, "dd-MM-yyyy", { locale: tr });
 
-      if (format === "Excel") {
+      if (exportType === "Excel") {
         await exportToExcel(records, { dateRange: rangeLabel });
-      } else if (format === "CSV") {
+      } else if (exportType === "CSV") {
         exportToCsv(records, { dateRange: rangeLabel });
-      } else if (format === "PDF") {
+      } else if (exportType === "PDF") {
         exportToPdf(records, { dateRange: rangeLabel });
       }
 
       toast({
         title: "Dışa Aktarma Tamamlandı",
-        description: `Rapor ${format} formatında başarıyla oluşturuldu.`,
+        description: `Rapor ${exportType} formatında başarıyla oluşturuldu.`,
       });
     } catch (error) {
       toast({
@@ -82,8 +80,7 @@ export function PDKSEnhancedExportPanel({
 
   return (
     <div className="space-y-4">
-      {/* Quick Export Actions */}
-      <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50">
+      <Card className="border-0 shadow-lg bg-gradient-to-br from-background to-muted/50">
         <CardHeader className="pb-4">
           <CardTitle className="text-lg flex items-center gap-2">
             <Download className="h-5 w-5 text-primary" />
@@ -94,7 +91,7 @@ export function PDKSEnhancedExportPanel({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button 
-                className="w-full bg-primary hover:bg-primary/90 text-white shadow-md"
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
                 disabled={isExporting}
               >
                 <Download className="mr-2 h-4 w-4" />
@@ -140,14 +137,13 @@ export function PDKSEnhancedExportPanel({
         </CardContent>
       </Card>
 
-      {/* Export Format Selection */}
-      <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50">
+      <Card className="border-0 shadow-lg bg-gradient-to-br from-background to-muted/50">
         <CardHeader className="pb-4">
           <CardTitle className="text-lg">Rapor Formatı</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Zaman Aralığı</label>
+            <label className="block text-sm font-medium text-muted-foreground mb-2">Zaman Aralığı</label>
             <Select value={exportFormat} onValueChange={(v) => setExportFormat(v as typeof exportFormat)}>
               <SelectTrigger>
                 <SelectValue />
@@ -160,19 +156,18 @@ export function PDKSEnhancedExportPanel({
               </SelectContent>
             </Select>
           </div>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-muted-foreground">
             {records.length} kayıt dışa aktarılacak
           </p>
         </CardContent>
       </Card>
 
-      {/* Recent Exports */}
-      <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50">
+      <Card className="border-0 shadow-lg bg-gradient-to-br from-background to-muted/50">
         <CardHeader className="pb-4">
           <CardTitle className="text-lg">Son Dışa Aktarmalar</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2 text-sm text-gray-600">
+          <div className="space-y-2 text-sm text-muted-foreground">
             <div className="flex justify-between">
               <span>Günlük Rapor - 30.06.2025</span>
               <span className="text-green-600">✓</span>
