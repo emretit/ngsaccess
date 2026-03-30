@@ -79,11 +79,11 @@ export const list = authedQuery({
 
     const enriched = await Promise.all(
       paginated.map(async (r) => {
-        const device = r.deviceId ? await ctx.db.get(r.deviceId) : null;
-        const employee = r.employeeId ? await ctx.db.get(r.employeeId) : null;
-        let department = null;
+        const device = r.deviceId ? await ctx.db.get(r.deviceId) as Doc<"devices"> | null : null;
+        const employee = r.employeeId ? await ctx.db.get(r.employeeId) as Doc<"employees"> | null : null;
+        let department: Doc<"departments"> | null = null;
         if (employee?.departmentId) {
-          department = await ctx.db.get(employee.departmentId);
+          department = await ctx.db.get(employee.departmentId) as Doc<"departments"> | null;
         }
         return {
           ...r,
