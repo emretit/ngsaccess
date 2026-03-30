@@ -76,7 +76,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
                   const next = zone._id === selectedZone ? null : zone._id;
                   setSelectedZone(next);
                   setSelectedDoor(null);
-                  onSelectZone?.(next as unknown as number | null);
+                  onSelectZone?.(next);
                 }}
               >
                 <Button
