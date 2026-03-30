@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -15,19 +13,19 @@ export function NotificationSettings({ onComplete }: NotificationSettingsProps) 
   const { notificationSettings, isLoading, saveNotificationSettings, isSaving } = useNotificationSettings();
   
   const [formData, setFormData] = useState({
-    email_notifications: true,
-    late_notifications: true,
-    report_notifications: true,
-    system_notifications: true
+    emailNotifications: true,
+    lateNotifications: true,
+    reportNotifications: true,
+    systemNotifications: true
   });
 
   useEffect(() => {
     if (notificationSettings) {
       setFormData({
-        email_notifications: notificationSettings.email_notifications ?? true,
-        late_notifications: notificationSettings.late_notifications ?? true,
-        report_notifications: notificationSettings.report_notifications ?? true,
-        system_notifications: notificationSettings.system_notifications ?? true
+        emailNotifications: notificationSettings.emailNotifications ?? true,
+        lateNotifications: notificationSettings.lateNotifications ?? true,
+        reportNotifications: notificationSettings.reportNotifications ?? true,
+        systemNotifications: notificationSettings.systemNotifications ?? true
       });
     }
   }, [notificationSettings]);
@@ -60,8 +58,8 @@ export function NotificationSettings({ onComplete }: NotificationSettingsProps) 
           <Label htmlFor="emailNotifications">E-posta Bildirimleri</Label>
           <Switch 
             id="emailNotifications" 
-            checked={formData.email_notifications}
-            onCheckedChange={(checked) => handleSwitchChange('email_notifications', checked)}
+            checked={formData.emailNotifications}
+            onCheckedChange={(checked) => handleSwitchChange('emailNotifications', checked)}
           />
         </div>
         
@@ -69,8 +67,8 @@ export function NotificationSettings({ onComplete }: NotificationSettingsProps) 
           <Label htmlFor="lateNotifications">Geç Kalma Bildirimleri</Label>
           <Switch 
             id="lateNotifications" 
-            checked={formData.late_notifications}
-            onCheckedChange={(checked) => handleSwitchChange('late_notifications', checked)}
+            checked={formData.lateNotifications}
+            onCheckedChange={(checked) => handleSwitchChange('lateNotifications', checked)}
           />
         </div>
         
@@ -78,8 +76,8 @@ export function NotificationSettings({ onComplete }: NotificationSettingsProps) 
           <Label htmlFor="reportNotifications">Rapor Bildirimleri</Label>
           <Switch 
             id="reportNotifications" 
-            checked={formData.report_notifications}
-            onCheckedChange={(checked) => handleSwitchChange('report_notifications', checked)}
+            checked={formData.reportNotifications}
+            onCheckedChange={(checked) => handleSwitchChange('reportNotifications', checked)}
           />
         </div>
 
@@ -87,8 +85,8 @@ export function NotificationSettings({ onComplete }: NotificationSettingsProps) 
           <Label htmlFor="systemNotifications">Sistem Bildirimleri</Label>
           <Switch 
             id="systemNotifications" 
-            checked={formData.system_notifications}
-            onCheckedChange={(checked) => handleSwitchChange('system_notifications', checked)}
+            checked={formData.systemNotifications}
+            onCheckedChange={(checked) => handleSwitchChange('systemNotifications', checked)}
           />
         </div>
         
