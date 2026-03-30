@@ -149,7 +149,7 @@ export const getRecentByProjects = query({
 
     return await Promise.all(
       readings.map(async (r) => {
-        const device = r.deviceId ? await ctx.db.get(r.deviceId) : null;
+        const device = r.deviceId ? await ctx.db.get(r.deviceId) as Doc<"devices"> | null : null;
         return {
           ...r,
           access_granted: r.accessStatus === "izin_verildi",
