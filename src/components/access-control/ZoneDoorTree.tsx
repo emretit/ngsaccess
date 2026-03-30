@@ -121,7 +121,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
                         onClick={() => {
                           const next = door._id === selectedDoor ? null : door._id;
                           setSelectedDoor(next);
-                          onSelectDoor?.(next as unknown as number | null);
+                          onSelectDoor?.(next);
                         }}
                       >
                         <DoorClosed className="h-4 w-4 shrink-0 text-muted-foreground" />
