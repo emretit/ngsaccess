@@ -466,9 +466,9 @@ export const getDepartmentCostReport = authedQuery({
 
     for (const [_, empReadings] of employeeMap) {
       const first = empReadings[0];
-      const employee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
+      const employee = first.employeeId ? await ctx.db.get(first.employeeId) as Doc<"employees"> | null : null;
       const department = employee?.departmentId
-        ? await ctx.db.get(employee.departmentId)
+        ? await ctx.db.get(employee.departmentId) as Doc<"departments"> | null
         : null;
       const deptName = department?.name ?? "Belirtilmemiş";
 
