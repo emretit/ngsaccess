@@ -95,9 +95,9 @@ export const getSgkMonthlyReport = authedQuery({
     const reportRows = await Promise.all(
       Array.from(employeeMap.entries()).map(async ([empKey, empReadings]) => {
         const first = empReadings[0];
-        const employee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
+        const employee = first.employeeId ? await ctx.db.get(first.employeeId) as Doc<"employees"> | null : null;
         const department = employee?.departmentId
-          ? await ctx.db.get(employee.departmentId)
+          ? await ctx.db.get(employee.departmentId) as Doc<"departments"> | null
           : null;
 
         const empId = first.employeeId;

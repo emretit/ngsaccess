@@ -473,9 +473,9 @@ export const getPdksChartData = authedQuery({
     for (const r of readings) {
       const empKey = r.employeeId ?? r.cardNo;
       if (empToDept.has(empKey)) continue;
-      const emp = r.employeeId ? await ctx.db.get(r.employeeId) : null;
+      const emp = r.employeeId ? await ctx.db.get(r.employeeId) as Doc<"employees"> | null : null;
       if (emp?.departmentId) {
-        const dept = await ctx.db.get(emp.departmentId);
+        const dept = await ctx.db.get(emp.departmentId) as Doc<"departments"> | null;
         empToDept.set(empKey, dept?.name ?? "Bilinmiyor");
       } else {
         empToDept.set(empKey, "Bilinmiyor");
