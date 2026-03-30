@@ -18,7 +18,7 @@ export function ZoneDoorTreePanel({ onSelectZone, onSelectDoor }: ZoneDoorTreePa
   const [showAddZoneDialog, setShowAddZoneDialog] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const generalSettings = useQuery(api.settings.getGeneral);
+  const generalSettings = useQuery(api.settings.getGeneral, {});
   const companyName = isSuperAdmin ? "Tüm Projeler" : (generalSettings?.companyName ?? "Ana Proje");
 
   const handleZoneAdded = () => {

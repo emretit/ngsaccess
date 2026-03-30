@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 
 const ZonesAndDoors = () => {
-  const zones = useQuery(api.zones.list) ?? [];
-  const doors = useQuery(api.doors.list) ?? [];
+  const zones = useQuery(api.zones.list, {}) ?? [];
+  const doors = useQuery(api.doors.list, {}) ?? [];
   const zonesLoading = zones === undefined;
   const doorsLoading = doors === undefined;
 

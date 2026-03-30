@@ -146,7 +146,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
           open={showAddDoorDialog}
           onOpenChange={setShowAddDoorDialog}
           onSuccess={() => {}}
-          zoneId={selectedZoneForDoor.id as unknown as number}
+          zoneId={selectedZoneForDoor.id}
           zoneName={selectedZoneForDoor.name}
         />
       )}
