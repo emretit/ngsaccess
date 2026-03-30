@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Upload, Loader2 } from "lucide-react";
 import { Employee } from "@/types/employee";
 
 interface EmployeeBulkActionsProps {
@@ -16,6 +17,8 @@ interface EmployeeBulkActionsProps {
   onDepartmentChange: (value: string) => void;
   onUpdateDepartment: () => void;
   onDelete: () => void;
+  onSyncToDevices?: () => void;
+  isSyncing?: boolean;
 }
 
 export function EmployeeBulkActions({
@@ -24,10 +27,12 @@ export function EmployeeBulkActions({
   selectedDepartment,
   onDepartmentChange,
   onUpdateDepartment,
-  onDelete
+  onDelete,
+  onSyncToDevices,
+  isSyncing,
 }: EmployeeBulkActionsProps) {
   return (
-    <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
+    <div className="flex items-center gap-4 p-4 bg-muted rounded-lg flex-wrap">
       <span className="text-sm font-medium">{selectedCount} personel seçildi</span>
       <Select value={selectedDepartment} onValueChange={onDepartmentChange}>
         <SelectTrigger className="w-[200px]">
@@ -46,6 +51,16 @@ export function EmployeeBulkActions({
       >
         Departmanı Güncelle
       </Button>
+      {onSyncToDevices && (
+        <Button
+          variant="outline"
+          onClick={onSyncToDevices}
+          disabled={isSyncing}
+        >
+          {isSyncing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+          Cihazlara Gönder
+        </Button>
+      )}
       <Button
         variant="destructive"
         onClick={onDelete}
