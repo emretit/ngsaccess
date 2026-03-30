@@ -33,7 +33,7 @@ export default function Employees() {
     let filtered = employees;
 
     if (selectedDepartment) {
-      filtered = filtered.filter(emp => emp.department_id === selectedDepartment);
+      filtered = filtered.filter(emp => String(emp.department_id ?? emp.departmentId) === String(selectedDepartment));
     }
 
     if (searchQuery) {

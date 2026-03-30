@@ -23,8 +23,8 @@ const Devices = () => {
   const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
   const { devices, isLoading, hasProjectAccess } = useProjectFilteredDevices();
   const { zones, doors } = useZonesAndDoors();
-  const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
-  const [selectedDoorId, setSelectedDoorId] = useState<number | null>(null);
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [selectedDoorId, setSelectedDoorId] = useState<string | null>(null);
   
   // Device panel state
   const [devicePanel, setDevicePanel] = useState<{

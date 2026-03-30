@@ -48,7 +48,7 @@ export default function PDKSRecords() {
   const {
     tableRecords,
     loading: tableLoading,
-    refetch: refetchTable,
+    refetch: refetchTable = () => {},
     selectedDate,
     dateRangeLabel,
   } = usePdksTableData(filters);
