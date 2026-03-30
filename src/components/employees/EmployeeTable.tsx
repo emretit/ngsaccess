@@ -226,6 +226,20 @@ export default function EmployeeTable({
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => handleSyncToDevice(employee)}
+                      disabled={syncingEmployeeId === (employee._id || employee.id)}
+                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                      title="Cihaza Senkronize Et"
+                    >
+                      {syncingEmployeeId === (employee._id || employee.id) ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Upload className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => handlePasswordResetClick(employee)}
                       className="h-8 w-8 text-muted-foreground hover:text-foreground"
                       title="Şifre Sıfırlama Maili Gönder"
