@@ -6,6 +6,7 @@ import { Id } from "../../convex/_generated/dataModel";
 
 export interface Device {
   _id: Id<"devices">;
+  id?: string;
   name: string;
   projectId?: Id<"projects">;
   zoneId?: Id<"zones">;
@@ -22,11 +23,11 @@ export interface Device {
   updatedAt: string;
   zone?: { name: string } | null;
   door?: { name: string } | null;
-  // Legacy aliases for compatibility
   device_name?: string;
   device_serial?: string;
   device_type?: string;
   device_location?: string;
+  [key: string]: unknown;
 }
 
 export function useDevices() {

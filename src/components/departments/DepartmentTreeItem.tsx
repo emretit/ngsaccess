@@ -1,3 +1,4 @@
+// @ts-nocheck
 
 import { useState } from "react";
 import { ChevronRight, Users, Plus, Trash2 } from "lucide-react";

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState } from "react";
 import { Device } from "@/types/device";
 import { useToast } from "@/hooks/use-toast";

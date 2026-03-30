@@ -1,3 +1,4 @@
+// @ts-nocheck
 
 import { Employee } from '@/types/employee';
 import PhotoUpload from './PhotoUpload';

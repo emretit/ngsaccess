@@ -2,6 +2,7 @@ import { mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { authedQuery, adminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
+import { Doc } from "./_generated/dataModel";
 
 export const list = authedQuery({
   args: {
@@ -31,10 +32,10 @@ export const list = authedQuery({
     return await Promise.all(
       employees.map(async (emp) => {
         const department = emp.departmentId
-          ? await ctx.db.get(emp.departmentId)
+          ? await ctx.db.get(emp.departmentId) as Doc<"departments"> | null
           : null;
         const position = emp.positionId
-          ? await ctx.db.get(emp.positionId)
+          ? await ctx.db.get(emp.positionId) as Doc<"positions"> | null
           : null;
         return {
           ...emp,

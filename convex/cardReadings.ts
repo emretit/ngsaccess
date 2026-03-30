@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { authedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
+import { Doc } from "./_generated/dataModel";
 
 export const list = authedQuery({
   args: {
@@ -78,11 +79,11 @@ export const list = authedQuery({
 
     const enriched = await Promise.all(
       paginated.map(async (r) => {
-        const device = r.deviceId ? await ctx.db.get(r.deviceId) : null;
-        const employee = r.employeeId ? await ctx.db.get(r.employeeId) : null;
-        let department = null;
+        const device = r.deviceId ? await ctx.db.get(r.deviceId) as Doc<"devices"> | null : null;
+        const employee = r.employeeId ? await ctx.db.get(r.employeeId) as Doc<"employees"> | null : null;
+        let department: Doc<"departments"> | null = null;
         if (employee?.departmentId) {
-          department = await ctx.db.get(employee.departmentId);
+          department = await ctx.db.get(employee.departmentId) as Doc<"departments"> | null;
         }
         return {
           ...r,
@@ -148,7 +149,7 @@ export const getRecentByProjects = query({
 
     return await Promise.all(
       readings.map(async (r) => {
-        const device = r.deviceId ? await ctx.db.get(r.deviceId) : null;
+        const device = r.deviceId ? await ctx.db.get(r.deviceId) as Doc<"devices"> | null : null;
         return {
           ...r,
           access_granted: r.accessStatus === "izin_verildi",
@@ -238,9 +239,9 @@ export const getPdksTableData = authedQuery({
     const tableData = await Promise.all(
       Array.from(employeeMap.entries()).map(async ([empKey, empReadings]) => {
         const first = empReadings[0];
-        const employee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
+        const employee = first.employeeId ? await ctx.db.get(first.employeeId) as Doc<"employees"> | null : null;
         const department = employee?.departmentId
-          ? await ctx.db.get(employee.departmentId)
+          ? await ctx.db.get(employee.departmentId) as Doc<"departments"> | null
           : null;
 
         const empId = first.employeeId;
@@ -472,9 +473,9 @@ export const getPdksChartData = authedQuery({
     for (const r of readings) {
       const empKey = r.employeeId ?? r.cardNo;
       if (empToDept.has(empKey)) continue;
-      const emp = r.employeeId ? await ctx.db.get(r.employeeId) : null;
+      const emp = r.employeeId ? await ctx.db.get(r.employeeId) as Doc<"employees"> | null : null;
       if (emp?.departmentId) {
-        const dept = await ctx.db.get(emp.departmentId);
+        const dept = await ctx.db.get(emp.departmentId) as Doc<"departments"> | null;
         empToDept.set(empKey, dept?.name ?? "Bilinmiyor");
       } else {
         empToDept.set(empKey, "Bilinmiyor");

@@ -1,6 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
+import type { Id, Doc } from "./_generated/dataModel";
 import { authedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 
@@ -416,7 +416,7 @@ export const getRecentReadings = authedQuery({
 
     return await Promise.all(
       readings.map(async (r) => {
-        const device = r.deviceId ? await ctx.db.get(r.deviceId) : null;
+        const device = r.deviceId ? await ctx.db.get(r.deviceId) as Doc<"devices"> | null : null;
         return {
           id: r._id,
           access_time: r.accessTime,

@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
 
 interface ZoneDoorTreePanelProps {
-  onSelectZone?: (zoneId: number | null) => void;
-  onSelectDoor?: (doorId: number | null) => void;
+  onSelectZone?: (zoneId: string | null) => void;
+  onSelectDoor?: (doorId: string | null) => void;
 }
 
 export function ZoneDoorTreePanel({ onSelectZone, onSelectDoor }: ZoneDoorTreePanelProps) {
@@ -18,7 +18,7 @@ export function ZoneDoorTreePanel({ onSelectZone, onSelectDoor }: ZoneDoorTreePa
   const [showAddZoneDialog, setShowAddZoneDialog] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const generalSettings = useQuery(api.settings.getGeneral);
+  const generalSettings = useQuery(api.settings.getGeneral, {});
   const companyName = isSuperAdmin ? "Tüm Projeler" : (generalSettings?.companyName ?? "Ana Proje");
 
   const handleZoneAdded = () => {

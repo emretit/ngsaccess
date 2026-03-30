@@ -10,14 +10,14 @@ import { AddDoorDialog } from "./AddDoorDialog";
 import { toast } from "@/hooks/use-toast";
 
 interface ZoneDoorTreeProps {
-  onSelectDoor?: (doorId: number | null) => void;
-  onSelectZone?: (zoneId: number | null) => void;
+  onSelectDoor?: (doorId: string | null) => void;
+  onSelectZone?: (zoneId: string | null) => void;
   onZoneAdded?: () => void;
 }
 
 export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDoorTreeProps) => {
-  const zones = useQuery(api.zones.list) ?? [];
-  const doors = useQuery(api.doors.list) ?? [];
+  const zones = useQuery(api.zones.list, {}) ?? [];
+  const doors = useQuery(api.doors.list, {}) ?? [];
 
   const removeZone = useMutation(api.zones.remove);
   const removeDoor = useMutation(api.doors.remove);
@@ -35,7 +35,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
       return;
     }
     try {
-      await removeZone({ id: zoneId });
+      await removeZone({ zoneId });
       toast({ title: "Başarılı", description: "Bölge silindi" });
       onZoneAdded?.();
     } catch {
@@ -45,7 +45,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
 
   const handleDeleteDoor = async (doorId: Id<"doors">) => {
     try {
-      await removeDoor({ id: doorId });
+      await removeDoor({ doorId });
       toast({ title: "Başarılı", description: "Kapı silindi" });
     } catch {
       toast({ title: "Hata", description: "Kapı silinirken bir hata oluştu", variant: "destructive" });
@@ -76,7 +76,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
                   const next = zone._id === selectedZone ? null : zone._id;
                   setSelectedZone(next);
                   setSelectedDoor(null);
-                  onSelectZone?.(next as unknown as number | null);
+                  onSelectZone?.(next);
                 }}
               >
                 <Button
@@ -121,7 +121,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
                         onClick={() => {
                           const next = door._id === selectedDoor ? null : door._id;
                           setSelectedDoor(next);
-                          onSelectDoor?.(next as unknown as number | null);
+                          onSelectDoor?.(next);
                         }}
                       >
                         <DoorClosed className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -146,7 +146,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
           open={showAddDoorDialog}
           onOpenChange={setShowAddDoorDialog}
           onSuccess={() => {}}
-          zoneId={selectedZoneForDoor.id as unknown as number}
+          zoneId={selectedZoneForDoor.id}
           zoneName={selectedZoneForDoor.name}
         />
       )}

@@ -3,6 +3,7 @@ import { internalQuery, internalMutation } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
+import { Doc } from "./_generated/dataModel";
 
 const STANDARD_DAY_MINUTES = 8 * 60;
 const STANDARD_WEEK_MINUTES = 45 * 60;
@@ -94,9 +95,9 @@ export const getSgkMonthlyReport = authedQuery({
     const reportRows = await Promise.all(
       Array.from(employeeMap.entries()).map(async ([empKey, empReadings]) => {
         const first = empReadings[0];
-        const employee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
+        const employee = first.employeeId ? await ctx.db.get(first.employeeId) as Doc<"employees"> | null : null;
         const department = employee?.departmentId
-          ? await ctx.db.get(employee.departmentId)
+          ? await ctx.db.get(employee.departmentId) as Doc<"departments"> | null
           : null;
 
         const empId = first.employeeId;
@@ -243,9 +244,9 @@ export const getOvertimeSummaryReport = authedQuery({
 
     for (const [empKey, empReadings] of employeeMap) {
       const first = empReadings[0];
-      const employee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
+      const employee = first.employeeId ? await ctx.db.get(first.employeeId) as Doc<"employees"> | null : null;
       const department = employee?.departmentId
-        ? await ctx.db.get(employee.departmentId)
+        ? await ctx.db.get(employee.departmentId) as Doc<"departments"> | null
         : null;
 
       const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
@@ -361,9 +362,9 @@ export const getAttendanceSummaryReport = authedQuery({
     const rows = await Promise.all(
       Array.from(employeeMap.entries()).map(async ([empKey, empReadings]) => {
         const first = empReadings[0];
-        const employee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
+        const employee = first.employeeId ? await ctx.db.get(first.employeeId) as Doc<"employees"> | null : null;
         const department = employee?.departmentId
-          ? await ctx.db.get(employee.departmentId)
+          ? await ctx.db.get(employee.departmentId) as Doc<"departments"> | null
           : null;
 
         const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
@@ -465,9 +466,9 @@ export const getDepartmentCostReport = authedQuery({
 
     for (const [_, empReadings] of employeeMap) {
       const first = empReadings[0];
-      const employee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
+      const employee = first.employeeId ? await ctx.db.get(first.employeeId) as Doc<"employees"> | null : null;
       const department = employee?.departmentId
-        ? await ctx.db.get(employee.departmentId)
+        ? await ctx.db.get(employee.departmentId) as Doc<"departments"> | null
         : null;
       const deptName = department?.name ?? "Belirtilmemiş";
 

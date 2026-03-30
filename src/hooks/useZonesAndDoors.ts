@@ -5,18 +5,22 @@ import { Id } from "../../convex/_generated/dataModel";
 
 export interface Zone {
   _id: Id<"zones">;
+  id?: string;
   name: string;
   description?: string;
   projectId?: Id<"projects">;
+  [key: string]: unknown;
 }
 
 export interface Door {
   _id: Id<"doors">;
+  id?: string;
   name: string;
   zoneId?: Id<"zones">;
   location?: string;
   status?: string;
   projectId?: Id<"projects">;
+  [key: string]: unknown;
 }
 
 export function useZonesAndDoors() {

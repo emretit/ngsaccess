@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useEffect } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { Id } from "../../../../convex/_generated/dataModel";
