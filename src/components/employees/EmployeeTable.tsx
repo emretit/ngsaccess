@@ -3,7 +3,7 @@
 'use client';
 
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -12,7 +12,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Edit2, Trash2, Mail } from "lucide-react";
+import { Edit2, Trash2, Mail, Upload, Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useEmployeeTable } from "@/hooks/useEmployeeTable";
 import { EmployeeBulkActions } from "./EmployeeBulkActions";
