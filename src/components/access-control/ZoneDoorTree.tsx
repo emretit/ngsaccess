@@ -45,7 +45,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
 
   const handleDeleteDoor = async (doorId: Id<"doors">) => {
     try {
-      await removeDoor({ id: doorId });
+      await removeDoor({ doorId });
       toast({ title: "Başarılı", description: "Kapı silindi" });
     } catch {
       toast({ title: "Hata", description: "Kapı silinirken bir hata oluştu", variant: "destructive" });
