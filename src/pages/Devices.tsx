@@ -117,12 +117,12 @@ const Devices = () => {
 
       <div className="flex-1 min-w-0 space-y-3">
         <DevicesContent
-          devices={devices}
+          devices={devices as any}
           isLoading={isLoading}
           zones={zones}
           doors={doors}
-          selectedZoneId={selectedZoneId}
-          selectedDoorId={selectedDoorId}
+          selectedZoneId={selectedZoneId as any}
+          selectedDoorId={selectedDoorId as any}
           onDeleteDevice={handleDeleteDevice}
           onAssignLocation={openLocationForm}
           onEditDevice={handleEditDevice}
