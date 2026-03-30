@@ -40,6 +40,7 @@ export default function EmployeeTable({
   const [showIndividualDeleteDialog, setShowIndividualDeleteDialog] = useState(false);
   const [selectedEmployeeForDelete, setSelectedEmployeeForDelete] = useState<Employee | null>(null);
   const [syncingEmployeeId, setSyncingEmployeeId] = useState<string | null>(null);
+  const [isBulkSyncing, setIsBulkSyncing] = useState(false);
 
   const syncEmployeeToDevices = useAction(api.actions.hikvisionSync.syncEmployeeToDevices);
 
