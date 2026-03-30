@@ -3,7 +3,7 @@
 'use client';
 
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -12,7 +12,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Edit2, Trash2, Mail } from "lucide-react";
+import { Edit2, Trash2, Mail, Upload, Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useEmployeeTable } from "@/hooks/useEmployeeTable";
 import { EmployeeBulkActions } from "./EmployeeBulkActions";
@@ -39,6 +39,43 @@ export default function EmployeeTable({
   const [showPasswordResetDialog, setShowPasswordResetDialog] = useState(false);
   const [showIndividualDeleteDialog, setShowIndividualDeleteDialog] = useState(false);
   const [selectedEmployeeForDelete, setSelectedEmployeeForDelete] = useState<Employee | null>(null);
+  const [syncingEmployeeId, setSyncingEmployeeId] = useState<string | null>(null);
+  const [isBulkSyncing, setIsBulkSyncing] = useState(false);
+
+  const syncEmployeeToDevices = useAction(api.actions.hikvisionSync.syncEmployeeToDevices);
+
+  const handleSyncToDevice = async (employee: Employee) => {
+    const empId = (employee._id || employee.id) as unknown as Id<"employees">;
+    setSyncingEmployeeId(empId);
+    try {
+      const result = await syncEmployeeToDevices({ employeeId: empId });
+      if (result.synced > 0) {
+        toast({
+          title: "Senkronizasyon Başarılı",
+          description: `${employee.first_name || employee.firstName} ${employee.last_name || employee.lastName} — ${result.synced} cihaza gönderildi.`,
+        });
+      } else if (result.errors.length > 0) {
+        toast({
+          title: "Senkronizasyon Hatası",
+          description: result.errors.join(", "),
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Bilgi",
+          description: "Bu çalışanın bağlı olduğu cihaz veya kart numarası bulunamadı.",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Hata",
+        description: (err as Error).message || "Senkronizasyon sırasında bir hata oluştu.",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncingEmployeeId(null);
+    }
+  };
   
   const {
     sortedEmployees,
@@ -90,6 +127,42 @@ export default function EmployeeTable({
     onRefresh?.();
   };
 
+  const handleBulkSyncToDevices = async () => {
+    setIsBulkSyncing(true);
+    let totalSynced = 0;
+    let totalFailed = 0;
+    const allErrors: string[] = [];
+
+    for (const empId of selectedEmployees) {
+      try {
+        const result = await syncEmployeeToDevices({ employeeId: empId as Id<"employees"> });
+        totalSynced += result.synced;
+        totalFailed += result.failed;
+        allErrors.push(...result.errors);
+      } catch (err) {
+        totalFailed++;
+        allErrors.push((err as Error).message);
+      }
+    }
+
+    setIsBulkSyncing(false);
+
+    if (totalSynced > 0) {
+      toast({
+        title: "Toplu Senkronizasyon Tamamlandı",
+        description: `${totalSynced} cihaza gönderildi${totalFailed > 0 ? `, ${totalFailed} hata` : ""}.`,
+      });
+    } else if (allErrors.length > 0) {
+      toast({
+        title: "Senkronizasyon Hatası",
+        description: allErrors.slice(0, 3).join("; "),
+        variant: "destructive",
+      });
+    } else {
+      toast({ title: "Bilgi", description: "Seçili çalışanlar için bağlı cihaz bulunamadı." });
+    }
+  };
+
   return (
     <div className="space-y-4">
       {selectedEmployees.length > 0 && (
@@ -100,6 +173,8 @@ export default function EmployeeTable({
           onDepartmentChange={setSelectedDepartment}
           onUpdateDepartment={handleBulkDepartmentUpdate}
           onDelete={() => setShowDeleteDialog(true)}
+          onSyncToDevices={handleBulkSyncToDevices}
+          isSyncing={isBulkSyncing}
         />
       )}
 
@@ -187,6 +262,20 @@ export default function EmployeeTable({
                 </TableCell>
                 <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center justify-end gap-0.5">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleSyncToDevice(employee)}
+                      disabled={syncingEmployeeId === (employee._id || employee.id)}
+                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                      title="Cihaza Senkronize Et"
+                    >
+                      {syncingEmployeeId === (employee._id || employee.id) ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Upload className="h-4 w-4" />
+                      )}
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"
