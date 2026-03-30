@@ -2,6 +2,7 @@ import { mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { authedQuery, adminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
+import { Doc } from "./_generated/dataModel";
 
 export const list = authedQuery({
   args: {

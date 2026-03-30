@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { authedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
+import { Doc } from "./_generated/dataModel";
 
 export const list = authedQuery({
   args: {

@@ -3,6 +3,7 @@ import { internalQuery, internalMutation } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
+import { Doc } from "./_generated/dataModel";
 
 const STANDARD_DAY_MINUTES = 8 * 60;
 const STANDARD_WEEK_MINUTES = 45 * 60;
