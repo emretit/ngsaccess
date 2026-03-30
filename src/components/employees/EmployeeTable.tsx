@@ -127,7 +127,6 @@ export default function EmployeeTable({
     onRefresh?.();
   };
 
-  const [isBulkSyncing, setIsBulkSyncing] = useState(false);
   const handleBulkSyncToDevices = async () => {
     setIsBulkSyncing(true);
     let totalSynced = 0;
