@@ -47,7 +47,7 @@ export default function PDKSRecords() {
   // Get real table data from database (filters: date range, report type)
   const {
     tableRecords,
-    loading: tableLoading,
+    isLoading: tableLoading,
     refetch: refetchTable = () => {},
     selectedDate,
     dateRangeLabel,

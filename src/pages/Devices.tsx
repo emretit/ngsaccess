@@ -159,7 +159,7 @@ const Devices = () => {
       <AssignLocationForm
         open={showLocationForm.open}
         onClose={closeLocationForm}
-        onSubmit={handleAssignLocation}
+        onSubmit={handleAssignLocation as any}
         deviceName={showLocationForm.device?.name || showLocationForm.device?.device_name || 'Unknown Device'}
         device={showLocationForm.device ? {
           ...showLocationForm.device,
