@@ -8,10 +8,19 @@ import { checkUserRole } from '@/services/authService';
 
 type UserRole = "super_admin" | "project_admin" | "project_user";
 
+interface UserProfile {
+  _id?: string;
+  email?: string;
+  name?: string;
+  role?: UserRole;
+  photo_url?: string;
+  [key: string]: unknown;
+}
+
 interface AuthContextType {
   session: unknown | null;
-  user: unknown | null;
-  profile: unknown | null;
+  user: UserProfile | null;
+  profile: UserProfile | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: unknown | null }>;
   signUp: (email: string, password: string, name?: string) => Promise<{ error: unknown | null }>;
