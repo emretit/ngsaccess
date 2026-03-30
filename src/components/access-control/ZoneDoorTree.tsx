@@ -10,8 +10,8 @@ import { AddDoorDialog } from "./AddDoorDialog";
 import { toast } from "@/hooks/use-toast";
 
 interface ZoneDoorTreeProps {
-  onSelectDoor?: (doorId: number | null) => void;
-  onSelectZone?: (zoneId: number | null) => void;
+  onSelectDoor?: (doorId: string | null) => void;
+  onSelectZone?: (zoneId: string | null) => void;
   onZoneAdded?: () => void;
 }
 
