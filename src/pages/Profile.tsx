@@ -8,7 +8,7 @@ import { useProfileUtils } from '@/hooks/useProfileUtils';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 export default function Profile() {
-  const { user, profile, refreshProfile, signOut } = useAuth();
+  const { user, profile, refreshProfile, signOut } = useAuth() as { user: any; profile: any; refreshProfile: () => Promise<void>; signOut: () => Promise<void> };
   const { formData, getUserInitials, updateFormData } = useProfileUtils();
   const navigate = useNavigate();
 
