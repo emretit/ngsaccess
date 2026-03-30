@@ -6,10 +6,12 @@ import { Id } from "../../convex/_generated/dataModel";
 
 export interface Department {
   _id: Id<"departments">;
+  id?: string;
   name: string;
   projectId?: Id<"projects">;
   parentId?: Id<"departments">;
   level?: number;
+  [key: string]: unknown;
 }
 
 export function useDepartments() {
