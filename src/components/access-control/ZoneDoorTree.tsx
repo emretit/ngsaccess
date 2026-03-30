@@ -35,7 +35,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
       return;
     }
     try {
-      await removeZone({ id: zoneId });
+      await removeZone({ zoneId });
       toast({ title: "Başarılı", description: "Bölge silindi" });
       onZoneAdded?.();
     } catch {
