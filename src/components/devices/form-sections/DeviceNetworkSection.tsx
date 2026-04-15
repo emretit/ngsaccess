@@ -12,17 +12,11 @@ interface DeviceNetworkSectionProps {
 }
 
 export function DeviceNetworkSection({ form, isNewDevice }: DeviceNetworkSectionProps) {
-  const deviceType = form.watch("device_type");
-  const isHikvisionRelevant =
-    deviceType === "Erişim Terminali" ||
-    deviceType === "Kart Okuyucu" ||
-    deviceType === "Yüz Tanıma";
-
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide pb-2">Ağ Bilgileri</h3>
 
-      {isNewDevice && isHikvisionRelevant && (
+      {isNewDevice && (
         <Alert className="border-blue-200 bg-blue-50/50 dark:border-blue-900/50 dark:bg-blue-950/20">
           <Info className="h-4 w-4" />
           <AlertTitle>Hikvision ISAPI ile Bağlantı</AlertTitle>
@@ -53,36 +47,32 @@ export function DeviceNetworkSection({ form, isNewDevice }: DeviceNetworkSection
         )}
       />
 
-      {isHikvisionRelevant && (
-        <>
-          <FormField
-            control={form.control}
-            name="device_username"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Cihaz Kullanıcı Adı</FormLabel>
-                <FormControl>
-                  <Input placeholder="admin" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="device_password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Cihaz Şifresi</FormLabel>
-                <FormControl>
-                  <Input type="password" placeholder="Cihaz şifresi" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </>
-      )}
+      <FormField
+        control={form.control}
+        name="device_username"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Cihaz Kullanıcı Adı</FormLabel>
+            <FormControl>
+              <Input placeholder="admin" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      <FormField
+        control={form.control}
+        name="device_password"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Cihaz Şifresi</FormLabel>
+            <FormControl>
+              <Input type="password" placeholder="Cihaz şifresi" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
     </div>
   );
 }

@@ -15,7 +15,15 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "api": "node server.js",
-    "dev:api": "nodemon server.js"
+    "dev:api": "nodemon server.js",
+    "seed:hikvision-device": "npx convex run seedHikvisionLanDevice:run '{}'",
+    "verify:hikvision": "bash scripts/verify-hikvision-convex.sh",
+    "forward:card-reader": "node scripts/forward-card-reader-to-convex.mjs",
+    "setup:hikvision-forward": "bash scripts/setup-hikvision-forward-full.sh",
+    "bridge:hikvision": "node scripts/hikvision-bridge.mjs",
+    "test:endpoint": "bash scripts/test-convex-endpoint.sh",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@auth/core": "^0.37.0",
@@ -100,6 +108,7 @@
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^4.1.4"
   }
 }

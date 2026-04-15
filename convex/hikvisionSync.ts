@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalQuery, internalMutation } from "./_generated/server";
+import { internalQuery, internalMutation, query, mutation } from "./_generated/server";
 
 /**
  * Çalışanın erişim grupları üzerinden bağlı olduğu cihazları ve kuralları getirir.
@@ -153,6 +153,74 @@ export const assignWeekPlanNo = internalMutation({
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.accessRuleId, { hikWeekPlanNo: args.weekPlanNo });
+  },
+});
+
+/**
+ * Debug: tüm zinciri (employees → groupMembers → accessRules → groupDevices → devices)
+ * tek bir çağrıda rapor eder. CLI'dan çağrılabilir.
+ */
+export const debugSyncChain = query({
+  args: {},
+  handler: async (ctx) => {
+    const devices = await ctx.db.query("devices").collect();
+    const employees = await ctx.db.query("employees").collect();
+    const rules = await ctx.db.query("accessRules").collect();
+    const members = await ctx.db.query("groupMembers").collect();
+    const groupDevs = await ctx.db.query("groupDevices").collect();
+
+    return {
+      devices: devices.map((d) => ({
+        _id: d._id,
+        name: d.name,
+        deviceIp: d.deviceIp,
+        deviceUsername: d.deviceUsername ?? null,
+        hasPassword: !!d.devicePassword,
+        isActive: d.isActive ?? null,
+      })),
+      employees: employees.map((e) => ({
+        _id: e._id,
+        name: `${e.firstName} ${e.lastName}`,
+        cardNumber: e.cardNumber,
+        isActive: e.isActive ?? null,
+      })),
+      accessRules: rules.map((r) => ({
+        _id: r._id,
+        name: r.name,
+        isActive: r.isActive ?? null,
+        days: r.days ?? [],
+        startTime: r.startTime ?? null,
+        endTime: r.endTime ?? null,
+        hikWeekPlanNo: r.hikWeekPlanNo ?? null,
+      })),
+      groupMembers: members.map((m) => ({
+        groupId: m.groupId,
+        employeeId: m.employeeId,
+      })),
+      groupDevices: groupDevs.map((g) => ({
+        groupId: g.groupId,
+        deviceId: g.deviceId,
+      })),
+    };
+  },
+});
+
+/**
+ * Debug-only: auth bypass ederek cihaz credential'larını yazar.
+ * Test bittikten sonra silinecek.
+ */
+export const debugPatchDeviceCreds = mutation({
+  args: {
+    deviceId: v.id("devices"),
+    deviceUsername: v.optional(v.string()),
+    devicePassword: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const patch: Record<string, unknown> = {};
+    if (args.deviceUsername !== undefined) patch.deviceUsername = args.deviceUsername;
+    if (args.devicePassword !== undefined) patch.devicePassword = args.devicePassword;
+    await ctx.db.patch(args.deviceId, patch);
+    return patch;
   },
 });
 

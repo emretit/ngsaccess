@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
@@ -143,5 +143,33 @@ export const remove = authedMutation({
     await Promise.all(groupDevices.map((gd) => ctx.db.delete(gd._id)));
 
     await ctx.db.delete(args.deviceId);
+  },
+});
+
+/** HTTP action'dan çağrılır — cihazdan herhangi bir POST gelince lastSeen günceller. */
+export const updateLastSeen = internalMutation({
+  args: {
+    deviceSerial: v.optional(v.string()),
+    deviceIp: v.optional(v.string()),
+  },
+  handler: async (ctx, { deviceSerial, deviceIp }) => {
+    const now = new Date().toISOString();
+    let device = null;
+
+    if (deviceSerial) {
+      device = await ctx.db
+        .query("devices")
+        .withIndex("by_device_serial", (q) => q.eq("deviceSerial", deviceSerial))
+        .first();
+    }
+    if (!device && deviceIp) {
+      device = await ctx.db
+        .query("devices")
+        .filter((q) => q.eq(q.field("deviceIp"), deviceIp))
+        .first();
+    }
+    if (device) {
+      await ctx.db.patch(device._id, { lastSeen: now });
+    }
   },
 });

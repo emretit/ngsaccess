@@ -79,11 +79,7 @@ const Devices = () => {
       description: String(dev.description || ''),
       access_direction: (dev.accessDirection || dev.access_direction || 'both') as ServerDevice["access_direction"],
     };
-
-    setDevicePanel({
-      open: true,
-      device: serverDevice
-    });
+    setDevicePanel({ open: true, device: serverDevice });
   };
 
   const handleDevicePanelClose = () => {

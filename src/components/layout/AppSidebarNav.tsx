@@ -40,7 +40,7 @@ export function AppSidebarNav() {
               }
             >
               <Link to={item.href}>
-                <Icon className="h-5 w-5" />
+                <Icon className="h-4 w-4" />
                 <span>{item.name}</span>
               </Link>
             </SidebarMenuButton>

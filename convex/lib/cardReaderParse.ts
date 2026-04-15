@@ -12,6 +12,9 @@ export const CARD_FIELDS = [
   "credentialsNo",
   "employeeNo",
   "employeeNoString",
+  "currentCardNumber",
+  "wiegandCardNo",
+  "cardReaderNo",
 ] as const;
 
 /** Hikvision cihaz seri no alan adları */
@@ -39,6 +42,7 @@ function getFirstString(
   for (const f of fields) {
     const v = obj[f];
     if (v != null && typeof v === "string" && v.trim()) return v.trim();
+    if (typeof v === "number" && !Number.isNaN(v)) return String(v);
   }
   return undefined;
 }
@@ -105,6 +109,37 @@ function extractJsonFromMultipart(raw: string, contentType: string | null): stri
 }
 
 /**
+ * Hikvision bazen kartı üst seviyede değil, EventNotificationAlert içindeki
+ * AccessControllerEvent / AcsEvent alt nesnesinde gönderir; ilk anlamlı objeyi seçer.
+ */
+function pickHikvisionPayload(body: Record<string, unknown>): Record<string, unknown> {
+  const eventAlert = body.EventNotificationAlert as
+    | Record<string, unknown>
+    | undefined;
+  const acsEvent = body.AcsEvent as Record<string, unknown> | undefined;
+  const acEvent = body.AccessControllerEvent as Record<string, unknown> | undefined;
+
+  const candidates: Array<Record<string, unknown> | undefined> = [
+    eventAlert,
+    eventAlert?.AccessControllerEvent as Record<string, unknown> | undefined,
+    eventAlert?.AcsEvent as Record<string, unknown> | undefined,
+    acsEvent,
+    acEvent,
+    body,
+  ];
+
+  for (const c of candidates) {
+    if (!c || typeof c !== "object") continue;
+    if (getFirstString(c, CARD_FIELDS)) return c;
+  }
+  for (const c of candidates) {
+    if (!c || typeof c !== "object") continue;
+    if (getFirstString(c, SERIAL_FIELDS)) return c;
+  }
+  return eventAlert ?? acsEvent ?? acEvent ?? body;
+}
+
+/**
  * Raw body'den user_id (kart no) ve serial (cihaz seri no) çıkarır.
  * Çıktı processCardReading({ cardNo, deviceSerial, rawBody }) ile uyumludur:
  *   cardNo = user_id, deviceSerial = serial
@@ -128,14 +163,7 @@ export function parseCardReaderBody(
   ) {
     try {
       const body = JSON.parse(jsonSource) as Record<string, unknown>;
-      const eventAlert = body.EventNotificationAlert as
-        | Record<string, unknown>
-        | undefined;
-      const acsEvent = body.AcsEvent as Record<string, unknown> | undefined;
-      const acEvent = body.AccessControllerEvent as
-        | Record<string, unknown>
-        | undefined;
-      const payload = eventAlert ?? acsEvent ?? acEvent ?? body;
+      const payload = pickHikvisionPayload(body);
       let user_id = getFirstString(payload as Record<string, unknown>, CARD_FIELDS);
       let serial = getFirstString(payload as Record<string, unknown>, SERIAL_FIELDS);
       // Serial üst seviye body'de olabilir (örn. macAddress, serialNumber)
@@ -151,9 +179,22 @@ export function parseCardReaderBody(
       }
       if (!user_id) user_id = body.user_id as string | undefined;
       if (!serial) serial = body.serial as string | undefined;
+      const nestedAlert = body.EventNotificationAlert as
+        | Record<string, unknown>
+        | undefined;
+      const nestedAc = nestedAlert?.AccessControllerEvent as
+        | Record<string, unknown>
+        | undefined;
       const deviceIp =
         (body.ipAddress as string)?.trim() ||
-        (payload && (payload as Record<string, unknown>).ipAddress as string)?.trim();
+        (payload && (payload as Record<string, unknown>).ipAddress as string)?.trim() ||
+        nestedAlert?.ipAddress as string | undefined ||
+        nestedAc?.ipAddress as string | undefined;
+      if (!serial) {
+        serial =
+          getFirstString(nestedAc ?? {}, SERIAL_FIELDS) ||
+          getFirstString(nestedAlert ?? {}, SERIAL_FIELDS);
+      }
       return {
         user_id,
         serial,
@@ -167,10 +208,12 @@ export function parseCardReaderBody(
 
   if (raw.includes("<") && raw.includes(">")) {
     const { user_id, serial } = extractFromXmlOrMultipart(raw);
+    const ipMatch = raw.match(/<ipAddress>([^<]+)<\/ipAddress>/i);
+    const deviceIp = ipMatch?.[1]?.trim() || undefined;
     return {
       user_id,
       serial,
-      deviceIp: undefined,
+      deviceIp,
       bodyForLog: { _raw: raw.slice(0, 500), _format: "xml/multipart" },
     };
   }

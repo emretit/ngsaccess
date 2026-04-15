@@ -573,6 +573,11 @@ export const processCardReading = internalMutation({
   },
   handler: async (ctx, args) => {
     const accessTime = new Date().toISOString();
+    const firstProjectId = (await ctx.db.query("projects").first())?._id;
+    const projectForRow = (
+      employeeProject: typeof firstProjectId,
+      deviceProject: typeof firstProjectId
+    ) => employeeProject ?? deviceProject ?? firstProjectId;
 
     // 1. Cihazı serial veya IP ile bul (her zaman - kayıt için gerekli)
     let device = null;
@@ -597,7 +602,7 @@ export const processCardReading = internalMutation({
 
     if (!employee) {
       await ctx.db.insert("cardReadings", {
-        projectId: device?.projectId,
+        projectId: projectForRow(undefined, device?.projectId),
         deviceId: device?._id,
         cardNo: args.cardNo,
         accessTime,
@@ -611,7 +616,7 @@ export const processCardReading = internalMutation({
 
     if (!employee.isActive) {
       await ctx.db.insert("cardReadings", {
-        projectId: employee.projectId,
+        projectId: projectForRow(employee.projectId, device?.projectId),
         deviceId: device?._id,
         employeeId: employee._id,
         cardNo: args.cardNo,
@@ -627,7 +632,7 @@ export const processCardReading = internalMutation({
 
     if (!device) {
       await ctx.db.insert("cardReadings", {
-        projectId: employee.projectId,
+        projectId: projectForRow(employee.projectId, undefined),
         employeeId: employee._id,
         cardNo: args.cardNo,
         employeeName: `${employee.firstName} ${employee.lastName}`,
@@ -648,7 +653,7 @@ export const processCardReading = internalMutation({
 
     if (deviceGroups.length === 0) {
       await ctx.db.insert("cardReadings", {
-        projectId: employee.projectId,
+        projectId: projectForRow(employee.projectId, device.projectId),
         deviceId: device._id,
         employeeId: employee._id,
         cardNo: args.cardNo,
@@ -683,7 +688,7 @@ export const processCardReading = internalMutation({
 
     // 5. Kayıt oluştur
     await ctx.db.insert("cardReadings", {
-      projectId: employee.projectId,
+      projectId: projectForRow(employee.projectId, device.projectId),
       deviceId: device._id,
       employeeId: employee._id,
       cardNo: args.cardNo,

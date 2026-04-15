@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 interface DeviceTableRowProps {
   device: Device;
+  rowIndex?: number;
   zoneName?: string;
   doorName?: string;
   onDeleteDevice: (deviceId: string) => void;
@@ -20,6 +21,7 @@ interface DeviceTableRowProps {
 
 export function DeviceTableRow({
   device,
+  rowIndex,
   zoneName,
   doorName,
   onDeleteDevice,
@@ -76,7 +78,7 @@ export function DeviceTableRow({
           onCheckedChange={(checked) => onSelect(checked as boolean, deviceId)}
         />
       </TableCell>
-      <TableCell className="font-medium">{deviceId || '-'}</TableCell>
+      <TableCell className="font-medium text-muted-foreground">{rowIndex ?? '-'}</TableCell>
       <TableCell>{device.device_serial || (device as { deviceSerial?: string }).deviceSerial || device.serial_number || '-'}</TableCell>
       <TableCell>{device.device_model || device.device_type || (device as { deviceType?: string }).deviceType || '-'}</TableCell>
       <TableCell>{zoneName || '-'}</TableCell>

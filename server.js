@@ -8,6 +8,10 @@
  *
  * Deployment URL'ini Convex Dashboard > Settings > URL bölümünden alın.
  * Örnek: https://notable-tern-4.convex.site/card-reader
+ *
+ * Cihaz dışarı POST atamıyorsa (DNS/log yok): LAN'da
+ * `npm run forward:card-reader` ile scripts/forward-card-reader-to-convex.mjs
+ * çalıştırıp cihazı http://<PC_IP>:8765/card-reader adresine yönlendir.
  */
 
 import express from 'express';

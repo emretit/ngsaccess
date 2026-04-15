@@ -8,6 +8,22 @@ const http = httpRouter();
 
 auth.addHttpRoutes(http);
 
+/** Tarayıcı/curl ile: deployment ve HTTP route’un açık olduğunu doğrular (Hikvision POST kullanmaz). */
+http.route({
+  path: "/card-reader",
+  method: "GET",
+  handler: httpAction(async () => {
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        message:
+          "Kart olayları için cihaz bu adrese POST atmalı (Hikvision httpHosts).",
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  }),
+});
+
 /**
  * Kart okuyucu (Hikvision vb.) event'leri: body parse → processCardReading.
  * Bkz. docs/TABLO_PARSE_UYUMLULUK.md, docs/YAPILACAKLAR_VE_TEST.md
@@ -19,62 +35,41 @@ http.route({
     try {
       const contentType = request.headers.get("Content-Type");
       const raw = await request.text();
-
       const { user_id, serial, deviceIp, bodyForLog } = parseCardReaderBody(
         raw,
         contentType
       );
 
-      const eventType =
-        (bodyForLog as Record<string, unknown>).eventType as string | undefined;
-      const dateTime =
-        (bodyForLog as Record<string, unknown>).dateTime as string | undefined;
       const accessEvent =
         (bodyForLog as Record<string, unknown>).AccessControllerEvent as
           | Record<string, unknown>
           | undefined;
       const subEventType = accessEvent?.subEventType;
+      const dateTime =
+        (bodyForLog as Record<string, unknown>).dateTime as string | undefined;
 
-      const rawBodyPreview = raw.length > 500 ? raw.slice(0, 500) + "..." : raw;
-      const parsedList = {
-        "Kart no (cardNo)": user_id ?? "(yok)",
-        "Cihaz seri (serial)": serial ?? "(yok)",
-        "Cihaz IP (deviceIp)": deviceIp ?? "(yok)",
-        "Event tipi": eventType ?? "(yok)",
-        "Alt tip (subEventType)": subEventType ?? "(yok)",
-        "Tarih/saat": dateTime ?? "(yok)",
-        "Content-Type": contentType ?? "(yok)",
-        "Raw body": rawBodyPreview,
-      };
-      console.log("[card-reader] parse sonucu (liste):");
-      Object.entries(parsedList).forEach(([k, v]) =>
-        console.log(`  ${k}: ${v}`)
-      );
+      // Her POST'ta (heartbeat dahil) lastSeen güncelle — cihaz "online" görünsün
+      if (serial || deviceIp) {
+        await ctx.runMutation(internal.devices.updateLastSeen, {
+          deviceSerial: serial ?? undefined,
+          deviceIp: deviceIp ?? undefined,
+        });
+      }
 
       if (!user_id) {
-        const payload = {
-          cevap: "error",
-          error: "user_id missing",
-          parsed: parsedList,
-        };
-        console.warn("[card-reader] user_id missing");
-        return new Response(JSON.stringify(payload), {
+        // Heartbeat — sessizce atla, log basma
+        return new Response(JSON.stringify({ cevap: "ok" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
       }
-      if (!serial && !deviceIp) {
-        const payload = {
-          cevap: "error",
-          error: "serial and deviceIp missing",
-          parsed: parsedList,
-        };
-        console.warn("[card-reader] serial and deviceIp missing");
-        return new Response(JSON.stringify(payload), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
+      console.log("[card-reader] kart okundu", {
+        cardNo: user_id,
+        serial: serial ?? "(yok)",
+        deviceIp: deviceIp ?? "(yok)",
+        subEventType: subEventType ?? "(yok)",
+        dateTime: dateTime ?? "(yok)",
+      });
 
       const result = await ctx.runMutation(
         internal.cardReadings.processCardReading,
@@ -86,10 +81,7 @@ http.route({
         }
       );
 
-      console.log(
-        "[card-reader] sonuç:",
-        result.granted ? "izin_verildi" : "reddedildi"
-      );
+      console.log("[card-reader] sonuç:", result.granted ? "izin_verildi" : "reddedildi");
       // Remote Verification: Hikvision checkResult ("success"|"failed") + cevap (geriye uyumluluk)
       const payload = {
         cevap: result.granted ? "ok" : "error",

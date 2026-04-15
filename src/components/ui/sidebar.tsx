@@ -17,9 +17,9 @@ import {
 
 const SIDEBAR_COOKIE_NAME = "sidebar:state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "16rem"
-const SIDEBAR_WIDTH_MOBILE = "18rem"
-const SIDEBAR_WIDTH_ICON = "3rem"
+const SIDEBAR_WIDTH = "13rem"
+const SIDEBAR_WIDTH_MOBILE = "15rem"
+const SIDEBAR_WIDTH_ICON = "2.75rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContext = {
@@ -305,7 +305,7 @@ const SidebarHeader = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="header"
-      className={cn("flex h-14 shrink-0 items-center px-4 md:px-6 border-b border-sidebar-border", className)}
+      className={cn("flex h-12 shrink-0 items-center px-3 border-b border-sidebar-border", className)}
       {...props}
     />
   )
@@ -320,7 +320,7 @@ const SidebarFooter = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="footer"
-      className={cn("flex flex-col gap-2 px-4 py-2 md:px-6", className)}
+      className={cn("flex flex-col gap-2 px-3 py-2", className)}
       {...props}
     />
   )
@@ -335,7 +335,7 @@ const SidebarSeparator = React.forwardRef<
     <Separator
       ref={ref}
       data-sidebar="separator"
-      className={cn("mx-4 w-auto bg-sidebar-border md:mx-6", className)}
+      className={cn("mx-3 w-auto bg-sidebar-border", className)}
       {...props}
     />
   )
@@ -368,7 +368,7 @@ const SidebarGroup = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="group"
-      className={cn("relative flex w-full min-w-0 flex-col px-4 py-1 md:px-6", className)}
+      className={cn("relative flex w-full min-w-0 flex-col px-2 py-1", className)}
       {...props}
     />
   )

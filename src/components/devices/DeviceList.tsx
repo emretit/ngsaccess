@@ -85,7 +85,7 @@ export function DeviceList({
                   onCheckedChange={handleSelectAll}
                 />
               </TableHead>
-              <TableHead className="bg-gray-50 font-semibold">ID</TableHead>
+              <TableHead className="bg-gray-50 font-semibold">#</TableHead>
               <TableHead className="bg-gray-50 font-semibold">Cihaz Seri No</TableHead>
               <TableHead className="bg-gray-50 font-semibold">Cihaz Modeli</TableHead>
               <TableHead className="bg-gray-50 font-semibold">Bölge</TableHead>
@@ -110,6 +110,7 @@ export function DeviceList({
                 <DeviceTableRow
                   key={device.id || (device as { _id?: string })._id || `device-${i}`}
                   device={device}
+                  rowIndex={i + 1}
                   zoneName={getZoneName(device)}
                   doorName={getDoorName(device)}
                   onDeleteDevice={onDeleteDevice}

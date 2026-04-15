@@ -55,7 +55,7 @@ export default function Layout() {
       <AppSidebar />
       <SidebarInset className="h-screen overflow-hidden bg-slate-100 dark:bg-slate-900/80">
         <AppHeader title={pageTitle} />
-        <main className="flex-1 overflow-auto p-4 md:p-6 min-w-0 bg-slate-100 dark:bg-slate-900/80">
+        <main className="flex-1 overflow-auto p-3 md:p-4 min-w-0 bg-slate-100 dark:bg-slate-900/80">
           <Outlet />
         </main>
       </SidebarInset>

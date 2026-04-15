@@ -56,8 +56,8 @@ export function DeviceFilters({
           />
         </div>
 
-        {/* Filtreler */}
-        <div className="flex gap-2">
+        {/* Sağ: Kontroller */}
+        <div className="flex items-center gap-2 ml-auto">
           <Select value={statusFilter} onValueChange={onStatusFilterChange}>
             <SelectTrigger className="w-[100px] h-8 text-xs">
               <Filter className="mr-1.5 h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -83,10 +83,9 @@ export function DeviceFilters({
               ))}
             </SelectContent>
           </Select>
-        </div>
 
-        {/* Sağ: Yeni Cihaz */}
-        <DeviceFormButton onOpenDevicePanel={onNewDevice} />
+          <DeviceFormButton onOpenDevicePanel={onNewDevice} />
+        </div>
       </div>
     </div>
   );
