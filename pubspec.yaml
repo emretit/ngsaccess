@@ -34,7 +34,7 @@ dependencies:
   intl: ^0.20.2
   
   # Fonts
-  google_fonts: ^6.2.1
+  google_fonts: ^8.1.0
   
   # SVG support
   flutter_svg: ^2.0.10+1
