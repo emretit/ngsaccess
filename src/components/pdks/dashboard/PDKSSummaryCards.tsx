@@ -24,7 +24,7 @@ export function PDKSSummaryCards({ data }: PDKSSummaryCardsProps) {
       value: data.totalEmployees,
       icon: Users,
       color: "text-blue-600",
-      bgColor: "bg-gradient-to-br from-blue-50 to-blue-100",
+      bgColor: "bg-linear-to-br from-blue-50 to-blue-100",
       borderColor: "border-blue-200",
       change: "Aktif çalışan",
       changeType: "neutral" as const,
@@ -34,7 +34,7 @@ export function PDKSSummaryCards({ data }: PDKSSummaryCardsProps) {
       value: data.presentToday,
       icon: UserCheck,
       color: "text-green-600",
-      bgColor: "bg-gradient-to-br from-green-50 to-green-100",
+      bgColor: "bg-linear-to-br from-green-50 to-green-100",
       borderColor: "border-green-200",
       change: `%${data.devamOrani ?? 0} devam oranı`,
       changeType: "positive" as const,
@@ -44,7 +44,7 @@ export function PDKSSummaryCards({ data }: PDKSSummaryCardsProps) {
       value: data.lateArrivals,
       icon: Clock,
       color: "text-orange-600",
-      bgColor: "bg-gradient-to-br from-orange-50 to-orange-100",
+      bgColor: "bg-linear-to-br from-orange-50 to-orange-100",
       borderColor: "border-orange-200",
       change:
         data.topLateDepartment && data.topLateDepartment !== "-"
@@ -57,7 +57,7 @@ export function PDKSSummaryCards({ data }: PDKSSummaryCardsProps) {
       value: `${data.overtimeHours}h`,
       icon: Timer,
       color: "text-purple-600",
-      bgColor: "bg-gradient-to-br from-purple-50 to-purple-100",
+      bgColor: "bg-linear-to-br from-purple-50 to-purple-100",
       borderColor: "border-purple-200",
       change: "Bugün toplam",
       changeType: "neutral" as const,
@@ -67,7 +67,7 @@ export function PDKSSummaryCards({ data }: PDKSSummaryCardsProps) {
       value: data.leaveToday ?? 0,
       icon: Palmtree,
       color: "text-primary",
-      bgColor: "bg-gradient-to-br from-primary/10 to-primary/5",
+      bgColor: "bg-linear-to-br from-primary/10 to-primary/5",
       borderColor: "border-primary/30",
       change: "Bugün izinli",
       changeType: "neutral" as const,
@@ -77,7 +77,7 @@ export function PDKSSummaryCards({ data }: PDKSSummaryCardsProps) {
       value: data.insideBuilding,
       icon: Building,
       color: "text-primary",
-      bgColor: "bg-gradient-to-br from-red-50 to-red-100",
+      bgColor: "bg-linear-to-br from-red-50 to-red-100",
       borderColor: "border-red-200",
       change: "Canlı veri",
       changeType: "neutral" as const,
@@ -100,7 +100,7 @@ export function PDKSSummaryCards({ data }: PDKSSummaryCardsProps) {
               <CardTitle className="text-sm font-medium text-gray-600 group-hover:text-gray-800 transition-colors">
                 {card.title}
               </CardTitle>
-              <div className={`p-2 rounded-full bg-white/80 group-hover:bg-white transition-colors shadow-sm`}>
+              <div className={`p-2 rounded-full bg-white/80 group-hover:bg-white transition-colors shadow-xs`}>
                 <card.icon className={`h-5 w-5 ${card.color}`} />
               </div>
             </CardHeader>

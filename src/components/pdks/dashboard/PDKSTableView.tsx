@@ -119,7 +119,7 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
 
   return (
     <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-      <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200 rounded-t-lg">
+      <CardHeader className="bg-linear-to-r from-gray-50 to-white border-b border-gray-200 rounded-t-lg">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
             📊 Çalışan Kayıtları
@@ -238,7 +238,7 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
                   
                   {expandedRows.has(record.id) && record.detailedLogs && (
                     <TableRow>
-                      <TableCell colSpan={10} className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-primary">
+                      <TableCell colSpan={10} className="bg-linear-to-r from-blue-50 to-indigo-50 border-l-4 border-primary">
                         <div className="p-6">
                           <h4 className="font-bold mb-4 text-gray-800 flex items-center gap-2">
                             🕐 Günlük Detaylı Kayıtlar - {record.name}
@@ -247,7 +247,7 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
                             {record.detailedLogs.map((log, logIndex) => (
                               <div 
                                 key={logIndex} 
-                                className="flex justify-between items-center p-3 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
+                                className="flex justify-between items-center p-3 bg-white rounded-lg shadow-xs border border-gray-200 hover:shadow-md transition-shadow"
                               >
                                 <span className="font-bold text-primary text-lg">{log.time}</span>
                                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${

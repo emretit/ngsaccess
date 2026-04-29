@@ -58,20 +58,20 @@ export default function SystemAdmin() {
   if (loading) {
     console.log("SystemAdmin: Loading durumunda...");
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-slate-900 via-purple-900 to-slate-900">
         <div className="text-center">
           <div className="relative mb-8">
-            <div className="w-24 h-24 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 rounded-3xl flex items-center justify-center text-white font-bold mx-auto shadow-2xl animate-pulse">
+            <div className="w-24 h-24 bg-linear-to-r from-purple-600 via-pink-600 to-blue-600 rounded-3xl flex items-center justify-center text-white font-bold mx-auto shadow-2xl animate-pulse">
               <Shield className="w-12 h-12" />
             </div>
-            <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 rounded-3xl animate-ping opacity-20"></div>
-            <div className="absolute -inset-4 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 rounded-3xl blur-xl opacity-30 animate-pulse"></div>
+            <div className="absolute inset-0 bg-linear-to-r from-purple-600 via-pink-600 to-blue-600 rounded-3xl animate-ping opacity-20"></div>
+            <div className="absolute -inset-4 bg-linear-to-r from-purple-600 via-pink-600 to-blue-600 rounded-3xl blur-xl opacity-30 animate-pulse"></div>
           </div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent mb-4">
+          <h2 className="text-3xl font-bold bg-linear-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent mb-4">
             Sistem Hazırlanıyor...
           </h2>
           <div className="w-80 h-3 bg-slate-700/50 rounded-full mx-auto overflow-hidden backdrop-blur-sm">
-            <div className="h-full bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 animate-pulse rounded-full"></div>
+            <div className="h-full bg-linear-to-r from-purple-500 via-pink-500 to-blue-500 animate-pulse rounded-full"></div>
           </div>
           <p className="text-purple-300 mt-4 text-sm">Yükleniyor, lütfen bekleyiniz...</p>
         </div>
@@ -89,7 +89,7 @@ export default function SystemAdmin() {
   if (!profile) {
     console.log("SystemAdmin: Profile henüz yüklenmedi, bekleniyor...");
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-slate-900 via-purple-900 to-slate-900">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-500 mx-auto mb-4"></div>
           <p className="text-purple-300">Profile yükleniyor...</p>
@@ -107,7 +107,7 @@ export default function SystemAdmin() {
   console.log("SystemAdmin: ✅ Tüm kontroller geçildi, sayfa render ediliyor!");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+    <div className="min-h-screen bg-linear-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
       {/* Enhanced Animated Background */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-purple-500/30 rounded-full blur-3xl animate-pulse"></div>
@@ -127,16 +127,16 @@ export default function SystemAdmin() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-8">
               <div className="relative group">
-                <div className="w-20 h-20 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 rounded-3xl flex items-center justify-center shadow-2xl group-hover:scale-105 transition-transform duration-300">
+                <div className="w-20 h-20 bg-linear-to-r from-purple-600 via-pink-600 to-blue-600 rounded-3xl flex items-center justify-center shadow-2xl group-hover:scale-105 transition-transform duration-300">
                   <Shield className="w-10 h-10 text-white" />
                 </div>
                 <div className="absolute -top-2 -right-2 w-8 h-8 bg-green-500 rounded-full border-4 border-black animate-pulse shadow-lg flex items-center justify-center">
                   <div className="w-2 h-2 bg-white rounded-full"></div>
                 </div>
-                <div className="absolute -inset-2 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 rounded-3xl blur-lg opacity-20 animate-pulse"></div>
+                <div className="absolute -inset-2 bg-linear-to-r from-purple-600 via-pink-600 to-blue-600 rounded-3xl blur-lg opacity-20 animate-pulse"></div>
               </div>
               <div>
-                <h1 className="text-5xl font-bold bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent leading-tight">
+                <h1 className="text-5xl font-bold bg-linear-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent leading-tight">
                   Sistem Yönetimi
                 </h1>
                 <p className="text-purple-300 mt-3 text-xl font-medium">Süper Admin Kontrol Merkezi</p>
@@ -153,7 +153,7 @@ export default function SystemAdmin() {
                 <p className="text-purple-400 text-xs mt-1">Rol: {profile?.role}</p>
               </div>
               <div className="flex flex-col items-center space-y-3">
-                <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 text-white text-sm font-bold px-6 py-3 rounded-full shadow-xl flex items-center space-x-2 hover:scale-105 transition-transform duration-300">
+                <span className="bg-linear-to-r from-purple-600 via-pink-600 to-blue-600 text-white text-sm font-bold px-6 py-3 rounded-full shadow-xl flex items-center space-x-2 hover:scale-105 transition-transform duration-300">
                   <Shield className="w-5 h-5" />
                   <span>SUPER ADMIN</span>
                 </span>
@@ -171,8 +171,8 @@ export default function SystemAdmin() {
       <div className="relative z-10 px-8 py-10">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           <Card className="bg-black/30 backdrop-blur-2xl border-white/20 hover:bg-black/40 transition-all duration-500 group overflow-hidden relative shadow-2xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-600/30 to-purple-600/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
+            <div className="absolute inset-0 bg-linear-to-br from-blue-600/30 to-purple-600/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-blue-500 to-purple-500"></div>
             <CardContent className="p-8 relative z-10">
               <div className="flex items-center justify-between">
                 <div>
@@ -188,8 +188,8 @@ export default function SystemAdmin() {
           </Card>
 
           <Card className="bg-black/30 backdrop-blur-2xl border-white/20 hover:bg-black/40 transition-all duration-500 group overflow-hidden relative shadow-2xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-green-600/30 to-emerald-600/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 to-emerald-500"></div>
+            <div className="absolute inset-0 bg-linear-to-br from-green-600/30 to-emerald-600/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-green-500 to-emerald-500"></div>
             <CardContent className="p-8 relative z-10">
               <div className="flex items-center justify-between">
                 <div>
@@ -205,8 +205,8 @@ export default function SystemAdmin() {
           </Card>
 
           <Card className="bg-black/30 backdrop-blur-2xl border-white/20 hover:bg-black/40 transition-all duration-500 group overflow-hidden relative shadow-2xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-600/30 to-pink-600/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-pink-500"></div>
+            <div className="absolute inset-0 bg-linear-to-br from-purple-600/30 to-pink-600/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-purple-500 to-pink-500"></div>
             <CardContent className="p-8 relative z-10">
               <div className="flex items-center justify-between">
                 <div>
@@ -222,8 +222,8 @@ export default function SystemAdmin() {
           </Card>
 
           <Card className="bg-black/30 backdrop-blur-2xl border-white/20 hover:bg-black/40 transition-all duration-500 group overflow-hidden relative shadow-2xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-600/30 to-red-600/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 to-red-500"></div>
+            <div className="absolute inset-0 bg-linear-to-br from-orange-600/30 to-red-600/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-orange-500 to-red-500"></div>
             <CardContent className="p-8 relative z-10">
               <div className="flex items-center justify-between">
                 <div>
@@ -241,7 +241,7 @@ export default function SystemAdmin() {
 
         {/* Enhanced Main Dashboard Container */}
         <div className="bg-black/30 backdrop-blur-2xl border border-white/20 rounded-3xl p-10 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600"></div>
+          <div className="absolute top-0 left-0 w-full h-2 bg-linear-to-r from-purple-600 via-pink-600 to-blue-600"></div>
           <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl"></div>
           <div className="relative z-10">
             <AdminDashboard />

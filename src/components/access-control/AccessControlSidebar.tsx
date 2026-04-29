@@ -26,7 +26,7 @@ const sidebarItems = [
 
 export function AccessControlSidebar({ selected, onSelect }: AccessControlSidebarProps) {
   return (
-    <div className="h-full w-[240px] shrink-0 bg-card rounded-xl border shadow-sm">
+    <div className="h-full w-[240px] shrink-0 bg-card rounded-xl border shadow-xs">
       <div className="p-6 border-b border-border">
         <div className="flex items-center gap-2">
           <Shield className="h-5 w-5 text-primary" />

@@ -100,7 +100,7 @@ Parser’ın okuduğu Hikvision alanları (wrapper’lar: EventNotificationAlert
 - [ ] **employees:** En az bir çalışanın `cardNumber` değeri, Hikvision’ın gönderdiği kart no ile **aynı** (trim, büyük/küçük harf dahil).
 - [ ] **devices:** Cihaz kaydında `deviceSerial`, Hikvision’ın gönderdiği seri no ile **aynı** (örn. `DS-K1T343MFWX20240702V032100ENFT9649880`).
 - [ ] **cardReadings:** Zorunlu alanlar `cardNo`, `accessTime`; processCardReading tüm insert’lerde bunları ve optional alanları dolduruyor.
-- [ ] **Parse:** Yeni bir endpoint (Convex HTTP, Supabase Edge, vb.) kullanacaksanız, aynı alan listeleriyle (cardFields, serialFields) parse yapıp `cardNo` + `deviceSerial` + `rawBody` ile processCardReading’i çağırın.
+- [ ] **Parse:** Yeni bir endpoint (Convex HTTP, vb.) kullanacaksanız, aynı alan listeleriyle (cardFields, serialFields) parse yapıp `cardNo` + `deviceSerial` + `rawBody` ile processCardReading'i çağırın.
 
 ---
 

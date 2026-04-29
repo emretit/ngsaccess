@@ -136,7 +136,7 @@ export default function Employees() {
 
         <EmployeeStats employees={employees} />
 
-        <div className="rounded-xl border bg-card shadow-sm">
+        <div className="rounded-xl border bg-card shadow-xs">
           <EmployeeTable
             employees={paginatedEmployees}
             onEdit={handleEditEmployee}

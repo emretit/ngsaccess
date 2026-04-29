@@ -137,8 +137,8 @@ export default function PDKSRecords() {
         <Card className="bg-white/95 backdrop-blur-sm dark:bg-gray-900/95 rounded-2xl shadow-2xl border-0 overflow-hidden">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             {/* Enhanced Tab Navigation */}
-            <div className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 p-4 sm:p-6 border-b border-gray-200/50">
-              <TabsList className="grid w-full grid-cols-4 max-w-2xl bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700 rounded-xl p-1 shadow-inner h-12">
+            <div className="bg-linear-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 p-4 sm:p-6 border-b border-gray-200/50">
+              <TabsList className="grid w-full grid-cols-4 max-w-2xl bg-linear-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700 rounded-xl p-1 shadow-inner h-12">
                 <TabsTrigger 
                   value="table" 
                   className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-md rounded-lg transition-all duration-200 text-sm font-medium"
@@ -206,7 +206,7 @@ export default function PDKSRecords() {
       {/* Enhanced AI Chat - Fixed Sidebar (Desktop) */}
       {showAiChat && (
         <div className="hidden lg:block fixed right-0 top-0 h-full w-80 bg-white/98 backdrop-blur-md dark:bg-gray-900/98 border-l border-gray-200/50 dark:border-gray-800/50 z-50 shadow-2xl">
-          <div className="flex items-center justify-between p-4 border-b border-gray-200/50 dark:border-gray-800/50 bg-gradient-to-r from-primary to-primary/80 text-white">
+          <div className="flex items-center justify-between p-4 border-b border-gray-200/50 dark:border-gray-800/50 bg-linear-to-r from-primary to-primary/80 text-white">
             <div className="flex items-center gap-3">
               <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
                 <MessageSquare className="h-5 w-5" />
@@ -235,7 +235,7 @@ export default function PDKSRecords() {
       {showAiChat && (
         <div className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50">
           <div className="absolute right-0 top-0 h-full w-full max-w-sm bg-white/98 backdrop-blur-md dark:bg-gray-900/98 shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200/50 dark:border-gray-800/50 bg-gradient-to-r from-primary to-primary/80 text-white">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200/50 dark:border-gray-800/50 bg-linear-to-r from-primary to-primary/80 text-white">
               <div className="flex items-center gap-3">
                 <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
                   <MessageSquare className="h-5 w-5" />
@@ -265,7 +265,7 @@ export default function PDKSRecords() {
       <div className="lg:hidden fixed bottom-6 right-6 z-40">
         <Button
           onClick={() => setShowAiChat(!showAiChat)}
-          className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white rounded-full h-16 w-16 p-0 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110 active:scale-95"
+          className="bg-linear-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-white rounded-full h-16 w-16 p-0 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110 active:scale-95"
         >
           {showAiChat ? <X className="h-6 w-6" /> : <MessageSquare className="h-6 w-6" />}
         </Button>

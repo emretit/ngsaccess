@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Clock, Palmtree, User, QrCode } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import QRCode from "qrcode.react";
+import { QRCodeSVG as QRCode } from "qrcode.react";
 
 const LEAVE_LABELS: Record<string, string> = {
   annual: "Yıllık",

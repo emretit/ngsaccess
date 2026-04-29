@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 
 const HeroSection = () => {
   return (
-    <section className="py-20 md:py-32 bg-gradient-to-b from-background to-muted/30">
+    <section className="py-20 md:py-32 bg-linear-to-b from-background to-muted/30">
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row items-center justify-between gap-12">
           <div className="max-w-2xl">

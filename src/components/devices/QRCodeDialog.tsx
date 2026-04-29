@@ -1,7 +1,7 @@
 
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import QRCode from 'qrcode.react';
+import { QRCodeSVG as QRCode } from 'qrcode.react';
 import {
   Dialog,
   DialogContent,

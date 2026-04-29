@@ -9,7 +9,7 @@ interface AiInsightsCardProps {
 
 export function AiInsightsCard({ insight, isLoading = false }: AiInsightsCardProps) {
   return (
-    <Card className="bg-gradient-to-br from-white to-secondary/20 dark:from-gray-800 dark:to-primary/10 border-primary/10">
+    <Card className="bg-linear-to-br from-white to-secondary/20 dark:from-gray-800 dark:to-primary/10 border-primary/10">
       <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
         <CardTitle className="text-md font-medium flex items-center text-primary">
           <Sparkles className="h-4 w-4 mr-2" />

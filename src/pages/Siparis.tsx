@@ -16,7 +16,7 @@ export default function Siparis() {
         </Button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border bg-background shadow-sm">
+      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border bg-background shadow-xs">
         <iframe
           title="Siparis"
           src="/siparis-app/index.html"

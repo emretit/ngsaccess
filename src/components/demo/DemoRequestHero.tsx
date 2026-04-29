@@ -4,7 +4,7 @@ import { ArrowRight, CheckCircle } from "lucide-react";
 
 const DemoRequestHero = () => {
   return (
-    <div className="bg-gradient-to-br from-primary to-primary/90 text-white py-16 px-4">
+    <div className="bg-linear-to-br from-primary to-primary/90 text-white py-16 px-4">
       <div className="max-w-4xl mx-auto text-center">
         <div className="w-20 h-20 bg-white/10 rounded-2xl flex items-center justify-center text-white font-bold text-3xl mx-auto mb-6 backdrop-blur-sm">
           P

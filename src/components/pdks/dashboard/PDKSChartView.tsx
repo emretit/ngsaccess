@@ -97,7 +97,7 @@ export function PDKSChartView() {
     <div className="space-y-6 animate-fade-in">
       {/* Chart Overview Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-all duration-300">
+        <Card className="bg-linear-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -109,7 +109,7 @@ export function PDKSChartView() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:shadow-lg transition-all duration-300">
+        <Card className="bg-linear-to-br from-green-50 to-green-100 border-green-200 hover:shadow-lg transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -127,7 +127,7 @@ export function PDKSChartView() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200 hover:shadow-lg transition-all duration-300">
+        <Card className="bg-linear-to-br from-yellow-50 to-yellow-100 border-yellow-200 hover:shadow-lg transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -139,7 +139,7 @@ export function PDKSChartView() {
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200 hover:shadow-lg transition-all duration-300">
+        <Card className="bg-linear-to-br from-red-50 to-red-100 border-red-200 hover:shadow-lg transition-all duration-300">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -321,7 +321,7 @@ export function PDKSChartView() {
         </Card>
 
         {/* Quick Stats */}
-        <Card className="shadow-xl border-0 bg-gradient-to-br from-gray-50 to-white hover:shadow-2xl transition-all duration-300">
+        <Card className="shadow-xl border-0 bg-linear-to-br from-gray-50 to-white hover:shadow-2xl transition-all duration-300">
           <CardHeader>
             <CardTitle className="text-lg font-bold text-gray-900">📈 Hızlı İstatistikler</CardTitle>
           </CardHeader>

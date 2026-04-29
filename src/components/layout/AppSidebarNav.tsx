@@ -35,7 +35,7 @@ export function AppSidebarNav() {
               tooltip={item.name}
               className={
                 isActive
-                  ? "!bg-white/20 !text-white hover:!bg-white/30 hover:!text-white"
+                  ? "bg-white/20! text-white! hover:bg-white/30! hover:text-white!"
                   : undefined
               }
             >

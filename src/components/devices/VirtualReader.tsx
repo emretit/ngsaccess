@@ -1,6 +1,6 @@
 
 import React from 'react';
-import QRCode from 'qrcode.react';
+import { QRCodeSVG as QRCode } from 'qrcode.react';
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from '@/components/ui/sonner';
 
@@ -52,7 +52,7 @@ const VirtualReader = ({
         className="flex flex-col items-center justify-center p-6 space-y-4"
         onClick={handleClick}
       >
-        <div className="bg-white p-2 rounded-lg shadow-sm">
+        <div className="bg-white p-2 rounded-lg shadow-xs">
           <QRCode
             value={id}
             size={size}

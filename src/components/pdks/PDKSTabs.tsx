@@ -47,7 +47,7 @@ export function PDKSTabs({
       </TabsContent>
       
       <TabsContent value="attendance" className="mt-4">
-        <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
+        <div className="rounded-lg border bg-card shadow-xs overflow-hidden">
           <PDKSTable
             records={filteredRecords}
             loading={loading}
@@ -58,14 +58,14 @@ export function PDKSTabs({
       </TabsContent>
       
       <TabsContent value="department" className="mt-4">
-        <div className="rounded-lg border bg-card shadow-sm p-6">
+        <div className="rounded-lg border bg-card shadow-xs p-6">
           <h3 className="font-medium text-lg mb-4">Departman Raporları</h3>
           <p className="text-gray-500">Bu özellik henüz geliştirilmektedir.</p>
         </div>
       </TabsContent>
       
       <TabsContent value="detailed" className="mt-4">
-        <div className="rounded-lg border bg-card shadow-sm p-6">
+        <div className="rounded-lg border bg-card shadow-xs p-6">
           <h3 className="font-medium text-lg mb-4">Detaylı Raporlar</h3>
           <p className="text-gray-500">Bu özellik henüz geliştirilmektedir.</p>
         </div>

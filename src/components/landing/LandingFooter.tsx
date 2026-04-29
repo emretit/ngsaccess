@@ -23,15 +23,15 @@ const LandingFooter = () => {
             <h4 className="font-medium mb-6 text-xl">İLETİŞİM</h4>
             <ul className="space-y-4">
               <li className="flex items-start">
-                <MapPin className="h-5 w-5 mr-3 mt-1 flex-shrink-0" />
+                <MapPin className="h-5 w-5 mr-3 mt-1 shrink-0" />
                 <span>Hasanpaşa Mh. Mandıra Cd. No:4/39<br />Kadıköy / İSTANBUL</span>
               </li>
               <li className="flex items-center">
-                <Phone className="h-5 w-5 mr-3 flex-shrink-0" />
+                <Phone className="h-5 w-5 mr-3 shrink-0" />
                 <span>0(212) 577-3572</span>
               </li>
               <li className="flex items-center">
-                <Mail className="h-5 w-5 mr-3 flex-shrink-0" />
+                <Mail className="h-5 w-5 mr-3 shrink-0" />
                 <a href="mailto:info@ngsplus.app" className="hover:underline">info@ngsplus.app</a>
               </li>
             </ul>

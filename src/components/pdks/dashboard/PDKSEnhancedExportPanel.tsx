@@ -80,7 +80,7 @@ export function PDKSEnhancedExportPanel({
 
   return (
     <div className="space-y-4">
-      <Card className="border-0 shadow-lg bg-gradient-to-br from-background to-muted/50">
+      <Card className="border-0 shadow-lg bg-linear-to-br from-background to-muted/50">
         <CardHeader className="pb-4">
           <CardTitle className="text-lg flex items-center gap-2">
             <Download className="h-5 w-5 text-primary" />
@@ -137,7 +137,7 @@ export function PDKSEnhancedExportPanel({
         </CardContent>
       </Card>
 
-      <Card className="border-0 shadow-lg bg-gradient-to-br from-background to-muted/50">
+      <Card className="border-0 shadow-lg bg-linear-to-br from-background to-muted/50">
         <CardHeader className="pb-4">
           <CardTitle className="text-lg">Rapor Formatı</CardTitle>
         </CardHeader>
@@ -162,7 +162,7 @@ export function PDKSEnhancedExportPanel({
         </CardContent>
       </Card>
 
-      <Card className="border-0 shadow-lg bg-gradient-to-br from-background to-muted/50">
+      <Card className="border-0 shadow-lg bg-linear-to-br from-background to-muted/50">
         <CardHeader className="pb-4">
           <CardTitle className="text-lg">Son Dışa Aktarmalar</CardTitle>
         </CardHeader>

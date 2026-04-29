@@ -121,14 +121,14 @@ const AdminProjectsPanel = () => {
     <div className="space-y-8">
       <div className="flex items-center justify-between mb-10">
         <div>
-          <h3 className="text-3xl font-bold bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent">
+          <h3 className="text-3xl font-bold bg-linear-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent">
             Proje Yönetimi
           </h3>
           <p className="text-purple-300 mt-2 text-lg">Sistemdeki tüm projeleri ve kullanıcıları yönetin</p>
         </div>
         <Button
           onClick={handleCreateProject}
-          className="bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 hover:from-purple-700 hover:via-pink-700 hover:to-blue-700 text-white font-bold px-8 py-4 rounded-xl shadow-xl hover:scale-105 transition-all duration-300 border-0"
+          className="bg-linear-to-r from-purple-600 via-pink-600 to-blue-600 hover:from-purple-700 hover:via-pink-700 hover:to-blue-700 text-white font-bold px-8 py-4 rounded-xl shadow-xl hover:scale-105 transition-all duration-300 border-0"
         >
           <Plus className="h-5 w-5 mr-3" />
           Yeni Proje

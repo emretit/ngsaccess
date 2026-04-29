@@ -53,7 +53,7 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-30 shadow-sm">
+    <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-30 shadow-xs">
       <div className="px-4 lg:px-6 xl:px-8">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">

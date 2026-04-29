@@ -45,7 +45,7 @@ export function PDKSHeader({
       <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
         {showSearchFilters && (
           <>
-            <div className="relative flex-grow">
+            <div className="relative grow">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
               <Input
                 placeholder="Personel ara..."

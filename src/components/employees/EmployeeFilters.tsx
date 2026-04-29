@@ -22,7 +22,7 @@ export function EmployeeFilters({
   const PAGE_SIZE_OPTIONS = [10, 50, 100];
 
   return (
-    <div className="rounded-xl border bg-card shadow-sm p-4 md:p-6">
+    <div className="rounded-xl border bg-card shadow-xs p-4 md:p-6">
       <div className="flex items-center gap-3 flex-wrap">
         {/* Sol: Başlık */}
         <div className="flex items-center gap-2 mr-2">

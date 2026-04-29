@@ -25,14 +25,14 @@ export function AdminDashboard() {
     <div className="space-y-10">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-4xl font-bold bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent">
+          <h2 className="text-4xl font-bold bg-linear-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent">
             Yönetim Merkezi
           </h2>
           <p className="text-purple-300 mt-3 text-lg">
             Tüm projeleri ve kullanıcıları merkezi olarak yönetin
           </p>
         </div>
-        <Badge className="px-8 py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 border-0 text-white font-bold text-lg shadow-xl hover:scale-105 transition-transform duration-300">
+        <Badge className="px-8 py-4 bg-linear-to-r from-purple-600 via-pink-600 to-blue-600 border-0 text-white font-bold text-lg shadow-xl hover:scale-105 transition-transform duration-300">
           <Shield className="w-6 h-6 mr-3" />
           Süper Admin Paneli
         </Badge>
@@ -41,8 +41,8 @@ export function AdminDashboard() {
       {/* Enhanced Dashboard Stats */}
       <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
         <Card className="bg-white/10 border-white/20 backdrop-blur-xl hover:bg-white/15 transition-all duration-500 group relative overflow-hidden shadow-xl">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-blue-500 to-purple-500"></div>
+          <div className="absolute inset-0 bg-linear-to-br from-blue-600/20 to-purple-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 relative z-10">
             <CardTitle className="text-sm font-bold text-purple-200 uppercase tracking-wider">Toplam Proje</CardTitle>
             <div className="w-12 h-12 bg-blue-500/30 rounded-2xl flex items-center justify-center group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 backdrop-blur-sm">
@@ -59,8 +59,8 @@ export function AdminDashboard() {
         </Card>
 
         <Card className="bg-white/10 border-white/20 backdrop-blur-xl hover:bg-white/15 transition-all duration-500 group relative overflow-hidden shadow-xl">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-green-500 to-emerald-500"></div>
-          <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-emerald-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-green-500 to-emerald-500"></div>
+          <div className="absolute inset-0 bg-linear-to-br from-green-600/20 to-emerald-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 relative z-10">
             <CardTitle className="text-sm font-bold text-purple-200 uppercase tracking-wider">Toplam Kullanıcı</CardTitle>
             <div className="w-12 h-12 bg-green-500/30 rounded-2xl flex items-center justify-center group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 backdrop-blur-sm">
@@ -77,8 +77,8 @@ export function AdminDashboard() {
         </Card>
 
         <Card className="bg-white/10 border-white/20 backdrop-blur-xl hover:bg-white/15 transition-all duration-500 group relative overflow-hidden shadow-xl">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-pink-500"></div>
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-600/20 to-pink-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-purple-500 to-pink-500"></div>
+          <div className="absolute inset-0 bg-linear-to-br from-purple-600/20 to-pink-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 relative z-10">
             <CardTitle className="text-sm font-bold text-purple-200 uppercase tracking-wider">Süper Admin</CardTitle>
             <div className="w-12 h-12 bg-purple-500/30 rounded-2xl flex items-center justify-center group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 backdrop-blur-sm">
@@ -97,8 +97,8 @@ export function AdminDashboard() {
         </Card>
 
         <Card className="bg-white/10 border-white/20 backdrop-blur-xl hover:bg-white/15 transition-all duration-500 group relative overflow-hidden shadow-xl">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 to-red-500"></div>
-          <div className="absolute inset-0 bg-gradient-to-br from-orange-600/20 to-red-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-orange-500 to-red-500"></div>
+          <div className="absolute inset-0 bg-linear-to-br from-orange-600/20 to-red-600/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 relative z-10">
             <CardTitle className="text-sm font-bold text-purple-200 uppercase tracking-wider">Sistem Durumu</CardTitle>
             <div className="w-12 h-12 bg-orange-500/30 rounded-2xl flex items-center justify-center group-hover:scale-110 group-hover:rotate-6 transition-all duration-300 backdrop-blur-sm">
@@ -120,14 +120,14 @@ export function AdminDashboard() {
         <TabsList className="bg-white/10 border-white/20 backdrop-blur-xl p-2 h-16 shadow-xl">
           <TabsTrigger 
             value="projects" 
-            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:via-pink-600 data-[state=active]:to-blue-600 data-[state=active]:text-white text-purple-200 font-bold px-8 py-3 rounded-xl transition-all duration-300 data-[state=active]:shadow-lg data-[state=active]:scale-105"
+            className="data-[state=active]:bg-linear-to-r data-[state=active]:from-purple-600 data-[state=active]:via-pink-600 data-[state=active]:to-blue-600 data-[state=active]:text-white text-purple-200 font-bold px-8 py-3 rounded-xl transition-all duration-300 data-[state=active]:shadow-lg data-[state=active]:scale-105"
           >
             <Building2 className="w-5 h-5 mr-3" />
             Proje & Kullanıcı Yönetimi
           </TabsTrigger>
           <TabsTrigger 
             value="devices" 
-            className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-600 data-[state=active]:via-pink-600 data-[state=active]:to-blue-600 data-[state=active]:text-white text-purple-200 font-bold px-8 py-3 rounded-xl transition-all duration-300 data-[state=active]:shadow-lg data-[state=active]:scale-105"
+            className="data-[state=active]:bg-linear-to-r data-[state=active]:from-purple-600 data-[state=active]:via-pink-600 data-[state=active]:to-blue-600 data-[state=active]:text-white text-purple-200 font-bold px-8 py-3 rounded-xl transition-all duration-300 data-[state=active]:shadow-lg data-[state=active]:scale-105"
           >
             <Monitor className="w-5 h-5 mr-3" />
             Cihaz Yönetimi
@@ -136,14 +136,14 @@ export function AdminDashboard() {
         
         <TabsContent value="projects" className="mt-10">
           <div className="bg-white/10 border-white/20 backdrop-blur-xl rounded-3xl p-8 shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600"></div>
+            <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-purple-600 via-pink-600 to-blue-600"></div>
             <AdminProjectsPanel />
           </div>
         </TabsContent>
 
         <TabsContent value="devices" className="mt-10">
           <div className="bg-white/10 border-white/20 backdrop-blur-xl rounded-3xl p-8 shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600"></div>
+            <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-purple-600 via-pink-600 to-blue-600"></div>
             <AdminDevicesPanel />
           </div>
         </TabsContent>

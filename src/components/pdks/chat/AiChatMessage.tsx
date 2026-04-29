@@ -36,7 +36,7 @@ export function AiChatMessage({ message, onExportExcel, onExportPDF }: AiChatMes
             : "bg-muted max-w-[85%]"
         )}
       >
-        <div className="break-words">{message.content}</div>
+        <div className="wrap-break-word">{message.content}</div>
         
         {hasData && (
           <div className="mt-2 w-full">
