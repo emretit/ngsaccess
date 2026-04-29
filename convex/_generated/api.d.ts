@@ -40,6 +40,7 @@ import type * as projects from "../projects.js";
 import type * as reports from "../reports.js";
 import type * as seedCardReaderTest from "../seedCardReaderTest.js";
 import type * as seedHikvisionLanDevice from "../seedHikvisionLanDevice.js";
+import type * as seedTestCardAccess from "../seedTestCardAccess.js";
 import type * as settings from "../settings.js";
 import type * as shifts from "../shifts.js";
 import type * as userProjects from "../userProjects.js";
@@ -85,6 +86,7 @@ declare const fullApi: ApiFromModules<{
   reports: typeof reports;
   seedCardReaderTest: typeof seedCardReaderTest;
   seedHikvisionLanDevice: typeof seedHikvisionLanDevice;
+  seedTestCardAccess: typeof seedTestCardAccess;
   settings: typeof settings;
   shifts: typeof shifts;
   userProjects: typeof userProjects;

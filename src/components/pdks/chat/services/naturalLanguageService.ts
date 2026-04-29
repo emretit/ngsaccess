@@ -55,13 +55,13 @@ export class NaturalLanguageService {
 
     // Sonuçları MessageData formatına çevir
     return rawData.map(row => ({
-      name: row.employee_name || row.name || 'Bilinmeyen',
-      check_in: row.access_time ? new Date(row.access_time).toLocaleString('tr-TR') : 
+      name: row.employeeName || row.name || 'Bilinmeyen',
+      check_in: row.accessTime ? new Date(row.accessTime).toLocaleString('tr-TR') :
                 row.first_entry ? new Date(row.first_entry).toLocaleString('tr-TR') : '-',
       check_out: null, // Çıkış verisi genelde ayrı bir kayıt
       department: row.department || 'Belirtilmemiş',
-      device: row.device_name || '-',
-      location: row.device_name || '-'
+      device: row.deviceName || row.name || '-',
+      location: row.deviceName || row.name || '-'
     }));
   }
 

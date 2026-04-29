@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -19,43 +18,10 @@ export function AdminDevicesPanel() {
 
   const removeDevice = useMutation(api.devices.remove);
 
-  const rawDevices: Device[] = rawDevicesData.map((device: {
-    _id: Id<"devices">;
-    name?: string;
-    serialNumber?: string;
-    deviceSerial?: string;
-    deviceModel?: string;
-    deviceType?: string;
-    type?: string;
-    status?: string;
-    zoneId?: Id<"zones">;
-    doorId?: Id<"doors">;
-    accessDirection?: string;
-    deviceMac?: string;
-    deviceIp?: string;
-    deviceFirmware?: string;
-    _creationTime?: number;
-    lastUsedAt?: string;
-    deviceLocation?: string;
-  }): Device => ({
-    id: device._id,
-    name: device.name ?? "",
-    device_name: device.name,
-    serial_number: device.serialNumber,
-    device_serial: device.deviceSerial,
-    device_model: device.deviceModel,
-    device_type: device.deviceType,
-    type: device.type,
-    status: device.status === "active" ? "online" : "offline",
-    zone_id: device.zoneId as unknown as number,
-    door_id: device.doorId as unknown as number,
-    access_direction: device.accessDirection,
-    device_mac: device.deviceMac,
-    device_ip: device.deviceIp,
-    device_firmware: device.deviceFirmware,
-    created_at: device._creationTime ? new Date(device._creationTime).toISOString() : undefined,
-    last_used_at: device.lastUsedAt,
-    device_location: device.deviceLocation,
+  const rawDevices: Device[] = rawDevicesData.map((device: Device & { _creationTime?: number }) => ({
+    ...device,
+    status: device.status === "active" ? "online" : (device.status ?? "offline"),
+    createdAt: device.createdAt ?? (device._creationTime ? new Date(device._creationTime).toISOString() : undefined),
   }));
 
   const {

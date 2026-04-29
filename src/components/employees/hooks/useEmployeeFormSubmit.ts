@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState } from "react";
 import { useMutation, useAction } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -6,20 +5,20 @@ import { toast } from "@/hooks/use-toast";
 import { Id } from "../../../../convex/_generated/dataModel";
 
 export interface EmployeeFormData {
-  first_name: string;
-  last_name: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  tc_no: string;
-  card_number: string;
-  company_id: string | null;
-  department_id: string | null;
-  position_id: string | null;
-  access_rule_id: string | null;
-  shift_id: string | null;
+  tcNo: string;
+  cardNumber: string;
+  companyId: string | null;
+  departmentId: string | null;
+  positionId: string | null;
+  accessRuleId: string | null;
+  shiftId: string | null;
   shift: string | null;
-  photo_url: string | null;
+  photoUrl: string | null;
   notes: string;
-  is_active: boolean;
+  isActive: boolean;
   projectId?: Id<"projects">;
 }
 
@@ -38,7 +37,6 @@ export const useEmployeeFormSubmit = (
 
   const createEmployee = useMutation(api.employees.create);
   const updateEmployee = useMutation(api.employees.update);
-  const checkDuplicate = useMutation(api.employees.update);
   const sendSetupEmail = useAction(api.actions.sendEmail.sendEmployeeSetupEmail);
   const syncToDevices = useAction(api.actions.hikvisionSync.syncEmployeeToDevices);
 
@@ -47,11 +45,11 @@ export const useEmployeeFormSubmit = (
     setIsLoading(true);
 
     try {
-      if (!formData.first_name?.trim()) {
+      if (!formData.firstName?.trim()) {
         toast({ title: "Hata", description: "Ad alanı zorunludur", variant: "destructive" });
         return;
       }
-      if (!formData.last_name?.trim()) {
+      if (!formData.lastName?.trim()) {
         toast({ title: "Hata", description: "Soyad alanı zorunludur", variant: "destructive" });
         return;
       }
@@ -59,11 +57,11 @@ export const useEmployeeFormSubmit = (
         toast({ title: "Hata", description: "E-posta alanı zorunludur", variant: "destructive" });
         return;
       }
-      if (!formData.tc_no?.trim() || formData.tc_no.length !== 11) {
+      if (!formData.tcNo?.trim() || formData.tcNo.length !== 11) {
         toast({ title: "Hata", description: "TC Kimlik No 11 haneli olmalıdır", variant: "destructive" });
         return;
       }
-      if (!formData.card_number?.trim()) {
+      if (!formData.cardNumber?.trim()) {
         toast({ title: "Hata", description: "Kart numarası zorunludur", variant: "destructive" });
         return;
       }
@@ -72,20 +70,20 @@ export const useEmployeeFormSubmit = (
         // Update
         await updateEmployee({
           employeeId: employee._id,
-          firstName: formData.first_name.trim(),
-          lastName: formData.last_name.trim(),
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
           email: formData.email.trim().toLowerCase(),
-          tcNo: formData.tc_no.trim(),
-          cardNumber: formData.card_number.trim(),
-          companyId: (formData.company_id ?? undefined) as Id<"companies"> | undefined,
-          departmentId: (formData.department_id ?? undefined) as Id<"departments"> | undefined,
-          positionId: (formData.position_id ?? undefined) as Id<"positions"> | undefined,
-          accessRuleId: (formData.access_rule_id ?? undefined) as Id<"accessRules"> | undefined,
-          shiftId: (formData.shift_id ?? undefined) as Id<"shifts"> | undefined,
+          tcNo: formData.tcNo.trim(),
+          cardNumber: formData.cardNumber.trim(),
+          companyId: (formData.companyId ?? undefined) as Id<"companies"> | undefined,
+          departmentId: (formData.departmentId ?? undefined) as Id<"departments"> | undefined,
+          positionId: (formData.positionId ?? undefined) as Id<"positions"> | undefined,
+          accessRuleId: (formData.accessRuleId ?? undefined) as Id<"accessRules"> | undefined,
+          shiftId: (formData.shiftId ?? undefined) as Id<"shifts"> | undefined,
           shift: formData.shift ?? undefined,
-          photoUrl: formData.photo_url ?? undefined,
+          photoUrl: formData.photoUrl ?? undefined,
           notes: formData.notes?.trim() ?? undefined,
-          isActive: formData.is_active ?? true,
+          isActive: formData.isActive ?? true,
         });
         toast({ title: "Başarılı", description: "Çalışan bilgileri güncellendi" });
 
@@ -107,21 +105,21 @@ export const useEmployeeFormSubmit = (
       } else {
         // Create
         const newId = await createEmployee({
-          firstName: formData.first_name.trim(),
-          lastName: formData.last_name.trim(),
+          firstName: formData.firstName.trim(),
+          lastName: formData.lastName.trim(),
           email: formData.email.trim().toLowerCase(),
-          tcNo: formData.tc_no.trim(),
-          cardNumber: formData.card_number.trim(),
+          tcNo: formData.tcNo.trim(),
+          cardNumber: formData.cardNumber.trim(),
           projectId: formData.projectId,
-          companyId: (formData.company_id ?? undefined) as Id<"companies"> | undefined,
-          departmentId: (formData.department_id ?? undefined) as Id<"departments"> | undefined,
-          positionId: (formData.position_id ?? undefined) as Id<"positions"> | undefined,
-          accessRuleId: (formData.access_rule_id ?? undefined) as Id<"accessRules"> | undefined,
-          shiftId: (formData.shift_id ?? undefined) as Id<"shifts"> | undefined,
+          companyId: (formData.companyId ?? undefined) as Id<"companies"> | undefined,
+          departmentId: (formData.departmentId ?? undefined) as Id<"departments"> | undefined,
+          positionId: (formData.positionId ?? undefined) as Id<"positions"> | undefined,
+          accessRuleId: (formData.accessRuleId ?? undefined) as Id<"accessRules"> | undefined,
+          shiftId: (formData.shiftId ?? undefined) as Id<"shifts"> | undefined,
           shift: formData.shift ?? undefined,
-          photoUrl: formData.photo_url ?? undefined,
+          photoUrl: formData.photoUrl ?? undefined,
           notes: formData.notes?.trim() ?? undefined,
-          isActive: formData.is_active ?? true,
+          isActive: formData.isActive ?? true,
         });
 
         // Setup email gönder
@@ -129,8 +127,8 @@ export const useEmployeeFormSubmit = (
           await sendSetupEmail({
             employeeId: newId,
             email: formData.email.trim().toLowerCase(),
-            firstName: formData.first_name.trim(),
-            lastName: formData.last_name.trim(),
+            firstName: formData.firstName.trim(),
+            lastName: formData.lastName.trim(),
             projectId: formData.projectId,
           });
           toast({ title: "Başarılı", description: "Personel eklendi ve kurulum e-postası gönderildi" });

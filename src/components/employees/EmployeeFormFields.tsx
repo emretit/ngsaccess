@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import React from 'react';
 import { Input } from '@/components/ui/input';
@@ -11,10 +10,10 @@ import { EmployeeFormData } from './hooks/useEmployeeFormData';
 interface EmployeeFormFieldsProps {
   formData: EmployeeFormData;
   setFormData: (data: EmployeeFormData) => void;
-  companies: { id: number; name: string }[];
-  departments: { id: number; name: string }[];
-  accessRules: { id: number; name: string }[];
-  positions: { id: number; name: string }[];
+  companies: { id: string; name: string }[];
+  departments: { id: string; name: string }[];
+  accessRules: { id: string; name: string }[];
+  positions: { id: string; name: string }[];
 }
 
 export default function EmployeeFormFields({
@@ -25,7 +24,7 @@ export default function EmployeeFormFields({
   accessRules,
   positions,
 }: EmployeeFormFieldsProps) {
-  const handleInputChange = (field: keyof EmployeeFormData, value: any) => {
+  const handleInputChange = <K extends keyof EmployeeFormData>(field: K, value: EmployeeFormData[K]) => {
     setFormData({ ...formData, [field]: value });
   };
 
@@ -34,13 +33,13 @@ export default function EmployeeFormFields({
       {/* Personal Information */}
       <div className="space-y-4">
         <h3 className="text-lg font-medium">Kişisel Bilgiler</h3>
-        
+
         <div>
           <Label htmlFor="first_name">Ad *</Label>
           <Input
             id="first_name"
-            value={formData.first_name}
-            onChange={(e) => handleInputChange('first_name', e.target.value)}
+            value={formData.firstName}
+            onChange={(e) => handleInputChange('firstName', e.target.value)}
             required
           />
         </div>
@@ -49,8 +48,8 @@ export default function EmployeeFormFields({
           <Label htmlFor="last_name">Soyad *</Label>
           <Input
             id="last_name"
-            value={formData.last_name}
-            onChange={(e) => handleInputChange('last_name', e.target.value)}
+            value={formData.lastName}
+            onChange={(e) => handleInputChange('lastName', e.target.value)}
             required
           />
         </div>
@@ -70,8 +69,8 @@ export default function EmployeeFormFields({
           <Label htmlFor="tc_no">TC Kimlik No *</Label>
           <Input
             id="tc_no"
-            value={formData.tc_no}
-            onChange={(e) => handleInputChange('tc_no', e.target.value)}
+            value={formData.tcNo}
+            onChange={(e) => handleInputChange('tcNo', e.target.value)}
             maxLength={11}
             required
           />
@@ -81,8 +80,8 @@ export default function EmployeeFormFields({
           <Label htmlFor="card_number">Kart Numarası *</Label>
           <Input
             id="card_number"
-            value={formData.card_number}
-            onChange={(e) => handleInputChange('card_number', e.target.value)}
+            value={formData.cardNumber}
+            onChange={(e) => handleInputChange('cardNumber', e.target.value)}
             required
           />
         </div>
@@ -95,15 +94,15 @@ export default function EmployeeFormFields({
         <div>
           <Label htmlFor="company_id">Şirket</Label>
           <Select
-            value={formData.company_id?.toString() || ''}
-            onValueChange={(value) => handleInputChange('company_id', value ? parseInt(value) : null)}
+            value={formData.companyId ?? ''}
+            onValueChange={(value) => handleInputChange('companyId', value || null)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Şirket seçin" />
             </SelectTrigger>
             <SelectContent>
               {companies.map((company) => (
-                <SelectItem key={company.id} value={company.id.toString()}>
+                <SelectItem key={company.id} value={company.id}>
                   {company.name}
                 </SelectItem>
               ))}
@@ -114,15 +113,15 @@ export default function EmployeeFormFields({
         <div>
           <Label htmlFor="department_id">Departman</Label>
           <Select
-            value={formData.department_id?.toString() || ''}
-            onValueChange={(value) => handleInputChange('department_id', value ? parseInt(value) : null)}
+            value={formData.departmentId ?? ''}
+            onValueChange={(value) => handleInputChange('departmentId', value || null)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Departman seçin" />
             </SelectTrigger>
             <SelectContent>
               {departments.map((department) => (
-                <SelectItem key={department.id} value={department.id.toString()}>
+                <SelectItem key={department.id} value={department.id}>
                   {department.name}
                 </SelectItem>
               ))}
@@ -133,15 +132,15 @@ export default function EmployeeFormFields({
         <div>
           <Label htmlFor="position_id">Pozisyon</Label>
           <Select
-            value={formData.position_id?.toString() || ''}
-            onValueChange={(value) => handleInputChange('position_id', value ? parseInt(value) : null)}
+            value={formData.positionId ?? ''}
+            onValueChange={(value) => handleInputChange('positionId', value || null)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Pozisyon seçin" />
             </SelectTrigger>
             <SelectContent>
               {positions.map((position) => (
-                <SelectItem key={position.id} value={position.id.toString()}>
+                <SelectItem key={position.id} value={position.id}>
                   {position.name}
                 </SelectItem>
               ))}
@@ -152,15 +151,15 @@ export default function EmployeeFormFields({
         <div>
           <Label htmlFor="access_rule_id">Erişim Kuralı</Label>
           <Select
-            value={formData.access_rule_id?.toString() || ''}
-            onValueChange={(value) => handleInputChange('access_rule_id', value ? parseInt(value) : null)}
+            value={formData.accessRuleId ?? ''}
+            onValueChange={(value) => handleInputChange('accessRuleId', value || null)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Erişim kuralı seçin" />
             </SelectTrigger>
             <SelectContent>
               {accessRules.map((rule) => (
-                <SelectItem key={rule.id} value={rule.id.toString()}>
+                <SelectItem key={rule.id} value={rule.id}>
                   {rule.name}
                 </SelectItem>
               ))}
@@ -192,8 +191,8 @@ export default function EmployeeFormFields({
         <div className="flex items-center space-x-2">
           <Checkbox
             id="is_active"
-            checked={formData.is_active}
-            onCheckedChange={(checked) => handleInputChange('is_active', checked)}
+            checked={formData.isActive}
+            onCheckedChange={(checked) => handleInputChange('isActive', checked === true)}
           />
           <Label htmlFor="is_active">Aktif</Label>
         </div>

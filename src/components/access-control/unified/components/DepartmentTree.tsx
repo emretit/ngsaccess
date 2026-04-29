@@ -33,8 +33,8 @@ export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) =
   };
 
   const handleSelectAll = () => {
-    const allEmployeeIds = employees.map(emp => String(emp.id));
-    const allDepartmentIds = departments.map(dept => String(dept._id));
+    const allEmployeeIds = employees.map(emp => String(emp._id));
+    const allDepartmentIds = departments.map((dept: any) => String(dept._id));
     const allSelected = allEmployeeIds.every(id => formData.selected_employees.includes(id));
 
     setFormData(prev => ({
@@ -45,12 +45,12 @@ export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) =
   };
 
   const getEmployeesForDepartment = (departmentId: string) => {
-    return employees.filter(emp => String(emp.department_id ?? '') === departmentId);
+    return employees.filter(emp => String(emp.departmentId ?? '') === departmentId);
   };
 
   const handleDepartmentChange = (departmentId: string, checked: boolean) => {
     const departmentEmployees = getEmployeesForDepartment(departmentId);
-    const employeeIds = departmentEmployees.map(emp => String(emp.id));
+    const employeeIds = departmentEmployees.map(emp => String(emp._id));
 
     setFormData(prev => {
       const newDepartments = checked
@@ -86,16 +86,16 @@ export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) =
   };
 
   const renderDepartmentTree = (parentId: string | null = null, level: number = 0) => {
-    const children = departments.filter(dept => {
+    const children = departments.filter((dept: any) => {
       const deptParentId = dept.parentId ? String(dept.parentId) : null;
       return deptParentId === parentId;
     });
 
     if (!children.length) return null;
 
-    return children.map(department => {
+    return children.map((department: any) => {
       const deptId = String(department._id);
-      const hasChildren = departments.some(dept => String(dept.parentId ?? '') === deptId);
+      const hasChildren = departments.some((dept: any) => String(dept.parentId ?? '') === deptId);
       const departmentEmployees = getEmployeesForDepartment(deptId);
       const isExpanded = expandedDepartments.has(deptId);
       const isSelected = isDepartmentSelected(deptId);
@@ -140,7 +140,7 @@ export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) =
           {isExpanded && (
             <div className="space-y-1">
               {departmentEmployees.map(employee => {
-                const empId = String(employee.id);
+                const empId = String(employee._id);
                 return (
                   <div
                     key={`emp-${empId}`}
@@ -159,7 +159,7 @@ export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) =
                       htmlFor={`employee-${empId}`}
                       className="text-sm font-normal cursor-pointer"
                     >
-                      {employee.first_name} {employee.last_name}
+                      {employee.firstName} {employee.lastName}
                     </Label>
                   </div>
                 );
@@ -174,10 +174,10 @@ export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) =
   };
 
   const allSelected = employees.length > 0 && employees.every(emp =>
-    formData.selected_employees.includes(String(emp.id))
+    formData.selected_employees.includes(String(emp._id))
   );
 
-  const orphanEmployees = employees.filter(emp => !emp.department_id);
+  const orphanEmployees = employees.filter(emp => !emp.departmentId);
 
   return (
     <div className="space-y-3">
@@ -205,7 +205,7 @@ export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) =
               </Label>
             </div>
             {orphanEmployees.map(employee => {
-              const empId = String(employee.id);
+              const empId = String(employee._id);
               return (
                 <div key={empId} className="flex items-center space-x-2 ml-6">
                   <Checkbox
@@ -220,7 +220,7 @@ export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) =
                     htmlFor={`orphan-employee-${empId}`}
                     className="text-sm font-normal cursor-pointer"
                   >
-                    {employee.first_name} {employee.last_name}
+                    {employee.firstName} {employee.lastName}
                   </Label>
                 </div>
               );

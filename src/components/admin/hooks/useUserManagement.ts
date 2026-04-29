@@ -1,32 +1,10 @@
-// @ts-nocheck
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
-import { Id } from "../../../../convex/_generated/dataModel";
+import type { User, Project, UserFormData, UserRole } from "../types/user-types";
 
-export type UserRole = "super_admin" | "project_admin" | "project_user";
-
-export interface User {
-  _id: Id<"users">;
-  email?: string;
-  fullName?: string;
-  name?: string;
-  role?: UserRole;
-  photoUrl?: string;
-}
-
-export interface Project {
-  _id: Id<"projects">;
-  name: string;
-  isActive?: boolean;
-}
-
-export interface UserFormData {
-  email: string;
-  role: UserRole;
-  projectId?: Id<"projects">;
-}
+export type { User, Project, UserFormData, UserRole };
 
 export const useUserManagement = () => {
   const { toast } = useToast();
@@ -72,8 +50,14 @@ export const useUserManagement = () => {
     }
   };
 
-  const handleDeleteUser = async (_userId: Id<"users">) => {
+  const handleDeleteUser = async (_user: User) => {
+    void _user;
     toast({ title: "Bilgi", description: "Kullanıcı silme işlemi admin panelinden yapılabilir." });
+  };
+
+  const resetForm = () => {
+    setCurrentUser(null);
+    setFormData({ email: "", role: "project_user", projectId: undefined });
   };
 
   return {
@@ -85,6 +69,7 @@ export const useUserManagement = () => {
     handleEditUser,
     handleSaveUser,
     handleDeleteUser,
+    resetForm,
     refetchUsers: () => {},
     loading: usersRaw === undefined,
   };

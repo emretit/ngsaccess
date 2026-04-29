@@ -1,7 +1,7 @@
-// @ts-nocheck
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 import { DepartmentTreeItem } from "./DepartmentTreeItem";
 import { AddDepartmentDialog } from "./AddDepartmentDialog";
@@ -10,16 +10,16 @@ import { useDepartments } from "@/hooks/useDepartments";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
 
 interface DepartmentTreeProps {
-  onSelectDepartment: (id: number | null) => void;
+  onSelectDepartment: (id: Id<"departments"> | null) => void;
 }
 
 export default function DepartmentTree({ onSelectDepartment }: DepartmentTreeProps) {
   const { departments, addDepartment, deleteDepartment } = useDepartments();
-  const { projectIds, isSuperAdmin } = useProjectAccess();
-  const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
+  const { isSuperAdmin } = useProjectAccess();
+  const [selectedDepartment, setSelectedDepartment] = useState<Id<"departments"> | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAddTopLevelDialog, setShowAddTopLevelDialog] = useState(false);
-  const [addingToParentId, setAddingToParentId] = useState<number | null>(null);
+  const [addingToParentId, setAddingToParentId] = useState<Id<"departments"> | null>(null);
 
   const generalSettings = useQuery(api.settings.getGeneral);
   const companyName = isSuperAdmin
@@ -31,7 +31,7 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
     onSelectDepartment(null);
   };
 
-  const handleSelectDepartment = (id: number) => {
+  const handleSelectDepartment = (id: Id<"departments">) => {
     setSelectedDepartment(id);
     onSelectDepartment(id);
   };
@@ -51,20 +51,20 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
     }
   };
 
-  const renderDepartmentTree = (parentId: number | null = null) => {
-    const children = departments.filter(dept => dept.parent_id === parentId);
-    
+  const renderDepartmentTree = (parentId: Id<"departments"> | null = null) => {
+    const children = departments.filter(dept => (dept.parentId ?? null) === parentId);
+
     if (!children.length) return null;
 
     return children.map(department => {
-      const hasChildren = departments.some(dept => dept.parent_id === department.id);
-      
+      const hasChildren = departments.some(dept => dept.parentId === department._id);
+
       return (
         <DepartmentTreeItem
-          key={department.id}
+          key={department._id}
           department={department}
-          level={department.level}
-          isSelected={selectedDepartment === department.id}
+          level={department.level ?? 0}
+          isSelected={selectedDepartment === department._id}
           onSelect={handleSelectDepartment}
           onAddSubDepartment={(parentId) => {
             setAddingToParentId(parentId);
@@ -73,7 +73,7 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
           onDelete={deleteDepartment}
           hasChildren={hasChildren}
         >
-          {renderDepartmentTree(department.id)}
+          {renderDepartmentTree(department._id)}
         </DepartmentTreeItem>
       );
     });
@@ -86,7 +86,7 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
         onProjectClick={handleProjectHeaderClick}
         onAddClick={() => setShowAddTopLevelDialog(true)}
       />
-      
+
       <div className="p-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
         <ul role="tree" className="space-y-0.5">
           {renderDepartmentTree()}

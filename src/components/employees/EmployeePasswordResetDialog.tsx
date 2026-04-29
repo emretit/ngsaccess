@@ -19,8 +19,6 @@ interface Employee {
   firstName?: string;
   lastName?: string;
   email?: string;
-  first_name?: string;
-  last_name?: string;
 }
 
 interface EmployeePasswordResetDialogProps {
@@ -37,8 +35,8 @@ export function EmployeePasswordResetDialog({
   const [isLoading, setIsLoading] = useState(false);
   const sendSetupEmail = useAction(api.actions.sendEmail.sendEmployeeSetupEmail);
 
-  const firstName = employee?.firstName ?? employee?.first_name ?? "";
-  const lastName = employee?.lastName ?? employee?.last_name ?? "";
+  const firstName = employee?.firstName ?? "";
+  const lastName = employee?.lastName ?? "";
   const email = employee?.email ?? "";
 
   const handleSendResetEmail = async () => {

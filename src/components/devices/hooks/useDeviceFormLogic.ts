@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,7 +24,7 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
   const currentProjectId = projectIds.length > 0 ? projectIds[0] : null;
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(formSchema) as any,
     defaultValues: {
       name: "",
       device_serial: "",
@@ -41,17 +40,18 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
   });
 
   // Watch zone selection for filtering doors
+  // react-hook-form internal subscription'ı React compiler analizinden muaftır.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const selectedZoneId = form.watch("zone_id");
   const filteredDoors = doors.filter((door) => String(door.zoneId) === String(selectedZoneId));
 
   // Load device data when dialog opens
-  useDeviceDataLoader({ device, open, form });
+  useDeviceDataLoader({ device, open, form: form as any });
 
   // Handle form submission
   const { onSubmit, isLoading } = useDeviceFormSubmission({
     device,
     currentProjectId,
-    projectIds,
     onSuccess,
   });
 

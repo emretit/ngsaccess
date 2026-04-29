@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -115,7 +114,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
   };
 
   const renderEmployees = (rule: any) => {
-    const employees = rule.group_members?.map((gm: any) => gm.employees).filter(Boolean) || [];
+    const employees = rule.groupMembers?.map((gm: any) => gm.employees).filter(Boolean) || [];
 
     if (employees.length === 0) {
       return (
@@ -132,7 +131,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
         <div className="flex flex-col">
           <span className="text-sm font-medium">{employees.length} çalışan</span>
           <span className="text-xs text-gray-500">
-            {employees.slice(0, 2).map((emp: any) => `${emp.first_name} ${emp.last_name}`).join(', ')}
+            {employees.slice(0, 2).map((emp: any) => `${emp.firstName} ${emp.lastName}`).join(', ')}
             {employees.length > 2 && ` +${employees.length - 2} diğer`}
           </span>
         </div>
@@ -141,7 +140,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
   };
 
   const renderDevices = (rule: any) => {
-    const devices = rule.group_devices?.map((gd: any) => gd.devices).filter(Boolean) || [];
+    const devices = rule.groupDevices?.map((gd: any) => gd.devices).filter(Boolean) || [];
 
     if (devices.length === 0) {
       return (
@@ -312,11 +311,11 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                         <div>
                           <h4 className="text-sm font-semibold text-gray-900 mb-3">Çalışanlar</h4>
                           <div className="space-y-2">
-                            {rule.group_members?.length > 0 ? (
-                              rule.group_members.map((gm: any, index: number) => (
+                            {rule.groupMembers?.length > 0 ? (
+                              rule.groupMembers.map((gm: any, index: number) => (
                                 <div key={index} className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
                                   <Users className="h-4 w-4 text-blue-500" />
-                                  <span className="text-sm">{gm.employees?.first_name} {gm.employees?.last_name}</span>
+                                  <span className="text-sm">{gm.employees?.firstName} {gm.employees?.lastName}</span>
                                 </div>
                               ))
                             ) : (
@@ -328,16 +327,16 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                         <div>
                           <h4 className="text-sm font-semibold text-gray-900 mb-3">Cihazlar</h4>
                           <div className="space-y-2">
-                            {rule.group_devices?.length > 0 ? (
-                              rule.group_devices.map((gd: any, index: number) => (
+                            {rule.groupDevices?.length > 0 ? (
+                              rule.groupDevices.map((gd: any, index: number) => (
                                 <div key={index} className="flex items-center gap-2 p-2 bg-green-50 rounded-lg">
                                   <Monitor className="h-4 w-4 text-green-500" />
                                   <div>
                                     <span className="text-sm font-medium">{gd.devices?.name}</span>
                                     <p className="text-xs text-gray-500">
                                       {gd.devices ? getDeviceLocationDisplay({
-                                        zoneId: gd.devices.zone_id,
-                                        doorId: gd.devices.door_id,
+                                        zoneId: gd.devices.zoneId,
+                                        doorId: gd.devices.doorId,
                                       }) : 'Konum Bilinmiyor'}
                                     </p>
                                   </div>

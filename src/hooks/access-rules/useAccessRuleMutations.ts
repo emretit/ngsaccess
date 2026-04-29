@@ -13,6 +13,7 @@ interface CreateRuleInput {
   accessDirection: string;
   priority: number;
   projectId?: Id<"projects">;
+  isActive?: boolean;
 }
 
 export const useAccessRuleMutations = () => {

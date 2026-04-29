@@ -75,7 +75,7 @@ export function FormSelectField({
 }: SelectFieldProps) {
   // "Durum" alanı için özel eşleştirme
   const getDisplayValue = () => {
-    if (name === 'is_active') {
+    if (name === 'is_active' || name === 'isActive') {
       if (value === 'active' || value === 'true' || value === true) return 'active';
       if (value === 'inactive' || value === 'false' || value === false) return 'inactive';
       return String(value);
@@ -84,7 +84,7 @@ export function FormSelectField({
   };
 
   const getDisplayOptions = () => {
-    if (name === 'is_active') {
+    if (name === 'is_active' || name === 'isActive') {
       return [
         { id: 'active', name: 'Aktif' },
         { id: 'inactive', name: 'Pasif' }

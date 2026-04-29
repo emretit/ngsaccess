@@ -113,7 +113,7 @@ export class TurkishNlpParser {
     }
     
     // Özel tarih formatları tespiti
-    const datePattern = /(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/;
+    const datePattern = /(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})/;
     const match = query.match(datePattern);
     if (match) {
       const [, day, month, year] = match;

@@ -10,15 +10,14 @@ export interface DashboardStats {
 }
 
 export interface CardReading {
-  id: string;
+  _id: string;
   cardNo: string;
   employeeName?: string;
   accessTime: string;
-  accessStatus?: string;
-  access_granted?: boolean;
+  accessStatus?: "izin_verildi" | "reddedildi";
   status?: string;
-  device_name?: string;
-  device_location?: string;
+  deviceName?: string;
+  description?: string;
 }
 
 export const fetchDashboardStats = async (): Promise<DashboardStats> => {

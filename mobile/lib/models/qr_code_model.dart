@@ -21,17 +21,15 @@ class QRCodeModel {
 
   factory QRCodeModel.fromConvex(Map<String, dynamic> json) {
     return QRCodeModel(
-      id: (json['_id'] ?? json['id'])?.toString() ?? '',
-      deviceId: (json['deviceId'] ?? json['device_id'])?.toString() ?? '',
-      deviceName: (json['deviceName'] ?? json['device_name'] ?? json['name'])
-              as String? ??
-          '',
+      id: (json['_id'] as String?) ?? '',
+      deviceId: (json['deviceId'] as String?) ?? '',
+      deviceName: (json['name'] as String?) ?? '',
       location: (json['location'] ?? json['description'] ?? '') as String,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : DateTime.now(),
-      isActive: (json['isActive'] ?? json['is_active'] ?? true) as bool,
-      qrData: (json['qrData'] ?? json['qr_data'] ?? '') as String,
+      isActive: (json['isActive'] ?? true) as bool,
+      qrData: (json['qrData'] ?? '') as String,
     );
   }
 }
@@ -39,7 +37,7 @@ class QRCodeModel {
 class QRCodeGenerator {
   /// Üretilen QR yükü:
   /// {
-  ///   "deviceId": "<Convex Id<devices>>",
+  ///   "deviceId": "&lt;Convex Id&lt;devices&gt;&gt;",
   ///   "deviceName": "...",
   ///   "location": "...",
   ///   "timestamp": "ISO string"
@@ -58,8 +56,7 @@ class QRCodeGenerator {
     return base64Encode(utf8.encode(jsonEncode(data)));
   }
 
-  /// QR'dan parse edilen veri. `device_id` field'ı geriye uyumluluk için
-  /// `deviceId`'ye da map'lenir.
+  /// QR'dan parse edilen veri. Convex camelCase alan adlarını bekler.
   static Map<String, dynamic> parseQRData(String qrData) {
     Map<String, dynamic>? tryDecodeBase64() {
       try {
@@ -80,7 +77,7 @@ class QRCodeGenerator {
 
     final data = tryDecodeBase64() ?? tryDecodeJson();
     if (data != null) {
-      final deviceId = (data['deviceId'] ?? data['device_id'])?.toString();
+      final deviceId = data['deviceId'] as String?;
       if (deviceId != null && deviceId.isNotEmpty) {
         if (data['timestamp'] is String) {
           try {
@@ -93,7 +90,7 @@ class QRCodeGenerator {
         return {
           'is_valid': true,
           'deviceId': deviceId,
-          'deviceName': data['deviceName'] ?? data['device_name'] ?? 'Cihaz',
+          'deviceName': data['deviceName'] ?? 'Cihaz',
           'location': data['location'] ?? '',
           'timestamp': data['timestamp'],
           'token': data['token'],

@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import { useState } from "react";
 import { Device } from "@/types/device";
@@ -28,7 +27,7 @@ export function useLocationForm() {
     if (!showLocationForm.device) return;
     try {
       await updateDevice({
-        id: showLocationForm.device.id as Id<"devices">,
+        deviceId: showLocationForm.device._id,
         zoneId: zoneId as Id<"zones">,
         doorId: doorId as Id<"doors">,
       });

@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import { Device, ServerDevice } from "@/types/device";
 import { DeviceList } from "@/components/devices/DeviceList";
@@ -12,8 +11,8 @@ interface DevicesContentProps {
   isLoading: boolean;
   zones: Zone[];
   doors: Door[];
-  selectedZoneId: number | null;
-  selectedDoorId: number | null;
+  selectedZoneId: string | null;
+  selectedDoorId: string | null;
   onDeleteDevice: (deviceId: string) => void;
   onAssignLocation: (device: Device) => void;
   onEditDevice: (device: Device) => void;

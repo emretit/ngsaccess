@@ -123,8 +123,8 @@ class AttendanceProvider extends ChangeNotifier {
       return false;
     }
 
-    final deviceIdRaw = parsed['deviceId']?.toString();
-    final deviceSerial = parsed['deviceSerial']?.toString() ?? deviceIdRaw;
+    final deviceIdRaw = parsed['deviceId'] as String?;
+    final deviceSerial = (parsed['deviceSerial'] as String?) ?? deviceIdRaw;
 
     final args = <String, dynamic>{};
     if (deviceIdRaw != null && deviceIdRaw.startsWith('j')) {

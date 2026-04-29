@@ -8,8 +8,8 @@ export function extractDateFromQuery(query: string): string | null {
   const datePatterns = [
     /(\d{1,2})\s+(ocak|şubat|mart|nisan|mayıs|haziran|temmuz|ağustos|eylül|ekim|kasım|aralık)\s+(\d{4})/i,  // 25 Nisan 2023
     /(\d{1,2})\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})/i, // 25 April 2023
-    /(\d{1,2})[\/\.-](\d{1,2})[\/\.-](\d{4})/,  // 25/04/2023, 25.04.2023, 25-04-2023
-    /(\d{4})[\/\.-](\d{1,2})[\/\.-](\d{1,2})/   // 2023/04/25, 2023.04.25, 2023-04-25
+    /(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})/,  // 25/04/2023, 25.04.2023, 25-04-2023
+    /(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})/   // 2023/04/25, 2023.04.25, 2023-04-25
   ];
   
   const monthMap: Record<string, string> = {

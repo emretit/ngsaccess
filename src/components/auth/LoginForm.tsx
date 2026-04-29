@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -34,10 +33,10 @@ const LoginForm = () => {
       }
       
       // Successful login handled by AuthProvider
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Giriş hatası",
-        description: error.message || "Giriş yapılırken bir hata oluştu.",
+        description: (error as Error)?.message || "Giriş yapılırken bir hata oluştu.",
         variant: "destructive",
       });
     } finally {

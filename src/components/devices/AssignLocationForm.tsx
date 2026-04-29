@@ -18,7 +18,7 @@ import { ServerDevice } from '@/types/device';
 interface AssignLocationFormProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (zoneId: number, doorId: number) => Promise<void>;
+  onSubmit: (zoneId: string, doorId: string) => Promise<void>;
   deviceName: string;
   device?: ServerDevice;
 }
@@ -37,12 +37,11 @@ export function AssignLocationForm({
   const [filteredDoors, setFilteredDoors] = useState<typeof doors>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Set initial values only when dialog opens and device changes
   useEffect(() => {
     if (open && device) {
-      const zoneValue = device.zone_id ? device.zone_id.toString() : "";
-      const doorValue = device.door_id ? device.door_id.toString() : "";
-      
+      const zoneValue = device.zoneId ?? "";
+      const doorValue = device.doorId ?? "";
+
       if (selectedZoneId !== zoneValue) {
         setSelectedZoneId(zoneValue);
       }
@@ -50,21 +49,19 @@ export function AssignLocationForm({
         setSelectedDoorId(doorValue);
       }
     } else if (open && !device) {
-      // Reset form when opening for a new device
       setSelectedZoneId("");
       setSelectedDoorId("");
     }
-  }, [open, device?.zone_id, device?.door_id]); // Only depend on open state and device IDs
+    // selectedZoneId/selectedDoorId deps'e eklenince loop oluşur — bilinçli olarak sadece prop'lara bağlı.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, device?.zoneId, device?.doorId]);
 
-  // Filter doors when zone changes or doors data updates
   useEffect(() => {
     if (selectedZoneId && doors.length > 0) {
-      const zoneIdNumber = parseInt(selectedZoneId, 10);
-      const filtered = doors.filter(door => door.zone_id === zoneIdNumber);
+      const filtered = doors.filter(door => door.zoneId === selectedZoneId);
       setFilteredDoors(filtered);
-      
-      // Only reset door selection if current door is not in the filtered list
-      if (selectedDoorId && !filtered.some(door => door.id.toString() === selectedDoorId)) {
+
+      if (selectedDoorId && !filtered.some(door => door._id === selectedDoorId)) {
         setSelectedDoorId("");
       }
     } else {
@@ -73,7 +70,9 @@ export function AssignLocationForm({
         setSelectedDoorId("");
       }
     }
-  }, [selectedZoneId, doors]); // Removed selectedDoorId from dependencies to prevent loop
+    // selectedDoorId yalnızca koşul kontrolünde okunur; deps'e eklenince gereksiz tekrar tetiklenir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedZoneId, doors]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +89,7 @@ export function AssignLocationForm({
     setIsSubmitting(true);
     
     try {
-      await onSubmit(parseInt(selectedZoneId, 10), parseInt(selectedDoorId, 10));
+      await onSubmit(selectedZoneId, selectedDoorId);
       toast({
         title: "Location assigned",
         description: `${deviceName} has been assigned to the selected location.`,
@@ -129,7 +128,7 @@ export function AssignLocationForm({
                 </SelectTrigger>
                 <SelectContent>
                   {zones.map((zone) => (
-                    <SelectItem key={zone.id} value={zone.id.toString()}>
+                    <SelectItem key={zone._id} value={zone._id}>
                       {zone.name}
                     </SelectItem>
                   ))}
@@ -150,7 +149,7 @@ export function AssignLocationForm({
                 </SelectTrigger>
                 <SelectContent>
                   {filteredDoors.map((door) => (
-                    <SelectItem key={door.id} value={door.id.toString()}>
+                    <SelectItem key={door._id} value={door._id}>
                       {door.name}
                     </SelectItem>
                   ))}

@@ -1,11 +1,10 @@
-
 import { useState, useMemo } from 'react';
 import { Device } from '@/types/device';
 
 export function useDeviceFilters(
   devices: Device[],
-  selectedZoneId: number | null,
-  selectedDoorId: number | null
+  selectedZoneId: string | null,
+  selectedDoorId: string | null
 ) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -14,8 +13,8 @@ export function useDeviceFilters(
   // Extract unique device types for filtering
   const deviceTypes = useMemo(() => {
     return Array.from(new Set(
-      devices.map(device => (device.device_type || (device as { deviceType?: string }).deviceType || device.type || ''))
-      .filter(type => type !== '')
+      devices.map(device => device.deviceType ?? '')
+        .filter(type => type !== '')
     ));
   }, [devices]);
 
@@ -25,10 +24,10 @@ export function useDeviceFilters(
       // Filter by zone/door
       const locationMatch = () => {
         if (selectedDoorId != null) {
-          return String(device.door_id || (device as { doorId?: string }).doorId) === String(selectedDoorId);
+          return device.doorId === selectedDoorId;
         }
         if (selectedZoneId != null) {
-          return String(device.zone_id || (device as { zoneId?: string }).zoneId) === String(selectedZoneId);
+          return device.zoneId === selectedZoneId;
         }
         return true;
       };
@@ -38,9 +37,9 @@ export function useDeviceFilters(
         if (!search) return true;
         const searchLower = search.toLowerCase();
         return (
-          (device.device_name || device.name || '').toLowerCase().includes(searchLower) ||
-          (device.device_serial || (device as { deviceSerial?: string }).deviceSerial || device.serial_number || '').toLowerCase().includes(searchLower) ||
-          (device.device_location || (device as { description?: string }).description || '').toLowerCase().includes(searchLower)
+          (device.name ?? '').toLowerCase().includes(searchLower) ||
+          (device.deviceSerial ?? '').toLowerCase().includes(searchLower) ||
+          (device.description ?? '').toLowerCase().includes(searchLower)
         );
       };
 
@@ -53,7 +52,7 @@ export function useDeviceFilters(
       // Filter by type
       const typeMatch = () => {
         if (typeFilter === 'all') return true;
-        const deviceType = device.device_type || (device as { deviceType?: string }).deviceType || device.type || '';
+        const deviceType = device.deviceType ?? '';
         return deviceType.toLowerCase() === typeFilter.toLowerCase();
       };
 

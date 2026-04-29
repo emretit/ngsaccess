@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";

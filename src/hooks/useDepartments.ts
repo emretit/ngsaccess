@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
@@ -7,12 +6,12 @@ import { Id } from "../../convex/_generated/dataModel";
 
 export interface Department {
   _id: Id<"departments">;
-  id?: string;
   name: string;
   projectId?: Id<"projects">;
-  parentId?: Id<"departments">;
+  parentId?: Id<"departments"> | null;
   level?: number;
-  [key: string]: unknown;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export function useDepartments() {

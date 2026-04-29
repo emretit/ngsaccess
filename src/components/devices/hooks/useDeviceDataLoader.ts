@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useEffect } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { Id } from "../../../../convex/_generated/dataModel";
@@ -19,13 +18,6 @@ interface DeviceData {
   devicePassword?: string;
   description?: string;
   status?: string;
-  // Legacy aliases
-  serial_number?: string;
-  device_type?: string;
-  zone_id?: Id<"zones">;
-  door_id?: Id<"doors">;
-  access_direction?: AccessDirection;
-  device_ip?: string;
 }
 
 interface UseDeviceDataLoaderProps {
@@ -39,12 +31,12 @@ export function useDeviceDataLoader({ device, open, form }: UseDeviceDataLoaderP
     if (device && open) {
       const formData: FormValues = {
         name: device.name ?? "",
-        device_serial: device.deviceSerial ?? device.serial_number ?? "",
-        device_type: (device.deviceType ?? device.device_type ?? "Kart Okuyucu") as FormValues["device_type"],
-        zone_id: (device.zoneId ?? device.zone_id) as string | undefined,
-        door_id: (device.doorId ?? device.door_id) as string | undefined,
-        access_direction: (device.accessDirection ?? device.access_direction ?? "both") as AccessDirection,
-        device_ip: device.deviceIp ?? device.device_ip ?? "",
+        device_serial: device.deviceSerial ?? "",
+        device_type: (device.deviceType ?? "Kart Okuyucu") as FormValues["device_type"],
+        zone_id: device.zoneId as string | undefined,
+        door_id: device.doorId as string | undefined,
+        access_direction: (device.accessDirection ?? "both") as AccessDirection,
+        device_ip: device.deviceIp ?? "",
         device_username: device.deviceUsername ?? "",
         device_password: device.devicePassword ?? "",
         description: device.description ?? "",

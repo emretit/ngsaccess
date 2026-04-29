@@ -146,12 +146,9 @@ export const getSgkMonthlyReport = authedQuery({
         }
 
         const workDays = dayReadingsMap.size;
-        let overtimeMinutes = 0;
-        if (workDays <= 1) {
-          overtimeMinutes = Math.max(0, totalMinutes - STANDARD_DAY_MINUTES);
-        } else {
-          overtimeMinutes = Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
-        }
+        const overtimeMinutes = workDays <= 1
+          ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES)
+          : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
 
         const totalHours = Math.round((totalMinutes / 60) * 10) / 10;
         const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
@@ -272,12 +269,9 @@ export const getOvertimeSummaryReport = authedQuery({
       }
 
       const workDays = dayReadingsMap.size;
-      let overtimeMinutes = 0;
-      if (workDays <= 1) {
-        overtimeMinutes = Math.max(0, totalMinutes - STANDARD_DAY_MINUTES);
-      } else {
-        overtimeMinutes = Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
-      }
+      const overtimeMinutes = workDays <= 1
+        ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES)
+        : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
       const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
       totalOvertimeHours += overtimeHours;
 
@@ -495,12 +489,9 @@ export const getDepartmentCostReport = authedQuery({
       }
 
       const workDays = dayReadingsMap.size;
-      let overtimeMinutes = 0;
-      if (workDays <= 1) {
-        overtimeMinutes = Math.max(0, totalMinutes - STANDARD_DAY_MINUTES);
-      } else {
-        overtimeMinutes = Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
-      }
+      const overtimeMinutes = workDays <= 1
+        ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES)
+        : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
       const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
 
       if (overtimeHours > 0) {

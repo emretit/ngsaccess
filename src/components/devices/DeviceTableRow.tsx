@@ -1,10 +1,10 @@
-// @ts-nocheck
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Device } from "@/types/device";
 import { Edit2, Trash2, MapPin, QrCode } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 interface DeviceTableRowProps {
   device: Device;
@@ -16,7 +16,7 @@ interface DeviceTableRowProps {
   onEditDevice: (device: Device) => void;
   onQRClick?: (device: Device) => void;
   selected: boolean;
-  onSelect: (checked: boolean, deviceId: string) => void;
+  onSelect: (checked: boolean, deviceId: Id<"devices">) => void;
 }
 
 export function DeviceTableRow({
@@ -57,7 +57,7 @@ export function DeviceTableRow({
     }
   };
 
-  const deviceId = device.id || (device as { _id?: string })._id || "";
+  const deviceId = String(device._id ?? "");
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -75,16 +75,16 @@ export function DeviceTableRow({
       <TableCell onClick={(e) => e.stopPropagation()}>
         <Checkbox
           checked={selected}
-          onCheckedChange={(checked) => onSelect(checked as boolean, deviceId)}
+          onCheckedChange={(checked) => onSelect(checked as boolean, device._id)}
         />
       </TableCell>
       <TableCell className="font-medium text-muted-foreground">{rowIndex ?? '-'}</TableCell>
-      <TableCell>{device.device_serial || (device as { deviceSerial?: string }).deviceSerial || device.serial_number || '-'}</TableCell>
-      <TableCell>{device.device_model || device.device_type || (device as { deviceType?: string }).deviceType || '-'}</TableCell>
+      <TableCell>{device.deviceSerial || '-'}</TableCell>
+      <TableCell>{device.deviceType || '-'}</TableCell>
       <TableCell>{zoneName || '-'}</TableCell>
       <TableCell>{doorName || '-'}</TableCell>
-      <TableCell>{getAccessDirectionText(device.access_direction || (device as { accessDirection?: string }).accessDirection)}</TableCell>
-      <TableCell>{getStatusBadge(device.status)}</TableCell>
+      <TableCell>{getAccessDirectionText(device.accessDirection)}</TableCell>
+      <TableCell>{getStatusBadge(device.status as 'online' | 'offline' | 'expired')}</TableCell>
       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-1">
           {onQRClick && (

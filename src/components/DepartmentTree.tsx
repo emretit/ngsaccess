@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 
 import { FolderTree } from "lucide-react";
 import {
@@ -14,17 +15,17 @@ import {
 import { cn } from "@/lib/utils";
 
 interface DepartmentTreeProps {
-  onSelectDepartment: (id: number | null) => void;
+  onSelectDepartment: (id: Id<"departments"> | null) => void;
 }
 
 export default function DepartmentTree({ onSelectDepartment }: DepartmentTreeProps) {
   const departments = useQuery(api.departments.list) ?? [];
-  const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
+  const [selectedDepartment, setSelectedDepartment] = useState<Id<"departments"> | null>(null);
 
-  const handleDepartmentClick = (id: string) => {
+  const handleDepartmentClick = (id: Id<"departments">) => {
     const newSelectedId = selectedDepartment === id ? null : id;
     setSelectedDepartment(newSelectedId);
-    onSelectDepartment(newSelectedId as unknown as number | null);
+    onSelectDepartment(newSelectedId);
   };
 
   return (
@@ -35,7 +36,7 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
       </SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
-          {departments.map((dept: { _id: string; name: string; level?: number }) => (
+          {departments.map((dept: { _id: Id<"departments">; name: string; level?: number }) => (
             <SidebarMenuItem key={dept._id}>
               <SidebarMenuButton
                 onClick={() => handleDepartmentClick(dept._id)}

@@ -24,7 +24,7 @@ class Attendance {
   String get type => 'check_in';
   DateTime get timestamp => accessTime;
   String? get userId => employeeId;
-  String get doorName => deviceInfo?['device_name'] as String? ?? 'Bilinmeyen Cihaz';
+  String get doorName => deviceInfo?['name'] as String? ?? 'Bilinmeyen Cihaz';
   DateTime? get checkInTime => accessTime;
   DateTime? get checkOutTime => null;
   String? get qrData => cardNo.isEmpty ? null : cardNo;
@@ -35,8 +35,8 @@ class Attendance {
     Map<String, dynamic>? deviceInfo;
     if (device != null) {
       deviceInfo = {
-        'device_id': device['_id'],
-        'device_name': device['name'],
+        'deviceId': device['_id'],
+        'name': device['name'],
         'location': device['description'] ?? '',
         'serial': device['deviceSerial'],
       };
@@ -68,7 +68,7 @@ class Attendance {
 
   String get formattedDeviceInfo {
     if (deviceInfo != null) {
-      final deviceName = deviceInfo!['device_name'] ?? 'Bilinmeyen Cihaz';
+      final deviceName = deviceInfo!['name'] ?? 'Bilinmeyen Cihaz';
       final location = deviceInfo!['location'];
       if (location != null && (location as String).isNotEmpty) {
         return '$deviceName ($location)';

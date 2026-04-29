@@ -138,7 +138,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.red.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(50),
               ),
               child: Icon(
@@ -199,7 +199,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                     label: Text(DateFormat('dd.MM.yyyy').format(_selectedDate!)),
                     deleteIcon: const Icon(Icons.close, size: 18),
                     onDeleted: () => setState(() => _selectedDate = null),
-                    backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                    backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                     labelStyle: TextStyle(color: AppTheme.primaryColor),
                   ),
                 if (_selectedDevice != null)
@@ -207,7 +207,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                     label: Text(_selectedDevice!),
                     deleteIcon: const Icon(Icons.close, size: 18),
                     onDeleted: () => setState(() => _selectedDevice = null),
-                    backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                    backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                     labelStyle: TextStyle(color: AppTheme.primaryColor),
                   ),
               ],
@@ -258,8 +258,8 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
               boxShadow: [
                 BoxShadow(
                   color: Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.black.withOpacity(0.3) 
-                      : Colors.black.withOpacity(0.05),
+                      ? Colors.black.withValues(alpha: 0.3) 
+                      : Colors.black.withValues(alpha: 0.05),
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
@@ -331,7 +331,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                           : Colors.black87,
                     ),
                     todayDecoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.5),
+                      color: AppTheme.primaryColor.withValues(alpha: 0.5),
                       shape: BoxShape.circle,
                     ),
                     selectedDecoration: BoxDecoration(
@@ -411,13 +411,13 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Theme.of(context).brightness == Brightness.dark 
-                  ? AppTheme.darkSurface.withOpacity(0.5)
-                  : Colors.grey.withOpacity(0.1),
+                  ? AppTheme.darkSurface.withValues(alpha: 0.5)
+                  : Colors.grey.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: Theme.of(context).brightness == Brightness.dark 
-                    ? Colors.grey.withOpacity(0.3)
-                    : Colors.grey.withOpacity(0.2),
+                    ? Colors.grey.withValues(alpha: 0.3)
+                    : Colors.grey.withValues(alpha: 0.2),
               ),
             ),
             child: Column(
@@ -480,9 +480,9 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: Colors.blue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                    border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
                   ),
                   child: Row(
                     children: [
@@ -555,14 +555,14 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [AppTheme.primaryColor, AppTheme.primaryColor.withOpacity(0.8)],
+                colors: [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.8)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: AppTheme.primaryColor.withOpacity(0.3),
+                  color: AppTheme.primaryColor.withValues(alpha: 0.3),
                   blurRadius: 10,
                   offset: const Offset(0, 5),
                 ),
@@ -656,9 +656,9 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
             decoration: BoxDecoration(
               color: Theme.of(context).brightness == Brightness.dark 
                   ? AppTheme.darkSurface 
-                  : Colors.blue.withOpacity(0.1),
+                  : Colors.blue.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+              border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -724,7 +724,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                 decoration: BoxDecoration(
                   color: Theme.of(context).brightness == Brightness.dark 
                       ? AppTheme.darkSurface 
-                      : Colors.grey.withOpacity(0.1),
+                      : Colors.grey.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -743,7 +743,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withOpacity(0.1),
+                        color: AppTheme.primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -757,7 +757,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                   ],
                 ),
               );
-            }).toList(),
+            }),
           ],
         ],
       ),
@@ -795,10 +795,10 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
           width: 24,
           height: 24,
           decoration: BoxDecoration(
-            color: color == Colors.transparent ? Colors.grey.withOpacity(0.2) : color,
+            color: color == Colors.transparent ? Colors.grey.withValues(alpha: 0.2) : color,
             shape: BoxShape.circle,
             border: color == Colors.transparent 
-                ? Border.all(color: Colors.grey.withOpacity(0.5), width: 1)
+                ? Border.all(color: Colors.grey.withValues(alpha: 0.5), width: 1)
                 : null,
           ),
           child: color == Colors.transparent 
@@ -842,9 +842,9 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurface : color.withOpacity(0.1),
+        color: isDark ? AppTheme.darkSurface : color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -868,7 +868,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
             title,
             style: TextStyle(
               fontSize: 14,
-              color: color.withOpacity(0.8),
+              color: color.withValues(alpha: 0.8),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -907,7 +907,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.1),
+              color: Colors.grey.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(50),
             ),
             child: Icon(
@@ -979,7 +979,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: isDark ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.05),
+            color: isDark ? Colors.black.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -1009,7 +1009,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: (isCheckIn ? Colors.green : Colors.red).withOpacity(0.3),
+                        color: (isCheckIn ? Colors.green : Colors.red).withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -1091,8 +1091,8 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: isCheckIn 
-                            ? Colors.green.withOpacity(0.1)
-                            : Colors.red.withOpacity(0.1),
+                            ? Colors.green.withValues(alpha: 0.1)
+                            : Colors.red.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -1132,7 +1132,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: (record.type == 'check_in' ? Colors.green : Colors.red).withOpacity(0.1),
+                color: (record.type == 'check_in' ? Colors.green : Colors.red).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
@@ -1240,6 +1240,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                 if (date != null) {
                   setState(() => _selectedDate = date);
                 }
+                if (!context.mounted) return;
                 Navigator.pop(context);
               },
             ),
@@ -1301,7 +1302,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                 leading: const Icon(Icons.location_on_rounded),
                 title: Text(device),
                 selected: device == _selectedDevice,
-                selectedTileColor: AppTheme.primaryColor.withOpacity(0.1),
+                selectedTileColor: AppTheme.primaryColor.withValues(alpha: 0.1),
                 onTap: () {
                   setState(() => _selectedDevice = device);
                   Navigator.pop(context);
@@ -1332,7 +1333,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
@@ -1387,13 +1388,13 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: isCheckIn 
-                            ? Colors.green.withOpacity(0.1)
-                            : Colors.red.withOpacity(0.1),
+                            ? Colors.green.withValues(alpha: 0.1)
+                            : Colors.red.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: isCheckIn 
-                              ? Colors.green.withOpacity(0.3)
-                              : Colors.red.withOpacity(0.3),
+                              ? Colors.green.withValues(alpha: 0.3)
+                              : Colors.red.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Row(

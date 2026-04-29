@@ -99,6 +99,8 @@ export const useEmployeeFormData = (employee?: EmployeeInput | null) => {
       });
       setPhotoPreview(null);
     }
+    // Form sadece employee._id değiştiğinde reset edilir; tüm employee prop'larını deps'e koymak gereksiz tekrar tetiklemeye yol açar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employee?._id]);
 
   const departments = useQuery(api.departments.list, projectIds.length > 0 ? {} : "skip");

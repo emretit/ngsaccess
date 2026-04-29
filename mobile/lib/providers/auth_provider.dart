@@ -47,6 +47,7 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   String? _accessToken;
+  // ignore: unused_field
   String? _refreshToken;
 
   AuthUser? get currentUser => _currentUser;

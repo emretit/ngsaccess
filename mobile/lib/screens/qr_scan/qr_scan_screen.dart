@@ -8,7 +8,7 @@ import '../../models/qr_code_model.dart';
 import 'dart:convert';
 
 class QRScanScreen extends StatefulWidget {
-  const QRScanScreen({Key? key}) : super(key: key);
+  const QRScanScreen({super.key});
 
   @override
   State<QRScanScreen> createState() => _QRScanScreenState();
@@ -213,7 +213,7 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 10,
                       offset: const Offset(0, 5),
                     ),
@@ -224,7 +224,14 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
                   version: QrVersions.auto,
                   size: 250.0,
                   backgroundColor: Colors.white,
-                  foregroundColor: Colors.black,
+                  eyeStyle: const QrEyeStyle(
+                    eyeShape: QrEyeShape.square,
+                    color: Colors.black,
+                  ),
+                  dataModuleStyle: const QrDataModuleStyle(
+                    dataModuleShape: QrDataModuleShape.square,
+                    color: Colors.black,
+                  ),
                   errorCorrectionLevel: QrErrorCorrectLevel.M,
                 ),
               ),
@@ -256,7 +263,7 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withOpacity(0.1),
+                  color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
@@ -395,7 +402,7 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
           children: [
             Text(message),
             const SizedBox(height: 8),
-            Text('Cihaz: ${deviceInfo['deviceName'] ?? deviceInfo['device_name'] ?? '-'}'),
+            Text('Cihaz: ${deviceInfo['deviceName'] ?? '-'}'),
             Text('Konum: ${deviceInfo['location'] ?? '-'}'),
             if (deviceInfo['timestamp'] != null)
               Text('Zaman: ${DateTime.parse(deviceInfo['timestamp']).toString()}'),

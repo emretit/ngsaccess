@@ -1,27 +1,30 @@
-// @ts-nocheck
+import type { Id } from "../../../../convex/_generated/dataModel";
+
+export type UserRole = 'super_admin' | 'project_admin' | 'project_user';
 
 export interface User {
-  id: string;
-  email: string;
-  role: 'super_admin' | 'project_admin' | 'project_user';
-  created_at: string;
-  updated_at: string;
-  full_name?: string;
-  photo_url?: string;
-  setup_token?: string;
-  token_expires_at?: string;
+  _id: Id<"users">;
+  email?: string;
+  role?: UserRole;
+  createdAt?: string;
+  updatedAt?: string;
+  fullName?: string;
+  name?: string;
+  photoUrl?: string;
+  setupToken?: string;
+  tokenExpiresAt?: string;
 }
 
 export interface Project {
-  id: number;
+  _id: Id<"projects">;
   name: string;
   description?: string;
-  is_active: boolean;
+  isActive?: boolean;
 }
 
 export interface UserFormData {
   email: string;
   password?: string;
-  role: 'super_admin' | 'project_admin' | 'project_user';
-  projectId?: number;
+  role: UserRole;
+  projectId?: Id<"projects">;
 }

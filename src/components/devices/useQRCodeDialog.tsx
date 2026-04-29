@@ -7,8 +7,8 @@ export function useQRCodeDialog() {
 
   const handleQRClick = (device: Device) => {
     setSelectedQR({
-      serial: device.device_serial || device.serial_number || '',
-      name: device.device_name || device.name || 'Device QR'
+      serial: device.deviceSerial || '',
+      name: device.name || 'Device QR'
     });
   };
 

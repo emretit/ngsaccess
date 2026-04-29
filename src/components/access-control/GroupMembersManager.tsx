@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -10,10 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AccessRule, GroupMember } from "@/types/access-control";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useAccessRules } from "@/hooks/useAccessRules";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 interface GroupMembersManagerProps {
   rule: AccessRule;
-  projectId?: number;
+  projectId?: string;
 }
 
 export function GroupMembersManager({ rule, projectId }: GroupMembersManagerProps) {
@@ -23,27 +23,27 @@ export function GroupMembersManager({ rule, projectId }: GroupMembersManagerProp
   const { employees } = useEmployees();
   const { addGroupMember, removeGroupMember } = useAccessRules();
 
-  const filteredEmployees = employees?.filter(emp => 
-    `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredEmployees = employees?.filter(emp =>
+    `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
-  const availableEmployees = filteredEmployees.filter(emp => 
-    !rule.group_members?.some(member => member.employee_id === emp.id)
+  const availableEmployees = filteredEmployees.filter(emp =>
+    !rule.groupMembers?.some(member => member.employeeId === emp._id)
   );
 
   const handleAddMember = () => {
     if (selectedEmployeeId) {
       addGroupMember.mutate({
-        groupId: rule.id,
-        employeeId: parseInt(selectedEmployeeId),
-        projectId
+        groupId: rule._id,
+        employeeId: selectedEmployeeId as Id<"employees">,
+        projectId: projectId as Id<"projects"> | undefined,
       });
       setSelectedEmployeeId("");
     }
   };
 
-  const handleRemoveMember = (memberId: number) => {
-    removeGroupMember.mutate(memberId);
+  const handleRemoveMember = (memberId: string) => {
+    removeGroupMember.mutate(memberId as Id<"groupMembers">);
   };
 
   return (
@@ -51,7 +51,7 @@ export function GroupMembersManager({ rule, projectId }: GroupMembersManagerProp
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           Grup Üyeleri
-          <Badge variant="secondary">{rule.group_members?.length || 0}</Badge>
+          <Badge variant="secondary">{rule.groupMembers?.length || 0}</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -70,8 +70,8 @@ export function GroupMembersManager({ rule, projectId }: GroupMembersManagerProp
               </SelectTrigger>
               <SelectContent>
                 {availableEmployees.map((employee) => (
-                  <SelectItem key={employee.id} value={employee.id.toString()}>
-                    {employee.first_name} {employee.last_name}
+                  <SelectItem key={employee._id} value={employee._id}>
+                    {employee.firstName} {employee.lastName}
                     {employee.email && ` (${employee.email})`}
                   </SelectItem>
                 ))}
@@ -90,11 +90,11 @@ export function GroupMembersManager({ rule, projectId }: GroupMembersManagerProp
 
         {/* Current members */}
         <div className="space-y-2">
-          {rule.group_members?.map((member) => (
-            <div key={member.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+          {rule.groupMembers?.map((member) => (
+            <div key={member._id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
               <div>
                 <div className="font-medium">
-                  {member.employees?.first_name} {member.employees?.last_name}
+                  {member.employees?.firstName} {member.employees?.lastName}
                 </div>
                 {member.employees?.email && (
                   <div className="text-sm text-muted-foreground">
@@ -105,7 +105,7 @@ export function GroupMembersManager({ rule, projectId }: GroupMembersManagerProp
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => handleRemoveMember(member.id)}
+                onClick={() => handleRemoveMember(member._id)}
                 disabled={removeGroupMember.isPending}
                 className="text-destructive hover:text-destructive"
               >

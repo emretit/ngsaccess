@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
@@ -47,7 +46,7 @@ export function DeviceForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+      <form onSubmit={form.handleSubmit(onSubmit as never)} className="space-y-5">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-5">
           <div className="space-y-5">
             <DeviceBasicSection form={form} />

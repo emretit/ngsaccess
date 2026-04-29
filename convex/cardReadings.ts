@@ -299,12 +299,9 @@ export const getPdksTableData = authedQuery({
         const totalHours = `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
 
         const workDays = dayReadingsMap.size;
-        let overtimeMinutes = 0;
-        if (workDays <= 1) {
-          overtimeMinutes = Math.max(0, totalMinutes - STANDARD_DAY_MINUTES);
-        } else {
-          overtimeMinutes = Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
-        }
+        const overtimeMinutes = workDays <= 1
+          ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES)
+          : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
         const overtime = overtimeMinutes > 0 ? `${overtimeMinutes}m` : "0m";
         const overtimeHours = overtimeMinutes / 60;
         const OVERTIME_MULTIPLIER = 1.5;

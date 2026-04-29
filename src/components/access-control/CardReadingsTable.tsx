@@ -25,9 +25,9 @@ export const CardReadingsTable = ({
   showClearFilters = false,
   onClearFilters,
 }: CardReadingsTableProps) => {
-  // Helper function to get status badge - using access_granted
+  // Helper function to get status badge - using accessStatus
   const getStatusBadge = (reading: CardReading) => {
-    if (reading.access_granted) {
+    if (reading.accessStatus === "izin_verildi") {
       return <Badge variant="success">İzin Verildi</Badge>;
     } else {
       return <Badge variant="destructive">Reddedildi</Badge>;
@@ -41,8 +41,8 @@ export const CardReadingsTable = ({
       return reading.devices.name;
     }
     // If no device name, try serial number
-    if (reading.devices?.device_serial) {
-      return reading.devices.device_serial;
+    if (reading.devices?.deviceSerial) {
+      return reading.devices.deviceSerial;
     }
     // Fallback to default
     return "Bilinmeyen Cihaz";
@@ -77,11 +77,11 @@ export const CardReadingsTable = ({
             </TableRow>
           ) : (
             readings.map((reading) => (
-              <TableRow key={reading.id}>
-                <TableCell>{reading.employee_name || "Bilinmeyen"}</TableCell>
-                <TableCell>{reading.card_no}</TableCell>
+              <TableRow key={reading._id}>
+                <TableCell>{reading.employeeName || "Bilinmeyen"}</TableCell>
+                <TableCell>{reading.cardNo}</TableCell>
                 <TableCell>
-                  {format(new Date(reading.access_time), "dd.MM.yyyy HH:mm:ss", { locale: tr })}
+                  {format(new Date(reading.accessTime), "dd.MM.yyyy HH:mm:ss", { locale: tr })}
                 </TableCell>
                 <TableCell>{reading.employees?.departments?.name || "-"}</TableCell>
                 <TableCell>{getDeviceDisplay(reading)}</TableCell>

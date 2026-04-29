@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -7,7 +6,7 @@ import { Info } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
 
 interface DeviceNetworkSectionProps {
-  form: UseFormReturn<{ device_type?: string; device_ip?: string; device_username?: string; device_password?: string }>;
+  form: UseFormReturn<any>;
   isNewDevice?: boolean;
 }
 

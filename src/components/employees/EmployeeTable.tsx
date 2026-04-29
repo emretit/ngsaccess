@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 'use client';
 
@@ -28,12 +27,12 @@ interface EmployeeTableProps {
   onRefresh?: () => void;
 }
 
-export default function EmployeeTable({ 
-  employees, 
-  onEdit, 
+export default function EmployeeTable({
+  employees,
+  onEdit,
   onDelete,
   onViewDetails,
-  onRefresh 
+  onRefresh
 }: EmployeeTableProps) {
   const [selectedEmployeeForReset, setSelectedEmployeeForReset] = useState<Employee | null>(null);
   const [showPasswordResetDialog, setShowPasswordResetDialog] = useState(false);
@@ -45,14 +44,14 @@ export default function EmployeeTable({
   const syncEmployeeToDevices = useAction(api.actions.hikvisionSync.syncEmployeeToDevices);
 
   const handleSyncToDevice = async (employee: Employee) => {
-    const empId = (employee._id || employee.id) as unknown as Id<"employees">;
+    const empId = employee._id;
     setSyncingEmployeeId(empId);
     try {
       const result = await syncEmployeeToDevices({ employeeId: empId });
       if (result.synced > 0) {
         toast({
           title: "Senkronizasyon Başarılı",
-          description: `${employee.first_name || employee.firstName} ${employee.last_name || employee.lastName} — ${result.synced} cihaza gönderildi.`,
+          description: `${employee.firstName} ${employee.lastName} — ${result.synced} cihaza gönderildi.`,
         });
       } else if (result.errors.length > 0) {
         toast({
@@ -76,7 +75,7 @@ export default function EmployeeTable({
       setSyncingEmployeeId(null);
     }
   };
-  
+
   const {
     sortedEmployees,
     selectedEmployees,
@@ -89,7 +88,7 @@ export default function EmployeeTable({
     handleBulkDelete: originalHandleBulkDelete,
     handleBulkDepartmentUpdate: originalHandleBulkDepartmentUpdate,
     requestSort
-  } = useEmployeeTable(employees as any);
+  } = useEmployeeTable(employees);
 
   const handlePasswordResetClick = (employee: Employee) => {
     setSelectedEmployeeForReset(employee);
@@ -106,8 +105,7 @@ export default function EmployeeTable({
   const handleIndividualDeleteConfirm = async () => {
     if (!selectedEmployeeForDelete) return;
     try {
-      const empId = (selectedEmployeeForDelete._id || selectedEmployeeForDelete.id) as unknown as Id<"employees">;
-      await removeEmployee({ employeeId: empId });
+      await removeEmployee({ employeeId: selectedEmployeeForDelete._id });
       toast({ title: "Başarılı", description: "Personel silindi" });
       setShowIndividualDeleteDialog(false);
       setSelectedEmployeeForDelete(null);
@@ -189,22 +187,22 @@ export default function EmployeeTable({
                 />
               </TableHead>
               <TableHead className="font-semibold text-foreground w-[56px]">Foto</TableHead>
-              <TableHead onClick={() => requestSort('first_name' as any)} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
+              <TableHead onClick={() => requestSort('firstName')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
                 Ad Soyad
               </TableHead>
-              <TableHead onClick={() => requestSort('email' as any)} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
+              <TableHead onClick={() => requestSort('email')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
                 E-posta
               </TableHead>
-              <TableHead onClick={() => requestSort('department_id' as any)} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
+              <TableHead onClick={() => requestSort('departmentId')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
                 Departman
               </TableHead>
-              <TableHead onClick={() => requestSort('position_id' as any)} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
+              <TableHead onClick={() => requestSort('positionId')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
                 Pozisyon
               </TableHead>
-              <TableHead onClick={() => requestSort('card_number' as any)} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
+              <TableHead onClick={() => requestSort('cardNumber')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
                 Kart No
               </TableHead>
-              <TableHead onClick={() => requestSort('is_active' as any)} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
+              <TableHead onClick={() => requestSort('isActive')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
                 Durum
               </TableHead>
               <TableHead className="text-right font-semibold text-foreground">İşlemler</TableHead>
@@ -217,9 +215,9 @@ export default function EmployeeTable({
                   Personel bulunamadı.
                 </TableCell>
               </TableRow>
-            ) : sortedEmployees.map((employee: any) => (
+            ) : sortedEmployees.map((employee: Employee) => (
               <TableRow
-                key={employee._id || employee.id}
+                key={employee._id}
                 className="cursor-pointer transition-colors hover:bg-muted/50"
                 onClick={(e) => {
                   if ((e.target as HTMLElement).closest('button, input[type="checkbox"]')) return;
@@ -228,19 +226,19 @@ export default function EmployeeTable({
               >
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <Checkbox
-                    checked={selectedEmployees.includes(employee._id || employee.id)}
-                    onCheckedChange={(checked) => handleSelectEmployee(checked as boolean, employee._id || employee.id)}
+                    checked={selectedEmployees.includes(employee._id)}
+                    onCheckedChange={(checked) => handleSelectEmployee(checked as boolean, employee._id)}
                   />
                 </TableCell>
                 <TableCell>
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={employee.photo_url || employee.photoUrl || ''} alt={`${employee.first_name || employee.firstName} ${employee.last_name || employee.lastName}`} />
+                    <AvatarImage src={employee.photoUrl || ''} alt={`${employee.firstName} ${employee.lastName}`} />
                     <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
-                      {(employee.first_name || employee.firstName)?.[0]}{(employee.last_name || employee.lastName)?.[0]}
+                      {employee.firstName?.[0]}{employee.lastName?.[0]}
                     </AvatarFallback>
                   </Avatar>
                 </TableCell>
-                <TableCell className="font-medium">{employee.first_name || employee.firstName} {employee.last_name || employee.lastName}</TableCell>
+                <TableCell className="font-medium">{employee.firstName} {employee.lastName}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">{employee.email}</TableCell>
                 <TableCell>
                   {employee.departments?.name ? (
@@ -254,10 +252,10 @@ export default function EmployeeTable({
                 <TableCell className="text-sm text-muted-foreground">
                   {employee.positions?.name ?? <span className="text-muted-foreground">—</span>}
                 </TableCell>
-                <TableCell className="font-mono text-sm">{employee.card_number || employee.cardNumber || <span className="text-muted-foreground">—</span>}</TableCell>
+                <TableCell className="font-mono text-sm">{employee.cardNumber || <span className="text-muted-foreground">—</span>}</TableCell>
                 <TableCell>
-                  <Badge variant={(employee.is_active ?? employee.isActive) ? "success" : "secondary"} className="text-xs">
-                    {(employee.is_active ?? employee.isActive) ? 'Aktif' : 'Pasif'}
+                  <Badge variant={employee.isActive ? "success" : "secondary"} className="text-xs">
+                    {employee.isActive ? 'Aktif' : 'Pasif'}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
@@ -266,11 +264,11 @@ export default function EmployeeTable({
                       variant="ghost"
                       size="icon"
                       onClick={() => handleSyncToDevice(employee)}
-                      disabled={syncingEmployeeId === (employee._id || employee.id)}
+                      disabled={syncingEmployeeId === employee._id}
                       className="h-8 w-8 text-muted-foreground hover:text-primary"
                       title="Cihaza Senkronize Et"
                     >
-                      {syncingEmployeeId === (employee._id || employee.id) ? (
+                      {syncingEmployeeId === employee._id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <Upload className="h-4 w-4" />

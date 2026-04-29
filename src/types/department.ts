@@ -1,12 +1,11 @@
+import type { Id } from "../../convex/_generated/dataModel";
+
 export interface Department {
-  _id?: string;
-  id?: string;
+  _id: Id<"departments">;
   name: string;
-  parent_id?: string | null;
-  parentId?: string | null;
+  parentId?: Id<"departments"> | null;
   level?: number;
-  created_at?: string;
-  updated_at?: string;
-  projectId?: string;
-  [key: string]: unknown;
+  projectId?: Id<"projects">;
+  createdAt?: string;
+  updatedAt?: string;
 }

@@ -3,7 +3,7 @@ import { Employee } from '@/types/employee';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Edit2, Mail, Phone, Calendar } from "lucide-react";
+import { Edit2, Mail } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { format } from 'date-fns';
 
@@ -20,19 +20,19 @@ export default function EmployeeDetails({ employee, onEdit }: EmployeeDetailProp
       <div className="flex justify-between items-start">
         <div className="flex items-center gap-4">
           <Avatar className="h-20 w-20">
-            <AvatarImage src={employee.photo_url || ''} alt={`${employee.first_name} ${employee.last_name}`} />
+            <AvatarImage src={employee.photoUrl || ''} alt={`${employee.firstName} ${employee.lastName}`} />
             <AvatarFallback className="text-xl">
-              {employee.first_name?.[0]}{employee.last_name?.[0]}
+              {employee.firstName?.[0]}{employee.lastName?.[0]}
             </AvatarFallback>
           </Avatar>
           <div>
-            <h3 className="font-medium text-lg">{employee.first_name} {employee.last_name}</h3>
+            <h3 className="font-medium text-lg">{employee.firstName} {employee.lastName}</h3>
             <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
               <Mail className="h-3 w-3" /> {employee.email}
             </p>
             <div className="mt-1">
-              <Badge variant={employee.is_active ? "success" : "secondary"}>
-                {employee.is_active ? 'Aktif' : 'Pasif'}
+              <Badge variant={employee.isActive ? "success" : "secondary"}>
+                {employee.isActive ? 'Aktif' : 'Pasif'}
               </Badge>
             </div>
           </div>
@@ -48,8 +48,8 @@ export default function EmployeeDetails({ employee, onEdit }: EmployeeDetailProp
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-3">
           <h4 className="text-sm font-medium">Kişisel Bilgiler</h4>
-          <DetailItem label="TC No" value={employee.tc_no} />
-          <DetailItem label="Kart No" value={employee.card_number} />
+          <DetailItem label="TC No" value={employee.tcNo} />
+          <DetailItem label="Kart No" value={employee.cardNumber} />
         </div>
 
         <div className="space-y-3">
@@ -57,7 +57,6 @@ export default function EmployeeDetails({ employee, onEdit }: EmployeeDetailProp
           <DetailItem label="Departman" value={employee.departments?.name || '-'} />
           <DetailItem label="Pozisyon" value={employee.positions?.name || '-'} />
           <DetailItem label="Vardiya" value={employee.shift || '-'} />
-          <DetailItem label="Erişim Kuralı" value={employee.access_rule || '-'} />
         </div>
       </div>
 
@@ -66,13 +65,13 @@ export default function EmployeeDetails({ employee, onEdit }: EmployeeDetailProp
       <div className="space-y-3">
         <h4 className="text-sm font-medium">Sistem Bilgileri</h4>
         <div className="grid grid-cols-2 gap-4">
-          <DetailItem 
-            label="Oluşturulma Tarihi" 
-            value={employee.created_at ? format(new Date(employee.created_at), 'dd.MM.yyyy HH:mm') : '-'} 
+          <DetailItem
+            label="Oluşturulma Tarihi"
+            value={employee.createdAt ? format(new Date(employee.createdAt), 'dd.MM.yyyy HH:mm') : '-'}
           />
-          <DetailItem 
-            label="Son Güncelleme" 
-            value={employee.updated_at ? format(new Date(employee.updated_at), 'dd.MM.yyyy HH:mm') : '-'} 
+          <DetailItem
+            label="Son Güncelleme"
+            value={employee.updatedAt ? format(new Date(employee.updatedAt), 'dd.MM.yyyy HH:mm') : '-'}
           />
         </div>
       </div>
@@ -92,13 +91,13 @@ export default function EmployeeDetails({ employee, onEdit }: EmployeeDetailProp
   );
 }
 
-function DetailItem({ 
-  label, 
-  value, 
-  valueClass = '' 
-}: { 
-  label: string; 
-  value: string | number | null | undefined; 
+function DetailItem({
+  label,
+  value,
+  valueClass = ''
+}: {
+  label: string;
+  value: string | number | null | undefined;
   valueClass?: string;
 }) {
   return (

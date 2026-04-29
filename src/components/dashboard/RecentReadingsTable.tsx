@@ -21,9 +21,9 @@ interface RecentReadingsTableProps {
 
 const RecentReadingsTable: React.FC<RecentReadingsTableProps> = ({ readings, loading }) => {
   const getStatusBadge = (reading: CardReading) => {
-    // Use access_granted for badge determination
-    const hasAccess = reading.access_granted;
-      
+    // Use accessStatus for badge determination
+    const hasAccess = reading.accessStatus === 'izin_verildi';
+
     return (
       <Badge variant={hasAccess ? 'success' : 'destructive'}>
         {hasAccess ? 'İzin Verildi' : 'Reddedildi'}
@@ -70,16 +70,16 @@ const RecentReadingsTable: React.FC<RecentReadingsTableProps> = ({ readings, loa
                 </TableRow>
               ) : (
                 readings.map((reading) => {
-                  const timeValue = reading.access_time ?? (reading as { accessTime?: string }).accessTime;
+                  const timeValue = reading.accessTime;
                   const date = timeValue ? new Date(timeValue) : null;
                   const isValidDate = date && !Number.isNaN(date.getTime());
                   return (
-                  <TableRow key={reading.id}>
+                  <TableRow key={reading._id}>
                     <TableCell>
                       {isValidDate ? format(date, 'HH:mm', { locale: tr }) : '-'}
                     </TableCell>
-                    <TableCell>{reading.employee_name}</TableCell>
-                    <TableCell>{reading.device_name || '-'}</TableCell>
+                    <TableCell>{reading.employeeName}</TableCell>
+                    <TableCell>{reading.devices?.name || '-'}</TableCell>
                     <TableCell>{getStatusBadge(reading)}</TableCell>
                   </TableRow>
                 );

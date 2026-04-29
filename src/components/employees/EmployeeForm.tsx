@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import { Employee } from '@/types/employee';
 import PhotoUpload from './PhotoUpload';
@@ -32,9 +31,7 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
   const { isLoading, handleSubmit } = useEmployeeFormSubmit(
     employee,
     onClose,
-    onSave,
-    departments,
-    positions
+    onSave
   );
 
   const { handleFileChange } = usePhotoUpload();
@@ -42,7 +39,7 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
   const onPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleFileChange(
       e,
-      (url) => setFormData({ ...formData, photo_url: url }),
+      (url) => setFormData({ ...formData, photoUrl: url }),
       setPhotoPreview
     );
   };

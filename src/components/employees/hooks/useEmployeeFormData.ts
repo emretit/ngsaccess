@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -7,20 +6,20 @@ import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { Id } from "../../../../convex/_generated/dataModel";
 
 export interface EmployeeFormData {
-  first_name: string;
-  last_name: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  tc_no: string;
-  card_number: string;
-  company_id: string | null;
-  department_id: string | null;
-  position_id: string | null;
-  access_rule_id: string | null;
+  tcNo: string;
+  cardNumber: string;
+  companyId: string | null;
+  departmentId: string | null;
+  positionId: string | null;
+  accessRuleId: string | null;
   shift: string | null;
-  shift_id: string | null;
-  photo_url: string | null;
+  shiftId: string | null;
+  photoUrl: string | null;
   notes: string;
-  is_active: boolean;
+  isActive: boolean;
   projectId?: Id<"projects">;
 }
 
@@ -29,20 +28,20 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
   const defaultProjectId = projectIds[0] as Id<"projects"> | undefined;
 
   const [formData, setFormData] = useState<EmployeeFormData>({
-    first_name: "",
-    last_name: "",
+    firstName: "",
+    lastName: "",
     email: "",
-    tc_no: "",
-    card_number: "",
-    company_id: null,
-    department_id: null,
-    position_id: null,
-    access_rule_id: null,
+    tcNo: "",
+    cardNumber: "",
+    companyId: null,
+    departmentId: null,
+    positionId: null,
+    accessRuleId: null,
     shift: null,
-    shift_id: null,
-    photo_url: null,
+    shiftId: null,
+    photoUrl: null,
     notes: "",
-    is_active: true,
+    isActive: true,
   });
 
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -60,39 +59,39 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
   useEffect(() => {
     if (employee) {
       setFormData({
-        first_name: (employee as Record<string, unknown>).firstName as string || employee.first_name || "",
-        last_name: (employee as Record<string, unknown>).lastName as string || employee.last_name || "",
+        firstName: employee.firstName || "",
+        lastName: employee.lastName || "",
         email: employee.email || "",
-        tc_no: employee.tc_no || "",
-        card_number: employee.card_number || "",
-        company_id: (employee.company_id as unknown as string) ?? null,
-        department_id: (employee.department_id as unknown as string) ?? null,
-        position_id: (employee.position_id as unknown as string) ?? null,
-        access_rule_id: (employee.access_rule_id as unknown as string) ?? null,
+        tcNo: employee.tcNo || "",
+        cardNumber: employee.cardNumber || "",
+        companyId: (employee.companyId as unknown as string) ?? null,
+        departmentId: (employee.departmentId as unknown as string) ?? null,
+        positionId: (employee.positionId as unknown as string) ?? null,
+        accessRuleId: (employee.accessRuleId as unknown as string) ?? null,
         shift: employee.shift ?? null,
-        shift_id: (employee.shift_id as unknown as string) ?? null,
-        photo_url: employee.photo_url ?? null,
+        shiftId: (employee.shiftId as unknown as string) ?? null,
+        photoUrl: employee.photoUrl ?? null,
         notes: employee.notes || "",
-        is_active: employee.is_active ?? true,
-        projectId: ((employee as Record<string, unknown>).projectId as Id<"projects">) ?? defaultProjectId,
+        isActive: employee.isActive ?? true,
+        projectId: employee.projectId ?? defaultProjectId,
       });
-      setPhotoPreview(employee.photo_url ?? null);
+      setPhotoPreview(employee.photoUrl ?? null);
     } else {
       setFormData({
-        first_name: "",
-        last_name: "",
+        firstName: "",
+        lastName: "",
         email: "",
-        tc_no: "",
-        card_number: "",
-        company_id: null,
-        department_id: null,
-        position_id: null,
-        access_rule_id: null,
+        tcNo: "",
+        cardNumber: "",
+        companyId: null,
+        departmentId: null,
+        positionId: null,
+        accessRuleId: null,
         shift: null,
-        shift_id: null,
-        photo_url: null,
+        shiftId: null,
+        photoUrl: null,
         notes: "",
-        is_active: true,
+        isActive: true,
         projectId: defaultProjectId,
       });
       setPhotoPreview(null);

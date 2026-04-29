@@ -3,13 +3,20 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
 export interface PDKSRecord {
-  id: string;
-  employee_first_name: string;
-  employee_last_name: string;
+  _id: string;
+  employeeFirstName: string;
+  employeeLastName: string;
   date: string;
-  entry_time: string;
-  exit_time: string;
+  entryTime: string;
+  exitTime: string;
   status: string;
+}
+
+interface CardReadingRow {
+  _id: string;
+  employeeName?: string;
+  accessTime?: string;
+  status?: string;
 }
 
 export function usePdksRecords() {
@@ -17,15 +24,13 @@ export function usePdksRecords() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   const result = useQuery(api.cardReadings.list, {});
-  const rawRecords: { _id: string; employeeName?: string; accessTime?: string; status?: string; }[] =
-    ((Array.isArray(result) ? result : (result as any)?.readings) ?? []) as any[];
+  const rawRecords: CardReadingRow[] = (
+    Array.isArray(result)
+      ? (result as CardReadingRow[])
+      : ((result as { readings?: CardReadingRow[] } | undefined)?.readings ?? [])
+  );
 
-  const records: PDKSRecord[] = rawRecords.map((r: {
-    _id: string;
-    employeeName?: string;
-    accessTime?: string;
-    status?: string;
-  }) => {
+  const records: PDKSRecord[] = rawRecords.map((r) => {
     const nameParts = (r.employeeName ?? "").split(" ");
     const lastName = nameParts.length > 1 ? nameParts.pop()! : "";
     const firstName = nameParts.join(" ");
@@ -34,18 +39,18 @@ export function usePdksRecords() {
       ? new Date(r.accessTime).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
       : "";
     return {
-      id: r._id,
-      employee_first_name: firstName,
-      employee_last_name: lastName,
+      _id: r._id,
+      employeeFirstName: firstName,
+      employeeLastName: lastName,
       date,
-      entry_time: time,
-      exit_time: "",
+      entryTime: time,
+      exitTime: "",
       status: r.status ?? "",
     };
   });
 
   const filteredRecords = records.filter((record) => {
-    const fullName = `${record.employee_first_name} ${record.employee_last_name}`.toLowerCase();
+    const fullName = `${record.employeeFirstName} ${record.employeeLastName}`.toLowerCase();
     const matchesSearch = searchTerm === "" || fullName.includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || record.status === statusFilter;
     return matchesSearch && matchesStatus;

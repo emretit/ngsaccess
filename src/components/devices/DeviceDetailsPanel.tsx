@@ -1,4 +1,3 @@
-// @ts-nocheck
 import {
   Sheet,
   SheetContent,
@@ -22,7 +21,7 @@ interface DeviceDetailsPanelProps {
 export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess }: DeviceDetailsPanelProps) {
   const projectsData = useQuery(api.projects.list);
   const projectsLoading = projectsData === undefined;
-  const projects = (projectsData ?? []).map((p: { _id: string; name: string }) => ({ id: p._id, name: p.name }));
+  const projects = (projectsData ?? []).map((p: { _id: string; name: string }) => ({ _id: p._id as never, name: p.name }));
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -47,7 +46,7 @@ export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess }:
             <div className="p-6">
               <DeviceForm
                 open={open}
-                device={selectedDevice ? { ...selectedDevice, _id: selectedDevice.id } : null}
+                device={selectedDevice}
                 projects={projects}
                 onSuccess={onSuccess}
                 onClose={onClose}

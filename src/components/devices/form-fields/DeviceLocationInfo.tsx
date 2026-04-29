@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import { FormSelectField } from "@/components/employees/FormFields";
 import { Zone, Door } from "@/hooks/useZonesAndDoors";
@@ -10,7 +9,7 @@ interface DeviceLocationInfoProps {
   onZoneChange: (value: string) => void;
   doorId: string;
   onDoorChange: (value: string) => void;
-  projects: { id: number; name: string; }[];
+  projects: { _id: string; name: string; }[];
   zones: Zone[];
   doors: Door[];
   loading: boolean;
@@ -31,7 +30,7 @@ export function DeviceLocationInfo({
   hideProjectSelection = false
 }: DeviceLocationInfoProps) {
   // Filter doors based on selected zone
-  const filteredDoors = doors.filter(door => String(door.zone_id) === zoneId);
+  const filteredDoors = doors.filter(door => String(door.zoneId) === zoneId);
 
   return (
     <>
@@ -42,7 +41,7 @@ export function DeviceLocationInfo({
           value={projectId}
           onChange={onProjectChange}
           options={projects.map(project => ({
-            id: project.id.toString(),
+            id: String(project._id),
             name: project.name
           }))}
           placeholder="Proje Seçiniz"
@@ -61,7 +60,7 @@ export function DeviceLocationInfo({
           }
         }}
         options={zones.map(zone => ({
-          id: String(zone.id),
+          id: String(zone._id),
           name: zone.name
         }))}
         placeholder={loading ? "Yükleniyor..." : "Bölge Seçiniz"}
@@ -73,7 +72,7 @@ export function DeviceLocationInfo({
         value={doorId}
         onChange={onDoorChange}
         options={filteredDoors.map(door => ({
-          id: String(door.id),
+          id: String(door._id),
           name: door.name
         }))}
         placeholder={zoneId 

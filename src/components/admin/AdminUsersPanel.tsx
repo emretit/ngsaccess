@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import React, { useState } from 'react';
 import ProjectFilter from '@/components/auth/ProjectFilter';
@@ -7,12 +6,13 @@ import { UserTable } from './components/UserTable';
 import { UserFormDialog } from './components/UserFormDialog';
 import { DeleteUserDialog } from './components/DeleteUserDialog';
 import { useUserManagement } from './hooks/useUserManagement';
+import type { User } from './types/user-types';
 
 const AdminUsersPanel = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [userToDelete, setUserToDelete] = useState(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const {
     users,
@@ -26,21 +26,21 @@ const AdminUsersPanel = () => {
     resetForm
   } = useUserManagement();
 
-  const filteredUsers = users.filter(user => 
-    user.email.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredUsers = users.filter((user: User) =>
+    (user.email ?? '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleCreateUser = () => {
-    resetForm();
+    resetForm?.();
     setIsDialogOpen(true);
   };
 
-  const handleEditClick = async (user) => {
+  const handleEditClick = async (user: User) => {
     await handleEditUser(user);
     setIsDialogOpen(true);
   };
 
-  const handleDeleteClick = (user) => {
+  const handleDeleteClick = (user: User) => {
     setUserToDelete(user);
     setIsDeleteDialogOpen(true);
   };

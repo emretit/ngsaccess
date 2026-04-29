@@ -10,8 +10,8 @@ interface EmployeeStatsProps {
 export function EmployeeStats({ employees }: EmployeeStatsProps) {
   const stats = useMemo(() => ({
     total: employees.length,
-    active: employees.filter(emp => emp.is_active).length,
-    inactive: employees.filter(emp => !emp.is_active).length
+    active: employees.filter(emp => emp.isActive).length,
+    inactive: employees.filter(emp => !emp.isActive).length
   }), [employees]);
 
   const activeRate = stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0;

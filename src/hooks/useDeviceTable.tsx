@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState } from "react";
 import { Device } from "@/types/device";
 import { useToast } from "@/hooks/use-toast";
@@ -7,20 +6,20 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
 export function useDeviceTable(devices: Device[]) {
-  const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
+  const [selectedDevices, setSelectedDevices] = useState<Id<"devices">[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const { toast } = useToast();
   const removeDevice = useMutation(api.devices.remove);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedDevices(devices.map((d) => d.id || (d as { _id?: string })._id || ""));
+      setSelectedDevices(devices.map((d) => d._id));
     } else {
       setSelectedDevices([]);
     }
   };
 
-  const handleSelectDevice = (checked: boolean, deviceId: string) => {
+  const handleSelectDevice = (checked: boolean, deviceId: Id<"devices">) => {
     if (checked) {
       setSelectedDevices([...selectedDevices, deviceId]);
     } else {
@@ -30,7 +29,7 @@ export function useDeviceTable(devices: Device[]) {
 
   const handleBulkDelete = async () => {
     try {
-      await Promise.all(selectedDevices.map((id) => removeDevice({ deviceId: id as Id<"devices"> })));
+      await Promise.all(selectedDevices.map((id) => removeDevice({ deviceId: id })));
       toast({ title: "Başarılı", description: `${selectedDevices.length} cihaz başarıyla silindi` });
       setSelectedDevices([]);
       setShowDeleteDialog(false);

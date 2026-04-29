@@ -4,7 +4,7 @@ import { AiInsightsCard } from "@/components/pdks/AiInsightsCard";
 import { PDKSTable } from "./PDKSTable";
 
 interface PDKSRecord {
-  id: number;
+  id: string;
   employee_first_name: string;
   employee_last_name: string;
   date: string;

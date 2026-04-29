@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import type { Id } from "../../convex/_generated/dataModel";
 import DepartmentTree from "@/components/departments/DepartmentTree";
 import SlideOverPanel from "@/components/employees/SlideOverPanel";
 import { Employee } from "@/types/employee";
@@ -18,14 +19,14 @@ export default function Employees() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-  const [selectedDepartment, setSelectedDepartment] = useState<number | null>(null);
+  const [selectedDepartment, setSelectedDepartment] = useState<Id<"departments"> | null>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [viewMode, setViewMode] = useState(false);
 
   const employeeStats = useMemo(() => ({
     total: employees.length,
-    active: employees.filter(emp => emp.is_active).length,
-    inactive: employees.filter(emp => !emp.is_active).length
+    active: employees.filter(emp => emp.isActive).length,
+    inactive: employees.filter(emp => !emp.isActive).length
   }), [employees]);
 
   // Filtreleme işlemini useMemo ile optimize et
@@ -33,17 +34,17 @@ export default function Employees() {
     let filtered = employees;
 
     if (selectedDepartment) {
-      filtered = filtered.filter(emp => String(emp.department_id ?? emp.departmentId) === String(selectedDepartment));
+      filtered = filtered.filter(emp => String(emp.departmentId) === String(selectedDepartment));
     }
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(emp =>
-        emp.first_name.toLowerCase().includes(query) ||
-        emp.last_name.toLowerCase().includes(query) ||
+        emp.firstName.toLowerCase().includes(query) ||
+        emp.lastName.toLowerCase().includes(query) ||
         emp.email.toLowerCase().includes(query) ||
-        emp.tc_no.includes(query) ||
-        emp.card_number.includes(query)
+        emp.tcNo.includes(query) ||
+        emp.cardNumber.includes(query)
       );
     }
 

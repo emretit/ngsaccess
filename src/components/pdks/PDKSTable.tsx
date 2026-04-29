@@ -20,7 +20,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 interface PDKSRecord {
-  id: number;
+  id: string;
   employee_first_name: string;
   employee_last_name: string;
   date: string;

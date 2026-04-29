@@ -3,11 +3,10 @@ import { NaturalLanguageQuery } from './parsers/turkishNlpParser';
 
 export class SqlQueryBuilder {
   static buildQuery(nlQuery: NaturalLanguageQuery): string {
-    let query = '';
-    let joins = new Set<string>();
-    let conditions: string[] = [];
-    let groupBy: string[] = [];
-    let orderBy = '';
+    let query: string;
+    const joins = new Set<string>();
+    const conditions: string[] = [];
+    const groupBy: string[] = [];
     
     // Ana SELECT ve FROM kısmı
     switch (nlQuery.intent) {
@@ -57,7 +56,7 @@ export class SqlQueryBuilder {
     
     // ORDER BY ekle
     if (nlQuery.orderBy) {
-      orderBy = this.buildOrderBy(nlQuery);
+      const orderBy = this.buildOrderBy(nlQuery);
       if (orderBy) {
         query += ' ORDER BY ' + orderBy;
       }

@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -11,10 +10,11 @@ import { AccessRule, GroupDevice } from "@/types/access-control";
 import { useDevices } from "@/hooks/useDevices";
 import { useAccessRules } from "@/hooks/useAccessRules";
 import { useLocationUtils } from "@/hooks/useLocationUtils";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 interface GroupDevicesManagerProps {
   rule: AccessRule;
-  projectId?: number;
+  projectId?: string;
 }
 
 export function GroupDevicesManager({ rule, projectId }: GroupDevicesManagerProps) {
@@ -30,23 +30,23 @@ export function GroupDevicesManager({ rule, projectId }: GroupDevicesManagerProp
     getDeviceLocationDisplay(device).toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
-  const availableDevices = filteredDevices.filter(device => 
-    !rule.group_devices?.some(groupDevice => groupDevice.device_id === Number(device.id))
+  const availableDevices = filteredDevices.filter(device =>
+    !rule.groupDevices?.some(groupDevice => groupDevice.deviceId === device._id)
   );
 
   const handleAddDevice = () => {
     if (selectedDeviceId) {
       addGroupDevice.mutate({
-        groupId: rule.id,
-        deviceId: parseInt(selectedDeviceId),
-        projectId
+        groupId: rule._id,
+        deviceId: selectedDeviceId as Id<"devices">,
+        projectId: projectId as Id<"projects"> | undefined,
       });
       setSelectedDeviceId("");
     }
   };
 
-  const handleRemoveDevice = (groupDeviceId: number) => {
-    removeGroupDevice.mutate(groupDeviceId);
+  const handleRemoveDevice = (groupDeviceId: string) => {
+    removeGroupDevice.mutate(groupDeviceId as Id<"groupDevices">);
   };
 
   return (
@@ -54,7 +54,7 @@ export function GroupDevicesManager({ rule, projectId }: GroupDevicesManagerProp
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           Grup Cihazları
-          <Badge variant="secondary">{rule.group_devices?.length || 0}</Badge>
+          <Badge variant="secondary">{rule.groupDevices?.length || 0}</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -73,7 +73,7 @@ export function GroupDevicesManager({ rule, projectId }: GroupDevicesManagerProp
               </SelectTrigger>
               <SelectContent>
                 {availableDevices.map((device) => (
-                  <SelectItem key={device.id} value={device.id.toString()}>
+                  <SelectItem key={device._id} value={device._id}>
                     {device.name} - {getDeviceLocationDisplay(device)}
                   </SelectItem>
                 ))}
@@ -92,25 +92,25 @@ export function GroupDevicesManager({ rule, projectId }: GroupDevicesManagerProp
 
         {/* Current devices */}
         <div className="space-y-2">
-          {rule.group_devices?.map((groupDevice) => {
-            const device = devices.find(d => d.id === groupDevice.device_id.toString());
+          {rule.groupDevices?.map((groupDevice) => {
+            const device = devices.find(d => d._id === groupDevice.deviceId);
             return (
-              <div key={groupDevice.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+              <div key={groupDevice._id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                 <div>
                   <div className="font-medium">
                     {groupDevice.devices?.name}
                   </div>
                   <div className="text-sm text-muted-foreground">
                     {device ? getDeviceLocationDisplay(device) : 'Konum Bilinmiyor'}
-                    {groupDevice.devices?.device_serial && 
-                      ` • ${groupDevice.devices.device_serial}`
+                    {groupDevice.devices?.deviceSerial &&
+                      ` • ${groupDevice.devices.deviceSerial}`
                     }
                   </div>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => handleRemoveDevice(groupDevice.id)}
+                  onClick={() => handleRemoveDevice(groupDevice._id)}
                   disabled={removeGroupDevice.isPending}
                   className="text-destructive hover:text-destructive"
                 >

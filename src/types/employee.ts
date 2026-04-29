@@ -1,43 +1,31 @@
+import type { Id } from "../../convex/_generated/dataModel";
+
 export interface Employee {
-  _id?: string;
-  id?: string;
-  first_name?: string;
-  firstName?: string;
-  last_name?: string;
-  lastName?: string;
-  email?: string;
-  tc_no?: string;
-  tcNo?: string;
-  card_number?: string;
-  cardNumber?: string;
-  photo_url?: string | null;
+  _id: Id<"employees">;
+  firstName: string;
+  lastName: string;
+  email: string;
+  tcNo: string;
+  cardNumber: string;
+  photoUrl?: string | null;
+  photoStorageId?: Id<"_storage">;
   shift?: string | null;
-  company_id?: string | null;
-  companyId?: string | null;
-  department_id?: string | null;
-  departmentId?: string | null;
-  position_id?: string | null;
-  positionId?: string | null;
-  shift_id?: string | null;
-  shiftId?: string | null;
-  access_rule_id?: string | null;
-  accessRuleId?: string | null;
-  access_rule?: string;
-  created_at?: string;
-  updated_at?: string;
-  is_active?: boolean;
+  companyId?: Id<"companies"> | null;
+  departmentId?: Id<"departments"> | null;
+  positionId?: Id<"positions"> | null;
+  shiftId?: Id<"shifts"> | null;
+  accessRuleId?: Id<"accessRules"> | null;
   isActive?: boolean;
   notes?: string;
-  projectId?: string;
+  projectId?: Id<"projects">;
+  createdAt?: string;
+  updatedAt?: string;
   departments?: {
-    id?: string;
-    _id?: string;
+    _id: Id<"departments">;
     name: string;
   } | null;
   positions?: {
-    id?: string;
-    _id?: string;
+    _id: Id<"positions">;
     name: string;
   } | null;
-  [key: string]: unknown;
 }

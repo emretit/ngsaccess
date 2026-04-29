@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import { FormTextField, FormSelectField } from "@/components/employees/FormFields";
 import { Switch } from "@/components/ui/switch";

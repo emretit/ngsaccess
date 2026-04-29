@@ -1,19 +1,19 @@
-// @ts-nocheck
 
 import { useState } from "react";
 import { ChevronRight, Users, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Department } from "@/types/department";
+import type { Id } from "../../../convex/_generated/dataModel";
 
 interface DepartmentTreeItemProps {
   department: Department;
   children?: React.ReactNode;
   level: number;
   isSelected: boolean;
-  onSelect: (id: number) => void;
-  onAddSubDepartment: (parentId: number) => void;
-  onDelete: (id: number) => void;
+  onSelect: (id: Id<"departments">) => void;
+  onAddSubDepartment: (parentId: Id<"departments">) => void;
+  onDelete: (id: Id<"departments">) => void;
   hasChildren: boolean;
 }
 
@@ -32,7 +32,7 @@ export function DepartmentTreeItem({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     switch (e.key) {
       case "Enter":
-        onSelect(department.id);
+        onSelect(department._id);
         break;
       case "ArrowRight":
         setIsExpanded(true);
@@ -53,7 +53,7 @@ export function DepartmentTreeItem({
           level === 0 ? "mt-0" : "mt-0.5"
         )}
         style={{ paddingLeft: `${level * 12 + 8}px` }}
-        onClick={() => onSelect(department.id)}
+        onClick={() => onSelect(department._id)}
         onKeyDown={handleKeyDown}
         tabIndex={0}
       >
@@ -84,7 +84,7 @@ export function DepartmentTreeItem({
             className="h-6 w-6 hover:bg-accent/80"
             onClick={(e) => {
               e.stopPropagation();
-              onAddSubDepartment(department.id);
+              onAddSubDepartment(department._id);
             }}
           >
             <Plus className="h-3 w-3" />
@@ -96,7 +96,7 @@ export function DepartmentTreeItem({
             disabled={hasChildren}
             onClick={(e) => {
               e.stopPropagation();
-              onDelete(department.id);
+              onDelete(department._id);
             }}
           >
             <Trash2 className="h-3 w-3" />

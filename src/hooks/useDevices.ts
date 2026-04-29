@@ -1,39 +1,15 @@
-// @ts-nocheck
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
 import { useProjectAccess } from "./useProjectAccess";
-import { Id } from "../../convex/_generated/dataModel";
+import type { Id } from "../../convex/_generated/dataModel";
+import type { Device } from "@/types/device";
 
-export interface Device {
-  _id: Id<"devices">;
-  id?: string;
-  name: string;
-  projectId?: Id<"projects">;
-  zoneId?: Id<"zones">;
-  doorId?: Id<"doors">;
-  deviceType?: string;
-  deviceIp?: string;
-  deviceSerial?: string;
-  accessDirection?: "entry" | "exit" | "both";
-  status?: string;
-  isActive?: boolean;
-  description?: string;
-  lastSeen?: string;
-  createdAt: string;
-  updatedAt: string;
-  zone?: { name: string } | null;
-  door?: { name: string } | null;
-  device_name?: string;
-  device_serial?: string;
-  device_type?: string;
-  device_location?: string;
-  [key: string]: unknown;
-}
+export type { Device };
 
 export function useDevices() {
   const { toast } = useToast();
-  const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
+  const { projectIds, loading: projectLoading } = useProjectAccess();
 
   const devicesRaw = useQuery(api.devices.list, !projectLoading ? {} : "skip");
 
@@ -41,38 +17,34 @@ export function useDevices() {
   const updateDevice = useMutation(api.devices.update);
   const deleteDevice = useMutation(api.devices.remove);
 
+  // Date.now() render içinde "şimdi" eşiği için kullanılır; her devices güncellemesinde
+  // yeniden hesaplanması istenen davranıştır (stale online/offline gösterimini önler).
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
+  const fiveMinutesAgo = now - 5 * 60 * 1000;
   const devices: Device[] = (devicesRaw ?? []).map((d: unknown) => {
-    const dev = d as Device;
-    const lastSeen = dev.lastSeen;
-    let computedStatus: string = "offline";
-    if (lastSeen) {
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-      computedStatus = new Date(lastSeen) > fiveMinutesAgo ? "online" : "offline";
+    const dev = d as Device & { lastSeen?: string };
+    let computedStatus: Device["status"] = "offline";
+    if (dev.lastSeen) {
+      computedStatus = new Date(dev.lastSeen).getTime() > fiveMinutesAgo ? "online" : "offline";
     }
-    return {
-      ...dev,
-      status: computedStatus,
-      device_name: dev.name,
-      device_serial: dev.deviceSerial,
-      device_type: dev.deviceType,
-      device_location: dev.description,
-    };
+    return { ...dev, status: computedStatus };
   });
 
   const addDevice = async (deviceData: Partial<Device>) => {
     const projectId = projectIds[0] as Id<"projects"> | undefined;
     try {
       const id = await createDevice({
-        name: deviceData.name ?? deviceData.device_name ?? "Yeni Cihaz",
+        name: deviceData.name ?? "Yeni Cihaz",
         projectId,
         zoneId: deviceData.zoneId,
         doorId: deviceData.doorId,
-        deviceType: deviceData.deviceType ?? deviceData.device_type,
+        deviceType: deviceData.deviceType,
         deviceIp: deviceData.deviceIp,
-        deviceSerial: deviceData.deviceSerial ?? deviceData.device_serial,
+        deviceSerial: deviceData.deviceSerial,
         accessDirection: deviceData.accessDirection,
         isActive: deviceData.isActive ?? true,
-        description: deviceData.description ?? deviceData.device_location,
+        description: deviceData.description,
       });
       toast({ title: "Cihaz eklendi" });
       return id;

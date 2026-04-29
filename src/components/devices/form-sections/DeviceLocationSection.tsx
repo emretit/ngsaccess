@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useRef } from "react";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,7 +14,7 @@ interface DoorForForm {
 }
 
 interface DeviceLocationSectionProps {
-  form: UseFormReturn<Record<string, unknown>>;
+  form: UseFormReturn<any>;
   zones: ZoneForForm[];
   doors: DoorForForm[];
   locationLoading: boolean;

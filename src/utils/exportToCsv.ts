@@ -1,4 +1,3 @@
-
 import { PDKSRecord } from "@/hooks/usePdksRecords";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -9,16 +8,16 @@ export function exportToCsv(records: PDKSRecord[]) {
     headers.join(','),
     ...records.map(record => {
       const values = [
-        `${record.employee_first_name} ${record.employee_last_name}`,
+        `${record.employeeFirstName} ${record.employeeLastName}`,
         format(new Date(record.date), "dd.MM.yyyy", { locale: tr }),
-        record.entry_time,
-        record.exit_time,
+        record.entryTime,
+        record.exitTime,
         record.status === 'present' ? 'Mevcut' : record.status === 'late' ? 'Geç' : 'Yok'
       ];
       return values.join(',');
     })
   ];
-  
+
   const csvContent = csvRows.join('\n');
   const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);

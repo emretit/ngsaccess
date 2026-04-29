@@ -1,10 +1,9 @@
-// @ts-nocheck
 
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useAccessRules } from "@/hooks/useAccessRules";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
-import type { Id } from "../../../../convex/_generated/dataModel";
+import type { Id } from "../../../../../convex/_generated/dataModel";
 
 interface RuleFormData {
   name: string;
@@ -46,23 +45,23 @@ export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void
     if (open) {
       if (editingRule) {
         // Convex returns camelCase: employeeId, deviceId
-        const employeeIds = editingRule.group_members
-          ?.map((gm: any) => String(gm.employeeId || gm.employee_id || '')).filter(Boolean) || [];
-        const deviceIds = editingRule.group_devices
-          ?.map((gd: any) => String(gd.deviceId || gd.device_id || '')).filter(Boolean) || [];
+        const employeeIds = editingRule.groupMembers
+          ?.map((gm: any) => String(gm.employeeId || '')).filter(Boolean) || [];
+        const deviceIds = editingRule.groupDevices
+          ?.map((gd: any) => String(gd.deviceId || '')).filter(Boolean) || [];
 
         setFormData({
           name: editingRule.name || '',
           description: editingRule.description || '',
-          target_type: editingRule.targetType || editingRule.target_type || 'individual',
+          target_type: editingRule.targetType || 'individual',
           selected_employees: employeeIds,
           selected_devices: deviceIds,
           selected_zones: [],
           selected_departments: [],
-          start_time: editingRule.startTime || editingRule.start_time || '',
-          end_time: editingRule.endTime || editingRule.end_time || '',
+          start_time: editingRule.startTime || '',
+          end_time: editingRule.endTime || '',
           days: editingRule.days || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-          access_direction: editingRule.accessDirection || editingRule.access_direction || 'both',
+          access_direction: editingRule.accessDirection || 'both',
           priority: editingRule.priority || 100,
         });
       } else {
@@ -137,7 +136,7 @@ export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void
       const deviceIds = formData.selected_devices as Id<"devices">[];
 
       if (editingRule) {
-        const ruleId = (editingRule._id || editingRule.id) as Id<"accessRules">;
+        const ruleId = editingRule._id as Id<"accessRules">;
         await updateAccessRuleWithAdditionalMembers.mutateAsync({
           id: ruleId,
           updates: ruleData,

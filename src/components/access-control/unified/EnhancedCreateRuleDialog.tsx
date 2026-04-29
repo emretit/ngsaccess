@@ -1,4 +1,3 @@
-// @ts-nocheck
 
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -30,16 +29,16 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    target_type: 'individual' as 'all' | 'department' | 'position' | 'individual',
-    selected_employees: [] as string[],
-    selected_devices: [] as string[],
-    selected_positions: [] as string[],
-    selected_zones: [] as string[],
-    selected_doors: [] as string[],
-    start_time: '',
-    end_time: '',
+    targetType: 'individual' as 'all' | 'department' | 'position' | 'individual',
+    selectedEmployees: [] as string[],
+    selectedDevices: [] as string[],
+    selectedPositions: [] as string[],
+    selectedZones: [] as string[],
+    selectedDoors: [] as string[],
+    startTime: '',
+    endTime: '',
     days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as string[],
-    access_direction: 'both' as 'entry' | 'exit' | 'both',
+    accessDirection: 'both' as 'entry' | 'exit' | 'both',
     priority: 100,
   });
 
@@ -60,32 +59,32 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
         setFormData({
           name: editingRule.name || '',
           description: editingRule.description || '',
-          target_type: editingRule.target_type || 'individual',
-          selected_employees: editingRule.rule_employees?.map((re: any) => re.employees?.id?.toString()).filter(Boolean) || [],
-          selected_devices: editingRule.rule_devices?.map((rd: any) => rd.devices?.id?.toString()).filter(Boolean) || [],
-          selected_positions: editingRule.rule_positions?.map((rp: any) => rp.positions?.id?.toString()).filter(Boolean) || [],
-          selected_zones: editingRule.rule_zones?.map((rz: any) => rz.zones?.id?.toString()).filter(Boolean) || [],
-          selected_doors: editingRule.rule_doors?.map((rd: any) => rd.doors?.id?.toString()).filter(Boolean) || [],
-          start_time: editingRule.start_time || '',
-          end_time: editingRule.end_time || '',
+          targetType: editingRule.targetType || 'individual',
+          selectedEmployees: editingRule.groupMembers?.map((gm: any) => gm.employees?._id).filter(Boolean) || [],
+          selectedDevices: editingRule.groupDevices?.map((gd: any) => gd.devices?._id).filter(Boolean) || [],
+          selectedPositions: [],
+          selectedZones: [],
+          selectedDoors: [],
+          startTime: editingRule.startTime || '',
+          endTime: editingRule.endTime || '',
           days: editingRule.days || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-          access_direction: editingRule.access_direction || 'both',
+          accessDirection: editingRule.accessDirection || 'both',
           priority: editingRule.priority || 100,
         });
       } else {
         setFormData({
           name: '',
           description: '',
-          target_type: 'individual',
-          selected_employees: [],
-          selected_devices: [],
-          selected_positions: [],
-          selected_zones: [],
-          selected_doors: [],
-          start_time: '',
-          end_time: '',
+          targetType: 'individual',
+          selectedEmployees: [],
+          selectedDevices: [],
+          selectedPositions: [],
+          selectedZones: [],
+          selectedDoors: [],
+          startTime: '',
+          endTime: '',
           days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-          access_direction: 'both',
+          accessDirection: 'both',
           priority: 100,
         });
       }
@@ -104,12 +103,12 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
       return;
     }
 
-    if (formData.target_type === 'individual' && formData.selected_employees.length === 0) {
+    if (formData.targetType === 'individual' && formData.selectedEmployees.length === 0) {
       alert('Lütfen en az bir çalışan seçin.');
       return;
     }
 
-    if (formData.selected_devices.length === 0 && formData.selected_zones.length === 0 && formData.selected_doors.length === 0) {
+    if (formData.selectedDevices.length === 0 && formData.selectedZones.length === 0 && formData.selectedDoors.length === 0) {
       alert('Lütfen en az bir cihaz, bölge veya kapı seçin.');
       return;
     }
@@ -117,17 +116,17 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
     const ruleData = {
       name: formData.name,
       description: formData.description,
-      target_type: formData.target_type,
-      start_time: formData.start_time,
-      end_time: formData.end_time,
+      targetType: formData.targetType,
+      startTime: formData.startTime,
+      endTime: formData.endTime,
       days: formData.days,
-      access_direction: formData.access_direction,
+      accessDirection: formData.accessDirection,
       priority: formData.priority,
     };
-    
+
     if (editingRule) {
       updateAccessRule.mutate({
-        id: editingRule.id,
+        id: editingRule._id,
         updates: ruleData
       });
     } else {
@@ -140,35 +139,35 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
   const handleTargetTypeChange = (value: string) => {
     setFormData(prev => ({
       ...prev,
-      target_type: value as 'all' | 'department' | 'position' | 'individual',
-      selected_employees: value === 'all' ? [] : prev.selected_employees
+      targetType: value as 'all' | 'department' | 'position' | 'individual',
+      selectedEmployees: value === 'all' ? [] : prev.selectedEmployees
     }));
   };
 
   const renderTargetSelection = () => {
-    switch (formData.target_type) {
+    switch (formData.targetType) {
       case 'individual':
         return (
           <div className="space-y-3">
             <Label>Çalışanlar</Label>
             <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
               {employees.map((employee) => (
-                <div key={employee.id} className="flex items-center space-x-2">
+                <div key={employee._id} className="flex items-center space-x-2">
                   <Checkbox
-                    id={`employee-${employee.id}`}
-                    checked={formData.selected_employees.includes(employee.id.toString())}
+                    id={`employee-${employee._id}`}
+                    checked={formData.selectedEmployees.includes(employee._id)}
                     onCheckedChange={(checked) => {
                       setFormData(prev => ({
                         ...prev,
-                        selected_employees: checked 
-                          ? [...prev.selected_employees, employee.id.toString()]
-                          : prev.selected_employees.filter(id => id !== employee.id.toString())
+                        selectedEmployees: checked
+                          ? [...prev.selectedEmployees, employee._id]
+                          : prev.selectedEmployees.filter(id => id !== employee._id)
                       }));
                     }}
                   />
                   <Users className="h-4 w-4 text-gray-500" />
-                  <Label htmlFor={`employee-${employee.id}`} className="text-sm cursor-pointer">
-                    {employee.first_name} {employee.last_name}
+                  <Label htmlFor={`employee-${employee._id}`} className="text-sm cursor-pointer">
+                    {employee.firstName} {employee.lastName}
                   </Label>
                 </div>
               ))}
@@ -181,26 +180,26 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
           <div className="space-y-3">
             <Label>Departmanlar</Label>
             <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-              {departments.map((department) => (
-                <div key={department.id} className="flex items-center space-x-2">
+              {departments.map((department: any) => (
+                <div key={department._id} className="flex items-center space-x-2">
                   <Checkbox
-                    id={`dept-${department.id}`}
-                    checked={formData.selected_employees.includes(department.id.toString())}
+                    id={`dept-${department._id}`}
+                    checked={formData.selectedEmployees.includes(department._id)}
                     onCheckedChange={(checked) => {
                       // For department rules, we store department employees
-                      const deptEmployees = employees.filter(emp => emp.department_id === department.id);
-                      const employeeIds = deptEmployees.map(emp => emp.id.toString());
-                      
+                      const deptEmployees = employees.filter(emp => emp.departmentId === department._id);
+                      const employeeIds = deptEmployees.map(emp => String(emp._id));
+
                       setFormData(prev => ({
                         ...prev,
-                        selected_employees: checked 
-                          ? [...new Set([...prev.selected_employees, ...employeeIds])]
-                          : prev.selected_employees.filter(id => !employeeIds.includes(id))
+                        selectedEmployees: checked
+                          ? [...new Set([...prev.selectedEmployees, ...employeeIds])]
+                          : prev.selectedEmployees.filter(id => !employeeIds.includes(id))
                       }));
                     }}
                   />
                   <Building2 className="h-4 w-4 text-blue-500" />
-                  <Label htmlFor={`dept-${department.id}`} className="text-sm cursor-pointer">
+                  <Label htmlFor={`dept-${department._id}`} className="text-sm cursor-pointer">
                     {department.name}
                   </Label>
                 </div>
@@ -238,71 +237,71 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
       <TabsContent value="devices" className="space-y-3">
         <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
           {devices.map((device) => (
-            <div key={device.id} className="flex items-center space-x-2">
+            <div key={device._id} className="flex items-center space-x-2">
               <Checkbox
-                id={`device-${device.id}`}
-                checked={formData.selected_devices.includes(device.id.toString())}
-                onCheckedChange={(checked) => 
+                id={`device-${device._id}`}
+                checked={formData.selectedDevices.includes(device._id)}
+                onCheckedChange={(checked) =>
                   setFormData(prev => ({
                     ...prev,
-                    selected_devices: checked 
-                      ? [...prev.selected_devices, device.id.toString()]
-                      : prev.selected_devices.filter(id => id !== device.id.toString())
+                    selectedDevices: checked
+                      ? [...prev.selectedDevices, device._id]
+                      : prev.selectedDevices.filter(id => id !== device._id)
                   }))
                 }
               />
               <MapPin className="h-4 w-4 text-green-500" />
-              <Label htmlFor={`device-${device.id}`} className="text-sm cursor-pointer">
+              <Label htmlFor={`device-${device._id}`} className="text-sm cursor-pointer">
                 {device.name} ({getDeviceLocationDisplay(device)})
               </Label>
             </div>
           ))}
         </div>
       </TabsContent>
-      
+
       <TabsContent value="zones" className="space-y-3">
         <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-          {zones.map((zone) => (
-            <div key={zone.id} className="flex items-center space-x-2">
+          {zones.map((zone: any) => (
+            <div key={zone._id} className="flex items-center space-x-2">
               <Checkbox
-                id={`zone-${zone.id}`}
-                checked={formData.selected_zones.includes(zone.id.toString())}
-                onCheckedChange={(checked) => 
+                id={`zone-${zone._id}`}
+                checked={formData.selectedZones.includes(zone._id)}
+                onCheckedChange={(checked) =>
                   setFormData(prev => ({
                     ...prev,
-                    selected_zones: checked 
-                      ? [...prev.selected_zones, zone.id.toString()]
-                      : prev.selected_zones.filter(id => id !== zone.id.toString())
+                    selectedZones: checked
+                      ? [...prev.selectedZones, zone._id]
+                      : prev.selectedZones.filter(id => id !== zone._id)
                   }))
                 }
               />
               <Building2 className="h-4 w-4 text-purple-500" />
-              <Label htmlFor={`zone-${zone.id}`} className="text-sm cursor-pointer">
+              <Label htmlFor={`zone-${zone._id}`} className="text-sm cursor-pointer">
                 {zone.name}
               </Label>
             </div>
           ))}
         </div>
       </TabsContent>
-      
+
       <TabsContent value="doors" className="space-y-3">
         <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-          {doors.map((door) => (
-            <div key={door.id} className="flex items-center space-x-2">
+          {doors.map((door: any) => (
+            <div key={door._id} className="flex items-center space-x-2">
               <Checkbox
-                id={`door-${door.id}`}
-                checked={formData.selected_doors.includes(door.id.toString())}
-                onCheckedChange={(checked) => 
+                id={`door-${door._id}`}
+                checked={formData.selectedDoors.includes(door._id)}
+                onCheckedChange={(checked) =>
                   setFormData(prev => ({
                     ...prev,
-                    selected_doors: checked 
-                      ? [...prev.selected_doors, door.id.toString()]
-                      : prev.selected_doors.filter(id => id !== door.id.toString())
+                    selectedDoors: checked
+                      ? [...prev.selectedDoors, door._id]
+                      : prev.selectedDoors.filter(id => id !== door._id)
                   }))
                 }
               />
               <MapPin className="h-4 w-4 text-orange-500" />
-              <Label htmlFor={`door-${door.id}`} className="text-sm cursor-pointer">
+              <Label htmlFor={`door-${door._id}`} className="text-sm cursor-pointer">
                 {door.name}
               </Label>
             </div>
@@ -387,7 +386,7 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
 
                   <div className="space-y-2">
                     <Label htmlFor="target_type">Hedef Türü</Label>
-                    <Select value={formData.target_type} onValueChange={handleTargetTypeChange}>
+                    <Select value={formData.targetType} onValueChange={handleTargetTypeChange}>
                       <SelectTrigger>
                         <SelectValue placeholder="Hedef türünü seçin" />
                       </SelectTrigger>
@@ -401,8 +400,8 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
 
                   <div className="space-y-2">
                     <Label htmlFor="access_direction">Erişim Yönü</Label>
-                    <Select value={formData.access_direction} onValueChange={(value) => 
-                      setFormData(prev => ({ ...prev, access_direction: value as 'entry' | 'exit' | 'both' }))
+                    <Select value={formData.accessDirection} onValueChange={(value) =>
+                      setFormData(prev => ({ ...prev, accessDirection: value as 'entry' | 'exit' | 'both' }))
                     }>
                       <SelectTrigger>
                         <SelectValue placeholder="Erişim yönünü seçin" />
@@ -432,11 +431,11 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
                 <CardContent>
                   {renderTargetSelection()}
                   
-                  {formData.selected_employees.length > 0 && (
+                  {formData.selectedEmployees.length > 0 && (
                     <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-2 mb-2">
                         <Badge variant="secondary">
-                          {formData.selected_employees.length} çalışan seçildi
+                          {formData.selectedEmployees.length} çalışan seçildi
                         </Badge>
                       </div>
                     </div>
@@ -460,19 +459,19 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
                   {renderAccessPointSelection()}
                   
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {formData.selected_devices.length > 0 && (
+                    {formData.selectedDevices.length > 0 && (
                       <Badge variant="outline">
-                        {formData.selected_devices.length} cihaz
+                        {formData.selectedDevices.length} cihaz
                       </Badge>
                     )}
-                    {formData.selected_zones.length > 0 && (
+                    {formData.selectedZones.length > 0 && (
                       <Badge variant="outline">
-                        {formData.selected_zones.length} bölge
+                        {formData.selectedZones.length} bölge
                       </Badge>
                     )}
-                    {formData.selected_doors.length > 0 && (
+                    {formData.selectedDoors.length > 0 && (
                       <Badge variant="outline">
-                        {formData.selected_doors.length} kapı
+                        {formData.selectedDoors.length} kapı
                       </Badge>
                     )}
                   </div>
@@ -495,8 +494,8 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
                       <Input
                         id="start_time"
                         type="time"
-                        value={formData.start_time}
-                        onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
+                        value={formData.startTime}
+                        onChange={(e) => setFormData(prev => ({ ...prev, startTime: e.target.value }))}
                       />
                     </div>
                     <div className="space-y-2">
@@ -504,8 +503,8 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
                       <Input
                         id="end_time"
                         type="time"
-                        value={formData.end_time}
-                        onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
+                        value={formData.endTime}
+                        onChange={(e) => setFormData(prev => ({ ...prev, endTime: e.target.value }))}
                       />
                     </div>
                   </div>
