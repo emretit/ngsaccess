@@ -10,7 +10,7 @@ class VisitorScreen extends StatefulWidget {
 }
 
 class _VisitorScreenState extends State<VisitorScreen> {
-  // Demo data - gerçek uygulamada Supabase'den gelecek
+  // Demo data - gerçek uygulamada Convex'ten gelecek
   final List<Visitor> _visitors = [
     Visitor(
       id: '1',

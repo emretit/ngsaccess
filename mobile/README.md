@@ -73,22 +73,17 @@ Modern ve kullanıcı dostu bir Flutter uygulaması ile QR kod tabanlı yoklama 
 ### Mimari
 - **State Management**: Provider
 - **Navigasyon**: 5 ana tab (Ana Sayfa, Geçmiş, QR Tarama, Ziyaretçi, Profil)
-- **Veri Katmanı**: Supabase entegrasyonu
+- **Veri Katmanı**: Convex entegrasyonu (web admin paneli ile aynı backend)
 - **Yerel Depolama**: SharedPreferences (oturum yönetimi)
 
 ### Bağımlılıklar
-```yaml
-dependencies:
-  flutter: sdk
-  supabase_flutter: ^2.5.6
-  provider: ^6.1.2
-  shared_preferences: ^2.2.3
-  intl: ^0.19.0
-  google_fonts: ^6.2.1
-  qr_code_scanner: ^1.0.1
-  permission_handler: ^11.3.1
-  flutter_dotenv: ^5.1.0
-```
+Güncel sürümler için [pubspec.yaml](pubspec.yaml) dosyasına bakın. Öne çıkan paketler:
+- `convex_flutter` — Convex backend istemcisi
+- `provider` — state management
+- `shared_preferences` — yerel oturum
+- `mobile_scanner` — QR tarama
+- `permission_handler` — kamera/depolama izinleri
+- `flutter_dotenv` — env yapılandırması
 
 ## 🚀 Kurulum
 
@@ -96,7 +91,7 @@ dependencies:
 - Flutter SDK (3.5.0+)
 - Dart SDK
 - Android Studio / VS Code
-- Supabase hesabı
+- Çalışan bir Convex deployment (web admin paneli ile aynı)
 
 ### Adımlar
 
@@ -116,41 +111,16 @@ flutter pub get
 cp env.example .env
 ```
 
-4. **Supabase yapılandırması**
-`.env` dosyasını düzenleyerek kendi Supabase projenizin bilgilerini girin:
+4. **Convex yapılandırması**
+`.env` dosyasını düzenleyerek Convex deployment URL'inizi girin:
 ```env
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key-here
+CONVEX_URL=https://<your-deployment>.convex.cloud
 ```
 
 **⚠️ Önemli**: `.env` dosyası git'e commit edilmez. Güvenlik için bu dosyayı gizli tutun.
 
-5. **Veritabanı şeması oluşturun**
-Supabase'de aşağıdaki tabloları oluşturun:
-
-```sql
--- Yoklama kayıtları tablosu
-CREATE TABLE card_readings (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID REFERENCES auth.users(id),
-    type TEXT NOT NULL CHECK (type IN ('check_in', 'check_out')),
-    door_name TEXT,
-    qr_data TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Ziyaretçiler tablosu (opsiyonel)
-CREATE TABLE visitors (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    name TEXT NOT NULL,
-    company TEXT,
-    purpose TEXT,
-    visit_date TIMESTAMP WITH TIME ZONE,
-    status TEXT DEFAULT 'expected',
-    contact_person TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
+5. **Şema ve fonksiyonlar**
+Veri şeması ve query/mutation fonksiyonları repo kökündeki `convex/` klasöründe yer alır (web admin paneli ile paylaşılır). Yeni şema değişikliklerini `npx convex dev` ile deploy edin.
 
 6. **Uygulamayı çalıştırın**
 ```bash
@@ -176,7 +146,7 @@ flutter run
 ```
 lib/
 ├── config/
-│   └── supabase_config.dart      # Supabase yapılandırması
+│   └── convex_config.dart        # Convex yapılandırması
 ├── models/
 │   └── attendance.dart           # Veri modelleri
 ├── providers/
