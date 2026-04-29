@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradient for background -->
+    <radialGradient id="bgGradient" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" style="stop-color:#a0002a;stop-opacity:1"/>
+      <stop offset="70%" style="stop-color:#800020;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#600018;stop-opacity:1"/>
+    </radialGradient>
+    
+    <!-- Gradient for text -->
+    <linearGradient id="textGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1"/>
+      <stop offset="50%" style="stop-color:#f8f8f8;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#e8e8e8;stop-opacity:1"/>
+    </linearGradient>
+    
+    <!-- Shadow filter -->
+    <filter id="textShadow">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+    
+    <!-- Subtle inner shadow -->
+    <filter id="innerShadow">
+      <feOffset dx="0" dy="-4"/>
+      <feGaussianBlur stdDeviation="8" result="offset-blur"/>
+      <feFlood flood-color="#000000" flood-opacity="0.2"/>
+      <feComposite in2="offset-blur" operator="in"/>
+    </filter>
+  </defs>
+  
+  <!-- Background circle with gradient -->
+  <circle cx="512" cy="512" r="512" fill="url(#bgGradient)"/>
+  
+  <!-- Inner highlight circle for depth -->
+  <circle cx="512" cy="480" r="450" fill="none" stroke="#ffffff" stroke-width="4" opacity="0.15"/>
+  
+  <!-- NGS+ text with gradient and shadow -->
+  <text x="512" y="580" font-family="Arial, Helvetica, sans-serif" font-size="280" font-weight="900" 
+        text-anchor="middle" fill="url(#textGradient)" filter="url(#textShadow)">NGS+</text>
+        
+  <!-- Subtitle with better readability -->
+  <text x="512" y="650" font-family="Arial, Helvetica, sans-serif" font-size="56" font-weight="600" 
+        text-anchor="middle" fill="#ffffff" opacity="0.9">YOKLAMA</text>
+        
+  <!-- Small decorative elements -->
+  <circle cx="350" cy="350" r="12" fill="#ffffff" opacity="0.2"/>
+  <circle cx="674" cy="350" r="12" fill="#ffffff" opacity="0.2"/>
+  <circle cx="350" cy="674" r="12" fill="#ffffff" opacity="0.2"/>
+  <circle cx="674" cy="674" r="12" fill="#ffffff" opacity="0.2"/>
+</svg> 
