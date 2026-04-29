@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import '../main_navigation.dart';
-import 'signup_screen.dart';
 import 'forgot_password_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -51,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     if (!_formKey.currentState!.validate()) return;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    bool success = await authProvider.signInEmployee(
+    bool success = await authProvider.signIn(
       _emailController.text.trim(),
       _passwordController.text,
     );
@@ -243,21 +242,19 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                             ),
                           ),
                           const SizedBox(height: 16),
-                          // Kayıt Olun linki
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Text('Hesabınız yok mu? '),
                               GestureDetector(
                                 onTap: () {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
-                                      builder: (_) => const SignupScreen(),
+                                      builder: (_) => const ForgotPasswordScreen(),
                                     ),
                                   );
                                 },
                                 child: Text(
-                                  'Kayıt olun',
+                                  'Şifremi unuttum',
                                   style: TextStyle(
                                     color: AppTheme.primaryBurgundy,
                                     fontWeight: FontWeight.bold,

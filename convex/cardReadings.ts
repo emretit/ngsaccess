@@ -1,7 +1,7 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
-import { authedQuery } from "./lib/customFunctions";
+import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import { Doc } from "./_generated/dataModel";
 
@@ -733,5 +733,132 @@ export const processCardReading = internalMutation({
     }
 
     return { granted: hasAccess };
+  },
+});
+
+/**
+ * Mobile uygulama için: oturum açmış çalışanın kendi son kart okumalarını döner.
+ * Çalışan kaydı `users.email` ile `employees.email` üzerinden eşlenir.
+ */
+export const listForEmployee = authedQuery({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 50;
+    const userEmail = ctx.user.email;
+    if (!userEmail) return [];
+
+    const employee = await ctx.db
+      .query("employees")
+      .withIndex("by_email", (q) => q.eq("email", userEmail))
+      .first();
+    if (!employee) return [];
+
+    const readings = await ctx.db
+      .query("cardReadings")
+      .withIndex("by_employee", (q) => q.eq("employeeId", employee._id))
+      .order("desc")
+      .take(limit);
+
+    return await Promise.all(
+      readings.map(async (r) => {
+        const device = r.deviceId
+          ? ((await ctx.db.get(r.deviceId)) as Doc<"devices"> | null)
+          : null;
+        return {
+          ...r,
+          device: device
+            ? {
+                _id: device._id,
+                name: device.name,
+                description: device.description ?? null,
+                deviceSerial: device.deviceSerial ?? null,
+              }
+            : null,
+        };
+      })
+    );
+  },
+});
+
+/**
+ * Mobile QR check-in. Auth'lu kullanıcı, çalışan kaydını email üzerinden alır,
+ * QR'dan gelen `deviceId` veya `deviceSerial` ile cihazı bulur, erişim kuralını
+ * değerlendirir ve `cardReadings` tablosuna kayıt atar.
+ */
+export const selfCheckIn = authedMutation({
+  args: {
+    deviceId: v.optional(v.id("devices")),
+    deviceSerial: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userEmail = ctx.user.email;
+    if (!userEmail) {
+      throw new Error("Hesabınız e-posta ile eşleşmiyor");
+    }
+
+    const employee = await ctx.db
+      .query("employees")
+      .withIndex("by_email", (q) => q.eq("email", userEmail))
+      .first();
+    if (!employee) {
+      throw new Error("Çalışan kaydı bulunamadı");
+    }
+    if (employee.isActive === false) {
+      throw new Error("Çalışan kaydı aktif değil");
+    }
+
+    let device: Doc<"devices"> | null = null;
+    if (args.deviceId) {
+      device = (await ctx.db.get(args.deviceId)) as Doc<"devices"> | null;
+    }
+    if (!device && args.deviceSerial?.trim()) {
+      device = await ctx.db
+        .query("devices")
+        .withIndex("by_device_serial", (q) =>
+          q.eq("deviceSerial", args.deviceSerial!.trim())
+        )
+        .first();
+    }
+    if (!device) {
+      throw new Error("Cihaz bulunamadı");
+    }
+
+    const deviceGroups = await ctx.db
+      .query("groupDevices")
+      .withIndex("by_device", (q) => q.eq("deviceId", device._id))
+      .collect();
+    const groupIds = deviceGroups.map((g) => g.groupId);
+
+    const employeeGroups = await ctx.db
+      .query("groupMembers")
+      .withIndex("by_employee", (q) => q.eq("employeeId", employee._id))
+      .collect();
+    const employeeGroupIds = new Set(employeeGroups.map((g) => g.groupId));
+    const matching = groupIds.filter((g) => employeeGroupIds.has(g));
+
+    let hasAccess = false;
+    for (const groupId of matching) {
+      const rule = await ctx.db.get(groupId);
+      if (rule?.isActive) {
+        hasAccess = true;
+        break;
+      }
+    }
+
+    const accessTime = new Date().toISOString();
+    const readingId = await ctx.db.insert("cardReadings", {
+      projectId: employee.projectId ?? device.projectId,
+      deviceId: device._id,
+      employeeId: employee._id,
+      cardNo: employee.cardNumber,
+      employeeName: `${employee.firstName} ${employee.lastName}`,
+      accessTime,
+      accessStatus: hasAccess ? "izin_verildi" : "reddedildi",
+      rawData: JSON.stringify({ source: "mobile_qr" }),
+      createdAt: accessTime,
+      updatedAt: accessTime,
+    });
+
+    return { granted: hasAccess, readingId };
   },
 });

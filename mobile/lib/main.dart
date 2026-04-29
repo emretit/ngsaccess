@@ -5,13 +5,12 @@ import 'providers/auth_provider.dart';
 import 'providers/attendance_provider.dart';
 import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
-import 'config/supabase_config.dart';
+import 'config/convex_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Supabase
-  await SupabaseConfig.initialize();
+  await ConvexConfig.initialize();
 
   runApp(const MyApp());
 }

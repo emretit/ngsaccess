@@ -52,37 +52,39 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   }
 
   Future<void> _checkAuthState() async {
-    // 2.5 saniye splash screen göster
-    await Future.delayed(const Duration(milliseconds: 2500));
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    final bootstrapFuture = authProvider.bootstrap();
+    await Future.wait([
+      bootstrapFuture,
+      Future.delayed(const Duration(milliseconds: 2500)),
+    ]);
 
     if (!mounted) return;
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
-    // Beni Hatırla kontrolü
-    final prefs = await SharedPreferences.getInstance();
-    final rememberMe = prefs.getBool('remember_me') ?? false;
-    final rememberedEmail = prefs.getString('remembered_email') ?? '';
-    final rememberedPassword = prefs.getString('remembered_password') ?? '';
-    if (!authProvider.isAuthenticated && rememberMe && rememberedEmail.isNotEmpty && rememberedPassword.isNotEmpty) {
-      bool success = await authProvider.signInEmployee(rememberedEmail, rememberedPassword);
-      if (success && mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MainNavigation()),
-        );
-        return;
+    if (!authProvider.isAuthenticated) {
+      final prefs = await SharedPreferences.getInstance();
+      final rememberMe = prefs.getBool('remember_me') ?? false;
+      final rememberedEmail = prefs.getString('remembered_email') ?? '';
+      final rememberedPassword = prefs.getString('remembered_password') ?? '';
+      if (rememberMe && rememberedEmail.isNotEmpty && rememberedPassword.isNotEmpty) {
+        final success = await authProvider.signIn(rememberedEmail, rememberedPassword);
+        if (success && mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const MainNavigation()),
+          );
+          return;
+        }
       }
     }
 
-    if (authProvider.isAuthenticated) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainNavigation()),
-      );
-    } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-      );
-    }
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) =>
+            authProvider.isAuthenticated ? const MainNavigation() : const LoginScreen(),
+      ),
+    );
   }
 
   @override

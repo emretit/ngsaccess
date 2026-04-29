@@ -192,7 +192,7 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
   Widget _buildMyQRTab() {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
-        if (authProvider.user == null) {
+        if (authProvider.currentUser == null) {
           return const Center(
             child: Text('Kullanıcı bilgileri yükleniyor...'),
           );
@@ -244,9 +244,9 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Text('Ad: ${authProvider.user?.userMetadata?['full_name'] ?? 'Bilinmiyor'}'),
-                      Text('E-posta: ${authProvider.user?.email ?? 'Bilinmiyor'}'),
-                      Text('ID: ${authProvider.user?.id ?? 'Bilinmiyor'}'),
+                      Text('Ad: ${[authProvider.currentUser?.firstName, authProvider.currentUser?.lastName].where((s) => s != null && s.isNotEmpty).join(' ').trim().isEmpty ? 'Bilinmiyor' : [authProvider.currentUser?.firstName, authProvider.currentUser?.lastName].where((s) => s != null && s.isNotEmpty).join(' ')}'),
+                      Text('E-posta: ${authProvider.currentUser?.email ?? 'Bilinmiyor'}'),
+                      Text('ID: ${authProvider.currentUser?.id ?? 'Bilinmiyor'}'),
                     ],
                   ),
                 ),
@@ -292,17 +292,21 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
 
   String _generateUserQRData(AuthProvider authProvider) {
     final now = DateTime.now();
+    final user = authProvider.currentUser;
+    final fullName = [user?.firstName, user?.lastName]
+        .where((s) => s != null && s.isNotEmpty)
+        .join(' ')
+        .trim();
     final userData = {
       'type': 'user_qr',
-      'user_id': authProvider.user?.id,
-      'user_name': authProvider.user?.userMetadata?['full_name'] ?? 'Bilinmiyor',
-      'user_email': authProvider.user?.email,
+      'user_id': user?.id,
+      'user_name': fullName.isEmpty ? 'Bilinmiyor' : fullName,
+      'user_email': user?.email,
       'timestamp': now.toIso8601String(),
       'expires_at': now.add(const Duration(hours: 24)).toIso8601String(),
       'app_version': '1.0.0',
       'device_type': 'mobile',
     };
-    
     return jsonEncode(userData);
   }
 
@@ -371,25 +375,10 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
     }
 
     final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
-    
-    // Giriş/çıkış durumunu belirle
-    final type = attendanceProvider.hasCheckedInToday 
-        ? (attendanceProvider.hasCheckedOutToday ? 'check_in' : 'check_out')
-        : 'check_in';
-
-    // QR kod verisini kaydet
-    final success = await attendanceProvider.recordAttendance(
-      qrData,
-      type,
-      deviceId: parsedData['device_id'],
-      location: parsedData['location'],
-    );
+    final success = await attendanceProvider.recordAttendance(qrData);
 
     if (success) {
-      _showSuccessDialog(
-        type == 'check_in' ? 'Giriş Başarılı' : 'Çıkış Başarılı',
-        parsedData,
-      );
+      _showSuccessDialog('Geçiş Başarılı', parsedData);
     } else {
       _showErrorDialog(attendanceProvider.errorMessage ?? 'Bir hata oluştu');
     }
@@ -406,8 +395,8 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
           children: [
             Text(message),
             const SizedBox(height: 8),
-            Text('Cihaz: ${deviceInfo['device_name']}'),
-            Text('Konum: ${deviceInfo['location']}'),
+            Text('Cihaz: ${deviceInfo['deviceName'] ?? deviceInfo['device_name'] ?? '-'}'),
+            Text('Konum: ${deviceInfo['location'] ?? '-'}'),
             if (deviceInfo['timestamp'] != null)
               Text('Zaman: ${DateTime.parse(deviceInfo['timestamp']).toString()}'),
           ],
