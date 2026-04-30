@@ -5,8 +5,19 @@ import { Plus } from "lucide-react";
 import { ShiftTable } from "./components/ShiftTable";
 import { AddShiftDialog } from "./components/AddShiftDialog";
 
+interface Shift {
+  id: number;
+  name: string;
+  startTime: string;
+  endTime: string;
+  breakDuration: string;
+  lunchBreakStart: string;
+  lunchBreakEnd: string;
+  isActive: boolean;
+}
+
 // Mock data for shifts - in real app this would come from database
-const mockShifts = [
+const mockShifts: Shift[] = [
   {
     id: 1,
     name: "Sabah Vardiyası",
@@ -46,31 +57,47 @@ interface ShiftSettingsProps {
 export function ShiftSettings({ onComplete }: ShiftSettingsProps) {
   const [shifts, setShifts] = useState(mockShifts);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editingShift, setEditingShift] = useState(null);
+  const [editingShift, setEditingShift] = useState<(Shift & { _id?: string }) | null>(null);
 
-  const handleAddShift = (newShift: any) => {
-    const shift = {
-      ...newShift,
+  const handleAddShift = (newShift: { name: string; startTime: string; endTime: string; breakDuration?: string | number; lunchBreakStart?: string; lunchBreakEnd?: string }) => {
+    const shift: Shift = {
+      name: newShift.name,
+      startTime: newShift.startTime,
+      endTime: newShift.endTime,
+      breakDuration: String(newShift.breakDuration ?? ""),
+      lunchBreakStart: newShift.lunchBreakStart ?? "",
+      lunchBreakEnd: newShift.lunchBreakEnd ?? "",
       id: Date.now(), // In real app, this would be handled by database
       isActive: true,
     };
     setShifts([...shifts, shift]);
     setIsAddDialogOpen(false);
-    
+
     // Call completion callback when first shift is added
     if (onComplete && shifts.length === 0) {
       onComplete();
     }
   };
 
-  const handleEditShift = (shift: any) => {
+  const handleEditShift = (shift: Shift) => {
     setEditingShift(shift);
     setIsAddDialogOpen(true);
   };
 
-  const handleUpdateShift = (updatedShift: any) => {
-    setShifts(shifts.map(shift => 
-      shift.id === updatedShift.id ? updatedShift : shift
+  const handleUpdateShift = (updatedShift: { _id?: string; id?: string | number; name: string; startTime: string; endTime: string; breakDuration?: string | number; lunchBreakStart?: string; lunchBreakEnd?: string }) => {
+    const id = Number(updatedShift.id);
+    setShifts(shifts.map(shift =>
+      shift.id === id
+        ? {
+            ...shift,
+            name: updatedShift.name,
+            startTime: updatedShift.startTime,
+            endTime: updatedShift.endTime,
+            breakDuration: String(updatedShift.breakDuration ?? ""),
+            lunchBreakStart: updatedShift.lunchBreakStart ?? "",
+            lunchBreakEnd: updatedShift.lunchBreakEnd ?? "",
+          }
+        : shift
     ));
     setEditingShift(null);
     setIsAddDialogOpen(false);

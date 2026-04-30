@@ -4,21 +4,11 @@ import { api } from "../../convex/_generated/api";
 import { toast } from "@/hooks/use-toast";
 import { Id } from "../../convex/_generated/dataModel";
 
-interface EmployeeRow {
-  _id: Id<"employees">;
-  firstName: string;
-  lastName: string;
-  email: string;
-  tcNo: string;
-  cardNumber: string;
-  departmentId?: Id<"departments">;
-  isActive?: boolean;
-  [key: string]: unknown;
-}
+import type { Employee } from "@/types/employee";
 
-export function useEmployeeTable(employees: EmployeeRow[]) {
+export function useEmployeeTable(employees: Employee[]) {
   const [sortConfig, setSortConfig] = useState<{
-    key: keyof EmployeeRow;
+    key: keyof Employee;
     direction: "asc" | "desc";
   } | null>(null);
 
@@ -80,7 +70,7 @@ export function useEmployeeTable(employees: EmployeeRow[]) {
     }
   };
 
-  const requestSort = (key: keyof EmployeeRow) => {
+  const requestSort = (key: keyof Employee) => {
     let direction: "asc" | "desc" = "asc";
     if (sortConfig && sortConfig.key === key && sortConfig.direction === "asc") {
       direction = "desc";

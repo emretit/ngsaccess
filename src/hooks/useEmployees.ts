@@ -11,7 +11,7 @@ export const useEmployees = () => {
     !projectLoading ? { projectIds, isSuperAdmin } : "skip"
   );
 
-  const employees = (employeesRaw ?? []) as unknown as Employee[];
+  const employees = (employeesRaw ?? []) as Employee[];
 
   return {
     employees,

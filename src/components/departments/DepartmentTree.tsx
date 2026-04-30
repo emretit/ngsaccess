@@ -21,7 +21,7 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
   const [showAddTopLevelDialog, setShowAddTopLevelDialog] = useState(false);
   const [addingToParentId, setAddingToParentId] = useState<Id<"departments"> | null>(null);
 
-  const generalSettings = useQuery(api.settings.getGeneral);
+  const generalSettings = useQuery(api.settings.getGeneral, {});
   const companyName = isSuperAdmin
     ? "Tüm Projeler"
     : (generalSettings?.companyName ?? "Ana Proje");

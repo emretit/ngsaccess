@@ -3,15 +3,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-interface RuleBasicInfoProps {
-  formData: {
-    name: string;
-    description: string;
-  };
-  setFormData: (updater: (prev: any) => any) => void;
+interface RuleBasicInfoFormData {
+  name: string;
+  description: string;
 }
 
-export const RuleBasicInfo = ({ formData, setFormData }: RuleBasicInfoProps) => {
+interface RuleBasicInfoProps<T extends RuleBasicInfoFormData = RuleBasicInfoFormData> {
+  formData: T;
+  setFormData: (updater: (prev: T) => T) => void;
+}
+
+export const RuleBasicInfo = <T extends RuleBasicInfoFormData,>({ formData, setFormData }: RuleBasicInfoProps<T>) => {
   return (
     <div className="grid grid-cols-1 gap-4">
       <div className="space-y-2">

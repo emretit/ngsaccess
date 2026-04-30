@@ -4,10 +4,20 @@ import { AiInsightsCard } from "@/components/pdks/AiInsightsCard";
 import { PDKSTable } from "./PDKSTable";
 import { PDKSAiChat } from "./PDKSAiChat";
 
+interface PDKSAttendanceRecord {
+  id: string;
+  employee_first_name: string;
+  employee_last_name: string;
+  date: string;
+  entry_time: string;
+  exit_time: string;
+  status: string;
+}
+
 interface PDKSRecordsContentProps {
   section: string;
-  records: any[];
-  filteredRecords: any[];
+  records: PDKSAttendanceRecord[];
+  filteredRecords: PDKSAttendanceRecord[];
   loading: boolean;
   searchTerm: string;
   statusFilter: string;
@@ -27,10 +37,10 @@ export function PDKSRecordsContent({
 }: PDKSRecordsContentProps) {
   const rawEmployees = useQuery(api.employees.list, {}) ?? [];
 
-  const employees = rawEmployees
-    .filter((emp: any) => emp.isActive !== false)
-    .map((emp: any) => ({
-      id: emp._id,
+  const employees: PDKSAttendanceRecord[] = rawEmployees
+    .filter((emp) => emp.isActive !== false)
+    .map((emp) => ({
+      id: String(emp._id),
       employee_first_name: emp.firstName ?? "",
       employee_last_name: emp.lastName ?? "",
       date: new Date().toISOString().split("T")[0],

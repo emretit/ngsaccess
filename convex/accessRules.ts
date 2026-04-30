@@ -47,8 +47,8 @@ export const list = authedQuery({
               employees: employee
                 ? {
                     id: employee._id,
-                    first_name: employee.firstName,
-                    last_name: employee.lastName,
+                    firstName: employee.firstName,
+                    lastName: employee.lastName,
                     email: employee.email,
                   }
                 : null,
@@ -70,9 +70,9 @@ export const list = authedQuery({
                 ? {
                     id: device._id,
                     name: device.name,
-                    device_serial: device.deviceSerial,
-                    zone_id: device.zoneId,
-                    door_id: device.doorId,
+                    deviceSerial: device.deviceSerial,
+                    zoneId: device.zoneId,
+                    doorId: device.doorId,
                   }
                 : null,
             };
@@ -81,8 +81,8 @@ export const list = authedQuery({
 
         return {
           ...rule,
-          group_members: membersWithEmployees,
-          group_devices: devicesWithDetails,
+          groupMembers: membersWithEmployees,
+          groupDevices: devicesWithDetails,
         };
       })
     );

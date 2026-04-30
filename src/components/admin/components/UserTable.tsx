@@ -34,7 +34,7 @@ export const UserTable: React.FC<UserTableProps> = ({
     setShowPasswordResetDialog(true);
   };
 
-  const getRoleDisplay = (role: string) => {
+  const getRoleDisplay = (role: string | undefined) => {
     switch (role) {
       case 'super_admin':
         return <Badge variant="destructive">Süper Admin</Badge>;
@@ -73,9 +73,9 @@ export const UserTable: React.FC<UserTableProps> = ({
               </TableRow>
             ) : (
               users.map((user, index) => (
-                <TableRow key={String((user as User & { _id?: string }).id ?? (user as User & { _id?: string })._id ?? user.email ?? index)}>
+                <TableRow key={String(user._id ?? user.email ?? index)}>
                   <TableCell className="font-medium">
-                    {user.email}
+                    {user.email ?? ""}
                   </TableCell>
                   <TableCell>{getRoleDisplay(user.role)}</TableCell>
                   <TableCell className="text-right">

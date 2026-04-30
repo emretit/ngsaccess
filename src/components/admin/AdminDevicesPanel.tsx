@@ -10,8 +10,8 @@ import { useDeviceFilters } from "@/hooks/useDeviceFilters";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 
 export function AdminDevicesPanel() {
-  const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
-  const [selectedDoorId, setSelectedDoorId] = useState<number | null>(null);
+  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [selectedDoorId, setSelectedDoorId] = useState<string | null>(null);
 
   const { zones, doors } = useZonesAndDoors();
   const rawDevicesData = useQuery(api.devices.list) ?? [];

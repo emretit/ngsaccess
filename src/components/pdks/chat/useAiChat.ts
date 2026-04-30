@@ -36,7 +36,7 @@ export function useAiChat() {
       setIsSaving(true);
       setSaveError(null);
 
-      const convexMessages = messages.map((m: any) => ({
+      const convexMessages = messages.map((m) => ({
         role: m.type as "user" | "assistant",
         content: m.content,
         data: m.data,

@@ -1,6 +1,7 @@
 
 'use client';
 
+import { useMemo } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Employee } from '@/types/employee';
@@ -11,25 +12,28 @@ interface SlideOverPanelProps {
   isOpen: boolean;
   onClose: () => void;
   employee: Employee | null;
-  onSave: (employee: Employee) => void;
+  // Form veya detay panelinden "kaydet/düzenle"ye basıldığında çağrılır.
+  // Payload akışa göre değişir (formData veya Employee), parent yalnızca tetiklenmeyi
+  // kullandığı için type'ı geniş tutuyoruz.
+  onSave: (payload?: unknown) => void;
   viewMode?: boolean;
 }
 
-export default function SlideOverPanel({ 
-  isOpen, 
-  onClose, 
-  employee, 
+export default function SlideOverPanel({
+  isOpen,
+  onClose,
+  employee,
   onSave,
   viewMode = false
 }: SlideOverPanelProps) {
-  const mapEmployeeToFormData = (emp: Employee | null) => {
-    if (!emp) return null;
+  const formEmployee = useMemo(() => {
+    if (!employee) return null;
     return {
-      ...emp,
-      department: emp.departments?.name || '',
-      position: emp.positions?.name || ''
+      ...employee,
+      department: employee.departments?.name || '',
+      position: employee.positions?.name || '',
     };
-  };
+  }, [employee]);
 
   return (
     <Sheet open={isOpen} onOpenChange={open => !open && onClose()}>
@@ -48,9 +52,9 @@ export default function SlideOverPanel({
               <EmployeeDetails employee={employee} onEdit={() => onSave(employee!)} />
             ) : (
               <EmployeeForm
-                employee={mapEmployeeToFormData(employee)}
+                employee={formEmployee}
                 onClose={onClose}
-                onSave={onSave}
+                onSave={(employee) => onSave(employee)}
               />
             )}
           </div>

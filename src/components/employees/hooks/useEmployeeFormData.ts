@@ -48,7 +48,7 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
 
   const departmentsData = useQuery(api.departments.list) ?? [];
   const companiesData = useQuery(api.companies.list) ?? [];
-  const accessRulesData = useQuery(api.accessRules.list) ?? [];
+  const accessRulesData = useQuery(api.accessRules.list, {}) ?? [];
   const positionsData = useQuery(api.positions.list) ?? [];
 
   const departments = departmentsData.map((d: { _id: string; name: string }) => ({ id: d._id, name: d.name }));
@@ -96,7 +96,11 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
       });
       setPhotoPreview(null);
     }
-  }, [employee, defaultProjectId]);
+    // Form sadece düzenlenen kişi (employee._id) değiştiğinde reset edilir.
+    // employee prop'u her parent re-render'da yeni referans alabilir; tüm objeyi
+    // dep'e koymak form'u sürekli resetler ve kullanıcının yazdıkları kaybolur.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employee?._id, defaultProjectId]);
 
   return {
     formData,

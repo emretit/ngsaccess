@@ -23,12 +23,6 @@ export default function Employees() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [viewMode, setViewMode] = useState(false);
 
-  const employeeStats = useMemo(() => ({
-    total: employees.length,
-    active: employees.filter(emp => emp.isActive).length,
-    inactive: employees.filter(emp => !emp.isActive).length
-  }), [employees]);
-
   // Filtreleme işlemini useMemo ile optimize et
   const filteredEmployees = useMemo(() => {
     let filtered = employees;
@@ -76,26 +70,21 @@ export default function Employees() {
     setIsPanelOpen(true);
   };
 
-  const handleDeleteEmployee = (employee: Employee) => {
-    console.log('Delete employee:', employee);
+  const handleDeleteEmployee = (_employee: Employee) => {
+    // Bireysel silme akışı EmployeeTable içinde dialog ile yönetiliyor.
   };
 
-  const handleSaveEmployee = (savedEmployee: Employee) => {
-    console.log('Employee saved:', savedEmployee);
-    
+  const handleSaveEmployee = (_savedEmployee?: unknown) => {
     if (viewMode) {
-      // If in view mode, just switch to edit mode
       setViewMode(false);
-    } else {
-      // If editing/creating, refresh data and close panel
-      refetch();
-      setIsPanelOpen(false);
-      setEditingEmployee(null);
+      return;
     }
+    refetch();
+    setIsPanelOpen(false);
+    setEditingEmployee(null);
   };
 
   const handleNewEmployee = () => {
-    console.log('Creating new employee');
     setEditingEmployee(null);
     setViewMode(false);
     setIsPanelOpen(true);
@@ -114,7 +103,7 @@ export default function Employees() {
   if (error) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-red-500">{error.toString()}</div>
+        <div className="text-red-500">{String(error)}</div>
       </div>
     );
   }

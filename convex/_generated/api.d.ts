@@ -34,6 +34,7 @@ import type * as leaves from "../leaves.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_cardReaderParse from "../lib/cardReaderParse.js";
 import type * as lib_customFunctions from "../lib/customFunctions.js";
+import type * as lib_employeeAuth from "../lib/employeeAuth.js";
 import type * as onboarding from "../onboarding.js";
 import type * as positions from "../positions.js";
 import type * as projects from "../projects.js";
@@ -80,6 +81,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/cardReaderParse": typeof lib_cardReaderParse;
   "lib/customFunctions": typeof lib_customFunctions;
+  "lib/employeeAuth": typeof lib_employeeAuth;
   onboarding: typeof onboarding;
   positions: typeof positions;
   projects: typeof projects;

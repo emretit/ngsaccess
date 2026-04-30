@@ -73,7 +73,8 @@ export default defineSchema({
   })
     .index("by_project", ["projectId"])
     .index("by_email", ["email"])
-    .index("by_card", ["cardNumber"]),
+    .index("by_card", ["cardNumber"])
+    .index("by_tc", ["tcNo"]),
 
   checkInTokens: defineTable({
     employeeId: v.id("employees"),
@@ -99,6 +100,16 @@ export default defineSchema({
   })
     .index("by_employee", ["employeeId"])
     .index("by_token", ["setupToken"]),
+
+  employeeSessions: defineTable({
+    employeeId: v.id("employees"),
+    token: v.string(),
+    expiresAt: v.string(),
+    createdAt: v.string(),
+    lastUsedAt: v.optional(v.string()),
+  })
+    .index("by_token", ["token"])
+    .index("by_employee", ["employeeId"]),
 
   departments: defineTable({
     name: v.string(),

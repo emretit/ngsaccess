@@ -12,7 +12,7 @@ import { useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { toast } from "@/hooks/use-toast";
-import { Mail, Loader2 } from "lucide-react";
+import { Smartphone, Loader2 } from "lucide-react";
 
 interface Employee {
   _id: Id<"employees">;
@@ -43,15 +43,18 @@ export function EmployeePasswordResetDialog({
     if (!employee) return;
     setIsLoading(true);
     try {
-      await sendSetupEmail({
+      const result = await sendSetupEmail({
         employeeId: employee._id,
         email,
         firstName,
         lastName,
       });
+      if (!result.success) {
+        throw new Error(result.error ?? "Mail gönderilemedi");
+      }
       toast({
         title: "Mail Gönderildi",
-        description: `${firstName} ${lastName} adlı personele şifre sıfırlama maili gönderildi.`,
+        description: `${firstName} ${lastName} adlı personele mobil uygulama şifresi kurulum maili gönderildi.`,
       });
       onOpenChange(false);
     } catch (error: unknown) {
@@ -70,13 +73,15 @@ export function EmployeePasswordResetDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" />
-            Şifre Sıfırlama Maili
+            <Smartphone className="h-5 w-5" />
+            Mobil Şifre Kurulumu
           </DialogTitle>
           <DialogDescription>
             {employee && (
               <>
-                <strong>{firstName} {lastName}</strong> adlı personele şifre sıfırlama maili göndermek istediğinize emin misiniz?
+                <strong>{firstName} {lastName}</strong> adlı personele <strong>mobil uygulama</strong> için şifre kurulum bağlantısı göndermek istediğinize emin misiniz?
+                <br /><br />
+                Bu şifre yönetim panelinden (web) tamamen bağımsızdır; çalışan yalnızca mobil uygulamada kullanır.
                 <br /><br />
                 Mail adresi: <strong>{email}</strong>
               </>
@@ -95,8 +100,8 @@ export function EmployeePasswordResetDialog({
               </>
             ) : (
               <>
-                <Mail className="mr-2 h-4 w-4" />
-                Mail Gönder
+                <Smartphone className="mr-2 h-4 w-4" />
+                Kurulum Maili Gönder
               </>
             )}
           </Button>

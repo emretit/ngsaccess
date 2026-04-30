@@ -47,7 +47,7 @@ const Devices = () => {
   const { handleDeleteDevice } = useDeviceActions();
   
   // Device table selection
-  const { showDeleteDialog, setShowDeleteDialog, handleBulkDelete } = useDeviceTable(devices as any);
+  const { showDeleteDialog, setShowDeleteDialog, handleBulkDelete } = useDeviceTable(devices);
 
   // Clear selections when zone/door changes
   useEffect(() => {
@@ -98,12 +98,12 @@ const Devices = () => {
 
       <div className="flex-1 min-w-0 space-y-3">
         <DevicesContent
-          devices={devices as any}
+          devices={devices}
           isLoading={isLoading}
           zones={zones}
           doors={doors}
-          selectedZoneId={selectedZoneId as any}
-          selectedDoorId={selectedDoorId as any}
+          selectedZoneId={selectedZoneId}
+          selectedDoorId={selectedDoorId}
           onDeleteDevice={handleDeleteDevice}
           onAssignLocation={openLocationForm}
           onEditDevice={handleEditDevice}

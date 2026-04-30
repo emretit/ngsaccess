@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:convex_flutter/convex_flutter.dart' as convex_pkg;
 
 import '../config/convex_config.dart';
 import '../models/attendance.dart';
@@ -15,7 +14,7 @@ class AttendanceProvider extends ChangeNotifier {
   String? _errorMessage;
   AuthProvider? _authProvider;
 
-  convex_pkg.SubscriptionHandle? _subscription;
+  ConvexSubscriptionHandle? _subscription;
   String? _subscribedUserId;
 
   List<Attendance> get attendanceRecords => _attendanceRecords;
@@ -26,10 +25,12 @@ class AttendanceProvider extends ChangeNotifier {
     final today = DateTime.now();
     final start = DateTime(today.year, today.month, today.day);
     final end = start.add(const Duration(days: 1));
-    final granted = _attendanceRecords.where((a) =>
-        a.granted &&
-        a.accessTime.isAfter(start) &&
-        a.accessTime.isBefore(end));
+    final granted = _attendanceRecords.where(
+      (a) =>
+          a.granted &&
+          a.accessTime.isAfter(start) &&
+          a.accessTime.isBefore(end),
+    );
     if (granted.isEmpty) return null;
     return granted.first;
   }
@@ -57,7 +58,7 @@ class AttendanceProvider extends ChangeNotifier {
   Future<void> _ensureSubscription() async {
     await _cancelSubscription();
     try {
-      _subscription = await convex.subscribe(
+      _subscription = await convex.subscribeEmployeeQuery(
         name: 'cardReadings:listForEmployee',
         args: {'limit': 50},
         onUpdate: _onSubscriptionUpdate,
@@ -99,7 +100,9 @@ class AttendanceProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final raw = await convex.query('cardReadings:listForEmployee', {'limit': 50});
+      final raw = await convex.employeeQuery('cardReadings:listForEmployee', {
+        'limit': 50,
+      });
       _attendanceRecords = Attendance.listFromConvexJson(raw);
     } catch (e) {
       _errorMessage = 'Kayıtlar yüklenemedi: $e';
@@ -141,9 +144,13 @@ class AttendanceProvider extends ChangeNotifier {
     try {
       _isLoading = true;
       notifyListeners();
-      final raw = await convex.mutation(name: 'cardReadings:selfCheckIn', args: args);
+      final raw = await convex.employeeMutation(
+        name: 'cardReadings:selfCheckIn',
+        args: args,
+      );
       final result = jsonDecode(raw);
-      final granted = result is Map<String, dynamic> && result['granted'] == true;
+      final granted =
+          result is Map<String, dynamic> && result['granted'] == true;
       if (!granted) {
         _errorMessage = 'Erişim reddedildi';
       }
@@ -167,8 +174,16 @@ class AttendanceProvider extends ChangeNotifier {
     final now = DateTime.now();
     final firstDay = DateTime(now.year, now.month, 1);
     final dates = _attendanceRecords
-        .where((r) => r.granted && r.accessTime.isAfter(firstDay) && r.accessTime.isBefore(now))
-        .map((r) => DateTime(r.accessTime.year, r.accessTime.month, r.accessTime.day))
+        .where(
+          (r) =>
+              r.granted &&
+              r.accessTime.isAfter(firstDay) &&
+              r.accessTime.isBefore(now),
+        )
+        .map(
+          (r) =>
+              DateTime(r.accessTime.year, r.accessTime.month, r.accessTime.day),
+        )
         .toSet();
     return dates.length;
   }
@@ -177,7 +192,10 @@ class AttendanceProvider extends ChangeNotifier {
     const lateAfter = Duration(hours: 9);
     return _attendanceRecords.where((r) {
       if (!r.granted) return false;
-      final t = Duration(hours: r.accessTime.hour, minutes: r.accessTime.minute);
+      final t = Duration(
+        hours: r.accessTime.hour,
+        minutes: r.accessTime.minute,
+      );
       return t > lateAfter;
     }).length;
   }

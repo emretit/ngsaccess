@@ -1,5 +1,5 @@
 
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuthState } from "@/hooks/useAuthState";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
@@ -24,7 +24,7 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
   const currentProjectId = projectIds.length > 0 ? projectIds[0] : null;
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema) as any,
+    resolver: zodResolver(formSchema) as Resolver<FormValues>,
     defaultValues: {
       name: "",
       device_serial: "",
@@ -46,7 +46,7 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
   const filteredDoors = doors.filter((door) => String(door.zoneId) === String(selectedZoneId));
 
   // Load device data when dialog opens
-  useDeviceDataLoader({ device, open, form: form as any });
+  useDeviceDataLoader({ device, open, form });
 
   // Handle form submission
   const { onSubmit, isLoading } = useDeviceFormSubmission({

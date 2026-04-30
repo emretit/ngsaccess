@@ -62,7 +62,7 @@ export function PDKSChartView() {
     departmentAbsence.length > 0
       ? departmentAbsence.map((d, i) => ({
           name: d.name,
-          value: d.devamsızlık,
+          value: d.absences,
           color: ["#EF4444", "#F59E0B", "#3B82F6", "#10B981"][i % 4],
         }))
       : [{ name: "Veri yok", value: 1, color: "#E5E7EB" }];
@@ -71,9 +71,9 @@ export function PDKSChartView() {
     lateDistribution.length > 0
       ? lateDistribution
       : [
-          { saat: "08:00", sayı: 0 },
-          { saat: "09:00", sayı: 0 },
-          { saat: "10:00", sayı: 0 },
+          { hour: "08:00", count: 0 },
+          { hour: "09:00", count: 0 },
+          { hour: "10:00", count: 0 },
         ];
 
   const avgRate =
@@ -94,10 +94,9 @@ export function PDKSChartView() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Chart Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-linear-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow-lg transition-all duration-300">
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="bg-linear-to-br from-blue-50 to-blue-100 border-blue-200 hover:shadow transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -109,7 +108,7 @@ export function PDKSChartView() {
           </CardContent>
         </Card>
 
-        <Card className="bg-linear-to-br from-green-50 to-green-100 border-green-200 hover:shadow-lg transition-all duration-300">
+        <Card className="bg-linear-to-br from-green-50 to-green-100 border-green-200 hover:shadow transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -127,7 +126,7 @@ export function PDKSChartView() {
           </CardContent>
         </Card>
 
-        <Card className="bg-linear-to-br from-yellow-50 to-yellow-100 border-yellow-200 hover:shadow-lg transition-all duration-300">
+        <Card className="bg-linear-to-br from-yellow-50 to-yellow-100 border-yellow-200 hover:shadow transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -139,7 +138,7 @@ export function PDKSChartView() {
           </CardContent>
         </Card>
 
-        <Card className="bg-linear-to-br from-red-50 to-red-100 border-red-200 hover:shadow-lg transition-all duration-300">
+        <Card className="bg-linear-to-br from-red-50 to-red-100 border-red-200 hover:shadow transition-shadow">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -153,9 +152,9 @@ export function PDKSChartView() {
       </div>
 
       {/* Main Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Daily Attendance Bar Chart */}
-        <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
+        <Card className="border border-border bg-card shadow-sm hover:shadow transition-shadow">
           <CardHeader>
             <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
               📊 Haftalık Devam Durumu
@@ -184,7 +183,7 @@ export function PDKSChartView() {
         </Card>
 
         {/* Hourly Check-in Trend */}
-        <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
+        <Card className="border border-border bg-card shadow-sm hover:shadow transition-shadow">
           <CardHeader>
             <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
               ⏰ Saatlik Giriş Trendi
@@ -219,8 +218,8 @@ export function PDKSChartView() {
       </div>
 
       {/* Devam Oranı Çizgi + Geç Kalma Dağılımı */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card className="border border-border bg-card shadow-sm hover:shadow transition-shadow">
           <CardHeader>
             <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
               📈 Günlük Devam Oranı
@@ -239,7 +238,7 @@ export function PDKSChartView() {
                     borderRadius: "8px",
                     boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
                   }}
-                  formatter={(value: number) => [`%${value}`, "Devam Oranı"]}
+                  formatter={(value) => [`%${value}`, "Devam Oranı"]}
                 />
                 <Line
                   type="monotone"
@@ -254,7 +253,7 @@ export function PDKSChartView() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
+        <Card className="border border-border bg-card shadow-sm hover:shadow transition-shadow">
           <CardHeader>
             <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
               ⏱️ Geç Kalma Saat Dağılımı
@@ -265,7 +264,7 @@ export function PDKSChartView() {
               <BarChart data={lateDistributionData} layout="vertical" margin={{ left: 40 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis type="number" tick={{ fontSize: 12 }} />
-                <YAxis dataKey="saat" type="category" width={50} tick={{ fontSize: 12 }} />
+                <YAxis dataKey="hour" type="category" width={50} tick={{ fontSize: 12 }} />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "white",
@@ -274,77 +273,48 @@ export function PDKSChartView() {
                     boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
                   }}
                 />
-                <Bar dataKey="sayı" fill={CHART_COLORS.late} name="Geç Kalan" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="count" fill={CHART_COLORS.late} name="Geç Kalan" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
 
-      {/* Bottom Row - Pie Chart and Additional Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Department Absence Pie Chart */}
-        <Card className="lg:col-span-2 shadow-xl border-0 bg-white/90 backdrop-blur-sm hover:shadow-2xl transition-all duration-300">
-          <CardHeader>
-            <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              🥧 Departman Devamsızlık Dağılımı
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={absenceTypeData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                >
-                  {absenceTypeData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'white', 
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Quick Stats */}
-        <Card className="shadow-xl border-0 bg-linear-to-br from-gray-50 to-white hover:shadow-2xl transition-all duration-300">
-          <CardHeader>
-            <CardTitle className="text-lg font-bold text-gray-900">📈 Hızlı İstatistikler</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors">
-              <span className="text-sm font-medium text-gray-700">Toplam Çalışma Saati</span>
-              <span className="text-lg font-bold text-blue-600">1,248h</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors">
-              <span className="text-sm font-medium text-gray-700">Mesai Saatleri</span>
-              <span className="text-lg font-bold text-green-600">156h</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition-colors">
-              <span className="text-sm font-medium text-gray-700">Ortalama Giriş</span>
-              <span className="text-lg font-bold text-yellow-600">08:45</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors">
-              <span className="text-sm font-medium text-gray-700">Ortalama Çıkış</span>
-              <span className="text-lg font-bold text-purple-600">18:15</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="border border-border bg-card shadow-sm hover:shadow transition-shadow">
+        <CardHeader>
+          <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            🥧 Departman Devamsızlık Dağılımı
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={absenceTypeData}
+                cx="50%"
+                cy="50%"
+                innerRadius={60}
+                outerRadius={100}
+                paddingAngle={5}
+                dataKey="value"
+                label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+              >
+                {absenceTypeData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "white",
+                  border: "1px solid #e5e7eb",
+                  borderRadius: "8px",
+                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
     </div>
   );
 }

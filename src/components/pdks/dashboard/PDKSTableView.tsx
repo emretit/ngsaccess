@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { ChevronDown, ChevronRight, Download, Search, Filter } from "lucide-react";
 import { exportToExcel, exportToCsv, exportToPdf } from "@/utils/pdksExport";
 import { useToast } from "@/hooks/use-toast";
@@ -205,9 +205,8 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
             </TableHeader>
             <TableBody>
               {filteredRecords.map((record, index) => (
-                <>
-                  <TableRow 
-                    key={record.id} 
+                <Fragment key={record.id}>
+                  <TableRow
                     className={`
                       hover:bg-blue-50/50 transition-colors cursor-pointer border-b border-gray-100
                       ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}
@@ -267,7 +266,7 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </Fragment>
               ))}
             </TableBody>
           </Table>

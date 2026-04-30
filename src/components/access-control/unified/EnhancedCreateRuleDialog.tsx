@@ -17,11 +17,13 @@ import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { useAccessRules } from "@/hooks/useAccessRules";
 import { useLocationUtils } from "@/hooks/useLocationUtils";
 import { Loader2, Users, Building2, MapPin, Clock, Shield, AlertTriangle } from "lucide-react";
+import type { AccessRule, GroupMember, GroupDevice, Zone, Door, RuleConflict } from "@/types/access-control";
+import type { Department } from "@/hooks/useDepartments";
 
 interface EnhancedCreateRuleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  editingRule?: any;
+  editingRule?: AccessRule;
   onClose: () => void;
 }
 
@@ -43,7 +45,7 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
   });
 
   const [activeTab, setActiveTab] = useState('basic');
-  const [conflicts, setConflicts] = useState<any[]>([]);
+  const [conflicts, setConflicts] = useState<RuleConflict[]>([]);
 
   const { employees } = useEmployees();
   const { devices } = useDevices();
@@ -59,16 +61,16 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
         setFormData({
           name: editingRule.name || '',
           description: editingRule.description || '',
-          targetType: editingRule.targetType || 'individual',
-          selectedEmployees: editingRule.groupMembers?.map((gm: any) => gm.employees?._id).filter(Boolean) || [],
-          selectedDevices: editingRule.groupDevices?.map((gd: any) => gd.devices?._id).filter(Boolean) || [],
+          targetType: (editingRule.targetType as 'all' | 'department' | 'position' | 'individual' | undefined) ?? 'individual',
+          selectedEmployees: editingRule.groupMembers?.map((gm: GroupMember) => gm.employees?._id).filter(Boolean).map(String) ?? [],
+          selectedDevices: editingRule.groupDevices?.map((gd: GroupDevice) => gd.devices?._id).filter(Boolean).map(String) ?? [],
           selectedPositions: [],
           selectedZones: [],
           selectedDoors: [],
           startTime: editingRule.startTime || '',
           endTime: editingRule.endTime || '',
           days: editingRule.days || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-          accessDirection: editingRule.accessDirection || 'both',
+          accessDirection: (editingRule.accessDirection as 'entry' | 'exit' | 'both' | undefined) ?? 'both',
           priority: editingRule.priority || 100,
         });
       } else {
@@ -180,7 +182,7 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
           <div className="space-y-3">
             <Label>Departmanlar</Label>
             <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-              {departments.map((department: any) => (
+              {(departments as Department[]).map((department) => (
                 <div key={department._id} className="flex items-center space-x-2">
                   <Checkbox
                     id={`dept-${department._id}`}
@@ -261,7 +263,7 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
 
       <TabsContent value="zones" className="space-y-3">
         <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-          {zones.map((zone: any) => (
+          {(zones as Zone[]).map((zone) => (
             <div key={zone._id} className="flex items-center space-x-2">
               <Checkbox
                 id={`zone-${zone._id}`}
@@ -286,7 +288,7 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
 
       <TabsContent value="doors" className="space-y-3">
         <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-          {doors.map((door: any) => (
+          {(doors as Door[]).map((door) => (
             <div key={door._id} className="flex items-center space-x-2">
               <Checkbox
                 id={`door-${door._id}`}
@@ -543,7 +545,7 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
                       <div className="space-y-2">
                         {conflicts.map((conflict, index) => (
                           <div key={index} className="text-sm text-red-600">
-                            {conflict.description}
+                            {conflict.conflictDescription}
                           </div>
                         ))}
                       </div>

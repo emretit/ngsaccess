@@ -7,15 +7,17 @@ import { ChevronRight, ChevronDown, Building2, MapPin } from "lucide-react";
 import { useDevices } from "@/hooks/useDevices";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 
-interface ZoneDeviceTreeProps {
-  formData: {
-    selected_devices: string[];
-    selected_zones: string[];
-  };
-  setFormData: (updater: (prev: any) => any) => void;
+interface ZoneDeviceTreeFormData {
+  selected_devices: string[];
+  selected_zones: string[];
 }
 
-export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) => {
+interface ZoneDeviceTreeProps<T extends ZoneDeviceTreeFormData = ZoneDeviceTreeFormData> {
+  formData: T;
+  setFormData: (updater: (prev: T) => T) => void;
+}
+
+export const ZoneDeviceTree = <T extends ZoneDeviceTreeFormData,>({ formData, setFormData }: ZoneDeviceTreeProps<T>) => {
   const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
   const { devices } = useDevices();
   const { zones } = useZonesAndDoors();
@@ -25,7 +27,7 @@ export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) =
       ...prev,
       selected_devices: checked
         ? [...prev.selected_devices, deviceId]
-        : prev.selected_devices.filter(id => id !== deviceId)
+        : prev.selected_devices.filter((id: string) => id !== deviceId)
     }));
   };
 
@@ -36,11 +38,11 @@ export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) =
     setFormData(prev => {
       const newZones = checked
         ? [...prev.selected_zones, zoneId]
-        : prev.selected_zones.filter(id => id !== zoneId);
+        : prev.selected_zones.filter((id: string) => id !== zoneId);
 
       const newDevices = checked
         ? [...new Set([...prev.selected_devices, ...zoneDeviceIds])]
-        : prev.selected_devices.filter(id => !zoneDeviceIds.includes(id));
+        : prev.selected_devices.filter((id: string) => !zoneDeviceIds.includes(id));
 
       return {
         ...prev,
@@ -85,7 +87,7 @@ export const ZoneDeviceTree = ({ formData, setFormData }: ZoneDeviceTreeProps) =
     formData.selected_devices.includes(String(device._id))
   );
 
-  const getDeviceLocationDisplay = (device: any) => {
+  const getDeviceLocationDisplay = (device: { zoneId?: unknown }) => {
     const zone = zones.find(z => String(z._id) === String(device.zoneId));
     return zone ? zone.name : 'Konum Belirtilmemiş';
   };

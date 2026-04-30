@@ -3,22 +3,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
-interface TimeScheduleProps {
-  formData: {
-    start_time: string;
-    end_time: string;
-    days: string[];
-  };
-  setFormData: (updater: (prev: any) => any) => void;
+interface TimeScheduleFormData {
+  start_time: string;
+  end_time: string;
+  days: string[];
 }
 
-export const TimeSchedule = ({ formData, setFormData }: TimeScheduleProps) => {
+interface TimeScheduleProps<T extends TimeScheduleFormData = TimeScheduleFormData> {
+  formData: T;
+  setFormData: (updater: (prev: T) => T) => void;
+}
+
+export const TimeSchedule = <T extends TimeScheduleFormData,>({ formData, setFormData }: TimeScheduleProps<T>) => {
   const handleDayChange = (day: string, checked: boolean) => {
     setFormData(prev => ({
       ...prev,
       days: checked 
         ? [...prev.days, day]
-        : prev.days.filter(d => d !== day)
+        : prev.days.filter((d: string) => d !== day)
     }));
   };
 

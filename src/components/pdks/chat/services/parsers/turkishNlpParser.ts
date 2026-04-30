@@ -108,7 +108,7 @@ export class TurkishNlpParser {
   private static detectTimeRange(query: string): NaturalLanguageQuery['timeRange'] {
     for (const [timeType, keywords] of Object.entries(this.TIME_KEYWORDS)) {
       if (keywords.some(keyword => query.includes(keyword))) {
-        return { type: timeType as any };
+        return { type: timeType as NaturalLanguageQuery["timeRange"]["type"] };
       }
     }
     

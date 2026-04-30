@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
+import { toast } from "@/hooks/use-toast";
 
 export function usePhotoUpload() {
   const [isLoading, setIsLoading] = useState(false);
@@ -19,7 +20,11 @@ export function usePhotoUpload() {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      alert("Dosya boyutu 5MB'dan küçük olmalıdır");
+      toast({
+        title: "Hata",
+        description: "Dosya boyutu 5 MB'dan küçük olmalıdır",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -32,33 +37,36 @@ export function usePhotoUpload() {
     try {
       setIsLoading(true);
 
-      // 1. Upload URL al
       const uploadUrl = await generateUploadUrl();
 
-      // 2. Dosyayı yükle
       const result = await fetch(uploadUrl, {
         method: "POST",
         headers: { "Content-Type": file.type },
         body: file,
       });
-      if (!result.ok) throw new Error("Dosya yüklenemedi");
+      if (!result.ok) throw new Error("Dosya sunucuya yüklenemedi");
       const { storageId } = (await result.json()) as { storageId: Id<"_storage"> };
 
-      // 3. Employee kaydını güncelle (eğer employeeId verilmişse)
       if (employeeId) {
         const url = await saveEmployeePhoto({ employeeId, storageId });
         onPhotoChange(url);
-      } else {
-        // Sadece URL üret, kaydet değil
-        const urlResponse = await fetch(`/api/convex/files/${storageId}`);
-        if (urlResponse.ok) {
-          const { url } = (await urlResponse.json()) as { url: string };
-          onPhotoChange(url);
-        }
+        return;
       }
+
+      // Yeni personel akışı: kayıt henüz yok, URL'i geçici endpoint ile çöz.
+      const urlResponse = await fetch(`/api/convex/files/${storageId}`);
+      if (!urlResponse.ok) {
+        throw new Error("Fotoğraf URL'i alınamadı");
+      }
+      const { url } = (await urlResponse.json()) as { url: string };
+      onPhotoChange(url);
     } catch (error) {
-      console.error("Fotoğraf yüklenirken hata:", error);
-      alert("Fotoğraf yüklenemedi. Lütfen daha sonra tekrar deneyiniz.");
+      const message = error instanceof Error ? error.message : "Fotoğraf yüklenemedi";
+      toast({
+        title: "Fotoğraf Yükleme Hatası",
+        description: message,
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }

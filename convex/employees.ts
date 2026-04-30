@@ -1,8 +1,36 @@
-import { mutation, internalMutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { authedQuery, adminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
-import { Doc } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
+import { QueryCtx } from "./_generated/server";
+
+type DuplicateField = "cardNumber" | "email" | "tcNo";
+
+async function findDuplicateEmployee(
+  ctx: QueryCtx,
+  field: DuplicateField,
+  value: string,
+  excludeId?: Id<"employees">
+): Promise<Doc<"employees"> | null> {
+  const indexName =
+    field === "cardNumber" ? "by_card" : field === "email" ? "by_email" : "by_tc";
+  const fieldName =
+    field === "cardNumber" ? "cardNumber" : field === "email" ? "email" : "tcNo";
+
+  const existing = await ctx.db
+    .query("employees")
+    .withIndex(indexName, (q) => q.eq(fieldName, value))
+    .collect();
+
+  return existing.find((e) => e._id !== excludeId) ?? null;
+}
+
+const DUPLICATE_MESSAGES: Record<DuplicateField, string> = {
+  cardNumber: "Bu kart numarası başka bir personelde kullanılıyor",
+  email: "Bu e-posta adresi başka bir personelde kullanılıyor",
+  tcNo: "Bu TC kimlik numarası başka bir personelde kullanılıyor",
+};
 
 export const list = authedQuery({
   args: {
@@ -40,10 +68,10 @@ export const list = authedQuery({
         return {
           ...emp,
           departments: department
-            ? { id: department._id, name: department.name }
+            ? { _id: department._id, name: department.name }
             : null,
           positions: position
-            ? { id: position._id, name: position.name }
+            ? { _id: position._id, name: position.name }
             : null,
         };
       })
@@ -78,21 +106,15 @@ export const checkDuplicate = authedQuery({
     excludeId: v.optional(v.id("employees")),
   },
   handler: async (ctx, args) => {
-    const byCard = await ctx.db
-      .query("employees")
-      .withIndex("by_card", (q) => q.eq("cardNumber", args.cardNumber))
-      .first();
-    if (byCard && byCard._id !== args.excludeId) {
-      return { field: "cardNumber", duplicate: true };
+    const checks: DuplicateField[] = ["cardNumber", "email", "tcNo"];
+    for (const field of checks) {
+      const value =
+        field === "cardNumber" ? args.cardNumber : field === "email" ? args.email : args.tcNo;
+      if (!value) continue;
+      const dup = await findDuplicateEmployee(ctx, field, value, args.excludeId);
+      if (dup) return { field, duplicate: true as const };
     }
-    const byEmail = await ctx.db
-      .query("employees")
-      .withIndex("by_email", (q) => q.eq("email", args.email))
-      .first();
-    if (byEmail && byEmail._id !== args.excludeId) {
-      return { field: "email", duplicate: true };
-    }
-    return { duplicate: false };
+    return { duplicate: false as const };
   },
 });
 
@@ -121,6 +143,13 @@ export const create = adminMutation({
         throw new Error("Bu projeye erişim yetkiniz yok");
       }
     }
+
+    for (const field of ["cardNumber", "email", "tcNo"] as const) {
+      const value = args[field];
+      const dup = await findDuplicateEmployee(ctx, field, value);
+      if (dup) throw new Error(DUPLICATE_MESSAGES[field]);
+    }
+
     const now = new Date().toISOString();
     return await ctx.db.insert("employees", {
       ...args,
@@ -168,6 +197,17 @@ export const update = adminMutation({
     ) {
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
+
+    // Sadece DEĞİŞEN alanlar için duplicate kontrol — mevcut çoğaltma kayıtlar
+    // başka alanları güncellenirken (örn. pozisyon) bozulmadan saklanır.
+    for (const field of ["cardNumber", "email", "tcNo"] as const) {
+      const newValue = updates[field];
+      if (newValue !== undefined && newValue !== emp[field]) {
+        const dup = await findDuplicateEmployee(ctx, field, newValue, employeeId);
+        if (dup) throw new Error(DUPLICATE_MESSAGES[field]);
+      }
+    }
+
     const clean: Record<string, unknown> = { updatedAt: new Date().toISOString() };
     for (const [k, val] of Object.entries(updates)) {
       if (val !== undefined) clean[k] = val;
@@ -201,6 +241,12 @@ export const remove = adminMutation({
       .withIndex("by_employee", (q) => q.eq("employeeId", args.employeeId))
       .collect();
     await Promise.all(employeeAuth.map((ea) => ctx.db.delete(ea._id)));
+
+    const employeeSessions = await ctx.db
+      .query("employeeSessions")
+      .withIndex("by_employee", (q) => q.eq("employeeId", args.employeeId))
+      .collect();
+    await Promise.all(employeeSessions.map((s) => ctx.db.delete(s._id)));
 
     await ctx.db.delete(args.employeeId);
   },
@@ -237,6 +283,13 @@ export const bulkUpdateStatus = adminMutation({
     isActive: v.boolean(),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    for (const id of args.employeeIds) {
+      const emp = await ctx.db.get(id);
+      if (emp && emp.projectId && !allowedProjectIds.some((pid) => pid === emp.projectId)) {
+        throw new Error(`Çalışan ${emp.firstName} ${emp.lastName} için erişim yetkiniz yok`);
+      }
+    }
     const now = new Date().toISOString();
     await Promise.all(
       args.employeeIds.map((id) =>

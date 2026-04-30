@@ -6,12 +6,26 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 
+interface ShiftFormPayload {
+  name: string;
+  startTime: string;
+  endTime: string;
+  breakDuration?: string | number;
+  lunchBreakStart?: string;
+  lunchBreakEnd?: string;
+}
+
+interface EditingShift extends ShiftFormPayload {
+  _id?: string;
+  id?: string | number;
+}
+
 interface AddShiftDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAdd: (shift: any) => void;
-  onUpdate: (shift: any) => void;
-  editingShift: any;
+  onAdd: (shift: ShiftFormPayload) => void;
+  onUpdate: (shift: EditingShift) => void;
+  editingShift: EditingShift | null;
   onClose: () => void;
 }
 
@@ -38,9 +52,9 @@ export function AddShiftDialog({
         name: editingShift.name,
         startTime: editingShift.startTime,
         endTime: editingShift.endTime,
-        breakDuration: editingShift.breakDuration,
-        lunchBreakStart: editingShift.lunchBreakStart,
-        lunchBreakEnd: editingShift.lunchBreakEnd,
+        breakDuration: String(editingShift.breakDuration ?? ""),
+        lunchBreakStart: editingShift.lunchBreakStart ?? "",
+        lunchBreakEnd: editingShift.lunchBreakEnd ?? "",
       });
     } else {
       setFormData({

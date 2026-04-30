@@ -14,7 +14,7 @@ export const list = authedQuery({
       .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
       .collect();
     const projects = await Promise.all(rows.map((r) => ctx.db.get(r.projectId)));
-    return projects.filter(Boolean);
+    return projects.filter((p): p is NonNullable<typeof p> => p !== null);
   },
 });
 

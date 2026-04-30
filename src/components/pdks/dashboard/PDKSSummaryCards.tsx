@@ -1,5 +1,6 @@
 import { Users, UserCheck, Clock, Timer, Building, Palmtree } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface SummaryData {
   totalEmployees: number;
@@ -85,42 +86,43 @@ export function PDKSSummaryCards({ data }: PDKSSummaryCardsProps) {
   ];
 
   return (
-    <div className="px-6 py-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {cards.map((card, index) => (
-          <Card 
-            key={index} 
-            className={`
-              ${card.bgColor} ${card.borderColor} 
-              hover:shadow-xl transition-all duration-300 hover:scale-105 
-              border-2 cursor-pointer group
-            `}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 group-hover:text-gray-800 transition-colors">
-                {card.title}
-              </CardTitle>
-              <div className={`p-2 rounded-full bg-white/80 group-hover:bg-white transition-colors shadow-xs`}>
-                <card.icon className={`h-5 w-5 ${card.color}`} />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col space-y-2">
-                <div className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-                  {card.value}
-                </div>
-                <div className={`
-                  text-xs font-medium
-                  ${card.changeType === 'positive' ? 'text-green-600' : 
-                    card.changeType === 'neutral' ? 'text-gray-500' : 'text-red-600'}
-                `}>
-                  {card.change}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {cards.map((card, index) => (
+        <Card
+          key={index}
+          className={cn(
+            card.bgColor,
+            card.borderColor,
+            "border hover:shadow-md transition-shadow"
+          )}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">
+              {card.title}
+            </CardTitle>
+            <div className="p-1.5 rounded-full bg-white/80 shadow-xs">
+              <card.icon className={cn("h-4 w-4 sm:h-5 sm:w-5", card.color)} />
+            </div>
+          </CardHeader>
+          <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
+            <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
+              {card.value}
+            </div>
+            <div
+              className={cn(
+                "text-[11px] sm:text-xs font-medium mt-1",
+                card.changeType === "positive"
+                  ? "text-green-600"
+                  : card.changeType === "neutral"
+                    ? "text-gray-500"
+                    : "text-red-600"
+              )}
+            >
+              {card.change}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }

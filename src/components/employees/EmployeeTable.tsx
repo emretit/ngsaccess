@@ -2,7 +2,7 @@
 'use client';
 
 import { useState } from "react";
-import { useMutation, useAction } from "convex/react";
+import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -11,7 +11,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Edit2, Trash2, Mail, Upload, Loader2 } from "lucide-react";
+import { Edit2, Trash2, Smartphone, Upload, Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useEmployeeTable } from "@/hooks/useEmployeeTable";
 import { EmployeeBulkActions } from "./EmployeeBulkActions";
@@ -42,6 +42,7 @@ export default function EmployeeTable({
   const [isBulkSyncing, setIsBulkSyncing] = useState(false);
 
   const syncEmployeeToDevices = useAction(api.actions.hikvisionSync.syncEmployeeToDevices);
+  const allDepartments = useQuery(api.departments.list, {}) ?? [];
 
   const handleSyncToDevice = async (employee: Employee) => {
     const empId = employee._id;
@@ -166,7 +167,7 @@ export default function EmployeeTable({
       {selectedEmployees.length > 0 && (
         <EmployeeBulkActions
           selectedCount={selectedEmployees.length}
-          departments={Array.from(new Set(employees.map(emp => emp.departments)))}
+          departments={allDepartments.map(d => ({ _id: d._id, name: d.name }))}
           selectedDepartment={selectedDepartment}
           onDepartmentChange={setSelectedDepartment}
           onUpdateDepartment={handleBulkDepartmentUpdate}
@@ -279,9 +280,9 @@ export default function EmployeeTable({
                       size="icon"
                       onClick={() => handlePasswordResetClick(employee)}
                       className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                      title="Şifre Sıfırlama Maili Gönder"
+                      title="Mobil Uygulama Şifresi Kur"
                     >
-                      <Mail className="h-4 w-4" />
+                      <Smartphone className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="ghost"

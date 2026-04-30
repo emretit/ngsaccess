@@ -43,10 +43,10 @@ const RegisterForm = () => {
       
       navigate('/home');
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Kayıt hatası",
-        description: error.message || "Kayıt olurken bir hata oluştu.",
+        description: (error as Error)?.message ?? "Kayıt olurken bir hata oluştu.",
         variant: "destructive",
       });
     } finally {

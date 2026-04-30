@@ -4,17 +4,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ChevronRight, ChevronDown, Users, User } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
-import { useDepartments } from "@/hooks/useDepartments";
+import { useDepartments, type Department } from "@/hooks/useDepartments";
 
-interface DepartmentTreeProps {
-  formData: {
-    selected_employees: string[];
-    selected_departments: string[];
-  };
-  setFormData: (updater: (prev: any) => any) => void;
+interface DepartmentTreeFormData {
+  selected_employees: string[];
+  selected_departments: string[];
 }
 
-export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) => {
+interface DepartmentTreeProps<T extends DepartmentTreeFormData = DepartmentTreeFormData> {
+  formData: T;
+  setFormData: (updater: (prev: T) => T) => void;
+}
+
+export const DepartmentTree = <T extends DepartmentTreeFormData,>({ formData, setFormData }: DepartmentTreeProps<T>) => {
   const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
   const { employees } = useEmployees();
   const { departments } = useDepartments();
@@ -23,7 +25,7 @@ export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) =
     setFormData(prev => {
       const newEmployees = checked
         ? [...prev.selected_employees, employeeId]
-        : prev.selected_employees.filter(id => id !== employeeId);
+        : prev.selected_employees.filter((id: string) => id !== employeeId);
 
       return {
         ...prev,
@@ -34,8 +36,8 @@ export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) =
 
   const handleSelectAll = () => {
     const allEmployeeIds = employees.map(emp => String(emp._id));
-    const allDepartmentIds = departments.map((dept: any) => String(dept._id));
-    const allSelected = allEmployeeIds.every(id => formData.selected_employees.includes(id));
+    const allDepartmentIds = departments.map((dept: Department) => String(dept._id));
+    const allSelected = allEmployeeIds.every((id: string) => formData.selected_employees.includes(id));
 
     setFormData(prev => ({
       ...prev,
@@ -55,11 +57,11 @@ export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) =
     setFormData(prev => {
       const newDepartments = checked
         ? [...prev.selected_departments, departmentId]
-        : prev.selected_departments.filter(id => id !== departmentId);
+        : prev.selected_departments.filter((id: string) => id !== departmentId);
 
       const newEmployees = checked
         ? [...new Set([...prev.selected_employees, ...employeeIds])]
-        : prev.selected_employees.filter(id => !employeeIds.includes(id));
+        : prev.selected_employees.filter((id: string) => !employeeIds.includes(id));
 
       return {
         ...prev,
@@ -86,16 +88,16 @@ export const DepartmentTree = ({ formData, setFormData }: DepartmentTreeProps) =
   };
 
   const renderDepartmentTree = (parentId: string | null = null, level: number = 0) => {
-    const children = departments.filter((dept: any) => {
+    const children = departments.filter((dept: Department) => {
       const deptParentId = dept.parentId ? String(dept.parentId) : null;
       return deptParentId === parentId;
     });
 
     if (!children.length) return null;
 
-    return children.map((department: any) => {
+    return children.map((department: Department) => {
       const deptId = String(department._id);
-      const hasChildren = departments.some((dept: any) => String(dept.parentId ?? '') === deptId);
+      const hasChildren = departments.some((dept: Department) => String(dept.parentId ?? '') === deptId);
       const departmentEmployees = getEmployeesForDepartment(deptId);
       const isExpanded = expandedDepartments.has(deptId);
       const isSelected = isDepartmentSelected(deptId);

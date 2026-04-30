@@ -1,19 +1,20 @@
-
 import { useState } from "react";
-import { CalendarIcon, Filter, Download, Search } from "lucide-react";
+import { CalendarIcon, Filter, Search } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { 
+import {
   Popover,
   PopoverContent,
-  PopoverTrigger
+  PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -26,58 +27,48 @@ interface DateRange {
 }
 
 interface PDKSFilterBarProps {
-  onFiltersChange: (filters: any) => void;
+  onFiltersChange: (filters: {
+    dateRange: DateRange;
+    department: string;
+    person: string;
+    reportType: string;
+  }) => void;
 }
 
 export function PDKSFilterBar({ onFiltersChange }: PDKSFilterBarProps) {
   const [dateRange, setDateRange] = useState<DateRange>({
     from: undefined,
-    to: undefined
+    to: undefined,
   });
   const [department, setDepartment] = useState<string>("all");
   const [person, setPerson] = useState<string>("");
   const [reportType, setReportType] = useState<string>("daily");
 
+  const departments = useQuery(api.departments.list);
+
   const handleApplyFilters = () => {
-    onFiltersChange({
-      dateRange,
-      department,
-      person,
-      reportType,
-    });
+    onFiltersChange({ dateRange, department, person, reportType });
   };
 
-  const handleDateRangeChange = (range: any) => {
-    setDateRange({
-      from: range?.from,
-      to: range?.to
-    });
+  const handleDateRangeChange = (range: { from?: Date; to?: Date } | undefined) => {
+    setDateRange({ from: range?.from, to: range?.to });
   };
 
   return (
-    <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 p-4 lg:p-6">
-      <div className="flex flex-col gap-4">
-        {/* Filter Title */}
-        <div className="flex items-center gap-2 mb-2">
-          <Filter className="h-5 w-5 text-primary" />
-          <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-            Filtreler ve Arama
-          </h3>
-        </div>
-        
-        {/* Filter Controls */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          {/* Date Range Picker */}
+    <div className="rounded-lg border border-border bg-card p-4">
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
           <div className="lg:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
               Tarih Aralığı
             </label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
+                  size="sm"
                   className={cn(
-                    "w-full justify-start text-left font-normal h-10",
+                    "w-full justify-start text-left font-normal",
                     !dateRange.from && "text-muted-foreground"
                   )}
                 >
@@ -110,99 +101,88 @@ export function PDKSFilterBar({ onFiltersChange }: PDKSFilterBarProps) {
             </Popover>
           </div>
 
-          {/* Department Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
               Departman
             </label>
             <Select value={department} onValueChange={setDepartment}>
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder="Departman seçin" />
+              <SelectTrigger className="h-9">
+                <SelectValue
+                  placeholder={
+                    departments === undefined ? "Yükleniyor..." : "Departman seçin"
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tüm Departmanlar</SelectItem>
-                <SelectItem value="IT">Bilgi İşlem</SelectItem>
-                <SelectItem value="HR">İnsan Kaynakları</SelectItem>
-                <SelectItem value="Finance">Finans</SelectItem>
-                <SelectItem value="Operations">Operasyon</SelectItem>
-                <SelectItem value="Sales">Satış</SelectItem>
+                {departments?.map((d) => (
+                  <SelectItem key={d._id} value={d._id}>
+                    {d.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Person Search */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
               Personel Arama
             </label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder="Ad, soyad ara..."
                 value={person}
                 onChange={(e) => setPerson(e.target.value)}
-                className="pl-10 h-10"
+                className="pl-9 h-9"
               />
             </div>
           </div>
 
-          {/* Report Type */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-xs font-medium text-muted-foreground mb-1.5">
               Rapor Türü
             </label>
             <Select
               value={reportType}
               onValueChange={(v) => {
                 setReportType(v);
-                onFiltersChange({
-                  dateRange,
-                  department,
-                  person,
-                  reportType: v,
-                });
+                onFiltersChange({ dateRange, department, person, reportType: v });
               }}
             >
-              <SelectTrigger className="h-10">
+              <SelectTrigger className="h-9">
                 <SelectValue placeholder="Rapor türü" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="daily">📅 Günlük</SelectItem>
-                <SelectItem value="weekly">📆 Haftalık</SelectItem>
-                <SelectItem value="monthly">📊 Aylık</SelectItem>
-                <SelectItem value="custom">📋 Özel Aralık</SelectItem>
+                <SelectItem value="daily">Günlük</SelectItem>
+                <SelectItem value="weekly">Haftalık</SelectItem>
+                <SelectItem value="monthly">Aylık</SelectItem>
+                <SelectItem value="custom">Özel Aralık</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 pt-2">
-          <Button 
-            onClick={handleApplyFilters} 
-            className="bg-primary hover:bg-primary/90 text-white shadow-md hover:shadow-lg transition-all duration-200"
-          >
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button onClick={handleApplyFilters} size="sm">
             <Filter className="mr-2 h-4 w-4" />
             Filtreleri Uygula
           </Button>
-          
-          <Button 
-            variant="outline" 
-            className="border-primary text-primary hover:bg-primary/5"
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Hızlı Dışa Aktar
-          </Button>
-          
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               setDateRange({ from: undefined, to: undefined });
               setDepartment("all");
               setPerson("");
               setReportType("daily");
+              onFiltersChange({
+                dateRange: { from: undefined, to: undefined },
+                department: "all",
+                person: "",
+                reportType: "daily",
+              });
             }}
-            className="text-gray-600 hover:text-gray-800"
           >
             Filtreleri Temizle
           </Button>

@@ -19,13 +19,18 @@ async function sendResendEmail(params: {
   fromName?: string;
 }): Promise<{ success: boolean; error?: string }> {
   if (!RESEND_API_KEY) {
-    console.warn("RESEND_API_KEY ayarlı değil, email gönderimi atlanıyor");
-    return { success: true };
+    console.error("RESEND_API_KEY ayarlı değil — email gönderilemedi");
+    return {
+      success: false,
+      error: "Mail servisi yapılandırılmamış (RESEND_API_KEY eksik)",
+    };
   }
 
+  const defaultFromEmail = process.env.MAIL_FROM_EMAIL ?? "noreply@ngsplus.app";
+  const defaultFromName = process.env.MAIL_FROM_NAME ?? "NGS Access";
   const from = params.fromEmail
-    ? `${params.fromName ?? "NGS Access"} <${params.fromEmail}>`
-    : "NGS Access <noreply@ngsaccess.com>";
+    ? `${params.fromName ?? defaultFromName} <${params.fromEmail}>`
+    : `${defaultFromName} <${defaultFromEmail}>`;
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -82,11 +87,12 @@ export const sendEmployeeSetupEmail = action({
       });
     }
 
-    const setupUrl = `${process.env.CONVEX_SITE_URL ?? "http://localhost:5173"}/employee-setup?token=${setupToken}`;
+    const baseUrl = process.env.SITE_URL ?? process.env.CONVEX_SITE_URL ?? "http://localhost:5173";
+    const setupUrl = `${baseUrl}/employee-setup?token=${setupToken}`;
 
     const html = `
       <h2>Merhaba ${args.firstName} ${args.lastName},</h2>
-      <p>NGS Access sistemine hoş geldiniz. Hesabınızı aktif etmek için aşağıdaki linke tıklayın:</p>
+      <p>NGS Access mobil uygulaması için şifre belirleyin. Aşağıdaki linke tıklayın:</p>
       <p><a href="${setupUrl}" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;">Hesabı Aktif Et</a></p>
       <p>Bu link 7 gün geçerlidir.</p>
       <p>NGS Access Ekibi</p>
@@ -116,7 +122,8 @@ export const sendUserSetupEmail = action({
       fullName: args.fullName,
     });
 
-    const setupUrl = `${process.env.CONVEX_SITE_URL ?? "http://localhost:5173"}/user-setup?token=${setupToken}`;
+    const baseUrl = process.env.SITE_URL ?? process.env.CONVEX_SITE_URL ?? "http://localhost:5173";
+    const setupUrl = `${baseUrl}/user-setup?token=${setupToken}`;
 
     const html = `
       <h2>Merhaba ${args.fullName ?? args.email},</h2>

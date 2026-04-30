@@ -418,18 +418,10 @@ export const getRecentReadings = authedQuery({
       readings.map(async (r) => {
         const device = r.deviceId ? await ctx.db.get(r.deviceId) as Doc<"devices"> | null : null;
         return {
-          id: r._id,
-          access_time: r.accessTime,
-          access_granted: r.accessStatus === "izin_verildi",
-          card_no: r.cardNo,
-          employee_id: r.employeeId ?? null,
-          employee_name: r.employeeName ?? null,
-          device_id: r.deviceId?.toString() ?? "",
-          device_name: device?.name ?? "Bilinmeyen Cihaz",
-          device_location: "-",
-          device_ip: "-",
-          device_serial: "-",
-          status: r.accessStatus === "izin_verildi" ? "success" : r.accessStatus === "reddedildi" ? "denied" : "unknown",
+          ...r,
+          devices: device
+            ? { name: device.name, deviceSerial: device.deviceSerial }
+            : null,
         };
       })
     );

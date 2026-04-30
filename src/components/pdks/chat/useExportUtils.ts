@@ -5,7 +5,7 @@ import { MessageData } from './types';
 export function useExportUtils() {
   const { toast } = useToast();
 
-  const formatReportData = (data: any[]) => {
+  const formatReportData = <T extends { check_in?: string | Date | null; check_out?: string | Date | null }>(data: T[]) => {
     return data.map(record => {
       const checkInDate = record.check_in ? new Date(record.check_in) : null;
       const checkOutDate = record.check_out ? new Date(record.check_out) : null;

@@ -1,5 +1,5 @@
 
-import { TurkishNlpParser } from "./parsers/turkishNlpParser";
+import { TurkishNlpParser, type NaturalLanguageQuery } from "./parsers/turkishNlpParser";
 import { SqlQueryBuilder } from "./sqlQueryBuilder";
 import { MessageData } from "../types";
 
@@ -27,7 +27,7 @@ export class NaturalLanguageService {
       
       // SQL sorguları artık Convex üzerinden çalışmıyor
       // TODO: Convex action'a taşı
-      const resultArray: unknown[] = [];
+      const resultArray: Record<string, unknown>[] = [];
       
       // Sonuçları formatla
       const formattedData = this.formatResults(resultArray, nlQuery);
@@ -48,24 +48,24 @@ export class NaturalLanguageService {
     }
   }
 
-  private static formatResults(rawData: any[], nlQuery: any): MessageData[] {
+  private static formatResults(rawData: Record<string, unknown>[], _nlQuery: NaturalLanguageQuery): MessageData[] {
     if (!rawData || rawData.length === 0) {
       return [];
     }
 
     // Sonuçları MessageData formatına çevir
     return rawData.map(row => ({
-      name: row.employeeName || row.name || 'Bilinmeyen',
-      check_in: row.accessTime ? new Date(row.accessTime).toLocaleString('tr-TR') :
-                row.first_entry ? new Date(row.first_entry).toLocaleString('tr-TR') : '-',
-      check_out: null, // Çıkış verisi genelde ayrı bir kayıt
-      department: row.department || 'Belirtilmemiş',
-      device: row.deviceName || row.name || '-',
-      location: row.deviceName || row.name || '-'
+      name: String(row.employeeName ?? row.name ?? 'Bilinmeyen'),
+      check_in: row.accessTime ? new Date(row.accessTime as string | number | Date).toLocaleString('tr-TR') :
+                row.first_entry ? new Date(row.first_entry as string | number | Date).toLocaleString('tr-TR') : '-',
+      check_out: null,
+      department: String(row.department ?? 'Belirtilmemiş'),
+      device: String(row.deviceName ?? row.name ?? '-'),
+      location: String(row.deviceName ?? row.name ?? '-'),
     }));
   }
 
-  private static generateResponse(nlQuery: any, data: MessageData[]): string {
+  private static generateResponse(nlQuery: NaturalLanguageQuery, data: MessageData[]): string {
     const count = data.length;
     
     // Zaman aralığı metni
@@ -99,7 +99,7 @@ export class NaturalLanguageService {
     }
   }
 
-  private static getTimeRangeText(timeRange: any): string {
+  private static getTimeRangeText(timeRange: NaturalLanguageQuery["timeRange"]): string {
     switch (timeRange.type) {
       case 'today': return 'Bugün';
       case 'yesterday': return 'Dün';

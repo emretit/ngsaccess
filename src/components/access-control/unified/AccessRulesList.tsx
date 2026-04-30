@@ -8,6 +8,7 @@ import { Loader2, Plus, Users, Monitor, ChevronDown, ChevronUp, Edit, Trash2, Cl
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useLocationUtils } from "@/hooks/useLocationUtils";
+import type { AccessRule, GroupMember, GroupDevice } from "@/types/access-control";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +23,7 @@ import {
 
 interface AccessRulesListProps {
   onCreateRule: () => void;
-  onEditRule?: (rule: any) => void;
+  onEditRule?: (rule: AccessRule) => void;
 }
 
 const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => {
@@ -43,10 +44,10 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
   };
 
   const handleDeleteRule = (ruleId: string) => {
-    deleteAccessRule.mutate(ruleId as any);
+    deleteAccessRule.mutate(ruleId as AccessRule["_id"]);
   };
 
-  const handleEditRule = (rule: any) => {
+  const handleEditRule = (rule: AccessRule) => {
     if (onEditRule) {
       onEditRule(rule);
     }
@@ -71,7 +72,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
           Hata Oluştu
         </h3>
         <p className="text-gray-600 mb-4">
-          Erişim kuralları yüklenirken bir hata oluştu: {error.message}
+          Erişim kuralları yüklenirken bir hata oluştu: {String(error)}
         </p>
         <Button onClick={() => window.location.reload()}>
           Yeniden Dene
@@ -113,8 +114,8 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
     return days.map(day => dayMap[day] || day).join(', ');
   };
 
-  const renderEmployees = (rule: any) => {
-    const employees = rule.groupMembers?.map((gm: any) => gm.employees).filter(Boolean) || [];
+  const renderEmployees = (rule: AccessRule) => {
+    const employees = rule.groupMembers?.map((gm: GroupMember) => gm.employees).filter(Boolean) ?? [];
 
     if (employees.length === 0) {
       return (
@@ -131,7 +132,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
         <div className="flex flex-col">
           <span className="text-sm font-medium">{employees.length} çalışan</span>
           <span className="text-xs text-gray-500">
-            {employees.slice(0, 2).map((emp: any) => `${emp.firstName} ${emp.lastName}`).join(', ')}
+            {employees.slice(0, 2).map((emp) => `${emp?.firstName ?? ''} ${emp?.lastName ?? ''}`).join(', ')}
             {employees.length > 2 && ` +${employees.length - 2} diğer`}
           </span>
         </div>
@@ -139,8 +140,8 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
     );
   };
 
-  const renderDevices = (rule: any) => {
-    const devices = rule.groupDevices?.map((gd: any) => gd.devices).filter(Boolean) || [];
+  const renderDevices = (rule: AccessRule) => {
+    const devices = rule.groupDevices?.map((gd: GroupDevice) => gd.devices).filter(Boolean) ?? [];
 
     if (devices.length === 0) {
       return (
@@ -157,7 +158,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
         <div className="flex flex-col">
           <span className="text-sm font-medium">{devices.length} cihaz</span>
           <span className="text-xs text-gray-500">
-            {devices.slice(0, 2).map((device: any) => device.name).join(', ')}
+            {devices.slice(0, 2).map((device) => device?.name ?? '').join(', ')}
             {devices.length > 2 && ` +${devices.length - 2} diğer`}
           </span>
         </div>
@@ -179,7 +180,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
       </div>
 
       <div className="space-y-4">
-        {rules.map((rule: any) => {
+        {(rules as unknown as AccessRule[]).map((rule) => {
           const ruleId = String(rule._id);
           return (
             <Card key={ruleId} className="border border-gray-200 hover:shadow-md transition-shadow">
@@ -311,8 +312,8 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                         <div>
                           <h4 className="text-sm font-semibold text-gray-900 mb-3">Çalışanlar</h4>
                           <div className="space-y-2">
-                            {rule.groupMembers?.length > 0 ? (
-                              rule.groupMembers.map((gm: any, index: number) => (
+                            {(rule.groupMembers?.length ?? 0) > 0 ? (
+                              rule.groupMembers!.map((gm: GroupMember, index: number) => (
                                 <div key={index} className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
                                   <Users className="h-4 w-4 text-blue-500" />
                                   <span className="text-sm">{gm.employees?.firstName} {gm.employees?.lastName}</span>
@@ -327,8 +328,8 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                         <div>
                           <h4 className="text-sm font-semibold text-gray-900 mb-3">Cihazlar</h4>
                           <div className="space-y-2">
-                            {rule.groupDevices?.length > 0 ? (
-                              rule.groupDevices.map((gd: any, index: number) => (
+                            {(rule.groupDevices?.length ?? 0) > 0 ? (
+                              rule.groupDevices!.map((gd: GroupDevice, index: number) => (
                                 <div key={index} className="flex items-center gap-2 p-2 bg-green-50 rounded-lg">
                                   <Monitor className="h-4 w-4 text-green-500" />
                                   <div>

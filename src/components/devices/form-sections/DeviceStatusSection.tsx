@@ -3,9 +3,10 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { UseFormReturn } from "react-hook-form";
+import type { FormValues } from "../hooks/useDeviceFormSchema";
 
 interface DeviceStatusSectionProps {
-  form: UseFormReturn<any>;
+  form: UseFormReturn<FormValues>;
 }
 
 export function DeviceStatusSection({ form }: DeviceStatusSectionProps) {

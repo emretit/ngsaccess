@@ -40,7 +40,7 @@ export function EmployeeBulkActions({
         </SelectTrigger>
         <SelectContent>
           {departments.map(dept => (
-            dept && <SelectItem key={dept.id} value={dept.id.toString()}>{dept.name}</SelectItem>
+            dept && <SelectItem key={dept._id} value={String(dept._id)}>{dept.name}</SelectItem>
           ))}
         </SelectContent>
       </Select>

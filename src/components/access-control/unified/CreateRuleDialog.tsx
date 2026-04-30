@@ -7,11 +7,12 @@ import { RuleBasicInfo } from "./components/RuleBasicInfo";
 import { DepartmentTree } from "./components/DepartmentTree";
 import { ZoneDeviceTree } from "./components/ZoneDeviceTree";
 import { TimeSchedule } from "./components/TimeSchedule";
+import type { AccessRule } from "@/types/access-control";
 
 interface CreateRuleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  editingRule?: any;
+  editingRule?: AccessRule | null;
   onClose: () => void;
 }
 

@@ -78,7 +78,7 @@ Modern ve kullanıcı dostu bir Flutter uygulaması ile QR kod tabanlı yoklama 
 
 ### Bağımlılıklar
 Güncel sürümler için [pubspec.yaml](pubspec.yaml) dosyasına bakın. Öne çıkan paketler:
-- `convex_flutter` — Convex backend istemcisi
+- `http` — Convex HTTP API istemcisi
 - `provider` — state management
 - `shared_preferences` — yerel oturum
 - `mobile_scanner` — QR tarama

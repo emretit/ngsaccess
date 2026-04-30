@@ -26,7 +26,7 @@ const LoginForm = () => {
       if (error) {
         toast({
           title: "Giriş hatası",
-          description: error.message || "Giriş yapılırken bir hata oluştu.",
+          description: (error as Error)?.message ?? "Giriş yapılırken bir hata oluştu.",
           variant: "destructive",
         });
         return;

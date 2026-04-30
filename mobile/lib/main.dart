@@ -40,10 +40,7 @@ class MyApp extends StatelessWidget {
             darkTheme: AppTheme.darkTheme,
             themeMode: ThemeMode.system,
             locale: const Locale('tr', 'TR'),
-            supportedLocales: const [
-              Locale('tr', 'TR'),
-              Locale('en', 'US'),
-            ],
+            supportedLocales: const [Locale('tr', 'TR'), Locale('en', 'US')],
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
@@ -55,4 +52,4 @@ class MyApp extends StatelessWidget {
       ),
     );
   }
-} 
+}

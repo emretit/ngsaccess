@@ -76,3 +76,6 @@ build/
 
 # Local Netlify folder
 .netlify
+
+# Reference docs (binary)
+*.pdf

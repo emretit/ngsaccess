@@ -1,186 +1,127 @@
-
 import { useState, useEffect } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Building, Users, Clock, AlertTriangle, Wifi, WifiOff } from "lucide-react";
+import { Building, Clock, Wifi, WifiOff } from "lucide-react";
+import { format } from "date-fns";
+import { tr } from "date-fns/locale";
 
 export function PDKSRealTimeWidget() {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [isConnected, setIsConnected] = useState(true);
 
-  // Update time every second
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
-
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Mock connection status toggle (simulates real connection monitoring)
-  useEffect(() => {
-    const connectionCheck = setInterval(() => {
-      setIsConnected(prev => Math.random() > 0.1 ? true : prev); // 90% uptime simulation
-    }, 5000);
+  const inside = useQuery(api.dashboard.getCurrentlyInside, {});
+  const recent = useQuery(api.dashboard.getRecentReadings, { limit: 8 });
 
-    return () => clearInterval(connectionCheck);
-  }, []);
-
-  // Mock real-time data
-  const realTimeData = {
-    currentlyInside: 42,
-    totalCapacity: 150,
-    todayEntries: 138,
-    todayExits: 96,
-    afterHoursAlerts: 2,
-    lastActivity: "2 dk önce",
-    recentActivities: [
-      { name: "Ahmet Yılmaz", action: "Gidiş", time: "18:23" },
-      { name: "Fatma Demir", action: "Giriş", time: "18:20" },
-      { name: "Mehmet Özkan", action: "Gidiş", time: "18:18" },
-    ]
-  };
-
-  const occupancyPercentage = (realTimeData.currentlyInside / realTimeData.totalCapacity) * 100;
+  const isConnected = inside !== undefined && recent !== undefined;
+  const insideCount = inside?.length ?? 0;
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      {/* Connection Status */}
-      <Card className="border-0 shadow-lg bg-linear-to-br from-white to-gray-50 hover:shadow-xl transition-all duration-300">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Card className="border border-border shadow-sm md:col-span-1">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center justify-between">
+          <CardTitle className="text-base flex items-center justify-between">
             <span className="flex items-center gap-2">
-              <Building className="h-5 w-5 text-primary" />
-              Canlı Takip
+              <Building className="h-4 w-4 text-primary" />
+              Canlı Durum
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               {isConnected ? (
                 <Wifi className="h-4 w-4 text-green-500" />
               ) : (
-                <WifiOff className="h-4 w-4 text-red-500" />
+                <WifiOff className="h-4 w-4 text-muted-foreground" />
               )}
-              <Badge variant={isConnected ? "default" : "destructive"} className="text-xs">
-                {isConnected ? "Bağlı" : "Bağlantı Yok"}
+              <Badge
+                variant={isConnected ? "default" : "secondary"}
+                className="text-[10px] px-1.5 py-0"
+              >
+                {isConnected ? "Bağlı" : "Bekleniyor"}
               </Badge>
             </div>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Current Time */}
-          <div className="text-center p-4 bg-linear-to-r from-primary to-primary/80 rounded-xl text-white shadow-lg">
-            <div className="text-2xl font-bold font-mono">
-              {currentTime.toLocaleTimeString('tr-TR', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                second: '2-digit'
+          <div className="text-center p-4 bg-primary text-primary-foreground rounded-lg">
+            <div className="text-2xl font-bold font-mono tracking-wide">
+              {currentTime.toLocaleTimeString("tr-TR", {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
               })}
             </div>
-            <div className="text-sm opacity-80 mt-1">
-              {currentTime.toLocaleDateString('tr-TR', { 
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
+            <div className="text-xs opacity-80 mt-1">
+              {currentTime.toLocaleDateString("tr-TR", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
               })}
             </div>
           </div>
 
-          {/* Current Occupancy */}
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-700">Şu An İçeride</span>
-              <span className="text-2xl font-bold text-primary">
-                {realTimeData.currentlyInside}
-              </span>
-            </div>
-            
-            {/* Occupancy Bar */}
-            <div className="relative w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-              <div 
-                className="bg-linear-to-r from-primary to-primary/80 h-3 rounded-full transition-all duration-500 relative"
-                style={{ width: `${occupancyPercentage}%` }}
-              >
-                <div className="absolute inset-0 bg-white/20 animate-pulse rounded-full"></div>
-              </div>
-            </div>
-            
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>0</span>
-              <span className="font-medium">{occupancyPercentage.toFixed(1)}% doluluk</span>
-              <span>{realTimeData.totalCapacity}</span>
-            </div>
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground mb-1">Şu An İçeride</div>
+            <div className="text-4xl font-bold text-primary">{insideCount}</div>
+            <div className="text-xs text-muted-foreground mt-1">çalışan</div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Today's Summary */}
-      <Card className="border-0 shadow-lg bg-linear-to-br from-white to-gray-50 hover:shadow-xl transition-all duration-300">
+      <Card className="border border-border shadow-sm md:col-span-2">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">📊 Günlük Özet</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-linear-to-br from-green-50 to-green-100 p-3 rounded-lg text-center hover:from-green-100 hover:to-green-200 transition-all duration-200">
-              <div className="text-lg font-bold text-green-700">{realTimeData.todayEntries}</div>
-              <div className="text-xs text-green-600 font-medium">Giriş</div>
-            </div>
-            <div className="bg-linear-to-br from-blue-50 to-blue-100 p-3 rounded-lg text-center hover:from-blue-100 hover:to-blue-200 transition-all duration-200">
-              <div className="text-lg font-bold text-blue-700">{realTimeData.todayExits}</div>
-              <div className="text-xs text-blue-600 font-medium">Çıkış</div>
-            </div>
-          </div>
-          
-          {realTimeData.afterHoursAlerts > 0 && (
-            <div className="bg-red-50 border border-red-200 p-3 rounded-lg hover:bg-red-100 transition-colors">
-              <div className="flex items-center gap-2 text-red-700">
-                <AlertTriangle className="h-4 w-4" />
-                <span className="text-sm font-medium">
-                  {realTimeData.afterHoursAlerts} mesai dışı uyarı
-                </span>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Recent Activity */}
-      <Card className="border-0 shadow-lg bg-linear-to-br from-white to-gray-50 hover:shadow-xl transition-all duration-300">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Clock className="h-5 w-5 text-primary" />
+          <CardTitle className="text-base flex items-center gap-2">
+            <Clock className="h-4 w-4 text-primary" />
             Son Hareketler
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {realTimeData.recentActivities.map((activity, index) => (
-              <div 
-                key={index}
-                className="flex justify-between items-center p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200 cursor-pointer"
-              >
-                <div>
-                  <div className="text-sm font-medium text-gray-800">
-                    {activity.name}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {activity.time}
-                  </div>
-                </div>
-                <Badge 
-                  variant={activity.action === 'Giriş' ? 'default' : 'secondary'}
-                  className="text-xs"
-                >
-                  {activity.action}
-                </Badge>
-              </div>
-            ))}
-          </div>
-          
-          <div className="mt-4 pt-3 border-t border-gray-200">
-            <div className="text-center text-xs text-gray-500">
-              Son güncelleme: {realTimeData.lastActivity}
+          {recent === undefined ? (
+            <div className="text-sm text-muted-foreground text-center py-6">
+              Yükleniyor...
             </div>
-          </div>
+          ) : recent.length === 0 ? (
+            <div className="text-sm text-muted-foreground text-center py-6">
+              Henüz hareket yok.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {recent.map((r) => {
+                const granted = r.accessStatus === "izin_verildi";
+                const time = format(new Date(r.accessTime), "HH:mm", { locale: tr });
+                const date = format(new Date(r.accessTime), "dd MMM", { locale: tr });
+                return (
+                  <div
+                    key={r._id}
+                    className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium truncate">
+                        {r.employeeName ?? r.cardNo ?? "Bilinmiyor"}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {r.devices?.name ?? "Cihaz"} · {date}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 ml-2">
+                      <span className="text-xs font-mono text-muted-foreground">
+                        {time}
+                      </span>
+                      <Badge
+                        variant={granted ? "default" : "destructive"}
+                        className="text-[10px] px-1.5 py-0"
+                      >
+                        {granted ? "İzinli" : "Reddedildi"}
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -4,8 +4,9 @@ import { useAccessRuleMutations } from "./access-rules/useAccessRuleMutations";
 import { useGroupMemberMutations } from "./access-rules/useGroupMemberMutations";
 import { useGroupDeviceMutations } from "./access-rules/useGroupDeviceMutations";
 import { useComplexAccessRuleMutations } from "./access-rules/useComplexAccessRuleMutations";
+import type { Id } from "../../convex/_generated/dataModel";
 
-export const useAccessRules = (projectId?: any) => {
+export const useAccessRules = (projectId?: Id<"projects">) => {
   const { data: accessRules, isLoading, error } = useAccessRulesQuery(projectId);
   
   const {

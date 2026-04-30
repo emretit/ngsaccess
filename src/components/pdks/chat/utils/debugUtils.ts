@@ -40,7 +40,7 @@ export function logInfo(message: string, data?: unknown): void {
  * @param obj - Object to format
  * @returns Formatted string
  */
-export function formatObject(obj: Record<string, any>): string {
+export function formatObject(obj: Record<string, unknown>): string {
   try {
     return JSON.stringify(obj, null, 2);
   } catch (e) {

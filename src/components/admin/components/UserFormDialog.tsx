@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import type { Id } from '../../../../convex/_generated/dataModel';
 import { User, UserFormData, Project } from '../types/user-types';
 
 interface UserFormDialogProps {
@@ -87,7 +88,7 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
               <Select 
                 value={formData.projectId != null ? String(formData.projectId) : ""} 
                 onValueChange={(value) => 
-                  onFormDataChange({ ...formData, projectId: value || undefined })}
+                  onFormDataChange({ ...formData, projectId: value ? (value as Id<"projects">) : undefined })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Proje seçin" />

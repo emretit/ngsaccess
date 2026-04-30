@@ -42,10 +42,10 @@ export default function ProfileForm({ email, fullName, role, userId, onProfileUp
         description: "Profil bilgileriniz başarıyla güncellendi.",
       });
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Hata",
-        description: error.message || "Profil güncellenirken bir hata oluştu.",
+        description: (error as Error)?.message ?? "Profil güncellenirken bir hata oluştu.",
         variant: "destructive",
       });
     } finally {

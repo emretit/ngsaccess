@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAccessRules } from "@/hooks/useAccessRules";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
 import type { Id } from "../../../../../convex/_generated/dataModel";
+import type { AccessRule, GroupMember, GroupDevice } from "@/types/access-control";
 
 interface RuleFormData {
   name: string;
@@ -20,7 +21,7 @@ interface RuleFormData {
   priority: number;
 }
 
-export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void) => {
+export const useRuleForm = (editingRule: AccessRule | null | undefined, open: boolean, onClose: () => void) => {
   const { toast } = useToast();
   const { projectIds } = useProjectAccess();
   const { createAccessRuleWithMembers, updateAccessRuleWithAdditionalMembers } = useAccessRules();
@@ -46,14 +47,14 @@ export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void
       if (editingRule) {
         // Convex returns camelCase: employeeId, deviceId
         const employeeIds = editingRule.groupMembers
-          ?.map((gm: any) => String(gm.employeeId || '')).filter(Boolean) || [];
+          ?.map((gm: GroupMember) => String(gm.employeeId || '')).filter(Boolean) ?? [];
         const deviceIds = editingRule.groupDevices
-          ?.map((gd: any) => String(gd.deviceId || '')).filter(Boolean) || [];
+          ?.map((gd: GroupDevice) => String(gd.deviceId || '')).filter(Boolean) ?? [];
 
         setFormData({
           name: editingRule.name || '',
           description: editingRule.description || '',
-          target_type: editingRule.targetType || 'individual',
+          target_type: (editingRule.targetType as RuleFormData['target_type'] | undefined) ?? 'individual',
           selected_employees: employeeIds,
           selected_devices: deviceIds,
           selected_zones: [],
@@ -61,7 +62,7 @@ export const useRuleForm = (editingRule: any, open: boolean, onClose: () => void
           start_time: editingRule.startTime || '',
           end_time: editingRule.endTime || '',
           days: editingRule.days || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
-          access_direction: editingRule.accessDirection || 'both',
+          access_direction: (editingRule.accessDirection as RuleFormData['access_direction'] | undefined) ?? 'both',
           priority: editingRule.priority || 100,
         });
       } else {

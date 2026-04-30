@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, Mail, Calendar, FileText, FileSpreadsheet, FileType } from "lucide-react";
+import { Download, FileText, FileSpreadsheet, FileType } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,7 +16,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { exportToExcel, exportToCsv, exportToPdf, type PDKSExportRecord } from "@/utils/pdksExport";
+import {
+  exportToExcel,
+  exportToCsv,
+  exportToPdf,
+  type PDKSExportRecord,
+} from "@/utils/pdksExport";
 import { format as formatDate } from "date-fns";
 import { tr } from "date-fns/locale";
 
@@ -32,14 +37,16 @@ export function PDKSEnhancedExportPanel({
   selectedDate = new Date(),
 }: PDKSEnhancedExportPanelProps) {
   const [isExporting, setIsExporting] = useState(false);
-  const [exportFormat, setExportFormat] = useState<"daily" | "weekly" | "monthly" | "custom">("daily");
+  const [exportFormat, setExportFormat] = useState<
+    "daily" | "weekly" | "monthly" | "custom"
+  >("daily");
   const { toast } = useToast();
 
   const handleExport = async (exportType: "Excel" | "PDF" | "CSV") => {
     setIsExporting(true);
-
     try {
-      const rangeLabel = dateRange || formatDate(selectedDate, "dd-MM-yyyy", { locale: tr });
+      const rangeLabel =
+        dateRange || formatDate(selectedDate, "dd-MM-yyyy", { locale: tr });
 
       if (exportType === "Excel") {
         await exportToExcel(records, { dateRange: rangeLabel });
@@ -51,9 +58,9 @@ export function PDKSEnhancedExportPanel({
 
       toast({
         title: "Dışa Aktarma Tamamlandı",
-        description: `Rapor ${exportType} formatında başarıyla oluşturuldu.`,
+        description: `Rapor ${exportType} formatında oluşturuldu.`,
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Hata",
         description: "Dışa aktarma sırasında bir hata oluştu.",
@@ -64,36 +71,19 @@ export function PDKSEnhancedExportPanel({
     }
   };
 
-  const handleEmailReport = () => {
-    toast({
-      title: "Email Gönderildi",
-      description: "Rapor belirlenen email adreslerine gönderildi.",
-    });
-  };
-
-  const handleScheduleReport = () => {
-    toast({
-      title: "Rapor Zamanlandı",
-      description: "Otomatik rapor zamanlaması ayarlandı.",
-    });
-  };
-
   return (
-    <div className="space-y-4">
-      <Card className="border-0 shadow-lg bg-linear-to-br from-background to-muted/50">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Download className="h-5 w-5 text-primary" />
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <Card className="border border-border shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Download className="h-4 w-4 text-primary" />
             Hızlı Dışa Aktarma
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button 
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
-                disabled={isExporting}
-              >
+              <Button className="w-full" disabled={isExporting}>
                 <Download className="mr-2 h-4 w-4" />
                 {isExporting ? "Dışa Aktarılıyor..." : "Rapor İndir"}
               </Button>
@@ -113,74 +103,37 @@ export function PDKSEnhancedExportPanel({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-
-          <div className="grid grid-cols-2 gap-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleEmailReport}
-              className="border-primary text-primary hover:bg-primary/5"
-            >
-              <Mail className="mr-1 h-3 w-3" />
-              Email
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleScheduleReport}
-              className="border-primary text-primary hover:bg-primary/5"
-            >
-              <Calendar className="mr-1 h-3 w-3" />
-              Zamanla
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-0 shadow-lg bg-linear-to-br from-background to-muted/50">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg">Rapor Formatı</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-muted-foreground mb-2">Zaman Aralığı</label>
-            <Select value={exportFormat} onValueChange={(v) => setExportFormat(v as typeof exportFormat)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="daily">Günlük Özet</SelectItem>
-                <SelectItem value="weekly">Haftalık Analiz</SelectItem>
-                <SelectItem value="monthly">Aylık Rapor</SelectItem>
-                <SelectItem value="custom">Özel Aralık</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <p className="text-xs text-muted-foreground">
-            {records.length} kayıt dışa aktarılacak
+            {records.length} kayıt dışa aktarılacak.
           </p>
         </CardContent>
       </Card>
 
-      <Card className="border-0 shadow-lg bg-linear-to-br from-background to-muted/50">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-lg">Son Dışa Aktarmalar</CardTitle>
+      <Card className="border border-border shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Rapor Formatı</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <div className="flex justify-between">
-              <span>Günlük Rapor - 30.06.2025</span>
-              <span className="text-green-600">✓</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Haftalık Özet - 29.06.2025</span>
-              <span className="text-green-600">✓</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Departman Analizi - 28.06.2025</span>
-              <span className="text-green-600">✓</span>
-            </div>
-          </div>
+        <CardContent className="space-y-2">
+          <label className="block text-xs font-medium text-muted-foreground">
+            Zaman Aralığı
+          </label>
+          <Select
+            value={exportFormat}
+            onValueChange={(v) => setExportFormat(v as typeof exportFormat)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="daily">Günlük Özet</SelectItem>
+              <SelectItem value="weekly">Haftalık Analiz</SelectItem>
+              <SelectItem value="monthly">Aylık Rapor</SelectItem>
+              <SelectItem value="custom">Özel Aralık</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground pt-1">
+            Bu seçim filtre çubuğundaki rapor türü ile bağımsız çalışır.
+          </p>
         </CardContent>
       </Card>
     </div>

@@ -1,7 +1,11 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
-import { authedQuery, authedMutation } from "./lib/customFunctions";
+import {
+  authedQuery,
+  employeeAuthedQuery,
+  employeeAuthedMutation,
+} from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import { Doc } from "./_generated/dataModel";
 
@@ -87,18 +91,8 @@ export const list = authedQuery({
         }
         return {
           ...r,
-          id: r._id,
-          employee_name: r.employeeName ?? null,
-          card_no: r.cardNo,
-          access_time: r.accessTime,
-          access_granted: r.accessStatus === "izin_verildi",
-          status: r.accessStatus === "izin_verildi" ? "success" : "denied",
-          device_name: device?.name ?? "Bilinmeyen Cihaz",
-          device_serial: device?.deviceSerial ?? "-",
-          device_location: "-",
-          device_ip: device?.deviceIp ?? "-",
           devices: device
-            ? { name: device.name, device_serial: device.deviceSerial }
+            ? { name: device.name, deviceSerial: device.deviceSerial }
             : null,
           employees: employee
             ? {
@@ -181,30 +175,49 @@ export const getPdksTableData = authedQuery({
     }
 
     let readings;
+    let employees: Doc<"employees">[];
     if (ctx.user.role === "super_admin") {
-      readings = await ctx.db
-        .query("cardReadings")
-        .withIndex("by_access_time")
-        .filter((q) =>
-          q.and(q.gte(q.field("accessTime"), startISO), q.lte(q.field("accessTime"), endISO))
-        )
-        .collect();
+      [readings, employees] = await Promise.all([
+        ctx.db
+          .query("cardReadings")
+          .withIndex("by_access_time")
+          .filter((q) =>
+            q.and(q.gte(q.field("accessTime"), startISO), q.lte(q.field("accessTime"), endISO))
+          )
+          .collect(),
+        ctx.db
+          .query("employees")
+          .filter((q) => q.eq(q.field("isActive"), true))
+          .collect(),
+      ]);
     } else if (allowedProjectIds.length > 0) {
-      const results = await Promise.all(
-        allowedProjectIds.map((pid) =>
-          ctx.db
-            .query("cardReadings")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .filter((q) =>
-              q.and(
-                q.gte(q.field("accessTime"), startISO),
-                q.lte(q.field("accessTime"), endISO)
+      const [readingResults, empResults] = await Promise.all([
+        Promise.all(
+          allowedProjectIds.map((pid) =>
+            ctx.db
+              .query("cardReadings")
+              .withIndex("by_project", (q) => q.eq("projectId", pid))
+              .filter((q) =>
+                q.and(
+                  q.gte(q.field("accessTime"), startISO),
+                  q.lte(q.field("accessTime"), endISO)
+                )
               )
-            )
-            .collect()
-        )
-      );
-      readings = results.flat();
+              .collect()
+          )
+        ),
+        Promise.all(
+          allowedProjectIds.map((pid) =>
+            ctx.db
+              .query("employees")
+              .withIndex("by_project", (q) => q.eq("projectId", pid))
+              .filter((q) => q.eq(q.field("isActive"), true))
+              .collect()
+          )
+        ),
+      ]);
+      readings = readingResults.flat();
+      employees = empResults.flat();
     } else {
       return [];
     }
@@ -213,11 +226,27 @@ export const getPdksTableData = authedQuery({
       (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
     );
 
+    const empById = new Map<string, Doc<"employees">>();
+    const empByCard = new Map<string, Doc<"employees">>();
+    for (const emp of employees) {
+      empById.set(String(emp._id), emp);
+      if (emp.cardNumber) empByCard.set(emp.cardNumber, emp);
+    }
+
     const employeeMap = new Map<string, typeof readings>();
+    for (const emp of employees) {
+      employeeMap.set(String(emp._id), []);
+    }
+
     for (const r of readings) {
-      const key = r.employeeId ?? r.cardNo;
-      if (!employeeMap.has(key)) employeeMap.set(key, []);
-      employeeMap.get(key)!.push(r);
+      let empKey: string | null = null;
+      if (r.employeeId && empById.has(String(r.employeeId))) {
+        empKey = String(r.employeeId);
+      } else if (r.cardNo && empByCard.has(r.cardNo)) {
+        empKey = String(empByCard.get(r.cardNo)!._id);
+      }
+      if (!empKey) continue;
+      employeeMap.get(empKey)!.push(r);
     }
 
     const STANDARD_DAY_MINUTES = 8 * 60;
@@ -238,24 +267,30 @@ export const getPdksTableData = authedQuery({
 
     const tableData = await Promise.all(
       Array.from(employeeMap.entries()).map(async ([empKey, empReadings]) => {
-        const first = empReadings[0];
-        const employee = first.employeeId ? await ctx.db.get(first.employeeId) as Doc<"employees"> | null : null;
+        const employee = empById.get(empKey) ?? null;
         const department = employee?.departmentId
           ? await ctx.db.get(employee.departmentId) as Doc<"departments"> | null
           : null;
 
-        const empId = first.employeeId;
-        const dateKeys = [...new Set(empReadings.map((r) => r.accessTime.split("T")[0]))];
+        const empId = employee?._id;
+        const periodDateKeys: string[] = [];
+        for (
+          let d = new Date(startISO);
+          d <= new Date(endISO);
+          d.setDate(d.getDate() + 1)
+        ) {
+          periodDateKeys.push(d.toISOString().split("T")[0]);
+        }
         const hasLeave = empId
           ? allLeaves.some((l) => {
               if (l.employeeId !== empId) return false;
-              return dateKeys.some((dk) => dk >= l.startDate && dk <= l.endDate);
+              return periodDateKeys.some((dk) => dk >= l.startDate && dk <= l.endDate);
             })
           : false;
         const leaveRecord = empId
           ? allLeaves.find((l) => {
               if (l.employeeId !== empId) return false;
-              return dateKeys.some((dk) => dk >= l.startDate && dk <= l.endDate);
+              return periodDateKeys.some((dk) => dk >= l.startDate && dk <= l.endDate);
             })
           : null;
         const leaveType = leaveRecord ? leaveTypeLabels[leaveRecord.leaveType] ?? leaveRecord.leaveType : "-";
@@ -309,9 +344,11 @@ export const getPdksTableData = authedQuery({
 
         return {
           id: empKey,
-          name: first.employeeName ?? (employee ? `${employee.firstName} ${employee.lastName}` : "Bilinmiyor"),
-          employeeId: empKey,
-          department: department?.name ?? "Bilinmiyor",
+          name: employee
+            ? `${employee.firstName} ${employee.lastName}`.trim()
+            : "Bilinmiyor",
+          employeeId: employee?.cardNumber ?? empKey,
+          department: department?.name ?? "-",
           firstEntry: firstEntry
             ? new Date(firstEntry.accessTime).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
             : "-",
@@ -335,7 +372,7 @@ export const getPdksTableData = authedQuery({
       })
     );
 
-    return tableData;
+    return tableData.sort((a, b) => a.name.localeCompare(b.name, "tr"));
   },
 });
 
@@ -502,14 +539,14 @@ export const getPdksChartData = authedQuery({
 
     const departmentAbsence = Array.from(departmentAbsenceMap.entries()).map(([name, value]) => ({
       name,
-      devamsızlık: value,
+      absences: value,
     }));
 
     const lateDistribution = Array.from(lateByHourMap.entries())
       .sort(([a], [b]) => a - b)
       .map(([hour, count]) => ({
-        saat: `${hour}:00`,
-        sayı: count,
+        hour: `${hour}:00`,
+        count,
       }));
 
     for (const r of readings) {
@@ -735,20 +772,14 @@ export const processCardReading = internalMutation({
 
 /**
  * Mobile uygulama için: oturum açmış çalışanın kendi son kart okumalarını döner.
- * Çalışan kaydı `users.email` ile `employees.email` üzerinden eşlenir.
+ * `employeeAuthedQuery` `sessionToken` arg'ını otomatik ekler ve
+ * `ctx.employee`'yi enjekte eder — `users` tablosuyla ilişki yok.
  */
-export const listForEmployee = authedQuery({
+export const listForEmployee = employeeAuthedQuery({
   args: { limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const limit = args.limit ?? 50;
-    const userEmail = ctx.user.email;
-    if (!userEmail) return [];
-
-    const employee = await ctx.db
-      .query("employees")
-      .withIndex("by_email", (q) => q.eq("email", userEmail))
-      .first();
-    if (!employee) return [];
+    const employee = ctx.employee;
 
     const readings = await ctx.db
       .query("cardReadings")
@@ -778,31 +809,17 @@ export const listForEmployee = authedQuery({
 });
 
 /**
- * Mobile QR check-in. Auth'lu kullanıcı, çalışan kaydını email üzerinden alır,
- * QR'dan gelen `deviceId` veya `deviceSerial` ile cihazı bulur, erişim kuralını
- * değerlendirir ve `cardReadings` tablosuna kayıt atar.
+ * Mobile QR check-in. `employeeAuthedMutation` üzerinden çalışana doğrudan
+ * `ctx.employee` ile erişir; QR'dan gelen `deviceId` / `deviceSerial` ile
+ * cihazı bulur, erişim kuralını değerlendirir ve kayıt atar.
  */
-export const selfCheckIn = authedMutation({
+export const selfCheckIn = employeeAuthedMutation({
   args: {
     deviceId: v.optional(v.id("devices")),
     deviceSerial: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userEmail = ctx.user.email;
-    if (!userEmail) {
-      throw new Error("Hesabınız e-posta ile eşleşmiyor");
-    }
-
-    const employee = await ctx.db
-      .query("employees")
-      .withIndex("by_email", (q) => q.eq("email", userEmail))
-      .first();
-    if (!employee) {
-      throw new Error("Çalışan kaydı bulunamadı");
-    }
-    if (employee.isActive === false) {
-      throw new Error("Çalışan kaydı aktif değil");
-    }
+    const employee = ctx.employee;
 
     let device: Doc<"devices"> | null = null;
     if (args.deviceId) {

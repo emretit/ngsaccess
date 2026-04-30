@@ -3,35 +3,34 @@ import { useMutation, useAction } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { toast } from "@/hooks/use-toast";
 import { Id } from "../../../../convex/_generated/dataModel";
+import { Employee } from "@/types/employee";
+import { EmployeeFormData } from "./useEmployeeFormData";
 
-export interface EmployeeFormData {
-  firstName: string;
-  lastName: string;
-  email: string;
-  tcNo: string;
-  cardNumber: string;
-  companyId: string | null;
-  departmentId: string | null;
-  positionId: string | null;
-  accessRuleId: string | null;
-  shiftId: string | null;
-  shift: string | null;
-  photoUrl: string | null;
-  notes: string;
-  isActive: boolean;
-  projectId?: Id<"projects">;
-}
+export type { EmployeeFormData };
 
-interface EmployeeInput {
-  _id?: Id<"employees">;
-  firstName?: string;
-  lastName?: string;
-}
+const errorMessage = (err: unknown, fallback = "Bir hata oluştu"): string =>
+  err instanceof Error ? err.message : typeof err === "string" ? err : fallback;
+
+const reportSyncResult = (synced: number, failed: number) => {
+  if (synced > 0) {
+    toast({
+      title: "Cihaz Senkronizasyonu",
+      description: `${synced} cihaza senkronize edildi`,
+    });
+  }
+  if (failed > 0) {
+    toast({
+      title: "Senkronizasyon Uyarısı",
+      description: `${failed} cihaza gönderilemedi`,
+      variant: "destructive",
+    });
+  }
+};
 
 export const useEmployeeFormSubmit = (
-  employee: EmployeeInput | null | undefined,
+  employee: Pick<Employee, "_id"> | null | undefined,
   onClose: () => void,
-  onSave: (employee: unknown) => void
+  onSave: (payload?: unknown) => void
 ) => {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -39,6 +38,10 @@ export const useEmployeeFormSubmit = (
   const updateEmployee = useMutation(api.employees.update);
   const sendSetupEmail = useAction(api.actions.sendEmail.sendEmployeeSetupEmail);
   const syncToDevices = useAction(api.actions.hikvisionSync.syncEmployeeToDevices);
+
+  // Form gönderildiği anda employee._id'yi snapshot al — sheet kapanırken
+  // parent state temizlenirse closure'daki employee null olabilir.
+  const editingId = employee?._id;
 
   const handleSubmit = async (formData: EmployeeFormData) => {
     if (isLoading) return;
@@ -66,72 +69,58 @@ export const useEmployeeFormSubmit = (
         return;
       }
 
-      if (employee?._id) {
+      const sharedPayload = {
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        email: formData.email.trim().toLowerCase(),
+        tcNo: formData.tcNo.trim(),
+        cardNumber: formData.cardNumber.trim(),
+        companyId: (formData.companyId ?? undefined) as Id<"companies"> | undefined,
+        departmentId: (formData.departmentId ?? undefined) as Id<"departments"> | undefined,
+        positionId: (formData.positionId ?? undefined) as Id<"positions"> | undefined,
+        accessRuleId: (formData.accessRuleId ?? undefined) as Id<"accessRules"> | undefined,
+        shiftId: (formData.shiftId ?? undefined) as Id<"shifts"> | undefined,
+        shift: formData.shift ?? undefined,
+        photoUrl: formData.photoUrl ?? undefined,
+        notes: formData.notes?.trim() ?? undefined,
+        isActive: formData.isActive ?? true,
+      };
+
+      if (editingId) {
         // Update
         await updateEmployee({
-          employeeId: employee._id,
-          firstName: formData.firstName.trim(),
-          lastName: formData.lastName.trim(),
-          email: formData.email.trim().toLowerCase(),
-          tcNo: formData.tcNo.trim(),
-          cardNumber: formData.cardNumber.trim(),
-          companyId: (formData.companyId ?? undefined) as Id<"companies"> | undefined,
-          departmentId: (formData.departmentId ?? undefined) as Id<"departments"> | undefined,
-          positionId: (formData.positionId ?? undefined) as Id<"positions"> | undefined,
-          accessRuleId: (formData.accessRuleId ?? undefined) as Id<"accessRules"> | undefined,
-          shiftId: (formData.shiftId ?? undefined) as Id<"shifts"> | undefined,
-          shift: formData.shift ?? undefined,
-          photoUrl: formData.photoUrl ?? undefined,
-          notes: formData.notes?.trim() ?? undefined,
-          isActive: formData.isActive ?? true,
+          employeeId: editingId,
+          projectId: formData.projectId,
+          ...sharedPayload,
         });
-        toast({ title: "Başarılı", description: "Çalışan bilgileri güncellendi" });
+        toast({ title: "Başarılı", description: "Personel güncellendi" });
 
-        // Hikvision cihazlarına senkronize et
         try {
-          const syncResult = await syncToDevices({ employeeId: employee._id });
-          if (syncResult.synced > 0) {
-            toast({ title: "Cihaz Senkronizasyonu", description: `${syncResult.synced} cihaza senkronize edildi` });
-          }
-          if (syncResult.failed > 0) {
-            toast({ title: "Senkronizasyon Uyarısı", description: `${syncResult.failed} cihaza gönderilemedi`, variant: "destructive" });
-          }
+          const syncResult = await syncToDevices({ employeeId: editingId });
+          reportSyncResult(syncResult.synced, syncResult.failed);
         } catch {
-          // Sync hatası çalışan kaydını engellemez
+          // Sync hatası kaydı engellemez
         }
 
-        onSave({ _id: employee._id, ...formData });
+        onSave({ _id: editingId, ...formData });
         onClose();
       } else {
         // Create
         const newId = await createEmployee({
-          firstName: formData.firstName.trim(),
-          lastName: formData.lastName.trim(),
-          email: formData.email.trim().toLowerCase(),
-          tcNo: formData.tcNo.trim(),
-          cardNumber: formData.cardNumber.trim(),
           projectId: formData.projectId,
-          companyId: (formData.companyId ?? undefined) as Id<"companies"> | undefined,
-          departmentId: (formData.departmentId ?? undefined) as Id<"departments"> | undefined,
-          positionId: (formData.positionId ?? undefined) as Id<"positions"> | undefined,
-          accessRuleId: (formData.accessRuleId ?? undefined) as Id<"accessRules"> | undefined,
-          shiftId: (formData.shiftId ?? undefined) as Id<"shifts"> | undefined,
-          shift: formData.shift ?? undefined,
-          photoUrl: formData.photoUrl ?? undefined,
-          notes: formData.notes?.trim() ?? undefined,
-          isActive: formData.isActive ?? true,
+          ...sharedPayload,
         });
+        toast({ title: "Başarılı", description: "Personel eklendi" });
 
-        // Setup email gönder
         try {
           await sendSetupEmail({
             employeeId: newId,
-            email: formData.email.trim().toLowerCase(),
-            firstName: formData.firstName.trim(),
-            lastName: formData.lastName.trim(),
+            email: sharedPayload.email,
+            firstName: sharedPayload.firstName,
+            lastName: sharedPayload.lastName,
             projectId: formData.projectId,
           });
-          toast({ title: "Başarılı", description: "Personel eklendi ve kurulum e-postası gönderildi" });
+          toast({ title: "Kurulum E-postası", description: "Personele kurulum bağlantısı gönderildi" });
         } catch {
           toast({
             title: "Uyarı",
@@ -140,27 +129,20 @@ export const useEmployeeFormSubmit = (
           });
         }
 
-        // Hikvision cihazlarına senkronize et
         try {
           const syncResult = await syncToDevices({ employeeId: newId });
-          if (syncResult.synced > 0) {
-            toast({ title: "Cihaz Senkronizasyonu", description: `${syncResult.synced} cihaza senkronize edildi` });
-          }
-          if (syncResult.failed > 0) {
-            toast({ title: "Senkronizasyon Uyarısı", description: `${syncResult.failed} cihaza gönderilemedi`, variant: "destructive" });
-          }
+          reportSyncResult(syncResult.synced, syncResult.failed);
         } catch {
-          // Sync hatası çalışan kaydını engellemez
+          // Sync hatası kaydı engellemez
         }
 
         onSave({ _id: newId, ...formData });
         onClose();
       }
-    } catch (error: unknown) {
-      const err = error as { message?: string };
+    } catch (error) {
       toast({
         title: "Hata",
-        description: err?.message ?? "Bir hata oluştu",
+        description: errorMessage(error),
         variant: "destructive",
       });
     } finally {

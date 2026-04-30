@@ -4,9 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Info } from "lucide-react";
 import { UseFormReturn } from "react-hook-form";
+import type { FormValues } from "../hooks/useDeviceFormSchema";
 
 interface DeviceNetworkSectionProps {
-  form: UseFormReturn<any>;
+  form: UseFormReturn<FormValues>;
   isNewDevice?: boolean;
 }
 

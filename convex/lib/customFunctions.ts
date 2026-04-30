@@ -1,8 +1,10 @@
 import { customQuery, customMutation, customAction, customCtx } from "convex-helpers/server/customFunctions";
+import { v } from "convex/values";
 import { query, mutation, action } from "../_generated/server";
 import { api } from "../_generated/api";
 import type { Doc } from "../_generated/dataModel";
 import { getCurrentUser, getCurrentUserOrNull } from "./auth";
+import { getCurrentEmployee } from "./employeeAuth";
 
 /**
  * Kimlik doğrulaması gerektiren query.
@@ -93,3 +95,26 @@ export const authedAction = customAction(
     return { user };
   })
 );
+
+/**
+ * Mobil employee oturumu için query. Her çağrı `sessionToken` arg'ı ister
+ * ve `ctx.employee`'yi enjekte eder. Web `users` tablosundan tamamen ayrıdır.
+ */
+export const employeeAuthedQuery = customQuery(query, {
+  args: { sessionToken: v.string() },
+  input: async (ctx, { sessionToken }) => {
+    const employee = await getCurrentEmployee(ctx, sessionToken);
+    return { ctx: { employee }, args: {} };
+  },
+});
+
+/**
+ * Mobil employee oturumu için mutation. Aynı sözleşme.
+ */
+export const employeeAuthedMutation = customMutation(mutation, {
+  args: { sessionToken: v.string() },
+  input: async (ctx, { sessionToken }) => {
+    const employee = await getCurrentEmployee(ctx, sessionToken);
+    return { ctx: { employee }, args: {} };
+  },
+});

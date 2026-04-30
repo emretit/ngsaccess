@@ -82,7 +82,7 @@ export function AiChatMessage({ message, onExportExcel, onExportPDF }: AiChatMes
               </Popover>
             </div>
             <div className="rounded-md border overflow-hidden overflow-x-auto">
-              <PDKSReportTable data={message.data} />
+              <PDKSReportTable data={message.data ?? []} />
             </div>
           </div>
         )}

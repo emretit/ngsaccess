@@ -32,11 +32,11 @@ export function UserPasswordResetDialog({
   const sendUserSetupEmail = useAction(api.actions.sendEmail.sendUserSetupEmail);
 
   const handleSendResetEmail = async () => {
-    if (!user) return;
+    if (!user || !user.email) return;
     setIsLoading(true);
     try {
       await sendUserSetupEmail({
-        userId: user.id as unknown as Id<"users">,
+        userId: user._id,
         email: user.email,
         fullName: user.email,
       });
