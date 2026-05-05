@@ -1,7 +1,7 @@
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Users, Dices, Shield, FileText, Settings, Bell, User, Menu, X } from 'lucide-react';
+import { Users, Dices, Shield, FileText, Settings, Bell, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/components/auth/AuthProvider';
@@ -24,7 +24,6 @@ const navigation = [
 export default function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
-  const profileRef = useRef<HTMLDivElement>(null);
   const { user, profile, signOut } = useAuth();
 
   // Close mobile menu when route changes

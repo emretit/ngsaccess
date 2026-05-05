@@ -22,10 +22,10 @@ const Leaves = lazy(() => import('@/pages/Leaves'));
 const EmployeePortal = lazy(() => import('@/pages/EmployeePortal'));
 const CheckIn = lazy(() => import('@/pages/CheckIn'));
 const Settings = lazy(() => import('@/pages/Settings'));
+const AuditLog = lazy(() => import('@/pages/AuditLog'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const SystemAdmin = lazy(() => import('@/pages/SystemAdmin'));
 const EngineeringDepartment = lazy(() => import('@/pages/EngineeringDepartment'));
-const Siparis = lazy(() => import('@/pages/Siparis'));
 const UserSetup = lazy(() => import('@/pages/UserSetup'));
 const EmployeeSetup = lazy(() => import('@/pages/EmployeeSetup'));
 const AdminSetup = lazy(() => import('@/pages/AdminSetup'));
@@ -67,8 +67,8 @@ function AppContent() {
           <Route path="/shifts" element={<Shifts />} />
           <Route path="/leaves" element={<Leaves />} />
           <Route path="/employee-portal" element={<EmployeePortal />} />
-          <Route path="/siparis" element={<Siparis />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/audit-log" element={<AuditLog />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/engineering-department" element={<EngineeringDepartment />} />
         </Route>

@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { query } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 import { optionalAuthQuery, authedMutation, adminQuery, adminMutation, superAdminMutation } from "./lib/customFunctions";
 
 /** Kurulum sayfası için: Sistemde super_admin var mı? (Public - auth gerekmez) */
@@ -141,5 +141,82 @@ export const initializeAdmin = authedMutation({
       updatedAt: new Date().toISOString(),
     });
     return null;
+  },
+});
+
+/**
+ * Dev/admin: belirli bir email için users + authAccounts + authSessions kayıtlarını siler.
+ * Sadece `npx convex run` ile çağrılabilir (internal).
+ */
+export const adminDeleteByEmail = internalMutation({
+  args: { email: v.string() },
+  returns: v.object({
+    usersDeleted: v.number(),
+    accountsDeleted: v.number(),
+    sessionsDeleted: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const lowered = args.email.toLowerCase();
+    const userRows = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", lowered))
+      .collect();
+    let accountsDeleted = 0;
+    let sessionsDeleted = 0;
+    for (const user of userRows) {
+      const accounts = await ctx.db
+        .query("authAccounts")
+        .withIndex("userIdAndProvider", (q) => q.eq("userId", user._id))
+        .collect();
+      for (const a of accounts) {
+        await ctx.db.delete(a._id);
+        accountsDeleted++;
+      }
+      const sessions = await ctx.db
+        .query("authSessions")
+        .withIndex("userId", (q) => q.eq("userId", user._id))
+        .collect();
+      for (const s of sessions) {
+        await ctx.db.delete(s._id);
+        sessionsDeleted++;
+      }
+      const userProjects = await ctx.db
+        .query("userProjects")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .collect();
+      for (const up of userProjects) {
+        await ctx.db.delete(up._id);
+      }
+      await ctx.db.delete(user._id);
+    }
+    return {
+      usersDeleted: userRows.length,
+      accountsDeleted,
+      sessionsDeleted,
+    };
+  },
+});
+
+export const adminFindByEmail = internalQuery({
+  args: { email: v.string() },
+  returns: v.union(
+    v.object({
+      _id: v.id("users"),
+      email: v.optional(v.string()),
+      role: v.optional(v.union(
+        v.literal("super_admin"),
+        v.literal("project_admin"),
+        v.literal("project_user"),
+      )),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const u = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", args.email.toLowerCase()))
+      .first();
+    if (!u) return null;
+    return { _id: u._id, email: u.email, role: u.role };
   },
 });

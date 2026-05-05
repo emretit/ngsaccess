@@ -1,6 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
-import { authedQuery, superAdminMutation } from "./lib/customFunctions";
+import { authedMutation, authedQuery, superAdminMutation } from "./lib/customFunctions";
 
 export const list = authedQuery({
   args: {},
@@ -47,6 +47,7 @@ export const create = superAdminMutation({
     return await ctx.db.insert("projects", {
       name: args.name,
       description: args.description,
+      ownerId: ctx.user._id,
       isActive: args.isActive ?? true,
       createdAt: now,
       updatedAt: now,
@@ -78,10 +79,17 @@ export const update = superAdminMutation({
   },
 });
 
-export const remove = superAdminMutation({
+export const remove = authedMutation({
   args: { id: v.id("projects") },
   returns: v.id("projects"),
   handler: async (ctx, args) => {
+    const project = await ctx.db.get(args.id);
+    if (!project) throw new Error("Proje bulunamadı");
+    const isSuperAdmin = ctx.user.role === "super_admin";
+    const isOwner = project.ownerId === ctx.user._id;
+    if (!isSuperAdmin && !isOwner) {
+      throw new Error("Sadece proje sahibi veya süper admin silebilir");
+    }
     await ctx.db.delete(args.id);
     return args.id;
   },

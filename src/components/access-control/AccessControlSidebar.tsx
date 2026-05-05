@@ -26,13 +26,13 @@ const sidebarItems = [
 
 export function AccessControlSidebar({ selected, onSelect }: AccessControlSidebarProps) {
   return (
-    <div className="h-full w-[240px] shrink-0 bg-card rounded-xl border shadow-xs">
-      <div className="p-6 border-b border-border">
+    <div className="h-full w-[220px] shrink-0 bg-card rounded-xl border shadow-xs">
+      <div className="p-4 border-b border-border">
         <div className="flex items-center gap-2">
-          <Shield className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold text-primary">Geçiş Kontrol</h2>
+          <Shield className="h-4 w-4 text-primary" />
+          <h2 className="text-base font-semibold text-primary">Geçiş Kontrol</h2>
         </div>
-        <p className="text-sm text-muted-foreground mt-1.5">Menü</p>
+        <p className="text-xs text-muted-foreground mt-1">Menü</p>
       </div>
       <nav className="p-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
         <ul className="space-y-0.5">
@@ -45,7 +45,7 @@ export function AccessControlSidebar({ selected, onSelect }: AccessControlSideba
                   type="button"
                   onClick={() => onSelect(item.key)}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors",
+                    "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium transition-colors",
                     isSelected
                       ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"

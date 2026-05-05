@@ -83,8 +83,6 @@ export function useExportUtils() {
     }
 
     try {
-      const PDF_GENERATION_ENDPOINT = "/api/generate-pdf";
-      
       // Prepare data for PDF generation
       const pdfData = {
         title: "PDKS Rapor",

@@ -27,7 +27,7 @@ async function sendResendEmail(params: {
   }
 
   const defaultFromEmail = process.env.MAIL_FROM_EMAIL ?? "noreply@ngsplus.app";
-  const defaultFromName = process.env.MAIL_FROM_NAME ?? "NGS Access";
+  const defaultFromName = process.env.MAIL_FROM_NAME ?? "NGS+";
   const from = params.fromEmail
     ? `${params.fromName ?? defaultFromName} <${params.fromEmail}>`
     : `${defaultFromName} <${defaultFromEmail}>`;
@@ -53,6 +53,78 @@ async function sendResendEmail(params: {
   return { success: true };
 }
 
+interface EmailTemplateParams {
+  title: string;
+  heading: string;
+  body: string;
+  ctaUrl?: string;
+  ctaLabel?: string;
+  securityNote?: string;
+  footerNote?: string;
+}
+
+function renderEmailTemplate(p: EmailTemplateParams): string {
+  // CTA: bulletproof button (table + inline style). Mail client'larda gradient/class
+  // genelde kırpılır; bu yüzden solid color + inline style + plain URL fallback.
+  const cta = p.ctaUrl && p.ctaLabel
+    ? `
+        <table role="presentation" border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 24px auto;">
+          <tr>
+            <td align="center" bgcolor="#711A1A" style="background-color: #711A1A; border-radius: 8px;">
+              <a href="${p.ctaUrl}" target="_blank" style="display: inline-block; padding: 16px 32px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; border-radius: 8px;">${p.ctaLabel}</a>
+            </td>
+          </tr>
+        </table>
+        <p style="margin: 16px 0 0; font-size: 13px; color: #888; line-height: 1.5; text-align: center;">
+          Buton görünmüyorsa şu adresi tarayıcınıza yapıştırın:<br/>
+          <a href="${p.ctaUrl}" target="_blank" style="color: #711A1A; word-break: break-all;">${p.ctaUrl}</a>
+        </p>`
+    : "";
+  const security = p.securityNote
+    ? `<div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 16px; margin: 24px 0 0; font-size: 14px; color: #856404; text-align: left;"><strong>Güvenlik:</strong> ${p.securityNote}</div>`
+    : "";
+  const footer = p.footerNote ?? "Bu e-postayı siz istemediyseniz güvenle yok sayabilirsiniz.";
+
+  return `<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${p.title}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f5f5f5;">
+  <table role="presentation" border="0" cellspacing="0" cellpadding="0" width="100%" bgcolor="#f5f5f5" style="background-color: #f5f5f5;">
+    <tr>
+      <td align="center" style="padding: 20px;">
+        <table role="presentation" border="0" cellspacing="0" cellpadding="0" width="600" style="max-width: 600px; background: #ffffff; border-radius: 16px; overflow: hidden;">
+          <tr>
+            <td bgcolor="#711A1A" style="background-color: #711A1A; padding: 40px 30px; text-align: center;">
+              <div style="font-size: 28px; font-weight: bold; letter-spacing: 2px; color: #ffffff;">NGS+</div>
+              <p style="font-size: 16px; margin: 10px 0 0; color: #ffffff; opacity: 0.9;">Erişim Yönetim Sistemi</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 30px; text-align: center; background: #ffffff;">
+              <h1 style="font-size: 24px; color: #333333; margin: 0 0 20px; font-weight: 600;">${p.heading}</h1>
+              <p style="font-size: 16px; color: #666666; line-height: 1.6; margin: 0 0 16px;">${p.body}</p>
+              ${cta}
+              ${security}
+            </td>
+          </tr>
+          <tr>
+            <td style="background: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #e9ecef;">
+              <p style="font-size: 14px; color: #6c757d; line-height: 1.5; margin: 0;">${footer}</p>
+              <p style="font-size: 14px; color: #6c757d; line-height: 1.5; margin: 12px 0 0;"><strong>NGS+</strong> · Erişim Yönetim Sistemi</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
 export const sendEmployeeSetupEmail = action({
   args: {
     employeeId: v.id("employees"),
@@ -65,7 +137,6 @@ export const sendEmployeeSetupEmail = action({
     const setupToken = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Mevcut auth kaydını güncelle veya yeni oluştur
     const existing = await ctx.runQuery(api.employeeAuth.getByEmployee, {
       employeeId: args.employeeId,
     });
@@ -87,55 +158,87 @@ export const sendEmployeeSetupEmail = action({
       });
     }
 
-    const baseUrl = process.env.SITE_URL ?? process.env.CONVEX_SITE_URL ?? "http://localhost:5173";
+    const baseUrl = process.env.SITE_URL ?? "https://ngsplus.app";
     const setupUrl = `${baseUrl}/employee-setup?token=${setupToken}`;
 
-    const html = `
-      <h2>Merhaba ${args.firstName} ${args.lastName},</h2>
-      <p>NGS Access mobil uygulaması için şifre belirleyin. Aşağıdaki linke tıklayın:</p>
-      <p><a href="${setupUrl}" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;">Hesabı Aktif Et</a></p>
-      <p>Bu link 7 gün geçerlidir.</p>
-      <p>NGS Access Ekibi</p>
-    `;
+    const html = renderEmailTemplate({
+      title: "NGS+ — Hesap Aktivasyonu",
+      heading: `Merhaba ${args.firstName} ${args.lastName} 👋`,
+      body: "NGS+ mobil uygulaması için şifrenizi belirleyin. Aşağıdaki butona tıklayarak hesabınızı aktif edebilirsiniz.",
+      ctaUrl: setupUrl,
+      ctaLabel: "Hesabı Aktif Et",
+      securityNote: "Bu link 7 gün geçerlidir. Eğer bu daveti siz beklemiyorsanız bu e-postayı yok sayabilirsiniz.",
+    });
 
     return await sendResendEmail({
       to: args.email,
-      subject: "NGS Access - Hesap Aktivasyonu",
+      subject: "NGS+ — Hesap Aktivasyonu",
       html,
     });
   },
 });
 
-export const sendUserSetupEmail = action({
+/**
+ * Yetkili kullanıcı (super_admin / proje sahibi / proje admin) bir kullanıcıyı
+ * projeye davet eder. invites.create ile token üretilir, kullanıcıya pafta tarzı
+ * kart maili gider; link /user-setup?token=xxx üzerinden şifre belirletir.
+ *
+ * type === "reset" parametresi gelecek için hazır (mevcut kullanıcıya şifre
+ * sıfırlama maili) — şu an UI'dan tetiklenmiyor.
+ */
+const ROLE_LABELS_TR: Record<"project_admin" | "project_user", string> = {
+  project_admin: "Proje Yöneticisi",
+  project_user: "Kullanıcı",
+};
+
+export const sendUserInviteEmail = action({
   args: {
-    userId: v.id("users"),
     email: v.string(),
-    fullName: v.optional(v.string()),
+    projectId: v.id("projects"),
+    role: v.union(v.literal("project_admin"), v.literal("project_user")),
+    type: v.optional(v.union(v.literal("invite"), v.literal("reset"))),
   },
   handler: async (ctx, args): Promise<{ success: boolean; error?: string }> => {
-    const setupToken = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const inviteType = args.type ?? "invite";
 
-    await ctx.runMutation(api.users.setupUser, {
-      userId: args.userId,
-      role: "project_user",
-      fullName: args.fullName,
+    const token: string = await ctx.runMutation(api.invites.create, {
+      email: args.email,
+      projectId: args.projectId,
+      role: args.role,
+      type: inviteType,
     });
 
-    const baseUrl = process.env.SITE_URL ?? process.env.CONVEX_SITE_URL ?? "http://localhost:5173";
-    const setupUrl = `${baseUrl}/user-setup?token=${setupToken}`;
+    const project = await ctx.runQuery(api.projects.getById, {
+      projectId: args.projectId,
+    });
+    const projectName = project?.name ?? "NGS+";
 
-    const html = `
-      <h2>Merhaba ${args.fullName ?? args.email},</h2>
-      <p>NGS Access yönetim paneline erişim sağlandı. Aşağıdaki link ile şifrenizi belirleyin:</p>
-      <p><a href="${setupUrl}" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;">Şifre Belirle</a></p>
-      <p>Bu link 24 saat geçerlidir.</p>
-      <p>NGS Access Ekibi</p>
-    `;
+    const baseUrl = process.env.SITE_URL ?? "https://ngsplus.app";
+    const setupUrl = `${baseUrl}/user-setup?token=${token}`;
+
+    const isReset = inviteType === "reset";
+    const subject = isReset
+      ? `NGS+ — Şifre sıfırlama bağlantısı`
+      : `${projectName} — NGS+ davetiniz`;
+    const heading = isReset ? "Şifrenizi sıfırlayın" : "NGS+'a davet edildiniz 👋";
+    const roleLabel = ROLE_LABELS_TR[args.role];
+    const body = isReset
+      ? `<strong>${projectName}</strong> hesabınız için yeni şifre belirlemeniz isteniyor. Aşağıdaki butona tıklayarak yeni şifrenizi oluşturabilirsiniz.`
+      : `<strong>${projectName}</strong> projesine <strong>${roleLabel}</strong> olarak davet edildiniz. Hesabınızı oluşturmak ve şifrenizi belirlemek için aşağıdaki butona tıklayın.`;
+    const ctaLabel = isReset ? "Şifre Sıfırla" : "Hesabı Aktif Et";
+
+    const html = renderEmailTemplate({
+      title: subject,
+      heading,
+      body,
+      ctaUrl: setupUrl,
+      ctaLabel,
+      securityNote: "Bu link 7 gün geçerlidir. Eğer bu maili siz beklemiyorsanız yok sayabilirsiniz.",
+    });
 
     return await sendResendEmail({
       to: args.email,
-      subject: "NGS Access - Yönetim Paneli Erişimi",
+      subject,
       html,
     });
   },
@@ -148,17 +251,16 @@ export const sendLateNotification = action({
     lateTime: v.string(),
     projectId: v.optional(v.id("projects")),
   },
-  handler: async (ctx, args): Promise<{ success: boolean; error?: string }> => {
-    const html = `
-      <h2>Geç Kalma Bildirimi</h2>
-      <p><strong>${args.employeeName}</strong> çalışanı işe geç kalmıştır.</p>
-      <p>Giriş saati: <strong>${args.lateTime}</strong></p>
-      <p>Lütfen PDKS sisteminden kontrol ediniz.</p>
-      <p>NGS Access PDKS</p>
-    `;
+  handler: async (_ctx, args): Promise<{ success: boolean; error?: string }> => {
+    const html = renderEmailTemplate({
+      title: "NGS+ PDKS — Geç Kalma Bildirimi",
+      heading: "Geç Kalma Bildirimi",
+      body: `<strong>${args.employeeName}</strong> çalışanı işe geç kalmıştır.<br/>Giriş saati: <strong>${args.lateTime}</strong>`,
+      footerNote: "Lütfen NGS+ PDKS panelinden detayları kontrol ediniz.",
+    });
     return await sendResendEmail({
       to: args.to,
-      subject: `PDKS - Geç Kalma: ${args.employeeName}`,
+      subject: `PDKS — Geç Kalma: ${args.employeeName}`,
       html,
     });
   },

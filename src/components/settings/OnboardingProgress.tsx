@@ -15,7 +15,6 @@ interface OnboardingProgressProps {
 }
 
 export function OnboardingProgress({ steps, currentStep }: OnboardingProgressProps) {
-  const currentIndex = steps.findIndex(step => step.key === currentStep);
   const completedSteps = steps.filter(step => step.completed).length;
   const progressPercentage = (completedSteps / steps.length) * 100;
 
@@ -36,10 +35,9 @@ export function OnboardingProgress({ steps, currentStep }: OnboardingProgressPro
       </div>
 
       <div className="space-y-3">
-        {steps.map((step, index) => {
+        {steps.map((step) => {
           const isCurrent = step.key === currentStep;
-          const isPast = index < currentIndex;
-          
+
           return (
             <div 
               key={step.key}

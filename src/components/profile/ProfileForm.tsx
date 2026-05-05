@@ -20,7 +20,7 @@ interface ProfileFormProps {
   onSignOut: () => Promise<void>;
 }
 
-export default function ProfileForm({ email, fullName, role, userId, onProfileUpdated, onSignOut }: ProfileFormProps) {
+export default function ProfileForm({ email, fullName, role, userId: _userId, onProfileUpdated, onSignOut }: ProfileFormProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [name, setName] = useState(fullName);
   const navigate = useNavigate();

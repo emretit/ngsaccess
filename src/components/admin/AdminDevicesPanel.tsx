@@ -10,15 +10,16 @@ import { useDeviceFilters } from "@/hooks/useDeviceFilters";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 
 export function AdminDevicesPanel() {
-  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
-  const [selectedDoorId, setSelectedDoorId] = useState<string | null>(null);
+  const [selectedZoneId, _setSelectedZoneId] = useState<string | null>(null);
+  const [selectedDoorId, _setSelectedDoorId] = useState<string | null>(null);
 
   const { zones, doors } = useZonesAndDoors();
-  const rawDevicesData = useQuery(api.devices.list) ?? [];
+  const rawDevicesData = useQuery(api.devices.list);
+  const isLoading = rawDevicesData === undefined;
 
   const removeDevice = useMutation(api.devices.remove);
 
-  const rawDevices: Device[] = rawDevicesData.map((device: Device & { _creationTime?: number }) => ({
+  const rawDevices: Device[] = (rawDevicesData ?? []).map((device: Device & { _creationTime?: number }) => ({
     ...device,
     status: device.status === "active" ? "online" : (device.status ?? "offline"),
     createdAt: device.createdAt ?? (device._creationTime ? new Date(device._creationTime).toISOString() : undefined),
@@ -72,7 +73,7 @@ export function AdminDevicesPanel() {
       <DeviceList
         devices={rawDevices}
         filteredDevices={filteredDevices}
-        isLoading={rawDevicesData === undefined}
+        isLoading={isLoading}
         zones={zones}
         doors={doors}
         onDeleteDevice={handleDeleteDevice}

@@ -74,7 +74,9 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  <SelectItem value="super_admin">Süper Admin</SelectItem>
+                  {currentUser && (
+                    <SelectItem value="super_admin">Süper Admin</SelectItem>
+                  )}
                   <SelectItem value="project_admin">Proje Yöneticisi</SelectItem>
                   <SelectItem value="project_user">Kullanıcı</SelectItem>
                 </SelectGroup>

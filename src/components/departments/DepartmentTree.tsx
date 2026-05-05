@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
+import { Loader2 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -14,7 +15,7 @@ interface DepartmentTreeProps {
 }
 
 export default function DepartmentTree({ onSelectDepartment }: DepartmentTreeProps) {
-  const { departments, addDepartment, deleteDepartment } = useDepartments();
+  const { departments, isLoading, addDepartment, deleteDepartment } = useDepartments();
   const { isSuperAdmin } = useProjectAccess();
   const [selectedDepartment, setSelectedDepartment] = useState<Id<"departments"> | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
@@ -80,7 +81,7 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
   };
 
   return (
-    <div className="h-full w-[240px] shrink-0 bg-card rounded-xl border shadow-xs">
+    <div className="h-full w-[220px] shrink-0 bg-card rounded-xl border shadow-xs">
       <DepartmentProjectHeader
         projectName={companyName}
         onProjectClick={handleProjectHeaderClick}
@@ -88,9 +89,20 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
       />
 
       <div className="p-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
-        <ul role="tree" className="space-y-0.5">
-          {renderDepartmentTree()}
-        </ul>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-6 text-xs text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            Yükleniyor...
+          </div>
+        ) : departments.length === 0 ? (
+          <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+            Departman yok
+          </p>
+        ) : (
+          <ul role="tree" className="space-y-0.5">
+            {renderDepartmentTree()}
+          </ul>
+        )}
       </div>
 
       <AddDepartmentDialog

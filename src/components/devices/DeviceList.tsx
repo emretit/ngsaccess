@@ -1,5 +1,4 @@
 
-import { format } from 'date-fns';
 import {
   Table,
   TableBody,
@@ -8,7 +7,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Device } from "@/types/device";
 import { Zone, Door } from "@/hooks/useZonesAndDoors";
 import { DeviceTableRow } from "@/components/devices/DeviceTableRow";

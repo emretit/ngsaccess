@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
 import type { User, Project, UserFormData, UserRole } from "../types/user-types";
@@ -20,7 +20,8 @@ export const useUserManagement = () => {
 
   const updateRoleMut = useMutation(api.users.updateRole);
   const assignProjectMut = useMutation(api.userProjects.assign);
-  const removeProjectMut = useMutation(api.userProjects.remove);
+  const _removeProjectMut = useMutation(api.userProjects.remove);
+  const sendInviteEmail = useAction(api.actions.sendEmail.sendUserInviteEmail);
 
   const users: User[] = (usersRaw ?? []) as User[];
   const projects: Project[] = (projectsRaw ?? []) as Project[];
@@ -31,19 +32,68 @@ export const useUserManagement = () => {
   };
 
   const handleSaveUser = async () => {
-    if (!currentUser) return false;
-    try {
-      await updateRoleMut({ userId: currentUser._id, role: formData.role });
-      if (formData.projectId) {
-        await assignProjectMut({ userId: currentUser._id, projectId: formData.projectId });
+    // Düzenleme akışı
+    if (currentUser) {
+      try {
+        await updateRoleMut({ userId: currentUser._id, role: formData.role });
+        if (formData.projectId) {
+          await assignProjectMut({ userId: currentUser._id, projectId: formData.projectId });
+        }
+        toast({ title: "Kullanıcı güncellendi" });
+        setCurrentUser(null);
+        return true;
+      } catch (error: unknown) {
+        toast({
+          title: "Hata",
+          description: (error as Error)?.message ?? "Kullanıcı güncellenemedi",
+          variant: "destructive",
+        });
+        return false;
       }
-      toast({ title: "Kullanıcı güncellendi" });
-      setCurrentUser(null);
+    }
+
+    // Yeni kullanıcı = davet maili gönder
+    const trimmedEmail = formData.email.trim().toLowerCase();
+    if (!trimmedEmail) {
+      toast({ title: "Hata", description: "E-posta adresi zorunludur", variant: "destructive" });
+      return false;
+    }
+    if (formData.role === "super_admin") {
+      toast({
+        title: "Hata",
+        description: "Süper admin davet edilemez. Mevcut kullanıcıyı düzenleyerek atayın.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    if (!formData.projectId) {
+      toast({ title: "Hata", description: "Proje seçimi zorunludur", variant: "destructive" });
+      return false;
+    }
+
+    try {
+      const result = await sendInviteEmail({
+        email: trimmedEmail,
+        projectId: formData.projectId,
+        role: formData.role,
+      });
+      if (!result.success) {
+        toast({
+          title: "Mail gönderilemedi",
+          description: result.error ?? "Davet maili gönderilirken bir hata oluştu",
+          variant: "destructive",
+        });
+        return false;
+      }
+      toast({
+        title: "Davet gönderildi",
+        description: `${trimmedEmail} adresine davet maili gönderildi.`,
+      });
       return true;
     } catch (error: unknown) {
       toast({
         title: "Hata",
-        description: (error as Error)?.message ?? "Kullanıcı güncellenemedi",
+        description: (error as Error)?.message ?? "Davet oluşturulamadı",
         variant: "destructive",
       });
       return false;

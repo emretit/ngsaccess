@@ -70,7 +70,7 @@ export class SqlQueryBuilder {
     return query;
   }
 
-  private static buildListQuery(nlQuery: NaturalLanguageQuery, joins: Set<string>, conditions: string[]): string {
+  private static buildListQuery(nlQuery: NaturalLanguageQuery, joins: Set<string>, _conditions: string[]): string {
     joins.add('LEFT JOIN employees e ON cr.employee_id = e.id');
     joins.add('LEFT JOIN departments d ON e.department_id = d.id');
     joins.add('LEFT JOIN devices dev ON cr.device_id = dev.id');
@@ -127,7 +127,7 @@ export class SqlQueryBuilder {
     `;
   }
 
-  private static buildAbsentQuery(nlQuery: NaturalLanguageQuery, joins: Set<string>, conditions: string[]): string {
+  private static buildAbsentQuery(nlQuery: NaturalLanguageQuery, joins: Set<string>, _conditions: string[]): string {
     joins.add('LEFT JOIN departments d ON e.department_id = d.id');
     
     const timeCondition = this.buildTimeConditions(nlQuery.timeRange);
@@ -166,8 +166,6 @@ export class SqlQueryBuilder {
   }
 
   private static buildTimeConditions(timeRange: NaturalLanguageQuery['timeRange']): string | null {
-    const now = new Date();
-    
     switch (timeRange.type) {
       case 'today':
         return "DATE(cr.access_time) = CURRENT_DATE";

@@ -15,7 +15,7 @@ export interface Department {
 }
 
 export function useDepartments() {
-  const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
+  const { projectIds, loading: projectLoading } = useProjectAccess();
   const { toast } = useToast();
 
   const departments = useQuery(

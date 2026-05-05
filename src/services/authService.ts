@@ -1,5 +1,3 @@
-import { Id } from "../../convex/_generated/dataModel";
-
 export interface AuthError {
   message: string;
 }

@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Plus, Trash2, Hash, Users, ChevronDown, ChevronRight } from "lucide-react";
+import { Edit, Plus, Trash2, Hash, Users, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -32,9 +32,16 @@ const AdminProjectsPanel = () => {
   const [formData, setFormData] = useState<ProjectForm>({ name: "", description: "", isActive: true });
   const { toast } = useToast();
 
-  const projects = useQuery(api.projects.list) ?? [];
-  const allUsers = useQuery(api.users.list) ?? [];
-  const allUserProjects = useQuery(api.userProjects.getAll) ?? [];
+  const projectsData = useQuery(api.projects.list);
+  const allUsersData = useQuery(api.users.list);
+  const allUserProjectsData = useQuery(api.userProjects.getAll);
+  const isLoading =
+    projectsData === undefined ||
+    allUsersData === undefined ||
+    allUserProjectsData === undefined;
+  const projects = projectsData ?? [];
+  const allUsers = allUsersData ?? [];
+  const allUserProjects = allUserProjectsData ?? [];
 
   const createProject = useMutation(api.projects.create);
   const updateProject = useMutation(api.projects.update);
@@ -150,7 +157,16 @@ const AdminProjectsPanel = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {projects.length === 0 ? (
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-16 text-purple-300">
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span>Yükleniyor...</span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : projects.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-16 text-purple-300 text-lg">
                     <div className="flex flex-col items-center space-y-4">

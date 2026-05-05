@@ -32,27 +32,27 @@ export function ZoneDoorTreePanel({ onSelectZone, onSelectDoor }: ZoneDoorTreePa
 
   return (
     <>
-      <div className="h-full w-[280px] shrink-0 bg-card rounded-xl border shadow-xs">
-        <div className="p-6 border-b border-border">
+      <div className="h-full w-[240px] shrink-0 bg-card rounded-xl border shadow-xs">
+        <div className="p-4 border-b border-border">
           <div
             className="flex items-center gap-2 cursor-pointer hover:text-primary/90 transition-colors"
             onClick={handleProjectHeaderClick}
           >
-            <Building2 className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold text-primary flex-1">{companyName}</h2>
+            <Building2 className="h-4 w-4 text-primary" />
+            <h2 className="text-base font-semibold text-primary flex-1">{companyName}</h2>
             <Button
               size="icon"
               variant="ghost"
-              className="h-8 w-8"
+              className="h-7 w-7"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowAddZoneDialog(true);
               }}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-3.5 w-3.5" />
             </Button>
           </div>
-          <p className="text-sm text-muted-foreground mt-1.5">Bölgeler & Kapılar</p>
+          <p className="text-xs text-muted-foreground mt-1">Bölgeler & Kapılar</p>
         </div>
         <div className="p-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
           <ZoneDoorTree

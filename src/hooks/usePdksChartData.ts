@@ -4,7 +4,7 @@ import { useProjectAccess } from "./useProjectAccess";
 import { subDays, format } from "date-fns";
 
 export const usePdksChartData = (daysBack = 7) => {
-  const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
+  const { loading: projectLoading } = useProjectAccess();
 
   const endDate = new Date();
   const startDate = subDays(endDate, daysBack);

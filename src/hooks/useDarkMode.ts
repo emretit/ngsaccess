@@ -36,7 +36,7 @@ export function useDarkMode() {
         companyName: "NGS Access",
         darkMode: enabled,
       });
-    } catch (e) {
+    } catch {
       // sessizce devam et
     }
   };

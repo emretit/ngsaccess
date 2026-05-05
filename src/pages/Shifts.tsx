@@ -26,7 +26,7 @@ import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Shifts() {
-  const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
+  const { loading: projectLoading } = useProjectAccess();
   const { toast } = useToast();
   const [assignOpen, setAssignOpen] = useState(false);
   const [assignForm, setAssignForm] = useState({

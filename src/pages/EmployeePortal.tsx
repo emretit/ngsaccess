@@ -4,7 +4,7 @@ import { api } from "@/lib/convexApi";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Clock, Palmtree, User, QrCode } from "lucide-react";
+import { Clock, Palmtree, User, QrCode } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { QRCodeSVG as QRCode } from "qrcode.react";
 
@@ -18,7 +18,7 @@ const LEAVE_LABELS: Record<string, string> = {
 
 export default function EmployeePortal() {
   const [employeeId, setEmployeeId] = useState<string | null>(null);
-  const { projectIds, isSuperAdmin, loading } = useProjectAccess();
+  const { loading } = useProjectAccess();
 
   const employees = useQuery(api.employees.list, !loading ? {} : "skip");
   const tableData = useQuery(

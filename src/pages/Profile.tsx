@@ -1,5 +1,4 @@
 
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/auth/AuthProvider';
 import ProfilePhoto from '@/components/profile/ProfilePhoto';
 import ProfileForm from '@/components/profile/ProfileForm';
@@ -10,7 +9,6 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 export default function Profile() {
   const { user, profile, refreshProfile, signOut } = useAuth();
   const { formData, getUserInitials, updateFormData } = useProfileUtils();
-  const navigate = useNavigate();
 
   const handlePhotoUpdated = (newUrl: string) => {
     updateFormData('photoUrl', newUrl);

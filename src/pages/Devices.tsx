@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { DevicesContent } from '@/components/devices/DevicesContent';
 import { ZoneDoorTreePanel } from '@/components/access-control/ZoneDoorTreePanel';
-import { DeviceForm } from '@/components/devices/DeviceForm';
 import { QRCodeDialog } from '@/components/devices/QRCodeDialog';
 import { DeviceDeleteDialog } from '@/components/devices/DeviceDeleteDialog';
 import { AssignLocationForm } from '@/components/devices/AssignLocationForm';
@@ -20,7 +19,7 @@ import { AccessDenied } from '@/components/shared/AccessDenied';
 import { useToast } from '@/hooks/use-toast';
 
 const Devices = () => {
-  const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
+  const { loading: projectLoading } = useProjectAccess();
   const { devices, isLoading, hasProjectAccess } = useProjectFilteredDevices();
   const { zones, doors } = useZonesAndDoors();
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);

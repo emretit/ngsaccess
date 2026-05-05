@@ -1,4 +1,4 @@
-import { internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { authedQuery, adminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
@@ -126,6 +126,7 @@ export const create = adminMutation({
     email: v.string(),
     tcNo: v.string(),
     cardNumber: v.string(),
+    payrollCode: v.optional(v.string()),
     departmentId: v.optional(v.id("departments")),
     companyId: v.optional(v.id("companies")),
     positionId: v.optional(v.id("positions")),
@@ -170,6 +171,7 @@ export const update = adminMutation({
     email: v.optional(v.string()),
     tcNo: v.optional(v.string()),
     cardNumber: v.optional(v.string()),
+    payrollCode: v.optional(v.string()),
     departmentId: v.optional(v.id("departments")),
     companyId: v.optional(v.id("companies")),
     positionId: v.optional(v.id("positions")),
@@ -300,6 +302,65 @@ export const bulkUpdateStatus = adminMutation({
   returns: v.null(),
 });
 
+/** Internal: Email ile çalışanı bulur (admin script'ler için) */
+export const getByEmailInternal = internalQuery({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("employees")
+      .withIndex("by_email", (q) => q.eq("email", args.email.trim().toLowerCase()))
+      .first();
+  },
+});
+
+/** Internal: employeeAuth setup için authId getter (admin script'ler için) */
+export const getAuthByEmployeeInternal = internalQuery({
+  args: { employeeId: v.id("employees") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("employeeAuth")
+      .withIndex("by_employee", (q) => q.eq("employeeId", args.employeeId))
+      .first();
+  },
+});
+
+/** Internal: employeeAuth oluştur (admin script'ler için) */
+export const createAuthInternal = internalMutation({
+  args: {
+    employeeId: v.id("employees"),
+    projectId: v.optional(v.id("projects")),
+    email: v.optional(v.string()),
+    passwordHash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const now = new Date().toISOString();
+    return await ctx.db.insert("employeeAuth", {
+      employeeId: args.employeeId,
+      projectId: args.projectId,
+      email: args.email,
+      passwordHash: args.passwordHash,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+/** Internal: employeeAuth.passwordHash güncelle (admin script'ler için) */
+export const updateAuthPasswordInternal = internalMutation({
+  args: {
+    authId: v.id("employeeAuth"),
+    passwordHash: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.authId, {
+      passwordHash: args.passwordHash,
+      setupToken: undefined,
+      tokenExpiresAt: undefined,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
 /** Internal: Çalışana projectId atamak için (one-off / migration) */
 export const setProjectId = internalMutation({
   args: {
@@ -312,5 +373,63 @@ export const setProjectId = internalMutation({
       updatedAt: new Date().toISOString(),
     });
     return args.employeeId;
+  },
+});
+
+/** Dev/admin: email ile employee + auth durumunu tek seferde getir. */
+export const adminInspectByEmail = internalQuery({
+  args: { email: v.string() },
+  returns: v.union(
+    v.object({
+      employee: v.object({
+        _id: v.id("employees"),
+        firstName: v.string(),
+        lastName: v.string(),
+        email: v.string(),
+        cardNumber: v.string(),
+        isActive: v.optional(v.boolean()),
+      }),
+      auth: v.union(
+        v.object({
+          _id: v.id("employeeAuth"),
+          hasPassword: v.boolean(),
+          hasSetupToken: v.boolean(),
+          tokenExpiresAt: v.union(v.string(), v.null()),
+          lastLogin: v.union(v.string(), v.null()),
+        }),
+        v.null(),
+      ),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const employee = await ctx.db
+      .query("employees")
+      .withIndex("by_email", (q) => q.eq("email", args.email.trim().toLowerCase()))
+      .first();
+    if (!employee) return null;
+    const auth = await ctx.db
+      .query("employeeAuth")
+      .withIndex("by_employee", (q) => q.eq("employeeId", employee._id))
+      .first();
+    return {
+      employee: {
+        _id: employee._id,
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+        email: employee.email,
+        cardNumber: employee.cardNumber,
+        isActive: employee.isActive,
+      },
+      auth: auth
+        ? {
+            _id: auth._id,
+            hasPassword: !!auth.passwordHash,
+            hasSetupToken: !!auth.setupToken,
+            tokenExpiresAt: auth.tokenExpiresAt ?? null,
+            lastLogin: auth.lastLogin ?? null,
+          }
+        : null,
+    };
   },
 });

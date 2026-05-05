@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
-import { ChevronRight, Building2, Plus, Trash2, DoorClosed } from "lucide-react";
+import { ChevronRight, Building2, Plus, Trash2, DoorClosed, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { AddDoorDialog } from "./AddDoorDialog";
@@ -16,8 +16,11 @@ interface ZoneDoorTreeProps {
 }
 
 export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDoorTreeProps) => {
-  const zones = useQuery(api.zones.list, {}) ?? [];
-  const doors = useQuery(api.doors.list, {}) ?? [];
+  const zonesData = useQuery(api.zones.list, {});
+  const doorsData = useQuery(api.doors.list, {});
+  const isLoading = zonesData === undefined || doorsData === undefined;
+  const zones = zonesData ?? [];
+  const doors = doorsData ?? [];
 
   const removeZone = useMutation(api.zones.remove);
   const removeDoor = useMutation(api.doors.remove);
@@ -56,6 +59,21 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
     setSelectedZoneForDoor({ id: zoneId, name: zoneName });
     setShowAddDoorDialog(true);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-6 text-xs text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+        Yükleniyor...
+      </div>
+    );
+  }
+
+  if (zones.length === 0) {
+    return (
+      <p className="px-2 py-6 text-center text-xs text-muted-foreground">Bölge yok</p>
+    );
+  }
 
   return (
     <>

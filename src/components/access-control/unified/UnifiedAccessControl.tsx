@@ -25,13 +25,8 @@ const UnifiedAccessControl = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Erişim Yönetimi</h1>
-        <p className="text-gray-600">Çalışan erişim kurallarını yönetin</p>
-      </div>
-
-      <AccessRulesList 
-        onCreateRule={handleCreateRule} 
+      <AccessRulesList
+        onCreateRule={handleCreateRule}
         onEditRule={handleEditRule}
       />
 

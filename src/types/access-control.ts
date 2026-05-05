@@ -50,11 +50,11 @@ export interface GroupMember {
   projectId?: Id<"projects">;
   createdAt?: string;
   employees?: {
-    _id: Id<"employees">;
+    id: Id<"employees">;
     firstName?: string;
     lastName?: string;
     email?: string;
-  };
+  } | null;
 }
 
 export interface GroupDevice {
@@ -64,12 +64,12 @@ export interface GroupDevice {
   projectId?: Id<"projects">;
   createdAt?: string;
   devices?: {
-    _id: Id<"devices">;
+    id: Id<"devices">;
     name: string;
     deviceSerial?: string;
     zoneId?: Id<"zones">;
     doorId?: Id<"doors">;
-  };
+  } | null;
 }
 
 export interface AccessRule {

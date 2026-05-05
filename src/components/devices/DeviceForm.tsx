@@ -21,7 +21,7 @@ export function DeviceForm({
   open,
   onClose,
   device,
-  projects,
+  projects: _projects,
   onSuccess,
 }: DeviceFormProps) {
   const {
@@ -31,7 +31,7 @@ export function DeviceForm({
     doors,
     locationLoading,
     selectedZoneId,
-    filteredDoors,
+    filteredDoors: _filteredDoors,
     onSubmit,
   } = useDeviceFormLogic({ device, open, onSuccess });
 

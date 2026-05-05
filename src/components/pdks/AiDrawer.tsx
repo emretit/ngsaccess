@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { PDKSAiChat } from "./PDKSAiChat";
-import { MessageSquare, X } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 export function AiDrawer() {

@@ -7,6 +7,7 @@ export interface Employee {
   email: string;
   tcNo: string;
   cardNumber: string;
+  payrollCode?: string;
   photoUrl?: string | null;
   photoStorageId?: Id<"_storage">;
   shift?: string | null;

@@ -1,17 +1,16 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { Eye, EyeOff, Lock, CheckCircle, XCircle } from "lucide-react";
+import { Eye, EyeOff, Lock, CheckCircle, XCircle, Smartphone } from "lucide-react";
 import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 
 export default function EmployeeSetup() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const token = searchParams.get("token");
 
   const [password, setPassword] = useState("");
@@ -19,6 +18,7 @@ export default function EmployeeSetup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const authRecord = useQuery(
     api.employeeAuth.getByToken,
@@ -41,9 +41,8 @@ export default function EmployeeSetup() {
         description: "Şifre belirleme bağlantısı geçersiz.",
         variant: "destructive",
       });
-      navigate("/login");
     }
-  }, [token, navigate]);
+  }, [token]);
 
   const validatePassword = (pwd: string) => ({
     minLength: pwd.length >= 8,
@@ -73,8 +72,7 @@ export default function EmployeeSetup() {
         toast({ title: "Hata", description: result.error ?? "Şifre belirlenemedi.", variant: "destructive" });
         return;
       }
-      toast({ title: "Başarılı", description: "Şifreniz başarıyla belirlendi. Giriş yapabilirsiniz." });
-      navigate("/login");
+      setIsSuccess(true);
     } catch (error: unknown) {
       toast({ title: "Hata", description: (error as Error)?.message ?? "Bir hata oluştu.", variant: "destructive" });
     } finally {
@@ -86,16 +84,47 @@ export default function EmployeeSetup() {
     return <div className="flex items-center justify-center min-h-screen"><p>Yükleniyor...</p></div>;
   }
 
+  if (isSuccess) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
+        <Card className="w-full max-w-md shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-center text-2xl flex items-center justify-center gap-2 text-green-600">
+              <CheckCircle className="h-7 w-7" />
+              Şifreniz Belirlendi
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <div className="flex justify-center">
+              <div className="rounded-full bg-primary/10 p-4">
+                <Smartphone className="h-10 w-10 text-primary" />
+              </div>
+            </div>
+            <p className="text-base text-gray-700">
+              Hesabınız başarıyla aktifleştirildi. Artık <strong>NGS+ mobil uygulaması</strong> üzerinden
+              e-posta ve şifrenizle giriş yapabilirsiniz.
+            </p>
+            <p className="text-sm text-gray-500">
+              Bu sekmeyi kapatabilirsiniz.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!tokenValid) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-center text-red-600">Geçersiz Bağlantı</CardTitle>
           </CardHeader>
-          <CardContent className="text-center">
+          <CardContent className="text-center space-y-3">
             <p>Bu şifre belirleme bağlantısı geçersiz veya süresi dolmuş.</p>
-            <Button className="mt-4" onClick={() => navigate("/login")}>Giriş Sayfasına Dön</Button>
+            <p className="text-sm text-muted-foreground">
+              Yöneticinizden yeni bir kurulum bağlantısı isteyin. Bu sekmeyi kapatabilirsiniz.
+            </p>
           </CardContent>
         </Card>
       </div>

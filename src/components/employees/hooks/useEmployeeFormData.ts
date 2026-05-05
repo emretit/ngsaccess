@@ -11,12 +11,13 @@ export interface EmployeeFormData {
   email: string;
   tcNo: string;
   cardNumber: string;
-  companyId: string | null;
-  departmentId: string | null;
-  positionId: string | null;
-  accessRuleId: string | null;
+  payrollCode: string;
+  companyId: Id<"companies"> | null;
+  departmentId: Id<"departments"> | null;
+  positionId: Id<"positions"> | null;
+  accessRuleId: Id<"accessRules"> | null;
   shift: string | null;
-  shiftId: string | null;
+  shiftId: Id<"shifts"> | null;
   photoUrl: string | null;
   notes: string;
   isActive: boolean;
@@ -33,6 +34,7 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
     email: "",
     tcNo: "",
     cardNumber: "",
+    payrollCode: "",
     companyId: null,
     departmentId: null,
     positionId: null,
@@ -46,15 +48,21 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
 
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
-  const departmentsData = useQuery(api.departments.list) ?? [];
-  const companiesData = useQuery(api.companies.list) ?? [];
-  const accessRulesData = useQuery(api.accessRules.list, {}) ?? [];
-  const positionsData = useQuery(api.positions.list) ?? [];
+  const departmentsData = useQuery(api.departments.list);
+  const companiesData = useQuery(api.companies.list);
+  const accessRulesData = useQuery(api.accessRules.list, {});
+  const positionsData = useQuery(api.positions.list);
 
-  const departments = departmentsData.map((d: { _id: string; name: string }) => ({ id: d._id, name: d.name }));
-  const companies = companiesData.map((c: { _id: string; name: string }) => ({ id: c._id, name: c.name }));
-  const accessRules = accessRulesData.filter((r: { isActive?: boolean }) => r.isActive !== false).map((r: { _id: string; name: string }) => ({ id: r._id, name: r.name }));
-  const positions = positionsData.map((p: { _id: string; name: string }) => ({ id: p._id, name: p.name }));
+  const optionsLoading =
+    departmentsData === undefined ||
+    companiesData === undefined ||
+    accessRulesData === undefined ||
+    positionsData === undefined;
+
+  const departments = (departmentsData ?? []).map((d: { _id: string; name: string }) => ({ id: d._id, name: d.name }));
+  const companies = (companiesData ?? []).map((c: { _id: string; name: string }) => ({ id: c._id, name: c.name }));
+  const accessRules = (accessRulesData ?? []).filter((r: { isActive?: boolean }) => r.isActive !== false).map((r: { _id: string; name: string }) => ({ id: r._id, name: r.name }));
+  const positions = (positionsData ?? []).map((p: { _id: string; name: string }) => ({ id: p._id, name: p.name }));
 
   useEffect(() => {
     if (employee) {
@@ -64,12 +72,13 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
         email: employee.email || "",
         tcNo: employee.tcNo || "",
         cardNumber: employee.cardNumber || "",
-        companyId: (employee.companyId as unknown as string) ?? null,
-        departmentId: (employee.departmentId as unknown as string) ?? null,
-        positionId: (employee.positionId as unknown as string) ?? null,
-        accessRuleId: (employee.accessRuleId as unknown as string) ?? null,
+        payrollCode: employee.payrollCode || "",
+        companyId: employee.companyId ?? null,
+        departmentId: employee.departmentId ?? null,
+        positionId: employee.positionId ?? null,
+        accessRuleId: employee.accessRuleId ?? null,
         shift: employee.shift ?? null,
-        shiftId: (employee.shiftId as unknown as string) ?? null,
+        shiftId: employee.shiftId ?? null,
         photoUrl: employee.photoUrl ?? null,
         notes: employee.notes || "",
         isActive: employee.isActive ?? true,
@@ -83,6 +92,7 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
         email: "",
         tcNo: "",
         cardNumber: "",
+        payrollCode: "",
         companyId: null,
         departmentId: null,
         positionId: null,
@@ -111,5 +121,6 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
     positions,
     photoPreview,
     setPhotoPreview,
+    optionsLoading,
   };
 };

@@ -16,6 +16,7 @@ import { useDepartments } from "@/hooks/useDepartments";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { useAccessRules } from "@/hooks/useAccessRules";
 import { useLocationUtils } from "@/hooks/useLocationUtils";
+import { toast } from "@/hooks/use-toast";
 import { Loader2, Users, Building2, MapPin, Clock, Shield, AlertTriangle } from "lucide-react";
 import type { AccessRule, GroupMember, GroupDevice, Zone, Door, RuleConflict } from "@/types/access-control";
 import type { Department } from "@/hooks/useDepartments";
@@ -45,13 +46,14 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
   });
 
   const [activeTab, setActiveTab] = useState('basic');
-  const [conflicts, setConflicts] = useState<RuleConflict[]>([]);
+  const [conflicts, _setConflicts] = useState<RuleConflict[]>([]);
 
-  const { employees } = useEmployees();
-  const { devices } = useDevices();
-  const { departments } = useDepartments();
-  const { zones, doors } = useZonesAndDoors();
+  const { employees, isLoading: employeesLoading } = useEmployees();
+  const { devices, isLoading: devicesLoading } = useDevices();
+  const { departments, isLoading: departmentsLoading } = useDepartments();
+  const { zones, doors, loading: zonesLoading } = useZonesAndDoors();
   const { createAccessRule, isCreating, updateAccessRule, isUpdating } = useAccessRules();
+  const optionsLoading = employeesLoading || devicesLoading || departmentsLoading || zonesLoading;
   const { getDeviceLocationDisplay } = useLocationUtils();
 
   // Reset form when dialog opens/closes or editing rule changes
@@ -62,8 +64,8 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
           name: editingRule.name || '',
           description: editingRule.description || '',
           targetType: (editingRule.targetType as 'all' | 'department' | 'position' | 'individual' | undefined) ?? 'individual',
-          selectedEmployees: editingRule.groupMembers?.map((gm: GroupMember) => gm.employees?._id).filter(Boolean).map(String) ?? [],
-          selectedDevices: editingRule.groupDevices?.map((gd: GroupDevice) => gd.devices?._id).filter(Boolean).map(String) ?? [],
+          selectedEmployees: editingRule.groupMembers?.map((gm: GroupMember) => gm.employees?.id).filter(Boolean).map(String) ?? [],
+          selectedDevices: editingRule.groupDevices?.map((gd: GroupDevice) => gd.devices?.id).filter(Boolean).map(String) ?? [],
           selectedPositions: [],
           selectedZones: [],
           selectedDoors: [],
@@ -93,25 +95,21 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
     }
   }, [open, editingRule]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    console.log('=== ENHANCED FORM SUBMIT ===');
-    console.log('Form data being submitted:', formData);
-    
-    // Enhanced validation
+
     if (!formData.name.trim()) {
-      alert('Lütfen kural adı girin.');
+      toast({ title: "Hata", description: "Lütfen kural adı girin.", variant: "destructive" });
       return;
     }
 
     if (formData.targetType === 'individual' && formData.selectedEmployees.length === 0) {
-      alert('Lütfen en az bir çalışan seçin.');
+      toast({ title: "Hata", description: "Lütfen en az bir çalışan seçin.", variant: "destructive" });
       return;
     }
 
     if (formData.selectedDevices.length === 0 && formData.selectedZones.length === 0 && formData.selectedDoors.length === 0) {
-      alert('Lütfen en az bir cihaz, bölge veya kapı seçin.');
+      toast({ title: "Hata", description: "Lütfen en az bir cihaz, bölge veya kapı seçin.", variant: "destructive" });
       return;
     }
 
@@ -126,16 +124,22 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
       priority: formData.priority,
     };
 
-    if (editingRule) {
-      updateAccessRule.mutate({
-        id: editingRule._id,
-        updates: ruleData
-      });
-    } else {
-      createAccessRule.mutate(ruleData);
+    try {
+      if (editingRule) {
+        await updateAccessRule.mutateAsync({
+          id: editingRule._id,
+          updates: ruleData,
+        });
+        toast({ title: "Başarılı", description: "Kural güncellendi." });
+      } else {
+        await createAccessRule.mutateAsync(ruleData);
+        toast({ title: "Başarılı", description: "Kural oluşturuldu." });
+      }
+      onClose();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Kural kaydedilemedi.";
+      toast({ title: "Hata", description: message, variant: "destructive" });
     }
-    
-    onClose();
   };
 
   const handleTargetTypeChange = (value: string) => {
@@ -153,7 +157,14 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
           <div className="space-y-3">
             <Label>Çalışanlar</Label>
             <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-              {employees.map((employee) => (
+              {employeesLoading ? (
+                <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Yükleniyor...
+                </div>
+              ) : employees.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-4">Çalışan yok</p>
+              ) : employees.map((employee) => (
                 <div key={employee._id} className="flex items-center space-x-2">
                   <Checkbox
                     id={`employee-${employee._id}`}
@@ -182,7 +193,14 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
           <div className="space-y-3">
             <Label>Departmanlar</Label>
             <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-              {(departments as Department[]).map((department) => (
+              {departmentsLoading ? (
+                <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Yükleniyor...
+                </div>
+              ) : departments.length === 0 ? (
+                <p className="text-center text-sm text-muted-foreground py-4">Departman yok</p>
+              ) : (departments as Department[]).map((department) => (
                 <div key={department._id} className="flex items-center space-x-2">
                   <Checkbox
                     id={`dept-${department._id}`}
@@ -238,7 +256,14 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
       
       <TabsContent value="devices" className="space-y-3">
         <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-          {devices.map((device) => (
+          {devicesLoading ? (
+            <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Yükleniyor...
+            </div>
+          ) : devices.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground py-4">Cihaz yok</p>
+          ) : devices.map((device) => (
             <div key={device._id} className="flex items-center space-x-2">
               <Checkbox
                 id={`device-${device._id}`}
@@ -263,7 +288,14 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
 
       <TabsContent value="zones" className="space-y-3">
         <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-          {(zones as Zone[]).map((zone) => (
+          {zonesLoading ? (
+            <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Yükleniyor...
+            </div>
+          ) : zones.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground py-4">Bölge yok</p>
+          ) : (zones as Zone[]).map((zone) => (
             <div key={zone._id} className="flex items-center space-x-2">
               <Checkbox
                 id={`zone-${zone._id}`}
@@ -288,7 +320,14 @@ const EnhancedCreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: 
 
       <TabsContent value="doors" className="space-y-3">
         <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
-          {(doors as Door[]).map((door) => (
+          {zonesLoading ? (
+            <div className="flex items-center justify-center py-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              Yükleniyor...
+            </div>
+          ) : doors.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground py-4">Kapı yok</p>
+          ) : (doors as Door[]).map((door) => (
             <div key={door._id} className="flex items-center space-x-2">
               <Checkbox
                 id={`door-${door._id}`}

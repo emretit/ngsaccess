@@ -17,7 +17,7 @@ export function useEmployeeTable(employees: Employee[]) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const bulkDelete = useMutation(api.employees.bulkDelete);
-  const bulkUpdateStatus = useMutation(api.employees.bulkUpdateStatus);
+  const _bulkUpdateStatus = useMutation(api.employees.bulkUpdateStatus);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {

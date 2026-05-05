@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { AdminDashboard } from "@/components/settings/sections/AdminDashboard";
 import { Card, CardContent } from "@/components/ui/card";
-import { Shield, Database, Users, Activity, Settings, Zap, Lock, BarChart3 } from "lucide-react";
+import { Shield, Database, Zap, Lock, BarChart3 } from "lucide-react";
 
 export default function SystemAdmin() {
   const { checkUserRole, loading, user, profile } = useAuth();

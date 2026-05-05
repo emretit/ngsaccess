@@ -30,8 +30,8 @@ interface EmployeeTableProps {
 export default function EmployeeTable({
   employees,
   onEdit,
-  onDelete,
-  onViewDetails,
+  onDelete: _onDelete,
+  onViewDetails: _onViewDetails,
   onRefresh
 }: EmployeeTableProps) {
   const [selectedEmployeeForReset, setSelectedEmployeeForReset] = useState<Employee | null>(null);

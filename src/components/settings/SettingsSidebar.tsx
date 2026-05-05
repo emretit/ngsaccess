@@ -1,5 +1,13 @@
-
-import { Settings, Clock, Bell, Mail, Users, FileBarChart } from "lucide-react";
+import {
+  Settings,
+  Clock,
+  Bell,
+  Mail,
+  Users,
+  FileBarChart,
+  CalendarClock,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface SettingsSidebarProps {
   selected: string;
@@ -23,6 +31,11 @@ const sidebarItems = [
     icon: Clock,
   },
   {
+    key: "work-payroll",
+    label: "Mesai & Tatil",
+    icon: CalendarClock,
+  },
+  {
     key: "reports",
     label: "Raporlar",
     icon: FileBarChart,
@@ -41,27 +54,39 @@ const sidebarItems = [
 
 export function SettingsSidebar({ selected, onSelect }: SettingsSidebarProps) {
   return (
-    <aside className="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 pt-6 min-h-full">
-      <nav className="flex flex-col gap-2">
-        {sidebarItems.map(item => {
-          const isSelected = selected === item.key;
-          
-          return (
-            <button
-              key={item.key}
-              onClick={() => onSelect(item.key)}
-              className={`flex items-center gap-3 px-6 py-3 text-left rounded-l-full transition-colors font-medium relative
-                ${isSelected 
-                  ? 'bg-primary/10 text-primary font-semibold border-r-4 border-r-primary' 
-                  : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800'}
-              `}
-            >
-              <item.icon className={`h-5 w-5 ${isSelected ? 'text-primary' : ''}`} />
-              <span className="flex-1">{item.label}</span>
-            </button>
-          );
-        })}
+    <div className="h-full w-[220px] shrink-0 bg-card rounded-xl border shadow-xs">
+      <div className="p-4 border-b border-border">
+        <div className="flex items-center gap-2">
+          <Settings className="h-4 w-4 text-primary" />
+          <h2 className="text-base font-semibold text-primary">Ayarlar</h2>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">Menü</p>
+      </div>
+      <nav className="p-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
+        <ul className="space-y-0.5">
+          {sidebarItems.map((item) => {
+            const Icon = item.icon;
+            const isSelected = selected === item.key;
+            return (
+              <li key={item.key}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(item.key)}
+                  className={cn(
+                    "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium transition-colors",
+                    isSelected
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {item.label}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       </nav>
-    </aside>
+    </div>
   );
 }

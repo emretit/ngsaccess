@@ -6,7 +6,7 @@ import type { Zone, Door } from "@/types/access-control";
 export type { Zone, Door };
 
 export function useZonesAndDoors() {
-  const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
+  const { loading: projectLoading } = useProjectAccess();
 
   const zones = useQuery(api.zones.list, !projectLoading ? {} : "skip");
   const doors = useQuery(api.doors.list, !projectLoading ? {} : "skip");

@@ -43,7 +43,7 @@ export function logInfo(message: string, data?: unknown): void {
 export function formatObject(obj: Record<string, unknown>): string {
   try {
     return JSON.stringify(obj, null, 2);
-  } catch (e) {
+  } catch {
     return '[Unable to stringify object]';
   }
 }

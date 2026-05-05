@@ -5,6 +5,8 @@ export interface PDKSExportRecord {
   id: string;
   name: string;
   employeeId: string;
+  payrollCode?: string;
+  payrollEmployeeCode?: string;
   department: string;
   firstEntry: string;
   lastExit: string;
@@ -12,6 +14,36 @@ export interface PDKSExportRecord {
   overtime: string;
   leaveType: string;
   status: string;
+}
+
+export interface MonthlyPayrollSheet {
+  year: number;
+  month: number;
+  days: string[];
+  rows: Array<{
+    employeeId: string;
+    payrollCode: string;
+    name: string;
+    cardNumber: string;
+    department: string;
+    cells: Array<{
+      date: string;
+      payrollCode: string;
+      totalMinutes: number;
+      overtimeMinutes: number;
+      multiplier: number;
+      isLate: boolean;
+      isEarlyExit: boolean;
+      isManual: boolean;
+    }>;
+    totals: {
+      totalMinutes: number;
+      overtimeMinutes: number;
+      leaveDays: number;
+      absentDays: number;
+      lateDays: number;
+    };
+  }>;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -28,12 +60,14 @@ export async function exportToExcel(
   records: PDKSExportRecord[],
   options: { title?: string; dateRange?: string } = {}
 ): Promise<void> {
-  const { title = "PDKS Raporu", dateRange = "" } = options;
+  const { dateRange = "" } = options;
 
   const headers = [
     "Çalışan",
     "ID",
+    "Bordro Kodu",
     "Departman",
+    "Gün Kodu",
     "İlk Giriş",
     "Son Çıkış",
     "Toplam Saat",
@@ -45,7 +79,9 @@ export async function exportToExcel(
   const rows = records.map((r) => [
     r.name,
     r.employeeId,
+    r.payrollEmployeeCode ?? "",
     r.department,
+    r.payrollCode ?? "",
     r.firstEntry,
     r.lastExit,
     r.totalHours,
@@ -65,7 +101,9 @@ export async function exportToExcel(
   worksheet.columns = [
     { width: 25 },
     { width: 15 },
+    { width: 14 },
     { width: 18 },
+    { width: 10 },
     { width: 10 },
     { width: 10 },
     { width: 12 },
@@ -142,7 +180,6 @@ export function exportToPdf(
   const { title = "PDKS Raporu", dateRange = "" } = options;
 
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 15;
   const colWidths = [40, 25, 35, 22, 22, 25, 18, 22, 22];
@@ -176,7 +213,7 @@ export function exportToPdf(
   y += headerHeight;
 
   doc.setFont("helvetica", "normal");
-  records.forEach((r, idx) => {
+  records.forEach((r, _idx) => {
     if (y > pageHeight - 25) {
       doc.addPage("a4", "landscape");
       y = margin;
@@ -205,4 +242,161 @@ export function exportToPdf(
 
   const fileName = `PDKS_Raporu_${dateRange || new Date().toISOString().split("T")[0]}.pdf`;
   doc.save(fileName);
+}
+
+const MONTH_NAMES_TR = [
+  "Ocak",
+  "Şubat",
+  "Mart",
+  "Nisan",
+  "Mayıs",
+  "Haziran",
+  "Temmuz",
+  "Ağustos",
+  "Eylül",
+  "Ekim",
+  "Kasım",
+  "Aralık",
+];
+
+/**
+ * Aylık bordro cetveli (pivot Excel): çalışan satır × gün kolonu.
+ * Her gün hücresinde payrollCode (N/RT/HT/İZN/DV) ve geç ise yan üst rozet.
+ * Sağ tarafta: toplam saat, FM saat, izin gün, devamsız gün, geç gün.
+ */
+export async function exportMonthlyPayrollSheet(
+  data: MonthlyPayrollSheet
+): Promise<void> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet(
+    `${MONTH_NAMES_TR[data.month - 1]} ${data.year}`,
+    { views: [{ state: "frozen", xSplit: 4, ySplit: 2 }] }
+  );
+
+  const dayCount = data.days.length;
+  const totalCols = 4 + dayCount + 5; // 4 sabit + günler + 5 toplam
+
+  // Başlık satırı 1 (merge): Ay-yıl başlığı
+  sheet.mergeCells(1, 1, 1, totalCols);
+  const titleCell = sheet.getCell(1, 1);
+  titleCell.value = `${MONTH_NAMES_TR[data.month - 1]} ${data.year} - Aylık Bordro Cetveli`;
+  titleCell.font = { bold: true, size: 14 };
+  titleCell.alignment = { horizontal: "center" };
+
+  // Başlık satırı 2
+  const headerRow = [
+    "Çalışan",
+    "Kart No",
+    "Bordro Kodu",
+    "Departman",
+    ...data.days.map((d) => d.split("-")[2]), // sadece gün
+    "Toplam Saat",
+    "FM Saat",
+    "İzin Günü",
+    "Devamsız Gün",
+    "Geç Gün",
+  ];
+  const r2 = sheet.addRow([]); // satır 2
+  void r2;
+  headerRow.forEach((h, i) => {
+    const c = sheet.getCell(2, i + 1);
+    c.value = h;
+    c.font = { bold: true };
+    c.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFE5E7EB" },
+    };
+    c.alignment = { horizontal: "center" };
+    c.border = {
+      top: { style: "thin" },
+      left: { style: "thin" },
+      bottom: { style: "thin" },
+      right: { style: "thin" },
+    };
+  });
+
+  // Veri satırları
+  data.rows.forEach((row, idx) => {
+    const r = idx + 3;
+    sheet.getCell(r, 1).value = row.name;
+    sheet.getCell(r, 2).value = row.cardNumber;
+    sheet.getCell(r, 3).value = row.payrollCode;
+    sheet.getCell(r, 4).value = row.department;
+
+    row.cells.forEach((cell, ci) => {
+      const c = sheet.getCell(r, 5 + ci);
+      c.value = cell.payrollCode;
+      c.alignment = { horizontal: "center" };
+      let bg: string | null = null;
+      switch (cell.payrollCode) {
+        case "RT":
+          bg = "FFFEE2E2"; // kırmızı
+          break;
+        case "HT":
+          bg = "FFFEF3C7"; // sarı
+          break;
+        case "İZN":
+          bg = "FFDBEAFE"; // mavi
+          break;
+        case "DV":
+          bg = "FFFECACA";
+          break;
+        case "N":
+          bg = cell.isLate ? "FFFEF9C3" : "FFDCFCE7";
+          break;
+      }
+      if (bg) {
+        c.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: bg },
+        };
+      }
+      if (cell.isManual) {
+        c.font = { italic: true, color: { argb: "FF7C3AED" } };
+      }
+    });
+
+    // Toplamlar
+    const totalsCol = 5 + dayCount;
+    sheet.getCell(r, totalsCol).value = (row.totals.totalMinutes / 60).toFixed(2);
+    sheet.getCell(r, totalsCol + 1).value = (
+      row.totals.overtimeMinutes / 60
+    ).toFixed(2);
+    sheet.getCell(r, totalsCol + 2).value = row.totals.leaveDays;
+    sheet.getCell(r, totalsCol + 3).value = row.totals.absentDays;
+    sheet.getCell(r, totalsCol + 4).value = row.totals.lateDays;
+  });
+
+  // Kolon genişlikleri
+  sheet.getColumn(1).width = 24;
+  sheet.getColumn(2).width = 12;
+  sheet.getColumn(3).width = 12;
+  sheet.getColumn(4).width = 18;
+  for (let i = 5; i < 5 + dayCount; i++) {
+    sheet.getColumn(i).width = 5;
+  }
+  for (let i = 5 + dayCount; i < 5 + dayCount + 5; i++) {
+    sheet.getColumn(i).width = 12;
+  }
+
+  // Lejant satırı
+  const legendRow = sheet.addRow([]);
+  legendRow.getCell(1).value =
+    "Kodlar: N=Normal · RT=Resmi Tatil · HT=Hafta Tatili · İZN=İzinli · DV=Devamsız · Mor italik=Manuel düzeltilmiş";
+  legendRow.getCell(1).font = { italic: true, size: 9 };
+  sheet.mergeCells(legendRow.number, 1, legendRow.number, totalCols);
+
+  const fileName = `Aylik_Bordro_Cetveli_${data.year}_${String(data.month).padStart(2, "0")}.xlsx`;
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
 }

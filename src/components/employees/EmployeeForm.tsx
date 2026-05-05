@@ -5,6 +5,7 @@ import EmployeeFormFields from './EmployeeFormFields';
 import { useEmployeeFormData } from './hooks/useEmployeeFormData';
 import { useEmployeeFormSubmit } from './hooks/useEmployeeFormSubmit';
 import { usePhotoUpload } from './hooks/usePhotoUpload';
+import { Loader2 } from 'lucide-react';
 
 interface EmployeeFormProps {
   employee?: Employee | null;
@@ -22,6 +23,7 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
     positions,
     photoPreview,
     setPhotoPreview,
+    optionsLoading,
   } = useEmployeeFormData(employee);
 
   const { isLoading, handleSubmit } = useEmployeeFormSubmit(
@@ -53,17 +55,24 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
           onPhotoChange={onPhotoChange}
         />
 
-        <EmployeeFormFields
-          formData={formData}
-          setFormData={setFormData}
-          companies={companies}
-          departments={departments}
-          accessRules={accessRules}
-          positions={positions}
-        />
+        {optionsLoading ? (
+          <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            Form bilgileri yükleniyor...
+          </div>
+        ) : (
+          <EmployeeFormFields
+            formData={formData}
+            setFormData={setFormData}
+            companies={companies}
+            departments={departments}
+            accessRules={accessRules}
+            positions={positions}
+          />
+        )}
       </div>
 
-      <FormActions isLoading={isLoading} onClose={onClose} />
+      <FormActions isLoading={isLoading || optionsLoading} onClose={onClose} />
     </form>
   );
 }

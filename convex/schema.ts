@@ -46,6 +46,7 @@ export default defineSchema({
   projects: defineTable({
     name: v.string(),
     description: v.optional(v.string()),
+    ownerId: v.optional(v.id("users")),
     isActive: v.optional(v.boolean()),
     createdAt: v.optional(v.string()),
     updatedAt: v.optional(v.string()),
@@ -58,6 +59,7 @@ export default defineSchema({
     email: v.string(),
     tcNo: v.string(),
     cardNumber: v.string(),
+    payrollCode: v.optional(v.string()),
     departmentId: v.optional(v.id("departments")),
     companyId: v.optional(v.id("companies")),
     positionId: v.optional(v.id("positions")),
@@ -231,12 +233,17 @@ export default defineSchema({
     entryTime: v.optional(v.string()),
     exitTime: v.optional(v.string()),
     status: v.string(),
+    manualEntry: v.optional(v.boolean()),
+    manualNote: v.optional(v.string()),
+    editedBy: v.optional(v.id("users")),
+    editedAt: v.optional(v.number()),
     createdAt: v.string(),
     updatedAt: v.string(),
   })
     .index("by_project", ["projectId"])
     .index("by_employee", ["employeeId"])
-    .index("by_date", ["date"]),
+    .index("by_date", ["date"])
+    .index("by_employee_date", ["employeeId", "date"]),
 
   companies: defineTable({
     name: v.string(),
@@ -394,11 +401,55 @@ export default defineSchema({
     lunchBreakStart: v.optional(v.string()),
     lunchBreakEnd: v.optional(v.string()),
     maxLateMinutes: v.optional(v.number()),
+    earlyExitToleranceMinutes: v.optional(v.number()),
     allowLateEntry: v.optional(v.boolean()),
     annualOvertimeLimitHours: v.optional(v.number()),
     overtimeMultiplier: v.optional(v.number()),
     updatedAt: v.optional(v.string()),
   }).index("by_project", ["projectId"]),
+
+  holidays: defineTable({
+    projectId: v.optional(v.id("projects")),
+    date: v.string(),
+    name: v.string(),
+    isHalfDay: v.optional(v.boolean()),
+    createdAt: v.string(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_date", ["projectId", "date"])
+    .index("by_date", ["date"]),
+
+  overtimeRates: defineTable({
+    projectId: v.optional(v.id("projects")),
+    weekdayMultiplier: v.number(),
+    weekendMultiplier: v.number(),
+    holidayMultiplier: v.number(),
+    nightShiftMultiplier: v.number(),
+    nightShiftStart: v.string(),
+    nightShiftEnd: v.string(),
+    updatedAt: v.string(),
+  }).index("by_project", ["projectId"]),
+
+  auditLog: defineTable({
+    userId: v.optional(v.id("users")),
+    userName: v.optional(v.string()),
+    projectId: v.optional(v.id("projects")),
+    action: v.union(
+      v.literal("create"),
+      v.literal("update"),
+      v.literal("delete")
+    ),
+    targetTable: v.string(),
+    targetId: v.string(),
+    oldValue: v.optional(v.any()),
+    newValue: v.optional(v.any()),
+    note: v.optional(v.string()),
+    timestamp: v.number(),
+    ipAddress: v.optional(v.string()),
+  })
+    .index("by_project_timestamp", ["projectId", "timestamp"])
+    .index("by_target", ["targetTable", "targetId"])
+    .index("by_user_timestamp", ["userId", "timestamp"]),
 
   reportScheduleSettings: defineTable({
     userId: v.id("users"),
@@ -413,12 +464,14 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_project", ["projectId"]),
 
-  // Kullanıcı davet sistemi - super_admin kullanıcıları projeye davet eder
+  // Kullanıcı davet sistemi - yetkili kullanıcılar projeye davet eder veya
+  // mevcut kullanıcıya şifre sıfırlama maili gönderir (type === "reset")
   invites: defineTable({
     email: v.string(),
     token: v.string(),
     projectId: v.id("projects"),
     role: v.union(v.literal("project_admin"), v.literal("project_user")),
+    type: v.optional(v.union(v.literal("invite"), v.literal("reset"))),
     createdBy: v.id("users"),
     expiresAt: v.string(),
     used: v.optional(v.boolean()),

@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { useAction } from 'convex/react';
-import { Message, MessageData } from '../types';
+import { Message } from '../types';
 import { sendChatMessage } from '../services/chatService';
 import { useMessages } from './useMessages';
 import { useInput } from './useInput';

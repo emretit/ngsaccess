@@ -1,12 +1,30 @@
 import { Link, useLocation } from "react-router-dom";
-import { Users, Dices, Shield, FileText, CalendarClock, Palmtree, UserCircle, Settings, ShoppingCart } from "lucide-react";
+import {
+  Users,
+  Dices,
+  Shield,
+  FileText,
+  CalendarClock,
+  Palmtree,
+  UserCircle,
+  Settings,
+  ClipboardList,
+} from "lucide-react";
 import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
+import { useAuth } from "@/components/auth/AuthProvider";
 
-const navItems = [
+interface NavItem {
+  name: string;
+  href: string;
+  icon: typeof Users;
+  adminOnly?: boolean;
+}
+
+const navItems: NavItem[] = [
   { name: "Kişiler", href: "/employees", icon: Users },
   { name: "Cihazlar", href: "/devices", icon: Dices },
   { name: "Geçiş Kontrol", href: "/access-control", icon: Shield },
@@ -14,16 +32,21 @@ const navItems = [
   { name: "Vardiyalar", href: "/shifts", icon: CalendarClock },
   { name: "İzinler", href: "/leaves", icon: Palmtree },
   { name: "Çalışan Portalı", href: "/employee-portal", icon: UserCircle },
-  { name: "Siparis", href: "/siparis", icon: ShoppingCart },
+  { name: "Denetim Kaydı", href: "/audit-log", icon: ClipboardList, adminOnly: true },
   { name: "Ayarlar", href: "/settings", icon: Settings },
 ];
 
 export function AppSidebarNav() {
   const location = useLocation();
+  const { profile } = useAuth();
+  const isAdmin =
+    profile?.role === "super_admin" || profile?.role === "project_admin";
 
   return (
     <SidebarMenu>
-      {navItems.map((item) => {
+      {navItems
+        .filter((item) => !item.adminOnly || isAdmin)
+        .map((item) => {
         const Icon = item.icon;
         const isActive = location.pathname === item.href;
 

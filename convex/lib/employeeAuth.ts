@@ -26,9 +26,12 @@ export async function hashEmployeePassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, BCRYPT_COST);
 }
 
+// Sync API kullanılıyor: Convex query/mutation environment'ında setTimeout
+// yasak; bcryptjs.compare async sürümü setTimeout ile chunk yaptığı için
+// "Can't use setTimeout in queries and mutations" hatası verir.
 export async function verifyEmployeePassword(
   plain: string,
   hash: string
 ): Promise<boolean> {
-  return bcrypt.compare(plain, hash);
+  return bcrypt.compareSync(plain, hash);
 }

@@ -22,7 +22,7 @@ interface AiChatPanelProps {
   };
 }
 
-export function AiChatPanel({ onClose, filters }: AiChatPanelProps) {
+export function AiChatPanel({ onClose, filters: _filters }: AiChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",

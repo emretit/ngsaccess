@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, MapPin } from "lucide-react";
 
 export function PDKSCurrentlyInsideWidget() {
-  const { projectIds, isSuperAdmin, loading } = useProjectAccess();
+  const { loading } = useProjectAccess();
   const inside = useQuery(api.dashboard.getCurrentlyInside, !loading ? {} : "skip");
 
   if (loading || inside === undefined) return null;
@@ -17,8 +17,12 @@ export function PDKSCurrentlyInsideWidget() {
     if (zone === "Belirtilmemiş") {
       noZone.push(p);
     } else {
-      if (!byZone.has(zone)) byZone.set(zone, []);
-      byZone.get(zone)!.push(p);
+      const bucket = byZone.get(zone);
+      if (bucket) {
+        bucket.push(p);
+      } else {
+        byZone.set(zone, [p]);
+      }
     }
   }
 

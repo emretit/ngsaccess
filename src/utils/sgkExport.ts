@@ -82,7 +82,6 @@ export async function exportSgkToExcel(data: SgkReportData): Promise<void> {
  */
 export function exportSgkToPdf(data: SgkReportData): void {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 15;
   const colWidths = [28, 45, 22, 35, 22, 22, 28, 18];

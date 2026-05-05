@@ -1,19 +1,42 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
-import { superAdminMutation } from "./lib/customFunctions";
+import { internalMutation, mutation, query } from "./_generated/server";
+import { authedMutation, superAdminMutation } from "./lib/customFunctions";
 
 /**
- * super_admin bir kullanıcıyı projeye davet eder.
- * Dönen token ile /user-setup?token=xxx linki oluşturulur.
+ * Yetkili kullanıcı (super_admin / proje sahibi / proje admin) bir kullanıcıyı
+ * projeye davet eder. Dönen token ile /user-setup?token=xxx linki oluşturulur.
+ *
+ * type === "reset" → mevcut kullanıcıya şifre sıfırlama maili (henüz Convex
+ * Auth password reset entegrasyonu yok; bu field gelecek PR için hazırlık).
  */
-export const create = superAdminMutation({
+export const create = authedMutation({
   args: {
     email: v.string(),
     projectId: v.id("projects"),
     role: v.union(v.literal("project_admin"), v.literal("project_user")),
+    type: v.optional(v.union(v.literal("invite"), v.literal("reset"))),
   },
   returns: v.string(),
   handler: async (ctx, args) => {
+    // Yetki: super_admin veya projenin owner'ı veya o projeye admin olarak atanmış
+    const project = await ctx.db.get(args.projectId);
+    if (!project) throw new Error("Proje bulunamadı");
+
+    const isSuperAdmin = ctx.user.role === "super_admin";
+    const isOwner = project.ownerId === ctx.user._id;
+    let isProjectAdmin = false;
+    if (!isSuperAdmin && !isOwner && ctx.user.role === "project_admin") {
+      const membership = await ctx.db
+        .query("userProjects")
+        .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
+        .filter((q) => q.eq(q.field("projectId"), args.projectId))
+        .first();
+      isProjectAdmin = membership !== null;
+    }
+    if (!isSuperAdmin && !isOwner && !isProjectAdmin) {
+      throw new Error("Bu projeye davet gönderme yetkin yok");
+    }
+
     // Aynı email için kullanılmamış davet varsa önce onu iptal et
     const existing = await ctx.db
       .query("invites")
@@ -32,6 +55,7 @@ export const create = superAdminMutation({
       token,
       projectId: args.projectId,
       role: args.role,
+      type: args.type ?? "invite",
       createdBy: ctx.user._id,
       expiresAt,
       used: false,
@@ -52,6 +76,7 @@ export const verify = query({
       email: v.string(),
       projectId: v.id("projects"),
       role: v.union(v.literal("project_admin"), v.literal("project_user")),
+      type: v.union(v.literal("invite"), v.literal("reset")),
       expiresAt: v.string(),
     }),
     v.null()
@@ -70,6 +95,7 @@ export const verify = query({
       email: invite.email,
       projectId: invite.projectId,
       role: invite.role,
+      type: invite.type ?? "invite",
       expiresAt: invite.expiresAt,
     };
   },
@@ -162,5 +188,57 @@ export const list = superAdminMutation({
         .collect();
     }
     return await ctx.db.query("invites").collect();
+  },
+});
+
+/**
+ * Dev/admin: belirli bir email için davet kayıtlarını listeler.
+ */
+export const adminListByEmail = internalMutation({
+  args: { email: v.string() },
+  returns: v.array(v.object({
+    _id: v.id("invites"),
+    email: v.string(),
+    projectId: v.id("projects"),
+    role: v.union(v.literal("project_admin"), v.literal("project_user")),
+    type: v.union(v.literal("invite"), v.literal("reset")),
+    expiresAt: v.string(),
+    used: v.boolean(),
+    token: v.string(),
+  })),
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("invites")
+      .withIndex("by_email", (q) => q.eq("email", args.email.toLowerCase()))
+      .collect();
+    return rows.map((r) => ({
+      _id: r._id,
+      email: r.email,
+      projectId: r.projectId,
+      role: r.role,
+      type: r.type ?? "invite",
+      expiresAt: r.expiresAt,
+      used: r.used ?? false,
+      token: r.token,
+    }));
+  },
+});
+
+/**
+ * Dev/admin: belirli bir email için tüm davet kayıtlarını siler.
+ * Sadece `npx convex run` ile çağrılabilir (internal).
+ */
+export const adminDeleteByEmail = internalMutation({
+  args: { email: v.string() },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("invites")
+      .withIndex("by_email", (q) => q.eq("email", args.email.toLowerCase()))
+      .collect();
+    for (const r of rows) {
+      await ctx.db.delete(r._id);
+    }
+    return rows.length;
   },
 });

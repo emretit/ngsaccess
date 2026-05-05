@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { EmployeeFormData } from './hooks/useEmployeeFormData';
+import type { Id } from '../../../convex/_generated/dataModel';
 
 interface EmployeeFormFieldsProps {
   formData: EmployeeFormData;
@@ -85,6 +86,16 @@ export default function EmployeeFormFields({
             required
           />
         </div>
+
+        <div>
+          <Label htmlFor="payroll_code">Bordro Kodu</Label>
+          <Input
+            id="payroll_code"
+            value={formData.payrollCode}
+            onChange={(e) => handleInputChange('payrollCode', e.target.value)}
+            placeholder="Bordro yazılımındaki personel kodu"
+          />
+        </div>
       </div>
 
       {/* Work Information */}
@@ -95,7 +106,7 @@ export default function EmployeeFormFields({
           <Label htmlFor="company_id">Şirket</Label>
           <Select
             value={formData.companyId ?? ''}
-            onValueChange={(value) => handleInputChange('companyId', value || null)}
+            onValueChange={(value) => handleInputChange('companyId', (value || null) as Id<'companies'> | null)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Şirket seçin" />
@@ -114,7 +125,7 @@ export default function EmployeeFormFields({
           <Label htmlFor="department_id">Departman</Label>
           <Select
             value={formData.departmentId ?? ''}
-            onValueChange={(value) => handleInputChange('departmentId', value || null)}
+            onValueChange={(value) => handleInputChange('departmentId', (value || null) as Id<'departments'> | null)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Departman seçin" />
@@ -133,7 +144,7 @@ export default function EmployeeFormFields({
           <Label htmlFor="position_id">Pozisyon</Label>
           <Select
             value={formData.positionId ?? ''}
-            onValueChange={(value) => handleInputChange('positionId', value || null)}
+            onValueChange={(value) => handleInputChange('positionId', (value || null) as Id<'positions'> | null)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Pozisyon seçin" />
@@ -152,7 +163,7 @@ export default function EmployeeFormFields({
           <Label htmlFor="access_rule_id">Erişim Kuralı</Label>
           <Select
             value={formData.accessRuleId ?? ''}
-            onValueChange={(value) => handleInputChange('accessRuleId', value || null)}
+            onValueChange={(value) => handleInputChange('accessRuleId', (value || null) as Id<'accessRules'> | null)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Erişim kuralı seçin" />

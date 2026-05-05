@@ -3,13 +3,15 @@ import { api } from "../../../convex/_generated/api";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 
 const ZonesAndDoors = () => {
-  const zones = useQuery(api.zones.list, {}) ?? [];
-  const doors = useQuery(api.doors.list, {}) ?? [];
-  const zonesLoading = zones === undefined;
-  const doorsLoading = doors === undefined;
+  const zonesData = useQuery(api.zones.list, {});
+  const doorsData = useQuery(api.doors.list, {});
+  const zonesLoading = zonesData === undefined;
+  const doorsLoading = doorsData === undefined;
+  const zones = zonesData ?? [];
+  const doors = doorsData ?? [];
 
   return (
     <div className="space-y-6">
@@ -32,7 +34,12 @@ const ZonesAndDoors = () => {
           <CardHeader><CardTitle>Bölgeler</CardTitle></CardHeader>
           <CardContent>
             {zonesLoading ? (
-              <div>Yükleniyor...</div>
+              <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Yükleniyor...
+              </div>
+            ) : zones.length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground py-8">Bölge yok</p>
             ) : (
               <div className="space-y-2">
                 {zones.map((zone: { _id: string; name: string; description?: string }) => (
@@ -50,7 +57,12 @@ const ZonesAndDoors = () => {
           <CardHeader><CardTitle>Kapılar</CardTitle></CardHeader>
           <CardContent>
             {doorsLoading ? (
-              <div>Yükleniyor...</div>
+              <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Yükleniyor...
+              </div>
+            ) : doors.length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground py-8">Kapı yok</p>
             ) : (
               <div className="space-y-2">
                 {doors.map((door: { _id: string; name: string; location?: string; status?: string }) => (

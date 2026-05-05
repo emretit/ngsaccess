@@ -1,7 +1,17 @@
 import { Fragment, useState } from "react";
-import { ChevronDown, ChevronRight, Download, Search, Filter } from "lucide-react";
-import { exportToExcel, exportToCsv, exportToPdf } from "@/utils/pdksExport";
+import { ChevronDown, ChevronRight, Download, Search, Filter, Pencil } from "lucide-react";
+import {
+  exportToExcel,
+  exportToCsv,
+  exportToPdf,
+  exportMonthlyPayrollSheet,
+} from "@/utils/pdksExport";
 import { useToast } from "@/hooks/use-toast";
+import { useConvex } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { ManualPdksEditDialog } from "../ManualPdksEditDialog";
+import type { Id } from "../../../../convex/_generated/dataModel";
 import {
   Table,
   TableBody,
@@ -25,6 +35,8 @@ interface EmployeeRecord {
   id: string;
   name: string;
   employeeId: string;
+  payrollCode?: string;
+  payrollEmployeeCode?: string;
   department: string;
   firstEntry: string;
   lastExit: string;
@@ -32,6 +44,11 @@ interface EmployeeRecord {
   overtime: string;
   leaveType: string;
   status: 'present' | 'late' | 'absent' | 'leave';
+  isLate?: boolean;
+  isEarlyExit?: boolean;
+  isManual?: boolean;
+  manualNote?: string | null;
+  manualEditedBy?: string | null;
   detailedLogs?: Array<{
     time: string;
     action: string;
@@ -49,7 +66,12 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [editingRecord, setEditingRecord] = useState<EmployeeRecord | null>(null);
   const { toast } = useToast();
+  const convex = useConvex();
+  const { profile } = useAuth();
+  const canEdit =
+    profile?.role === "super_admin" || profile?.role === "project_admin";
 
   const safeRecords = Array.isArray(records) ? records : [];
 
@@ -66,6 +88,29 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
   const handleExportPdf = () => {
     exportToPdf(filteredRecords, { dateRange: selectedDate?.toISOString().split("T")[0] ?? "" });
     toast({ title: "PDF indirildi", description: `${filteredRecords.length} kayıt dışa aktarıldı.` });
+  };
+
+  const handleExportMonthly = async () => {
+    const ref = selectedDate ?? new Date();
+    const year = ref.getFullYear();
+    const month = ref.getMonth() + 1;
+    try {
+      const data = await convex.query(api.cardReadings.getMonthlyPayrollSheet, {
+        year,
+        month,
+      });
+      await exportMonthlyPayrollSheet(data);
+      toast({
+        title: "Aylık bordro cetveli indirildi",
+        description: `${data.rows.length} çalışan, ${data.days.length} gün.`,
+      });
+    } catch (e) {
+      toast({
+        title: "Hata",
+        description: e instanceof Error ? e.message : "Cetvel oluşturulamadı",
+        variant: "destructive",
+      });
+    }
   };
 
   const toggleRowExpansion = (id: string) => {
@@ -180,6 +225,9 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
                 <DropdownMenuItem onClick={handleExportExcel}>📊 Excel (.xlsx)</DropdownMenuItem>
                 <DropdownMenuItem onClick={handleExportPdf}>📄 PDF</DropdownMenuItem>
                 <DropdownMenuItem onClick={handleExportCsv}>📝 CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportMonthly}>
+                  📅 Aylık Bordro Cetveli
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -201,6 +249,11 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
                 <TableHead className="font-semibold text-gray-700">Mesai</TableHead>
                 <TableHead className="font-semibold text-gray-700">İzin</TableHead>
                 <TableHead className="font-semibold text-gray-700">Durum</TableHead>
+                {canEdit && (
+                  <TableHead className="font-semibold text-gray-700 w-20">
+                    Aksiyon
+                  </TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -220,7 +273,23 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
                         <ChevronRight className="h-4 w-4 text-gray-400" />
                       )}
                     </TableCell>
-                    <TableCell className="font-medium text-gray-900">{record.name}</TableCell>
+                    <TableCell className="font-medium text-gray-900">
+                      <div className="flex items-center gap-2">
+                        {record.name}
+                        {record.isManual && (
+                          <span
+                            title={
+                              record.manualNote
+                                ? `Manuel düzeltme — ${record.manualEditedBy ?? ""}: ${record.manualNote}`
+                                : `Manuel düzeltme${record.manualEditedBy ? ` — ${record.manualEditedBy}` : ""}`
+                            }
+                            className="text-purple-600"
+                          >
+                            ✏️
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-gray-600">{record.employeeId}</TableCell>
                     <TableCell>
                       <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
@@ -232,12 +301,36 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
                     <TableCell className="font-semibold text-green-700">{record.totalHours}</TableCell>
                     <TableCell className="font-semibold text-purple-700">{record.overtime}</TableCell>
                     <TableCell>{record.leaveType}</TableCell>
-                    <TableCell>{getStatusBadge(record.status)}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        {getStatusBadge(record.status)}
+                        {record.isEarlyExit && (
+                          <Badge className="bg-orange-100 text-orange-800 border-orange-200 border text-xs">
+                            Erken Çıkış
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    {canEdit && (
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingRecord(record);
+                          }}
+                          title="Manuel düzelt"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                   
                   {expandedRows.has(record.id) && record.detailedLogs && (
                     <TableRow>
-                      <TableCell colSpan={10} className="bg-linear-to-r from-blue-50 to-indigo-50 border-l-4 border-primary">
+                      <TableCell colSpan={canEdit ? 11 : 10} className="bg-linear-to-r from-blue-50 to-indigo-50 border-l-4 border-primary">
                         <div className="p-6">
                           <h4 className="font-bold mb-4 text-gray-800 flex items-center gap-2">
                             🕐 Günlük Detaylı Kayıtlar - {record.name}
@@ -272,6 +365,21 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
           </Table>
         </div>
       </CardContent>
+      {editingRecord && (
+        <ManualPdksEditDialog
+          open={!!editingRecord}
+          employeeId={editingRecord.id as Id<"employees">}
+          employeeName={editingRecord.name}
+          date={(selectedDate ?? new Date()).toISOString().split("T")[0]}
+          initialEntry={
+            editingRecord.firstEntry !== "-" ? editingRecord.firstEntry : ""
+          }
+          initialExit={
+            editingRecord.lastExit !== "-" ? editingRecord.lastExit : ""
+          }
+          onClose={() => setEditingRecord(null)}
+        />
+      )}
     </Card>
   );
 }

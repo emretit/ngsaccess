@@ -15,7 +15,7 @@ const LEAVE_TYPE_LABELS: Record<string, string> = {
 };
 
 export function PDKSDashboardWidgets() {
-  const { projectIds, isSuperAdmin, loading } = useProjectAccess();
+  const { loading } = useProjectAccess();
   const widgets = useQuery(api.dashboard.getPdksDashboardWidgets, !loading ? {} : "skip");
 
   if (loading || !widgets) return null;

@@ -7,7 +7,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 export const useDashboard = () => {
   const { isAuthenticated } = useConvexAuth();
   const { profile } = useAuth();
-  const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
+  const { loading: projectLoading } = useProjectAccess();
 
   const stats = useQuery(
     api.dashboard.getStats,

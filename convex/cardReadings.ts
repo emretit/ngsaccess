@@ -8,6 +8,17 @@ import {
 } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import { Doc } from "./_generated/dataModel";
+import {
+  getEffectiveWorkSettings,
+  getEffectiveOvertimeRates,
+  getHolidaysMap,
+  parseHHMM,
+  classifyDay,
+  multiplierForClassification,
+  payrollCodeForDay,
+  evaluateLateEarly,
+  DEFAULT_WEEKEND_DAYS,
+} from "./lib/pdksHelpers";
 
 export const list = authedQuery({
   args: {
@@ -162,17 +173,13 @@ export const getPdksTableData = authedQuery({
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    let startISO: string;
-    let endISO: string;
 
-    if (args.startDate && args.endDate) {
-      startISO = `${args.startDate}T00:00:00.000`;
-      endISO = `${args.endDate}T23:59:59.999`;
-    } else {
-      const today = args.date ?? new Date().toISOString().split("T")[0];
-      startISO = `${today}T00:00:00.000`;
-      endISO = `${today}T23:59:59.999`;
-    }
+    const today = args.date ?? new Date().toISOString().split("T")[0];
+    const startDate = args.startDate ?? today;
+    const endDate = args.endDate ?? today;
+    const startISO = `${startDate}T00:00:00.000`;
+    const endISO = `${endDate}T23:59:59.999`;
+    const isSingleDay = startDate === endDate;
 
     let readings;
     let employees: Doc<"employees">[];
@@ -249,6 +256,50 @@ export const getPdksTableData = authedQuery({
       employeeMap.get(empKey)!.push(r);
     }
 
+    // Settings & holidays per project (super_admin için global = undefined)
+    const referenceProjectId =
+      ctx.user.role === "super_admin"
+        ? undefined
+        : allowedProjectIds[0] ?? undefined;
+    const [workSettings, holidayMap, generalSettings] = await Promise.all([
+      getEffectiveWorkSettings(ctx, referenceProjectId),
+      getHolidaysMap(ctx, referenceProjectId, startDate, endDate),
+      ctx.db
+        .query("generalSettings")
+        .withIndex("by_project", (q) => q.eq("projectId", referenceProjectId))
+        .first(),
+    ]);
+    const workingDays =
+      generalSettings?.workingDays && generalSettings.workingDays.length > 0
+        ? generalSettings.workingDays
+        : ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
+    const weekendByDefault = !workingDays.some((d) =>
+      DEFAULT_WEEKEND_DAYS.includes(d)
+    );
+    void weekendByDefault;
+
+    // pdksRecords manuel override haritası
+    const manualPdksByEmpDate = new Map<string, Doc<"pdksRecords">>();
+    for (const empKey of employeeMap.keys()) {
+      const emp = empById.get(empKey);
+      if (!emp) continue;
+      const recs = await ctx.db
+        .query("pdksRecords")
+        .withIndex("by_employee_date", (q) => q.eq("employeeId", emp._id))
+        .filter((q) =>
+          q.and(
+            q.gte(q.field("date"), startDate),
+            q.lte(q.field("date"), endDate)
+          )
+        )
+        .collect();
+      for (const r of recs) {
+        if (r.manualEntry) {
+          manualPdksByEmpDate.set(`${empKey}__${r.date}`, r);
+        }
+      }
+    }
+
     const STANDARD_DAY_MINUTES = 8 * 60;
     const STANDARD_WEEK_MINUTES = 45 * 60;
 
@@ -265,22 +316,23 @@ export const getPdksTableData = authedQuery({
       parental: "Doğum/Ebeveyn",
     };
 
+    const periodDateKeys: string[] = [];
+    for (
+      let d = new Date(`${startDate}T00:00:00.000Z`);
+      d <= new Date(`${endDate}T00:00:00.000Z`);
+      d.setUTCDate(d.getUTCDate() + 1)
+    ) {
+      periodDateKeys.push(d.toISOString().split("T")[0]);
+    }
+
     const tableData = await Promise.all(
       Array.from(employeeMap.entries()).map(async ([empKey, empReadings]) => {
         const employee = empById.get(empKey) ?? null;
         const department = employee?.departmentId
-          ? await ctx.db.get(employee.departmentId) as Doc<"departments"> | null
+          ? (await ctx.db.get(employee.departmentId)) as Doc<"departments"> | null
           : null;
 
         const empId = employee?._id;
-        const periodDateKeys: string[] = [];
-        for (
-          let d = new Date(startISO);
-          d <= new Date(endISO);
-          d.setDate(d.getDate() + 1)
-        ) {
-          periodDateKeys.push(d.toISOString().split("T")[0]);
-        }
         const hasLeave = empId
           ? allLeaves.some((l) => {
               if (l.employeeId !== empId) return false;
@@ -293,19 +345,36 @@ export const getPdksTableData = authedQuery({
               return periodDateKeys.some((dk) => dk >= l.startDate && dk <= l.endDate);
             })
           : null;
-        const leaveType = leaveRecord ? leaveTypeLabels[leaveRecord.leaveType] ?? leaveRecord.leaveType : "-";
+        const leaveType = leaveRecord
+          ? leaveTypeLabels[leaveRecord.leaveType] ?? leaveRecord.leaveType
+          : "-";
 
         const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
-        const firstEntry = granted[0];
-        const lastExit = granted[granted.length - 1];
+
+        // Tek gün modunda manuel override öncelikli
+        const manualToday =
+          isSingleDay && empId
+            ? manualPdksByEmpDate.get(`${empKey}__${startDate}`)
+            : undefined;
+
+        const firstEntryISO = manualToday?.entryTime
+          ? `${startDate}T${manualToday.entryTime}:00.000`
+          : granted[0]?.accessTime;
+        const lastExitISO = manualToday?.exitTime
+          ? `${startDate}T${manualToday.exitTime}:00.000`
+          : granted[granted.length - 1]?.accessTime;
+
+        const { isLate, isEarlyExit } = evaluateLateEarly(
+          firstEntryISO,
+          lastExitISO !== firstEntryISO ? lastExitISO : undefined,
+          workSettings
+        );
 
         let status: "present" | "late" | "absent" | "leave" = "present";
-        if (hasLeave && !firstEntry) {
+        if (hasLeave && !firstEntryISO) {
           status = "leave";
-        } else if (firstEntry) {
-          const h = new Date(firstEntry.accessTime).getHours();
-          const m = new Date(firstEntry.accessTime).getMinutes();
-          if (h > 9 || (h === 9 && m > 15)) status = "late";
+        } else if (firstEntryISO) {
+          if (isLate) status = "late";
         } else {
           status = "absent";
         }
@@ -320,27 +389,64 @@ export const getPdksTableData = authedQuery({
         let totalMinutes = 0;
         for (const dayReadings of dayReadingsMap.values()) {
           dayReadings.sort(
-            (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
+            (a, b) =>
+              new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
           );
           const firstOfDay = dayReadings[0];
           const lastOfDay = dayReadings[dayReadings.length - 1];
           if (firstOfDay._id !== lastOfDay._id) {
             const diff =
-              new Date(lastOfDay.accessTime).getTime() - new Date(firstOfDay.accessTime).getTime();
+              new Date(lastOfDay.accessTime).getTime() -
+              new Date(firstOfDay.accessTime).getTime();
             totalMinutes += Math.floor(diff / 60000);
           }
         }
 
+        // Manuel override total minutes hesabı (tek gün)
+        if (isSingleDay && manualToday?.entryTime && manualToday?.exitTime) {
+          const entryMin = parseHHMM(manualToday.entryTime);
+          const exitMin = parseHHMM(manualToday.exitTime);
+          totalMinutes = Math.max(0, exitMin - entryMin);
+        }
+
         const totalHours = `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
 
-        const workDays = dayReadingsMap.size;
-        const overtimeMinutes = workDays <= 1
-          ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES)
-          : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
+        const workDays = dayReadingsMap.size || (manualToday ? 1 : 0);
+        const overtimeMinutes =
+          workDays <= 1
+            ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES)
+            : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
         const overtime = overtimeMinutes > 0 ? `${overtimeMinutes}m` : "0m";
         const overtimeHours = overtimeMinutes / 60;
-        const OVERTIME_MULTIPLIER = 1.5;
-        const overtimePayMultiplier = overtimeMinutes > 0 ? OVERTIME_MULTIPLIER : 0;
+
+        // Tek gün modunda günün tipine göre çarpan; period için workSettings.overtimeMultiplier
+        let overtimePayMultiplier = 0;
+        if (overtimeMinutes > 0) {
+          if (isSingleDay) {
+            const cls = classifyDay(startDate, workingDays, holidayMap.get(startDate));
+            const rates = await getEffectiveOvertimeRates(ctx, referenceProjectId);
+            overtimePayMultiplier = multiplierForClassification(cls, rates);
+          } else {
+            overtimePayMultiplier = workSettings.overtimeMultiplier;
+          }
+        }
+
+        // payrollCode (tek gün için anlamlı; periodda günleri karıştırır)
+        const payrollCode = isSingleDay
+          ? payrollCodeForDay({
+              classification: classifyDay(
+                startDate,
+                workingDays,
+                holidayMap.get(startDate)
+              ),
+              hasLeave,
+              hasAttendance: !!firstEntryISO,
+            })
+          : "—";
+
+        const editor = manualToday?.editedBy
+          ? await ctx.db.get(manualToday.editedBy)
+          : null;
 
         return {
           id: empKey,
@@ -348,23 +454,40 @@ export const getPdksTableData = authedQuery({
             ? `${employee.firstName} ${employee.lastName}`.trim()
             : "Bilinmiyor",
           employeeId: employee?.cardNumber ?? empKey,
+          payrollCode,
+          payrollEmployeeCode: employee?.payrollCode ?? "",
           department: department?.name ?? "-",
-          firstEntry: firstEntry
-            ? new Date(firstEntry.accessTime).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
+          firstEntry: firstEntryISO
+            ? new Date(firstEntryISO).toLocaleTimeString("tr-TR", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
             : "-",
           lastExit:
-            lastExit && lastExit._id !== firstEntry?._id
-              ? new Date(lastExit.accessTime).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
+            lastExitISO && lastExitISO !== firstEntryISO
+              ? new Date(lastExitISO).toLocaleTimeString("tr-TR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
               : "-",
           totalHours,
           overtime,
           overtimeHours,
           overtimeMultiplier: overtimePayMultiplier,
-          yearlyOvertimeLimit: 270,
+          yearlyOvertimeLimit: workSettings.annualOvertimeLimitHours,
           leaveType,
           status,
+          isLate,
+          isEarlyExit,
+          isManual: !!manualToday,
+          manualNote: manualToday?.manualNote ?? null,
+          manualEditedBy:
+            editor?.fullName ?? editor?.name ?? editor?.email ?? null,
           detailedLogs: empReadings.map((r) => ({
-            time: new Date(r.accessTime).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }),
+            time: new Date(r.accessTime).toLocaleTimeString("tr-TR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
             action: r.accessStatus === "izin_verildi" ? "Giriş" : "Reddedildi",
             location: "Bilinmiyor",
           })),
@@ -571,6 +694,270 @@ export const getPdksChartData = authedQuery({
   },
 });
 
+/**
+ * Aylık bordro cetveli - çalışan × gün matrisi.
+ * Her gün için: payrollCode (N/RT/HT/İZN/DV), çalışılan dakika, geç kalma flag,
+ * fazla mesai dakikası ve günün çarpanı.
+ */
+export const getMonthlyPayrollSheet = authedQuery({
+  args: {
+    year: v.number(),
+    month: v.number(), // 1-12
+  },
+  handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+
+    const monthStr = String(args.month).padStart(2, "0");
+    const lastDay = new Date(args.year, args.month, 0).getUTCDate();
+    const startDate = `${args.year}-${monthStr}-01`;
+    const endDate = `${args.year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
+    const startISO = `${startDate}T00:00:00.000`;
+    const endISO = `${endDate}T23:59:59.999`;
+
+    let readings;
+    let employees: Doc<"employees">[];
+    if (ctx.user.role === "super_admin") {
+      [readings, employees] = await Promise.all([
+        ctx.db
+          .query("cardReadings")
+          .withIndex("by_access_time")
+          .filter((q) =>
+            q.and(
+              q.gte(q.field("accessTime"), startISO),
+              q.lte(q.field("accessTime"), endISO)
+            )
+          )
+          .collect(),
+        ctx.db
+          .query("employees")
+          .filter((q) => q.eq(q.field("isActive"), true))
+          .collect(),
+      ]);
+    } else if (allowedProjectIds.length > 0) {
+      const [readingResults, empResults] = await Promise.all([
+        Promise.all(
+          allowedProjectIds.map((pid) =>
+            ctx.db
+              .query("cardReadings")
+              .withIndex("by_project", (q) => q.eq("projectId", pid))
+              .filter((q) =>
+                q.and(
+                  q.gte(q.field("accessTime"), startISO),
+                  q.lte(q.field("accessTime"), endISO)
+                )
+              )
+              .collect()
+          )
+        ),
+        Promise.all(
+          allowedProjectIds.map((pid) =>
+            ctx.db
+              .query("employees")
+              .withIndex("by_project", (q) => q.eq("projectId", pid))
+              .filter((q) => q.eq(q.field("isActive"), true))
+              .collect()
+          )
+        ),
+      ]);
+      readings = readingResults.flat();
+      employees = empResults.flat();
+    } else {
+      return { days: [], rows: [], year: args.year, month: args.month };
+    }
+
+    const referenceProjectId =
+      ctx.user.role === "super_admin"
+        ? undefined
+        : allowedProjectIds[0] ?? undefined;
+    const [workSettings, holidayMap, generalSettings, overtimeRates] =
+      await Promise.all([
+        getEffectiveWorkSettings(ctx, referenceProjectId),
+        getHolidaysMap(ctx, referenceProjectId, startDate, endDate),
+        ctx.db
+          .query("generalSettings")
+          .withIndex("by_project", (q) => q.eq("projectId", referenceProjectId))
+          .first(),
+        getEffectiveOvertimeRates(ctx, referenceProjectId),
+      ]);
+    const workingDays =
+      generalSettings?.workingDays && generalSettings.workingDays.length > 0
+        ? generalSettings.workingDays
+        : ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
+
+    // Liste tüm günler için
+    const days: string[] = [];
+    for (let d = 1; d <= lastDay; d++) {
+      days.push(`${args.year}-${monthStr}-${String(d).padStart(2, "0")}`);
+    }
+
+    // Onaylı izinler
+    const approvedLeaves = await ctx.db
+      .query("leaves")
+      .filter((q) => q.eq(q.field("status"), "approved"))
+      .collect();
+
+    // Manuel pdksRecords her çalışan için ay aralığı
+    const empIds = employees.map((e) => e._id);
+    const manualByEmpDate = new Map<string, Doc<"pdksRecords">>();
+    for (const eid of empIds) {
+      const recs = await ctx.db
+        .query("pdksRecords")
+        .withIndex("by_employee_date", (q) => q.eq("employeeId", eid))
+        .filter((q) =>
+          q.and(
+            q.gte(q.field("date"), startDate),
+            q.lte(q.field("date"), endDate)
+          )
+        )
+        .collect();
+      for (const r of recs) {
+        if (r.manualEntry) manualByEmpDate.set(`${eid}__${r.date}`, r);
+      }
+    }
+
+    // readings'i çalışan × gün'e grupla
+    const empByCard = new Map<string, Doc<"employees">>();
+    for (const e of employees) {
+      if (e.cardNumber) empByCard.set(e.cardNumber, e);
+    }
+
+    const empDayReadings = new Map<string, Doc<"cardReadings">[]>();
+    for (const r of readings) {
+      let empId: string | null = null;
+      if (r.employeeId && empIds.some((id) => id === r.employeeId)) {
+        empId = String(r.employeeId);
+      } else if (r.cardNo && empByCard.has(r.cardNo)) {
+        empId = String(empByCard.get(r.cardNo)!._id);
+      }
+      if (!empId) continue;
+      const dateKey = r.accessTime.split("T")[0];
+      const key = `${empId}__${dateKey}`;
+      if (!empDayReadings.has(key)) empDayReadings.set(key, []);
+      empDayReadings.get(key)!.push(r);
+    }
+
+    const STANDARD_DAY_MINUTES = 8 * 60;
+
+    const rows = await Promise.all(
+      employees.map(async (emp) => {
+        const department = emp.departmentId
+          ? ((await ctx.db.get(emp.departmentId)) as Doc<"departments"> | null)
+          : null;
+
+        const cells = days.map((d) => {
+          const manual = manualByEmpDate.get(`${emp._id}__${d}`);
+          const dayReadings = (empDayReadings.get(`${emp._id}__${d}`) ?? [])
+            .filter((r) => r.accessStatus === "izin_verildi")
+            .sort(
+              (a, b) =>
+                new Date(a.accessTime).getTime() -
+                new Date(b.accessTime).getTime()
+            );
+
+          const hasLeave = approvedLeaves.some(
+            (l) =>
+              l.employeeId === emp._id &&
+              d >= l.startDate &&
+              d <= l.endDate
+          );
+          const cls = classifyDay(d, workingDays, holidayMap.get(d));
+          const hasAttendance =
+            (manual?.entryTime != null && manual?.exitTime != null) ||
+            dayReadings.length >= 2;
+          const code = payrollCodeForDay({
+            classification: cls,
+            hasLeave,
+            hasAttendance,
+          });
+
+          let totalMin = 0;
+          if (manual?.entryTime && manual?.exitTime) {
+            totalMin = Math.max(
+              0,
+              parseHHMM(manual.exitTime) - parseHHMM(manual.entryTime)
+            );
+          } else if (dayReadings.length >= 2) {
+            const first = dayReadings[0];
+            const last = dayReadings[dayReadings.length - 1];
+            totalMin = Math.floor(
+              (new Date(last.accessTime).getTime() -
+                new Date(first.accessTime).getTime()) /
+                60000
+            );
+          }
+
+          const entryISO = manual?.entryTime
+            ? `${d}T${manual.entryTime}:00.000`
+            : dayReadings[0]?.accessTime;
+          const exitISO = manual?.exitTime
+            ? `${d}T${manual.exitTime}:00.000`
+            : dayReadings[dayReadings.length - 1]?.accessTime;
+          const { isLate, isEarlyExit } = evaluateLateEarly(
+            entryISO,
+            exitISO !== entryISO ? exitISO : undefined,
+            workSettings
+          );
+
+          const overtimeMin =
+            cls === "workday"
+              ? Math.max(0, totalMin - STANDARD_DAY_MINUTES)
+              : totalMin; // weekend/holiday: tüm çalışılan süre FM
+          const multiplier =
+            overtimeMin > 0
+              ? multiplierForClassification(cls, overtimeRates)
+              : 0;
+
+          return {
+            date: d,
+            payrollCode: code,
+            totalMinutes: totalMin,
+            overtimeMinutes: overtimeMin,
+            multiplier,
+            isLate,
+            isEarlyExit,
+            isManual: !!manual,
+          };
+        });
+
+        const totals = cells.reduce(
+          (acc, c) => {
+            acc.totalMinutes += c.totalMinutes;
+            acc.overtimeMinutes += c.overtimeMinutes;
+            if (c.payrollCode === "İZN") acc.leaveDays += 1;
+            if (c.payrollCode === "DV") acc.absentDays += 1;
+            if (c.isLate) acc.lateDays += 1;
+            return acc;
+          },
+          {
+            totalMinutes: 0,
+            overtimeMinutes: 0,
+            leaveDays: 0,
+            absentDays: 0,
+            lateDays: 0,
+          }
+        );
+
+        return {
+          employeeId: emp._id,
+          payrollCode: emp.payrollCode ?? "",
+          name: `${emp.firstName} ${emp.lastName}`.trim(),
+          cardNumber: emp.cardNumber,
+          department: department?.name ?? "-",
+          cells,
+          totals,
+        };
+      })
+    );
+
+    return {
+      days,
+      rows: rows.sort((a, b) => a.name.localeCompare(b.name, "tr")),
+      year: args.year,
+      month: args.month,
+    };
+  },
+});
+
 export const insert = mutation({
   args: {
     projectId: v.optional(v.id("projects")),
@@ -626,6 +1013,118 @@ export const processCardReading = internalMutation({
     if (!device && args.deviceIp?.trim()) {
       const all = await ctx.db.query("devices").collect();
       device = all.find((d) => d.deviceIp?.trim() === args.deviceIp!.trim()) ?? null;
+    }
+
+    // Mobil dinamik QR token branch'i: cihaz QR'ı kart gibi POST'lar.
+    // UUID v4 formatı gerçek kart numaralarıyla çakışmaz (kartlar tiresiz).
+    const isToken = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(args.cardNo);
+    if (isToken) {
+      const tokenRow = await ctx.db
+        .query("checkInTokens")
+        .withIndex("by_token", (q) => q.eq("token", args.cardNo))
+        .first();
+
+      if (!tokenRow) {
+        await ctx.db.insert("cardReadings", {
+          projectId: projectForRow(undefined, device?.projectId),
+          deviceId: device?._id,
+          cardNo: args.cardNo,
+          accessTime,
+          accessStatus: "reddedildi",
+          rawData: args.rawBody,
+          createdAt: accessTime,
+          updatedAt: accessTime,
+        });
+        return { granted: false };
+      }
+
+      if (tokenRow.usedAt) {
+        await ctx.db.insert("cardReadings", {
+          projectId: projectForRow(undefined, device?.projectId),
+          deviceId: device?._id,
+          employeeId: tokenRow.employeeId,
+          cardNo: args.cardNo,
+          accessTime,
+          accessStatus: "reddedildi",
+          rawData: args.rawBody,
+          createdAt: accessTime,
+          updatedAt: accessTime,
+        });
+        return { granted: false };
+      }
+
+      if (new Date(accessTime) > new Date(tokenRow.expiresAt)) {
+        await ctx.db.insert("cardReadings", {
+          projectId: projectForRow(undefined, device?.projectId),
+          deviceId: device?._id,
+          employeeId: tokenRow.employeeId,
+          cardNo: args.cardNo,
+          accessTime,
+          accessStatus: "reddedildi",
+          rawData: args.rawBody,
+          createdAt: accessTime,
+          updatedAt: accessTime,
+        });
+        return { granted: false };
+      }
+
+      const tokenEmployee = await ctx.db.get(tokenRow.employeeId);
+      if (!tokenEmployee || !tokenEmployee.isActive) {
+        await ctx.db.insert("cardReadings", {
+          projectId: projectForRow(tokenEmployee?.projectId, device?.projectId),
+          deviceId: device?._id,
+          employeeId: tokenRow.employeeId,
+          cardNo: args.cardNo,
+          accessTime,
+          accessStatus: "reddedildi",
+          rawData: args.rawBody,
+          createdAt: accessTime,
+          updatedAt: accessTime,
+        });
+        return { granted: false };
+      }
+
+      // Cihaz + grup erişim kontrolü (kart akışıyla aynı kural)
+      let tokenHasAccess = false;
+      if (device) {
+        const deviceGroups = await ctx.db
+          .query("groupDevices")
+          .withIndex("by_device", (q) => q.eq("deviceId", device._id))
+          .collect();
+        const groupIds = deviceGroups.map((gd) => gd.groupId);
+        const employeeAccessGroups = await ctx.db
+          .query("groupMembers")
+          .withIndex("by_employee", (q) => q.eq("employeeId", tokenEmployee._id))
+          .collect();
+        const employeeGroupIds = new Set(
+          employeeAccessGroups.map((gm) => gm.groupId)
+        );
+        const matchingGroupIds = groupIds.filter((gid) =>
+          employeeGroupIds.has(gid)
+        );
+        for (const groupId of matchingGroupIds) {
+          const rule = await ctx.db.get(groupId);
+          if (rule?.isActive) {
+            tokenHasAccess = true;
+            break;
+          }
+        }
+      }
+
+      await ctx.db.patch(tokenRow._id, { usedAt: accessTime });
+      await ctx.db.insert("cardReadings", {
+        projectId: projectForRow(tokenEmployee.projectId, device?.projectId),
+        deviceId: device?._id,
+        employeeId: tokenEmployee._id,
+        cardNo: tokenEmployee.cardNumber,
+        employeeName: `${tokenEmployee.firstName} ${tokenEmployee.lastName}`,
+        accessTime,
+        accessStatus: tokenHasAccess ? "izin_verildi" : "reddedildi",
+        rawData: args.rawBody,
+        createdAt: accessTime,
+        updatedAt: accessTime,
+      });
+      return { granted: tokenHasAccess };
     }
 
     // 2. Çalışanı kart numarasına göre bul
@@ -736,9 +1235,12 @@ export const processCardReading = internalMutation({
 
     // 6. Geç kalma bildirimi (hasAccess + geç giriş)
     if (hasAccess) {
+      const settings = await getEffectiveWorkSettings(ctx, employee.projectId);
+      const lateThresholdMin =
+        parseHHMM(settings.workStartTime) + settings.maxLateMinutes;
       const h = new Date(accessTime).getHours();
       const m = new Date(accessTime).getMinutes();
-      const isLate = h > 9 || (h === 9 && m > 15);
+      const isLate = h * 60 + m > lateThresholdMin;
       if (isLate && employee.projectId) {
         const notifSettings = await ctx.db
           .query("notificationSettings")

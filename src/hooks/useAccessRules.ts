@@ -30,17 +30,6 @@ export const useAccessRules = (projectId?: Id<"projects">) => {
     updateAccessRuleWithAdditionalMembers
   } = useComplexAccessRuleMutations();
 
-  // Legacy API compatibility - aliasing new names to old ones
-  const rules = accessRules || [];
-  const createRule = createAccessRule;
-  const isCreating = createAccessRule.isPending;
-  const updateRule = updateAccessRule;
-  const isUpdating = updateAccessRule.isPending || updateAccessRuleWithAdditionalMembers.isPending;
-  const deleteRule = deleteAccessRule;
-  const isDeleting = deleteAccessRule.isPending;
-  const toggleRule = updateAccessRule;
-  const isToggling = updateAccessRule.isPending;
-
   return {
     accessRules,
     rules: accessRules || [], // Legacy alias

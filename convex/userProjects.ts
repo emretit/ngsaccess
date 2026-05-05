@@ -110,3 +110,26 @@ export const getByProject = authedQuery({
       .collect();
   },
 });
+
+import { internalQuery as _internalQuery } from "./_generated/server";
+
+export const adminListByUser = _internalQuery({
+  args: { userId: v.id("users") },
+  returns: v.array(v.object({
+    projectId: v.id("projects"),
+    projectName: v.string(),
+    ownerId: v.union(v.id("users"), v.null()),
+  })),
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("userProjects")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    const out = [];
+    for (const r of rows) {
+      const p = await ctx.db.get(r.projectId);
+      if (p) out.push({ projectId: p._id, projectName: p.name, ownerId: p.ownerId ?? null });
+    }
+    return out;
+  },
+});

@@ -1,8 +1,10 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation } from "./_generated/server";
+import { employeeAuthedMutation } from "./lib/customFunctions";
 
 /**
- * Çalışan için QR check-in token oluşturur (5 dakika geçerli)
+ * Çalışan için QR check-in token oluşturur (5 dakika geçerli).
+ * Web admin/portal tarafı kullanıyor — `employeeId` parametresiyle.
  */
 export const createCheckInToken = mutation({
   args: {
@@ -19,6 +21,31 @@ export const createCheckInToken = mutation({
 
     await ctx.db.insert("checkInTokens", {
       employeeId: args.employeeId,
+      token,
+      expiresAt,
+      createdAt,
+    });
+
+    return { token, expiresAt };
+  },
+});
+
+/**
+ * Mobil çalışan oturumu için: kendi adına QR check-in token üretir.
+ * `ctx.employee` `employeeAuthedMutation` tarafından enjekte edilir.
+ */
+export const createMyCheckInToken = employeeAuthedMutation({
+  args: {},
+  handler: async (ctx) => {
+    const employee = ctx.employee;
+
+    const token = crypto.randomUUID();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 10 * 1000).toISOString();
+    const createdAt = now.toISOString();
+
+    await ctx.db.insert("checkInTokens", {
+      employeeId: employee._id,
       token,
       expiresAt,
       createdAt,

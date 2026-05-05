@@ -194,7 +194,10 @@ export const upsertWork = authedMutation({
     lunchBreakStart: v.optional(v.string()),
     lunchBreakEnd: v.optional(v.string()),
     maxLateMinutes: v.optional(v.number()),
+    earlyExitToleranceMinutes: v.optional(v.number()),
     allowLateEntry: v.optional(v.boolean()),
+    annualOvertimeLimitHours: v.optional(v.number()),
+    overtimeMultiplier: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const now = new Date().toISOString();

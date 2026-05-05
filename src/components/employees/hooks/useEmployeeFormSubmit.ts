@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useMutation, useAction } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { toast } from "@/hooks/use-toast";
-import { Id } from "../../../../convex/_generated/dataModel";
 import { Employee } from "@/types/employee";
 import { EmployeeFormData } from "./useEmployeeFormData";
 
@@ -75,11 +74,12 @@ export const useEmployeeFormSubmit = (
         email: formData.email.trim().toLowerCase(),
         tcNo: formData.tcNo.trim(),
         cardNumber: formData.cardNumber.trim(),
-        companyId: (formData.companyId ?? undefined) as Id<"companies"> | undefined,
-        departmentId: (formData.departmentId ?? undefined) as Id<"departments"> | undefined,
-        positionId: (formData.positionId ?? undefined) as Id<"positions"> | undefined,
-        accessRuleId: (formData.accessRuleId ?? undefined) as Id<"accessRules"> | undefined,
-        shiftId: (formData.shiftId ?? undefined) as Id<"shifts"> | undefined,
+        payrollCode: formData.payrollCode?.trim() || undefined,
+        companyId: formData.companyId ?? undefined,
+        departmentId: formData.departmentId ?? undefined,
+        positionId: formData.positionId ?? undefined,
+        accessRuleId: formData.accessRuleId ?? undefined,
+        shiftId: formData.shiftId ?? undefined,
         shift: formData.shift ?? undefined,
         photoUrl: formData.photoUrl ?? undefined,
         notes: formData.notes?.trim() ?? undefined,

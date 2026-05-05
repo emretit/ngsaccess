@@ -3,7 +3,7 @@ import { api } from "../../convex/_generated/api";
 import { useProjectAccess } from "./useProjectAccess";
 
 export const usePdksStats = () => {
-  const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
+  const { loading: projectLoading } = useProjectAccess();
 
   const stats = useQuery(api.dashboard.getPdksStats, !projectLoading ? {} : "skip");
 

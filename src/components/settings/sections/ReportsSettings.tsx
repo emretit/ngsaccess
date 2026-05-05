@@ -14,7 +14,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileSpreadsheet, FileText, Loader2, Mail } from "lucide-react";
 import { exportSgkToExcel, exportSgkToPdf, type SgkReportData } from "@/utils/sgkExport";
 import { exportReportsToExcel } from "@/utils/reportsExport";

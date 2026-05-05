@@ -1,6 +1,6 @@
 name: ngsplusapp
 description: NGS Plus Yoklama Takip Sistemi - QR kod tabanlı modern yoklama uygulaması
-version: 1.0.0+1
+version: 1.0.2+1
 
 environment:
   sdk: '^3.8.0'

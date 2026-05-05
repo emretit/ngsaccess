@@ -180,7 +180,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
       </div>
 
       <div className="space-y-4">
-        {(rules as unknown as AccessRule[]).map((rule) => {
+        {(rules as AccessRule[]).map((rule) => {
           const ruleId = String(rule._id);
           return (
             <Card key={ruleId} className="border border-gray-200 hover:shadow-md transition-shadow">
@@ -312,9 +312,9 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                         <div>
                           <h4 className="text-sm font-semibold text-gray-900 mb-3">Çalışanlar</h4>
                           <div className="space-y-2">
-                            {(rule.groupMembers?.length ?? 0) > 0 ? (
-                              rule.groupMembers!.map((gm: GroupMember, index: number) => (
-                                <div key={index} className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
+                            {rule.groupMembers && rule.groupMembers.length > 0 ? (
+                              rule.groupMembers.map((gm: GroupMember) => (
+                                <div key={gm._id} className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
                                   <Users className="h-4 w-4 text-blue-500" />
                                   <span className="text-sm">{gm.employees?.firstName} {gm.employees?.lastName}</span>
                                 </div>
@@ -328,9 +328,9 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                         <div>
                           <h4 className="text-sm font-semibold text-gray-900 mb-3">Cihazlar</h4>
                           <div className="space-y-2">
-                            {(rule.groupDevices?.length ?? 0) > 0 ? (
-                              rule.groupDevices!.map((gd: GroupDevice, index: number) => (
-                                <div key={index} className="flex items-center gap-2 p-2 bg-green-50 rounded-lg">
+                            {rule.groupDevices && rule.groupDevices.length > 0 ? (
+                              rule.groupDevices.map((gd: GroupDevice) => (
+                                <div key={gd._id} className="flex items-center gap-2 p-2 bg-green-50 rounded-lg">
                                   <Monitor className="h-4 w-4 text-green-500" />
                                   <div>
                                     <span className="text-sm font-medium">{gd.devices?.name}</span>

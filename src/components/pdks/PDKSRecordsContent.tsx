@@ -27,17 +27,18 @@ interface PDKSRecordsContentProps {
 
 export function PDKSRecordsContent({
   section,
-  records,
-  filteredRecords,
-  loading,
+  records: _records,
+  filteredRecords: _filteredRecords,
+  loading: _loading,
   searchTerm,
   statusFilter,
   insight,
   isLoadingInsight,
 }: PDKSRecordsContentProps) {
-  const rawEmployees = useQuery(api.employees.list, {}) ?? [];
+  const rawEmployees = useQuery(api.employees.list, {});
+  const employeesLoading = rawEmployees === undefined;
 
-  const employees: PDKSAttendanceRecord[] = rawEmployees
+  const employees: PDKSAttendanceRecord[] = (rawEmployees ?? [])
     .filter((emp) => emp.isActive !== false)
     .map((emp) => ({
       id: String(emp._id),
@@ -48,8 +49,6 @@ export function PDKSRecordsContent({
       exit_time: "",
       status: "present",
     }));
-
-  const employeesLoading = rawEmployees === undefined;
 
   if (section === "summary") {
     return (

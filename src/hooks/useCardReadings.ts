@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useProjectAccess } from "./useProjectAccess";
-import { Id } from "../../convex/_generated/dataModel";
 
 export const useCardReadings = (pageSize: number = 100) => {
   const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();

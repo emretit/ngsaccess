@@ -1,4 +1,4 @@
-import { GeneralSettings, GeneralSettingsFormData, CompanyInfo } from '../types/generalSettings';
+import { GeneralSettings, CompanyInfo } from '../types/generalSettings';
 
 export const normalizeWebsiteUrl = (url: string): string => {
   if (!url) return url;

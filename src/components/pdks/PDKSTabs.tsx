@@ -24,7 +24,7 @@ interface PDKSTabsProps {
 }
 
 export function PDKSTabs({
-  records,
+  records: _records,
   filteredRecords,
   loading,
   searchTerm,

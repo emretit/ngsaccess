@@ -16,7 +16,7 @@ export function useAiChat() {
   const saveConversation = useMutation(api.chatConversations.save);
 
   const { isOpenAIConnected, checkOpenAIStatus } = useModelStatus();
-  const { formatReportData, handleExportExcel, handleExportPDF } = useExportUtils();
+  const { handleExportExcel, handleExportPDF } = useExportUtils();
   const { messages, input, setInput, isLoading, handleSendMessage: originalSendMessage } = useMessageHandler();
 
   const handleSendMessage = async (e: React.FormEvent, customContent?: string) => {

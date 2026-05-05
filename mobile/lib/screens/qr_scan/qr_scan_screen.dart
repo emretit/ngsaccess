@@ -1,11 +1,13 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:provider/provider.dart';
+import '../../config/convex_config.dart';
 import '../../providers/attendance_provider.dart';
-import '../../providers/auth_provider.dart';
 import '../../models/qr_code_model.dart';
-import 'dart:convert';
 
 class QRScanScreen extends StatefulWidget {
   const QRScanScreen({super.key});
@@ -21,10 +23,84 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
   String? _lastScannedCode;
   DateTime? _lastScanTime;
 
+  // Dinamik check-in token state (10 sn geçerli, cihaz QR'ı kart gibi okur)
+  String? _checkInToken;
+  DateTime? _checkInExpiresAt;
+  DateTime? _checkInIssuedAt;
+  bool _tokenLoading = false;
+  String? _tokenError;
+  Timer? _tokenTicker;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _refreshCheckInToken();
+  }
+
+  Future<void> _refreshCheckInToken() async {
+    if (!mounted) return;
+    setState(() {
+      _tokenLoading = true;
+      _tokenError = null;
+    });
+    try {
+      final raw = await convex.employeeMutation(
+        name: 'employeeCheckIn:createMyCheckInToken',
+        args: const {},
+      );
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Geçersiz yanıt');
+      }
+      final token = decoded['token'] as String?;
+      final expiresAtStr = decoded['expiresAt'] as String?;
+      if (token == null || expiresAtStr == null) {
+        throw Exception('Token yok');
+      }
+      if (!mounted) return;
+      setState(() {
+        _checkInToken = token;
+        _checkInExpiresAt = DateTime.parse(expiresAtStr);
+        _checkInIssuedAt = DateTime.now();
+        _tokenLoading = false;
+      });
+      _ensureTokenTicker();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _tokenLoading = false;
+        _tokenError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  void _ensureTokenTicker() {
+    _tokenTicker?.cancel();
+    _tokenTicker = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (!mounted) return;
+      // Süre dolduysa ticker'ı durdur (gereksiz redraw yok)
+      if (_isTokenExpired()) {
+        _tokenTicker?.cancel();
+      }
+      setState(() {});
+    });
+  }
+
+  bool _isTokenExpired() {
+    final expiresAt = _checkInExpiresAt;
+    if (expiresAt == null) return false;
+    return !DateTime.now().isBefore(expiresAt);
+  }
+
+  double _tokenProgress() {
+    final issuedAt = _checkInIssuedAt;
+    final expiresAt = _checkInExpiresAt;
+    if (issuedAt == null || expiresAt == null) return 0;
+    final total = expiresAt.difference(issuedAt).inMilliseconds;
+    if (total <= 0) return 0;
+    final remaining = expiresAt.difference(DateTime.now()).inMilliseconds;
+    return (remaining / total).clamp(0.0, 1.0);
   }
 
   @override
@@ -36,12 +112,12 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
           controller: _tabController,
           tabs: const [
             Tab(
-              icon: Icon(Icons.camera_alt),
-              text: 'Tara',
-            ),
-            Tab(
               icon: Icon(Icons.qr_code),
               text: 'QR Kodum',
+            ),
+            Tab(
+              icon: Icon(Icons.camera_alt),
+              text: 'Tara',
             ),
           ],
         ),
@@ -49,8 +125,8 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildScannerTab(),
           _buildMyQRTab(),
+          _buildScannerTab(),
         ],
       ),
     );
@@ -189,132 +265,171 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
     );
   }
 
-  Widget _buildMyQRTab() {
-    return Consumer<AuthProvider>(
-      builder: (context, authProvider, child) {
-        if (authProvider.currentUser == null) {
-          return const Center(
-            child: Text('Kullanıcı bilgileri yükleniyor...'),
-          );
-        }
-
-        final qrData = _generateUserQRData(authProvider);
-        
-        return Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // QR Code
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: QrImageView(
-                  data: qrData,
-                  version: QrVersions.auto,
-                  size: 250.0,
-                  backgroundColor: Colors.white,
-                  eyeStyle: const QrEyeStyle(
-                    eyeShape: QrEyeShape.square,
-                    color: Colors.black,
-                  ),
-                  dataModuleStyle: const QrDataModuleStyle(
-                    dataModuleShape: QrDataModuleShape.square,
-                    color: Colors.black,
-                  ),
-                  errorCorrectionLevel: QrErrorCorrectLevel.M,
-                ),
-              ),
-              const SizedBox(height: 24),
-              // User info
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Kullanıcı Bilgileri',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text('Ad: ${[authProvider.currentUser?.firstName, authProvider.currentUser?.lastName].where((s) => s != null && s.isNotEmpty).join(' ').trim().isEmpty ? 'Bilinmiyor' : [authProvider.currentUser?.firstName, authProvider.currentUser?.lastName].where((s) => s != null && s.isNotEmpty).join(' ')}'),
-                      Text('E-posta: ${authProvider.currentUser?.email ?? 'Bilinmiyor'}'),
-                      Text('ID: ${authProvider.currentUser?.id ?? 'Bilinmiyor'}'),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Instructions
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'Bu QR kodu başkalarının size yoklama işlemi yapması için kullanılır. '
-                  'QR kodunuzu gösterin ve diğer kişilerin kamerasına okutun.',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.black87,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Refresh button
-              ElevatedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    // QR kodunu yenile
-                  });
-                },
-                icon: const Icon(Icons.refresh),
-                label: const Text('QR Kodunu Yenile'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
+  Widget _buildQrWithExpiry(String token) {
+    final expired = _isTokenExpired();
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
               ),
             ],
           ),
-        );
-      },
+          child: Opacity(
+            opacity: expired ? 0.25 : 1.0,
+            child: QrImageView(
+              data: token,
+              version: QrVersions.auto,
+              size: 250.0,
+              backgroundColor: Colors.white,
+              eyeStyle: const QrEyeStyle(
+                eyeShape: QrEyeShape.square,
+                color: Colors.black,
+              ),
+              dataModuleStyle: const QrDataModuleStyle(
+                dataModuleShape: QrDataModuleShape.square,
+                color: Colors.black,
+              ),
+              errorCorrectionLevel: QrErrorCorrectLevel.M,
+            ),
+          ),
+        ),
+        if (expired)
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: _tokenLoading ? null : _refreshCheckInToken,
+              borderRadius: BorderRadius.circular(80),
+              child: Container(
+                width: 140,
+                height: 140,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).primaryColor,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Theme.of(context)
+                          .primaryColor
+                          .withValues(alpha: 0.4),
+                      blurRadius: 20,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: _tokenLoading
+                    ? const Center(
+                        child: SizedBox(
+                          width: 32,
+                          height: 32,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        ),
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(
+                            Icons.refresh,
+                            color: Colors.white,
+                            size: 40,
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Yenile',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
-  String _generateUserQRData(AuthProvider authProvider) {
-    final now = DateTime.now();
-    final user = authProvider.currentUser;
-    final fullName = [user?.firstName, user?.lastName]
-        .where((s) => s != null && s.isNotEmpty)
-        .join(' ')
-        .trim();
-    final userData = {
-      'type': 'user_qr',
-      'user_id': user?.id,
-      'user_name': fullName.isEmpty ? 'Bilinmiyor' : fullName,
-      'user_email': user?.email,
-      'timestamp': now.toIso8601String(),
-      'expires_at': now.add(const Duration(hours: 24)).toIso8601String(),
-      'app_version': '1.0.0',
-      'device_type': 'mobile',
-    };
-    return jsonEncode(userData);
+  Widget _buildMyQRTab() {
+    final token = _checkInToken;
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (_tokenLoading && token == null)
+            const Padding(
+              padding: EdgeInsets.all(40),
+              child: CircularProgressIndicator(),
+            )
+          else if (_tokenError != null && token == null)
+            Column(
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                const SizedBox(height: 12),
+                Text(
+                  _tokenError!,
+                  style: const TextStyle(color: Colors.red),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: _refreshCheckInToken,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Tekrar dene'),
+                ),
+              ],
+            )
+          else if (token != null) ...[
+            _buildQrWithExpiry(token),
+            const SizedBox(height: 20),
+            // Daralan progress bar
+            SizedBox(
+              width: 250,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  value: _tokenProgress(),
+                  minHeight: 8,
+                  backgroundColor: Colors.grey.withValues(alpha: 0.2),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    _isTokenExpired()
+                        ? Colors.red
+                        : Theme.of(context).primaryColor,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Bu QR kodu kapı cihazına okutun. Kod 10 saniye geçerlidir, '
+                'süre dolunca yenile butonuna basın.',
+                style: TextStyle(fontSize: 14, color: Colors.black87),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   void _onDetect(BarcodeCapture capture) async {
@@ -452,8 +567,9 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
 
   @override
   void dispose() {
+    _tokenTicker?.cancel();
     _tabController.dispose();
     cameraController.dispose();
     super.dispose();
   }
-} 
+}

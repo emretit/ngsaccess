@@ -29,7 +29,7 @@ const LEAVE_TYPES = [
 ];
 
 export default function Leaves() {
-  const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
+  const { loading: projectLoading } = useProjectAccess();
   const { profile } = useAuth();
   const createLeave = useMutation(api.leaves.create);
   const approveLeave = useMutation(api.leaves.approve);
@@ -55,7 +55,6 @@ export default function Leaves() {
   }
 
   const pendingLeaves = leaves?.filter((l) => l.status === "pending") ?? [];
-  const approvedLeaves = leaves?.filter((l) => l.status === "approved") ?? [];
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -179,7 +178,7 @@ export default function Leaves() {
                   toast({ title: "İzin talebi gönderildi", description: "Talep onay bekliyor." });
                   setFormData({ employeeId: "", leaveType: "annual", startDate: "", endDate: "", notes: "" });
                   setShowForm(false);
-                } catch (e) {
+                } catch {
                   toast({
                     title: "Hata",
                     description: "İzin talebi oluşturulamadı.",

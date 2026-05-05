@@ -3,7 +3,6 @@ import { useDashboard } from '@/hooks/useDashboard';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import StatsGrid from '@/components/dashboard/StatsGrid';
 import ActivitySummaryCard from '@/components/dashboard/ActivitySummaryCard';
-import CalendarCard from '@/components/dashboard/CalendarCard';
 import RecentReadingsTable from '@/components/dashboard/RecentReadingsTable';
 import QuickLinksGrid from '@/components/dashboard/QuickLinksGrid';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
