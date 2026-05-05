@@ -60,28 +60,27 @@ const SidebarProvider = React.forwardRef<
     },
     ref
   ) => {
-    // This is the internal state of the sidebar.
-    // We use openProp and setOpenProp for control from outside the component.
     const [_open, _setOpen] = React.useState(defaultOpen)
     const open = openProp ?? _open
+    const openRef = React.useRef(open)
+    openRef.current = open
+
     const setOpen = React.useCallback(
       (value: boolean | ((value: boolean) => boolean)) => {
-        const openState = typeof value === "function" ? value(open) : value
+        const openState =
+          typeof value === "function" ? value(openRef.current) : value
         if (setOpenProp) {
           setOpenProp(openState)
         } else {
           _setOpen(openState)
         }
-
-        // This sets the cookie to keep the sidebar state.
         document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
       },
-      [setOpenProp, open]
+      [setOpenProp]
     )
 
-    // Helper to toggle the sidebar.
     const toggleSidebar = React.useCallback(() => {
-      setOpen((open) => !open)
+      setOpen((prev) => !prev)
     }, [setOpen])
 
     // Adds a keyboard shortcut to toggle the sidebar.
@@ -189,10 +188,10 @@ const Sidebar = React.forwardRef<
         className={cn(
           "group peer flex shrink-0 flex-col overflow-hidden",
           "h-svh w-(--sidebar-width) duration-200 transition-[width] ease-linear",
-          "group-data-[collapsible=offcanvas]:w-0",
+          "data-[collapsible=offcanvas]:w-0",
           variant === "floating" || variant === "inset"
-            ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))] p-2 rounded-lg border border-sidebar-border shadow-sm"
-            : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l border-sidebar-border",
+            ? "data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4)))] p-2 rounded-lg border border-sidebar-border shadow-sm"
+            : "data-[collapsible=icon]:w-(--sidebar-width-icon) data-[side=left]:border-r data-[side=right]:border-l border-sidebar-border",
           "bg-sidebar text-sidebar-foreground",
           className
         )}
