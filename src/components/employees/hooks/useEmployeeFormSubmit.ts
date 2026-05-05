@@ -59,7 +59,8 @@ export const useEmployeeFormSubmit = (
         toast({ title: "Hata", description: "E-posta alanı zorunludur", variant: "destructive" });
         return;
       }
-      if (!formData.tcNo?.trim() || formData.tcNo.length !== 11) {
+      const trimmedTcNo = formData.tcNo?.trim() ?? "";
+      if (trimmedTcNo && trimmedTcNo.length !== 11) {
         toast({ title: "Hata", description: "TC Kimlik No 11 haneli olmalıdır", variant: "destructive" });
         return;
       }
@@ -72,7 +73,7 @@ export const useEmployeeFormSubmit = (
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim().toLowerCase(),
-        tcNo: formData.tcNo.trim(),
+        tcNo: trimmedTcNo || undefined,
         cardNumber: formData.cardNumber.trim(),
         payrollCode: formData.payrollCode?.trim() || undefined,
         companyId: formData.companyId ?? undefined,

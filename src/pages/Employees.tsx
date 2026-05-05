@@ -37,7 +37,7 @@ export default function Employees() {
         emp.firstName.toLowerCase().includes(query) ||
         emp.lastName.toLowerCase().includes(query) ||
         emp.email.toLowerCase().includes(query) ||
-        emp.tcNo.includes(query) ||
+        (emp.tcNo ?? '').includes(query) ||
         emp.cardNumber.includes(query)
       );
     }

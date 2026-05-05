@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
@@ -200,9 +200,8 @@ export default function AuditLog() {
                     cls: "bg-gray-100",
                   };
                   return (
-                    <>
+                    <Fragment key={r._id}>
                       <TableRow
-                        key={r._id}
                         className="cursor-pointer hover:bg-muted/50"
                         onClick={() => setExpandedRow(expanded ? null : r._id)}
                       >
@@ -235,7 +234,7 @@ export default function AuditLog() {
                         </TableCell>
                       </TableRow>
                       {expanded && (
-                        <TableRow key={`${r._id}-expanded`}>
+                        <TableRow>
                           <TableCell colSpan={7} className="bg-muted/30">
                             <div className="grid grid-cols-2 gap-4 p-4">
                               <div>
@@ -258,7 +257,7 @@ export default function AuditLog() {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   );
                 })
               )}

@@ -100,7 +100,7 @@ export const getById = authedQuery({
 
 export const checkDuplicate = authedQuery({
   args: {
-    tcNo: v.string(),
+    tcNo: v.optional(v.string()),
     cardNumber: v.string(),
     email: v.string(),
     excludeId: v.optional(v.id("employees")),
@@ -124,7 +124,7 @@ export const create = adminMutation({
     firstName: v.string(),
     lastName: v.string(),
     email: v.string(),
-    tcNo: v.string(),
+    tcNo: v.optional(v.string()),
     cardNumber: v.string(),
     payrollCode: v.optional(v.string()),
     departmentId: v.optional(v.id("departments")),
@@ -147,6 +147,7 @@ export const create = adminMutation({
 
     for (const field of ["cardNumber", "email", "tcNo"] as const) {
       const value = args[field];
+      if (!value) continue;
       const dup = await findDuplicateEmployee(ctx, field, value);
       if (dup) throw new Error(DUPLICATE_MESSAGES[field]);
     }

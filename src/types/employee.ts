@@ -5,7 +5,7 @@ export interface Employee {
   firstName: string;
   lastName: string;
   email: string;
-  tcNo: string;
+  tcNo?: string;
   cardNumber: string;
   payrollCode?: string;
   photoUrl?: string | null;

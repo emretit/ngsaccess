@@ -67,13 +67,12 @@ export default function EmployeeFormFields({
         </div>
 
         <div>
-          <Label htmlFor="tc_no">TC Kimlik No *</Label>
+          <Label htmlFor="tc_no">TC Kimlik No</Label>
           <Input
             id="tc_no"
             value={formData.tcNo}
             onChange={(e) => handleInputChange('tcNo', e.target.value)}
             maxLength={11}
-            required
           />
         </div>
 

@@ -17,7 +17,6 @@ import {
   multiplierForClassification,
   payrollCodeForDay,
   evaluateLateEarly,
-  DEFAULT_WEEKEND_DAYS,
 } from "./lib/pdksHelpers";
 
 export const list = authedQuery({
@@ -273,10 +272,6 @@ export const getPdksTableData = authedQuery({
       generalSettings?.workingDays && generalSettings.workingDays.length > 0
         ? generalSettings.workingDays
         : ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
-    const weekendByDefault = !workingDays.some((d) =>
-      DEFAULT_WEEKEND_DAYS.includes(d)
-    );
-    void weekendByDefault;
 
     // pdksRecords manuel override haritası
     const manualPdksByEmpDate = new Map<string, Doc<"pdksRecords">>();
@@ -550,6 +545,14 @@ export const getPdksChartData = authedQuery({
       (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
     );
 
+    const chartProjectId =
+      ctx.user.role === "super_admin"
+        ? undefined
+        : allowedProjectIds[0] ?? undefined;
+    const chartSettings = await getEffectiveWorkSettings(ctx, chartProjectId);
+    const lateThresholdMin =
+      parseHHMM(chartSettings.workStartTime) + chartSettings.maxLateMinutes;
+
     const dayNames = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
 
     const dailyMap = new Map<
@@ -597,7 +600,7 @@ export const getPdksChartData = authedQuery({
           rec.firstEntry = r.accessTime;
           const h = new Date(r.accessTime).getHours();
           const m = new Date(r.accessTime).getMinutes();
-          rec.hasLate = h > 9 || (h === 9 && m > 15);
+          rec.hasLate = h * 60 + m > lateThresholdMin;
         }
       }
     }

@@ -57,7 +57,7 @@ export default defineSchema({
     firstName: v.string(),
     lastName: v.string(),
     email: v.string(),
-    tcNo: v.string(),
+    tcNo: v.optional(v.string()),
     cardNumber: v.string(),
     payrollCode: v.optional(v.string()),
     departmentId: v.optional(v.id("departments")),
