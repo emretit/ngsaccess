@@ -75,22 +75,22 @@ export function DeviceList({
       
       <div className="rounded-md border">
         <Table>
-          <TableHeader className="sticky top-0 bg-white border-b-2 border-gray-200">
+          <TableHeader className="sticky top-0 bg-card border-b-2 border-border">
             <TableRow>
-              <TableHead className="w-[50px] bg-gray-50 font-semibold">
-                <Checkbox 
-                  checked={filteredDevices.length > 0 && selectedDevices.length === filteredDevices.length} 
+              <TableHead className="w-[50px] bg-muted/50 font-semibold">
+                <Checkbox
+                  checked={filteredDevices.length > 0 && selectedDevices.length === filteredDevices.length}
                   onCheckedChange={handleSelectAll}
                 />
               </TableHead>
-              <TableHead className="bg-gray-50 font-semibold">#</TableHead>
-              <TableHead className="bg-gray-50 font-semibold">Cihaz Seri No</TableHead>
-              <TableHead className="bg-gray-50 font-semibold">Cihaz Modeli</TableHead>
-              <TableHead className="bg-gray-50 font-semibold">Bölge</TableHead>
-              <TableHead className="bg-gray-50 font-semibold">Kapı</TableHead>
-              <TableHead className="bg-gray-50 font-semibold">Erişim Yönü</TableHead>
-              <TableHead className="bg-gray-50 font-semibold">Durum</TableHead>
-              <TableHead className="text-right bg-gray-50 font-semibold">İşlemler</TableHead>
+              <TableHead className="bg-muted/50 font-semibold">#</TableHead>
+              <TableHead className="bg-muted/50 font-semibold">Cihaz Seri No</TableHead>
+              <TableHead className="bg-muted/50 font-semibold">Cihaz Modeli</TableHead>
+              <TableHead className="bg-muted/50 font-semibold">Bölge</TableHead>
+              <TableHead className="bg-muted/50 font-semibold">Kapı</TableHead>
+              <TableHead className="bg-muted/50 font-semibold">Erişim Yönü</TableHead>
+              <TableHead className="bg-muted/50 font-semibold">Durum</TableHead>
+              <TableHead className="text-right bg-muted/50 font-semibold">İşlemler</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -123,16 +123,16 @@ export function DeviceList({
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-16">
                   <div className="flex flex-col items-center justify-center space-y-4">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-                      <Smartphone className="h-8 w-8 text-gray-400" />
+                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
+                      <Smartphone className="h-8 w-8 text-muted-foreground/70" />
                     </div>
                     <div className="text-center">
-                      <p className="text-lg font-medium text-gray-900 mb-2">
-                        {devices.length > 0 
-                          ? "Filtrelere uygun cihaz bulunamadı" 
+                      <p className="text-lg font-medium text-foreground mb-2">
+                        {devices.length > 0
+                          ? "Filtrelere uygun cihaz bulunamadı"
                           : "Henüz cihaz bulunmuyor"}
                       </p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-muted-foreground">
                         {devices.length > 0 
                           ? "Lütfen filtrelerinizi değiştirip tekrar deneyin" 
                           : "Yeni cihaz eklemek için 'Yeni Cihaz Ekle' butonuna tıklayın"}

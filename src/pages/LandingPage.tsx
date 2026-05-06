@@ -1,33 +1,33 @@
-
-import React from 'react';
 import LandingHeader from '@/components/landing/LandingHeader';
 import HeroSection from '@/components/landing/HeroSection';
+import StatsSection from '@/components/landing/StatsSection';
 import FeaturesSection from '@/components/landing/FeaturesSection';
+import HowItWorksSection from '@/components/landing/HowItWorksSection';
+import MobileAppSection from '@/components/landing/MobileAppSection';
 import PricingSection from '@/components/landing/PricingSection';
 import TestimonialsSection from '@/components/landing/TestimonialsSection';
+import FAQSection from '@/components/landing/FAQSection';
+import FinalCTASection from '@/components/landing/FinalCTASection';
 import LandingFooter from '@/components/landing/LandingFooter';
 
 const LandingPage = () => {
-  console.log("Rendering LandingPage without auth check");
-  
   return (
     <div className="min-h-screen bg-background">
       <LandingHeader />
-      <main>
+      <main id="main">
         <HeroSection />
-        <section id="features">
-          <FeaturesSection />
-        </section>
-        <section id="pricing">
-          <PricingSection />
-        </section>
-        <section id="testimonials">
-          <TestimonialsSection />
-        </section>
+        <StatsSection />
+        <FeaturesSection />
+        <HowItWorksSection />
+        <MobileAppSection />
+        <PricingSection />
+        <TestimonialsSection />
+        <FAQSection />
+        <FinalCTASection />
       </main>
-      <footer id="contact">
+      <div id="contact">
         <LandingFooter />
-      </footer>
+      </div>
     </div>
   );
 };

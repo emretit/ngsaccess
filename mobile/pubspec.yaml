@@ -1,6 +1,6 @@
 name: ngsplusapp
 description: NGS Plus Yoklama Takip Sistemi - QR kod tabanlı modern yoklama uygulaması
-version: 1.0.2+1
+version: 1.0.4+1
 
 environment:
   sdk: '^3.8.0'
@@ -41,19 +41,27 @@ dependencies:
   
   # State management
   provider: ^6.1.2
-  
+
+  # Routing
+  go_router: ^17.2.3
+
   # Calendar widget
   table_calendar: ^3.0.9
+
+  # Charts (used by ProgressHeroCard and future history stats)
+  fl_chart: ^1.2.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.1
+  mocktail: ^1.0.4
 
 flutter:
   uses-material-design: true
-  
+  generate: true
+
   # Assets
   assets:
     - .env

@@ -54,7 +54,7 @@ const sidebarItems = [
 
 export function SettingsSidebar({ selected, onSelect }: SettingsSidebarProps) {
   return (
-    <div className="h-full w-[220px] shrink-0 bg-card rounded-xl border shadow-xs">
+    <div className="h-full w-full md:w-[220px] shrink-0 bg-card rounded-xl border shadow-xs">
       <div className="p-4 border-b border-border">
         <div className="flex items-center gap-2">
           <Settings className="h-4 w-4 text-primary" />

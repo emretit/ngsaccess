@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../providers/auth_provider.dart';
-import '../theme/app_theme.dart';
-import 'auth/login_screen.dart';
-import 'main_navigation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../l10n/app_localizations.dart';
+import '../providers/auth_provider.dart';
+import '../router/app_router.dart';
+import '../theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -68,23 +70,12 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       final rememberedEmail = prefs.getString('remembered_email') ?? '';
       final rememberedPassword = prefs.getString('remembered_password') ?? '';
       if (rememberMe && rememberedEmail.isNotEmpty && rememberedPassword.isNotEmpty) {
-        final success = await authProvider.signIn(rememberedEmail, rememberedPassword);
-        if (success && mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const MainNavigation()),
-          );
-          return;
-        }
+        await authProvider.signIn(rememberedEmail, rememberedPassword);
       }
     }
 
     if (!mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) =>
-            authProvider.isAuthenticated ? const MainNavigation() : const LoginScreen(),
-      ),
-    );
+    context.go(authProvider.isAuthenticated ? AppRoute.home : AppRoute.login);
   }
 
   @override
@@ -96,7 +87,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkBackground : Colors.white,
       body: Center(
@@ -131,10 +123,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                       ),
                     ),
                     const SizedBox(height: 40),
-                    
-                    // Uygulama ismi
+
                     Text(
-                      'NGS Plus',
+                      l10n.appName,
                       style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: AppTheme.primaryBurgundy,
@@ -142,9 +133,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                       ),
                     ),
                     const SizedBox(height: 12),
-                    
+
                     Text(
-                      'Yoklama Takip Sistemi',
+                      l10n.appTagline,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: isDark ? Colors.grey[300] : Colors.grey[600],
                         fontWeight: FontWeight.w500,

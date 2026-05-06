@@ -4,6 +4,7 @@ import { api } from "../../../../convex/_generated/api";
 import { toast } from "@/hooks/use-toast";
 import { Employee } from "@/types/employee";
 import { EmployeeFormData } from "./useEmployeeFormData";
+import { employeeFormSchema } from "./useEmployeeFormSchema";
 
 export type { EmployeeFormData };
 
@@ -47,35 +48,33 @@ export const useEmployeeFormSubmit = (
     setIsLoading(true);
 
     try {
-      if (!formData.firstName?.trim()) {
-        toast({ title: "Hata", description: "Ad alanı zorunludur", variant: "destructive" });
-        return;
-      }
-      if (!formData.lastName?.trim()) {
-        toast({ title: "Hata", description: "Soyad alanı zorunludur", variant: "destructive" });
-        return;
-      }
-      if (!formData.email?.trim()) {
-        toast({ title: "Hata", description: "E-posta alanı zorunludur", variant: "destructive" });
-        return;
-      }
-      const trimmedTcNo = formData.tcNo?.trim() ?? "";
-      if (trimmedTcNo && trimmedTcNo.length !== 11) {
-        toast({ title: "Hata", description: "TC Kimlik No 11 haneli olmalıdır", variant: "destructive" });
-        return;
-      }
-      if (!formData.cardNumber?.trim()) {
-        toast({ title: "Hata", description: "Kart numarası zorunludur", variant: "destructive" });
+      const parsed = employeeFormSchema.safeParse({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        tcNo: formData.tcNo,
+        cardNumber: formData.cardNumber,
+        payrollCode: formData.payrollCode,
+      });
+      if (!parsed.success) {
+        const firstError = parsed.error.issues[0];
+        toast({
+          title: "Hata",
+          description: firstError?.message ?? "Form bilgileri geçersiz",
+          variant: "destructive",
+        });
         return;
       }
 
+      const trimmedTcNo = parsed.data.tcNo?.trim() ?? "";
+
       const sharedPayload = {
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
-        email: formData.email.trim().toLowerCase(),
+        firstName: parsed.data.firstName.trim(),
+        lastName: parsed.data.lastName.trim(),
+        email: parsed.data.email.trim().toLowerCase(),
         tcNo: trimmedTcNo || undefined,
-        cardNumber: formData.cardNumber.trim(),
-        payrollCode: formData.payrollCode?.trim() || undefined,
+        cardNumber: parsed.data.cardNumber.trim(),
+        payrollCode: parsed.data.payrollCode?.trim() || undefined,
         companyId: formData.companyId ?? undefined,
         departmentId: formData.departmentId ?? undefined,
         positionId: formData.positionId ?? undefined,

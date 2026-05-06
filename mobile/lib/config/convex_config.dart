@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+
+import '../core/errors.dart';
 
 class ConvexConfig {
   static String get deploymentUrl =>
@@ -44,14 +48,36 @@ class ConvexSubscriptionHandle {
   }
 }
 
+/// Auth oturumu sona erdiğinde tetiklenen callback. UI tarafı (ör. main.dart)
+/// burada login ekranına yönlendirme yapar. `null` ise sessiz geçer.
+typedef AuthExpiryCallback = void Function();
+
 class HttpConvexClient {
-  HttpConvexClient({required String deploymentUrl})
-    : _deploymentUrl = deploymentUrl.replaceFirst(RegExp(r'/$'), '');
+  HttpConvexClient({
+    required String deploymentUrl,
+    Duration requestTimeout = const Duration(seconds: 15),
+    int maxRetries = 3,
+    http.Client? httpClient,
+  })  : _deploymentUrl = deploymentUrl.replaceFirst(RegExp(r'/$'), ''),
+        _timeout = requestTimeout,
+        _maxRetries = maxRetries,
+        _http = httpClient ?? http.Client();
 
   final String _deploymentUrl;
+  final Duration _timeout;
+  final int _maxRetries;
+  final http.Client _http;
+
   String? _sessionToken;
+  AuthExpiryCallback? _onAuthExpired;
 
   String? get sessionToken => _sessionToken;
+
+  /// Auth oturumu sona erdiğinde çağrılacak callback'i ayarlar.
+  /// Birden fazla kez çağrılırsa en son verilen kullanılır.
+  void setOnAuthExpired(AuthExpiryCallback? callback) {
+    _onAuthExpired = callback;
+  }
 
   Future<void> setAuth({required String? token}) async {
     _sessionToken = token;
@@ -63,34 +89,40 @@ class HttpConvexClient {
 
   /// Auth gerektirmeyen public query (örn. henüz giriş yokken).
   Future<String> query(String name, Map<String, dynamic> args) {
-    return _call(endpoint: 'query', name: name, args: args);
+    return _call(endpoint: 'query', name: name, args: args, retry: true);
   }
 
   /// Auth gerektirmeyen public mutation (örn. employeeAuth:signIn).
+  ///
+  /// [retry] varsayılan olarak `false` — mutation'lar idempotent olmadıkça
+  /// retry edilmez. Caller idempotent olduğunu biliyorsa `retry: true` geçer.
   Future<String> mutation({
     required String name,
     required Map<String, dynamic> args,
+    bool retry = false,
   }) {
-    return _call(endpoint: 'mutation', name: name, args: args);
+    return _call(endpoint: 'mutation', name: name, args: args, retry: retry);
   }
 
   Future<String> action({
     required String name,
     required Map<String, dynamic> args,
+    bool retry = false,
   }) {
-    return _call(endpoint: 'action', name: name, args: args);
+    return _call(endpoint: 'action', name: name, args: args, retry: retry);
   }
 
   /// Employee oturumu gerektiren query — `sessionToken` arg'ı otomatik eklenir.
   Future<String> employeeQuery(String name, Map<String, dynamic> args) {
     final token = _sessionToken;
     if (token == null) {
-      throw StateError('Mobil oturum yok — employeeQuery çağrılamaz');
+      throw const AuthExpiredError('Mobil oturum yok');
     }
     return _call(
       endpoint: 'query',
       name: name,
       args: {...args, 'sessionToken': token},
+      retry: true,
     );
   }
 
@@ -98,15 +130,17 @@ class HttpConvexClient {
   Future<String> employeeMutation({
     required String name,
     required Map<String, dynamic> args,
+    bool retry = false,
   }) {
     final token = _sessionToken;
     if (token == null) {
-      throw StateError('Mobil oturum yok — employeeMutation çağrılamaz');
+      throw const AuthExpiredError('Mobil oturum yok');
     }
     return _call(
       endpoint: 'mutation',
       name: name,
       args: {...args, 'sessionToken': token},
+      retry: retry,
     );
   }
 
@@ -114,19 +148,20 @@ class HttpConvexClient {
     required String name,
     required Map<String, dynamic> args,
     required void Function(String) onUpdate,
-    required void Function(String, String?) onError,
+    required void Function(AppError) onError,
   }) async {
     Future<void> refresh() async {
       try {
         onUpdate(await employeeQuery(name, args));
-      } catch (error) {
-        onError(error.toString(), null);
+      } catch (error, stack) {
+        final mapped = AppError.fromException(error, stack);
+        onError(mapped);
       }
     }
 
     await refresh();
     return ConvexSubscriptionHandle(
-      Timer.periodic(const Duration(seconds: 10), (_) {
+      Timer.periodic(const Duration(seconds: 3), (_) {
         unawaited(refresh());
       }),
     );
@@ -136,27 +171,95 @@ class HttpConvexClient {
     required String endpoint,
     required String name,
     required Map<String, dynamic> args,
+    required bool retry,
   }) async {
-    final response = await http.post(
-      Uri.parse('$_deploymentUrl/api/$endpoint'),
-      headers: const {
-        'Content-Type': 'application/json',
-        'Convex-Client': 'flutter-http-ngsplus',
-      },
-      body: jsonEncode({
-        'path': name,
-        'format': 'convex_encoded_json',
-        'args': [_convexToJson(args)],
-      }),
-    );
+    final maxAttempts = retry ? _maxRetries : 1;
+    AppError? lastError;
 
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Convex HTTP ${response.statusCode}: ${response.body}');
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        return await _attempt(endpoint: endpoint, name: name, args: args);
+      } on AuthExpiredError {
+        // Token yoksa veya backend expired dediyse retry etmenin anlamı yok.
+        _onAuthExpired?.call();
+        rethrow;
+      } on BusinessError {
+        // İş kuralı hatası (4xx semantik) — retry edilmez.
+        rethrow;
+      } on TimeoutError catch (e) {
+        lastError = e;
+      } on NetworkError catch (e) {
+        lastError = e;
+      } on ServerError catch (e) {
+        // Sadece 5xx retry edilir.
+        if (e.statusCode < 500) rethrow;
+        lastError = e;
+      } catch (error, stack) {
+        // Beklenmedik istisna — wrap edip dışarı.
+        throw AppError.fromException(error, stack);
+      }
+
+      if (attempt < maxAttempts - 1) {
+        final delayMs = 250 * math.pow(2, attempt).toInt();
+        await Future<void>.delayed(Duration(milliseconds: delayMs));
+      }
     }
 
-    final decoded = jsonDecode(response.body);
+    throw lastError ?? const UnknownError('retry exhausted');
+  }
+
+  Future<String> _attempt({
+    required String endpoint,
+    required String name,
+    required Map<String, dynamic> args,
+  }) async {
+    final http.Response response;
+    try {
+      response = await _http
+          .post(
+            Uri.parse('$_deploymentUrl/api/$endpoint'),
+            headers: const {
+              'Content-Type': 'application/json',
+              'Convex-Client': 'flutter-http-ngsplus',
+            },
+            body: jsonEncode({
+              'path': name,
+              'format': 'convex_encoded_json',
+              'args': [_convexToJson(args)],
+            }),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw const TimeoutError();
+    } on SocketException catch (e) {
+      throw NetworkError(e.message);
+    } on HttpException catch (e) {
+      throw NetworkError(e.message);
+    }
+
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw AuthExpiredError('HTTP ${response.statusCode}');
+    }
+
+    if (response.statusCode >= 500) {
+      throw ServerError(statusCode: response.statusCode, body: response.body);
+    }
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw BusinessError(
+        message: 'Convex HTTP ${response.statusCode}: ${response.body}',
+      );
+    }
+
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (e) {
+      throw BusinessError(message: 'Invalid Convex response: ${response.body}');
+    }
+
     if (decoded is! Map<String, dynamic>) {
-      throw Exception('Invalid Convex response: ${response.body}');
+      throw BusinessError(message: 'Invalid Convex response: ${response.body}');
     }
 
     final status = decoded['status'];
@@ -164,8 +267,23 @@ class HttpConvexClient {
       return jsonEncode(_jsonToConvex(decoded['value']));
     }
 
-    final message = decoded['errorMessage'] as String? ?? response.body;
-    throw Exception(message);
+    final errorMessage =
+        decoded['errorMessage'] as String? ?? response.body;
+
+    if (_isAuthExpiryMessage(errorMessage)) {
+      throw AuthExpiredError(errorMessage);
+    }
+
+    throw BusinessError(message: errorMessage);
+  }
+
+  bool _isAuthExpiryMessage(String message) {
+    final lower = message.toLowerCase();
+    return lower.contains('mobil oturum yok') ||
+        lower.contains('session expired') ||
+        lower.contains('oturum süresi doldu') ||
+        lower.contains('oturum geçersiz') ||
+        lower.contains('unauthorized');
   }
 }
 

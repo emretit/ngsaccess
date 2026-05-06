@@ -118,7 +118,7 @@ export default function UserSetup() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
+    <div className="flex items-center justify-center min-h-screen bg-muted/50 p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader>
           <CardTitle className="text-2xl text-center flex items-center justify-center gap-2">
@@ -172,8 +172,8 @@ export default function UserSetup() {
                 <div key={k} className="flex items-center gap-2">
                   {passwordChecks[k as keyof typeof passwordChecks]
                     ? <CheckCircle className="h-4 w-4 text-green-500" />
-                    : <XCircle className="h-4 w-4 text-gray-300" />}
-                  <span className={passwordChecks[k as keyof typeof passwordChecks] ? "text-green-600" : "text-gray-400"}>
+                    : <XCircle className="h-4 w-4 text-muted-foreground/60" />}
+                  <span className={passwordChecks[k as keyof typeof passwordChecks] ? "text-green-600" : "text-muted-foreground/70"}>
                     {label}
                   </span>
                 </div>

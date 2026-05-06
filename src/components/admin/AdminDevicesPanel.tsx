@@ -8,6 +8,7 @@ import { DeviceList } from "@/components/devices/DeviceList";
 import { DeviceFilters } from "@/components/devices/DeviceFilters";
 import { useDeviceFilters } from "@/hooks/useDeviceFilters";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
+import { toast } from "@/hooks/use-toast";
 
 export function AdminDevicesPanel() {
   const [selectedZoneId, _setSelectedZoneId] = useState<string | null>(null);
@@ -39,21 +40,23 @@ export function AdminDevicesPanel() {
   const handleDeleteDevice = async (deviceId: string) => {
     try {
       await removeDevice({ deviceId: deviceId as Id<"devices"> });
+      toast({ title: "Başarılı", description: "Cihaz silindi" });
     } catch (error) {
-      console.error("Error deleting device:", error);
+      const message = error instanceof Error ? error.message : "Cihaz silinemedi";
+      toast({ title: "Hata", description: message, variant: "destructive" });
     }
   };
 
-  const handleAssignLocation = (device: Device) => {
-    console.log("Assign location for device:", device);
+  const handleAssignLocation = (_device: Device) => {
+    // TODO: open assign-location dialog
   };
 
-  const handleEditDevice = (device: Device) => {
-    console.log("Edit device:", device);
+  const handleEditDevice = (_device: Device) => {
+    // TODO: open edit-device dialog
   };
 
   const handleNewDevice = () => {
-    console.log("Add new device");
+    // TODO: open new-device dialog
   };
 
   return (

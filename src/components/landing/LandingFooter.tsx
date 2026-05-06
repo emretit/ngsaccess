@@ -1,86 +1,177 @@
-
-import React from 'react';
-import { Facebook, Twitter, Linkedin, Instagram, MapPin, Phone, Mail } from 'lucide-react';
+import {
+  Facebook,
+  Twitter,
+  Linkedin,
+  Instagram,
+  MapPin,
+  Phone,
+  Mail,
+} from 'lucide-react';
 import Logo from '@/components/ui/logo';
 
+interface FooterLink {
+  label: string;
+  href: string;
+}
+
+interface FooterColumn {
+  title: string;
+  links: FooterLink[];
+}
+
+const COLUMNS: FooterColumn[] = [
+  {
+    title: 'Ürün',
+    links: [
+      { label: 'Özellikler', href: '#features' },
+      { label: 'Nasıl Çalışır', href: '#how-it-works' },
+      { label: 'Fiyatlandırma', href: '#pricing' },
+      { label: 'Mobil Uygulama', href: '#features' },
+      { label: 'Demo İste', href: '/demo-request' },
+    ],
+  },
+  {
+    title: 'Şirket',
+    links: [
+      { label: 'Hakkımızda', href: '/about' },
+      { label: 'Müşteriler', href: '#testimonials' },
+      { label: 'Blog', href: '/blog' },
+      { label: 'İletişim', href: '#contact' },
+    ],
+  },
+  {
+    title: 'Yasal',
+    links: [
+      { label: 'Gizlilik Politikası', href: '/legal/privacy' },
+      { label: 'Kullanım Koşulları', href: '/legal/terms' },
+      { label: 'Çerez Politikası', href: '/legal/cookies' },
+      { label: 'KVKK Aydınlatma', href: '/legal/kvkk' },
+    ],
+  },
+];
+
+const SOCIAL_LINKS = [
+  { icon: Facebook, label: 'Facebook', href: '#' },
+  { icon: Twitter, label: 'Twitter', href: '#' },
+  { icon: Linkedin, label: 'LinkedIn', href: '#' },
+  { icon: Instagram, label: 'Instagram', href: '#' },
+];
+
 const LandingFooter = () => {
-  // Sayfa içi kaydırma fonksiyonu
-  const scrollToSection = (sectionId: string) => (e: React.MouseEvent) => {
+  const handleAnchor = (href: string) => (e: React.MouseEvent) => {
+    if (!href.startsWith('#')) return;
     e.preventDefault();
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
+    const id = href.replace('#', '');
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
-  
+
   return (
-    <footer className="bg-gray-600 text-white py-12">
-      <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-          {/* İletişim Bölümü */}
-          <div>
-            <h4 className="font-medium mb-6 text-xl">İLETİŞİM</h4>
-            <ul className="space-y-4">
-              <li className="flex items-start">
-                <MapPin className="h-5 w-5 mr-3 mt-1 shrink-0" />
-                <span>Hasanpaşa Mh. Mandıra Cd. No:4/39<br />Kadıköy / İSTANBUL</span>
+    <footer className="bg-burgundy-900 text-white">
+      <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-14 md:py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10">
+          {/* Brand column */}
+          <div className="lg:col-span-4">
+            <Logo size="md" variant="full" tone="light" />
+            <p className="mt-4 text-sm text-white/75 leading-relaxed max-w-sm">
+              Modern işletmeler için bulut tabanlı PDKS ve geçiş kontrol sistemi.
+              QR, kart ve mobil — tek platformda.
+            </p>
+
+            <ul className="mt-6 space-y-3 text-sm">
+              <li className="flex items-start gap-3">
+                <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-yellow-300" />
+                <span className="text-white/80">
+                  Hasanpaşa Mh. Mandıra Cd. No:4/39
+                  <br />
+                  Kadıköy / İstanbul
+                </span>
               </li>
-              <li className="flex items-center">
-                <Phone className="h-5 w-5 mr-3 shrink-0" />
-                <span>0(212) 577-3572</span>
+              <li className="flex items-center gap-3">
+                <Phone className="h-4 w-4 shrink-0 text-yellow-300" />
+                <a
+                  href="tel:+902125773572"
+                  className="text-white/80 hover:text-white transition-colors"
+                >
+                  0 (212) 577 35 72
+                </a>
               </li>
-              <li className="flex items-center">
-                <Mail className="h-5 w-5 mr-3 shrink-0" />
-                <a href="mailto:info@ngsplus.app" className="hover:underline">info@ngsplus.app</a>
+              <li className="flex items-center gap-3">
+                <Mail className="h-4 w-4 shrink-0 text-yellow-300" />
+                <a
+                  href="mailto:info@ngsplus.app"
+                  className="text-white/80 hover:text-white transition-colors"
+                >
+                  info@ngsplus.app
+                </a>
               </li>
             </ul>
           </div>
-          
-          {/* En Çok Tıklananlar */}
-          <div>
-            <h4 className="font-medium mb-6 text-xl">EN ÇOK TIKLANANLAR</h4>
-            <ul className="space-y-3">
-              <li><a href="#features" onClick={scrollToSection('features')} className="hover:underline transition-colors">Özellikler</a></li>
-              <li><a href="#pricing" onClick={scrollToSection('pricing')} className="hover:underline transition-colors">Fiyatlandırma</a></li>
-              <li><a href="#testimonials" onClick={scrollToSection('testimonials')} className="hover:underline transition-colors">Hakkımızda</a></li>
-              <li><a href="#contact" onClick={scrollToSection('contact')} className="hover:underline transition-colors">İletişim</a></li>
-            </ul>
-          </div>
-          
-          {/* Bizi Takip Edin */}
-          <div>
-            <h4 className="font-medium mb-6 text-xl">BİZİ TAKİP EDİN</h4>
-            <div className="flex space-x-4">
-              <a href="#" className="bg-white rounded-full p-2 hover:bg-gray-200 transition-colors" aria-label="Facebook">
-                <Facebook className="h-6 w-6 text-gray-600" />
-              </a>
-              <a href="#" className="bg-white rounded-full p-2 hover:bg-gray-200 transition-colors" aria-label="Twitter">
-                <Twitter className="h-6 w-6 text-gray-600" />
-              </a>
-              <a href="#" className="bg-white rounded-full p-2 hover:bg-gray-200 transition-colors" aria-label="LinkedIn">
-                <Linkedin className="h-6 w-6 text-gray-600" />
-              </a>
-              <a href="#" className="bg-white rounded-full p-2 hover:bg-gray-200 transition-colors" aria-label="Instagram">
-                <Instagram className="h-6 w-6 text-gray-600" />
-              </a>
+
+          {/* Link columns */}
+          {COLUMNS.map((col) => (
+            <div key={col.title} className="lg:col-span-2">
+              <h4 className="font-semibold mb-4 text-white text-sm uppercase tracking-wide">
+                {col.title}
+              </h4>
+              <ul className="space-y-2.5">
+                {col.links.map((link) => (
+                  <li key={link.label}>
+                    <a
+                      href={link.href}
+                      onClick={handleAnchor(link.href)}
+                      className="text-sm text-white/75 hover:text-white transition-colors"
+                    >
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <div className="mt-6">
-              <Logo size="md" variant="full" className="mb-4" />
-              <p className="text-sm">
-                Modern işletmeler için modern personel takibi ve geçiş kontrol sistemleri.
-              </p>
+          ))}
+
+          {/* Social column */}
+          <div className="lg:col-span-2">
+            <h4 className="font-semibold mb-4 text-white text-sm uppercase tracking-wide">
+              Bizi Takip Edin
+            </h4>
+            <div className="flex gap-2">
+              {SOCIAL_LINKS.map(({ icon: Icon, label, href }) => (
+                <a
+                  key={label}
+                  href={href}
+                  aria-label={label}
+                  className="rounded-full bg-white/10 hover:bg-yellow-300 hover:text-burgundy-900 p-2.5 transition-colors"
+                >
+                  <Icon className="h-4 w-4" />
+                </a>
+              ))}
             </div>
           </div>
         </div>
-        
-        <div className="border-t border-gray-500 pt-8 flex flex-col md:flex-row justify-between items-center">
-          <p className="text-sm">
+
+        <div className="border-t border-white/10 mt-12 pt-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <p className="text-xs text-white/60">
             &copy; {new Date().getFullYear()} NGS Plus. Tüm hakları saklıdır.
           </p>
-          <div className="flex space-x-4 mt-4 md:mt-0">
-            <a href="#" className="text-xs hover:underline">Gizlilik Politikası</a>
-            <a href="#" className="text-xs hover:underline">Kullanım Koşulları</a>
-            <a href="#" className="text-xs hover:underline">Çerezler</a>
+          <div className="flex flex-wrap gap-x-5 gap-y-2 text-xs">
+            <a
+              href="/legal/privacy"
+              className="text-white/60 hover:text-white transition-colors"
+            >
+              Gizlilik
+            </a>
+            <a
+              href="/legal/terms"
+              className="text-white/60 hover:text-white transition-colors"
+            >
+              Koşullar
+            </a>
+            <a
+              href="/legal/cookies"
+              className="text-white/60 hover:text-white transition-colors"
+            >
+              Çerezler
+            </a>
           </div>
         </div>
       </div>

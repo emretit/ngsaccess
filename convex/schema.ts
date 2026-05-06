@@ -215,6 +215,9 @@ export default defineSchema({
     accessStatus: v.optional(
       v.union(v.literal("izin_verildi"), v.literal("reddedildi"))
     ),
+    direction: v.optional(
+      v.union(v.literal("entry"), v.literal("exit"))
+    ),
     rawData: v.optional(v.string()),
     createdAt: v.optional(v.string()),
     updatedAt: v.optional(v.string()),
@@ -222,7 +225,8 @@ export default defineSchema({
     .index("by_project", ["projectId"])
     .index("by_device", ["deviceId"])
     .index("by_employee", ["employeeId"])
-    .index("by_access_time", ["accessTime"]),
+    .index("by_access_time", ["accessTime"])
+    .index("by_employee_device_time", ["employeeId", "deviceId", "accessTime"]),
 
   pdksRecords: defineTable({
     projectId: v.optional(v.id("projects")),
@@ -273,6 +277,7 @@ export default defineSchema({
     endTime: v.string(),
     breakStart: v.optional(v.string()),
     breakEnd: v.optional(v.string()),
+    isActive: v.optional(v.boolean()),
     createdAt: v.string(),
     updatedAt: v.string(),
   }).index("by_project", ["projectId"]),

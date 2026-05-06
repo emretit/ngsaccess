@@ -34,6 +34,14 @@ export const CardReadingsTable = ({
     }
   };
 
+  // Yön badge'i: alan yoksa default "Giriş" göster (eski kayıtlar için).
+  const getDirectionBadge = (reading: CardReading) => {
+    if (reading.direction === "exit") {
+      return <Badge variant="destructive">Çıkış</Badge>;
+    }
+    return <Badge variant="success">Giriş</Badge>;
+  };
+
   // Helper function to get device display name
   const getDeviceDisplay = (reading: CardReading) => {
     // First try to get device name from devices relation
@@ -58,13 +66,14 @@ export const CardReadingsTable = ({
             <TableHead>Zaman</TableHead>
             <TableHead>Departman</TableHead>
             <TableHead>Cihaz</TableHead>
+            <TableHead>Yön</TableHead>
             <TableHead>Durum</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {readings.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                 <div className="flex flex-col items-center gap-2">
                   <p>{emptyMessage}</p>
                   {showClearFilters && onClearFilters && (
@@ -85,6 +94,7 @@ export const CardReadingsTable = ({
                 </TableCell>
                 <TableCell>{reading.employees?.departments?.name || "-"}</TableCell>
                 <TableCell>{getDeviceDisplay(reading)}</TableCell>
+                <TableCell>{getDirectionBadge(reading)}</TableCell>
                 <TableCell>{getStatusBadge(reading)}</TableCell>
               </TableRow>
             ))

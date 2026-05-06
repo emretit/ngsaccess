@@ -20,14 +20,14 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-gray-50 to-gray-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4">
             P
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">PDKS Sistemi</h1>
-          <p className="text-gray-600 mt-2">Kayıt Olun</p>
+          <h1 className="text-3xl font-bold text-foreground">PDKS Sistemi</h1>
+          <p className="text-muted-foreground mt-2">Kayıt Olun</p>
         </div>
 
         <RegisterForm />

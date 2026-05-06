@@ -34,8 +34,8 @@ const ProjectFilter: React.FC<ProjectFilterProps> = ({
               <span className="text-2xl">🔒</span>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Yönetici Erişimi Gerekli</h3>
-              <p className="text-gray-600 mt-2">
+              <h3 className="text-lg font-semibold text-foreground">Yönetici Erişimi Gerekli</h3>
+              <p className="text-muted-foreground mt-2">
                 Bu sayfaya erişim için yönetici yetkisine sahip olmanız gerekiyor.
               </p>
             </div>
@@ -58,8 +58,8 @@ const ProjectFilter: React.FC<ProjectFilterProps> = ({
             <span className="text-2xl">🔒</span>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Proje Erişimi Yok</h3>
-            <p className="text-gray-600 mt-2">
+            <h3 className="text-lg font-semibold text-foreground">Proje Erişimi Yok</h3>
+            <p className="text-muted-foreground mt-2">
               Bu sayfaya erişim için size atanmış bir proje bulunmuyor. 
               Lütfen sistem yöneticinizle iletişime geçin.
             </p>

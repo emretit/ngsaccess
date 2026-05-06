@@ -42,7 +42,7 @@ export default function EmployeeTable({
   const [isBulkSyncing, setIsBulkSyncing] = useState(false);
 
   const syncEmployeeToDevices = useAction(api.actions.hikvisionSync.syncEmployeeToDevices);
-  const allDepartments = useQuery(api.departments.list, {}) ?? [];
+  const allDepartments = useQuery(api.departments.list, {}) ?? []; // dropdown filter — empty during load is acceptable UX
 
   const handleSyncToDevice = async (employee: Employee) => {
     const empId = employee._id;
@@ -203,6 +203,9 @@ export default function EmployeeTable({
               <TableHead onClick={() => requestSort('cardNumber')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
                 Kart No
               </TableHead>
+              <TableHead className="font-semibold text-foreground">
+                Bordro Kodu
+              </TableHead>
               <TableHead onClick={() => requestSort('isActive')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
                 Durum
               </TableHead>
@@ -212,7 +215,7 @@ export default function EmployeeTable({
           <TableBody>
             {sortedEmployees.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground text-sm">
+                <TableCell colSpan={10} className="h-32 text-center text-muted-foreground text-sm">
                   Personel bulunamadı.
                 </TableCell>
               </TableRow>
@@ -254,6 +257,9 @@ export default function EmployeeTable({
                   {employee.positions?.name ?? <span className="text-muted-foreground">—</span>}
                 </TableCell>
                 <TableCell className="font-mono text-sm">{employee.cardNumber || <span className="text-muted-foreground">—</span>}</TableCell>
+                <TableCell className="font-mono text-sm">
+                  {employee.payrollCode || <span className="text-muted-foreground">—</span>}
+                </TableCell>
                 <TableCell>
                   <Badge variant={employee.isActive ? "success" : "secondary"} className="text-xs">
                     {employee.isActive ? 'Aktif' : 'Pasif'}

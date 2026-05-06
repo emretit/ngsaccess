@@ -5,15 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export function EngineeringDepartmentView() {
-  const allDepartments = useQuery(api.departments.list, {}) ?? [];
-  const allEmployees = useQuery(api.employees.list, {}) ?? [];
+  const allDepartmentsData = useQuery(api.departments.list, {});
+  const allEmployeesData = useQuery(api.employees.list, {});
+  const loading = allDepartmentsData === undefined || allEmployeesData === undefined;
+  const allDepartments = allDepartmentsData ?? [];
+  const allEmployees = allEmployeesData ?? [];
 
   const engineeringDept = allDepartments.find((d: { name: string }) => d.name === "Engineering");
   const employees = engineeringDept
     ? allEmployees.filter((e: { departmentId?: string }) => e.departmentId === engineeringDept._id)
     : [];
-
-  const loading = allDepartments === undefined || allEmployees === undefined;
 
   return (
     <Card className="w-full">

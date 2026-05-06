@@ -3,6 +3,7 @@ import { api } from "../../../convex/_generated/api";
 import { AiInsightsCard } from "@/components/pdks/AiInsightsCard";
 import { PDKSTable } from "./PDKSTable";
 import { PDKSAiChat } from "./PDKSAiChat";
+import { toLocalDateString } from "@/lib/date";
 
 interface PDKSAttendanceRecord {
   id: string;
@@ -44,7 +45,7 @@ export function PDKSRecordsContent({
       id: String(emp._id),
       employee_first_name: emp.firstName ?? "",
       employee_last_name: emp.lastName ?? "",
-      date: new Date().toISOString().split("T")[0],
+      date: toLocalDateString(),
       entry_time: "",
       exit_time: "",
       status: "present",

@@ -97,15 +97,15 @@ export function PDKSSummaryCards({ data }: PDKSSummaryCardsProps) {
           )}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
-            <CardTitle className="text-xs sm:text-sm font-medium text-gray-600">
+            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
               {card.title}
             </CardTitle>
-            <div className="p-1.5 rounded-full bg-white/80 shadow-xs">
+            <div className="p-1.5 rounded-full bg-card/80 shadow-xs">
               <card.icon className={cn("h-4 w-4 sm:h-5 sm:w-5", card.color)} />
             </div>
           </CardHeader>
           <CardContent className="p-3 pt-0 sm:p-4 sm:pt-0">
-            <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
+            <div className="text-2xl sm:text-3xl font-bold text-foreground">
               {card.value}
             </div>
             <div
@@ -114,7 +114,7 @@ export function PDKSSummaryCards({ data }: PDKSSummaryCardsProps) {
                 card.changeType === "positive"
                   ? "text-green-600"
                   : card.changeType === "neutral"
-                    ? "text-gray-500"
+                    ? "text-muted-foreground"
                     : "text-red-600"
               )}
             >

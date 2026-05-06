@@ -26,24 +26,24 @@ export function PDKSAiChat() {
   };
 
   const handleExportExcel = () => {
-    console.log('Export to Excel');
+    // TODO: Excel export pipeline
   };
 
   const handleExportPDF = () => {
-    console.log('Export to PDF');
+    // TODO: PDF export pipeline
   };
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-gray-900">
+    <div className="h-full flex flex-col bg-card">
       {/* Header */}
-      <div className="border-b border-gray-200 dark:border-gray-800 p-4">
+      <div className="border-b border-border p-4">
         <div className="flex items-center gap-3 mb-4">
           <div className="bg-primary/10 p-2 rounded-full">
             <Bot className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100">AI Asistan</h3>
-            <p className="text-sm text-gray-500">PDKS verilerinizi sorgulayın</p>
+            <h3 className="font-semibold text-foreground">AI Asistan</h3>
+            <p className="text-sm text-muted-foreground">PDKS verilerinizi sorgulayın</p>
           </div>
         </div>
 
@@ -78,7 +78,7 @@ export function PDKSAiChat() {
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 ? (
-          <div className="text-center text-gray-500 mt-8">
+          <div className="text-center text-muted-foreground mt-8">
             <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p className="text-sm mb-4">AI asistanınıza PDKS verileriniz hakkında sorular sorabilirsiniz.</p>
             {aiMode === 'native' && (
@@ -103,7 +103,7 @@ export function PDKSAiChat() {
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-gray-200 dark:border-gray-800 p-4">
+      <div className="border-t border-border p-4">
         <form onSubmit={onSubmit} className="space-y-3">
           <div className="flex gap-2">
             <Input
@@ -127,7 +127,7 @@ export function PDKSAiChat() {
           </div>
           
           {aiMode === 'native' && (
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               💡 Türkçe sorularınızı anlayabilir ve PDKS verilerinizden hızlı yanıtlar verebilirim.
             </p>
           )}

@@ -47,12 +47,12 @@ const VirtualReader = ({
   };
 
   return (
-    <Card className="hover:shadow-lg transition-shadow duration-200 cursor-pointer bg-white dark:bg-gray-800 border-burgundy/20">
-      <CardContent 
+    <Card className="hover:shadow-lg transition-shadow duration-200 cursor-pointer bg-card border-burgundy/20">
+      <CardContent
         className="flex flex-col items-center justify-center p-6 space-y-4"
         onClick={handleClick}
       >
-        <div className="bg-white p-2 rounded-lg shadow-xs">
+        <div className="bg-card p-2 rounded-lg shadow-xs">
           <QRCode
             value={id}
             size={size}
@@ -60,7 +60,7 @@ const VirtualReader = ({
             className="rounded"
           />
         </div>
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <span className="text-sm font-medium text-foreground">
           {label || id}
         </span>
       </CardContent>

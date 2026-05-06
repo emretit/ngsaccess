@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -56,6 +56,14 @@ export function ManualPdksEditDialog({
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
   const upsert = useMutation(api.pdksRecords.upsertManual);
+
+  useEffect(() => {
+    if (open) {
+      setEntryTime(normalizeTime(initialEntry));
+      setExitTime(normalizeTime(initialExit));
+      setNote("");
+    }
+  }, [open, initialEntry, initialExit]);
 
   const handleSave = async () => {
     if (entryTime && !HHMM.test(entryTime)) {

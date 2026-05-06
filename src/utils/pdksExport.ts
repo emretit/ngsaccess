@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { jsPDF } from "jspdf";
+import { toLocalDateString } from "@/lib/date";
 
 export interface PDKSExportRecord {
   id: string;
@@ -112,7 +113,7 @@ export async function exportToExcel(
     { width: 10 },
   ];
 
-  const fileName = `PDKS_Raporu_${dateRange || new Date().toISOString().split("T")[0]}.xlsx`;
+  const fileName = `PDKS_Raporu_${dateRange || toLocalDateString()}.xlsx`;
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -137,7 +138,9 @@ export function exportToCsv(
   const headers = [
     "Çalışan",
     "ID",
+    "Bordro Kodu",
     "Departman",
+    "Gün Kodu",
     "İlk Giriş",
     "Son Çıkış",
     "Toplam Saat",
@@ -146,18 +149,25 @@ export function exportToCsv(
     "Durum",
   ];
 
+  const escapeCsv = (v: string) =>
+    /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+
   const rows = records.map((r) =>
     [
       r.name,
       r.employeeId,
+      r.payrollEmployeeCode ?? "",
       r.department,
+      r.payrollCode ?? "",
       r.firstEntry,
       r.lastExit,
       r.totalHours,
       r.overtime,
       r.leaveType,
       STATUS_LABELS[r.status] ?? r.status,
-    ].join(",")
+    ]
+      .map((c) => escapeCsv(String(c)))
+      .join(",")
   );
 
   const csvContent = [headers.join(","), ...rows].join("\n");
@@ -165,7 +175,7 @@ export function exportToCsv(
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `PDKS_Raporu_${dateRange || new Date().toISOString().split("T")[0]}.csv`;
+  link.download = `PDKS_Raporu_${dateRange || toLocalDateString()}.csv`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -182,7 +192,7 @@ export function exportToPdf(
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 15;
-  const colWidths = [40, 25, 35, 22, 22, 25, 18, 22, 22];
+  const colWidths = [38, 22, 22, 28, 16, 18, 18, 22, 16, 18, 18];
   const rowHeight = 8;
   const headerHeight = 10;
 
@@ -201,7 +211,19 @@ export function exportToPdf(
   }
 
   doc.setFontSize(9);
-  const headers = ["Çalışan", "ID", "Departman", "İlk Giriş", "Son Çıkış", "Toplam", "Mesai", "İzin", "Durum"];
+  const headers = [
+    "Çalışan",
+    "ID",
+    "Bordro",
+    "Departman",
+    "Gün",
+    "İlk Giriş",
+    "Son Çıkış",
+    "Toplam",
+    "Mesai",
+    "İzin",
+    "Durum",
+  ];
   let x = margin;
 
   headers.forEach((h, i) => {
@@ -221,9 +243,11 @@ export function exportToPdf(
 
     x = margin;
     const rowData = [
-      r.name.substring(0, 25),
+      r.name.substring(0, 22),
       r.employeeId,
-      r.department.substring(0, 18),
+      r.payrollEmployeeCode ?? "",
+      r.department.substring(0, 16),
+      r.payrollCode ?? "",
       r.firstEntry,
       r.lastExit,
       r.totalHours,
@@ -240,7 +264,7 @@ export function exportToPdf(
     y += rowHeight;
   });
 
-  const fileName = `PDKS_Raporu_${dateRange || new Date().toISOString().split("T")[0]}.pdf`;
+  const fileName = `PDKS_Raporu_${dateRange || toLocalDateString()}.pdf`;
   doc.save(fileName);
 }
 

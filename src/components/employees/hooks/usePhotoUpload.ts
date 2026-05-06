@@ -16,8 +16,20 @@ export function usePhotoUpload() {
     onPreviewChange: (preview: string) => void,
     employeeId?: Id<"employees">
   ) => {
-    const file = e.target.files?.[0];
+    const input = e.target;
+    const file = input.files?.[0];
+    input.value = "";
     if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Hata",
+        description: "Sadece JPEG, PNG veya WebP fotoğraflar yüklenebilir",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (file.size > 5 * 1024 * 1024) {
       toast({
@@ -29,10 +41,12 @@ export function usePhotoUpload() {
     }
 
     const reader = new FileReader();
-    reader.onload = (event) => {
-      onPreviewChange(event.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+    const previewUrl = await new Promise<string>((resolve, reject) => {
+      reader.onload = (event) => resolve(event.target?.result as string);
+      reader.onerror = () => reject(new Error("Önizleme oluşturulamadı"));
+      reader.readAsDataURL(file);
+    });
+    onPreviewChange(previewUrl);
 
     try {
       setIsLoading(true);
@@ -53,7 +67,6 @@ export function usePhotoUpload() {
         return;
       }
 
-      // Yeni personel akışı: kayıt henüz yok, URL'i geçici endpoint ile çöz.
       const urlResponse = await fetch(`/api/convex/files/${storageId}`);
       if (!urlResponse.ok) {
         throw new Error("Fotoğraf URL'i alınamadı");
@@ -61,6 +74,7 @@ export function usePhotoUpload() {
       const { url } = (await urlResponse.json()) as { url: string };
       onPhotoChange(url);
     } catch (error) {
+      onPreviewChange("");
       const message = error instanceof Error ? error.message : "Fotoğraf yüklenemedi";
       toast({
         title: "Fotoğraf Yükleme Hatası",

@@ -26,13 +26,13 @@ const stats = [
 
 const DemoStats = () => {
   return (
-    <div className="py-16 px-4 bg-white">
+    <div className="py-16 px-4 bg-background">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
             Rakamlarla PDKS Sistemi
           </h2>
-          <p className="text-lg text-gray-600">
+          <p className="text-lg text-muted-foreground">
             Binlerce işletmenin tercihi, güvenilir çözüm
           </p>
         </div>
@@ -44,10 +44,10 @@ const DemoStats = () => {
                 <div className="text-4xl font-bold text-primary mb-2">
                   {stat.number}
                 </div>
-                <div className="text-xl font-semibold text-gray-900 mb-1">
+                <div className="text-xl font-semibold text-foreground mb-1">
                   {stat.label}
                 </div>
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-muted-foreground">
                   {stat.description}
                 </div>
               </CardContent>

@@ -116,17 +116,16 @@ export class NaturalLanguageService {
     }
   }
 
-  // Örnek sorgular
   static getSampleQueries(): string[] {
     return [
       "Bugün kimler geç kaldı?",
       "Bu hafta IT departmanında kimler vardı?",
-      "Ahmet Yılmaz'ın bu ayki giriş çıkış saatleri",
+      "Bu ay en çok geç kalan kişi kim?",
       "Dün kaç kişi işe geldi?",
       "Bu ay en çok geç kalan 10 kişi",
       "Geçen hafta devamsızlık yapanlar",
       "Bugün hangi departmanlarda kimler var?",
-      "Bu hafta gece vardiyasında kimler vardı?"
+      "Bu hafta gece vardiyasında kimler vardı?",
     ];
   }
 }

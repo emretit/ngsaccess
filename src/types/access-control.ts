@@ -5,6 +5,7 @@ export interface CardReading {
   cardNo: string;
   accessStatus?: "izin_verildi" | "reddedildi";
   accessTime: string;
+  direction?: "entry" | "exit";
   employeeId?: Id<"employees"> | null;
   employeeName?: string | null;
   deviceId?: Id<"devices">;

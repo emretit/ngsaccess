@@ -17,9 +17,27 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Trash2, CalendarPlus, Sparkles, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
+import { z } from "zod";
+
+const holidaySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tarih YYYY-MM-DD formatında olmalı"),
+  name: z.string().trim().min(1, "Tatil adı zorunlu").max(100, "Tatil adı en fazla 100 karakter"),
+  isHalfDay: z.boolean(),
+});
 
 export function HolidayCalendarManager() {
   const { projectIds, loading: projectLoading } = useProjectAccess();
@@ -42,17 +60,18 @@ export function HolidayCalendarManager() {
   const seed = useMutation(api.holidays.seedTurkishHolidays);
 
   const handleAdd = async () => {
-    if (!date || !name.trim()) {
+    const parsed = holidaySchema.safeParse({ date, name, isHalfDay });
+    if (!parsed.success) {
       toast({
         title: "Eksik bilgi",
-        description: "Tarih ve isim zorunlu.",
+        description: parsed.error.issues[0]?.message ?? "Form bilgileri geçersiz",
         variant: "destructive",
       });
       return;
     }
     setAdding(true);
     try {
-      await create({ projectId, date, name: name.trim(), isHalfDay });
+      await create({ projectId, date: parsed.data.date, name: parsed.data.name, isHalfDay: parsed.data.isHalfDay });
       setDate("");
       setName("");
       setIsHalfDay(false);
@@ -220,13 +239,27 @@ export function HolidayCalendarManager() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDelete(h._id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="ghost">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Tatili sil</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              "{h.name}" ({h.date}) tatilini silmek istediğinize emin misiniz?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>İptal</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete(h._id)}>
+                              Sil
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </TableCell>
                   </TableRow>
                 ))

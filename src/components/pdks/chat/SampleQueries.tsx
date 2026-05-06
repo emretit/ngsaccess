@@ -1,7 +1,7 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MessageSquare } from "lucide-react";
+import { NaturalLanguageService } from "./services/naturalLanguageService";
 
 interface SampleQueriesProps {
   onQuerySelect: (query: string) => void;
@@ -9,18 +9,9 @@ interface SampleQueriesProps {
 }
 
 export function SampleQueries({ onQuerySelect, isVisible }: SampleQueriesProps) {
-  const sampleQueries = [
-    "Bugün kimler geç kaldı?",
-    "Bu hafta IT departmanında kimler vardı?",
-    "Dün kaç kişi işe geldi?",
-    "Bu ay en çok geç kalan 10 kişi",
-    "Geçen hafta devamsızlık yapanlar",
-    "Bugün hangi departmanlarda kimler var?",
-    "Ahmet Yılmaz'ın bu ayki kayıtları",
-    "Bu hafta Finans departmanı devam durumu"
-  ];
-
   if (!isVisible) return null;
+
+  const sampleQueries = NaturalLanguageService.getSampleQueries();
 
   return (
     <Card className="mb-4">
@@ -32,9 +23,9 @@ export function SampleQueries({ onQuerySelect, isVisible }: SampleQueriesProps) 
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {sampleQueries.map((query, index) => (
+          {sampleQueries.map((query) => (
             <Button
-              key={index}
+              key={query}
               variant="outline"
               size="sm"
               className="text-left justify-start h-auto py-2 px-3"

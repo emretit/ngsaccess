@@ -37,7 +37,7 @@ const DemoRequestHero = () => {
 
         <Button 
           size="lg" 
-          className="bg-white text-primary hover:bg-gray-100 text-lg px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+          className="bg-card text-primary hover:bg-muted text-lg px-8 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
         >
           Demo Talep Et
           <ArrowRight className="ml-2 h-5 w-5" />

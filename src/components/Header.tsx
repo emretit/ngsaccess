@@ -52,7 +52,7 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 sticky top-0 z-30 shadow-xs">
+    <header className="bg-card border-b border-border sticky top-0 z-30 shadow-xs">
       <div className="px-4 lg:px-6 xl:px-8">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
@@ -60,7 +60,7 @@ export default function Header() {
               <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center text-white font-bold">
                 P
               </div>
-              <span className="ml-2 text-xl font-semibold text-gray-900 dark:text-gray-100">PDKS</span>
+              <span className="ml-2 text-xl font-semibold text-foreground">PDKS</span>
             </Link>
             
             {/* Desktop Navigation */}
@@ -74,7 +74,7 @@ export default function Header() {
                     className={`${
                       location.pathname === item.href
                         ? 'text-primary font-medium border-b-2 border-primary'
-                        : 'text-gray-600 dark:text-gray-300 hover:text-[#711A1A] dark:hover:text-[#f2b4b4]'
+                        : 'text-muted-foreground hover:text-[#711A1A] dark:hover:text-[#f2b4b4]'
                     } transition-colors flex items-center py-2 px-1`}
                   >
                     <IconComponent className="h-4 w-4 mr-1.5" />
@@ -86,7 +86,7 @@ export default function Header() {
           </div>
           
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="icon" className="text-gray-600 dark:text-gray-300 hover:text-[#711A1A] dark:hover:text-[#f2b4b4] relative">
+            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-[#711A1A] dark:hover:text-[#f2b4b4] relative">
               <Bell className="h-5 w-5" />
               <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
             </Button>
@@ -94,7 +94,7 @@ export default function Header() {
             {/* User Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="flex items-center space-x-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
+                <Button variant="ghost" size="sm" className="flex items-center space-x-2 hover:bg-muted rounded-full">
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={profile?.photo_url || ''} alt={getUserDisplayName()} />
                     <AvatarFallback className="bg-primary text-white">
@@ -136,7 +136,7 @@ export default function Header() {
                 variant="ghost" 
                 size="icon"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="text-gray-600 dark:text-gray-300"
+                className="text-muted-foreground"
                 aria-label={isMobileMenuOpen ? "Menüyü kapat" : "Menüyü aç"}
               >
                 {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -147,7 +147,7 @@ export default function Header() {
         
         {/* Mobile Navigation Menu */}
         {isMobileMenuOpen && (
-          <nav className="md:hidden py-4 border-t border-gray-200 dark:border-gray-700">
+          <nav className="md:hidden py-4 border-t border-border">
             <div className="flex flex-col space-y-1">
               {navigation.map(item => {
                 const IconComponent = item.icon;
@@ -157,8 +157,8 @@ export default function Header() {
                     to={item.href}
                     className={`${
                       location.pathname === item.href
-                        ? 'bg-gray-100 dark:bg-gray-800 text-primary font-medium'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                        ? 'bg-muted text-primary font-medium'
+                        : 'text-muted-foreground hover:bg-muted/50'
                     } px-4 py-3 rounded-md transition-colors flex items-center`}
                   >
                     <IconComponent className="h-5 w-5 mr-3" />

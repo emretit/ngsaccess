@@ -25,9 +25,21 @@ export default function ProfilePhoto({
   const saveUserPhoto = useMutation(api.files.saveUserPhoto);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0]) return;
+    const input = e.target;
+    if (!input.files || !input.files[0]) return;
 
-    const file = e.target.files[0];
+    const file = input.files[0];
+    input.value = "";
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Geçersiz dosya türü",
+        description: "Sadece JPEG, PNG veya WebP fotoğraflar yüklenebilir.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (file.size > 2 * 1024 * 1024) {
       toast({

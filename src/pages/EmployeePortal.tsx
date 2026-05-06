@@ -147,7 +147,7 @@ export default function EmployeePortal() {
               <CardContent className="flex flex-col items-center gap-4">
                 {checkInUrl ? (
                   <>
-                    <div className="p-4 bg-white rounded-lg">
+                    <div className="p-4 bg-card rounded-lg">
                       <QRCode value={checkInUrl} size={200} level="M" />
                     </div>
                     <p className="text-xs text-muted-foreground">

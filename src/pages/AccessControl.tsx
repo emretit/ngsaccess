@@ -15,7 +15,7 @@ const AccessControl = () => {
   }
 
   return (
-    <div className="flex gap-4 min-h-full">
+    <div className="flex flex-col md:flex-row gap-4 min-h-full">
       <AccessControlSidebar selected={activeTab} onSelect={setActiveTab} />
 
       <div className="flex-1 min-w-0 overflow-auto">

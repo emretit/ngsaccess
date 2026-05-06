@@ -1,110 +1,95 @@
 import { useState } from "react";
+import { useMutation, useQuery } from "convex/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-import { ShiftTable } from "./components/ShiftTable";
-import { AddShiftDialog } from "./components/AddShiftDialog";
-
-interface Shift {
-  id: number;
-  name: string;
-  startTime: string;
-  endTime: string;
-  breakDuration: string;
-  lunchBreakStart: string;
-  lunchBreakEnd: string;
-  isActive: boolean;
-}
-
-// Mock data for shifts - in real app this would come from database
-const mockShifts: Shift[] = [
-  {
-    id: 1,
-    name: "Sabah Vardiyası",
-    startTime: "08:00",
-    endTime: "16:00",
-    breakDuration: "15",
-    lunchBreakStart: "12:00",
-    lunchBreakEnd: "13:00",
-    isActive: true,
-  },
-  {
-    id: 2,
-    name: "Akşam Vardiyası",
-    startTime: "16:00",
-    endTime: "00:00",
-    breakDuration: "15",
-    lunchBreakStart: "20:00",
-    lunchBreakEnd: "21:00",
-    isActive: true,
-  },
-  {
-    id: 3,
-    name: "Gece Vardiyası",
-    startTime: "00:00",
-    endTime: "08:00",
-    breakDuration: "15",
-    lunchBreakStart: "04:00",
-    lunchBreakEnd: "05:00",
-    isActive: true,
-  },
-];
+import { Loader2, Plus } from "lucide-react";
+import { api } from "../../../../convex/_generated/api";
+import type { Id } from "../../../../convex/_generated/dataModel";
+import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { useToast } from "@/hooks/use-toast";
+import { ShiftTable, type ShiftRow } from "./components/ShiftTable";
+import {
+  AddShiftDialog,
+  type EditingShift,
+  type ShiftFormPayload,
+} from "./components/AddShiftDialog";
 
 interface ShiftSettingsProps {
   onComplete?: () => void;
 }
 
 export function ShiftSettings({ onComplete }: ShiftSettingsProps) {
-  const [shifts, setShifts] = useState(mockShifts);
+  const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
+  const projectId = projectIds[0];
+  const { toast } = useToast();
+
+  const shifts = useQuery(api.shifts.list, projectLoading ? "skip" : {});
+  const createShift = useMutation(api.shifts.create);
+  const updateShift = useMutation(api.shifts.update);
+  const removeShift = useMutation(api.shifts.remove);
+
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editingShift, setEditingShift] = useState<(Shift & { _id?: string }) | null>(null);
+  const [editingShift, setEditingShift] = useState<EditingShift | null>(null);
 
-  const handleAddShift = (newShift: { name: string; startTime: string; endTime: string; breakDuration?: string | number; lunchBreakStart?: string; lunchBreakEnd?: string }) => {
-    const shift: Shift = {
-      name: newShift.name,
-      startTime: newShift.startTime,
-      endTime: newShift.endTime,
-      breakDuration: String(newShift.breakDuration ?? ""),
-      lunchBreakStart: newShift.lunchBreakStart ?? "",
-      lunchBreakEnd: newShift.lunchBreakEnd ?? "",
-      id: Date.now(), // In real app, this would be handled by database
-      isActive: true,
-    };
-    setShifts([...shifts, shift]);
-    setIsAddDialogOpen(false);
-
-    // Call completion callback when first shift is added
-    if (onComplete && shifts.length === 0) {
-      onComplete();
+  const handleAdd = async (payload: ShiftFormPayload) => {
+    if (!projectId) {
+      toast({
+        title: "Proje bulunamadı",
+        description: "Vardiya eklemek için en az bir projeye atanmış olmalısınız.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      await createShift({ projectId, ...payload });
+      toast({ title: "Eklendi", description: `"${payload.name}" oluşturuldu.` });
+      if (shifts && shifts.length === 0 && onComplete) onComplete();
+    } catch (e) {
+      toast({
+        title: "Hata",
+        description: e instanceof Error ? e.message : "Vardiya eklenemedi",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleEditShift = (shift: Shift) => {
-    setEditingShift(shift);
+  const handleUpdate = async (id: Id<"shifts">, payload: ShiftFormPayload) => {
+    try {
+      await updateShift({ shiftId: id, ...payload });
+      toast({ title: "Güncellendi", description: `"${payload.name}" kaydedildi.` });
+    } catch (e) {
+      toast({
+        title: "Hata",
+        description: e instanceof Error ? e.message : "Vardiya güncellenemedi",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEdit = (shift: ShiftRow) => {
+    setEditingShift({
+      _id: shift._id,
+      name: shift.name,
+      startTime: shift.startTime,
+      endTime: shift.endTime,
+      breakStart: shift.breakStart,
+      breakEnd: shift.breakEnd,
+      isActive: shift.isActive ?? true,
+    });
     setIsAddDialogOpen(true);
   };
 
-  const handleUpdateShift = (updatedShift: { _id?: string; id?: string | number; name: string; startTime: string; endTime: string; breakDuration?: string | number; lunchBreakStart?: string; lunchBreakEnd?: string }) => {
-    const id = Number(updatedShift.id);
-    setShifts(shifts.map(shift =>
-      shift.id === id
-        ? {
-            ...shift,
-            name: updatedShift.name,
-            startTime: updatedShift.startTime,
-            endTime: updatedShift.endTime,
-            breakDuration: String(updatedShift.breakDuration ?? ""),
-            lunchBreakStart: updatedShift.lunchBreakStart ?? "",
-            lunchBreakEnd: updatedShift.lunchBreakEnd ?? "",
-          }
-        : shift
-    ));
-    setEditingShift(null);
-    setIsAddDialogOpen(false);
-  };
-
-  const handleDeleteShift = (shiftId: number) => {
-    setShifts(shifts.filter(shift => shift.id !== shiftId));
+  const handleDelete = async (shiftId: Id<"shifts">) => {
+    try {
+      await removeShift({ shiftId });
+      toast({ title: "Silindi", description: "Vardiya kaldırıldı." });
+    } catch (e) {
+      toast({
+        title: "Hata",
+        description: e instanceof Error ? e.message : "Vardiya silinemedi",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCloseDialog = () => {
@@ -112,40 +97,65 @@ export function ShiftSettings({ onComplete }: ShiftSettingsProps) {
     setEditingShift(null);
   };
 
+  const isLoading = projectLoading || shifts === undefined;
+  const hasNoProjectAccess = !projectLoading && !projectId && !isSuperAdmin;
+
+  const tableShifts: ShiftRow[] = (shifts ?? []).map((s) => ({
+    _id: s._id,
+    name: s.name,
+    startTime: s.startTime,
+    endTime: s.endTime,
+    breakStart: s.breakStart,
+    breakEnd: s.breakEnd,
+    isActive: s.isActive,
+  }));
+
   return (
-    <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
+    <div className="space-y-6 p-6 bg-muted/50 min-h-screen">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Vardiya Ayarları</h1>
-          <p className="text-gray-600 mt-2">Çalışma vardiyalarını yönetin ve düzenleyin</p>
+          <h1 className="text-3xl font-bold text-foreground">Vardiya Ayarları</h1>
+          <p className="text-muted-foreground mt-2">Çalışma vardiyalarını yönetin ve düzenleyin</p>
         </div>
-        <Button 
+        <Button
           onClick={() => setIsAddDialogOpen(true)}
           className="bg-primary hover:bg-primary/90 text-white"
+          disabled={hasNoProjectAccess}
         >
           <Plus className="w-4 h-4 mr-2" />
           Yeni Vardiya Ekle
         </Button>
       </div>
 
-      <Card className="shadow-md">
-        <CardHeader className="bg-white border-b border-gray-200">
-          <CardTitle className="text-xl text-gray-800">Mevcut Vardiyalar</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ShiftTable 
-            shifts={shifts}
-            onEdit={handleEditShift}
-            onDelete={handleDeleteShift}
-          />
-        </CardContent>
-      </Card>
+      {hasNoProjectAccess ? (
+        <Card className="shadow-md">
+          <CardContent className="py-10 text-center text-muted-foreground">
+            Vardiya yönetimi için en az bir projeye atanmış olmanız gerekir.
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="shadow-md">
+          <CardHeader className="bg-card border-b border-border">
+            <CardTitle className="text-xl text-foreground">Mevcut Vardiyalar</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                Yükleniyor...
+              </div>
+            ) : (
+              <ShiftTable shifts={tableShifts} onEdit={handleEdit} onDelete={handleDelete} />
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <AddShiftDialog
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
-        onAdd={handleAddShift}
-        onUpdate={handleUpdateShift}
+        onAdd={handleAdd}
+        onUpdate={handleUpdate}
         editingShift={editingShift}
         onClose={handleCloseDialog}
       />

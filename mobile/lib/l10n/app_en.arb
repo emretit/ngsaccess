@@ -1,0 +1,338 @@
+{
+  "@@locale": "en",
+
+  "appName": "NGS Plus",
+  "appTagline": "Attendance Tracking System",
+  "pdksTitle": "Time & Attendance",
+  "pdksSubtitle": "Personnel Attendance Control System",
+
+  "commonOk": "OK",
+  "commonCancel": "Cancel",
+  "commonClose": "Close",
+  "commonRetry": "Try Again",
+  "commonError": "Error",
+  "commonSuccess": "Success",
+  "commonAdd": "Add",
+  "comingSoon": "Coming soon.",
+
+  "navHome": "Home",
+  "navHistory": "History",
+  "navVisitor": "Visitor",
+  "navProfile": "Profile",
+
+  "loginTitle": "Sign In",
+  "loginPrompt": "Enter your credentials to sign in to the time & attendance system",
+  "loginEmailLabel": "Email",
+  "loginPasswordLabel": "Password",
+  "loginEmailRequired": "Please enter your email address",
+  "loginEmailInvalid": "Please enter a valid email address",
+  "loginPasswordRequired": "Please enter your password",
+  "loginPasswordTooShort": "Password must be at least 6 characters",
+  "loginRememberMe": "Remember Me",
+  "loginForgotPassword": "Forgot password",
+
+  "forgotPasswordTitle": "Reset Password",
+  "forgotPasswordHeadline": "Forgot your password?",
+  "forgotPasswordPrompt": "Enter your email address and we'll send you a reset link.",
+  "forgotPasswordSendButton": "Send Reset Link",
+  "forgotPasswordBackToLogin": "Back to sign in",
+  "forgotPasswordSuccessTitle": "Email Sent!",
+  "forgotPasswordSuccessBody": "A password reset link has been sent to {email}. Please check your inbox.",
+  "@forgotPasswordSuccessBody": {
+    "placeholders": {
+      "email": { "type": "String" }
+    }
+  },
+  "forgotPasswordSuccessButton": "Back to Sign In",
+
+  "homeGreetingMorning": "Good morning",
+  "homeGreetingDay": "Good day",
+  "homeGreetingEvening": "Good evening",
+  "homeGreetingFallback": "User",
+  "homeGreetingLine": "{greeting}, {name}!",
+  "@homeGreetingLine": {
+    "placeholders": {
+      "greeting": { "type": "String" },
+      "name": { "type": "String" }
+    }
+  },
+  "homeAttendanceStatus": "Attendance Status",
+  "homeScanCheckIn": "Scan QR - Check In",
+  "homeScanCheckOut": "Scan QR - Check Out",
+  "homeStatusInside": "Inside",
+  "homeStatusOut": "Checked Out",
+  "homeStatusNone": "Not Yet",
+  "homeAttendanceEntryRow": "Last In",
+  "homeAttendanceExitRow": "Last Out",
+  "homeExtraMovements": "+{count} movements",
+  "@homeExtraMovements": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "homeScanCheckInAgain": "Scan QR - Check In Again",
+  "homeAttendanceTimeEmpty": "—",
+  "homeMonthSummary": "This Month's Summary",
+  "homeStatTotalDays": "Total Days",
+  "homeStatDaysPresent": "Days Present",
+  "homeStatTimesLate": "Times Late",
+  "homeProgressLabel": "{present} / {total} days attended",
+  "@homeProgressLabel": {
+    "placeholders": {
+      "present": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "homeQuoteOfTheDay": "💫 Quote of the Day",
+  "homeQuote1": "Success is where preparation meets opportunity.",
+  "homeQuote2": "Every new day is a new beginning.",
+  "homeQuote3": "Discipline is the bridge to freedom.",
+  "homeQuote4": "Small steps create big changes.",
+  "homeQuote5": "Today is the tomorrow you thought about yesterday.",
+  "homeQuote6": "Time is the most valuable treasure — use it wisely.",
+  "homeQuote7": "Good habits are the key to success.",
+  "homeQuote8": "Every day is an opportunity to improve yourself.",
+
+  "profileTitle": "Profile",
+  "profileEditButton": "Edit Profile",
+  "profileEditDialogBody": "Profile editing will be added soon.",
+  "profileNotifications": "Notifications",
+  "profileNotificationsSubtitle": "Manage notification settings",
+  "profileSecurity": "Security",
+  "profileSecuritySubtitle": "Password and security settings",
+  "profileTheme": "Theme",
+  "profileThemeDark": "Dark theme active",
+  "profileThemeLight": "Light theme active",
+  "profileThemeSystem": "Follow system",
+  "profileThemeModeLight": "Light theme",
+  "profileThemeModeDark": "Dark theme",
+  "profileThemeModeSystem": "Follow system",
+  "profileLanguage": "Language",
+  "profileLanguageValueTr": "Turkish",
+  "profileLanguageValueEn": "English",
+  "profilePreferredDoor": "Quick Access Door",
+  "profilePreferredDoorEmpty": "Not selected",
+  "homeQuickActions": "Quick Actions",
+  "quickActionUnlock": "Open Door",
+  "quickActionVisitor": "Visitor",
+  "quickActionHistory": "History",
+  "quickActionProfile": "Profile",
+  "unlockNoDeviceSelected": "Pick a quick-access door from Profile first",
+  "unlockGranted": "Access Granted",
+  "unlockDenied": "Access Denied",
+  "selectDeviceTitle": "Select Door",
+  "selectDeviceSearch": "Search...",
+  "selectDeviceEmpty": "No accessible doors yet",
+  "selectDeviceNoMatch": "No matching doors",
+  "profileHelp": "Help & Support",
+  "profileHelpSubtitle": "FAQ and support",
+  "profileAboutApp": "About the App",
+  "profileAppVersion": "Version 1.0.0",
+  "profilePrivacy": "Privacy Policy",
+  "profilePrivacySubtitle": "Data usage policy",
+  "profileLogout": "Sign Out",
+  "profileLogoutSubtitle": "Sign out of your account",
+  "profileLogoutConfirmTitle": "Sign Out",
+  "profileLogoutConfirmBody": "Are you sure you want to sign out of your account?",
+  "profileSettings": "Settings",
+  "profileSettingsBody": "Advanced settings will be added soon.",
+  "profileNotificationsDialogTitle": "Notification Settings",
+  "profileNotificationsDialogBody": "Notification settings will be added soon.",
+  "profileSecurityDialogTitle": "Security Settings",
+  "profileSecurityDialogBody": "Security settings will be added soon.",
+  "profileThemeDialogTitle": "Theme Settings",
+  "profileThemeDialogBody": "Theme settings will be added soon.",
+  "profileLanguageDialogTitle": "Language Settings",
+  "profileLanguageDialogBody": "Language settings will be added soon.",
+  "profileHelpDialogTitle": "Help & Support",
+  "profileHelpDialogBody": "Help and support page will be added soon.",
+  "profilePrivacyDialogTitle": "Privacy Policy",
+  "profilePrivacyDialogBody": "Privacy policy will be added soon.",
+  "profileAboutDialogTitle": "About NGS Plus",
+  "profileAboutLine1": "NGS Plus Attendance Tracking System",
+  "profileAboutLine2": "Version: 1.0.0",
+  "profileAboutLine3": "Developer: NGS Team",
+  "profileAboutLine4": "QR code based attendance tracking application.",
+  "profileFallbackEmail": "email@example.com",
+
+  "historyTitle": "History",
+  "historyTabAll": "All",
+  "historyTabThisMonth": "This Month",
+  "historyTabStats": "Stats",
+  "historyLoading": "Loading data...",
+  "historyErrorTitle": "An Error Occurred",
+  "historyErrorBody": "Failed to load data: {error}",
+  "@historyErrorBody": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "historyEmpty": "No records found",
+  "historyEmptyHint": "Pull down to refresh data",
+  "historyColorLegend": "Color Legend",
+  "historyLegendEarly": "Early Check-in",
+  "historyLegendEarlyDesc": "Days checked in before 09:00",
+  "historyLegendNormal": "Normal Check-in",
+  "historyLegendNormalDesc": "Days checked in between 09:00 - 09:30",
+  "historyLegendLate": "Late Check-in",
+  "historyLegendLateDesc": "Days checked in after 09:30",
+  "historyLegendNone": "No Attendance",
+  "historyLegendNoneDesc": "Days with no check-in/out records",
+  "historyCalendarHint": "Tap days to see details. Green dots indicate additional attendance records.",
+  "historyMonthSummary": "This Month's Summary",
+  "historyTotalCheckIns": "Total Check-ins",
+  "historyTotalCheckOuts": "Total Check-outs",
+  "historyActiveDays": "Active Days",
+  "historyGeneralStats": "General Statistics",
+  "historyThisWeek": "This Week",
+  "historyWeeklySummary": "Weekly Summary",
+  "historyWeeklyTotalRecords": "{count} records this week",
+  "@historyWeeklyTotalRecords": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "historyWeeklyCheckIn": "Check-ins: {count}",
+  "@historyWeeklyCheckIn": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "historyWeeklyCheckOut": "Check-outs: {count}",
+  "@historyWeeklyCheckOut": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "historyDeviceStats": "Device Statistics",
+  "historyCheckInRecord": "Checked In",
+  "historyCheckOutRecord": "Checked Out",
+  "historyBadgeIn": "IN",
+  "historyBadgeOut": "OUT",
+  "historyUnknownDevice": "Unknown Device",
+  "historyUnknownLocation": "Unknown Location",
+  "historyDetailCheckIn": "Check-in Details",
+  "historyDetailCheckOut": "Check-out Details",
+  "historyDetailDate": "Date",
+  "historyDetailTime": "Time",
+  "historyDetailLocation": "Location",
+  "historyDetailQrCode": "QR Code",
+  "historyFilterTitle": "Filter",
+  "historyFilterDate": "Date",
+  "historyFilterDateNone": "No date selected",
+  "historyFilterDevice": "Device",
+  "historyFilterDeviceNone": "No device selected",
+  "historyFilterClear": "Clear Filters",
+  "historyFilterDeviceSelectTitle": "Select Device",
+  "historyDayRecordCount": "{count} Record(s)",
+  "@historyDayRecordCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "historyEntryShort": "In",
+  "historyExitShort": "Out",
+
+  "qrTabTitle": "QR Actions",
+  "qrTabMyQr": "My QR",
+  "qrTabScan": "Scan",
+  "qrInvalidResponse": "Invalid response",
+  "qrTokenMissing": "Token missing",
+  "qrRefresh": "Refresh",
+  "qrTryAgain": "Try again",
+  "qrFrameHint": "Place the QR code inside the frame",
+  "qrTokenHint": "Show this QR code to the door device. Code is valid for 10 seconds; tap refresh when expired.",
+  "qrProcessError": "An error occurred while processing the QR code: {error}",
+  "@qrProcessError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "qrUserCodeTitle": "User QR Code",
+  "qrUserCodeBody": "User: {name}\nEmail: {email}\nDate: {date}",
+  "@qrUserCodeBody": {
+    "placeholders": {
+      "name": { "type": "String" },
+      "email": { "type": "String" },
+      "date": { "type": "String" }
+    }
+  },
+  "qrInvalidCode": "Invalid QR code",
+  "qrAccessGranted": "Access Granted",
+  "qrUnknownError": "An error occurred",
+  "qrDeviceLine": "Device: {name}",
+  "@qrDeviceLine": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "qrLocationLine": "Location: {location}",
+  "@qrLocationLine": {
+    "placeholders": {
+      "location": { "type": "String" }
+    }
+  },
+  "qrTimeLine": "Time: {time}",
+  "@qrTimeLine": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+
+  "visitorTitle": "Visitor Management",
+  "visitorStatTotal": "Total",
+  "visitorStatInside": "Inside",
+  "visitorStatExpected": "Expected",
+  "visitorEmpty": "No visitor records yet",
+  "visitorEmptyHint": "Tap + to add a new visitor",
+  "visitorStatusExpected": "Expected",
+  "visitorStatusInside": "Inside",
+  "visitorStatusOut": "Left",
+  "visitorContactPerson": "Contact: {name}",
+  "@visitorContactPerson": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "visitorCheckOut": "Check Out",
+  "visitorCheckIn": "Check In",
+  "visitorCheckedInToast": "{name} checked in",
+  "@visitorCheckedInToast": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "visitorCheckedOutToast": "{name} checked out",
+  "@visitorCheckedOutToast": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "visitorFilterTitle": "Filter",
+  "visitorFilterBody": "Filtering options will go here.",
+  "visitorAddTitle": "New Visitor",
+  "visitorFieldName": "Full Name",
+  "visitorFieldCompany": "Company",
+  "visitorFieldPurpose": "Visit Purpose",
+  "visitorFieldContact": "Contact Person",
+  "visitorAddedToast": "Visitor added",
+  "visitorAddButton": "Add Visitor",
+
+  "errorNetwork": "No internet connection. Please check your connection.",
+  "errorTimeout": "The server did not respond. Please try again later.",
+  "errorServer": "Server error ({code}). Please try again shortly.",
+  "@errorServer": {
+    "placeholders": {
+      "code": { "type": "int" }
+    }
+  },
+  "errorAuthExpired": "Your session has ended. Please sign in again.",
+  "errorUnknown": "An unexpected error occurred. Please try again.",
+  "errorBusinessInvalidCredentials": "Invalid email or password",
+  "errorBusinessNoMobilePassword": "Your mobile password isn't set yet. Ask your administrator for a setup link.",
+  "errorBusinessEmployeeInactive": "Your employee record is not active",
+
+  "passwordResetAdminInfo": "Your mobile password is set up by your administrator. Please contact them.",
+  "qrInvalidDevice": "QR code is missing device information",
+  "accessDenied": "Access denied"
+}

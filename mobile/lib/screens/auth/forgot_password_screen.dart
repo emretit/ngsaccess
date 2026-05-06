@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+
+import '../../core/error_localizer.dart';
+import '../../core/spacing.dart';
+import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/responsive_container.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -32,10 +38,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       setState(() {
         _emailSent = true;
       });
-    } else if (mounted && authProvider.errorMessage != null) {
+    } else if (mounted && (authProvider.lastError != null || authProvider.errorMessage != null)) {
+      final message = authProvider.lastError != null
+          ? localizeAppError(context, authProvider.lastError!)
+          : authProvider.errorMessage!;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(authProvider.errorMessage!),
+          content: Text(message),
           backgroundColor: Colors.red,
         ),
       );
@@ -45,17 +54,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkBackground : Colors.white,
       appBar: AppBar(
-        title: const Text('Şifre Sıfırla'),
+        title: Text(l10n.forgotPasswordTitle),
         backgroundColor: Colors.transparent,
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: _emailSent ? _buildSuccessView() : _buildFormView(),
+        child: ResponsiveContainer(
+          maxWidth: AppSpacing.formMaxWidth,
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: _emailSent ? _buildSuccessView() : _buildFormView(),
+          ),
         ),
       ),
     );
@@ -63,15 +76,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   Widget _buildFormView() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    final l10n = AppLocalizations.of(context);
+
     return Form(
       key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 32),
-          
-          // Icon
           Container(
             width: 80,
             height: 80,
@@ -86,10 +98,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          
-          // Title and description
           Text(
-            'Şifrenizi mi unuttunuz?',
+            l10n.forgotPasswordHeadline,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
               color: isDark ? Colors.white : Colors.black87,
@@ -97,22 +107,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
-          
           Text(
-            'E-posta adresinizi girin, size şifre sıfırlama bağlantısı gönderelim.',
+            l10n.forgotPasswordPrompt,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: isDark ? Colors.grey[300] : Colors.grey[600],
             ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 48),
-
-          // Email field
           TextFormField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
             decoration: InputDecoration(
-              labelText: 'E-posta',
+              labelText: l10n.loginEmailLabel,
               prefixIcon: const Icon(Icons.email_outlined),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -122,17 +129,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
             validator: (value) {
               if (value == null || value.isEmpty) {
-                return 'E-posta adresinizi girin';
+                return l10n.loginEmailRequired;
               }
               if (!value.contains('@')) {
-                return 'Geçerli bir e-posta adresi girin';
+                return l10n.loginEmailInvalid;
               }
               return null;
             },
           ),
           const SizedBox(height: 24),
-
-          // Reset button
           Consumer<AuthProvider>(
             builder: (context, authProvider, _) {
               return ElevatedButton(
@@ -149,19 +154,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           strokeWidth: 2,
                         ),
                       )
-                    : const Text('Sıfırlama Bağlantısı Gönder'),
+                    : Text(l10n.forgotPasswordSendButton),
               );
             },
           ),
           const SizedBox(height: 24),
-
-          // Back to login
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
+            onPressed: () => context.pop(),
             child: Text(
-              'Giriş sayfasına dön',
+              l10n.forgotPasswordBackToLogin,
               style: TextStyle(
                 color: isDark ? AppTheme.primaryBurgundy2 : AppTheme.primaryBurgundy,
               ),
@@ -174,12 +175,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   Widget _buildSuccessView() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    final l10n = AppLocalizations.of(context);
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Success icon
         Container(
           width: 100,
           height: 100,
@@ -194,10 +195,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
         ),
         const SizedBox(height: 24),
-        
-        // Success message
         Text(
-          'E-posta Gönderildi!',
+          l10n.forgotPasswordSuccessTitle,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.bold,
             color: isDark ? Colors.white : Colors.black87,
@@ -205,25 +204,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
-        
         Text(
-          '${_emailController.text} adresine şifre sıfırlama bağlantısı gönderildi. E-postanızı kontrol edin.',
+          l10n.forgotPasswordSuccessBody(_emailController.text),
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
             color: isDark ? Colors.grey[300] : Colors.grey[600],
           ),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 48),
-        
-        // Back button
         ElevatedButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          onPressed: () => context.pop(),
           style: ElevatedButton.styleFrom(
             minimumSize: const Size(double.infinity, 56),
           ),
-          child: const Text('Giriş Sayfasına Dön'),
+          child: Text(l10n.forgotPasswordSuccessButton),
         ),
       ],
     );

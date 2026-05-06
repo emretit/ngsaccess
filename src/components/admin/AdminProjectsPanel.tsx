@@ -268,7 +268,16 @@ const AdminProjectsPanel = () => {
         </div>
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog
+        open={isDialogOpen}
+        onOpenChange={(open) => {
+          setIsDialogOpen(open);
+          if (!open) {
+            setCurrentProjectId(null);
+            setFormData({ name: "", description: "", isActive: true });
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{currentProjectId ? "Proje Düzenle" : "Yeni Proje"}</DialogTitle>

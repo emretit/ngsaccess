@@ -1,122 +1,213 @@
-
-import React from 'react';
-import { ChevronRight } from 'lucide-react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Check, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 
-const PricingSection = () => {
-  return (
-    <section id="pricing" className="py-20 bg-muted/30">
-      <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl font-bold">Basit, Şeffaf Fiyatlandırma</h2>
-          <p className="mt-4 text-muted-foreground text-lg max-w-2xl mx-auto">
-            Kuruluşunuz için en uygun planı seçin
-          </p>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <PricingCard
-            name="Ücretsiz"
-            price="₺0"
-            period="/ay"
-            description="Küçük takımlar için ideal"
-            buttonText="Ücretsiz Başlayın"
-            buttonVariant="outline"
-            features={[
-              "5 çalışana kadar",
-              "Temel raporlar",
-              "E-posta desteği"
-            ]}
-          />
-          
-          <PricingCard
-            name="Profesyonel"
-            price="₺299"
-            period="/ay"
-            description="Büyüyen işletmeler için"
-            buttonText="14 Günlük Deneme Başlatın"
-            buttonVariant="default"
-            isPopular
-            features={[
-              "50 çalışana kadar",
-              "Gelişmiş raporlar ve yapay zeka analizleri",
-              "Öncelikli destek",
-              "Çoklu geçiş noktaları"
-            ]}
-          />
-          
-          <PricingCard
-            name="Kurumsal"
-            price="Özel Fiyat"
-            period=""
-            description="Büyük organizasyonlar için"
-            buttonText="Satış Ekibiyle İletişime Geçin"
-            buttonVariant="outline"
-            features={[
-              "Sınırsız çalışan",
-              "Özel entegrasyonlar",
-              "Özel müşteri temsilcisi",
-              "Yerinde kurulum seçenekleri"
-            ]}
-          />
-        </div>
-      </div>
-    </section>
-  );
-};
+type Billing = 'monthly' | 'yearly';
 
-interface PricingCardProps {
+interface Plan {
   name: string;
-  price: string;
-  period: string;
   description: string;
+  monthlyPrice: number | null;
+  yearlyPrice: number | null;
+  customLabel?: string;
   buttonText: string;
-  buttonVariant: "default" | "outline";
+  buttonVariant: 'default' | 'outline';
   features: string[];
-  isPopular?: boolean;
+  popular?: boolean;
+  ctaPath: string;
 }
 
-const PricingCard = ({
-  name,
-  price,
-  period,
-  description,
-  buttonText,
-  buttonVariant,
-  features,
-  isPopular
-}: PricingCardProps) => {
+const PLANS: Plan[] = [
+  {
+    name: 'Başlangıç',
+    description: 'Küçük takımlar için ideal',
+    monthlyPrice: 399,
+    yearlyPrice: 319,
+    buttonText: 'Hemen Başla',
+    buttonVariant: 'outline',
+    ctaPath: '/demo-request?plan=starter',
+    features: [
+      '10 çalışana kadar',
+      'QR kodla giriş çıkış',
+      'Temel raporlar',
+      'E-posta desteği',
+    ],
+  },
+  {
+    name: 'Profesyonel',
+    description: 'Büyüyen işletmeler için',
+    monthlyPrice: 799,
+    yearlyPrice: 639,
+    buttonText: '14 Gün Ücretsiz Dene',
+    buttonVariant: 'default',
+    popular: true,
+    ctaPath: '/demo-request?plan=pro',
+    features: [
+      '50 çalışana kadar',
+      'Kart okuyucu entegrasyonu',
+      'AI asistanlı raporlar',
+      'Vardiya & izin yönetimi',
+      'Çoklu geçiş noktası',
+      'Öncelikli destek',
+    ],
+  },
+  {
+    name: 'Kurumsal',
+    description: 'Büyük organizasyonlar için',
+    monthlyPrice: null,
+    yearlyPrice: null,
+    customLabel: 'Özel Fiyat',
+    buttonText: 'Satış Ekibiyle Görüş',
+    buttonVariant: 'outline',
+    ctaPath: '/demo-request?plan=enterprise',
+    features: [
+      'Sınırsız çalışan',
+      'Hikvision & özel entegrasyonlar',
+      'SLA & yerinde kurulum',
+      'Özel müşteri temsilcisi',
+      'KVKK & ISO uyum desteği',
+      'Tek oturum açma (SSO)',
+    ],
+  },
+];
+
+const formatPrice = (price: number) =>
+  new Intl.NumberFormat('tr-TR').format(price);
+
+const PricingSection = () => {
+  const [billing, setBilling] = useState<Billing>('monthly');
+  const navigate = useNavigate();
+
   return (
-    <Card className={`${isPopular ? "border-primary shadow-lg" : "border-none shadow-md hover:shadow-lg transition-all"} relative`}>
-      {isPopular && (
-        <div className="absolute -top-3 left-0 right-0 mx-auto w-fit">
-          <Badge className="px-3 py-1">POPÜLER</Badge>
+    <section id="pricing" className="py-20 md:py-28 bg-muted/30">
+      <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div className="text-center mb-10 md:mb-12 max-w-3xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+            Basit, şeffaf fiyatlandırma
+          </h2>
+          <p className="mt-4 text-lg text-muted-foreground">
+            Kuruluşunuzun büyüklüğüne göre uygun planı seçin. İstediğiniz zaman değiştirin.
+          </p>
         </div>
-      )}
-      <CardContent className="pt-6">
-        <div className="text-center">
-          <h3 className="text-xl font-semibold mb-1">{name}</h3>
-          <div className="text-3xl font-bold my-4">
-            {price}<span className="text-lg text-muted-foreground font-normal">{period}</span>
-          </div>
-          <p className="text-muted-foreground mb-6">{description}</p>
-          <Button variant={buttonVariant} className="w-full">
-            {buttonText}
-          </Button>
-          
-          <div className="mt-8 text-left">
-            {features.map((feature, index) => (
-              <p key={index} className="flex items-center text-sm mb-3">
-                <ChevronRight className="h-4 w-4 text-primary mr-2" />
-                {feature}
-              </p>
-            ))}
-          </div>
+
+        <div className="flex items-center justify-center gap-3 mb-12">
+          <span
+            className={`text-sm font-medium transition-colors ${
+              billing === 'monthly' ? 'text-foreground' : 'text-muted-foreground'
+            }`}
+          >
+            Aylık
+          </span>
+          <Switch
+            checked={billing === 'yearly'}
+            onCheckedChange={(checked) => setBilling(checked ? 'yearly' : 'monthly')}
+            aria-label="Faturalandırma periyodu"
+          />
+          <span
+            className={`text-sm font-medium transition-colors flex items-center gap-2 ${
+              billing === 'yearly' ? 'text-foreground' : 'text-muted-foreground'
+            }`}
+          >
+            Yıllık
+            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-0">
+              %20 indirim
+            </Badge>
+          </span>
         </div>
-      </CardContent>
-    </Card>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+          {PLANS.map((plan, idx) => {
+            const price =
+              billing === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice;
+
+            return (
+              <motion.div
+                key={plan.name}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-50px' }}
+                transition={{ duration: 0.4, delay: idx * 0.1 }}
+                className={`relative rounded-2xl border bg-card p-8 ${
+                  plan.popular
+                    ? 'border-primary shadow-xl shadow-primary/10 md:scale-[1.03]'
+                    : 'border-border shadow-sm hover:shadow-md transition-shadow'
+                }`}
+              >
+                {plan.popular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <Badge className="bg-primary text-white shadow-md flex items-center gap-1 px-3 py-1">
+                      <Sparkles className="h-3 w-3" />
+                      EN POPÜLER
+                    </Badge>
+                  </div>
+                )}
+
+                <div className="mb-6">
+                  <h3 className="text-xl font-bold">{plan.name}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {plan.description}
+                  </p>
+                </div>
+
+                <div className="mb-6 min-h-[80px]">
+                  {price === null ? (
+                    <div className="text-3xl font-bold">{plan.customLabel}</div>
+                  ) : (
+                    <>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-4xl font-bold">
+                          ₺{formatPrice(price)}
+                        </span>
+                        <span className="text-muted-foreground">
+                          /ay{billing === 'yearly' && price > 0 ? ' (yıllık)' : ''}
+                        </span>
+                      </div>
+                      {billing === 'yearly' && plan.monthlyPrice && plan.monthlyPrice > 0 && (
+                        <div className="text-xs text-muted-foreground line-through mt-1">
+                          ₺{formatPrice(plan.monthlyPrice)}/ay
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <Button
+                  variant={plan.buttonVariant}
+                  className={`w-full mb-6 ${
+                    plan.buttonVariant === 'default'
+                      ? 'bg-primary hover:bg-primary/90 shadow-md shadow-primary/20'
+                      : ''
+                  }`}
+                  onClick={() => navigate(plan.ctaPath)}
+                >
+                  {plan.buttonText}
+                </Button>
+
+                <ul className="space-y-3">
+                  {plan.features.map((feature) => (
+                    <li
+                      key={feature}
+                      className="flex items-start gap-2.5 text-sm"
+                    >
+                      <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        <p className="text-center text-xs text-muted-foreground mt-10">
+          * Tüm fiyatlara KDV dahildir. İstediğiniz zaman iptal edebilirsiniz.
+        </p>
+      </div>
+    </section>
   );
 };
 

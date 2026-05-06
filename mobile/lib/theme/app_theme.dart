@@ -13,6 +13,14 @@ class AppTheme {
   static const Color darkSurface = Color(0xFF1E1E1E);
   static const Color primaryColor = primaryBurgundy;
 
+  // Semantic status colors
+  static const Color success = Color(0xFF22C55E);
+  static const Color warning = Color(0xFFF59E0B);
+  static const Color danger = Color(0xFFEF4444);
+  static const Color info = Color(0xFF3B82F6);
+  static const Color surfaceVariantLight = Color(0xFFF5F5F5);
+  static const Color surfaceVariantDark = Color(0xFF2A2A2A);
+
   // Light Theme
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,

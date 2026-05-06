@@ -1,9 +1,16 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
-  <!-- Outer circle -->
-  <circle cx="100" cy="100" r="95" fill="none" stroke="#800020" stroke-width="10"/>
-  
-  <!-- NGS+ text -->
-  <text x="100" y="120" font-family="Arial, sans-serif" font-size="48" font-weight="bold" 
-        text-anchor="middle" fill="#800020">NGS+</text>
-</svg> 
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="280 240 680 680" preserveAspectRatio="xMidYMid meet">
+  <title>NGS Plus Logo</title>
+  <path
+    d="M 838,401 A 290 290 0 1 0 915,562"
+    fill="none"
+    stroke="#b00016"
+    stroke-width="23"
+    stroke-linecap="round"
+  />
+  <g fill="#b00016">
+    <path d="M 422,540 L 422,674 L 450,674 L 450,586 L 522,674 L 553,674 L 553,540 L 525,540 L 525,631 L 506,611 L 452,543 L 443,540 Z"/>
+    <path d="M 591,547 L 584,554 L 581,559 L 578,569 L 578,647 L 581,657 L 584,662 L 593,670 L 605,674 L 686,674 L 694,671 L 699,666 L 702,659 L 702,598 L 644,598 L 644,621 L 674,621 L 674,648 L 670,651 L 620,651 L 615,650 L 608,644 L 606,638 L 606,578 L 608,571 L 613,566 L 622,563 L 699,563 L 699,540 L 609,540 L 604,541 L 598,543 Z"/>
+    <path d="M 733,544 L 726,551 L 723,557 L 721,568 L 721,587 L 722,593 L 724,599 L 727,604 L 732,609 L 740,613 L 748,615 L 804,622 L 810,628 L 811,631 L 811,639 L 810,644 L 807,648 L 798,651 L 725,651 L 725,674 L 813,674 L 818,673 L 824,671 L 829,668 L 834,663 L 839,650 L 839,622 L 834,609 L 829,604 L 818,599 L 757,591 L 750,584 L 750,570 L 754,565 L 758,563 L 832,563 L 832,539 L 748,539 L 739,541 Z"/>
+    <path d="M 870,429 L 870,460 L 868,462 L 837,462 L 837,483 L 868,483 L 870,485 L 870,517 L 890,516 L 890,485 L 892,483 L 923,483 L 923,462 L 891,462 L 890,461 L 890,429 Z"/>
+  </g>
+</svg>

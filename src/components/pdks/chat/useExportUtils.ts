@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { useToast } from "@/hooks/use-toast";
 import { MessageData } from './types';
+import { toLocalDateString } from "@/lib/date";
 
 export function useExportUtils() {
   const { toast } = useToast();
@@ -53,7 +54,7 @@ export function useExportUtils() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `pdks_rapor_${new Date().toISOString().split('T')[0]}.xlsx`;
+      link.download = `pdks_rapor_${toLocalDateString()}.xlsx`;
       link.click();
       URL.revokeObjectURL(url);
 

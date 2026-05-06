@@ -40,13 +40,13 @@ export function PDKSHeader({
 }: PDKSHeaderProps) {
   return (
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-      <h1 className="text-2xl font-semibold text-gray-900">PDKS Kayıtları</h1>
+      <h1 className="text-2xl font-semibold text-foreground">PDKS Kayıtları</h1>
       
       <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
         {showSearchFilters && (
           <>
             <div className="relative grow">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/70" size={18} />
               <Input
                 placeholder="Personel ara..."
                 className="pl-10 w-full"

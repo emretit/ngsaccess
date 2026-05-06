@@ -12,6 +12,7 @@ import { api } from "../../../../convex/_generated/api";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ManualPdksEditDialog } from "../ManualPdksEditDialog";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import { toLocalDateString } from "@/lib/date";
 import {
   Table,
   TableBody,
@@ -76,17 +77,17 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
   const safeRecords = Array.isArray(records) ? records : [];
 
   const handleExportExcel = async () => {
-    await exportToExcel(filteredRecords, { dateRange: selectedDate?.toISOString().split("T")[0] ?? "" });
+    await exportToExcel(filteredRecords, { dateRange: selectedDate ? toLocalDateString(selectedDate) : "" });
     toast({ title: "Excel indirildi", description: `${filteredRecords.length} kayıt dışa aktarıldı.` });
   };
 
   const handleExportCsv = () => {
-    exportToCsv(filteredRecords, { dateRange: selectedDate?.toISOString().split("T")[0] ?? "" });
+    exportToCsv(filteredRecords, { dateRange: selectedDate ? toLocalDateString(selectedDate) : "" });
     toast({ title: "CSV indirildi", description: `${filteredRecords.length} kayıt dışa aktarıldı.` });
   };
 
   const handleExportPdf = () => {
-    exportToPdf(filteredRecords, { dateRange: selectedDate?.toISOString().split("T")[0] ?? "" });
+    exportToPdf(filteredRecords, { dateRange: selectedDate ? toLocalDateString(selectedDate) : "" });
     toast({ title: "PDF indirildi", description: `${filteredRecords.length} kayıt dışa aktarıldı.` });
   };
 
@@ -155,7 +156,7 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
         <CardContent className="p-12">
           <div className="flex flex-col items-center justify-center space-y-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            <p className="text-gray-500 font-medium">Veriler yükleniyor...</p>
+            <p className="text-muted-foreground font-medium">Veriler yükleniyor...</p>
           </div>
         </CardContent>
       </Card>
@@ -163,12 +164,12 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
   }
 
   return (
-    <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
-      <CardHeader className="bg-linear-to-r from-gray-50 to-white border-b border-gray-200 rounded-t-lg">
+    <Card className="shadow-lg border-0 bg-card/80 backdrop-blur-sm">
+      <CardHeader className="bg-linear-to-r from-muted/50 to-card border-b border-border rounded-t-lg">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <CardTitle className="text-xl font-bold text-gray-900 flex items-center gap-2">
+          <CardTitle className="text-xl font-bold text-foreground flex items-center gap-2">
             📊 Çalışan Kayıtları
-            <span className="text-sm font-normal text-gray-500">
+            <span className="text-sm font-normal text-muted-foreground">
               ({filteredRecords.length} kayıt)
             </span>
           </CardTitle>
@@ -176,7 +177,7 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
           <div className="flex flex-col sm:flex-row gap-3">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground/70 h-4 w-4" />
               <Input
                 placeholder="Çalışan ara..."
                 value={searchTerm}
@@ -188,7 +189,7 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
             {/* Status Filter */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="border-gray-300">
+                <Button variant="outline" className="border-border">
                   <Filter className="mr-2 h-4 w-4" />
                   Durum Filtresi
                 </Button>
@@ -237,20 +238,20 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
       <CardContent className="p-0">
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="bg-gray-50/80">
-              <TableRow className="border-gray-200">
-                <TableHead className="w-[50px] font-semibold text-gray-700"></TableHead>
-                <TableHead className="font-semibold text-gray-700">Çalışan</TableHead>
-                <TableHead className="font-semibold text-gray-700">ID</TableHead>
-                <TableHead className="font-semibold text-gray-700">Departman</TableHead>
-                <TableHead className="font-semibold text-gray-700">İlk Giriş</TableHead>
-                <TableHead className="font-semibold text-gray-700">Son Çıkış</TableHead>
-                <TableHead className="font-semibold text-gray-700">Toplam</TableHead>
-                <TableHead className="font-semibold text-gray-700">Mesai</TableHead>
-                <TableHead className="font-semibold text-gray-700">İzin</TableHead>
-                <TableHead className="font-semibold text-gray-700">Durum</TableHead>
+            <TableHeader className="bg-muted/50">
+              <TableRow className="border-border">
+                <TableHead className="w-[50px] font-semibold text-foreground"></TableHead>
+                <TableHead className="font-semibold text-foreground">Çalışan</TableHead>
+                <TableHead className="font-semibold text-foreground">ID</TableHead>
+                <TableHead className="font-semibold text-foreground">Departman</TableHead>
+                <TableHead className="font-semibold text-foreground">İlk Giriş</TableHead>
+                <TableHead className="font-semibold text-foreground">Son Çıkış</TableHead>
+                <TableHead className="font-semibold text-foreground">Toplam</TableHead>
+                <TableHead className="font-semibold text-foreground">Mesai</TableHead>
+                <TableHead className="font-semibold text-foreground">İzin</TableHead>
+                <TableHead className="font-semibold text-foreground">Durum</TableHead>
                 {canEdit && (
-                  <TableHead className="font-semibold text-gray-700 w-20">
+                  <TableHead className="font-semibold text-foreground w-20">
                     Aksiyon
                   </TableHead>
                 )}
@@ -261,8 +262,8 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
                 <Fragment key={record.id}>
                   <TableRow
                     className={`
-                      hover:bg-blue-50/50 transition-colors cursor-pointer border-b border-gray-100
-                      ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}
+                      hover:bg-blue-50/50 transition-colors cursor-pointer border-b border-border
+                      ${index % 2 === 0 ? 'bg-card' : 'bg-muted/30'}
                     `}
                     onClick={() => toggleRowExpansion(record.id)}
                   >
@@ -270,10 +271,10 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
                       {expandedRows.has(record.id) ? (
                         <ChevronDown className="h-4 w-4 text-primary" />
                       ) : (
-                        <ChevronRight className="h-4 w-4 text-gray-400" />
+                        <ChevronRight className="h-4 w-4 text-muted-foreground/70" />
                       )}
                     </TableCell>
-                    <TableCell className="font-medium text-gray-900">
+                    <TableCell className="font-medium text-foreground">
                       <div className="flex items-center gap-2">
                         {record.name}
                         {record.isManual && (
@@ -290,7 +291,7 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-gray-600">{record.employeeId}</TableCell>
+                    <TableCell className="text-muted-foreground">{record.employeeId}</TableCell>
                     <TableCell>
                       <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
                         {record.department}
@@ -332,14 +333,14 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
                     <TableRow>
                       <TableCell colSpan={canEdit ? 11 : 10} className="bg-linear-to-r from-blue-50 to-indigo-50 border-l-4 border-primary">
                         <div className="p-6">
-                          <h4 className="font-bold mb-4 text-gray-800 flex items-center gap-2">
+                          <h4 className="font-bold mb-4 text-foreground flex items-center gap-2">
                             🕐 Günlük Detaylı Kayıtlar - {record.name}
                           </h4>
                           <div className="grid gap-3">
                             {record.detailedLogs.map((log, logIndex) => (
                               <div 
                                 key={logIndex} 
-                                className="flex justify-between items-center p-3 bg-white rounded-lg shadow-xs border border-gray-200 hover:shadow-md transition-shadow"
+                                className="flex justify-between items-center p-3 bg-card rounded-lg shadow-xs border border-border hover:shadow-md transition-shadow"
                               >
                                 <span className="font-bold text-primary text-lg">{log.time}</span>
                                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${
@@ -349,7 +350,7 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
                                 }`}>
                                   {log.action}
                                 </span>
-                                <span className="text-gray-600 bg-gray-100 px-3 py-1 rounded-full text-sm">
+                                <span className="text-muted-foreground bg-muted px-3 py-1 rounded-full text-sm">
                                   📍 {log.location}
                                 </span>
                               </div>
@@ -370,7 +371,7 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
           open={!!editingRecord}
           employeeId={editingRecord.id as Id<"employees">}
           employeeName={editingRecord.name}
-          date={(selectedDate ?? new Date()).toISOString().split("T")[0]}
+          date={toLocalDateString(selectedDate ?? new Date())}
           initialEntry={
             editingRecord.firstEntry !== "-" ? editingRecord.firstEntry : ""
           }

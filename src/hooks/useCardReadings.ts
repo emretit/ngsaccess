@@ -2,17 +2,20 @@ import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useProjectAccess } from "./useProjectAccess";
+import { toLocalDateString } from "@/lib/date";
+import { useDebouncedValue } from "./useDebouncedValue";
 
 export const useCardReadings = (pageSize: number = 100) => {
   const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
+  const debouncedSearchTerm = useDebouncedValue(searchTerm, 300);
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [accessFilter, setAccessFilter] = useState<"all" | "granted" | "denied">("all");
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, dateFilter, accessFilter]);
+  }, [debouncedSearchTerm, dateFilter, accessFilter]);
 
   const result = useQuery(
     api.cardReadings.list,
@@ -22,10 +25,8 @@ export const useCardReadings = (pageSize: number = 100) => {
           isSuperAdmin,
           page: currentPage,
           pageSize,
-          searchTerm: searchTerm || undefined,
-          dateFilter: dateFilter
-            ? dateFilter.toISOString().split("T")[0]
-            : undefined,
+          searchTerm: debouncedSearchTerm || undefined,
+          dateFilter: dateFilter ? toLocalDateString(dateFilter) : undefined,
           accessFilter,
         }
       : "skip"

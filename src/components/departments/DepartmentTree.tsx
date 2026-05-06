@@ -81,7 +81,7 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
   };
 
   return (
-    <div className="h-full w-[220px] shrink-0 bg-card rounded-xl border shadow-xs">
+    <div className="h-full w-full md:w-[220px] shrink-0 bg-card rounded-xl border shadow-xs">
       <DepartmentProjectHeader
         projectName={companyName}
         onProjectClick={handleProjectHeaderClick}

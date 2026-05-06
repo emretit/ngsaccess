@@ -101,7 +101,7 @@ export function PDKSChartView() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-blue-600 text-sm font-medium">Haftalık Ortalama Devam</p>
-                <p className="text-2xl font-bold text-gray-900">%{avgRate}</p>
+                <p className="text-2xl font-bold text-foreground">%{avgRate}</p>
               </div>
               <TrendingUp className="h-8 w-8 text-blue-600" />
             </div>
@@ -113,7 +113,7 @@ export function PDKSChartView() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-green-600 text-sm font-medium">En İyi Gün</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-2xl font-bold text-foreground">
                   {dailyAttendanceData.length > 0
                     ? dailyAttendanceData.reduce((best, d) =>
                         (d.oran ?? 0) > (best.oran ?? 0) ? d : best
@@ -131,7 +131,7 @@ export function PDKSChartView() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-yellow-600 text-sm font-medium">Toplam Geç Kalma</p>
-                <p className="text-2xl font-bold text-gray-900">{totalLate} kişi</p>
+                <p className="text-2xl font-bold text-foreground">{totalLate} kişi</p>
               </div>
               <Clock className="h-8 w-8 text-yellow-600" />
             </div>
@@ -143,7 +143,7 @@ export function PDKSChartView() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-red-600 text-sm font-medium">Toplam Devamsızlık</p>
-                <p className="text-2xl font-bold text-gray-900">{totalAbsent} gün</p>
+                <p className="text-2xl font-bold text-foreground">{totalAbsent} gün</p>
               </div>
               <AlertTriangle className="h-8 w-8 text-red-600" />
             </div>
@@ -156,7 +156,7 @@ export function PDKSChartView() {
         {/* Daily Attendance Bar Chart */}
         <Card className="border border-border bg-card shadow-sm hover:shadow transition-shadow">
           <CardHeader>
-            <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
               📊 Haftalık Devam Durumu
             </CardTitle>
           </CardHeader>
@@ -185,7 +185,7 @@ export function PDKSChartView() {
         {/* Hourly Check-in Trend */}
         <Card className="border border-border bg-card shadow-sm hover:shadow transition-shadow">
           <CardHeader>
-            <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
               ⏰ Saatlik Giriş Trendi
             </CardTitle>
           </CardHeader>
@@ -221,7 +221,7 @@ export function PDKSChartView() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card className="border border-border bg-card shadow-sm hover:shadow transition-shadow">
           <CardHeader>
-            <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
               📈 Günlük Devam Oranı
             </CardTitle>
           </CardHeader>
@@ -255,7 +255,7 @@ export function PDKSChartView() {
 
         <Card className="border border-border bg-card shadow-sm hover:shadow transition-shadow">
           <CardHeader>
-            <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
               ⏱️ Geç Kalma Saat Dağılımı
             </CardTitle>
           </CardHeader>
@@ -282,7 +282,7 @@ export function PDKSChartView() {
 
       <Card className="border border-border bg-card shadow-sm hover:shadow transition-shadow">
         <CardHeader>
-          <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+          <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
             🥧 Departman Devamsızlık Dağılımı
           </CardTitle>
         </CardHeader>

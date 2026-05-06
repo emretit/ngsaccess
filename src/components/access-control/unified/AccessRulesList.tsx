@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useAccessRules } from "@/hooks/useAccessRules";
+import { toast } from "@/hooks/use-toast";
 import { Loader2, Plus, Users, Monitor, ChevronDown, ChevronUp, Edit, Trash2, Clock, Calendar } from "lucide-react";
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -29,7 +30,31 @@ interface AccessRulesListProps {
 const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => {
   const { rules, isLoading, error, updateAccessRule, deleteAccessRule, isDeleting } = useAccessRules();
   const [expandedRules, setExpandedRules] = useState<Set<string>>(new Set());
+  const [optimisticActive, setOptimisticActive] = useState<Map<string, boolean>>(new Map());
   const { getDeviceLocationDisplay } = useLocationUtils();
+
+  const handleToggleActive = async (rule: AccessRule, next: boolean) => {
+    const ruleId = String(rule._id);
+    setOptimisticActive((prev) => new Map(prev).set(ruleId, next));
+    try {
+      await updateAccessRule.mutateAsync({ id: rule._id, updates: { isActive: next } });
+    } catch (error) {
+      setOptimisticActive((prev) => {
+        const m = new Map(prev);
+        m.delete(ruleId);
+        return m;
+      });
+      const message = error instanceof Error ? error.message : "Kural durumu değiştirilemedi";
+      toast({ title: "Hata", description: message, variant: "destructive" });
+    } finally {
+      setOptimisticActive((prev) => {
+        if (!prev.has(ruleId)) return prev;
+        const m = new Map(prev);
+        m.delete(ruleId);
+        return m;
+      });
+    }
+  };
 
   const toggleExpanded = (ruleId: string) => {
     setExpandedRules(prev => {
@@ -68,10 +93,10 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
         <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <span className="text-2xl">&#x26a0;&#xfe0f;</span>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <h3 className="text-lg font-semibold text-foreground mb-2">
           Hata Oluştu
         </h3>
-        <p className="text-gray-600 mb-4">
+        <p className="text-muted-foreground mb-4">
           Erişim kuralları yüklenirken bir hata oluştu: {String(error)}
         </p>
         <Button onClick={() => window.location.reload()}>
@@ -84,13 +109,13 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
   if (!rules || rules.length === 0) {
     return (
       <div className="text-center py-12">
-        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
           <span className="text-2xl">&#x1f510;</span>
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+        <h3 className="text-lg font-semibold text-foreground mb-2">
           Henüz erişim kuralı yok
         </h3>
-        <p className="text-gray-600 mb-4">
+        <p className="text-muted-foreground mb-4">
           İlk erişim kuralınızı oluşturmak için başlayın.
         </p>
         <Button onClick={onCreateRule}>
@@ -119,7 +144,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
 
     if (employees.length === 0) {
       return (
-        <div className="flex items-center gap-2 text-gray-500">
+        <div className="flex items-center gap-2 text-muted-foreground">
           <Users className="h-4 w-4" />
           <span className="text-sm">Çalışan seçilmemiş</span>
         </div>
@@ -131,7 +156,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
         <Users className="h-4 w-4 text-blue-500" />
         <div className="flex flex-col">
           <span className="text-sm font-medium">{employees.length} çalışan</span>
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-muted-foreground">
             {employees.slice(0, 2).map((emp) => `${emp?.firstName ?? ''} ${emp?.lastName ?? ''}`).join(', ')}
             {employees.length > 2 && ` +${employees.length - 2} diğer`}
           </span>
@@ -145,7 +170,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
 
     if (devices.length === 0) {
       return (
-        <div className="flex items-center gap-2 text-gray-500">
+        <div className="flex items-center gap-2 text-muted-foreground">
           <Monitor className="h-4 w-4" />
           <span className="text-sm">Cihaz seçilmemiş</span>
         </div>
@@ -157,7 +182,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
         <Monitor className="h-4 w-4 text-green-500" />
         <div className="flex flex-col">
           <span className="text-sm font-medium">{devices.length} cihaz</span>
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-muted-foreground">
             {devices.slice(0, 2).map((device) => device?.name ?? '').join(', ')}
             {devices.length > 2 && ` +${devices.length - 2} diğer`}
           </span>
@@ -170,8 +195,8 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Erişim Kuralları</h2>
-          <p className="text-gray-600 mt-1">Çalışan erişim kurallarını yönetin ve düzenleyin</p>
+          <h2 className="text-2xl font-bold text-foreground">Erişim Kuralları</h2>
+          <p className="text-muted-foreground mt-1">Çalışan erişim kurallarını yönetin ve düzenleyin</p>
         </div>
         <Button onClick={onCreateRule} className="bg-primary hover:bg-primary/90">
           <Plus className="h-4 w-4 mr-2" />
@@ -183,25 +208,27 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
         {(rules as AccessRule[]).map((rule) => {
           const ruleId = String(rule._id);
           return (
-            <Card key={ruleId} className="border border-gray-200 hover:shadow-md transition-shadow">
+            <Card key={ruleId} className="border border-border hover:shadow-md transition-shadow">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-semibold text-gray-900">{rule.name}</h3>
-                      <Badge variant={rule.isActive ? "default" : "secondary"}>
-                        {rule.isActive ? "Aktif" : "Pasif"}
-                      </Badge>
+                      <h3 className="text-lg font-semibold text-foreground">{rule.name}</h3>
+                      {(() => {
+                        const effectiveActive = optimisticActive.get(String(rule._id)) ?? rule.isActive ?? true;
+                        return (
+                          <Badge variant={effectiveActive ? "default" : "secondary"}>
+                            {effectiveActive ? "Aktif" : "Pasif"}
+                          </Badge>
+                        );
+                      })()}
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <Switch
-                      checked={rule.isActive ?? true}
-                      onCheckedChange={(checked) =>
-                        updateAccessRule.mutate({ id: rule._id, updates: { isActive: checked } })
-                      }
-                      disabled={updateAccessRule.isPending}
+                      checked={optimisticActive.get(String(rule._id)) ?? rule.isActive ?? true}
+                      onCheckedChange={(checked) => handleToggleActive(rule, checked)}
                     />
 
                     <Button
@@ -270,7 +297,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                 </div>
 
                 {rule.description && (
-                  <p className="text-sm text-gray-600 mt-2">{rule.description}</p>
+                  <p className="text-sm text-muted-foreground mt-2">{rule.description}</p>
                 )}
               </CardHeader>
 
@@ -281,7 +308,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                     <Clock className="h-4 w-4 text-orange-500" />
                     <div>
                       <span className="text-sm font-medium">Zaman</span>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         {rule.startTime && rule.endTime
                           ? `${rule.startTime} - ${rule.endTime}`
                           : '24 saat'
@@ -294,7 +321,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                     <Calendar className="h-4 w-4 text-purple-500" />
                     <div>
                       <span className="text-sm font-medium">Günler</span>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-muted-foreground">
                         {formatDays(rule.days || [])}
                       </p>
                     </div>
@@ -307,10 +334,10 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                 {/* Expandable Details */}
                 <Collapsible open={expandedRules.has(ruleId)}>
                   <CollapsibleContent>
-                    <div className="border-t border-gray-100 pt-4 mt-4">
+                    <div className="border-t border-border pt-4 mt-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                          <h4 className="text-sm font-semibold text-gray-900 mb-3">Çalışanlar</h4>
+                          <h4 className="text-sm font-semibold text-foreground mb-3">Çalışanlar</h4>
                           <div className="space-y-2">
                             {rule.groupMembers && rule.groupMembers.length > 0 ? (
                               rule.groupMembers.map((gm: GroupMember) => (
@@ -320,13 +347,13 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                                 </div>
                               ))
                             ) : (
-                              <div className="text-sm text-gray-500 italic">Çalışan seçilmemiş</div>
+                              <div className="text-sm text-muted-foreground italic">Çalışan seçilmemiş</div>
                             )}
                           </div>
                         </div>
 
                         <div>
-                          <h4 className="text-sm font-semibold text-gray-900 mb-3">Cihazlar</h4>
+                          <h4 className="text-sm font-semibold text-foreground mb-3">Cihazlar</h4>
                           <div className="space-y-2">
                             {rule.groupDevices && rule.groupDevices.length > 0 ? (
                               rule.groupDevices.map((gd: GroupDevice) => (
@@ -334,7 +361,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                                   <Monitor className="h-4 w-4 text-green-500" />
                                   <div>
                                     <span className="text-sm font-medium">{gd.devices?.name}</span>
-                                    <p className="text-xs text-gray-500">
+                                    <p className="text-xs text-muted-foreground">
                                       {gd.devices ? getDeviceLocationDisplay({
                                         zoneId: gd.devices.zoneId,
                                         doorId: gd.devices.doorId,
@@ -344,7 +371,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                                 </div>
                               ))
                             ) : (
-                              <div className="text-sm text-gray-500 italic">Cihaz seçilmemiş</div>
+                              <div className="text-sm text-muted-foreground italic">Cihaz seçilmemiş</div>
                             )}
                           </div>
                         </div>

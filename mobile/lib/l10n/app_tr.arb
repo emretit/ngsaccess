@@ -1,0 +1,338 @@
+{
+  "@@locale": "tr",
+
+  "appName": "NGS Plus",
+  "appTagline": "Yoklama Takip Sistemi",
+  "pdksTitle": "PDKS Sistemi",
+  "pdksSubtitle": "Personel Devam Kontrol Sistemi",
+
+  "commonOk": "Tamam",
+  "commonCancel": "İptal",
+  "commonClose": "Kapat",
+  "commonRetry": "Tekrar Dene",
+  "commonError": "Hata",
+  "commonSuccess": "Başarılı",
+  "commonAdd": "Ekle",
+  "comingSoon": "Yakında eklenecek.",
+
+  "navHome": "Ana Sayfa",
+  "navHistory": "Geçmiş",
+  "navVisitor": "Ziyaretçi",
+  "navProfile": "Profil",
+
+  "loginTitle": "Giriş Yap",
+  "loginPrompt": "PDKS sistemine giriş yapmak için bilgilerinizi giriniz",
+  "loginEmailLabel": "E-posta",
+  "loginPasswordLabel": "Şifre",
+  "loginEmailRequired": "E-posta adresinizi girin",
+  "loginEmailInvalid": "Geçerli bir e-posta adresi girin",
+  "loginPasswordRequired": "Şifrenizi girin",
+  "loginPasswordTooShort": "Şifre en az 6 karakter olmalı",
+  "loginRememberMe": "Beni Hatırla",
+  "loginForgotPassword": "Şifremi unuttum",
+
+  "forgotPasswordTitle": "Şifre Sıfırla",
+  "forgotPasswordHeadline": "Şifrenizi mi unuttunuz?",
+  "forgotPasswordPrompt": "E-posta adresinizi girin, size şifre sıfırlama bağlantısı gönderelim.",
+  "forgotPasswordSendButton": "Sıfırlama Bağlantısı Gönder",
+  "forgotPasswordBackToLogin": "Giriş sayfasına dön",
+  "forgotPasswordSuccessTitle": "E-posta Gönderildi!",
+  "forgotPasswordSuccessBody": "{email} adresine şifre sıfırlama bağlantısı gönderildi. E-postanızı kontrol edin.",
+  "@forgotPasswordSuccessBody": {
+    "placeholders": {
+      "email": { "type": "String" }
+    }
+  },
+  "forgotPasswordSuccessButton": "Giriş Sayfasına Dön",
+
+  "homeGreetingMorning": "Günaydın",
+  "homeGreetingDay": "İyi günler",
+  "homeGreetingEvening": "İyi akşamlar",
+  "homeGreetingFallback": "Kullanıcı",
+  "homeGreetingLine": "{greeting}, {name}!",
+  "@homeGreetingLine": {
+    "placeholders": {
+      "greeting": { "type": "String" },
+      "name": { "type": "String" }
+    }
+  },
+  "homeAttendanceStatus": "Yoklama Durumu",
+  "homeScanCheckIn": "QR Kod Tara - Giriş Yap",
+  "homeScanCheckOut": "QR Kod Tara - Çıkış Yap",
+  "homeStatusInside": "İçeride",
+  "homeStatusOut": "Çıktı",
+  "homeStatusNone": "Henüz Yok",
+  "homeAttendanceEntryRow": "Son Giriş",
+  "homeAttendanceExitRow": "Son Çıkış",
+  "homeExtraMovements": "+{count} hareket",
+  "@homeExtraMovements": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "homeScanCheckInAgain": "QR Kod Tara - Tekrar Giriş",
+  "homeAttendanceTimeEmpty": "—",
+  "homeMonthSummary": "Bu Ayki Özet",
+  "homeStatTotalDays": "Toplam Gün",
+  "homeStatDaysPresent": "Mevcut Günler",
+  "homeStatTimesLate": "Geç Kalma",
+  "homeProgressLabel": "{present} / {total} gün katıldın",
+  "@homeProgressLabel": {
+    "placeholders": {
+      "present": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "homeQuoteOfTheDay": "💫 Günün Sözü",
+  "homeQuote1": "Başarı, hazırlık ile fırsatın buluştuğu andır.",
+  "homeQuote2": "Her yeni gün, yeni bir başlangıçtır.",
+  "homeQuote3": "Disiplin, özgürlüğün köprüsüdür.",
+  "homeQuote4": "Küçük adımlar büyük değişimler yaratır.",
+  "homeQuote5": "Bugün dün düşündüğünüz yarındır.",
+  "homeQuote6": "Zaman en değerli hazinedir, onu akıllıca kullan.",
+  "homeQuote7": "İyi alışkanlıklar, başarının anahtarıdır.",
+  "homeQuote8": "Her gün kendini geliştirme fırsatıdır.",
+
+  "profileTitle": "Profil",
+  "profileEditButton": "Profili Düzenle",
+  "profileEditDialogBody": "Profil düzenleme özelliği yakında eklenecek.",
+  "profileNotifications": "Bildirimler",
+  "profileNotificationsSubtitle": "Bildirim ayarlarını yönet",
+  "profileSecurity": "Güvenlik",
+  "profileSecuritySubtitle": "Şifre ve güvenlik ayarları",
+  "profileTheme": "Tema",
+  "profileThemeDark": "Koyu tema aktif",
+  "profileThemeLight": "Açık tema aktif",
+  "profileThemeSystem": "Sistem ayarına göre",
+  "profileThemeModeLight": "Açık tema",
+  "profileThemeModeDark": "Koyu tema",
+  "profileThemeModeSystem": "Sistem ayarına göre",
+  "profileLanguage": "Dil",
+  "profileLanguageValueTr": "Türkçe",
+  "profileLanguageValueEn": "İngilizce",
+  "profilePreferredDoor": "Hızlı Erişim Kapısı",
+  "profilePreferredDoorEmpty": "Seçilmedi",
+  "homeQuickActions": "Hızlı İşlemler",
+  "quickActionUnlock": "Kapıyı Aç",
+  "quickActionVisitor": "Ziyaretçi",
+  "quickActionHistory": "Geçmiş",
+  "quickActionProfile": "Profil",
+  "unlockNoDeviceSelected": "Önce Profil'den hızlı erişim kapısını seç",
+  "unlockGranted": "Erişim Verildi",
+  "unlockDenied": "Erişim Reddedildi",
+  "selectDeviceTitle": "Kapı Seç",
+  "selectDeviceSearch": "Ara...",
+  "selectDeviceEmpty": "Henüz erişiminiz olan kapı yok",
+  "selectDeviceNoMatch": "Eşleşen kapı bulunamadı",
+  "profileHelp": "Yardım & Destek",
+  "profileHelpSubtitle": "SSS ve destek",
+  "profileAboutApp": "Uygulama Hakkında",
+  "profileAppVersion": "Versiyon 1.0.0",
+  "profilePrivacy": "Gizlilik Politikası",
+  "profilePrivacySubtitle": "Veri kullanım politikası",
+  "profileLogout": "Çıkış Yap",
+  "profileLogoutSubtitle": "Hesabınızdan çıkış yapın",
+  "profileLogoutConfirmTitle": "Çıkış Yap",
+  "profileLogoutConfirmBody": "Hesabınızdan çıkış yapmak istediğinizden emin misiniz?",
+  "profileSettings": "Ayarlar",
+  "profileSettingsBody": "Gelişmiş ayarlar yakında eklenecek.",
+  "profileNotificationsDialogTitle": "Bildirim Ayarları",
+  "profileNotificationsDialogBody": "Bildirim ayarları yakında eklenecek.",
+  "profileSecurityDialogTitle": "Güvenlik Ayarları",
+  "profileSecurityDialogBody": "Güvenlik ayarları yakında eklenecek.",
+  "profileThemeDialogTitle": "Tema Ayarları",
+  "profileThemeDialogBody": "Tema ayarları yakında eklenecek.",
+  "profileLanguageDialogTitle": "Dil Ayarları",
+  "profileLanguageDialogBody": "Dil ayarları yakında eklenecek.",
+  "profileHelpDialogTitle": "Yardım & Destek",
+  "profileHelpDialogBody": "Yardım ve destek sayfası yakında eklenecek.",
+  "profilePrivacyDialogTitle": "Gizlilik Politikası",
+  "profilePrivacyDialogBody": "Gizlilik politikası yakında eklenecek.",
+  "profileAboutDialogTitle": "NGS Plus Hakkında",
+  "profileAboutLine1": "NGS Plus Yoklama Takip Sistemi",
+  "profileAboutLine2": "Versiyon: 1.0.0",
+  "profileAboutLine3": "Geliştirici: NGS Team",
+  "profileAboutLine4": "QR kod tabanlı yoklama takip uygulaması.",
+  "profileFallbackEmail": "email@example.com",
+
+  "historyTitle": "Geçmiş",
+  "historyTabAll": "Tümü",
+  "historyTabThisMonth": "Bu Ay",
+  "historyTabStats": "İstatistik",
+  "historyLoading": "Veriler yükleniyor...",
+  "historyErrorTitle": "Bir Hata Oluştu",
+  "historyErrorBody": "Veriler yüklenirken hata oluştu: {error}",
+  "@historyErrorBody": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "historyEmpty": "Kayıt bulunamadı",
+  "historyEmptyHint": "Veriler yenilemek için aşağı çekin",
+  "historyColorLegend": "Renk Açıklamaları",
+  "historyLegendEarly": "Erken Giriş",
+  "historyLegendEarlyDesc": "Saat 09:00'dan önce giriş yapılan günler",
+  "historyLegendNormal": "Normal Giriş",
+  "historyLegendNormalDesc": "Saat 09:00-09:30 arası giriş yapılan günler",
+  "historyLegendLate": "Geç Giriş",
+  "historyLegendLateDesc": "Saat 09:30'dan sonra giriş yapılan günler",
+  "historyLegendNone": "Katılım Yok",
+  "historyLegendNoneDesc": "Hiç giriş-çıkış kaydı bulunmayan günler",
+  "historyCalendarHint": "Günlere tıklayarak detayları görebilirsiniz. Yeşil noktalar ek katılım kayıtlarını gösterir.",
+  "historyMonthSummary": "Bu Ay Özeti",
+  "historyTotalCheckIns": "Toplam Giriş",
+  "historyTotalCheckOuts": "Toplam Çıkış",
+  "historyActiveDays": "Aktif Gün",
+  "historyGeneralStats": "Genel İstatistikler",
+  "historyThisWeek": "Bu Hafta",
+  "historyWeeklySummary": "Haftalık Özet",
+  "historyWeeklyTotalRecords": "Bu hafta toplam {count} kayıt",
+  "@historyWeeklyTotalRecords": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "historyWeeklyCheckIn": "Giriş: {count}",
+  "@historyWeeklyCheckIn": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "historyWeeklyCheckOut": "Çıkış: {count}",
+  "@historyWeeklyCheckOut": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "historyDeviceStats": "Cihaz Bazlı İstatistikler",
+  "historyCheckInRecord": "Giriş Yapıldı",
+  "historyCheckOutRecord": "Çıkış Yapıldı",
+  "historyBadgeIn": "GİRİŞ",
+  "historyBadgeOut": "ÇIKIŞ",
+  "historyUnknownDevice": "Bilinmeyen Cihaz",
+  "historyUnknownLocation": "Bilinmeyen Konum",
+  "historyDetailCheckIn": "Giriş Detayları",
+  "historyDetailCheckOut": "Çıkış Detayları",
+  "historyDetailDate": "Tarih",
+  "historyDetailTime": "Saat",
+  "historyDetailLocation": "Konum",
+  "historyDetailQrCode": "QR Kod",
+  "historyFilterTitle": "Filtrele",
+  "historyFilterDate": "Tarih",
+  "historyFilterDateNone": "Tarih seçilmedi",
+  "historyFilterDevice": "Cihaz",
+  "historyFilterDeviceNone": "Cihaz seçilmedi",
+  "historyFilterClear": "Filtreleri Temizle",
+  "historyFilterDeviceSelectTitle": "Cihaz Seç",
+  "historyDayRecordCount": "{count} Kayıt",
+  "@historyDayRecordCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "historyEntryShort": "Giriş",
+  "historyExitShort": "Çıkış",
+
+  "qrTabTitle": "QR İşlemleri",
+  "qrTabMyQr": "QR Kodum",
+  "qrTabScan": "Tara",
+  "qrInvalidResponse": "Geçersiz yanıt",
+  "qrTokenMissing": "Token yok",
+  "qrRefresh": "Yenile",
+  "qrTryAgain": "Tekrar dene",
+  "qrFrameHint": "QR kodu kare içine yerleştirin",
+  "qrTokenHint": "Bu QR kodu kapı cihazına okutun. Kod 10 saniye geçerlidir, süre dolunca yenile butonuna basın.",
+  "qrProcessError": "QR kod işlenirken bir hata oluştu: {error}",
+  "@qrProcessError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "qrUserCodeTitle": "Kullanıcı QR Kodu",
+  "qrUserCodeBody": "Kullanıcı: {name}\nE-posta: {email}\nTarih: {date}",
+  "@qrUserCodeBody": {
+    "placeholders": {
+      "name": { "type": "String" },
+      "email": { "type": "String" },
+      "date": { "type": "String" }
+    }
+  },
+  "qrInvalidCode": "Geçersiz QR kod",
+  "qrAccessGranted": "Geçiş Başarılı",
+  "qrUnknownError": "Bir hata oluştu",
+  "qrDeviceLine": "Cihaz: {name}",
+  "@qrDeviceLine": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "qrLocationLine": "Konum: {location}",
+  "@qrLocationLine": {
+    "placeholders": {
+      "location": { "type": "String" }
+    }
+  },
+  "qrTimeLine": "Zaman: {time}",
+  "@qrTimeLine": {
+    "placeholders": {
+      "time": { "type": "String" }
+    }
+  },
+
+  "visitorTitle": "Ziyaretçi Yönetimi",
+  "visitorStatTotal": "Toplam",
+  "visitorStatInside": "İçeride",
+  "visitorStatExpected": "Beklenen",
+  "visitorEmpty": "Henüz ziyaretçi kaydı yok",
+  "visitorEmptyHint": "Yeni ziyaretçi eklemek için + butonuna tıklayın",
+  "visitorStatusExpected": "Bekleniyor",
+  "visitorStatusInside": "İçeride",
+  "visitorStatusOut": "Çıktı",
+  "visitorContactPerson": "İletişim: {name}",
+  "@visitorContactPerson": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "visitorCheckOut": "Çıkış Yap",
+  "visitorCheckIn": "Giriş Yap",
+  "visitorCheckedInToast": "{name} giriş yaptı",
+  "@visitorCheckedInToast": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "visitorCheckedOutToast": "{name} çıkış yaptı",
+  "@visitorCheckedOutToast": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "visitorFilterTitle": "Filtrele",
+  "visitorFilterBody": "Filtreleme seçenekleri buraya gelecek.",
+  "visitorAddTitle": "Yeni Ziyaretçi",
+  "visitorFieldName": "Ad Soyad",
+  "visitorFieldCompany": "Şirket",
+  "visitorFieldPurpose": "Ziyaret Amacı",
+  "visitorFieldContact": "İletişim Kişisi",
+  "visitorAddedToast": "Ziyaretçi eklendi",
+  "visitorAddButton": "Ziyaretçi Ekle",
+
+  "errorNetwork": "İnternet bağlantısı kurulamadı. Lütfen bağlantınızı kontrol edin.",
+  "errorTimeout": "Sunucu yanıt vermedi. Lütfen daha sonra tekrar deneyin.",
+  "errorServer": "Sunucu hatası ({code}). Lütfen biraz sonra tekrar deneyin.",
+  "@errorServer": {
+    "placeholders": {
+      "code": { "type": "int" }
+    }
+  },
+  "errorAuthExpired": "Oturumunuz sona erdi. Lütfen tekrar giriş yapın.",
+  "errorUnknown": "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.",
+  "errorBusinessInvalidCredentials": "E-posta veya şifre hatalı",
+  "errorBusinessNoMobilePassword": "Mobil şifreniz henüz kurulmamış. Yöneticinizden kurulum bağlantısı isteyin.",
+  "errorBusinessEmployeeInactive": "Çalışan kaydınız aktif değil",
+
+  "passwordResetAdminInfo": "Mobil şifre kurulumunu yöneticiniz yapar. Lütfen yöneticinizle iletişime geçin.",
+  "qrInvalidDevice": "QR kodda cihaz bilgisi yok",
+  "accessDenied": "Erişim reddedildi"
+}

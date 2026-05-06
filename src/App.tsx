@@ -4,6 +4,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { AuthProvider } from '@/components/auth/AuthProvider';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import Layout from '@/components/Layout';
 import { useDarkMode } from '@/hooks/useDarkMode';
 import './App.css';
@@ -80,14 +81,16 @@ function AppContent() {
 
 function App() {
   return (
-    <TooltipProvider>
-      <Router>
-        <AuthProvider>
-          <AppContent />
-          <Toaster />
-        </AuthProvider>
-      </Router>
-    </TooltipProvider>
+    <ErrorBoundary>
+      <TooltipProvider>
+        <Router>
+          <AuthProvider>
+            <AppContent />
+            <Toaster />
+          </AuthProvider>
+        </Router>
+      </TooltipProvider>
+    </ErrorBoundary>
   );
 }
 

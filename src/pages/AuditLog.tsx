@@ -98,10 +98,10 @@ export default function AuditLog() {
   }
 
   return (
-    <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
+    <div className="space-y-6 p-6 bg-muted/50 min-h-screen">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Denetim Kaydı</h1>
-        <p className="text-gray-600 mt-2">
+        <h1 className="text-3xl font-bold text-foreground">Denetim Kaydı</h1>
+        <p className="text-muted-foreground mt-2">
           Sistemdeki tüm değişikliklerin kim, ne zaman, neyi yaptığını gösterir.
         </p>
       </div>
@@ -241,7 +241,7 @@ export default function AuditLog() {
                                 <h4 className="font-semibold mb-2 text-sm">
                                   Eski Değer
                                 </h4>
-                                <pre className="text-xs bg-white p-3 rounded border overflow-auto max-h-60">
+                                <pre className="text-xs bg-card p-3 rounded border overflow-auto max-h-60">
                                   {formatJson(r.oldValue)}
                                 </pre>
                               </div>
@@ -249,7 +249,7 @@ export default function AuditLog() {
                                 <h4 className="font-semibold mb-2 text-sm">
                                   Yeni Değer
                                 </h4>
-                                <pre className="text-xs bg-white p-3 rounded border overflow-auto max-h-60">
+                                <pre className="text-xs bg-card p-3 rounded border overflow-auto max-h-60">
                                   {formatJson(r.newValue)}
                                 </pre>
                               </div>

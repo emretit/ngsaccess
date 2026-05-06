@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
+
+import '../../core/error_localizer.dart';
+import '../../core/spacing.dart';
+import '../../l10n/app_localizations.dart';
+import '../../models/attendance.dart';
 import '../../providers/attendance_provider.dart';
 import '../../theme/app_theme.dart';
-import '../../models/attendance.dart';
+import '../../widgets/responsive_container.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -14,39 +19,79 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateMixin {
+  static const int _initialDisplayCount = 20;
+  static const int _displayIncrement = 20;
+  static const double _loadMoreThresholdPx = 240;
+
   DateTime? _selectedDate;
   String? _selectedDevice;
   List<String> _deviceList = [];
   bool _isLoading = false;
   late TabController _tabController;
-  
+  final ScrollController _allTabScrollController = ScrollController();
+  int _displayLimit = _initialDisplayCount;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _loadData();
+    _allTabScrollController.addListener(_onAllTabScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadData();
+    });
   }
 
   @override
   void dispose() {
+    _allTabScrollController.removeListener(_onAllTabScroll);
+    _allTabScrollController.dispose();
     _tabController.dispose();
     super.dispose();
   }
 
+  void _onAllTabScroll() {
+    if (!_allTabScrollController.hasClients) return;
+    final position = _allTabScrollController.position;
+    if (position.pixels < position.maxScrollExtent - _loadMoreThresholdPx) {
+      return;
+    }
+
+    final provider = Provider.of<AttendanceProvider>(context, listen: false);
+    final filteredCount = _getFilteredRecords().length;
+
+    if (_displayLimit < filteredCount) {
+      setState(() {
+        _displayLimit = (_displayLimit + _displayIncrement).clamp(
+          _initialDisplayCount,
+          filteredCount,
+        );
+      });
+    }
+
+    if (provider.hasMore &&
+        !provider.isLoadingMore &&
+        _displayLimit + _displayIncrement >
+            provider.attendanceRecords.length) {
+      provider.loadMore();
+    }
+  }
+
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    
+    setState(() {
+      _isLoading = true;
+      _displayLimit = _initialDisplayCount;
+    });
+
     try {
       final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
       await attendanceProvider.loadAttendanceRecords();
-      
-      // Benzersiz cihaz listesini oluştur
+
       final devices = attendanceProvider.attendanceRecords
           .where((record) => record.doorName.isNotEmpty)
           .map((record) => record.doorName)
           .toSet()
           .toList();
-      
+
       setState(() {
         _deviceList = devices;
         _isLoading = false;
@@ -54,9 +99,10 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Veriler yüklenirken hata oluştu: $e'),
+            content: Text(l10n.historyErrorBody(e.toString())),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -68,11 +114,12 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkBackground : Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Geçmiş'),
+        title: Text(l10n.historyTitle),
         elevation: 0,
         backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
         foregroundColor: isDark ? Colors.white : Colors.black,
@@ -87,10 +134,10 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
           indicatorColor: AppTheme.primaryColor,
           labelColor: isDark ? Colors.white : AppTheme.primaryColor,
           unselectedLabelColor: Colors.grey,
-          tabs: const [
-            Tab(text: 'Tümü', icon: Icon(Icons.list_rounded)),
-            Tab(text: 'Bu Ay', icon: Icon(Icons.calendar_month_rounded)),
-            Tab(text: 'İstatistik', icon: Icon(Icons.analytics_rounded)),
+          tabs: [
+            Tab(text: l10n.historyTabAll, icon: const Icon(Icons.list_rounded)),
+            Tab(text: l10n.historyTabThisMonth, icon: const Icon(Icons.calendar_month_rounded)),
+            Tab(text: l10n.historyTabStats, icon: const Icon(Icons.analytics_rounded)),
           ],
         ),
       ),
@@ -99,9 +146,12 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
           : Consumer<AttendanceProvider>(
               builder: (context, attendanceProvider, child) {
                 if (attendanceProvider.errorMessage != null) {
-                  return _buildErrorState(attendanceProvider.errorMessage!);
+                  final msg = attendanceProvider.lastError != null
+                      ? localizeAppError(context, attendanceProvider.lastError!)
+                      : attendanceProvider.errorMessage!;
+                  return _buildErrorState(msg);
                 }
-                
+
                 return TabBarView(
                   controller: _tabController,
                   children: [
@@ -116,19 +166,21 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
   }
 
   Widget _buildLoadingState() {
-    return const Center(
+    final l10n = AppLocalizations.of(context);
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CircularProgressIndicator(),
-          SizedBox(height: 16),
-          Text('Veriler yükleniyor...'),
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(l10n.historyLoading),
         ],
       ),
     );
   }
 
   Widget _buildErrorState(String errorMessage) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -149,7 +201,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
             ),
             const SizedBox(height: 24),
             Text(
-              'Bir Hata Oluştu',
+              l10n.historyErrorTitle,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -166,7 +218,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
             ElevatedButton.icon(
               onPressed: _loadData,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Tekrar Dene'),
+              label: Text(l10n.commonRetry),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primaryColor,
                 foregroundColor: Colors.white,
@@ -223,11 +275,13 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
   }
 
   Widget _buildThisMonthTab(AttendanceProvider provider) {
+    final l10n = AppLocalizations.of(context);
+    final localeTag = Localizations.localeOf(context).toLanguageTag();
     final now = DateTime.now();
     final startOfMonth = DateTime(now.year, now.month, 1);
     final endOfMonth = DateTime(now.year, now.month + 1, 0);
     final thisMonthRecords = provider.attendanceRecords.where((record) {
-      return record.timestamp.isAfter(startOfMonth.subtract(const Duration(days: 1))) && 
+      return record.timestamp.isAfter(startOfMonth.subtract(const Duration(days: 1))) &&
              record.timestamp.isBefore(endOfMonth.add(const Duration(days: 1)));
     }).toList();
 
@@ -242,7 +296,9 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
     }
 
     return SingleChildScrollView(
-      child: Column(
+      child: ResponsiveContainer(
+        maxWidth: AppSpacing.contentMaxWidth,
+        child: Column(
         children: [
           const SizedBox(height: 16),
           
@@ -277,7 +333,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      DateFormat('MMMM yyyy', 'tr_TR').format(now),
+                      DateFormat('MMMM yyyy', localeTag).format(now),
                       style: TextStyle(
                         color: AppTheme.primaryColor,
                         fontSize: 16,
@@ -292,7 +348,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                   lastDay: endOfMonth,
                   focusedDay: now,
                   calendarFormat: CalendarFormat.month,
-                  locale: 'tr_TR',
+                  locale: localeTag,
                   eventLoader: (day) {
                     return attendanceByDay[day] ?? [];
                   },
@@ -432,45 +488,44 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Renk Açıklamaları',
+                      l10n.historyColorLegend,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Theme.of(context).brightness == Brightness.dark 
-                            ? Colors.white 
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
                             : Colors.black87,
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                
-                // Renk açıklama öğeleri
+
                 _buildColorLegend(
                   Colors.blue[100]!,
-                  'Erken Giriş',
-                  'Saat 09:00\'dan önce giriş yapılan günler',
+                  l10n.historyLegendEarly,
+                  l10n.historyLegendEarlyDesc,
                   Icons.schedule_rounded,
                 ),
                 const SizedBox(height: 8),
                 _buildColorLegend(
                   Colors.green[100]!,
-                  'Normal Giriş',
-                  'Saat 09:00-09:30 arası giriş yapılan günler',
+                  l10n.historyLegendNormal,
+                  l10n.historyLegendNormalDesc,
                   Icons.check_circle_outline,
                 ),
                 const SizedBox(height: 8),
                 _buildColorLegend(
                   Colors.orange[100]!,
-                  'Geç Giriş',
-                  'Saat 09:30\'dan sonra giriş yapılan günler',
+                  l10n.historyLegendLate,
+                  l10n.historyLegendLateDesc,
                   Icons.warning_amber_rounded,
                 ),
                 const SizedBox(height: 8),
                 _buildColorLegend(
                   Colors.transparent,
-                  'Katılım Yok',
-                  'Hiç giriş-çıkış kaydı bulunmayan günler',
+                  l10n.historyLegendNone,
+                  l10n.historyLegendNoneDesc,
                   Icons.remove_circle_outline,
                 ),
                 
@@ -494,7 +549,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Günlere tıklayarak detayları görebilirsiniz. Yeşil noktalar ek katılım kayıtlarını gösterir.',
+                          l10n.historyCalendarHint,
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.blue[700],
@@ -510,11 +565,14 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
           
           const SizedBox(height: 16),
         ],
+        ),
       ),
     );
   }
 
   Widget _buildStatsTab(AttendanceProvider provider) {
+    final l10n = AppLocalizations.of(context);
+    final localeTag = Localizations.localeOf(context).toLanguageTag();
     final records = provider.attendanceRecords;
     final checkIns = records.where((r) => r.type == 'check_in').length;
     final checkOuts = records.where((r) => r.type == 'check_out').length;
@@ -546,10 +604,11 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Column(
+      child: ResponsiveContainer(
+        maxWidth: AppSpacing.contentMaxWidth,
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Bu ayın özeti
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
@@ -571,9 +630,9 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Bu Ay Özeti',
-                  style: TextStyle(
+                Text(
+                  l10n.historyMonthSummary,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -581,7 +640,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  DateFormat('MMMM yyyy', 'tr_TR').format(now),
+                  DateFormat('MMMM yyyy', localeTag).format(now),
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 14,
@@ -591,13 +650,13 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildMonthStat('Toplam Giriş', 
+                    _buildMonthStat(l10n.historyTotalCheckIns,
                       thisMonthRecords.where((r) => r.type == 'check_in').length.toString(),
                       Icons.login_rounded),
-                    _buildMonthStat('Toplam Çıkış', 
+                    _buildMonthStat(l10n.historyTotalCheckOuts,
                       thisMonthRecords.where((r) => r.type == 'check_out').length.toString(),
                       Icons.logout_rounded),
-                    _buildMonthStat('Aktif Gün', 
+                    _buildMonthStat(l10n.historyActiveDays,
                       attendanceByDay.keys.length.toString(),
                       Icons.calendar_today_rounded),
                   ],
@@ -605,23 +664,22 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
               ],
             ),
           ),
-          
+
           const SizedBox(height: 24),
-          
-          // Genel istatistikler
+
           Text(
-            'Genel İstatistikler',
+            l10n.historyGeneralStats,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 16),
-          
+
           Row(
             children: [
               Expanded(
                 child: _buildStatCard(
-                  'Toplam Giriş',
+                  l10n.historyTotalCheckIns,
                   checkIns.toString(),
                   Icons.login_rounded,
                   Colors.green,
@@ -630,7 +688,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
               const SizedBox(width: 16),
               Expanded(
                 child: _buildStatCard(
-                  'Toplam Çıkış',
+                  l10n.historyTotalCheckOuts,
                   checkOuts.toString(),
                   Icons.logout_rounded,
                   Colors.red,
@@ -638,12 +696,11 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
               ),
             ],
           ),
-          
+
           const SizedBox(height: 24),
-          
-          // Haftalık istatistikler
+
           Text(
-            'Bu Hafta',
+            l10n.historyThisWeek,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
             ),
@@ -668,7 +725,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                     Icon(Icons.calendar_today, color: Colors.blue[600]),
                     const SizedBox(width: 8),
                     Text(
-                      'Haftalık Özet',
+                      l10n.historyWeeklySummary,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -679,7 +736,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Bu hafta toplam ${weeklyRecords.length} kayıt',
+                  l10n.historyWeeklyTotalRecords(weeklyRecords.length),
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.blue[600],
@@ -687,14 +744,14 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Giriş: ${weeklyRecords.where((r) => r.type == 'check_in').length}',
+                  l10n.historyWeeklyCheckIn(weeklyRecords.where((r) => r.type == 'check_in').length),
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.blue[600],
                   ),
                 ),
                 Text(
-                  'Çıkış: ${weeklyRecords.where((r) => r.type == 'check_out').length}',
+                  l10n.historyWeeklyCheckOut(weeklyRecords.where((r) => r.type == 'check_out').length),
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.blue[600],
@@ -709,7 +766,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
           // Cihaz bazlı istatistikler
           if (_deviceList.isNotEmpty) ...[
             Text(
-              'Cihaz Bazlı İstatistikler',
+              l10n.historyDeviceStats,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
@@ -760,6 +817,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
             }),
           ],
         ],
+        ),
       ),
     );
   }
@@ -878,28 +936,55 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
   }
 
   Widget _buildRecordsList(AttendanceProvider provider) {
+    final l10n = AppLocalizations.of(context);
     final records = _getFilteredRecords();
-    
+
     if (records.isEmpty) {
       return RefreshIndicator(
         onRefresh: _loadData,
-        child: _buildEmptyState('Kayıt bulunamadı'),
+        child: _buildEmptyState(l10n.historyEmpty),
       );
     }
+
+    final visibleCount = _displayLimit.clamp(0, records.length);
+    final hasMoreLocal = visibleCount < records.length;
+    final hasMoreRemote = provider.hasMore;
+    final showFooter = hasMoreLocal || hasMoreRemote || provider.isLoadingMore;
 
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView.builder(
+        controller: _allTabScrollController,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: records.length,
+        itemCount: visibleCount + (showFooter ? 1 : 0),
         itemBuilder: (context, index) {
+          if (index >= visibleCount) {
+            return _buildLoadMoreFooter();
+          }
           return _buildModernAttendanceCard(records[index]);
         },
       ),
     );
   }
 
+  Widget _buildLoadMoreFooter() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Center(
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState(String message) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -927,7 +1012,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
           ),
           const SizedBox(height: 8),
           Text(
-            'Veriler yenilemek için aşağı çekin',
+            l10n.historyEmptyHint,
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[500],
@@ -966,14 +1051,15 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
   }
 
   Widget _buildModernAttendanceCard(Attendance record) {
+    final l10n = AppLocalizations.of(context);
     final isCheckIn = record.type == 'check_in';
     final formattedTime = DateFormat('HH:mm').format(record.timestamp);
     final formattedDate = DateFormat('dd.MM.yyyy').format(record.timestamp);
-    final deviceName = record.doorName.isNotEmpty ? record.doorName : 'Bilinmeyen Cihaz';
+    final deviceName = record.doorName.isNotEmpty ? record.doorName : l10n.historyUnknownDevice;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color: isDark ? AppTheme.darkSurface : Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -991,22 +1077,23 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
           borderRadius: BorderRadius.circular(16),
           onTap: () => _showModernRecordDetails(record),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Sol taraf - Renkli ikon
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: isCheckIn 
+                      colors: isCheckIn
                           ? [Colors.green[400]!, Colors.green[600]!]
                           : [Colors.red[400]!, Colors.red[600]!],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
                         color: (isCheckIn ? Colors.green : Colors.red).withValues(alpha: 0.3),
@@ -1018,33 +1105,22 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                   child: Icon(
                     isCheckIn ? Icons.login_rounded : Icons.logout_rounded,
                     color: Colors.white,
-                    size: 24,
+                    size: 20,
                   ),
                 ),
-                const SizedBox(width: 16),
-                
+                const SizedBox(width: 12),
+
                 // Orta kısım - Ana bilgiler
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Giriş/Çıkış başlığı
-                      Text(
-                        isCheckIn ? 'Giriş Yapıldı' : 'Çıkış Yapıldı',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      
                       // Cihaz ismi
                       Row(
                         children: [
                           Icon(
                             Icons.location_on_rounded,
-                            size: 16,
+                            size: 14,
                             color: isDark ? Colors.grey[400] : Colors.grey[600],
                           ),
                           const SizedBox(width: 4),
@@ -1052,29 +1128,29 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                             child: Text(
                               deviceName,
                               style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: isDark ? Colors.grey[300] : Colors.grey[700],
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.grey[300] : Colors.grey[800],
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      
+                      const SizedBox(height: 2),
+
                       // Tarih ve saat
                       Row(
                         children: [
                           Icon(
                             Icons.access_time_rounded,
-                            size: 16,
+                            size: 14,
                             color: isDark ? Colors.grey[400] : Colors.grey[600],
                           ),
                           const SizedBox(width: 4),
                           Text(
                             '$formattedDate • $formattedTime',
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 12,
                               color: isDark ? Colors.grey[400] : Colors.grey[600],
                             ),
                           ),
@@ -1083,34 +1159,24 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                     ],
                   ),
                 ),
-                
-                // Sağ taraf - Durum ve ok ikonu
-                Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isCheckIn 
-                            ? Colors.green.withValues(alpha: 0.1)
-                            : Colors.red.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        isCheckIn ? 'GİRİŞ' : 'ÇIKIŞ',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: isCheckIn ? Colors.green[700] : Colors.red[700],
-                        ),
-                      ),
+
+                // Sağ taraf - Durum badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isCheckIn
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    isCheckIn ? l10n.historyBadgeIn : l10n.historyBadgeOut,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: isCheckIn ? Colors.green[700] : Colors.red[700],
                     ),
-                    const SizedBox(height: 8),
-                    Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 16,
-                      color: isDark ? Colors.grey[600] : Colors.grey[400],
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -1121,6 +1187,8 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
   }
 
   void _showModernRecordDetails(Attendance record) {
+    final l10n = AppLocalizations.of(context);
+    final localeTag = Localizations.localeOf(context).toLanguageTag();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1141,27 +1209,27 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
               ),
             ),
             const SizedBox(width: 12),
-            Text(record.type == 'check_in' ? 'Giriş Detayları' : 'Çıkış Detayları'),
+            Text(record.type == 'check_in' ? l10n.historyDetailCheckIn : l10n.historyDetailCheckOut),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildDetailRow(Icons.calendar_today_rounded, 'Tarih', 
-                DateFormat('dd.MM.yyyy EEEE', 'tr_TR').format(record.timestamp)),
-            _buildDetailRow(Icons.access_time_rounded, 'Saat', 
+            _buildDetailRow(Icons.calendar_today_rounded, l10n.historyDetailDate,
+                DateFormat('dd.MM.yyyy EEEE', localeTag).format(record.timestamp)),
+            _buildDetailRow(Icons.access_time_rounded, l10n.historyDetailTime,
                 DateFormat('HH:mm:ss').format(record.timestamp)),
-            _buildDetailRow(Icons.location_on_rounded, 'Konum', 
-                record.doorName.isNotEmpty ? record.doorName : 'Bilinmeyen Konum'),
+            _buildDetailRow(Icons.location_on_rounded, l10n.historyDetailLocation,
+                record.doorName.isNotEmpty ? record.doorName : l10n.historyUnknownLocation),
             if (record.qrData != null && record.qrData!.isNotEmpty)
-              _buildDetailRow(Icons.qr_code_rounded, 'QR Kod', record.qrData!),
+              _buildDetailRow(Icons.qr_code_rounded, l10n.historyDetailQrCode, record.qrData!),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Kapat'),
+            child: Text(l10n.commonClose),
           ),
         ],
       ),
@@ -1205,30 +1273,30 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
   }
 
   void _showFilterDialog() {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.filter_list_rounded),
-            SizedBox(width: 8),
-            Text('Filtrele'),
+            const Icon(Icons.filter_list_rounded),
+            const SizedBox(width: 8),
+            Text(l10n.historyFilterTitle),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Tarih seçici
             ListTile(
               leading: const Icon(Icons.calendar_today_rounded),
-              title: const Text('Tarih'),
+              title: Text(l10n.historyFilterDate),
               subtitle: Text(
                 _selectedDate != null
                     ? DateFormat('dd.MM.yyyy').format(_selectedDate!)
-                    : 'Tarih seçilmedi',
+                    : l10n.historyFilterDateNone,
               ),
               onTap: () async {
                 final date = await showDatePicker(
@@ -1244,12 +1312,11 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                 Navigator.pop(context);
               },
             ),
-            // Cihaz seçici
             if (_deviceList.isNotEmpty)
               ListTile(
                 leading: const Icon(Icons.devices_rounded),
-                title: const Text('Cihaz'),
-                subtitle: Text(_selectedDevice ?? 'Cihaz seçilmedi'),
+                title: Text(l10n.historyFilterDevice),
+                subtitle: Text(_selectedDevice ?? l10n.historyFilterDeviceNone),
                 onTap: () {
                   Navigator.pop(context);
                   _showDeviceSelectionDialog();
@@ -1266,11 +1333,11 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
               });
               Navigator.pop(context);
             },
-            child: const Text('Filtreleri Temizle'),
+            child: Text(l10n.historyFilterClear),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Tamam'),
+            child: Text(l10n.commonOk),
           ),
         ],
       ),
@@ -1278,17 +1345,18 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
   }
 
   void _showDeviceSelectionDialog() {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.devices_rounded),
-            SizedBox(width: 8),
-            Text('Cihaz Seç'),
+            const Icon(Icons.devices_rounded),
+            const SizedBox(width: 8),
+            Text(l10n.historyFilterDeviceSelectTitle),
           ],
         ),
         content: SizedBox(
@@ -1314,7 +1382,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('İptal'),
+            child: Text(l10n.commonCancel),
           ),
         ],
       ),
@@ -1322,6 +1390,8 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
   }
 
   void _showDayDetailsDialog(DateTime selectedDay, List<Attendance> dayRecords) {
+    final l10n = AppLocalizations.of(context);
+    final localeTag = Localizations.localeOf(context).toLanguageTag();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1347,11 +1417,11 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    DateFormat('dd MMMM yyyy', 'tr_TR').format(selectedDay),
+                    DateFormat('dd MMMM yyyy', localeTag).format(selectedDay),
                     style: const TextStyle(fontSize: 16),
                   ),
                   Text(
-                    DateFormat('EEEE', 'tr_TR').format(selectedDay),
+                    DateFormat('EEEE', localeTag).format(selectedDay),
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.grey[600],
@@ -1369,7 +1439,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${dayRecords.length} Kayıt',
+                l10n.historyDayRecordCount(dayRecords.length),
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -1387,12 +1457,12 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: isCheckIn 
+                        color: isCheckIn
                             ? Colors.green.withValues(alpha: 0.1)
                             : Colors.red.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: isCheckIn 
+                          color: isCheckIn
                               ? Colors.green.withValues(alpha: 0.3)
                               : Colors.red.withValues(alpha: 0.3),
                         ),
@@ -1410,7 +1480,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  isCheckIn ? 'Giriş' : 'Çıkış',
+                                  isCheckIn ? l10n.historyEntryShort : l10n.historyExitShort,
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: isCheckIn ? Colors.green[700] : Colors.red[700],
@@ -1418,9 +1488,9 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  record.doorName.isNotEmpty 
-                                      ? record.doorName 
-                                      : 'Bilinmeyen Konum',
+                                  record.doorName.isNotEmpty
+                                      ? record.doorName
+                                      : l10n.historyUnknownLocation,
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey[600],
@@ -1448,7 +1518,7 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Kapat'),
+            child: Text(l10n.commonClose),
           ),
         ],
       ),

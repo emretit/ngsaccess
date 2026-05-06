@@ -86,7 +86,7 @@ export default function EmployeeSetup() {
 
   if (isSuccess) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
+      <div className="flex items-center justify-center min-h-screen bg-muted/50 p-4">
         <Card className="w-full max-w-md shadow-lg">
           <CardHeader>
             <CardTitle className="text-center text-2xl flex items-center justify-center gap-2 text-green-600">
@@ -100,11 +100,11 @@ export default function EmployeeSetup() {
                 <Smartphone className="h-10 w-10 text-primary" />
               </div>
             </div>
-            <p className="text-base text-gray-700">
+            <p className="text-base text-foreground">
               Hesabınız başarıyla aktifleştirildi. Artık <strong>NGS+ mobil uygulaması</strong> üzerinden
               e-posta ve şifrenizle giriş yapabilirsiniz.
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-muted-foreground">
               Bu sekmeyi kapatabilirsiniz.
             </p>
           </CardContent>
@@ -115,7 +115,7 @@ export default function EmployeeSetup() {
 
   if (!tokenValid) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
+      <div className="flex items-center justify-center min-h-screen bg-muted/50 p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-center text-red-600">Geçersiz Bağlantı</CardTitle>
@@ -132,7 +132,7 @@ export default function EmployeeSetup() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
+    <div className="flex items-center justify-center min-h-screen bg-muted/50 p-4">
       <Card className="w-full max-w-md shadow-lg">
         <CardHeader>
           <CardTitle className="text-2xl text-center flex items-center justify-center gap-2">
@@ -157,8 +157,8 @@ export default function EmployeeSetup() {
             <div className="space-y-1 text-sm">
               {Object.entries({ minLength: "En az 8 karakter", hasUpper: "Büyük harf", hasLower: "Küçük harf", hasNumber: "Rakam" }).map(([k, label]) => (
                 <div key={k} className="flex items-center gap-2">
-                  {passwordChecks[k as keyof typeof passwordChecks] ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-gray-300" />}
-                  <span className={passwordChecks[k as keyof typeof passwordChecks] ? "text-green-600" : "text-gray-400"}>{label}</span>
+                  {passwordChecks[k as keyof typeof passwordChecks] ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-muted-foreground/60" />}
+                  <span className={passwordChecks[k as keyof typeof passwordChecks] ? "text-green-600" : "text-muted-foreground/70"}>{label}</span>
                 </div>
               ))}
             </div>

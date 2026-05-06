@@ -142,6 +142,7 @@ export const create = authedMutation({
     endTime: v.string(),
     breakStart: v.optional(v.string()),
     breakEnd: v.optional(v.string()),
+    isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -149,7 +150,12 @@ export const create = authedMutation({
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
     const now = new Date().toISOString();
-    return await ctx.db.insert("shifts", { ...args, createdAt: now, updatedAt: now });
+    return await ctx.db.insert("shifts", {
+      ...args,
+      isActive: args.isActive ?? true,
+      createdAt: now,
+      updatedAt: now,
+    });
   },
 });
 
@@ -161,6 +167,7 @@ export const update = authedMutation({
     endTime: v.optional(v.string()),
     breakStart: v.optional(v.string()),
     breakEnd: v.optional(v.string()),
+    isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);

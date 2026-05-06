@@ -32,7 +32,7 @@ export function ZoneDoorTreePanel({ onSelectZone, onSelectDoor }: ZoneDoorTreePa
 
   return (
     <>
-      <div className="h-full w-[240px] shrink-0 bg-card rounded-xl border shadow-xs">
+      <div className="h-full w-full md:w-[240px] shrink-0 bg-card rounded-xl border shadow-xs">
         <div className="p-4 border-b border-border">
           <div
             className="flex items-center gap-2 cursor-pointer hover:text-primary/90 transition-colors"

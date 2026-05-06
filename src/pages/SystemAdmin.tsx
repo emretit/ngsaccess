@@ -10,53 +10,18 @@ export default function SystemAdmin() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.log("SystemAdmin: Sayfa yüklendi, detaylı kontrol ediliyor...", {
-      loading,
-      hasUser: !!user,
-      userEmail: user?.email,
-      hasProfile: !!profile,
-      profileRole: profile?.role,
-      profileData: profile,
-      checkResult: profile ? checkUserRole('super_admin') : 'profile henüz yüklenmedi'
-    });
-
-    // Loading tamamlandıktan SONRA yetki kontrolü yap
-    if (!loading) {
-      console.log("SystemAdmin: Loading tamamlandı, yetki kontrol ediliyor...");
-      
-      // Kullanıcı giriş yapmış mı kontrol et
-      if (!user) {
-        console.log("SystemAdmin: Kullanıcı giriş yapmamış, /login'e yönlendiriliyor...");
-        navigate('/login');
-        return;
-      }
-
-      // Profile yüklenmiş mi kontrol et
-      if (!profile) {
-        console.log("SystemAdmin: Profile henüz yüklenmedi, bekleniyor...");
-        return;
-      }
-
-      const hasAccess = checkUserRole('super_admin');
-      console.log("SystemAdmin: Nihai yetki kontrolü:", {
-        userEmail: user.email,
-        profileRole: profile.role,
-        hasAccess,
-        profileId: profile.id
-      });
-
-      if (!hasAccess) {
-        console.log("SystemAdmin: Yetki yok, /home'a yönlendiriliyor...");
-        navigate('/home');
-      } else {
-        console.log("SystemAdmin: ✅ Yetki onaylandı, sayfa yükleniyor!");
-      }
+    if (loading) return;
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    if (!profile) return;
+    if (!checkUserRole('super_admin')) {
+      navigate('/home');
     }
   }, [checkUserRole, loading, navigate, profile, user]);
 
-  // Loading durumunda loading ekranı göster
   if (loading) {
-    console.log("SystemAdmin: Loading durumunda...");
     return (
       <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-slate-900 via-purple-900 to-slate-900">
         <div className="text-center">
@@ -79,15 +44,11 @@ export default function SystemAdmin() {
     );
   }
 
-  // Kullanıcı giriş yapmamışsa
   if (!user) {
-    console.log("SystemAdmin: Kullanıcı yok, yönlendirme için null döndürülüyor");
     return null;
   }
 
-  // Profile henüz yüklenmemişse
   if (!profile) {
-    console.log("SystemAdmin: Profile henüz yüklenmedi, bekleniyor...");
     return (
       <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-slate-900 via-purple-900 to-slate-900">
         <div className="text-center">
@@ -98,13 +59,9 @@ export default function SystemAdmin() {
     );
   }
 
-  // Yetki kontrolü
   if (!checkUserRole('super_admin')) {
-    console.log("SystemAdmin: Yetki kontrol sonucu negatif, null döndürülüyor");
     return null;
   }
-
-  console.log("SystemAdmin: ✅ Tüm kontroller geçildi, sayfa render ediliyor!");
 
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">

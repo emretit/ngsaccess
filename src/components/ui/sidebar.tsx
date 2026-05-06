@@ -63,7 +63,9 @@ const SidebarProvider = React.forwardRef<
     const [_open, _setOpen] = React.useState(defaultOpen)
     const open = openProp ?? _open
     const openRef = React.useRef(open)
-    openRef.current = open
+    React.useEffect(() => {
+      openRef.current = open
+    }, [open])
 
     const setOpen = React.useCallback(
       (value: boolean | ((value: boolean) => boolean)) => {

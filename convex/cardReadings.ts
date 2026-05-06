@@ -1,4 +1,5 @@
 import { query, mutation, internalMutation } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 import {
@@ -7,7 +8,7 @@ import {
   employeeAuthedMutation,
 } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
-import { Doc } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
 import {
   getEffectiveWorkSettings,
   getEffectiveOvertimeRates,
@@ -984,6 +985,49 @@ export const insert = mutation({
   },
 });
 
+type AccessDirection = "entry" | "exit";
+
+// Türkiye saatiyle (UTC+3, DST yok) verilen ISO timestamp'inin günü başlangıcının
+// UTC ISO karşılığını döndürür. Toggle'ı günlük resetlemek için kullanılır.
+function startOfTurkeyDayISO(nowISO: string): string {
+  const tr = new Date(new Date(nowISO).getTime() + 3 * 60 * 60 * 1000);
+  const y = tr.getUTCFullYear();
+  const m = String(tr.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(tr.getUTCDate()).padStart(2, "0");
+  // TR günü 00:00 = UTC önceki günün 21:00
+  return `${y}-${m}-${d}T00:00:00.000+03:00`;
+}
+
+// Cihazın yön ayarına ve toggle state'ine göre okumanın yönünü çözer.
+async function resolveDirection(
+  ctx: MutationCtx,
+  params: {
+    device: Doc<"devices"> | null;
+    employeeId: Id<"employees"> | null;
+    nowISO: string;
+  }
+): Promise<AccessDirection> {
+  const cfg = params.device?.accessDirection ?? "both";
+  if (cfg === "entry") return "entry";
+  if (cfg === "exit") return "exit";
+
+  // both → çalışan + cihaz çiftine göre toggle
+  if (!params.employeeId || !params.device) return "entry";
+
+  const startOfDay = startOfTurkeyDayISO(params.nowISO);
+  const last = await ctx.db
+    .query("cardReadings")
+    .withIndex("by_employee_device_time", (q) =>
+      q.eq("employeeId", params.employeeId!).eq("deviceId", params.device!._id)
+    )
+    .filter((q) => q.eq(q.field("accessStatus"), "izin_verildi"))
+    .order("desc")
+    .first();
+
+  if (!last || last.accessTime < startOfDay) return "entry";
+  return last.direction === "entry" ? "exit" : "entry";
+}
+
 /**
  * Kart okuyucu cihazlarından gelen istekleri işler (internal - HTTP action'dan çağrılır).
  * Erişim kontrolü yapar ve card_readings kaydı oluşturur.
@@ -1115,6 +1159,11 @@ export const processCardReading = internalMutation({
       }
 
       await ctx.db.patch(tokenRow._id, { usedAt: accessTime });
+      const tokenDirection = await resolveDirection(ctx, {
+        device,
+        employeeId: tokenEmployee._id,
+        nowISO: accessTime,
+      });
       await ctx.db.insert("cardReadings", {
         projectId: projectForRow(tokenEmployee.projectId, device?.projectId),
         deviceId: device?._id,
@@ -1123,6 +1172,7 @@ export const processCardReading = internalMutation({
         employeeName: `${tokenEmployee.firstName} ${tokenEmployee.lastName}`,
         accessTime,
         accessStatus: tokenHasAccess ? "izin_verildi" : "reddedildi",
+        direction: tokenDirection,
         rawData: args.rawBody,
         createdAt: accessTime,
         updatedAt: accessTime,
@@ -1188,6 +1238,11 @@ export const processCardReading = internalMutation({
       .collect();
 
     if (deviceGroups.length === 0) {
+      const noGroupDirection = await resolveDirection(ctx, {
+        device,
+        employeeId: employee._id,
+        nowISO: accessTime,
+      });
       await ctx.db.insert("cardReadings", {
         projectId: projectForRow(employee.projectId, device.projectId),
         deviceId: device._id,
@@ -1196,6 +1251,7 @@ export const processCardReading = internalMutation({
         employeeName: `${employee.firstName} ${employee.lastName}`,
         accessTime,
         accessStatus: "reddedildi",
+        direction: noGroupDirection,
         rawData: args.rawBody,
         createdAt: accessTime,
         updatedAt: accessTime,
@@ -1223,6 +1279,11 @@ export const processCardReading = internalMutation({
     }
 
     // 5. Kayıt oluştur
+    const cardDirection = await resolveDirection(ctx, {
+      device,
+      employeeId: employee._id,
+      nowISO: accessTime,
+    });
     await ctx.db.insert("cardReadings", {
       projectId: projectForRow(employee.projectId, device.projectId),
       deviceId: device._id,
@@ -1231,6 +1292,7 @@ export const processCardReading = internalMutation({
       employeeName: `${employee.firstName} ${employee.lastName}`,
       accessTime,
       accessStatus: hasAccess ? "izin_verildi" : "reddedildi",
+      direction: cardDirection,
       rawData: args.rawBody,
       createdAt: accessTime,
       updatedAt: accessTime,
@@ -1365,6 +1427,11 @@ export const selfCheckIn = employeeAuthedMutation({
     }
 
     const accessTime = new Date().toISOString();
+    const direction = await resolveDirection(ctx, {
+      device,
+      employeeId: employee._id,
+      nowISO: accessTime,
+    });
     const readingId = await ctx.db.insert("cardReadings", {
       projectId: employee.projectId ?? device.projectId,
       deviceId: device._id,
@@ -1373,6 +1440,7 @@ export const selfCheckIn = employeeAuthedMutation({
       employeeName: `${employee.firstName} ${employee.lastName}`,
       accessTime,
       accessStatus: hasAccess ? "izin_verildi" : "reddedildi",
+      direction,
       rawData: JSON.stringify({ source: "mobile_qr" }),
       createdAt: accessTime,
       updatedAt: accessTime,

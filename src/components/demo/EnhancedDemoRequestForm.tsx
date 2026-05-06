@@ -71,14 +71,14 @@ const EnhancedDemoRequestForm = () => {
   };
 
   return (
-    <div className="py-16 px-4 bg-gray-50">
+    <div className="py-16 px-4 bg-muted/50">
       <div className="max-w-2xl mx-auto">
         <Card className="shadow-2xl border-0">
           <CardHeader className="text-center pb-8">
-            <CardTitle className="text-3xl font-bold text-gray-900">
+            <CardTitle className="text-3xl font-bold text-foreground">
               Ücretsiz Demo Talep Edin
             </CardTitle>
-            <CardDescription className="text-lg text-gray-600">
+            <CardDescription className="text-lg text-muted-foreground">
               15 dakikada kurulum tamamlayın, hemen kullanmaya başlayın
             </CardDescription>
           </CardHeader>
@@ -87,7 +87,7 @@ const EnhancedDemoRequestForm = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName" className="text-sm font-medium text-gray-700">
+                  <Label htmlFor="firstName" className="text-sm font-medium text-foreground">
                     Ad *
                   </Label>
                   <Input
@@ -102,7 +102,7 @@ const EnhancedDemoRequestForm = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName" className="text-sm font-medium text-gray-700">
+                  <Label htmlFor="lastName" className="text-sm font-medium text-foreground">
                     Soyad *
                   </Label>
                   <Input
@@ -119,7 +119,7 @@ const EnhancedDemoRequestForm = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                <Label htmlFor="email" className="text-sm font-medium text-foreground flex items-center gap-2">
                   <Mail className="h-4 w-4" />
                   E-posta Adresi *
                 </Label>
@@ -136,7 +136,7 @@ const EnhancedDemoRequestForm = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                <Label htmlFor="phone" className="text-sm font-medium text-foreground flex items-center gap-2">
                   <Phone className="h-4 w-4" />
                   Telefon Numarası
                 </Label>
@@ -152,7 +152,7 @@ const EnhancedDemoRequestForm = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="companyName" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                <Label htmlFor="companyName" className="text-sm font-medium text-foreground flex items-center gap-2">
                   <Building className="h-4 w-4" />
                   Firma Adı *
                 </Label>
@@ -169,7 +169,7 @@ const EnhancedDemoRequestForm = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="employeeCount" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                <Label htmlFor="employeeCount" className="text-sm font-medium text-foreground flex items-center gap-2">
                   <Users className="h-4 w-4" />
                   Personel Sayısı
                 </Label>
@@ -185,7 +185,7 @@ const EnhancedDemoRequestForm = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="message" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                <Label htmlFor="message" className="text-sm font-medium text-foreground flex items-center gap-2">
                   <MessageSquare className="h-4 w-4" />
                   Ek Notlar
                 </Label>
@@ -200,7 +200,7 @@ const EnhancedDemoRequestForm = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-gray-700">
+                <Label htmlFor="password" className="text-sm font-medium text-foreground">
                   Şifre *
                 </Label>
                 <Input
@@ -226,7 +226,7 @@ const EnhancedDemoRequestForm = () => {
             </form>
 
             <div className="mt-8 text-center">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-muted-foreground">
                 Zaten hesabınız var mı?{" "}
                 <button 
                   onClick={() => navigate('/login')}

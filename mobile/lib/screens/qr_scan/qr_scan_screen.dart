@@ -1,13 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+
 import '../../config/convex_config.dart';
-import '../../providers/attendance_provider.dart';
+import '../../core/error_localizer.dart';
+import '../../core/errors.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/qr_code_model.dart';
+import '../../providers/attendance_provider.dart';
 
 class QRScanScreen extends StatefulWidget {
   const QRScanScreen({super.key});
@@ -51,12 +56,16 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
       );
       final decoded = jsonDecode(raw);
       if (decoded is! Map<String, dynamic>) {
-        throw Exception('Geçersiz yanıt');
+        throw Exception(
+          mounted ? AppLocalizations.of(context).qrInvalidResponse : 'Invalid response',
+        );
       }
       final token = decoded['token'] as String?;
       final expiresAtStr = decoded['expiresAt'] as String?;
       if (token == null || expiresAtStr == null) {
-        throw Exception('Token yok');
+        throw Exception(
+          mounted ? AppLocalizations.of(context).qrTokenMissing : 'Token missing',
+        );
       }
       if (!mounted) return;
       setState(() {
@@ -68,9 +77,10 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
       _ensureTokenTicker();
     } catch (e) {
       if (!mounted) return;
+      final message = e is AppError ? e.userMessage : e.toString().replaceFirst('Exception: ', '');
       setState(() {
         _tokenLoading = false;
-        _tokenError = e.toString().replaceFirst('Exception: ', '');
+        _tokenError = message;
       });
     }
   }
@@ -105,19 +115,20 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('QR İşlemleri'),
+        title: Text(l10n.qrTabTitle),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
+          tabs: [
             Tab(
-              icon: Icon(Icons.qr_code),
-              text: 'QR Kodum',
+              icon: const Icon(Icons.qr_code),
+              text: l10n.qrTabMyQr,
             ),
             Tab(
-              icon: Icon(Icons.camera_alt),
-              text: 'Tara',
+              icon: const Icon(Icons.camera_alt),
+              text: l10n.qrTabScan,
             ),
           ],
         ),
@@ -133,6 +144,7 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
   }
 
   Widget _buildScannerTab() {
+    final l10n = AppLocalizations.of(context);
     return Stack(
       children: [
         MobileScanner(
@@ -146,11 +158,11 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
               child: CircularProgressIndicator(),
             ),
           ),
-        // QR Overlay
+        // QR Overlay — tablet/landscape'de 400px'i geçmesin.
         Center(
           child: Container(
-            width: MediaQuery.of(context).size.width * 0.8,
-            height: MediaQuery.of(context).size.width * 0.8,
+            width: math.min(MediaQuery.of(context).size.width * 0.8, 400),
+            height: math.min(MediaQuery.of(context).size.width * 0.8, 400),
             decoration: BoxDecoration(
               border: Border.all(
                 color: Theme.of(context).primaryColor,
@@ -228,10 +240,10 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
           right: 0,
           child: Container(
             padding: const EdgeInsets.all(16),
-            child: const Text(
-              'QR kodu kare içine yerleştirin',
+            child: Text(
+              l10n.qrFrameHint,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
@@ -266,6 +278,7 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
   }
 
   Widget _buildQrWithExpiry(String token) {
+    final l10n = AppLocalizations.of(context);
     final expired = _isTokenExpired();
     return Stack(
       alignment: Alignment.center,
@@ -338,16 +351,16 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
                       )
                     : Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(
+                        children: [
+                          const Icon(
                             Icons.refresh,
                             color: Colors.white,
                             size: 40,
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
-                            'Yenile',
-                            style: TextStyle(
+                            l10n.qrRefresh,
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -363,6 +376,7 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
   }
 
   Widget _buildMyQRTab() {
+    final l10n = AppLocalizations.of(context);
     final token = _checkInToken;
     return Container(
       padding: const EdgeInsets.all(24),
@@ -388,7 +402,7 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
                 ElevatedButton.icon(
                   onPressed: _refreshCheckInToken,
                   icon: const Icon(Icons.refresh),
-                  label: const Text('Tekrar dene'),
+                  label: Text(l10n.qrTryAgain),
                 ),
               ],
             )
@@ -419,14 +433,25 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
                 color: Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Text(
-                'Bu QR kodu kapı cihazına okutun. Kod 10 saniye geçerlidir, '
-                'süre dolunca yenile butonuna basın.',
-                style: TextStyle(fontSize: 14, color: Colors.black87),
+              child: Text(
+                l10n.qrTokenHint,
+                style: const TextStyle(fontSize: 14, color: Colors.black87),
                 textAlign: TextAlign.center,
               ),
             ),
-          ],
+          ]
+          else
+            Column(
+              children: [
+                const Icon(Icons.qr_code_2, size: 64, color: Colors.grey),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: _refreshCheckInToken,
+                  icon: const Icon(Icons.refresh),
+                  label: Text(l10n.qrRefresh),
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -454,79 +479,85 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
   }
 
   Future<void> _processQRCode(String qrData) async {
+    final l10n = AppLocalizations.of(context);
     setState(() => _isProcessing = true);
 
     try {
-      // QR kod türünü belirle
       Map<String, dynamic> parsedData;
-      
+
       try {
         parsedData = jsonDecode(qrData);
       } catch (e) {
-        // Eski format QR kodları için
         parsedData = QRCodeGenerator.parseQRData(qrData);
       }
 
       if (parsedData['type'] == 'user_qr') {
-        // Kullanıcı QR kodu okutuldu
         await _processUserQRCode(parsedData);
       } else {
-        // Cihaz QR kodu okutuldu
         await _processDeviceQRCode(qrData, parsedData);
       }
     } catch (e) {
-      _showErrorDialog('QR kod işlenirken bir hata oluştu: $e');
+      _showErrorDialog(l10n.qrProcessError(e.toString()));
     } finally {
       setState(() => _isProcessing = false);
     }
   }
 
   Future<void> _processUserQRCode(Map<String, dynamic> userData) async {
+    final l10n = AppLocalizations.of(context);
     _showInfoDialog(
-      'Kullanıcı QR Kodu',
-      'Kullanıcı: ${userData['user_name']}\n'
-      'E-posta: ${userData['user_email']}\n'
-      'Tarih: ${userData['timestamp']}',
+      l10n.qrUserCodeTitle,
+      l10n.qrUserCodeBody(
+        (userData['user_name'] ?? '-').toString(),
+        (userData['user_email'] ?? '-').toString(),
+        (userData['timestamp'] ?? '-').toString(),
+      ),
     );
   }
 
   Future<void> _processDeviceQRCode(String qrData, Map<String, dynamic> parsedData) async {
+    final l10n = AppLocalizations.of(context);
     if (!parsedData['is_valid']) {
-      _showErrorDialog(parsedData['error'] ?? 'Geçersiz QR kod');
+      _showErrorDialog(parsedData['error'] ?? l10n.qrInvalidCode);
       return;
     }
 
     final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
     final success = await attendanceProvider.recordAttendance(qrData);
 
+    if (!mounted) return;
     if (success) {
-      _showSuccessDialog('Geçiş Başarılı', parsedData);
+      _showSuccessDialog(l10n.qrAccessGranted, parsedData);
     } else {
-      _showErrorDialog(attendanceProvider.errorMessage ?? 'Bir hata oluştu');
+      final msg = attendanceProvider.lastError != null
+          ? localizeAppError(context, attendanceProvider.lastError!)
+          : (attendanceProvider.errorMessage ?? l10n.qrUnknownError);
+      _showErrorDialog(msg);
     }
   }
 
   void _showSuccessDialog(String message, Map<String, dynamic> deviceInfo) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Başarılı'),
+        title: Text(l10n.commonSuccess),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(message),
             const SizedBox(height: 8),
-            Text('Cihaz: ${deviceInfo['deviceName'] ?? '-'}'),
-            Text('Konum: ${deviceInfo['location'] ?? '-'}'),
+            Text(l10n.qrDeviceLine((deviceInfo['deviceName'] ?? '-').toString())),
+            Text(l10n.qrLocationLine((deviceInfo['location'] ?? '-').toString())),
             if (deviceInfo['timestamp'] != null)
-              Text('Zaman: ${DateTime.parse(deviceInfo['timestamp']).toString()}'),
+              Text(l10n.qrTimeLine(DateTime.parse(deviceInfo['timestamp'].toString()).toString())),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Tamam'),
+            child: Text(l10n.commonOk),
           ),
         ],
       ),
@@ -534,15 +565,16 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
   }
 
   void _showErrorDialog(String message) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Hata'),
+        title: Text(l10n.commonError),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Tamam'),
+            child: Text(l10n.commonOk),
           ),
         ],
       ),
@@ -550,6 +582,7 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
   }
 
   void _showInfoDialog(String title, String message) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -558,7 +591,7 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Tamam'),
+            child: Text(l10n.commonOk),
           ),
         ],
       ),

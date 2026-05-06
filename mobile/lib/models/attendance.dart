@@ -8,6 +8,7 @@ class Attendance {
   final String? employeeName;
   final DateTime accessTime;
   final bool granted;
+  final String? direction;
   final Map<String, dynamic>? deviceInfo;
 
   Attendance({
@@ -18,15 +19,18 @@ class Attendance {
     required this.employeeName,
     required this.accessTime,
     required this.granted,
+    this.direction,
     this.deviceInfo,
   });
 
-  String get type => 'check_in';
+  String get type => direction == 'exit' ? 'check_out' : 'check_in';
   DateTime get timestamp => accessTime;
   String? get userId => employeeId;
   String get doorName => deviceInfo?['name'] as String? ?? 'Bilinmeyen Cihaz';
-  DateTime? get checkInTime => accessTime;
-  DateTime? get checkOutTime => null;
+  bool get isEntry => direction != 'exit';
+  bool get isExit => direction == 'exit';
+  DateTime? get checkInTime => isEntry ? accessTime : null;
+  DateTime? get checkOutTime => isExit ? accessTime : null;
   String? get qrData => cardNo.isEmpty ? null : cardNo;
 
   factory Attendance.fromConvex(Map<String, dynamic> json) {
@@ -48,8 +52,9 @@ class Attendance {
       deviceId: json['deviceId']?.toString(),
       cardNo: (json['cardNo'] as String?) ?? '',
       employeeName: json['employeeName'] as String?,
-      accessTime: DateTime.parse(json['accessTime'] as String),
+      accessTime: DateTime.parse(json['accessTime'] as String).toLocal(),
       granted: accessStatus == 'izin_verildi',
+      direction: json['direction'] as String?,
       deviceInfo: deviceInfo,
     );
   }
@@ -63,6 +68,7 @@ class Attendance {
       'employeeName': employeeName,
       'accessTime': accessTime.toIso8601String(),
       'accessStatus': granted ? 'izin_verildi' : 'reddedildi',
+      'direction': direction,
     };
   }
 
