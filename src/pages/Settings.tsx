@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { SettingsSidebar } from "@/components/settings/SettingsSidebar";
 import { GeneralSettings } from "@/components/settings/sections/GeneralSettings";
-import { ShiftSettings } from "@/components/settings/sections/ShiftSettings";
 import { WorkAndPayrollSettings } from "@/components/settings/sections/WorkAndPayrollSettings";
 import { ReportsSettings } from "@/components/settings/sections/ReportsSettings";
 import { NotificationSettings } from "@/components/settings/sections/NotificationSettings";
@@ -25,8 +24,6 @@ export default function Settings() {
         return <GeneralSettings />;
       case "users":
         return <AdminUsersPanel />;
-      case "schedule":
-        return <ShiftSettings />;
       case "work-payroll":
         return <WorkAndPayrollSettings />;
       case "reports":

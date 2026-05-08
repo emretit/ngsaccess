@@ -9,20 +9,17 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { PDKSFilterBar } from "./PDKSFilterBar";
+import { PDKSFilterBar, type FilterValues } from "./PDKSFilterBar";
 
 interface PDKSMobileDrawerProps {
-  onFiltersChange: (filters: {
-    dateRange: { from: Date | undefined; to: Date | undefined };
-    department: string;
-    person: string;
-    reportType: string;
-  }) => void;
+  values: FilterValues;
+  onChange: (values: FilterValues) => void;
   activeFilterCount?: number;
 }
 
 export function PDKSMobileDrawer({
-  onFiltersChange,
+  values,
+  onChange,
   activeFilterCount = 0,
 }: PDKSMobileDrawerProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -51,7 +48,7 @@ export function PDKSMobileDrawer({
               Filtreler ve Arama
             </SheetTitle>
           </SheetHeader>
-          <PDKSFilterBar onFiltersChange={onFiltersChange} />
+          <PDKSFilterBar values={values} onChange={onChange} />
           <div className="mt-4">
             <Button onClick={() => setIsOpen(false)} className="w-full" size="sm">
               <X className="mr-2 h-4 w-4" />

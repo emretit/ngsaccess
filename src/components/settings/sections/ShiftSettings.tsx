@@ -16,9 +16,10 @@ import {
 
 interface ShiftSettingsProps {
   onComplete?: () => void;
+  embedded?: boolean;
 }
 
-export function ShiftSettings({ onComplete }: ShiftSettingsProps) {
+export function ShiftSettings({ onComplete, embedded = false }: ShiftSettingsProps) {
   const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
   const projectId = projectIds[0];
   const { toast } = useToast();
@@ -111,21 +112,41 @@ export function ShiftSettings({ onComplete }: ShiftSettingsProps) {
   }));
 
   return (
-    <div className="space-y-6 p-6 bg-muted/50 min-h-screen">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Vardiya Ayarları</h1>
-          <p className="text-muted-foreground mt-2">Çalışma vardiyalarını yönetin ve düzenleyin</p>
+    <div
+      className={
+        embedded
+          ? "space-y-4"
+          : "space-y-6 p-6 bg-muted/50 min-h-screen"
+      }
+    >
+      {!embedded && (
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Vardiya Ayarları</h1>
+            <p className="text-muted-foreground mt-2">Çalışma vardiyalarını yönetin ve düzenleyin</p>
+          </div>
+          <Button
+            onClick={() => setIsAddDialogOpen(true)}
+            className="bg-primary hover:bg-primary/90 text-white"
+            disabled={hasNoProjectAccess}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Yeni Vardiya Ekle
+          </Button>
         </div>
-        <Button
-          onClick={() => setIsAddDialogOpen(true)}
-          className="bg-primary hover:bg-primary/90 text-white"
-          disabled={hasNoProjectAccess}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Yeni Vardiya Ekle
-        </Button>
-      </div>
+      )}
+      {embedded && (
+        <div className="flex justify-end">
+          <Button
+            onClick={() => setIsAddDialogOpen(true)}
+            className="bg-primary hover:bg-primary/90 text-white"
+            disabled={hasNoProjectAccess}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Yeni Vardiya Ekle
+          </Button>
+        </div>
+      )}
 
       {hasNoProjectAccess ? (
         <Card className="shadow-md">

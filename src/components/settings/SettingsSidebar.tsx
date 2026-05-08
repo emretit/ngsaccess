@@ -1,6 +1,5 @@
 import {
   Settings,
-  Clock,
   Bell,
   Mail,
   Users,
@@ -24,11 +23,6 @@ const sidebarItems = [
     key: "users",
     label: "Kullanıcı Yönetimi",
     icon: Users,
-  },
-  {
-    key: "schedule",
-    label: "Vardiya Ayarları",
-    icon: Clock,
   },
   {
     key: "work-payroll",

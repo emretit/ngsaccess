@@ -197,13 +197,13 @@ export function evaluateLateEarly(
   let isEarlyExit = false;
 
   if (entryISO) {
-    const d = new Date(entryISO);
-    const min = d.getHours() * 60 + d.getMinutes();
+    const tr = new Date(new Date(entryISO).getTime() + 3 * 60 * 60 * 1000);
+    const min = tr.getUTCHours() * 60 + tr.getUTCMinutes();
     isLate = min > lateThresholdMin;
   }
   if (exitISO) {
-    const d = new Date(exitISO);
-    const min = d.getHours() * 60 + d.getMinutes();
+    const tr = new Date(new Date(exitISO).getTime() + 3 * 60 * 60 * 1000);
+    const min = tr.getUTCHours() * 60 + tr.getUTCMinutes();
     isEarlyExit = min < earlyThresholdMin;
   }
   return { isLate, isEarlyExit };

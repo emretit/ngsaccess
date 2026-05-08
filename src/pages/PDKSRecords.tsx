@@ -1,13 +1,12 @@
-
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { PDKSFilterBar } from "@/components/pdks/dashboard/PDKSFilterBar";
+import { PDKSFilterBar, type FilterValues, type StatusFilter } from "@/components/pdks/dashboard/PDKSFilterBar";
 import { PDKSSummaryCards } from "@/components/pdks/dashboard/PDKSSummaryCards";
-import { PDKSDashboardWidgets } from "@/components/pdks/dashboard/PDKSDashboardWidgets";
-import { PDKSCurrentlyInsideWidget } from "@/components/pdks/dashboard/PDKSCurrentlyInsideWidget";
 import { PDKSTableView } from "@/components/pdks/dashboard/PDKSTableView";
+import { PDKSHeatmapView } from "@/components/pdks/dashboard/PDKSHeatmapView";
+import { PDKSEmployeeDetailDrawer } from "@/components/pdks/dashboard/PDKSEmployeeDetailDrawer";
 import { PDKSChartView } from "@/components/pdks/dashboard/PDKSChartView";
 import { PDKSRealTimeWidget } from "@/components/pdks/dashboard/PDKSRealTimeWidget";
 import { PDKSEnhancedExportPanel } from "@/components/pdks/dashboard/PDKSEnhancedExportPanel";
@@ -17,48 +16,50 @@ import { usePdksRecords } from "@/hooks/usePdksRecords";
 import { usePdksStats } from "@/hooks/usePdksStats";
 import { usePdksTableData } from "@/hooks/usePdksTableData";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, BarChart3, Table2, RefreshCw, Activity, Download, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { MessageSquare, BarChart3, Table2, RefreshCw, Activity, Download, X, Calendar as CalendarIcon, LayoutGrid } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import type { Id } from "../../convex/_generated/dataModel";
+
+const DEFAULT_FILTERS: FilterValues = {
+  dateRange: { from: undefined, to: undefined },
+  reportType: "daily",
+  companyId: undefined,
+  departmentId: undefined,
+  positionId: undefined,
+  shiftId: undefined,
+  statusFilter: "all",
+  person: "",
+};
 
 export default function PDKSRecords() {
   const [activeTab, setActiveTab] = useState("table");
   const [showAiChat, setShowAiChat] = useState(false);
-  const [filters, setFilters] = useState<{
-    dateRange?: { from?: Date; to?: Date };
-    department?: string;
-    person?: string;
-    reportType?: "daily" | "weekly" | "monthly" | "custom";
-  }>({ reportType: "daily" });
+  const [filters, setFilters] = useState<FilterValues>(DEFAULT_FILTERS);
+  const [drilldown, setDrilldown] = useState<{
+    employeeId: Id<"employees">;
+    date?: string;
+  } | null>(null);
   const { toast } = useToast();
 
-  const {
-    loading,
-    handleRefresh,
-  } = usePdksRecords();
-
-  const { stats: summaryData, isLoading: statsLoading } = usePdksStats();
+  const { loading, handleRefresh } = usePdksRecords();
+  const { stats: summaryData, isLoading: statsLoading } = usePdksStats({
+    companyId: filters.companyId,
+    departmentId: filters.departmentId,
+    positionId: filters.positionId,
+    shiftId: filters.shiftId,
+    compareWithPrevious: true,
+  });
 
   const {
     tableRecords,
     isLoading: tableLoading,
     selectedDate,
     dateRangeLabel,
+    startDate,
+    endDate,
   } = usePdksTableData(filters);
-
-  const handleFiltersChange = (newFilters: {
-    dateRange?: { from?: Date; to?: Date };
-    department?: string;
-    person?: string;
-    reportType?: string;
-  }) => {
-    setFilters({
-      dateRange: newFilters.dateRange,
-      department: newFilters.department,
-      person: newFilters.person,
-      reportType: (newFilters.reportType as "daily" | "weekly" | "monthly" | "custom") ?? "daily",
-    });
-  };
 
   const handleRefreshData = () => {
     handleRefresh();
@@ -69,12 +70,27 @@ export default function PDKSRecords() {
   };
 
   const activeFilterCount =
-    (filters.dateRange?.from ? 1 : 0) +
-    (filters.department && filters.department !== "all" ? 1 : 0) +
-    (filters.person ? 1 : 0) +
-    (filters.reportType && filters.reportType !== "daily" ? 1 : 0);
+    (filters.dateRange.from ? 1 : 0) +
+    (filters.reportType !== "daily" ? 1 : 0) +
+    (filters.companyId ? 1 : 0) +
+    (filters.departmentId ? 1 : 0) +
+    (filters.positionId ? 1 : 0) +
+    (filters.shiftId ? 1 : 0) +
+    (filters.statusFilter !== "all" ? 1 : 0) +
+    (filters.person ? 1 : 0);
 
-  if (loading || statsLoading || tableLoading) {
+  const handleCardClick = useCallback((status: StatusFilter) => {
+    setFilters((f) => ({ ...f, statusFilter: status }));
+  }, []);
+
+  const handleHeatmapCellClick = useCallback(
+    (employeeId: string, date: string) => {
+      setDrilldown({ employeeId: employeeId as Id<"employees">, date });
+    },
+    []
+  );
+
+  if (loading || statsLoading) {
     return <LoadingSpinner text="PDKS kayıtları yükleniyor..." />;
   }
 
@@ -83,9 +99,31 @@ export default function PDKSRecords() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">PDKS Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Personel Devam Kontrol Sistemi
-          </p>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <p className="text-sm text-muted-foreground">
+              Personel Devam Kontrol Sistemi
+            </p>
+            <Badge variant="outline" className="gap-1.5 text-xs">
+              <CalendarIcon className="h-3 w-3" />
+              {dateRangeLabel}
+            </Badge>
+            <Badge variant="secondary" className="text-xs">
+              {tableRecords.length} çalışan
+            </Badge>
+            {filters.statusFilter !== "all" && (
+              <Badge variant="default" className="text-xs gap-1">
+                Filtre: {filters.statusFilter}
+                <button
+                  onClick={() =>
+                    setFilters((f) => ({ ...f, statusFilter: "all" }))
+                  }
+                  className="hover:opacity-70"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -98,7 +136,8 @@ export default function PDKSRecords() {
             <span className="hidden sm:inline">Yenile</span>
           </Button>
           <PDKSMobileDrawer
-            onFiltersChange={handleFiltersChange}
+            values={filters}
+            onChange={setFilters}
             activeFilterCount={activeFilterCount}
           />
           <Button
@@ -114,27 +153,22 @@ export default function PDKSRecords() {
       </div>
 
       <div className="hidden lg:block">
-        <PDKSFilterBar onFiltersChange={handleFiltersChange} />
+        <PDKSFilterBar values={filters} onChange={setFilters} />
       </div>
 
-      <PDKSSummaryCards data={summaryData} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2">
-          <PDKSDashboardWidgets />
-        </div>
-        <div>
-          <PDKSCurrentlyInsideWidget />
-        </div>
-      </div>
+      <PDKSSummaryCards data={summaryData} onCardClick={handleCardClick} />
 
       <Card className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="px-4 py-3 border-b border-border">
-            <TabsList className="grid w-full grid-cols-4 h-10 bg-muted">
+            <TabsList className="grid w-full grid-cols-5 h-10 bg-muted">
               <TabsTrigger value="table" className="flex items-center gap-2 text-xs sm:text-sm">
                 <Table2 className="h-4 w-4" />
                 <span>Tablo</span>
+              </TabsTrigger>
+              <TabsTrigger value="heatmap" className="flex items-center gap-2 text-xs sm:text-sm">
+                <LayoutGrid className="h-4 w-4" />
+                <span>Heatmap</span>
               </TabsTrigger>
               <TabsTrigger value="charts" className="flex items-center gap-2 text-xs sm:text-sm">
                 <BarChart3 className="h-4 w-4" />
@@ -160,6 +194,16 @@ export default function PDKSRecords() {
               />
             </TabsContent>
 
+            <TabsContent value="heatmap" className="mt-0">
+              <PDKSHeatmapView
+                records={tableRecords}
+                loading={tableLoading}
+                startDate={startDate}
+                endDate={endDate}
+                onCellClick={handleHeatmapCellClick}
+              />
+            </TabsContent>
+
             <TabsContent value="charts" className="mt-0">
               <PDKSChartView />
             </TabsContent>
@@ -178,6 +222,15 @@ export default function PDKSRecords() {
           </div>
         </Tabs>
       </Card>
+
+      <PDKSEmployeeDetailDrawer
+        open={drilldown !== null}
+        onOpenChange={(open) => !open && setDrilldown(null)}
+        employeeId={drilldown?.employeeId ?? null}
+        startDate={startDate}
+        endDate={endDate}
+        highlightDate={drilldown?.date}
+      />
 
       <Sheet open={showAiChat} onOpenChange={setShowAiChat}>
         <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">

@@ -1,8 +1,10 @@
-import { query } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id, Doc } from "./_generated/dataModel";
 import { authedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
+
+type AuthedCtx = QueryCtx & { user: Doc<"users"> };
 
 export const getStats = authedQuery({
   args: {
@@ -95,136 +97,214 @@ export const getStats = authedQuery({
   },
 });
 
-export const getPdksStats = authedQuery({
-  args: {},
-  handler: async (ctx) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const today = new Date().toISOString().split("T")[0];
-    const startISO = `${today}T00:00:00.000`;
-    const endISO = `${today}T23:59:59.999`;
+type PdksStatsCore = {
+  totalEmployees: number;
+  presentToday: number;
+  lateArrivals: number;
+  overtimeHours: number;
+  insideBuilding: number;
+  leaveToday: number;
+  devamOrani: number;
+};
 
-    let employees: unknown[] = [];
-    let todayReadings: { employeeId?: unknown; accessTime: string; accessStatus?: string }[] = [];
+async function computePdksStatsForRange(
+  ctx: AuthedCtx,
+  range: { start: string; end: string },
+  filters: {
+    companyId?: Id<"companies">;
+    departmentId?: Id<"departments">;
+    positionId?: Id<"positions">;
+    shiftId?: Id<"shifts">;
+  }
+): Promise<{ core: PdksStatsCore; lateByDept: Map<string, number>; employees: Doc<"employees">[] }> {
+  const allowedProjectIds = await getProjectIdsForUser(ctx);
+  const startISO = range.start;
+  const endISO = range.end;
 
-    if (ctx.user.role === "super_admin") {
-      employees = await ctx.db.query("employees").filter((q) => q.eq(q.field("isActive"), true)).collect();
-      todayReadings = await ctx.db
-        .query("cardReadings")
-        .withIndex("by_access_time")
-        .filter((q) =>
-          q.and(
-            q.gte(q.field("accessTime"), startISO),
-            q.lte(q.field("accessTime"), endISO)
-          )
-        )
-        .collect();
-    } else if (allowedProjectIds.length > 0) {
-      const [empResults, readingResults] = await Promise.all([
-        Promise.all(
-          allowedProjectIds.map((pid) =>
-            ctx.db
-              .query("employees")
-              .withIndex("by_project", (q) => q.eq("projectId", pid))
-              .filter((q) => q.eq(q.field("isActive"), true))
-              .collect()
-          )
-        ),
-        Promise.all(
-          allowedProjectIds.map((pid) =>
-            ctx.db
-              .query("cardReadings")
-              .withIndex("by_project", (q) => q.eq("projectId", pid))
-              .filter((q) =>
-                q.and(
-                  q.gte(q.field("accessTime"), startISO),
-                  q.lte(q.field("accessTime"), endISO)
-                )
-              )
-              .collect()
-          )
-        ),
-      ]);
-      employees = empResults.flat();
-      todayReadings = readingResults.flat();
-    }
+  let employees: Doc<"employees">[] = [];
+  let readings: Doc<"cardReadings">[] = [];
 
-    const empIdsWithEntry = new Set(
-      todayReadings
-        .filter((r) => r.accessStatus === "izin_verildi")
-        .map((r) => r.employeeId ?? r)
-    );
-    const presentSet = new Set<string>();
-    const lateSet = new Set<string>();
-    const empFirstEntry = new Map<string, string>();
-
-    for (const r of todayReadings) {
-      if (r.accessStatus !== "izin_verildi") continue;
-      const key = String(r.employeeId ?? "");
-      if (!empFirstEntry.has(key)) {
-        empFirstEntry.set(key, r.accessTime);
-        presentSet.add(key);
-        const h = new Date(r.accessTime).getHours();
-        const m = new Date(r.accessTime).getMinutes();
-        if (h > 9 || (h === 9 && m > 15)) lateSet.add(key);
-      }
-    }
-
-    const approvedLeaves = await ctx.db
-      .query("leaves")
-      .filter((q) => q.eq(q.field("status"), "approved"))
+  if (ctx.user.role === "super_admin") {
+    employees = await ctx.db
+      .query("employees")
+      .filter((q) => q.eq(q.field("isActive"), true))
       .collect();
-    const leaveToday = approvedLeaves.filter(
-      (l) => today >= l.startDate && today <= l.endDate
-    ).length;
+    readings = await ctx.db
+      .query("cardReadings")
+      .withIndex("by_access_time")
+      .filter((q) =>
+        q.and(
+          q.gte(q.field("accessTime"), startISO),
+          q.lte(q.field("accessTime"), endISO)
+        )
+      )
+      .collect();
+  } else if (allowedProjectIds.length > 0) {
+    const [empResults, readingResults] = await Promise.all([
+      Promise.all(
+        allowedProjectIds.map((pid) =>
+          ctx.db
+            .query("employees")
+            .withIndex("by_project", (q) => q.eq("projectId", pid))
+            .filter((q) => q.eq(q.field("isActive"), true))
+            .collect()
+        )
+      ),
+      Promise.all(
+        allowedProjectIds.map((pid) =>
+          ctx.db
+            .query("cardReadings")
+            .withIndex("by_project", (q) => q.eq("projectId", pid))
+            .filter((q) =>
+              q.and(
+                q.gte(q.field("accessTime"), startISO),
+                q.lte(q.field("accessTime"), endISO)
+              )
+            )
+            .collect()
+        )
+      ),
+    ]);
+    employees = empResults.flat();
+    readings = readingResults.flat();
+  }
 
-    let totalOvertimeMinutes = 0;
-    const empDayReadings = new Map<string, typeof todayReadings>();
-    for (const r of todayReadings) {
-      if (r.accessStatus !== "izin_verildi") continue;
-      const key = String(r.employeeId ?? "");
-      if (!empDayReadings.has(key)) empDayReadings.set(key, []);
-      empDayReadings.get(key)!.push(r);
+  if (filters.companyId) employees = employees.filter((e) => e.companyId === filters.companyId);
+  if (filters.departmentId) employees = employees.filter((e) => e.departmentId === filters.departmentId);
+  if (filters.positionId) employees = employees.filter((e) => e.positionId === filters.positionId);
+  if (filters.shiftId) employees = employees.filter((e) => e.shiftId === filters.shiftId);
+
+  const allowedEmpIds = new Set(employees.map((e) => String(e._id)));
+  const filteredReadings = readings.filter((r) =>
+    r.employeeId ? allowedEmpIds.has(String(r.employeeId)) : true
+  );
+
+  const presentSet = new Set<string>();
+  const lateSet = new Set<string>();
+  const empFirstEntry = new Map<string, string>();
+
+  for (const r of filteredReadings) {
+    if (r.accessStatus !== "izin_verildi") continue;
+    const key = String(r.employeeId ?? "");
+    if (!key) continue;
+    if (!empFirstEntry.has(key)) {
+      empFirstEntry.set(key, r.accessTime);
+      presentSet.add(key);
+      const h = new Date(r.accessTime).getHours();
+      const m = new Date(r.accessTime).getMinutes();
+      if (h > 9 || (h === 9 && m > 15)) lateSet.add(key);
     }
-    for (const dayReadings of empDayReadings.values()) {
-      dayReadings.sort(
-        (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
-      );
-      const first = dayReadings[0];
-      const last = dayReadings[dayReadings.length - 1];
-      if (first !== last) {
-        const diff = new Date(last.accessTime).getTime() - new Date(first.accessTime).getTime();
-        totalOvertimeMinutes += Math.max(0, Math.floor(diff / 60000) - 8 * 60);
-      }
+  }
+
+  const startDate = startISO.split("T")[0];
+  const endDate = endISO.split("T")[0];
+  const approvedLeaves = await ctx.db
+    .query("leaves")
+    .filter((q) => q.eq(q.field("status"), "approved"))
+    .collect();
+  const leaveToday = approvedLeaves.filter(
+    (l) =>
+      allowedEmpIds.has(String(l.employeeId)) &&
+      ((startDate >= l.startDate && startDate <= l.endDate) ||
+        (endDate >= l.startDate && endDate <= l.endDate) ||
+        (l.startDate >= startDate && l.startDate <= endDate))
+  ).length;
+
+  let totalOvertimeMinutes = 0;
+  const empDayReadings = new Map<string, Doc<"cardReadings">[]>();
+  for (const r of filteredReadings) {
+    if (r.accessStatus !== "izin_verildi") continue;
+    const key = String(r.employeeId ?? "");
+    if (!key) continue;
+    if (!empDayReadings.has(key)) empDayReadings.set(key, []);
+    empDayReadings.get(key)!.push(r);
+  }
+  for (const dayReadings of empDayReadings.values()) {
+    dayReadings.sort(
+      (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
+    );
+    const first = dayReadings[0];
+    const last = dayReadings[dayReadings.length - 1];
+    if (first !== last) {
+      const diff = new Date(last.accessTime).getTime() - new Date(first.accessTime).getTime();
+      totalOvertimeMinutes += Math.max(0, Math.floor(diff / 60000) - 8 * 60);
     }
+  }
 
-    const totalEmployees = employees.length;
-    const presentToday = presentSet.size;
-    const devamOrani = totalEmployees > 0 ? Math.round((presentToday / totalEmployees) * 100) : 0;
-
-    const lateByDept = new Map<string, number>();
-    for (const empId of lateSet) {
-      const emp = (employees as { _id: string; departmentId?: string }[]).find(
-        (e) => String(e._id) === empId
-      );
-      if (emp?.departmentId) {
-        const dept = await ctx.db.get(emp.departmentId as Id<"departments">);
-        const name = (dept && "name" in dept ? dept.name : null) ?? "Bilinmiyor";
-        lateByDept.set(name, (lateByDept.get(name) ?? 0) + 1);
-      }
+  const lateByDept = new Map<string, number>();
+  for (const empId of lateSet) {
+    const emp = employees.find((e) => String(e._id) === empId);
+    if (emp?.departmentId) {
+      const dept = await ctx.db.get(emp.departmentId);
+      const name = dept?.name ?? "Bilinmiyor";
+      lateByDept.set(name, (lateByDept.get(name) ?? 0) + 1);
     }
-    const topLateDept = [...lateByDept.entries()]
-      .sort(([, a], [, b]) => b - a)[0];
+  }
 
-    return {
+  const totalEmployees = employees.length;
+  const presentToday = presentSet.size;
+
+  return {
+    core: {
       totalEmployees,
       presentToday,
       lateArrivals: lateSet.size,
       overtimeHours: Math.round((totalOvertimeMinutes / 60) * 10) / 10,
       insideBuilding: presentSet.size,
       leaveToday,
-      devamOrani,
+      devamOrani: totalEmployees > 0 ? Math.round((presentToday / totalEmployees) * 100) : 0,
+    },
+    lateByDept,
+    employees,
+  };
+}
+
+export const getPdksStats = authedQuery({
+  args: {
+    companyId: v.optional(v.id("companies")),
+    departmentId: v.optional(v.id("departments")),
+    positionId: v.optional(v.id("positions")),
+    shiftId: v.optional(v.id("shifts")),
+    compareWithPrevious: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    const today = new Date().toISOString().split("T")[0];
+    const startISO = `${today}T00:00:00.000`;
+    const endISO = `${today}T23:59:59.999`;
+
+    const filters = {
+      companyId: args.companyId,
+      departmentId: args.departmentId,
+      positionId: args.positionId,
+      shiftId: args.shiftId,
+    };
+
+    const current = await computePdksStatsForRange(
+      ctx,
+      { start: startISO, end: endISO },
+      filters
+    );
+
+    const topLateDept = [...current.lateByDept.entries()].sort(([, a], [, b]) => b - a)[0];
+
+    let previous: PdksStatsCore | undefined;
+    if (args.compareWithPrevious) {
+      const yesterday = new Date(`${today}T00:00:00.000Z`);
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+      const prevDate = yesterday.toISOString().split("T")[0];
+      const prev = await computePdksStatsForRange(
+        ctx,
+        { start: `${prevDate}T00:00:00.000`, end: `${prevDate}T23:59:59.999` },
+        filters
+      );
+      previous = prev.core;
+    }
+
+    return {
+      ...current.core,
       topLateDepartment: topLateDept?.[0] ?? "-",
       topLateDepartmentCount: topLateDept?.[1] ?? 0,
+      previous,
     };
   },
 });
