@@ -1,13 +1,11 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
-import { Id } from "../../../../../convex/_generated/dataModel";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
 export const useGeneralSettings = () => {
   const { toast } = useToast();
-  const { projectIds } = useProjectAccess();
-  const projectId = projectIds[0] as Id<"projects"> | undefined;
+  const { projectId } = useActiveProject();
 
   const settings = useQuery(api.settings.getGeneral, { projectId });
   const upsertGeneral = useMutation(api.settings.upsertGeneral);

@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { authedMutation } from "./lib/customFunctions";
+import { limiter } from "./lib/rateLimit";
+import { requireSetupSecret } from "./lib/auth";
 
 /**
  * Yeni kayıt olan kullanıcı için otomatik proje oluşturur.
@@ -17,12 +19,10 @@ export const ensureProjectForNewUser = authedMutation({
   handler: async (ctx) => {
     const user = ctx.user;
 
-    // super_admin zaten tüm projelere erişir
     if (user.role === "super_admin") {
       return null;
     }
 
-    // Kullanıcının projesi var mı?
     const existing = await ctx.db
       .query("userProjects")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
@@ -31,6 +31,11 @@ export const ensureProjectForNewUser = authedMutation({
     if (existing) {
       return null;
     }
+
+    await limiter.limit(ctx, "register", {
+      key: user.email ?? user._id,
+      throws: true,
+    });
 
     // Proje adı: kullanıcı adı veya email
     const projectName =
@@ -86,10 +91,7 @@ export const assignProjectsToExistingUsers = mutation({
     errors: v.array(v.string()),
   }),
   handler: async (ctx, args) => {
-    const expectedSecret = process.env.ADMIN_SETUP_SECRET;
-    if (!expectedSecret || args.secret !== expectedSecret) {
-      throw new Error("Geçersiz gizli kod");
-    }
+    requireSetupSecret(args.secret);
 
     const users = await ctx.db.query("users").collect();
     const result = { processed: 0, created: 0, skipped: 0, errors: [] as string[] };

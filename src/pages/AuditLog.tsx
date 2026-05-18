@@ -1,9 +1,9 @@
 import { Fragment, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText } from "lucide-react";
 
 const ACTION_LABELS: Record<string, { label: string; cls: string }> = {
   create: { label: "Oluştur", cls: "bg-green-100 text-green-800" },
@@ -52,8 +52,7 @@ function formatJson(value: unknown): string {
 
 export default function AuditLog() {
   const { profile } = useAuth();
-  const { projectIds, loading } = useProjectAccess();
-  const projectId = projectIds[0];
+  const { projectId, loading } = useActiveProject();
 
   const [targetTable, setTargetTable] = useState<string>("all");
   const [startDate, setStartDate] = useState("");
@@ -98,79 +97,69 @@ export default function AuditLog() {
   }
 
   return (
-    <div className="space-y-6 p-6 bg-muted/50 min-h-screen">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Denetim Kaydı</h1>
-        <p className="text-muted-foreground mt-2">
-          Sistemdeki tüm değişikliklerin kim, ne zaman, neyi yaptığını gösterir.
-        </p>
-      </div>
+    <div className="space-y-3">
+      <div className="rounded-xl border bg-card shadow-xs p-4 md:p-6">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 mr-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+              <FileText className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold leading-tight">Denetim Kaydı</h2>
+              <p className="text-xs text-muted-foreground">
+                {visibleRows.length} kayıt gösteriliyor
+              </p>
+            </div>
+          </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Filtre</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-            <div className="space-y-2">
-              <Label htmlFor="target">Hedef Tablo</Label>
-              <Select value={targetTable} onValueChange={setTargetTable}>
-                <SelectTrigger id="target">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tümü</SelectItem>
-                  {(tables ?? []).map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {TABLE_LABELS[t] ?? t}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="start">Başlangıç</Label>
-              <Input
-                id="start"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="end">Bitiş</Label>
-              <Input
-                id="end"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
-            </div>
+          <div className="flex items-center gap-2 ml-auto flex-wrap">
+            <Select value={targetTable} onValueChange={setTargetTable}>
+              <SelectTrigger id="target" className="w-[160px] h-8 text-xs">
+                <SelectValue placeholder="Hedef Tablo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs">Tüm Tablolar</SelectItem>
+                {(tables ?? []).map((t) => (
+                  <SelectItem key={t} value={t} className="text-xs">
+                    {TABLE_LABELS[t] ?? t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              id="start"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="h-8 w-[130px] text-xs"
+              aria-label="Başlangıç"
+            />
+            <Input
+              id="end"
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="h-8 w-[130px] text-xs"
+              aria-label="Bitiş"
+            />
             <Button
               variant="outline"
+              size="sm"
               onClick={() => {
                 setTargetTable("all");
                 setStartDate("");
                 setEndDate("");
               }}
+              className="h-8 gap-1.5 text-xs"
             >
-              Filtreyi Temizle
+              Temizle
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            Kayıtlar
-            <span className="ml-2 text-sm font-normal text-muted-foreground">
-              ({visibleRows.length})
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
+      <div className="rounded-xl border bg-card shadow-xs overflow-hidden">
+        <Table>
             <TableHeader>
               <TableRow>
                 <TableHead className="w-10"></TableHead>
@@ -263,8 +252,7 @@ export default function AuditLog() {
               )}
             </TableBody>
           </Table>
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 }

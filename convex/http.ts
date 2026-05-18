@@ -35,24 +35,33 @@ http.route({
     try {
       const contentType = request.headers.get("Content-Type");
       const raw = await request.text();
-      const { user_id, serial, deviceIp, bodyForLog } = parseCardReaderBody(
-        raw,
-        contentType
-      );
-
-      const accessEvent =
-        (bodyForLog as Record<string, unknown>).AccessControllerEvent as
-          | Record<string, unknown>
-          | undefined;
-      const subEventType = accessEvent?.subEventType;
-      const dateTime =
-        (bodyForLog as Record<string, unknown>).dateTime as string | undefined;
+      const parsed = parseCardReaderBody(raw, contentType);
+      const {
+        user_id,
+        serial,
+        deviceIp,
+        hikDevIndex,
+        hikMajorEventType,
+        hikSubEventType,
+        hikCurrentVerifyMode,
+        hikSerialNo,
+        hikFrontSerialNo,
+        hikDateTime,
+        hikPictureURL,
+        hikMask,
+        hikHelmet,
+        hikTemperature,
+        hikEventState,
+        hikEhomeID,
+      } = parsed;
 
       // Her POST'ta (heartbeat dahil) lastSeen güncelle — cihaz "online" görünsün
-      if (serial || deviceIp) {
+      if (serial || deviceIp || hikDevIndex || hikEhomeID) {
         await ctx.runMutation(internal.devices.updateLastSeen, {
           deviceSerial: serial ?? undefined,
           deviceIp: deviceIp ?? undefined,
+          hikDevIndex: hikDevIndex ?? undefined,
+          ehomeID: hikEhomeID ?? undefined,
         });
       }
 
@@ -67,8 +76,11 @@ http.route({
         cardNo: user_id,
         serial: serial ?? "(yok)",
         deviceIp: deviceIp ?? "(yok)",
-        subEventType: subEventType ?? "(yok)",
-        dateTime: dateTime ?? "(yok)",
+        hikDevIndex: hikDevIndex ?? "(yok)",
+        major: hikMajorEventType ?? "(yok)",
+        sub: hikSubEventType ?? "(yok)",
+        verifyMode: hikCurrentVerifyMode ?? "(yok)",
+        dateTime: hikDateTime ?? "(yok)",
       });
 
       const result = await ctx.runMutation(
@@ -78,6 +90,19 @@ http.route({
           deviceSerial: serial ?? "",
           deviceIp: deviceIp ?? undefined,
           rawBody: raw.length > 10000 ? raw.slice(0, 10000) : raw,
+          hikDevIndex: hikDevIndex ?? undefined,
+          hikEhomeID: hikEhomeID ?? undefined,
+          hikMajorEventType: hikMajorEventType ?? undefined,
+          hikSubEventType: hikSubEventType ?? undefined,
+          hikCurrentVerifyMode: hikCurrentVerifyMode ?? undefined,
+          hikSerialNo: hikSerialNo ?? undefined,
+          hikFrontSerialNo: hikFrontSerialNo ?? undefined,
+          hikDateTime: hikDateTime ?? undefined,
+          hikPictureURL: hikPictureURL ?? undefined,
+          hikMask: hikMask ?? undefined,
+          hikHelmet: hikHelmet ?? undefined,
+          hikTemperature: hikTemperature ?? undefined,
+          hikEventState: hikEventState ?? undefined,
         }
       );
 

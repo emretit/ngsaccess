@@ -6,7 +6,6 @@ import {
   FileText,
   CalendarClock,
   Palmtree,
-  UserCircle,
   Settings,
   ClipboardList,
 } from "lucide-react";
@@ -31,7 +30,6 @@ const navItems: NavItem[] = [
   { name: "PDKS Kayıtları", href: "/pdks-records", icon: FileText },
   { name: "Vardiyalar", href: "/shifts", icon: CalendarClock },
   { name: "İzinler", href: "/leaves", icon: Palmtree },
-  { name: "Çalışan Portalı", href: "/employee-portal", icon: UserCircle },
   { name: "Denetim Kaydı", href: "/audit-log", icon: ClipboardList, adminOnly: true },
   { name: "Ayarlar", href: "/settings", icon: Settings },
 ];

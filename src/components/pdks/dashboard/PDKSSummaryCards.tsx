@@ -1,15 +1,13 @@
 import { Users, UserCheck, Clock, Timer, Building, Palmtree, ArrowUp, ArrowDown, Minus } from "lucide-react";
+import { Line, LineChart, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
 import type { StatusFilter } from "./PDKSFilterBar";
 
-interface PreviousData {
-  totalEmployees: number;
-  presentToday: number;
-  lateArrivals: number;
-  overtimeHours: number;
-  insideBuilding: number;
-  leaveToday: number;
-  devamOrani: number;
+interface PreviousSeries {
+  presentToday: number[];
+  lateArrivals: number[];
+  overtimeHours: number[];
+  leaveToday: number[];
 }
 
 interface SummaryData {
@@ -22,7 +20,7 @@ interface SummaryData {
   devamOrani?: number;
   topLateDepartment?: string;
   topLateDepartmentCount?: number;
-  previous?: PreviousData;
+  previousSeries?: PreviousSeries;
 }
 
 interface PDKSSummaryCardsProps {
@@ -30,15 +28,53 @@ interface PDKSSummaryCardsProps {
   onCardClick?: (statusFilter: StatusFilter) => void;
 }
 
+function Sparkline({
+  series,
+  current,
+  invertColor,
+}: {
+  series?: number[];
+  current: number;
+  invertColor?: boolean;
+}) {
+  if (!series || series.length === 0) return null;
+  const data = [...series, current].map((v, i) => ({ x: i, y: v }));
+  const start = series[0] ?? 0;
+  const isUp = current > start;
+  const isPositive = invertColor ? !isUp : isUp;
+  const stroke = current === start
+    ? "var(--muted-foreground)"
+    : isPositive
+      ? "#059669"
+      : "#e11d48";
+  return (
+    <div className="h-6 w-14 shrink-0">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
+          <Line
+            type="monotone"
+            dataKey="y"
+            stroke={stroke}
+            strokeWidth={1.5}
+            dot={false}
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 function TrendBadge({
   current,
-  previous,
+  series,
   invertColor,
 }: {
   current: number;
-  previous?: number;
+  series?: number[];
   invertColor?: boolean;
 }) {
+  const previous = series?.[series.length - 1];
   if (previous === undefined) return null;
   if (current === previous) {
     return (
@@ -72,7 +108,9 @@ export function PDKSSummaryCards({ data, onCardClick }: PDKSSummaryCardsProps) {
     color: string;
     sub?: string;
     statusFilter?: StatusFilter;
-    trend?: { current: number; previous?: number; invertColor?: boolean };
+    current?: number;
+    invertColor?: boolean;
+    series?: number[];
   }> = [
     {
       title: "Toplam Çalışan",
@@ -87,7 +125,8 @@ export function PDKSSummaryCards({ data, onCardClick }: PDKSSummaryCardsProps) {
       color: "text-emerald-600",
       sub: `%${data.devamOrani ?? 0}`,
       statusFilter: "present",
-      trend: { current: data.presentToday, previous: data.previous?.presentToday },
+      current: data.presentToday,
+      series: data.previousSeries?.presentToday,
     },
     {
       title: "Geç Kalanlar",
@@ -99,11 +138,9 @@ export function PDKSSummaryCards({ data, onCardClick }: PDKSSummaryCardsProps) {
           ? `${data.topLateDepartment} (${data.topLateDepartmentCount})`
           : undefined,
       statusFilter: "late",
-      trend: {
-        current: data.lateArrivals,
-        previous: data.previous?.lateArrivals,
-        invertColor: true,
-      },
+      current: data.lateArrivals,
+      invertColor: true,
+      series: data.previousSeries?.lateArrivals,
     },
     {
       title: "Mesai",
@@ -111,7 +148,8 @@ export function PDKSSummaryCards({ data, onCardClick }: PDKSSummaryCardsProps) {
       icon: Timer,
       color: "text-purple-600",
       statusFilter: "overtime",
-      trend: { current: data.overtimeHours, previous: data.previous?.overtimeHours },
+      current: data.overtimeHours,
+      series: data.previousSeries?.overtimeHours,
     },
     {
       title: "İzindeki",
@@ -119,7 +157,8 @@ export function PDKSSummaryCards({ data, onCardClick }: PDKSSummaryCardsProps) {
       icon: Palmtree,
       color: "text-amber-600",
       statusFilter: "leave",
-      trend: { current: data.leaveToday ?? 0, previous: data.previous?.leaveToday },
+      current: data.leaveToday ?? 0,
+      series: data.previousSeries?.leaveToday,
     },
     {
       title: "İçeride",
@@ -168,11 +207,11 @@ export function PDKSSummaryCards({ data, onCardClick }: PDKSSummaryCardsProps) {
                 <span className="text-lg font-semibold tabular-nums text-foreground leading-none">
                   {stat.value}
                 </span>
-                {stat.trend && (
+                {stat.current !== undefined && (
                   <TrendBadge
-                    current={stat.trend.current}
-                    previous={stat.trend.previous}
-                    invertColor={stat.trend.invertColor}
+                    current={stat.current}
+                    series={stat.series}
+                    invertColor={stat.invertColor}
                   />
                 )}
                 {stat.sub && (
@@ -182,6 +221,13 @@ export function PDKSSummaryCards({ data, onCardClick }: PDKSSummaryCardsProps) {
                 )}
               </div>
             </div>
+            {stat.series && stat.current !== undefined && (
+              <Sparkline
+                series={stat.series}
+                current={stat.current}
+                invertColor={stat.invertColor}
+              />
+            )}
           </button>
         );
       })}

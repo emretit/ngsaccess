@@ -80,7 +80,7 @@ export const setupCardAndDevice = internalMutation({
         description: "Test amaçlı: 7/24 tüm cihazlara erişim",
         startTime: "00:00",
         endTime: "23:59",
-        days: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+        days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
         priority: 100,
         isActive: true,
         createdAt: now,

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -40,8 +40,7 @@ const holidaySchema = z.object({
 });
 
 export function HolidayCalendarManager() {
-  const { projectIds, loading: projectLoading } = useProjectAccess();
-  const projectId = projectIds[0];
+  const { projectId, loading: projectLoading } = useActiveProject();
   const { toast } = useToast();
 
   const [year, setYear] = useState(new Date().getFullYear());
@@ -90,10 +89,15 @@ export function HolidayCalendarManager() {
   const handleSeed = async () => {
     setSeeding(true);
     try {
-      const result = await seed({ projectId, years: [2026, 2027] });
+      const result = await seed({ projectId, years: [year] });
+      const missing = result.missingReligiousYears ?? [];
+      const missingMsg =
+        missing.length > 0
+          ? ` (${missing.join(", ")} için dini tatil tablosu yok — manuel girin)`
+          : "";
       toast({
-        title: "TR resmi tatilleri yüklendi",
-        description: `${result.inserted} yeni eklendi, ${result.skipped} mevcut.`,
+        title: `${year} TR resmi tatilleri yüklendi`,
+        description: `${result.inserted} yeni eklendi, ${result.skipped} mevcut.${missingMsg}`,
       });
     } catch (e) {
       toast({
@@ -148,7 +152,7 @@ export function HolidayCalendarManager() {
             ) : (
               <Sparkles className="mr-2 h-4 w-4" />
             )}
-            TR Tatillerini Yükle (2026-2027)
+            {year} Tatillerini Otomatik Doldur
           </Button>
         </div>
       </CardHeader>

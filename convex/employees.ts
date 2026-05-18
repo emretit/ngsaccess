@@ -1,9 +1,11 @@
 import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
+import { api } from "./_generated/api";
 import { authedQuery, adminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import { Doc, Id } from "./_generated/dataModel";
-import { QueryCtx } from "./_generated/server";
+import { MutationCtx, QueryCtx } from "./_generated/server";
+import { cascadeRemoveEmployeePII } from "./lib/employeeCascade";
 
 type DuplicateField = "cardNumber" | "email" | "tcNo";
 
@@ -31,6 +33,32 @@ const DUPLICATE_MESSAGES: Record<DuplicateField, string> = {
   email: "Bu e-posta adresi başka bir personelde kullanılıyor",
   tcNo: "Bu TC kimlik numarası başka bir personelde kullanılıyor",
 };
+
+// Form add-only: dropdown sadece eklemek için; var olan diğer kuralları silmez
+// (Erişim Yönetimi sayfası bunun için). Returns true if a new row was inserted.
+async function upsertGroupMembership(
+  ctx: MutationCtx,
+  employeeId: Id<"employees">,
+  accessRuleId: Id<"accessRules"> | undefined,
+  projectId: Id<"projects"> | undefined,
+): Promise<boolean> {
+  if (!accessRuleId) return false;
+  const existing = await ctx.db
+    .query("groupMembers")
+    .withIndex("by_project_employee", (q) =>
+      q.eq("projectId", projectId).eq("employeeId", employeeId),
+    )
+    .filter((q) => q.eq(q.field("groupId"), accessRuleId))
+    .first();
+  if (existing) return false;
+  await ctx.db.insert("groupMembers", {
+    groupId: accessRuleId,
+    employeeId,
+    projectId,
+    createdAt: new Date().toISOString(),
+  });
+  return true;
+}
 
 export const list = authedQuery({
   args: {
@@ -76,6 +104,32 @@ export const list = authedQuery({
         };
       })
     );
+  },
+});
+
+export const listLightForImport = authedQuery({
+  args: {},
+  handler: async (ctx) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const employees =
+      ctx.user.role === "super_admin"
+        ? await ctx.db.query("employees").collect()
+        : (
+            await Promise.all(
+              allowedProjectIds.map((pid) =>
+                ctx.db
+                  .query("employees")
+                  .withIndex("by_project", (q) => q.eq("projectId", pid))
+                  .collect(),
+              ),
+            )
+          ).flat();
+    return employees.map((e) => ({
+      _id: String(e._id),
+      tcNo: e.tcNo ?? "",
+      firstName: e.firstName,
+      lastName: e.lastName,
+    }));
   },
 });
 
@@ -136,6 +190,8 @@ export const create = adminMutation({
     isActive: v.optional(v.boolean()),
     notes: v.optional(v.string()),
     shift: v.optional(v.string()),
+    hourlyRate: v.optional(v.number()),
+    monthlySalary: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     if (args.projectId) {
@@ -153,12 +209,18 @@ export const create = adminMutation({
     }
 
     const now = new Date().toISOString();
-    return await ctx.db.insert("employees", {
+    const id = await ctx.db.insert("employees", {
       ...args,
       isActive: args.isActive ?? true,
       createdAt: now,
       updatedAt: now,
     });
+    await upsertGroupMembership(ctx, id, args.accessRuleId, args.projectId);
+    // DB import gibi UI dışı insert akışlarında da push tetiklensin diye burada (idempotent).
+    await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+      employeeId: id,
+    });
+    return id;
   },
   returns: v.id("employees"),
 });
@@ -182,6 +244,8 @@ export const update = adminMutation({
     isActive: v.optional(v.boolean()),
     notes: v.optional(v.string()),
     shift: v.optional(v.string()),
+    hourlyRate: v.optional(v.number()),
+    monthlySalary: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const { employeeId, ...updates } = args;
@@ -216,6 +280,23 @@ export const update = adminMutation({
       if (val !== undefined) clean[k] = val;
     }
     await ctx.db.patch(employeeId, clean);
+
+    const groupMemberAdded = await upsertGroupMembership(
+      ctx,
+      employeeId,
+      updates.accessRuleId,
+      emp.projectId,
+    );
+
+    const cardChanged =
+      updates.cardNumber !== undefined && updates.cardNumber !== emp.cardNumber;
+    const activeChanged =
+      updates.isActive !== undefined && updates.isActive !== emp.isActive;
+    if (cardChanged || activeChanged || groupMemberAdded) {
+      await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+        employeeId,
+      });
+    }
     return employeeId;
   },
   returns: v.id("employees"),
@@ -233,9 +314,18 @@ export const remove = adminMutation({
     ) {
       throw new Error("Bu çalışana erişim yetkiniz yok");
     }
+    // Önce cihazlardan sil (employeeId bilgisi gerektiği için DB silinmeden çağrılır).
+    await ctx.scheduler.runAfter(
+      0,
+      api.actions.hikvisionSync.deleteEmployeeFromDevices,
+      { employeeId: args.employeeId },
+    );
+
     const groupMembers = await ctx.db
       .query("groupMembers")
-      .withIndex("by_employee", (q) => q.eq("employeeId", args.employeeId))
+      .withIndex("by_project_employee", (q) =>
+        q.eq("projectId", emp.projectId).eq("employeeId", args.employeeId),
+      )
       .collect();
     await Promise.all(groupMembers.map((gm) => ctx.db.delete(gm._id)));
 
@@ -251,6 +341,15 @@ export const remove = adminMutation({
       .collect();
     await Promise.all(employeeSessions.map((s) => ctx.db.delete(s._id)));
 
+    const shiftAssignments = await ctx.db
+      .query("shiftAssignments")
+      .withIndex("by_employee", (q) => q.eq("employeeId", args.employeeId))
+      .collect();
+    await Promise.all(shiftAssignments.map((a) => ctx.db.delete(a._id)));
+
+    // KVKK cascade: biyometrik veri sil, rıza iptal, cardReadings PII anonimleştir
+    await cascadeRemoveEmployeePII(ctx, args.employeeId);
+
     await ctx.db.delete(args.employeeId);
   },
   returns: v.null(),
@@ -260,19 +359,30 @@ export const bulkDelete = adminMutation({
   args: { employeeIds: v.array(v.id("employees")) },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    for (const id of args.employeeIds) {
-      const emp = await ctx.db.get(id);
+    const employees = await Promise.all(
+      args.employeeIds.map((id) => ctx.db.get(id)),
+    );
+    for (const emp of employees) {
       if (emp && emp.projectId && !allowedProjectIds.some((pid) => pid === emp.projectId)) {
         throw new Error(`Çalışan ${emp.firstName} ${emp.lastName} için erişim yetkiniz yok`);
       }
     }
     await Promise.all(
-      args.employeeIds.map(async (id) => {
+      employees.map(async (emp, idx) => {
+        const id = args.employeeIds[idx];
         const groupMembers = await ctx.db
           .query("groupMembers")
-          .withIndex("by_employee", (q) => q.eq("employeeId", id))
+          .withIndex("by_project_employee", (q) =>
+            q.eq("projectId", emp?.projectId).eq("employeeId", id),
+          )
           .collect();
         await Promise.all(groupMembers.map((gm) => ctx.db.delete(gm._id)));
+        const shiftAssignments = await ctx.db
+          .query("shiftAssignments")
+          .withIndex("by_employee", (q) => q.eq("employeeId", id))
+          .collect();
+        await Promise.all(shiftAssignments.map((a) => ctx.db.delete(a._id)));
+        await cascadeRemoveEmployeePII(ctx, id);
         await ctx.db.delete(id);
       })
     );

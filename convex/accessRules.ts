@@ -1,4 +1,5 @@
-import { mutation, query } from "./_generated/server";
+
+import { api } from "./_generated/api";
 import { v } from "convex/values";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
@@ -36,7 +37,9 @@ export const list = authedQuery({
       rules.map(async (rule) => {
         const groupMembers = await ctx.db
           .query("groupMembers")
-          .withIndex("by_group", (q) => q.eq("groupId", rule._id))
+          .withIndex("by_project_group", (q) =>
+            q.eq("projectId", rule.projectId).eq("groupId", rule._id),
+          )
           .collect();
 
         const membersWithEmployees = await Promise.all(
@@ -58,7 +61,9 @@ export const list = authedQuery({
 
         const groupDevices = await ctx.db
           .query("groupDevices")
-          .withIndex("by_group", (q) => q.eq("groupId", rule._id))
+          .withIndex("by_project_group", (q) =>
+            q.eq("projectId", rule.projectId).eq("groupId", rule._id),
+          )
           .collect();
 
         const devicesWithDetails = await Promise.all(
@@ -147,6 +152,18 @@ export const update = authedMutation({
       if (v !== undefined) clean[k] = v;
     }
     await ctx.db.patch(ruleId, clean);
+
+    // Plan-ilişkili alanlardan biri değiştiyse week plan'ı cihazlara yeniden yaz.
+    const planAffected =
+      updates.startTime !== undefined ||
+      updates.endTime !== undefined ||
+      updates.days !== undefined ||
+      updates.isActive !== undefined;
+    if (planAffected) {
+      await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncWeekPlanToDevices, {
+        accessRuleId: ruleId,
+      });
+    }
     return ruleId;
   },
 });
@@ -162,17 +179,32 @@ export const remove = authedMutation({
     }
     const members = await ctx.db
       .query("groupMembers")
-      .withIndex("by_group", (q) => q.eq("groupId", args.ruleId))
+      .withIndex("by_project_group", (q) =>
+        q.eq("projectId", rule.projectId).eq("groupId", args.ruleId),
+      )
       .collect();
+    const affectedEmployeeIds = members.map((m) => m.employeeId);
     await Promise.all(members.map((m) => ctx.db.delete(m._id)));
 
     const devices = await ctx.db
       .query("groupDevices")
-      .withIndex("by_group", (q) => q.eq("groupId", args.ruleId))
+      .withIndex("by_project_group", (q) =>
+        q.eq("projectId", rule.projectId).eq("groupId", args.ruleId),
+      )
       .collect();
     await Promise.all(devices.map((d) => ctx.db.delete(d._id)));
 
     await ctx.db.delete(args.ruleId);
+
+    // Etkilenen üyeleri yeniden sync et — kalan kurallarına göre RightPlan
+    // güncellensin, hiç kuralı kalmadıysa cihazdan sökülecek (Phase 5 reconcile).
+    await Promise.all(
+      affectedEmployeeIds.map((empId) =>
+        ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+          employeeId: empId,
+        }),
+      ),
+    );
   },
 });
 
@@ -231,6 +263,20 @@ export const createWithGroups = authedMutation({
       );
     }
 
+    const syncJobs: Promise<unknown>[] = [
+      ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncWeekPlanToDevices, {
+        accessRuleId: ruleId,
+      }),
+    ];
+    for (const empId of employeeIds ?? []) {
+      syncJobs.push(
+        ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+          employeeId: empId,
+        }),
+      );
+    }
+    await Promise.all(syncJobs);
+
     return ruleId;
   },
 });
@@ -261,7 +307,7 @@ export const updateWithGroups = authedMutation({
     if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
-    const { ruleId, employeeIds, deviceIds, projectId, ...updates } = args;
+    const { ruleId, employeeIds, deviceIds, projectId: _ignoredProjectId, ...updates } = args;
     const now = new Date().toISOString();
     const clean: Record<string, unknown> = { updatedAt: now };
     for (const [k, v] of Object.entries(updates)) {
@@ -272,7 +318,9 @@ export const updateWithGroups = authedMutation({
     if (employeeIds !== undefined) {
       const existing = await ctx.db
         .query("groupMembers")
-        .withIndex("by_group", (q) => q.eq("groupId", ruleId))
+        .withIndex("by_project_group", (q) =>
+          q.eq("projectId", rule.projectId).eq("groupId", ruleId),
+        )
         .collect();
       await Promise.all(existing.map((m) => ctx.db.delete(m._id)));
       await Promise.all(
@@ -280,7 +328,7 @@ export const updateWithGroups = authedMutation({
           ctx.db.insert("groupMembers", {
             groupId: ruleId,
             employeeId: empId,
-            projectId,
+            projectId: rule.projectId,
             createdAt: now,
           })
         )
@@ -290,7 +338,9 @@ export const updateWithGroups = authedMutation({
     if (deviceIds !== undefined) {
       const existing = await ctx.db
         .query("groupDevices")
-        .withIndex("by_group", (q) => q.eq("groupId", ruleId))
+        .withIndex("by_project_group", (q) =>
+          q.eq("projectId", rule.projectId).eq("groupId", ruleId),
+        )
         .collect();
       await Promise.all(existing.map((d) => ctx.db.delete(d._id)));
       await Promise.all(
@@ -298,12 +348,28 @@ export const updateWithGroups = authedMutation({
           ctx.db.insert("groupDevices", {
             groupId: ruleId,
             deviceId: devId,
-            projectId,
+            projectId: rule.projectId,
             createdAt: now,
           })
         )
       );
     }
+
+    const syncJobs: Promise<unknown>[] = [
+      ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncWeekPlanToDevices, {
+        accessRuleId: ruleId,
+      }),
+    ];
+    if (employeeIds !== undefined) {
+      for (const empId of employeeIds) {
+        syncJobs.push(
+          ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+            employeeId: empId,
+          }),
+        );
+      }
+    }
+    await Promise.all(syncJobs);
 
     return ruleId;
   },
@@ -323,10 +389,14 @@ export const addGroupMember = authedMutation({
     if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
       throw new Error("Bu gruba erişim yetkiniz yok");
     }
-    return await ctx.db.insert("groupMembers", {
+    const id = await ctx.db.insert("groupMembers", {
       ...args,
       createdAt: new Date().toISOString(),
     });
+    await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+      employeeId: args.employeeId,
+    });
+    return id;
   },
 });
 
@@ -339,7 +409,11 @@ export const removeGroupMember = authedMutation({
     if (member.projectId && !allowedProjectIds.some((id) => id === member.projectId)) {
       throw new Error("Bu üyeye erişim yetkiniz yok");
     }
+    const employeeId = member.employeeId;
     await ctx.db.delete(args.memberId);
+    await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.deleteEmployeeFromDevices, {
+      employeeId,
+    });
   },
 });
 
@@ -357,10 +431,15 @@ export const addGroupDevice = authedMutation({
     if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
       throw new Error("Bu gruba erişim yetkiniz yok");
     }
-    return await ctx.db.insert("groupDevices", {
+    const id = await ctx.db.insert("groupDevices", {
       ...args,
       createdAt: new Date().toISOString(),
     });
+    // Bu gruba bağlı tüm çalışanları yeni cihaza sync et + week-plan'ı cihaza yaz.
+    await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncWeekPlanToDevices, {
+      accessRuleId: args.groupId,
+    });
+    return id;
   },
 });
 
@@ -374,5 +453,22 @@ export const removeGroupDevice = authedMutation({
       throw new Error("Bu kayda erişim yetkiniz yok");
     }
     await ctx.db.delete(args.groupDeviceId);
+
+    // Bu gruba bağlı üyeleri yeniden sync — diğer kurallarla cihazda kalabilirler.
+    // Tam söküm (kişi bu cihazda artık hiçbir kuralla yoksa cihazdan sil) Phase 5
+    // reconcile cron'da. Şimdilik üyelerin RightPlan'ı güncel olsun.
+    const members = await ctx.db
+      .query("groupMembers")
+      .withIndex("by_project_group", (q) =>
+        q.eq("projectId", gd.projectId).eq("groupId", gd.groupId),
+      )
+      .collect();
+    await Promise.all(
+      members.map((m) =>
+        ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+          employeeId: m.employeeId,
+        }),
+      ),
+    );
   },
 });

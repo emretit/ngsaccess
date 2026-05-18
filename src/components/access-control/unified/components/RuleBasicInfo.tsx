@@ -1,7 +1,5 @@
-
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 interface RuleBasicInfoFormData {
   name: string;
@@ -15,8 +13,8 @@ interface RuleBasicInfoProps<T extends RuleBasicInfoFormData = RuleBasicInfoForm
 
 export const RuleBasicInfo = <T extends RuleBasicInfoFormData,>({ formData, setFormData }: RuleBasicInfoProps<T>) => {
   return (
-    <div className="grid grid-cols-1 gap-4">
-      <div className="space-y-2">
+    <div className="grid gap-x-6 gap-y-3 md:grid-cols-2">
+      <div className="space-y-1.5">
         <Label htmlFor="name">Kural Adı</Label>
         <Input
           id="name"
@@ -27,14 +25,13 @@ export const RuleBasicInfo = <T extends RuleBasicInfoFormData,>({ formData, setF
         />
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <Label htmlFor="description">Açıklama</Label>
-        <Textarea
+        <Input
           id="description"
           value={formData.description}
           onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
           placeholder="Kural açıklaması (opsiyonel)"
-          rows={3}
         />
       </div>
     </div>

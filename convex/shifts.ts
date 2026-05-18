@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+
 import { v } from "convex/values";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
@@ -56,6 +56,7 @@ export const assignShift = authedMutation({
     startDate: v.string(),
     endDate: v.string(),
     weekPattern: v.optional(v.array(v.string())),
+    forceConfirm: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -70,9 +71,25 @@ export const assignShift = authedMutation({
     if (!shift || (shift.projectId && !allowedProjectIds.some((id) => id === shift.projectId))) {
       throw new Error("Bu vardiyaya erişim yetkiniz yok");
     }
+    if (args.startDate > args.endDate) {
+      throw new Error("Bitiş tarihi başlangıçtan önce olamaz");
+    }
+    if (!args.forceConfirm) {
+      const existing = await ctx.db
+        .query("shiftAssignments")
+        .withIndex("by_employee", (q) => q.eq("employeeId", args.employeeId))
+        .collect();
+      const overlapCount = existing.filter(
+        (a) => a.startDate <= args.endDate && a.endDate >= args.startDate,
+      ).length;
+      if (overlapCount > 0) {
+        throw new Error(`OVERLAP:${overlapCount}`);
+      }
+    }
     const now = new Date().toISOString();
+    const { forceConfirm: _force, ...rest } = args;
     return await ctx.db.insert("shiftAssignments", {
-      ...args,
+      ...rest,
       createdAt: now,
       updatedAt: now,
     });
@@ -86,6 +103,7 @@ export const updateAssignment = authedMutation({
     endDate: v.optional(v.string()),
     shiftId: v.optional(v.id("shifts")),
     weekPattern: v.optional(v.array(v.string())),
+    forceConfirm: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -94,12 +112,105 @@ export const updateAssignment = authedMutation({
     if (assignment.projectId && !allowedProjectIds.some((id) => id === assignment.projectId)) {
       throw new Error("Bu atamaya erişim yetkiniz yok");
     }
-    const { assignmentId, ...updates } = args;
+    const nextStart = args.startDate ?? assignment.startDate;
+    const nextEnd = args.endDate ?? assignment.endDate;
+    if (nextStart > nextEnd) {
+      throw new Error("Bitiş tarihi başlangıçtan önce olamaz");
+    }
+    if (!args.forceConfirm && (args.startDate !== undefined || args.endDate !== undefined)) {
+      const existing = await ctx.db
+        .query("shiftAssignments")
+        .withIndex("by_employee", (q) => q.eq("employeeId", assignment.employeeId))
+        .collect();
+      const overlapCount = existing.filter(
+        (a) =>
+          a._id !== assignment._id &&
+          a.startDate <= nextEnd &&
+          a.endDate >= nextStart,
+      ).length;
+      if (overlapCount > 0) {
+        throw new Error(`OVERLAP:${overlapCount}`);
+      }
+    }
+    const { assignmentId, forceConfirm: _force, ...updates } = args;
     const clean: Record<string, unknown> = { updatedAt: new Date().toISOString() };
     for (const [k, val] of Object.entries(updates)) {
       if (val !== undefined) clean[k] = val;
     }
     await ctx.db.patch(assignmentId, clean);
+  },
+});
+
+export const bulkAssignShift = authedMutation({
+  args: {
+    employeeIds: v.array(v.id("employees")),
+    shiftId: v.id("shifts"),
+    startDate: v.string(),
+    endDate: v.string(),
+    weekPattern: v.optional(v.array(v.string())),
+    forceConfirm: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    if (args.startDate > args.endDate) {
+      throw new Error("Bitiş tarihi başlangıçtan önce olamaz");
+    }
+    if (args.employeeIds.length === 0) {
+      throw new Error("En az bir çalışan seçin");
+    }
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const shift = await ctx.db.get(args.shiftId);
+    if (!shift) throw new Error("Vardiya bulunamadı");
+    if (shift.projectId && !allowedProjectIds.some((id) => id === shift.projectId)) {
+      throw new Error("Bu vardiyaya erişim yetkiniz yok");
+    }
+
+    const now = new Date().toISOString();
+    const inserted: string[] = [];
+    const skipped: { employeeId: string; reason: string }[] = [];
+    let overlapCount = 0;
+
+    for (const employeeId of args.employeeIds) {
+      const emp = await ctx.db.get(employeeId);
+      if (!emp) {
+        skipped.push({ employeeId, reason: "Çalışan bulunamadı" });
+        continue;
+      }
+      if (emp.projectId && !allowedProjectIds.some((id) => id === emp.projectId)) {
+        skipped.push({ employeeId, reason: "Erişim yok" });
+        continue;
+      }
+      if (!args.forceConfirm) {
+        const existing = await ctx.db
+          .query("shiftAssignments")
+          .withIndex("by_employee", (q) => q.eq("employeeId", employeeId))
+          .collect();
+        const hasOverlap = existing.some(
+          (a) => a.startDate <= args.endDate && a.endDate >= args.startDate,
+        );
+        if (hasOverlap) {
+          overlapCount += 1;
+          skipped.push({ employeeId, reason: "Çakışma" });
+          continue;
+        }
+      }
+      const id = await ctx.db.insert("shiftAssignments", {
+        employeeId,
+        shiftId: args.shiftId,
+        projectId: emp.projectId,
+        startDate: args.startDate,
+        endDate: args.endDate,
+        weekPattern: args.weekPattern,
+        createdAt: now,
+        updatedAt: now,
+      });
+      inserted.push(String(id));
+    }
+
+    if (!args.forceConfirm && overlapCount > 0 && inserted.length === 0) {
+      throw new Error(`OVERLAP:${overlapCount}`);
+    }
+
+    return { insertedCount: inserted.length, skipped, overlapCount };
   },
 });
 
@@ -113,6 +224,27 @@ export const removeAssignment = authedMutation({
       throw new Error("Bu atamaya erişim yetkiniz yok");
     }
     await ctx.db.delete(args.assignmentId);
+  },
+});
+
+export const bulkRemoveAssignment = authedMutation({
+  args: { assignmentIds: v.array(v.id("shiftAssignments")) },
+  handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    let deleted = 0;
+    for (const id of args.assignmentIds) {
+      const assignment = await ctx.db.get(id);
+      if (!assignment) continue;
+      if (
+        assignment.projectId &&
+        !allowedProjectIds.some((pid) => pid === assignment.projectId)
+      ) {
+        continue;
+      }
+      await ctx.db.delete(id);
+      deleted += 1;
+    }
+    return { deleted };
   },
 });
 
@@ -142,6 +274,10 @@ export const create = authedMutation({
     endTime: v.string(),
     breakStart: v.optional(v.string()),
     breakEnd: v.optional(v.string()),
+    lateToleranceMinutes: v.optional(v.number()),
+    earlyExitToleranceMinutes: v.optional(v.number()),
+    overtimeStartToleranceMinutes: v.optional(v.number()),
+    overtimeEnabled: v.optional(v.boolean()),
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -153,6 +289,7 @@ export const create = authedMutation({
     return await ctx.db.insert("shifts", {
       ...args,
       isActive: args.isActive ?? true,
+      overtimeEnabled: args.overtimeEnabled ?? true,
       createdAt: now,
       updatedAt: now,
     });
@@ -167,6 +304,10 @@ export const update = authedMutation({
     endTime: v.optional(v.string()),
     breakStart: v.optional(v.string()),
     breakEnd: v.optional(v.string()),
+    lateToleranceMinutes: v.optional(v.number()),
+    earlyExitToleranceMinutes: v.optional(v.number()),
+    overtimeStartToleranceMinutes: v.optional(v.number()),
+    overtimeEnabled: v.optional(v.boolean()),
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -194,6 +335,12 @@ export const remove = authedMutation({
     if (shift.projectId && !allowedProjectIds.some((id) => id === shift.projectId)) {
       throw new Error("Bu vardiyaya erişim yetkiniz yok");
     }
+    const linkedAssignments = await ctx.db
+      .query("shiftAssignments")
+      .withIndex("by_shift", (q) => q.eq("shiftId", args.shiftId))
+      .collect();
+    await Promise.all(linkedAssignments.map((a) => ctx.db.delete(a._id)));
     await ctx.db.delete(args.shiftId);
+    return { removedAssignments: linkedAssignments.length };
   },
 });

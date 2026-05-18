@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, query } from "./_generated/server";
-import { optionalAuthQuery, authedMutation, adminQuery, adminMutation, superAdminMutation } from "./lib/customFunctions";
+import type { Id } from "./_generated/dataModel";
+import { optionalAuthQuery, authedMutation, adminQuery, superAdminMutation } from "./lib/customFunctions";
+import { getProjectIdsForUser } from "./lib/auth";
 
 /** Kurulum sayfası için: Sistemde super_admin var mı? (Public - auth gerekmez) */
 export const hasSuperAdmin = query({
@@ -20,6 +22,17 @@ export const currentUser = optionalAuthQuery({
   handler: async (ctx) => {
     if (!ctx.user) return null;
     return ctx.user;
+  },
+});
+
+/**
+ * Action'lardan çağrılabilen internal query — caller'ın eriştiği proje ID'lerini döndürür.
+ * Auth context ctx.runQuery üzerinden propagate olur (bkz. customFunctions.ts authedAction).
+ */
+export const listProjectIdsForCurrentUser = internalQuery({
+  args: {},
+  handler: async (ctx): Promise<Id<"projects">[]> => {
+    return await getProjectIdsForUser(ctx);
   },
 });
 

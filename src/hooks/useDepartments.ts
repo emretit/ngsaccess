@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
-import { useProjectAccess } from "./useProjectAccess";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { Id } from "../../convex/_generated/dataModel";
 
 export interface Department {
@@ -15,7 +15,7 @@ export interface Department {
 }
 
 export function useDepartments() {
-  const { projectIds, loading: projectLoading } = useProjectAccess();
+  const { projectId, loading: projectLoading } = useActiveProject();
   const { toast } = useToast();
 
   const departments = useQuery(
@@ -28,7 +28,6 @@ export function useDepartments() {
 
   const addDepartment = async (name: string, parentId: Id<"departments"> | null = null) => {
     if (!name.trim()) return false;
-    const projectId = projectIds[0] as Id<"projects"> | undefined;
     const parentDept = parentId ? (departments ?? []).find((d: Department) => d._id === parentId) : null;
     try {
       await createDept({

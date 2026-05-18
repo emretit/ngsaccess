@@ -188,6 +188,45 @@ export default function EmployeeFormFields({
         </div>
 
         <div>
+          <Label htmlFor="hourly_rate">Saatlik Ücret (TL)</Label>
+          <Input
+            id="hourly_rate"
+            type="number"
+            min={0}
+            step="0.01"
+            value={formData.hourlyRate ?? ''}
+            onChange={(e) =>
+              handleInputChange(
+                'hourlyRate',
+                e.target.value === '' ? null : Number(e.target.value)
+              )
+            }
+            placeholder="Mesai TL hesabı için"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="monthly_salary">Aylık Maaş (TL)</Label>
+          <Input
+            id="monthly_salary"
+            type="number"
+            min={0}
+            step="0.01"
+            value={formData.monthlySalary ?? ''}
+            onChange={(e) =>
+              handleInputChange(
+                'monthlySalary',
+                e.target.value === '' ? null : Number(e.target.value)
+              )
+            }
+            placeholder="Saatlik ücret yoksa kullanılır"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            İkisi de boşsa mesai TL hesabı yapılmaz.
+          </p>
+        </div>
+
+        <div>
           <Label htmlFor="notes">Notlar</Label>
           <Textarea
             id="notes"

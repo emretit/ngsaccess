@@ -12,7 +12,13 @@ export const getByCurrentUser = query({
       .query("userProjects")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
-    return rows;
+    const enriched = await Promise.all(
+      rows.map(async (r) => {
+        const project = await ctx.db.get(r.projectId);
+        return { ...r, projectName: project?.name ?? "Proje" };
+      })
+    );
+    return enriched;
   },
 });
 

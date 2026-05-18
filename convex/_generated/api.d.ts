@@ -10,7 +10,11 @@
 
 import type * as accessRules from "../accessRules.js";
 import type * as actions_getChatData from "../actions/getChatData.js";
+import type * as actions_hikDebug from "../actions/hikDebug.js";
+import type * as actions_hikGatewayDevice from "../actions/hikGatewayDevice.js";
+import type * as actions_hikQueueWorker from "../actions/hikQueueWorker.js";
 import type * as actions_hikvisionSync from "../actions/hikvisionSync.js";
+import type * as actions_pdksImport from "../actions/pdksImport.js";
 import type * as actions_sendEmail from "../actions/sendEmail.js";
 import type * as actions_sendScheduledReports from "../actions/sendScheduledReports.js";
 import type * as actions_setPassword from "../actions/setPassword.js";
@@ -26,6 +30,9 @@ import type * as devices from "../devices.js";
 import type * as doors from "../doors.js";
 import type * as employeeAuth from "../employeeAuth.js";
 import type * as employeeCheckIn from "../employeeCheckIn.js";
+import type * as employeeConsents from "../employeeConsents.js";
+import type * as employeeFaces from "../employeeFaces.js";
+import type * as employeeFingerprints from "../employeeFingerprints.js";
 import type * as employees from "../employees.js";
 import type * as files from "../files.js";
 import type * as hikvisionSync from "../hikvisionSync.js";
@@ -35,10 +42,22 @@ import type * as invites from "../invites.js";
 import type * as leaves from "../leaves.js";
 import type * as lib_audit from "../lib/audit.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_breakDeduction from "../lib/breakDeduction.js";
 import type * as lib_cardReaderParse from "../lib/cardReaderParse.js";
 import type * as lib_customFunctions from "../lib/customFunctions.js";
+import type * as lib_digestAuth from "../lib/digestAuth.js";
 import type * as lib_employeeAuth from "../lib/employeeAuth.js";
+import type * as lib_employeeCascade from "../lib/employeeCascade.js";
+import type * as lib_hikEventCodes from "../lib/hikEventCodes.js";
+import type * as lib_hikGateway from "../lib/hikGateway.js";
+import type * as lib_hikSync from "../lib/hikSync.js";
+import type * as lib_overtimeCalc from "../lib/overtimeCalc.js";
 import type * as lib_pdksHelpers from "../lib/pdksHelpers.js";
+import type * as lib_rateLimit from "../lib/rateLimit.js";
+import type * as lib_sgkCodes from "../lib/sgkCodes.js";
+import type * as lib_shiftResolver from "../lib/shiftResolver.js";
+import type * as lib_turkishHolidays from "../lib/turkishHolidays.js";
+import type * as migrations_projectIdBackfill from "../migrations/projectIdBackfill.js";
 import type * as onboarding from "../onboarding.js";
 import type * as pdksRecords from "../pdksRecords.js";
 import type * as positions from "../positions.js";
@@ -48,7 +67,9 @@ import type * as seedCardReaderTest from "../seedCardReaderTest.js";
 import type * as seedHikvisionLanDevice from "../seedHikvisionLanDevice.js";
 import type * as seedTestCardAccess from "../seedTestCardAccess.js";
 import type * as settings from "../settings.js";
+import type * as sgkExport from "../sgkExport.js";
 import type * as shifts from "../shifts.js";
+import type * as userPreferences from "../userPreferences.js";
 import type * as userProjects from "../userProjects.js";
 import type * as users from "../users.js";
 import type * as zones from "../zones.js";
@@ -62,7 +83,11 @@ import type {
 declare const fullApi: ApiFromModules<{
   accessRules: typeof accessRules;
   "actions/getChatData": typeof actions_getChatData;
+  "actions/hikDebug": typeof actions_hikDebug;
+  "actions/hikGatewayDevice": typeof actions_hikGatewayDevice;
+  "actions/hikQueueWorker": typeof actions_hikQueueWorker;
   "actions/hikvisionSync": typeof actions_hikvisionSync;
+  "actions/pdksImport": typeof actions_pdksImport;
   "actions/sendEmail": typeof actions_sendEmail;
   "actions/sendScheduledReports": typeof actions_sendScheduledReports;
   "actions/setPassword": typeof actions_setPassword;
@@ -78,6 +103,9 @@ declare const fullApi: ApiFromModules<{
   doors: typeof doors;
   employeeAuth: typeof employeeAuth;
   employeeCheckIn: typeof employeeCheckIn;
+  employeeConsents: typeof employeeConsents;
+  employeeFaces: typeof employeeFaces;
+  employeeFingerprints: typeof employeeFingerprints;
   employees: typeof employees;
   files: typeof files;
   hikvisionSync: typeof hikvisionSync;
@@ -87,10 +115,22 @@ declare const fullApi: ApiFromModules<{
   leaves: typeof leaves;
   "lib/audit": typeof lib_audit;
   "lib/auth": typeof lib_auth;
+  "lib/breakDeduction": typeof lib_breakDeduction;
   "lib/cardReaderParse": typeof lib_cardReaderParse;
   "lib/customFunctions": typeof lib_customFunctions;
+  "lib/digestAuth": typeof lib_digestAuth;
   "lib/employeeAuth": typeof lib_employeeAuth;
+  "lib/employeeCascade": typeof lib_employeeCascade;
+  "lib/hikEventCodes": typeof lib_hikEventCodes;
+  "lib/hikGateway": typeof lib_hikGateway;
+  "lib/hikSync": typeof lib_hikSync;
+  "lib/overtimeCalc": typeof lib_overtimeCalc;
   "lib/pdksHelpers": typeof lib_pdksHelpers;
+  "lib/rateLimit": typeof lib_rateLimit;
+  "lib/sgkCodes": typeof lib_sgkCodes;
+  "lib/shiftResolver": typeof lib_shiftResolver;
+  "lib/turkishHolidays": typeof lib_turkishHolidays;
+  "migrations/projectIdBackfill": typeof migrations_projectIdBackfill;
   onboarding: typeof onboarding;
   pdksRecords: typeof pdksRecords;
   positions: typeof positions;
@@ -100,7 +140,9 @@ declare const fullApi: ApiFromModules<{
   seedHikvisionLanDevice: typeof seedHikvisionLanDevice;
   seedTestCardAccess: typeof seedTestCardAccess;
   settings: typeof settings;
+  sgkExport: typeof sgkExport;
   shifts: typeof shifts;
+  userPreferences: typeof userPreferences;
   userProjects: typeof userProjects;
   users: typeof users;
   zones: typeof zones;
@@ -132,4 +174,6 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {};
+export declare const components: {
+  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+};

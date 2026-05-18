@@ -412,6 +412,40 @@ export async function exportMonthlyPayrollSheet(
   legendRow.getCell(1).font = { italic: true, size: 9 };
   sheet.mergeCells(legendRow.number, 1, legendRow.number, totalCols);
 
+  // İmza alanı (4857 / SGK denetim için)
+  sheet.addRow([]);
+  const signatureRow = sheet.addRow([]);
+  signatureRow.getCell(1).value = "Hazırlayan (Muhasebe)";
+  signatureRow.getCell(1).font = { bold: true, size: 10 };
+  signatureRow.getCell(Math.floor(totalCols / 2)).value = "Onaylayan (Müdür)";
+  signatureRow.getCell(Math.floor(totalCols / 2)).font = { bold: true, size: 10 };
+  signatureRow.getCell(totalCols).value = `Tarih: ${new Date().toLocaleDateString("tr-TR")}`;
+  signatureRow.getCell(totalCols).font = { size: 10 };
+
+  const linesRow = sheet.addRow([]);
+  linesRow.getCell(1).value = "İmza: ____________________";
+  linesRow.getCell(Math.floor(totalCols / 2)).value = "İmza: ____________________";
+
+  // Print ayarları (landscape A4, fit to page width)
+  sheet.pageSetup = {
+    orientation: "landscape",
+    paperSize: 9, // A4
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    horizontalCentered: true,
+    margins: {
+      left: 0.4,
+      right: 0.4,
+      top: 0.6,
+      bottom: 0.6,
+      header: 0.3,
+      footer: 0.3,
+    },
+  };
+  sheet.headerFooter.oddHeader = `&L${MONTH_NAMES_TR[data.month - 1]} ${data.year} - Personel Devam Çizelgesi&R&P / &N`;
+  sheet.headerFooter.oddFooter = "&CYasal saklama süresi: 10 yıl (4857)";
+
   const fileName = `Aylik_Bordro_Cetveli_${data.year}_${String(data.month).padStart(2, "0")}.xlsx`;
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {

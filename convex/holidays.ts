@@ -2,6 +2,8 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { adminMutation, authedQuery } from "./lib/customFunctions";
 import { writeAudit } from "./lib/audit";
+import { getProjectIdsForUser } from "./lib/auth";
+import { getTurkishHolidaysForYear, hasReligiousData } from "./lib/turkishHolidays";
 
 export const list = authedQuery({
   args: {
@@ -19,6 +21,39 @@ export const list = authedQuery({
     if (args.year === undefined) return rows;
     const prefix = `${args.year}-`;
     return rows.filter((r) => r.date.startsWith(prefix));
+  },
+});
+
+export const listForRange = authedQuery({
+  args: {
+    startDate: v.string(),
+    endDate: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    let rows;
+    if (ctx.user.role === "super_admin") {
+      rows = await ctx.db.query("holidays").collect();
+    } else if (allowedProjectIds.length > 0) {
+      const [projectRows, globalRows] = await Promise.all([
+        Promise.all(
+          allowedProjectIds.map((pid) =>
+            ctx.db
+              .query("holidays")
+              .withIndex("by_project", (q) => q.eq("projectId", pid))
+              .collect(),
+          ),
+        ),
+        ctx.db
+          .query("holidays")
+          .withIndex("by_project", (q) => q.eq("projectId", undefined))
+          .collect(),
+      ]);
+      rows = [...projectRows.flat(), ...globalRows];
+    } else {
+      return [];
+    }
+    return rows.filter((r) => r.date >= args.startDate && r.date <= args.endDate);
   },
 });
 
@@ -75,65 +110,19 @@ export const remove = adminMutation({
   },
 });
 
-interface SeedHoliday {
-  date: string;
-  name: string;
-  isHalfDay?: boolean;
-}
-
-const TR_HOLIDAYS_BY_YEAR: Record<number, SeedHoliday[]> = {
-  2026: [
-    { date: "2026-01-01", name: "Yılbaşı" },
-    { date: "2026-03-19", name: "Ramazan Bayramı Arefesi", isHalfDay: true },
-    { date: "2026-03-20", name: "Ramazan Bayramı 1. Gün" },
-    { date: "2026-03-21", name: "Ramazan Bayramı 2. Gün" },
-    { date: "2026-03-22", name: "Ramazan Bayramı 3. Gün" },
-    { date: "2026-04-23", name: "Ulusal Egemenlik ve Çocuk Bayramı" },
-    { date: "2026-05-01", name: "Emek ve Dayanışma Günü" },
-    { date: "2026-05-19", name: "Atatürk'ü Anma, Gençlik ve Spor Bayramı" },
-    { date: "2026-05-26", name: "Kurban Bayramı Arefesi", isHalfDay: true },
-    { date: "2026-05-27", name: "Kurban Bayramı 1. Gün" },
-    { date: "2026-05-28", name: "Kurban Bayramı 2. Gün" },
-    { date: "2026-05-29", name: "Kurban Bayramı 3. Gün" },
-    { date: "2026-05-30", name: "Kurban Bayramı 4. Gün" },
-    { date: "2026-07-15", name: "Demokrasi ve Milli Birlik Günü" },
-    { date: "2026-08-30", name: "Zafer Bayramı" },
-    { date: "2026-10-28", name: "Cumhuriyet Bayramı Arefesi", isHalfDay: true },
-    { date: "2026-10-29", name: "Cumhuriyet Bayramı" },
-  ],
-  2027: [
-    { date: "2027-01-01", name: "Yılbaşı" },
-    { date: "2027-03-08", name: "Ramazan Bayramı Arefesi", isHalfDay: true },
-    { date: "2027-03-09", name: "Ramazan Bayramı 1. Gün" },
-    { date: "2027-03-10", name: "Ramazan Bayramı 2. Gün" },
-    { date: "2027-03-11", name: "Ramazan Bayramı 3. Gün" },
-    { date: "2027-04-23", name: "Ulusal Egemenlik ve Çocuk Bayramı" },
-    { date: "2027-05-01", name: "Emek ve Dayanışma Günü" },
-    { date: "2027-05-16", name: "Kurban Bayramı Arefesi", isHalfDay: true },
-    { date: "2027-05-17", name: "Kurban Bayramı 1. Gün" },
-    { date: "2027-05-18", name: "Kurban Bayramı 2. Gün" },
-    { date: "2027-05-19", name: "Atatürk'ü Anma + Kurban Bayramı 3. Gün" },
-    { date: "2027-05-20", name: "Kurban Bayramı 4. Gün" },
-    { date: "2027-07-15", name: "Demokrasi ve Milli Birlik Günü" },
-    { date: "2027-08-30", name: "Zafer Bayramı" },
-    { date: "2027-10-28", name: "Cumhuriyet Bayramı Arefesi", isHalfDay: true },
-    { date: "2027-10-29", name: "Cumhuriyet Bayramı" },
-  ],
-};
-
 export const seedTurkishHolidays = adminMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     years: v.array(v.number()),
   },
   handler: async (ctx, args) => {
-    const inserted: string[] = [];
-    const skipped: string[] = [];
+    let inserted = 0;
+    let skipped = 0;
+    const missingYears: number[] = [];
 
     for (const year of args.years) {
-      const list = TR_HOLIDAYS_BY_YEAR[year];
-      if (!list) continue;
-
+      if (!hasReligiousData(year)) missingYears.push(year);
+      const list = getTurkishHolidaysForYear(year);
       for (const h of list) {
         const existing = await ctx.db
           .query("holidays")
@@ -142,7 +131,7 @@ export const seedTurkishHolidays = adminMutation({
           )
           .first();
         if (existing) {
-          skipped.push(h.date);
+          skipped += 1;
           continue;
         }
         await ctx.db.insert("holidays", {
@@ -150,9 +139,10 @@ export const seedTurkishHolidays = adminMutation({
           date: h.date,
           name: h.name,
           isHalfDay: h.isHalfDay ?? false,
+          type: h.type,
           createdAt: new Date().toISOString(),
         });
-        inserted.push(h.date);
+        inserted += 1;
       }
     }
 
@@ -162,11 +152,11 @@ export const seedTurkishHolidays = adminMutation({
       action: "create",
       targetTable: "holidays",
       targetId: "bulk-seed",
-      newValue: { years: args.years, insertedCount: inserted.length },
-      note: `TR resmi tatil seed: ${inserted.length} eklendi, ${skipped.length} mevcut`,
+      newValue: { years: args.years, insertedCount: inserted },
+      note: `TR resmi tatil seed: ${inserted} eklendi, ${skipped} mevcut`,
     });
 
-    return { inserted: inserted.length, skipped: skipped.length };
+    return { inserted, skipped, missingReligiousYears: missingYears };
   },
 });
 

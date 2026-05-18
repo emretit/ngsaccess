@@ -1,9 +1,15 @@
 import { v } from "convex/values";
 import { internalQuery, internalMutation } from "./_generated/server";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import { Doc } from "./_generated/dataModel";
+import {
+  getEffectiveWorkSettings,
+  resolveHourlyRate,
+  overtimePayTRY,
+  DEFAULT_WORK_SETTINGS,
+} from "./lib/pdksHelpers";
 
 const STANDARD_DAY_MINUTES = 8 * 60;
 const STANDARD_WEEK_MINUTES = 45 * 60;
@@ -93,7 +99,7 @@ export const getSgkMonthlyReport = authedQuery({
       .collect();
 
     const reportRows = await Promise.all(
-      Array.from(employeeMap.entries()).map(async ([empKey, empReadings]) => {
+      Array.from(employeeMap.entries()).map(async ([, empReadings]) => {
         const first = empReadings[0];
         const employee = first.employeeId ? await ctx.db.get(first.employeeId) as Doc<"employees"> | null : null;
         const department = employee?.departmentId
@@ -101,7 +107,6 @@ export const getSgkMonthlyReport = authedQuery({
           : null;
 
         const empId = first.employeeId;
-        const dateKeys = [...new Set(empReadings.map((r) => r.accessTime.split("T")[0]))];
 
         const leaveDaysInMonth = empId
           ? allLeaves
@@ -236,8 +241,23 @@ export const getOvertimeSummaryReport = authedQuery({
       employeeMap.get(key)!.push(r);
     }
 
+    const referenceProjectId =
+      args.isSuperAdmin
+        ? undefined
+        : (args.projectIds?.[0] ?? allowedProjectIds[0] ?? undefined);
+    const workSettings = referenceProjectId
+      ? await getEffectiveWorkSettings(ctx, referenceProjectId)
+      : DEFAULT_WORK_SETTINGS;
+
     let totalOvertimeHours = 0;
-    const rows: { employeeId: string; name: string; department: string; overtimeHours: number }[] = [];
+    let totalOvertimePayTRY = 0;
+    const rows: {
+      employeeId: string;
+      name: string;
+      department: string;
+      overtimeHours: number;
+      overtimePayTRY: number | null;
+    }[] = [];
 
     for (const [empKey, empReadings] of employeeMap) {
       const first = empReadings[0];
@@ -275,11 +295,27 @@ export const getOvertimeSummaryReport = authedQuery({
       const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
       totalOvertimeHours += overtimeHours;
 
+      const empHourlyRate = employee
+        ? resolveHourlyRate({
+            hourlyRate: employee.hourlyRate,
+            monthlySalary: employee.monthlySalary,
+            monthlyHoursBase: workSettings.monthlyHoursBase,
+          })
+        : null;
+      const payTRY = overtimePayTRY({
+        overtimeMinutes,
+        multiplier: workSettings.overtimeMultiplier,
+        hourlyRate: empHourlyRate,
+      });
+      const payRounded = payTRY !== null ? Math.round(payTRY * 100) / 100 : null;
+      if (payRounded !== null) totalOvertimePayTRY += payRounded;
+
       rows.push({
         employeeId: empKey,
         name: first.employeeName ?? (employee ? `${employee.firstName} ${employee.lastName}` : "Bilinmiyor"),
         department: department?.name ?? "Bilinmiyor",
         overtimeHours,
+        overtimePayTRY: payRounded,
       });
     }
 
@@ -289,6 +325,8 @@ export const getOvertimeSummaryReport = authedQuery({
       startDate,
       endDate,
       totalOvertimeHours: Math.round(totalOvertimeHours * 10) / 10,
+      totalOvertimePayTRY: Math.round(totalOvertimePayTRY * 100) / 100,
+      overtimeMultiplier: workSettings.overtimeMultiplier,
       rows: rows.filter((r) => r.overtimeHours > 0).sort((a, b) => b.overtimeHours - a.overtimeHours),
     };
   },
@@ -455,8 +493,18 @@ export const getDepartmentCostReport = authedQuery({
       employeeMap.get(key)!.push(r);
     }
 
-    const rate = args.hourlyRate ?? 100;
-    const byDept = new Map<string, { overtimeHours: number; employeeCount: number }>();
+    const referenceProjectId =
+      args.isSuperAdmin
+        ? undefined
+        : (args.projectIds?.[0] ?? allowedProjectIds[0] ?? undefined);
+    const workSettings = referenceProjectId
+      ? await getEffectiveWorkSettings(ctx, referenceProjectId)
+      : DEFAULT_WORK_SETTINGS;
+    const fallbackRate = args.hourlyRate;
+    const byDept = new Map<
+      string,
+      { overtimeHours: number; cost: number; employeeCount: number }
+    >();
 
     for (const [_, empReadings] of employeeMap) {
       const first = empReadings[0];
@@ -495,8 +543,24 @@ export const getDepartmentCostReport = authedQuery({
       const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
 
       if (overtimeHours > 0) {
-        const existing = byDept.get(deptName) ?? { overtimeHours: 0, employeeCount: 0 };
+        const empRate =
+          (employee
+            ? resolveHourlyRate({
+                hourlyRate: employee.hourlyRate,
+                monthlySalary: employee.monthlySalary,
+                monthlyHoursBase: workSettings.monthlyHoursBase,
+              })
+            : null) ?? fallbackRate ?? null;
+        const payTRY = overtimePayTRY({
+          overtimeMinutes,
+          multiplier: workSettings.overtimeMultiplier,
+          hourlyRate: empRate,
+        });
+
+        const existing =
+          byDept.get(deptName) ?? { overtimeHours: 0, cost: 0, employeeCount: 0 };
         existing.overtimeHours += overtimeHours;
+        existing.cost += payTRY ?? 0;
         existing.employeeCount += 1;
         byDept.set(deptName, existing);
       }
@@ -506,14 +570,14 @@ export const getDepartmentCostReport = authedQuery({
       department: name,
       overtimeHours: Math.round(data.overtimeHours * 10) / 10,
       employeeCount: data.employeeCount,
-      cost: Math.round(data.overtimeHours * rate * 1.5 * 100) / 100,
+      cost: Math.round(data.cost * 100) / 100,
     }));
 
     return {
       year: args.year,
       month: args.month,
-      hourlyRate: rate,
-      overtimeMultiplier: 1.5,
+      hourlyRate: fallbackRate ?? null,
+      overtimeMultiplier: workSettings.overtimeMultiplier,
       rows: rows.sort((a, b) => b.cost - a.cost),
     };
   },

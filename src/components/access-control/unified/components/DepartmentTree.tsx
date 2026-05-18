@@ -5,10 +5,10 @@ import { Label } from "@/components/ui/label";
 import { ChevronRight, ChevronDown, Users, User } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useDepartments, type Department } from "@/hooks/useDepartments";
+import { areAllSelected } from "./selectionHelpers";
 
 interface DepartmentTreeFormData {
   selected_employees: string[];
-  selected_departments: string[];
 }
 
 interface DepartmentTreeProps<T extends DepartmentTreeFormData = DepartmentTreeFormData> {
@@ -36,13 +36,11 @@ export const DepartmentTree = <T extends DepartmentTreeFormData,>({ formData, se
 
   const handleSelectAll = () => {
     const allEmployeeIds = employees.map(emp => String(emp._id));
-    const allDepartmentIds = departments.map((dept: Department) => String(dept._id));
-    const allSelected = allEmployeeIds.every((id: string) => formData.selected_employees.includes(id));
+    const allSelected = areAllSelected(employees, formData.selected_employees);
 
     setFormData(prev => ({
       ...prev,
       selected_employees: allSelected ? [] : allEmployeeIds,
-      selected_departments: allSelected ? [] : allDepartmentIds
     }));
   };
 
@@ -55,18 +53,16 @@ export const DepartmentTree = <T extends DepartmentTreeFormData,>({ formData, se
     const employeeIds = departmentEmployees.map(emp => String(emp._id));
 
     setFormData(prev => {
-      const newDepartments = checked
-        ? [...prev.selected_departments, departmentId]
-        : prev.selected_departments.filter((id: string) => id !== departmentId);
-
-      const newEmployees = checked
-        ? [...new Set([...prev.selected_employees, ...employeeIds])]
-        : prev.selected_employees.filter((id: string) => !employeeIds.includes(id));
-
+      if (checked) {
+        return {
+          ...prev,
+          selected_employees: [...new Set([...prev.selected_employees, ...employeeIds])],
+        };
+      }
+      const toRemove = new Set(employeeIds);
       return {
         ...prev,
-        selected_departments: newDepartments,
-        selected_employees: newEmployees
+        selected_employees: prev.selected_employees.filter((id: string) => !toRemove.has(id)),
       };
     });
   };
@@ -83,10 +79,6 @@ export const DepartmentTree = <T extends DepartmentTreeFormData,>({ formData, se
     });
   };
 
-  const isDepartmentSelected = (departmentId: string) => {
-    return formData.selected_departments.includes(departmentId);
-  };
-
   const renderDepartmentTree = (parentId: string | null = null, level: number = 0) => {
     const children = departments.filter((dept: Department) => {
       const deptParentId = dept.parentId ? String(dept.parentId) : null;
@@ -100,7 +92,7 @@ export const DepartmentTree = <T extends DepartmentTreeFormData,>({ formData, se
       const hasChildren = departments.some((dept: Department) => String(dept.parentId ?? '') === deptId);
       const departmentEmployees = getEmployeesForDepartment(deptId);
       const isExpanded = expandedDepartments.has(deptId);
-      const isSelected = isDepartmentSelected(deptId);
+      const isSelected = areAllSelected(departmentEmployees, formData.selected_employees);
 
       return (
         <div key={`dept-${deptId}`} className="space-y-1">
@@ -175,10 +167,7 @@ export const DepartmentTree = <T extends DepartmentTreeFormData,>({ formData, se
     });
   };
 
-  const allSelected = employees.length > 0 && employees.every(emp =>
-    formData.selected_employees.includes(String(emp._id))
-  );
-
+  const allSelected = areAllSelected(employees, formData.selected_employees);
   const orphanEmployees = employees.filter(emp => !emp.departmentId);
 
   return (
@@ -195,7 +184,7 @@ export const DepartmentTree = <T extends DepartmentTreeFormData,>({ formData, se
           {allSelected ? 'Tümünü Kaldır' : 'Tümünü Seç'}
         </Button>
       </div>
-      <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-1">
+      <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-1">
         {renderDepartmentTree()}
 
         {orphanEmployees.length > 0 && (

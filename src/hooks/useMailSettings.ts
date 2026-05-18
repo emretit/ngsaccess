@@ -1,8 +1,7 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
-import { useProjectAccess } from "./useProjectAccess";
-import { Id } from "../../convex/_generated/dataModel";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
 interface MailSettingsInput {
   smtpHost?: string;
@@ -17,8 +16,7 @@ interface MailSettingsInput {
 
 export function useMailSettings() {
   const { toast } = useToast();
-  const { projectIds } = useProjectAccess();
-  const projectId = projectIds[0] as Id<"projects"> | undefined;
+  const { projectId } = useActiveProject();
 
   const mailSettings = useQuery(api.settings.getMail, { projectId });
   const upsertMail = useMutation(api.settings.upsertMail);

@@ -9,17 +9,26 @@ import {
   isSameDay,
   toISODate,
 } from "./lib/weekUtils";
+import {
+  holidayOn,
+  leaveForEmployeeOn,
+  assignmentAppliesOnDate,
+} from "./lib/calendarOverlays";
 import { cn } from "@/lib/utils";
 
 type Employee = FunctionReturnType<typeof api.employees.list>[number];
 type Shift = FunctionReturnType<typeof api.shifts.list>[number];
 type Assignment = FunctionReturnType<typeof api.shifts.listAssignments>[number];
+type Holiday = FunctionReturnType<typeof api.holidays.listForRange>[number];
+type Leave = FunctionReturnType<typeof api.leaves.listForRange>[number];
 
 interface ShiftCalendarGridProps {
   weekStart: Date;
   employees: Employee[];
   shifts: Shift[];
   assignments: Assignment[];
+  leaves?: Leave[];
+  holidays?: Holiday[];
   onEmptyCellClick: (employeeId: string, date: string) => void;
   onAssignmentClick: (assignment: Assignment) => void;
 }
@@ -29,6 +38,8 @@ export function ShiftCalendarGrid({
   employees,
   shifts,
   assignments,
+  leaves = [],
+  holidays = [],
   onEmptyCellClick,
   onAssignmentClick,
 }: ShiftCalendarGridProps) {
@@ -60,7 +71,7 @@ export function ShiftCalendarGrid({
   }
 
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
       <div className="min-w-[820px]">
         <div className="grid grid-cols-[180px_repeat(7,minmax(100px,1fr))] border-b bg-muted/40">
           <div className="px-3 py-2 text-xs font-semibold text-muted-foreground">
@@ -93,22 +104,33 @@ export function ShiftCalendarGrid({
               key={emp._id}
               className="grid grid-cols-[180px_repeat(7,minmax(100px,1fr))] border-b last:border-b-0"
             >
-              <div className="sticky left-0 z-10 flex items-center bg-background px-3 py-2 text-sm">
-                <span className="truncate font-medium">
+              <div className="sticky left-0 z-10 flex flex-col justify-center bg-background px-3 py-2 text-sm">
+                <span className="truncate font-medium leading-tight">
                   {emp.firstName} {emp.lastName}
                 </span>
+                {emp.email && (
+                  <span className="truncate text-[11px] text-muted-foreground leading-tight">
+                    {emp.email}
+                  </span>
+                )}
               </div>
               {days.map((d) => {
                 const iso = toISODate(d);
-                const cellAssignments = empAssignments.filter((a) =>
-                  isDateInRange(iso, a.startDate, a.endDate),
+                const cellAssignments = empAssignments.filter(
+                  (a) =>
+                    isDateInRange(iso, a.startDate, a.endDate) &&
+                    assignmentAppliesOnDate(a, iso),
                 );
+                const holiday = holidayOn(iso, holidays);
+                const leave = leaveForEmployeeOn(iso, String(emp._id), leaves);
                 return (
                   <div key={iso} className="p-1">
                     <ShiftCalendarCell
                       isToday={isSameDay(d, today)}
                       cellAssignments={cellAssignments}
                       shiftMap={shiftMap}
+                      holiday={holiday}
+                      leave={leave}
                       onEmptyClick={() => onEmptyCellClick(emp._id, iso)}
                       onAssignmentClick={onAssignmentClick}
                     />

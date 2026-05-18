@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
 import { authedMutation, superAdminMutation } from "./lib/customFunctions";
+import { limiter } from "./lib/rateLimit";
 
 /**
  * Yetkili kullanıcı (super_admin / proje sahibi / proje admin) bir kullanıcıyı
@@ -36,6 +37,11 @@ export const create = authedMutation({
     if (!isSuperAdmin && !isOwner && !isProjectAdmin) {
       throw new Error("Bu projeye davet gönderme yetkin yok");
     }
+
+    await limiter.limit(ctx, "inviteCreate", {
+      key: ctx.user._id,
+      throws: true,
+    });
 
     // Aynı email için kullanılmamış davet varsa önce onu iptal et
     const existing = await ctx.db

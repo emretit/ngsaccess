@@ -1,4 +1,4 @@
-import { mutation, query, internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import {
   authedQuery,
@@ -51,7 +51,9 @@ export const listForEmployee = employeeAuthedQuery({
 
     const memberships = await ctx.db
       .query("groupMembers")
-      .withIndex("by_employee", (q) => q.eq("employeeId", employee._id))
+      .withIndex("by_project_employee", (q) =>
+        q.eq("projectId", employee.projectId).eq("employeeId", employee._id),
+      )
       .collect();
 
     if (memberships.length === 0) return [];
@@ -69,7 +71,9 @@ export const listForEmployee = employeeAuthedQuery({
       Array.from(activeGroupIds).map((gid) =>
         ctx.db
           .query("groupDevices")
-          .withIndex("by_group", (q) => q.eq("groupId", gid))
+          .withIndex("by_project_group", (q) =>
+            q.eq("projectId", employee.projectId).eq("groupId", gid),
+          )
           .collect()
       )
     );
@@ -132,6 +136,10 @@ export const create = authedMutation({
     description: v.optional(v.string()),
     deviceUsername: v.optional(v.string()),
     devicePassword: v.optional(v.string()),
+    brand: v.optional(v.union(v.literal("hikvision"), v.literal("other"))),
+    ehomeID: v.optional(v.string()),
+    ehomeKey: v.optional(v.string()),
+    hikModel: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -167,6 +175,10 @@ export const update = authedMutation({
     lastSeen: v.optional(v.string()),
     deviceUsername: v.optional(v.string()),
     devicePassword: v.optional(v.string()),
+    brand: v.optional(v.union(v.literal("hikvision"), v.literal("other"))),
+    ehomeID: v.optional(v.string()),
+    ehomeKey: v.optional(v.string()),
+    hikModel: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -203,7 +215,9 @@ export const remove = authedMutation({
 
     const groupDevices = await ctx.db
       .query("groupDevices")
-      .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
+      .withIndex("by_project_device", (q) =>
+        q.eq("projectId", device.projectId).eq("deviceId", args.deviceId),
+      )
       .collect();
     await Promise.all(groupDevices.map((gd) => ctx.db.delete(gd._id)));
 
@@ -216,8 +230,10 @@ export const updateLastSeen = internalMutation({
   args: {
     deviceSerial: v.optional(v.string()),
     deviceIp: v.optional(v.string()),
+    hikDevIndex: v.optional(v.string()),
+    ehomeID: v.optional(v.string()),
   },
-  handler: async (ctx, { deviceSerial, deviceIp }) => {
+  handler: async (ctx, { deviceSerial, deviceIp, hikDevIndex, ehomeID }) => {
     const now = new Date().toISOString();
     let device = null;
 
@@ -227,14 +243,145 @@ export const updateLastSeen = internalMutation({
         .withIndex("by_device_serial", (q) => q.eq("deviceSerial", deviceSerial))
         .first();
     }
+    if (!device && hikDevIndex) {
+      device = await ctx.db
+        .query("devices")
+        .withIndex("by_hik_dev_index", (q) => q.eq("hikDevIndex", hikDevIndex))
+        .first();
+    }
+    if (!device && ehomeID) {
+      device = await ctx.db
+        .query("devices")
+        .withIndex("by_ehome_id", (q) => q.eq("ehomeID", ehomeID))
+        .first();
+    }
     if (!device && deviceIp) {
       device = await ctx.db
         .query("devices")
-        .filter((q) => q.eq(q.field("deviceIp"), deviceIp))
+        .withIndex("by_device_ip", (q) => q.eq("deviceIp", deviceIp))
         .first();
     }
     if (device) {
-      await ctx.db.patch(device._id, { lastSeen: now });
+      // Sadece heartbeat/timestamp güncelle. deviceIp/hikDevIndex auto-populate
+      // ETMİYORUZ — /card-reader unauth olduğu için saldırgan forged ipAddress
+      // veya devIndex yollayarak cihaz lookup index'lerini bozabilir. Bu alanlar
+      // sadece trusted yoldan (gateway register / refreshGatewayDeviceStatus) yazılır.
+      await ctx.db.patch(device._id, {
+        lastSeen: now,
+        hikLastSeenAt: Date.now(),
+      });
     }
+  },
+});
+
+// ────────────────────────────────────────────────────────────
+// Hik Device Gateway internal helpers
+// ────────────────────────────────────────────────────────────
+
+export const getByIdInternal = internalQuery({
+  args: { id: v.id("devices") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.id);
+  },
+});
+
+/**
+ * Gateway'e kayıtlı tüm aktif Hikvision cihazların devIndex listesi.
+ * Günlük saat senkronu / nightly reconcile cron'ları kullanır.
+ */
+export const listRegisteredHikDevIndexes = internalQuery({
+  args: {},
+  handler: async (ctx): Promise<string[]> => {
+    const devices = await ctx.db.query("devices").collect();
+    return devices
+      .filter(
+        (d) =>
+          d.brand === "hikvision" &&
+          !!d.hikDevIndex &&
+          d.isActive !== false,
+      )
+      .map((d) => d.hikDevIndex as string);
+  },
+});
+
+export const setHikDevIndex = internalMutation({
+  args: {
+    deviceId: v.id("devices"),
+    hikDevIndex: v.union(v.string(), v.null()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.deviceId, {
+      hikDevIndex: args.hikDevIndex ?? undefined,
+      hikOfflineHint: undefined,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+export const setHikDoorCount = internalMutation({
+  args: { deviceId: v.id("devices"), doorCount: v.number() },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.deviceId, {
+      hikDoorCount: args.doorCount,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+export const setHikOfflineHint = internalMutation({
+  args: { deviceId: v.id("devices"), hint: v.string() },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.deviceId, {
+      hikOfflineHint: args.hint,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+export const applyGatewayHeartbeat = internalMutation({
+  args: {
+    hikDevIndex: v.string(),
+    online: v.boolean(),
+    deviceIp: v.optional(v.string()),
+    model: v.optional(v.string()),
+    /**
+     * Caller'ın eriştiği projeler. Boş array verilirse cross-tenant filtre
+     * uygulanmaz (sadece super_admin caller'lar için). Aksi halde sadece bu
+     * listedeki projelere ait cihaz patch'lenir.
+     */
+    allowedProjectIds: v.optional(v.array(v.id("projects"))),
+  },
+  handler: async (ctx, args): Promise<boolean> => {
+    const device = await ctx.db
+      .query("devices")
+      .withIndex("by_hik_dev_index", (q) =>
+        q.eq("hikDevIndex", args.hikDevIndex),
+      )
+      .first();
+    if (!device) return false;
+    // Scope kontrolü:
+    // - undefined → internal trusted caller (cron vb.), filtre yok
+    // - [] → caller'ın hiçbir projeye yetkisi yok → deny
+    // - non-empty → device.projectId bu listede olmalı; aksi halde deny
+    if (args.allowedProjectIds !== undefined) {
+      if (!device.projectId) return false;
+      if (!args.allowedProjectIds.some((id) => id === device.projectId)) {
+        return false;
+      }
+    }
+    const patch: Record<string, unknown> = {
+      hikLastSeenAt: Date.now(),
+      updatedAt: new Date().toISOString(),
+    };
+    if (args.online) {
+      patch.hikOfflineHint = undefined;
+      patch.lastSeen = new Date().toISOString();
+    } else {
+      patch.hikOfflineHint = "Gateway: offline";
+    }
+    if (args.deviceIp && !device.deviceIp) patch.deviceIp = args.deviceIp;
+    if (args.model && !device.hikModel) patch.hikModel = args.model;
+    await ctx.db.patch(device._id, patch);
+    return true;
   },
 });

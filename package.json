@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.91",
+    "@convex-dev/rate-limiter": "^0.3.2",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.0",
     "@radix-ui/react-alert-dialog": "^1.1.1",
@@ -61,7 +62,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.0.0",
-    "convex": "^1.32.0",
+    "convex": "^1.39.1",
     "convex-helpers": "^0.1.114",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",

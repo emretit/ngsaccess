@@ -132,6 +132,135 @@ export const upsertManual = adminMutation({
   },
 });
 
+export const bulkUpsertManual = adminMutation({
+  args: {
+    rows: v.array(
+      v.object({
+        employeeId: v.id("employees"),
+        date: v.string(),
+        entryTime: v.optional(v.string()),
+        exitTime: v.optional(v.string()),
+        note: v.optional(v.string()),
+      }),
+    ),
+  },
+  handler: async (ctx, args) => {
+    if (args.rows.length === 0) return { inserted: 0, updated: 0, errors: [] };
+    if (args.rows.length > 500) {
+      throw new Error("Tek seferde en fazla 500 satır gönderebilirsiniz");
+    }
+
+    const userProjectIds =
+      ctx.user.role === "project_admin"
+        ? new Set(
+            (
+              await ctx.db
+                .query("userProjects")
+                .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
+                .collect()
+            ).map((up) => String(up.projectId)),
+          )
+        : null;
+
+    let inserted = 0;
+    let updated = 0;
+    const errors: { index: number; message: string }[] = [];
+    const touchedIds: string[] = [];
+    const now = new Date().toISOString();
+
+    for (let i = 0; i < args.rows.length; i++) {
+      const row = args.rows[i];
+      try {
+        if (!DATE_REGEX.test(row.date)) throw new Error("Geçersiz tarih");
+        if (row.entryTime && !HHMM_REGEX.test(row.entryTime))
+          throw new Error("Geçersiz giriş saati");
+        if (row.exitTime && !HHMM_REGEX.test(row.exitTime))
+          throw new Error("Geçersiz çıkış saati");
+        if (row.entryTime && row.exitTime && row.entryTime >= row.exitTime)
+          throw new Error("Çıkış saati girişten sonra olmalı");
+
+        const employee = await ctx.db.get(row.employeeId);
+        if (!employee) throw new Error("Çalışan bulunamadı");
+        if (userProjectIds && employee.projectId) {
+          if (!userProjectIds.has(String(employee.projectId))) {
+            throw new Error("Projeye erişim yetkiniz yok");
+          }
+        }
+
+        const existing = await ctx.db
+          .query("pdksRecords")
+          .withIndex("by_employee_date", (q) =>
+            q.eq("employeeId", row.employeeId).eq("date", row.date),
+          )
+          .first();
+
+        const status =
+          row.entryTime && row.exitTime
+            ? "present"
+            : row.entryTime
+              ? "present"
+              : "absent";
+
+        if (existing) {
+          await ctx.db.patch(existing._id, {
+            entryTime: row.entryTime,
+            exitTime: row.exitTime,
+            status,
+            manualEntry: true,
+            manualNote: row.note,
+            editedBy: ctx.user._id,
+            editedAt: Date.now(),
+            updatedAt: now,
+          });
+          updated += 1;
+          touchedIds.push(String(existing._id));
+        } else {
+          const id = await ctx.db.insert("pdksRecords", {
+            projectId: employee.projectId,
+            employeeId: row.employeeId,
+            employeeFirstName: employee.firstName,
+            employeeLastName: employee.lastName,
+            date: row.date,
+            entryTime: row.entryTime,
+            exitTime: row.exitTime,
+            status,
+            manualEntry: true,
+            manualNote: row.note,
+            editedBy: ctx.user._id,
+            editedAt: Date.now(),
+            createdAt: now,
+            updatedAt: now,
+          });
+          inserted += 1;
+          touchedIds.push(String(id));
+        }
+      } catch (e) {
+        errors.push({
+          index: i,
+          message: e instanceof Error ? e.message : "Bilinmeyen hata",
+        });
+      }
+    }
+
+    await writeAudit(ctx, {
+      user: ctx.user,
+      projectId: null,
+      action: "update",
+      targetTable: "pdksRecords",
+      targetId: "bulk-upsert",
+      newValue: {
+        inserted,
+        updated,
+        errors: errors.length,
+        touched: touchedIds.length,
+      },
+      note: `Toplu manuel düzeltme: +${inserted} yeni, ↻${updated} güncel, ✗${errors.length} hata`,
+    });
+
+    return { inserted, updated, errors };
+  },
+});
+
 export const removeManual = adminMutation({
   args: { id: v.id("pdksRecords") },
   handler: async (ctx, args) => {

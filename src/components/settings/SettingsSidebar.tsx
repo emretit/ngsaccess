@@ -5,6 +5,7 @@ import {
   Users,
   FileBarChart,
   CalendarClock,
+  Plug,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +34,11 @@ const sidebarItems = [
     key: "reports",
     label: "Raporlar",
     icon: FileBarChart,
+  },
+  {
+    key: "integrations",
+    label: "Entegrasyonlar",
+    icon: Plug,
   },
   {
     key: "mail",

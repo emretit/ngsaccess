@@ -1,4 +1,3 @@
-import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { EmployeePagination } from "@/components/employees/EmployeePagination";
 import { useProjectFilteredCardReadings } from "@/hooks/useProjectFilteredCardReadings";
@@ -22,8 +21,6 @@ const CardReadings = () => {
     setAccessFilter,
     totalPages,
   } = useProjectFilteredCardReadings(PAGE_SIZE);
-
-  // Convex useQuery otomatik realtime sağlar
 
   const handleRefresh = () => {};
   const handleClearFilters = () => {
@@ -57,47 +54,36 @@ const CardReadings = () => {
       : "Görüntülenecek kart okutma kaydı bulunamadı.";
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between gap-4">
-        <h2 className="text-2xl font-bold">Kart Okuma Kayıtları</h2>
-        <CardReadingsFilters
-          searchTerm={searchTerm}
-          setSearchTerm={setSearchTerm}
-          dateFilter={dateFilter}
-          setDateFilter={setDateFilter}
-          accessFilter={accessFilter}
-          setAccessFilter={setAccessFilter}
-          handleRefresh={handleRefresh}
+    <div className="space-y-3">
+      <CardReadingsFilters
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        dateFilter={dateFilter}
+        setDateFilter={setDateFilter}
+        accessFilter={accessFilter}
+        setAccessFilter={setAccessFilter}
+        handleRefresh={handleRefresh}
+        totalCount={totalCount}
+        currentPage={currentPage}
+        pageSize={PAGE_SIZE}
+      />
+
+      <div className="rounded-xl border bg-card shadow-xs overflow-hidden">
+        <CardReadingsTable
+          readings={readings}
+          emptyMessage={emptyMessage}
+          showClearFilters={Boolean(searchTerm || dateFilter || accessFilter !== "all")}
+          onClearFilters={handleClearFilters}
         />
       </div>
 
-      <Card>
-        <div className="p-6">
-          {totalCount > 0 && (
-            <div className="mb-4 text-sm text-muted-foreground">
-              {totalCount} kayıttan {(currentPage - 1) * PAGE_SIZE + 1} -{" "}
-              {Math.min(currentPage * PAGE_SIZE, totalCount)} arası görüntüleniyor
-            </div>
-          )}
-
-          <CardReadingsTable
-            readings={readings}
-            emptyMessage={emptyMessage}
-            showClearFilters={Boolean(searchTerm || dateFilter || accessFilter !== "all")}
-            onClearFilters={handleClearFilters}
-          />
-
-          {totalPages > 1 && (
-            <div className="mt-4">
-              <EmployeePagination
-                currentPage={currentPage}
-                totalPages={totalPages}
-                onPageChange={setCurrentPage}
-              />
-            </div>
-          )}
-        </div>
-      </Card>
+      {totalPages > 1 && (
+        <EmployeePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
+      )}
     </div>
   );
 };

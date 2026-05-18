@@ -1,6 +1,73 @@
 import { v } from "convex/values";
 import { adminQuery } from "./lib/customFunctions";
 
+interface PdksAuditPayload {
+  date?: string;
+  entryTime?: string;
+  exitTime?: string;
+  status?: string;
+  manualNote?: string;
+}
+
+function isPdksPayload(value: unknown): value is PdksAuditPayload {
+  return typeof value === "object" && value !== null;
+}
+
+export const getPdksAuditForEmployee = adminQuery({
+  args: {
+    employeeId: v.id("employees"),
+    startDate: v.string(),
+    endDate: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("auditLog")
+      .order("desc")
+      .take(500);
+    const filtered = rows.filter((r) => r.targetTable === "pdksRecords");
+
+    const userIds = new Set(filtered.map((r) => String(r.userId)));
+    const users = await Promise.all(
+      [...userIds].map(async (id) => {
+        const u = await ctx.db.get(id as never);
+        return u ? { id, name: (u as { name?: string; email?: string }).name ?? (u as { email?: string }).email ?? id } : null;
+      }),
+    );
+    const userMap = new Map(users.filter((u) => u !== null).map((u) => [u!.id, u!.name]));
+
+    return filtered
+      .map((r) => {
+        const newDate = isPdksPayload(r.newValue) ? r.newValue.date : undefined;
+        const oldDate = isPdksPayload(r.oldValue) ? r.oldValue.date : undefined;
+        const recordDate = newDate ?? oldDate;
+        if (recordDate && (recordDate < args.startDate || recordDate > args.endDate)) {
+          return null;
+        }
+        // Filter to this employee: heuristic — targetId starts with the employee
+        // id or oldValue/newValue includes it. Audit log doesn't index by
+        // employee directly, so we accept best-effort matching.
+        const targetIdStr = String(r.targetId);
+        const matchesEmployee =
+          targetIdStr === String(args.employeeId) ||
+          (isPdksPayload(r.newValue) && JSON.stringify(r.newValue).includes(String(args.employeeId))) ||
+          (isPdksPayload(r.oldValue) && JSON.stringify(r.oldValue).includes(String(args.employeeId)));
+        if (!matchesEmployee && targetIdStr !== "bulk-upsert") return null;
+
+        return {
+          id: String(r._id),
+          timestamp: r.timestamp,
+          action: r.action,
+          userName: userMap.get(String(r.userId)) ?? "Bilinmeyen",
+          date: recordDate,
+          oldValue: isPdksPayload(r.oldValue) ? r.oldValue : null,
+          newValue: isPdksPayload(r.newValue) ? r.newValue : null,
+          note: r.note,
+        };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+  },
+});
+
 export const list = adminQuery({
   args: {
     projectId: v.optional(v.id("projects")),

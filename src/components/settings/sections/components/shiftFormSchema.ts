@@ -17,6 +17,25 @@ export const shiftFormSchema = z
       .regex(TIME_REGEX, "HH:MM formatında olmalı")
       .optional()
       .or(z.literal("")),
+    lateToleranceMinutes: z
+      .number()
+      .int()
+      .min(0, "Negatif olamaz")
+      .max(240, "En çok 240 dakika")
+      .optional(),
+    earlyExitToleranceMinutes: z
+      .number()
+      .int()
+      .min(0, "Negatif olamaz")
+      .max(240, "En çok 240 dakika")
+      .optional(),
+    overtimeStartToleranceMinutes: z
+      .number()
+      .int()
+      .min(0, "Negatif olamaz")
+      .max(240, "En çok 240 dakika")
+      .optional(),
+    overtimeEnabled: z.boolean(),
     isActive: z.boolean(),
   })
   .refine(

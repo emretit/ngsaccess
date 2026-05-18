@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Download, FileText, FileSpreadsheet, FileType } from "lucide-react";
+import { useConvex } from "convex/react";
+import { Download, FileText, FileSpreadsheet, FileType, FileBadge } from "lucide-react";
+import { api } from "../../../../convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +43,46 @@ export function PDKSEnhancedExportPanel({
     "daily" | "weekly" | "monthly" | "custom"
   >("daily");
   const { toast } = useToast();
+  const convex = useConvex();
+
+  const handleSgkExport = async () => {
+    setIsExporting(true);
+    try {
+      const year = selectedDate.getFullYear();
+      const month = selectedDate.getMonth() + 1;
+      const result = await convex.query(api.sgkExport.buildAphbForMonth, {
+        year,
+        month,
+      });
+      if (!result.xml) {
+        toast({
+          title: "SGK XML üretilemedi",
+          description: "Veri bulunamadı.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const blob = new Blob([result.xml], { type: "application/xml" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = result.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast({
+        title: "SGK Aylık Bildirim",
+        description: `${result.filename} indirildi.`,
+      });
+    } catch (e) {
+      toast({
+        title: "SGK XML hatası",
+        description: e instanceof Error ? e.message : "Bilinmeyen hata",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const handleExport = async (exportType: "Excel" | "PDF" | "CSV") => {
     setIsExporting(true);
@@ -100,6 +142,10 @@ export function PDKSEnhancedExportPanel({
               <DropdownMenuItem onClick={() => handleExport("CSV")}>
                 <FileText className="mr-2 h-4 w-4 text-blue-600" />
                 CSV Verileri
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleSgkExport}>
+                <FileBadge className="mr-2 h-4 w-4 text-amber-600" />
+                SGK Aylık Bildirim (XML)
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

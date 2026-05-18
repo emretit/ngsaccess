@@ -7,8 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
-import { Id } from "../../../convex/_generated/dataModel";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
 interface AddZoneDialogProps {
   open: boolean;
@@ -21,7 +20,7 @@ export function AddZoneDialog({ open, onOpenChange, onSuccess }: AddZoneDialogPr
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { projectIds } = useProjectAccess();
+  const { projectId } = useActiveProject();
   const createZone = useMutation(api.zones.create);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,7 +34,7 @@ export function AddZoneDialog({ open, onOpenChange, onSuccess }: AddZoneDialogPr
       await createZone({
         name: name.trim(),
         description: description.trim() || undefined,
-        projectId: projectIds[0] as Id<"projects"> | undefined,
+        projectId,
       });
       toast({ title: "Başarılı", description: "Bölge başarıyla eklendi." });
       setName("");

@@ -63,7 +63,7 @@ export const exportReportsToExcel = {
   department: async (data: {
     year: number;
     month: number;
-    hourlyRate: number;
+    hourlyRate: number | null;
     overtimeMultiplier: number;
     rows: { department: string; overtimeHours: number; employeeCount: number; cost: number }[];
   }) => {
@@ -73,10 +73,55 @@ export const exportReportsToExcel = {
     const ws = workbook.addWorksheet("Maliyet");
     ws.addRow(["Departman Maliyet Analizi Raporu", "", "", ""]);
     ws.addRow([`Dönem: ${data.year}-${String(data.month).padStart(2, "0")}`, "", "", ""]);
-    ws.addRow([`Saatlik ücret: ${data.hourlyRate}₺, Mesai çarpanı: ${data.overtimeMultiplier}x`, "", "", ""]);
+    const rateLabel = data.hourlyRate !== null ? `${data.hourlyRate}₺` : "çalışan başına";
+    ws.addRow([`Saatlik ücret: ${rateLabel}, Mesai çarpanı: ${data.overtimeMultiplier}x`, "", "", ""]);
     ws.addRow([]);
     ws.addRow(headers);
     rows.forEach((r) => ws.addRow(r));
     await downloadExcel(workbook, `Departman_Maliyet_${data.year}_${String(data.month).padStart(2, "0")}.xlsx`);
+  },
+  shiftAssignments: async (data: {
+    rows: {
+      employee: string;
+      department: string;
+      shift: string;
+      startDate: string;
+      endDate: string;
+      durationDays: number;
+      weekPattern: string;
+      status: string;
+    }[];
+  }) => {
+    const headers = [
+      "Çalışan",
+      "Departman",
+      "Vardiya",
+      "Başlangıç",
+      "Bitiş",
+      "Süre (gün)",
+      "Günler",
+      "Durum",
+    ];
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet("Vardiya Atamaları");
+    ws.addRow(["Vardiya Atamaları", "", "", "", "", "", "", ""]);
+    ws.addRow([`Çıkartma tarihi: ${new Date().toLocaleString("tr-TR")}`, "", "", "", "", "", "", ""]);
+    ws.addRow([`Toplam kayıt: ${data.rows.length}`, "", "", "", "", "", "", ""]);
+    ws.addRow([]);
+    ws.addRow(headers);
+    data.rows.forEach((r) =>
+      ws.addRow([
+        r.employee,
+        r.department,
+        r.shift,
+        r.startDate,
+        r.endDate,
+        r.durationDays,
+        r.weekPattern,
+        r.status,
+      ]),
+    );
+    const stamp = new Date().toISOString().slice(0, 10);
+    await downloadExcel(workbook, `Vardiya_Atamalari_${stamp}.xlsx`);
   },
 };

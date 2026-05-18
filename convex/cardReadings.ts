@@ -18,7 +18,19 @@ import {
   multiplierForClassification,
   payrollCodeForDay,
   evaluateLateEarly,
+  dailyOvertimeForShift,
+  isoTimeToTRMinutes,
+  resolveHourlyRate,
+  overtimePayTRY,
 } from "./lib/pdksHelpers";
+import {
+  buildShiftResolver,
+  settingsForShift,
+  thresholdsForShift,
+} from "./lib/shiftResolver";
+import { netWorkMinutes } from "./lib/breakDeduction";
+import { bucketWeeklyOvertime, type DayEntry } from "./lib/overtimeCalc";
+import { inferAccessStatus, inferDenialReason } from "./lib/hikEventCodes";
 
 export const list = authedQuery({
   args: {
@@ -298,14 +310,17 @@ export const getPdksTableData = authedQuery({
       ctx.user.role === "super_admin"
         ? undefined
         : allowedProjectIds[0] ?? undefined;
-    const [workSettings, holidayMap, generalSettings] = await Promise.all([
-      getEffectiveWorkSettings(ctx, referenceProjectId),
-      getHolidaysMap(ctx, referenceProjectId, startDate, endDate),
-      ctx.db
-        .query("generalSettings")
-        .withIndex("by_project", (q) => q.eq("projectId", referenceProjectId))
-        .first(),
-    ]);
+    const [workSettings, holidayMap, generalSettings, shiftResolver, overtimeRates] =
+      await Promise.all([
+        getEffectiveWorkSettings(ctx, referenceProjectId),
+        getHolidaysMap(ctx, referenceProjectId, startDate, endDate),
+        ctx.db
+          .query("generalSettings")
+          .withIndex("by_project", (q) => q.eq("projectId", referenceProjectId))
+          .first(),
+        buildShiftResolver(ctx, employees),
+        getEffectiveOvertimeRates(ctx, referenceProjectId),
+      ]);
     const workingDays =
       generalSettings?.workingDays && generalSettings.workingDays.length > 0
         ? generalSettings.workingDays
@@ -333,9 +348,6 @@ export const getPdksTableData = authedQuery({
       }
     }
 
-    const STANDARD_DAY_MINUTES = 8 * 60;
-    const STANDARD_WEEK_MINUTES = 45 * 60;
-
     const allLeaves = await ctx.db
       .query("leaves")
       .filter((q) => q.eq(q.field("status"), "approved"))
@@ -347,6 +359,11 @@ export const getPdksTableData = authedQuery({
       excuse: "Mazeret",
       unpaid: "Ücretsiz",
       parental: "Doğum/Ebeveyn",
+      marriage: "Evlilik",
+      bereavement: "Vefat",
+      paternity: "Babalık",
+      lactation: "Süt izni",
+      compensatory: "Telafi",
     };
 
     const periodDateKeys: string[] = [];
@@ -358,11 +375,14 @@ export const getPdksTableData = authedQuery({
       periodDateKeys.push(d.toISOString().split("T")[0]);
     }
 
+    const tableDepartments = await ctx.db.query("departments").collect();
+    const tableDeptById = new Map(tableDepartments.map((d) => [String(d._id), d]));
+
     const tableData = await Promise.all(
       Array.from(employeeMap.entries()).map(async ([empKey, empReadings]) => {
         const employee = empById.get(empKey) ?? null;
         const department = employee?.departmentId
-          ? (await ctx.db.get(employee.departmentId)) as Doc<"departments"> | null
+          ? tableDeptById.get(String(employee.departmentId)) ?? null
           : null;
 
         const empId = employee?._id;
@@ -397,10 +417,17 @@ export const getPdksTableData = authedQuery({
           ? `${startDate}T${manualToday.exitTime}:00.000+03:00`
           : granted[granted.length - 1]?.accessTime;
 
+        const refDateISO = isSingleDay
+          ? startDate
+          : (firstEntryISO?.split("T")[0] ?? startDate);
+        const refShift = employee
+          ? shiftResolver.resolve(employee._id, refDateISO)
+          : null;
+        const refSettings = settingsForShift(refShift, workSettings);
         const { isLate, isEarlyExit } = evaluateLateEarly(
           firstEntryISO,
           lastExitISO !== firstEntryISO ? lastExitISO : undefined,
-          workSettings
+          refSettings,
         );
 
         let status: "present" | "late" | "absent" | "leave" = "present";
@@ -444,25 +471,69 @@ export const getPdksTableData = authedQuery({
 
         const totalHours = `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
 
-        const workDays = dayReadingsMap.size || (manualToday ? 1 : 0);
-        const overtimeMinutes =
-          workDays <= 1
-            ? Math.max(0, totalMinutes - STANDARD_DAY_MINUTES)
-            : Math.max(0, totalMinutes - STANDARD_WEEK_MINUTES);
-        const overtime = overtimeMinutes > 0 ? `${overtimeMinutes}m` : "0m";
-        const overtimeHours = overtimeMinutes / 60;
-
-        // Tek gün modunda günün tipine göre çarpan; period için workSettings.overtimeMultiplier
+        // Mesai hesabı: gün gün "vardiya bitişinden sonra geçen süre" (hafta sonu/tatil tüm gün)
+        let overtimeMinutes = 0;
         let overtimePayMultiplier = 0;
-        if (overtimeMinutes > 0) {
-          if (isSingleDay) {
-            const cls = classifyDay(startDate, workingDays, holidayMap.get(startDate));
-            const rates = await getEffectiveOvertimeRates(ctx, referenceProjectId);
-            overtimePayMultiplier = multiplierForClassification(cls, rates);
-          } else {
+
+        if (isSingleDay) {
+          const cls = classifyDay(startDate, workingDays, holidayMap.get(startDate));
+          let lastExitMin: number | undefined;
+          if (manualToday?.exitTime) {
+            lastExitMin = parseHHMM(manualToday.exitTime);
+          } else if (granted.length > 1) {
+            const sortedGranted = [...granted].sort(
+              (a, b) =>
+                new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
+            );
+            lastExitMin = isoTimeToTRMinutes(
+              sortedGranted[sortedGranted.length - 1].accessTime
+            );
+          }
+          overtimeMinutes = dailyOvertimeForShift({
+            classification: cls,
+            netMinutes: totalMinutes,
+            lastExitMinutes: lastExitMin,
+            shift: refShift,
+            workSettings,
+          });
+          if (overtimeMinutes > 0) {
+            overtimePayMultiplier = multiplierForClassification(cls, overtimeRates);
+          }
+        } else {
+          for (const [dk, dayReadings] of dayReadingsMap.entries()) {
+            if (dayReadings.length < 2) continue;
+            const dayFirstISO = dayReadings[0].accessTime;
+            const dayLastISO = dayReadings[dayReadings.length - 1].accessTime;
+            const dayNetMin = Math.floor(
+              (new Date(dayLastISO).getTime() - new Date(dayFirstISO).getTime()) / 60000
+            );
+            const dayCls = classifyDay(dk, workingDays, holidayMap.get(dk));
+            const dayShift = employee ? shiftResolver.resolve(employee._id, dk) : null;
+            overtimeMinutes += dailyOvertimeForShift({
+              classification: dayCls,
+              netMinutes: dayNetMin,
+              lastExitMinutes: isoTimeToTRMinutes(dayLastISO),
+              shift: dayShift,
+              workSettings,
+            });
+          }
+          if (overtimeMinutes > 0) {
             overtimePayMultiplier = workSettings.overtimeMultiplier;
           }
         }
+        const overtime = overtimeMinutes > 0 ? `${overtimeMinutes}m` : "0m";
+        const overtimeHours = overtimeMinutes / 60;
+
+        const hourlyRate = resolveHourlyRate({
+          hourlyRate: employee?.hourlyRate,
+          monthlySalary: employee?.monthlySalary,
+          monthlyHoursBase: workSettings.monthlyHoursBase,
+        });
+        const overtimePayAmountTRY = overtimePayTRY({
+          overtimeMinutes,
+          multiplier: overtimePayMultiplier,
+          hourlyRate,
+        });
 
         // payrollCode (tek gün için anlamlı; periodda günleri karıştırır)
         const payrollCode = isSingleDay
@@ -542,10 +613,14 @@ export const getPdksTableData = authedQuery({
               hasLeave: dayHasLeave,
               hasAttendance: !!firstISO,
             });
+            const dayShift = employee
+              ? shiftResolver.resolve(employee._id, dk)
+              : null;
+            const daySettings = settingsForShift(dayShift, workSettings);
             const { isLate: dayLate } = evaluateLateEarly(
               firstISO ?? undefined,
               lastISO ?? undefined,
-              workSettings
+              daySettings,
             );
             // late minutes
             let lateMinutes = 0;
@@ -553,8 +628,8 @@ export const getPdksTableData = authedQuery({
               const t = new Date(firstISO);
               const istanbulMins =
                 t.getUTCHours() * 60 + t.getUTCMinutes() + 3 * 60;
-              const startMins = parseHHMM(workSettings.workStartTime);
-              const tolerance = workSettings.maxLateMinutes ?? 0;
+              const startMins = parseHHMM(daySettings.workStartTime);
+              const tolerance = daySettings.maxLateMinutes ?? 0;
               lateMinutes = Math.max(
                 0,
                 (istanbulMins % (24 * 60)) - startMins - tolerance
@@ -570,7 +645,14 @@ export const getPdksTableData = authedQuery({
               dayStatus = "leave";
             }
 
-            const dayOvertime = Math.max(0, dayMinutes - STANDARD_DAY_MINUTES);
+            const dayLastExitMin = lastISO ? isoTimeToTRMinutes(lastISO) : undefined;
+            const dayOvertime = dailyOvertimeForShift({
+              classification: cls,
+              netMinutes: dayMinutes,
+              lastExitMinutes: dayLastExitMin,
+              shift: dayShift,
+              workSettings,
+            });
 
             days.push({
               date: dk,
@@ -626,6 +708,8 @@ export const getPdksTableData = authedQuery({
           overtime,
           overtimeHours,
           overtimeMultiplier: overtimePayMultiplier,
+          overtimePayTRY: overtimePayAmountTRY,
+          hourlyRate,
           yearlyOvertimeLimit: workSettings.annualOvertimeLimitHours,
           leaveType,
           status,
@@ -706,6 +790,7 @@ export const getPdksChartData = authedQuery({
         departmentAbsence: [],
         lateDistribution: [],
         hourlyTrend: [],
+        lateMinutesSamples: [],
       };
     }
 
@@ -718,8 +803,23 @@ export const getPdksChartData = authedQuery({
         ? undefined
         : allowedProjectIds[0] ?? undefined;
     const chartSettings = await getEffectiveWorkSettings(ctx, chartProjectId);
-    const lateThresholdMin =
+    const fallbackLateThresholdMin =
       parseHHMM(chartSettings.workStartTime) + chartSettings.maxLateMinutes;
+
+    const chartEmployees =
+      ctx.user.role === "super_admin"
+        ? await ctx.db.query("employees").collect()
+        : (
+            await Promise.all(
+              allowedProjectIds.map((pid) =>
+                ctx.db
+                  .query("employees")
+                  .withIndex("by_project", (q) => q.eq("projectId", pid))
+                  .collect(),
+              ),
+            )
+          ).flat();
+    const chartShiftResolver = await buildShiftResolver(ctx, chartEmployees);
 
     const dayNames = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
 
@@ -749,7 +849,8 @@ export const getPdksChartData = authedQuery({
       });
     }
 
-    const employeeDayMap = new Map<string, Map<string, { firstEntry?: string; hasLate: boolean }>>();
+    const employeeDayMap = new Map<string, Map<string, { firstEntry?: string; hasLate: boolean; lateMinutes: number }>>();
+    const lateMinutesSamples: number[] = [];
 
     for (const r of readings) {
       const empKey = r.employeeId ?? r.cardNo;
@@ -761,15 +862,20 @@ export const getPdksChartData = authedQuery({
         if (!employeeDayMap.has(empKey)) employeeDayMap.set(empKey, new Map());
         const empDay = employeeDayMap.get(empKey)!;
         if (!empDay.has(dateKey)) {
-          empDay.set(dateKey, { hasLate: false });
+          empDay.set(dateKey, { hasLate: false, lateMinutes: 0 });
         }
         const rec = empDay.get(dateKey)!;
         if (!rec.firstEntry) {
           rec.firstEntry = r.accessTime;
-          const tr = new Date(new Date(r.accessTime).getTime() + 3 * 60 * 60 * 1000);
-          const h = tr.getUTCHours();
-          const m = tr.getUTCMinutes();
-          rec.hasLate = h * 60 + m > lateThresholdMin;
+          const arrivalMin = isoTimeToTRMinutes(r.accessTime);
+          const shift = r.employeeId
+            ? chartShiftResolver.resolve(r.employeeId, dateKey)
+            : null;
+          const lateThresholdMin = shift
+            ? thresholdsForShift(shift, chartSettings).lateThresholdMin
+            : fallbackLateThresholdMin;
+          rec.hasLate = arrivalMin > lateThresholdMin;
+          rec.lateMinutes = Math.max(0, arrivalMin - lateThresholdMin);
         }
       }
     }
@@ -781,6 +887,7 @@ export const getPdksChartData = authedQuery({
         dayData.present.add(empKey);
         if (rec.hasLate) {
           dayData.late.add(empKey);
+          if (rec.lateMinutes > 0) lateMinutesSamples.push(rec.lateMinutes);
           const firstReading = readings.find((r) => (r.employeeId ?? r.cardNo) === empKey);
           if (firstReading?.employeeId && rec.firstEntry) {
             const h = new Date(rec.firstEntry).getHours();
@@ -862,6 +969,7 @@ export const getPdksChartData = authedQuery({
       departmentAbsence,
       lateDistribution,
       hourlyTrend,
+      lateMinutesSamples,
     };
   },
 });
@@ -941,7 +1049,7 @@ export const getMonthlyPayrollSheet = authedQuery({
       ctx.user.role === "super_admin"
         ? undefined
         : allowedProjectIds[0] ?? undefined;
-    const [workSettings, holidayMap, generalSettings, overtimeRates] =
+    const [workSettings, holidayMap, generalSettings, overtimeRates, payrollShiftResolver] =
       await Promise.all([
         getEffectiveWorkSettings(ctx, referenceProjectId),
         getHolidaysMap(ctx, referenceProjectId, startDate, endDate),
@@ -950,6 +1058,7 @@ export const getMonthlyPayrollSheet = authedQuery({
           .withIndex("by_project", (q) => q.eq("projectId", referenceProjectId))
           .first(),
         getEffectiveOvertimeRates(ctx, referenceProjectId),
+        buildShiftResolver(ctx, employees),
       ]);
     const workingDays =
       generalSettings?.workingDays && generalSettings.workingDays.length > 0
@@ -968,22 +1077,18 @@ export const getMonthlyPayrollSheet = authedQuery({
       .filter((q) => q.eq(q.field("status"), "approved"))
       .collect();
 
-    // Manuel pdksRecords her çalışan için ay aralığı
+    // Manuel pdksRecords her çalışan için ay aralığı (batch: tek query, in-memory filter)
     const empIds = employees.map((e) => e._id);
+    const empIdSet = new Set<string>(empIds.map((id) => String(id)));
     const manualByEmpDate = new Map<string, Doc<"pdksRecords">>();
-    for (const eid of empIds) {
-      const recs = await ctx.db
-        .query("pdksRecords")
-        .withIndex("by_employee_date", (q) => q.eq("employeeId", eid))
-        .filter((q) =>
-          q.and(
-            q.gte(q.field("date"), startDate),
-            q.lte(q.field("date"), endDate)
-          )
-        )
-        .collect();
+    const allRecs = await ctx.db
+      .query("pdksRecords")
+      .withIndex("by_date", (q) => q.gte("date", startDate).lte("date", endDate))
+      .collect();
+    const recs = allRecs.filter((r) => empIdSet.has(String(r.employeeId)));
+    {
       for (const r of recs) {
-        if (r.manualEntry) manualByEmpDate.set(`${eid}__${r.date}`, r);
+        if (r.manualEntry) manualByEmpDate.set(`${String(r.employeeId)}__${r.date}`, r);
       }
     }
 
@@ -1008,13 +1113,20 @@ export const getMonthlyPayrollSheet = authedQuery({
       empDayReadings.get(key)!.push(r);
     }
 
-    const STANDARD_DAY_MINUTES = 8 * 60;
+    const allDepartments = await ctx.db.query("departments").collect();
+    const deptById = new Map(allDepartments.map((d) => [String(d._id), d]));
 
     const rows = await Promise.all(
       employees.map(async (emp) => {
         const department = emp.departmentId
-          ? ((await ctx.db.get(emp.departmentId)) as Doc<"departments"> | null)
+          ? deptById.get(String(emp.departmentId)) ?? null
           : null;
+
+        const empHourlyRate = resolveHourlyRate({
+          hourlyRate: emp.hourlyRate,
+          monthlySalary: emp.monthlySalary,
+          monthlyHoursBase: workSettings.monthlyHoursBase,
+        });
 
         const cells = days.map((d) => {
           const manual = manualByEmpDate.get(`${emp._id}__${d}`);
@@ -1042,20 +1154,23 @@ export const getMonthlyPayrollSheet = authedQuery({
             hasAttendance,
           });
 
-          let totalMin = 0;
+          let rawTotalMin = 0;
+          let entryMin: number | undefined;
+          let exitMin: number | undefined;
           if (manual?.entryTime && manual?.exitTime) {
-            totalMin = Math.max(
-              0,
-              parseHHMM(manual.exitTime) - parseHHMM(manual.entryTime)
-            );
+            entryMin = parseHHMM(manual.entryTime);
+            exitMin = parseHHMM(manual.exitTime);
+            rawTotalMin = Math.max(0, exitMin - entryMin);
           } else if (dayReadings.length >= 2) {
             const first = dayReadings[0];
             const last = dayReadings[dayReadings.length - 1];
-            totalMin = Math.floor(
+            rawTotalMin = Math.floor(
               (new Date(last.accessTime).getTime() -
                 new Date(first.accessTime).getTime()) /
                 60000
             );
+            entryMin = isoTimeToTRMinutes(first.accessTime);
+            exitMin = isoTimeToTRMinutes(last.accessTime);
           }
 
           const entryISO = manual?.entryTime
@@ -1064,20 +1179,35 @@ export const getMonthlyPayrollSheet = authedQuery({
           const exitISO = manual?.exitTime
             ? `${d}T${manual.exitTime}:00.000`
             : dayReadings[dayReadings.length - 1]?.accessTime;
+          const dayShift = payrollShiftResolver.resolve(emp._id, d);
+          const daySettings = settingsForShift(dayShift, workSettings);
           const { isLate, isEarlyExit } = evaluateLateEarly(
             entryISO,
             exitISO !== entryISO ? exitISO : undefined,
-            workSettings
+            daySettings
           );
 
-          const overtimeMin =
-            cls === "workday"
-              ? Math.max(0, totalMin - STANDARD_DAY_MINUTES)
-              : totalMin; // weekend/holiday: tüm çalışılan süre FM
+          const totalMin = netWorkMinutes(rawTotalMin, dayShift, {
+            entryMinutes: entryMin,
+            exitMinutes: exitMin,
+          });
+
+          const overtimeMin = dailyOvertimeForShift({
+            classification: cls,
+            netMinutes: totalMin,
+            lastExitMinutes: exitMin,
+            shift: dayShift,
+            workSettings,
+          });
           const multiplier =
             overtimeMin > 0
               ? multiplierForClassification(cls, overtimeRates)
               : 0;
+          const overtimePayAmount = overtimePayTRY({
+            overtimeMinutes: overtimeMin,
+            multiplier,
+            hourlyRate: empHourlyRate,
+          });
 
           return {
             date: d,
@@ -1085,16 +1215,30 @@ export const getMonthlyPayrollSheet = authedQuery({
             totalMinutes: totalMin,
             overtimeMinutes: overtimeMin,
             multiplier,
+            overtimePayTRY: overtimePayAmount,
             isLate,
             isEarlyExit,
             isManual: !!manual,
+            classification: cls,
           };
         });
+
+        const dayEntries: DayEntry[] = cells.map((c) => ({
+          date: c.date,
+          netMinutes: c.totalMinutes,
+          classification: c.classification,
+        }));
+        const buckets = bucketWeeklyOvertime(dayEntries);
+        const weeklyOvertimeMin = buckets.reduce(
+          (s, b) => s + b.overtimeMinutes + b.premiumMinutes,
+          0,
+        );
+        const exceedsDaily11h = buckets.flatMap((b) => b.exceedsDaily11h);
 
         const totals = cells.reduce(
           (acc, c) => {
             acc.totalMinutes += c.totalMinutes;
-            acc.overtimeMinutes += c.overtimeMinutes;
+            acc.overtimePayTRY += c.overtimePayTRY ?? 0;
             if (c.payrollCode === "İZN") acc.leaveDays += 1;
             if (c.payrollCode === "DV") acc.absentDays += 1;
             if (c.isLate) acc.lateDays += 1;
@@ -1102,7 +1246,7 @@ export const getMonthlyPayrollSheet = authedQuery({
           },
           {
             totalMinutes: 0,
-            overtimeMinutes: 0,
+            overtimePayTRY: 0,
             leaveDays: 0,
             absentDays: 0,
             lateDays: 0,
@@ -1115,8 +1259,14 @@ export const getMonthlyPayrollSheet = authedQuery({
           name: `${emp.firstName} ${emp.lastName}`.trim(),
           cardNumber: emp.cardNumber,
           department: department?.name ?? "-",
+          hourlyRate: empHourlyRate,
           cells,
-          totals,
+          totals: {
+            ...totals,
+            overtimeMinutes: weeklyOvertimeMin,
+            overtimePayTRY: empHourlyRate !== null ? totals.overtimePayTRY : null,
+            exceedsDaily11h,
+          },
         };
       })
     );
@@ -1206,6 +1356,19 @@ export const processCardReading = internalMutation({
     deviceSerial: v.string(),
     deviceIp: v.optional(v.string()),
     rawBody: v.optional(v.string()),
+    hikDevIndex: v.optional(v.string()),
+    hikEhomeID: v.optional(v.string()),
+    hikMajorEventType: v.optional(v.number()),
+    hikSubEventType: v.optional(v.number()),
+    hikCurrentVerifyMode: v.optional(v.string()),
+    hikSerialNo: v.optional(v.number()),
+    hikFrontSerialNo: v.optional(v.number()),
+    hikDateTime: v.optional(v.string()),
+    hikPictureURL: v.optional(v.string()),
+    hikMask: v.optional(v.string()),
+    hikHelmet: v.optional(v.string()),
+    hikTemperature: v.optional(v.number()),
+    hikEventState: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const accessTime = new Date().toISOString();
@@ -1214,6 +1377,22 @@ export const processCardReading = internalMutation({
       employeeProject: typeof firstProjectId,
       deviceProject: typeof firstProjectId
     ) => employeeProject ?? deviceProject ?? firstProjectId;
+
+    // Tüm cardReadings insert'lerine spread edilecek Hikvision metadata
+    const hikFields = {
+      hikDevIndex: args.hikDevIndex,
+      hikMajorEventType: args.hikMajorEventType,
+      hikSubEventType: args.hikSubEventType,
+      hikCurrentVerifyMode: args.hikCurrentVerifyMode,
+      hikSerialNo: args.hikSerialNo,
+      hikFrontSerialNo: args.hikFrontSerialNo,
+      hikDateTime: args.hikDateTime,
+      hikPictureURL: args.hikPictureURL,
+      hikMask: args.hikMask,
+      hikHelmet: args.hikHelmet,
+      hikTemperature: args.hikTemperature,
+      hikEventState: args.hikEventState,
+    } as const;
 
     // 1. Cihazı serial veya IP ile bul (her zaman - kayıt için gerekli)
     let device = null;
@@ -1225,9 +1404,97 @@ export const processCardReading = internalMutation({
         )
         .first();
     }
+    // Gateway-passthrough event'inde serial yerine devIndex gelir → indexli lookup
+    if (!device && args.hikDevIndex?.trim()) {
+      device = await ctx.db
+        .query("devices")
+        .withIndex("by_hik_dev_index", (q) =>
+          q.eq("hikDevIndex", args.hikDevIndex!.trim())
+        )
+        .first();
+    }
+    // Cihaz event'i `deviceID` field'ında ehomeID gönderir (gateway register'da atadığımız)
+    if (!device && args.hikEhomeID?.trim()) {
+      device = await ctx.db
+        .query("devices")
+        .withIndex("by_ehome_id", (q) =>
+          q.eq("ehomeID", args.hikEhomeID!.trim())
+        )
+        .first();
+    }
     if (!device && args.deviceIp?.trim()) {
-      const all = await ctx.db.query("devices").collect();
-      device = all.find((d) => d.deviceIp?.trim() === args.deviceIp!.trim()) ?? null;
+      device = await ctx.db
+        .query("devices")
+        .withIndex("by_device_ip", (q) =>
+          q.eq("deviceIp", args.deviceIp!.trim())
+        )
+        .first();
+    }
+
+    // Hikvision brand-dispatch: karar cihazda verilir, biz sadece audit yazarız.
+    // QR vs. cihazlar aşağıdaki mevcut akışa düşer (Convex DB lookup → granted hesapla).
+    if (device?.brand === "hikvision") {
+      const inferred = inferAccessStatus(
+        args.hikMajorEventType,
+        args.hikSubEventType,
+      );
+      const accessStatus: "izin_verildi" | "reddedildi" =
+        inferred ?? "reddedildi";
+      const granted = accessStatus === "izin_verildi";
+      const denialReason = granted
+        ? undefined
+        : inferDenialReason(args.hikSubEventType);
+
+      const employee = await ctx.db
+        .query("employees")
+        .withIndex("by_card", (q) => q.eq("cardNumber", args.cardNo))
+        .first();
+
+      const direction = employee
+        ? await resolveDirection(ctx, {
+            device,
+            employeeId: employee._id,
+            nowISO: accessTime,
+          })
+        : undefined;
+
+      // serialNo gap detection — event ardışıklığı bozulduysa AcsEvent backfill için işaretle.
+      // Şimdilik sadece warn log; Phase 5.2'de history backfill kuyruğu eklenecek.
+      if (
+        args.hikSerialNo !== undefined &&
+        args.hikFrontSerialNo !== undefined &&
+        device.hikLastSerialNo !== undefined &&
+        args.hikFrontSerialNo !== device.hikLastSerialNo
+      ) {
+        console.warn(
+          `[hik-event-gap] device=${device.name} expected front=${device.hikLastSerialNo} got=${args.hikFrontSerialNo} current=${args.hikSerialNo}`,
+        );
+      }
+      if (
+        args.hikSerialNo !== undefined &&
+        args.hikSerialNo !== device.hikLastSerialNo
+      ) {
+        await ctx.db.patch(device._id, { hikLastSerialNo: args.hikSerialNo });
+      }
+
+      await ctx.db.insert("cardReadings", {
+        projectId: projectForRow(employee?.projectId, device.projectId),
+        deviceId: device._id,
+        employeeId: employee?._id,
+        cardNo: args.cardNo,
+        employeeName: employee
+          ? `${employee.firstName} ${employee.lastName}`
+          : undefined,
+        accessTime,
+        accessStatus,
+        direction,
+        rawData: args.rawBody,
+        ...hikFields,
+        hikDenialReason: denialReason,
+        createdAt: accessTime,
+        updatedAt: accessTime,
+      });
+      return { granted };
     }
 
     // Mobil dinamik QR token branch'i: cihaz QR'ı kart gibi POST'lar.
@@ -1247,6 +1514,7 @@ export const processCardReading = internalMutation({
           accessTime,
           accessStatus: "reddedildi",
           rawData: args.rawBody,
+          ...hikFields,
           createdAt: accessTime,
           updatedAt: accessTime,
         });
@@ -1262,6 +1530,7 @@ export const processCardReading = internalMutation({
           accessTime,
           accessStatus: "reddedildi",
           rawData: args.rawBody,
+          ...hikFields,
           createdAt: accessTime,
           updatedAt: accessTime,
         });
@@ -1277,6 +1546,7 @@ export const processCardReading = internalMutation({
           accessTime,
           accessStatus: "reddedildi",
           rawData: args.rawBody,
+          ...hikFields,
           createdAt: accessTime,
           updatedAt: accessTime,
         });
@@ -1293,6 +1563,7 @@ export const processCardReading = internalMutation({
           accessTime,
           accessStatus: "reddedildi",
           rawData: args.rawBody,
+          ...hikFields,
           createdAt: accessTime,
           updatedAt: accessTime,
         });
@@ -1304,12 +1575,16 @@ export const processCardReading = internalMutation({
       if (device) {
         const deviceGroups = await ctx.db
           .query("groupDevices")
-          .withIndex("by_device", (q) => q.eq("deviceId", device._id))
+          .withIndex("by_project_device", (q) =>
+            q.eq("projectId", device.projectId).eq("deviceId", device._id),
+          )
           .collect();
         const groupIds = deviceGroups.map((gd) => gd.groupId);
         const employeeAccessGroups = await ctx.db
           .query("groupMembers")
-          .withIndex("by_employee", (q) => q.eq("employeeId", tokenEmployee._id))
+          .withIndex("by_project_employee", (q) =>
+            q.eq("projectId", tokenEmployee.projectId).eq("employeeId", tokenEmployee._id),
+          )
           .collect();
         const employeeGroupIds = new Set(
           employeeAccessGroups.map((gm) => gm.groupId)
@@ -1342,6 +1617,7 @@ export const processCardReading = internalMutation({
         accessStatus: tokenHasAccess ? "izin_verildi" : "reddedildi",
         direction: tokenDirection,
         rawData: args.rawBody,
+        ...hikFields,
         createdAt: accessTime,
         updatedAt: accessTime,
       });
@@ -1362,6 +1638,7 @@ export const processCardReading = internalMutation({
         accessTime,
         accessStatus: "reddedildi",
         rawData: args.rawBody,
+        ...hikFields,
         createdAt: accessTime,
         updatedAt: accessTime,
       });
@@ -1378,6 +1655,7 @@ export const processCardReading = internalMutation({
         accessTime,
         accessStatus: "reddedildi",
         rawData: args.rawBody,
+        ...hikFields,
         createdAt: accessTime,
         updatedAt: accessTime,
       });
@@ -1393,6 +1671,7 @@ export const processCardReading = internalMutation({
         accessTime,
         accessStatus: "reddedildi",
         rawData: args.rawBody,
+        ...hikFields,
         createdAt: accessTime,
         updatedAt: accessTime,
       });
@@ -1402,7 +1681,9 @@ export const processCardReading = internalMutation({
     // 3. Cihazın hiçbir grupta olup olmadığını kontrol et
     const deviceGroups = await ctx.db
       .query("groupDevices")
-      .withIndex("by_device", (q) => q.eq("deviceId", device._id))
+      .withIndex("by_project_device", (q) =>
+        q.eq("projectId", device.projectId).eq("deviceId", device._id),
+      )
       .collect();
 
     if (deviceGroups.length === 0) {
@@ -1421,6 +1702,7 @@ export const processCardReading = internalMutation({
         accessStatus: "reddedildi",
         direction: noGroupDirection,
         rawData: args.rawBody,
+        ...hikFields,
         createdAt: accessTime,
         updatedAt: accessTime,
       });
@@ -1431,7 +1713,9 @@ export const processCardReading = internalMutation({
     const groupIds = deviceGroups.map((gd) => gd.groupId);
     const employeeAccessGroups = await ctx.db
       .query("groupMembers")
-      .withIndex("by_employee", (q) => q.eq("employeeId", employee._id))
+      .withIndex("by_project_employee", (q) =>
+        q.eq("projectId", employee.projectId).eq("employeeId", employee._id),
+      )
       .collect();
 
     const employeeGroupIds = new Set(employeeAccessGroups.map((gm) => gm.groupId));
@@ -1462,6 +1746,7 @@ export const processCardReading = internalMutation({
       accessStatus: hasAccess ? "izin_verildi" : "reddedildi",
       direction: cardDirection,
       rawData: args.rawBody,
+      ...hikFields,
       createdAt: accessTime,
       updatedAt: accessTime,
     });
@@ -1469,8 +1754,9 @@ export const processCardReading = internalMutation({
     // 6. Geç kalma bildirimi (hasAccess + geç giriş)
     if (hasAccess) {
       const settings = await getEffectiveWorkSettings(ctx, employee.projectId);
-      const lateThresholdMin =
-        parseHHMM(settings.workStartTime) + settings.maxLateMinutes;
+      const dayShiftResolver = await buildShiftResolver(ctx, [employee]);
+      const dayShift = dayShiftResolver.resolve(employee._id, accessTime.split("T")[0]);
+      const { lateThresholdMin } = thresholdsForShift(dayShift, settings);
       const tr = new Date(new Date(accessTime).getTime() + 3 * 60 * 60 * 1000);
       const h = tr.getUTCHours();
       const m = tr.getUTCMinutes();
@@ -1575,13 +1861,17 @@ export const selfCheckIn = employeeAuthedMutation({
 
     const deviceGroups = await ctx.db
       .query("groupDevices")
-      .withIndex("by_device", (q) => q.eq("deviceId", device._id))
+      .withIndex("by_project_device", (q) =>
+        q.eq("projectId", device.projectId).eq("deviceId", device._id),
+      )
       .collect();
     const groupIds = deviceGroups.map((g) => g.groupId);
 
     const employeeGroups = await ctx.db
       .query("groupMembers")
-      .withIndex("by_employee", (q) => q.eq("employeeId", employee._id))
+      .withIndex("by_project_employee", (q) =>
+        q.eq("projectId", employee.projectId).eq("employeeId", employee._id),
+      )
       .collect();
     const employeeGroupIds = new Set(employeeGroups.map((g) => g.groupId));
     const matching = groupIds.filter((g) => employeeGroupIds.has(g));
@@ -1666,7 +1956,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
 
     const referenceProjectId =
       ctx.user.role === "super_admin" ? undefined : employee.projectId;
-    const [workSettings, holidayMap, generalSettings, manualRecords, leaves, department, company, position, shift] =
+    const [workSettings, holidayMap, generalSettings, manualRecords, leaves, department, company, position, shift, detailShiftResolver] =
       await Promise.all([
         getEffectiveWorkSettings(ctx, referenceProjectId),
         getHolidaysMap(ctx, referenceProjectId, args.startDate, args.endDate),
@@ -1693,6 +1983,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
         employee.companyId ? ctx.db.get(employee.companyId) : Promise.resolve(null),
         employee.positionId ? ctx.db.get(employee.positionId) : Promise.resolve(null),
         employee.shiftId ? ctx.db.get(employee.shiftId) : Promise.resolve(null),
+        buildShiftResolver(ctx, [employee]),
       ]);
 
     const workingDays =
@@ -1762,10 +2053,12 @@ export const getEmployeeAttendanceDetail = authedQuery({
           hasLeave,
           hasAttendance: !!firstISO,
         });
+        const dayShift = detailShiftResolver.resolve(employee._id, dk);
+        const daySettingsForLate = settingsForShift(dayShift, workSettings);
         const { isLate, isEarlyExit } = evaluateLateEarly(
           firstISO ?? undefined,
           lastISO ?? undefined,
-          workSettings
+          daySettingsForLate
         );
 
         let status: "present" | "late" | "absent" | "leave" | "weekend" | "holiday" = "absent";
@@ -1774,7 +2067,9 @@ export const getEmployeeAttendanceDetail = authedQuery({
         if (firstISO) status = isLate ? "late" : "present";
         else if (hasLeave) status = "leave";
 
-        const overtimeMinutes = Math.max(0, totalMinutes - 8 * 60);
+        const netMinutes = netWorkMinutes(totalMinutes, dayShift);
+        const overtimeMinutes = Math.max(0, netMinutes - 8 * 60);
+        totalMinutes = netMinutes;
 
         return {
           date: dk,

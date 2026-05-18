@@ -10,6 +10,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -49,18 +59,21 @@ export function AssignmentEditDialog({
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [busy, setBusy] = useState(false);
+  const [overlapCount, setOverlapCount] = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (assignment && open) {
       setShiftId(assignment.shiftId);
       setStartDate(assignment.startDate);
       setEndDate(assignment.endDate);
+      setOverlapCount(null);
     }
   }, [assignment, open]);
 
   if (!assignment) return null;
 
-  const handleSave = async () => {
+  const saveImpl = async (forceConfirm: boolean) => {
     if (startDate > endDate) {
       toast({
         title: "Hatalı tarih",
@@ -76,30 +89,41 @@ export function AssignmentEditDialog({
         shiftId: shiftId as Id<"shifts">,
         startDate,
         endDate,
+        forceConfirm,
       });
       toast({ title: "Atama güncellendi" });
+      setOverlapCount(null);
       onOpenChange(false);
     } catch (e) {
-      toast({
-        title: "Hata",
-        description: e instanceof Error ? e.message : "Güncellenemedi",
-        variant: "destructive",
-      });
+      const msg = e instanceof Error ? e.message : "Güncellenemedi";
+      const overlapMatch = /OVERLAP:(\d+)/.exec(msg);
+      if (overlapMatch) {
+        setOverlapCount(Number(overlapMatch[1]));
+      } else {
+        toast({
+          title: "Atama güncellenemedi",
+          description: msg,
+          variant: "destructive",
+        });
+      }
     } finally {
       setBusy(false);
     }
   };
+
+  const handleSave = () => saveImpl(false);
 
   const handleDelete = async () => {
     setBusy(true);
     try {
       await removeAssignment({ assignmentId: assignment._id });
       toast({ title: "Atama silindi" });
+      setConfirmDelete(false);
       onOpenChange(false);
     } catch (e) {
       toast({
-        title: "Hata",
-        description: e instanceof Error ? e.message : "Silinemedi",
+        title: "Atama silinemedi",
+        description: e instanceof Error ? e.message : "Bilinmeyen hata",
         variant: "destructive",
       });
     } finally {
@@ -164,7 +188,7 @@ export function AssignmentEditDialog({
               type="button"
               variant="ghost"
               size="sm"
-              onClick={handleDelete}
+              onClick={() => setConfirmDelete(true)}
               disabled={busy}
               className="text-destructive hover:text-destructive"
             >
@@ -188,6 +212,58 @@ export function AssignmentEditDialog({
           </div>
         </div>
       </DialogContent>
+
+      <AlertDialog
+        open={overlapCount !== null}
+        onOpenChange={(o) => !o && setOverlapCount(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Çakışan atama var</AlertDialogTitle>
+            <AlertDialogDescription>
+              Yeni tarih aralığı çalışanın {overlapCount} mevcut atamasıyla
+              çakışıyor. Yine de kaydetmek istiyor musunuz?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Vazgeç</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void saveImpl(true);
+              }}
+              disabled={busy}
+            >
+              Yine de Kaydet
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Atamayı sil</AlertDialogTitle>
+            <AlertDialogDescription>
+              Bu atamayı silmek istediğinizden emin misiniz? İşlem geri
+              alınamaz.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>Vazgeç</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void handleDelete();
+              }}
+              disabled={busy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

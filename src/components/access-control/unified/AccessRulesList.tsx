@@ -5,10 +5,15 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useAccessRules } from "@/hooks/useAccessRules";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Plus, Users, Monitor, ChevronDown, ChevronUp, Edit, Trash2, Clock, Calendar } from "lucide-react";
+import { Loader2, Plus, Users, Monitor, ChevronDown, ChevronUp, Edit, Trash2, Clock, Calendar, UploadCloud, Shield } from "lucide-react";
 import { useState } from "react";
+import { useAction } from "convex/react";
+import { api } from "../../../../convex/_generated/api";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useLocationUtils } from "@/hooks/useLocationUtils";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { useDeviceSyncing, deviceSyncStore } from "@/hooks/access-rules/deviceSyncStore";
+import { formatWeekdaysAbbr } from "./components/weekdays";
 import type { AccessRule, GroupMember, GroupDevice } from "@/types/access-control";
 import {
   AlertDialog,
@@ -32,6 +37,37 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
   const [expandedRules, setExpandedRules] = useState<Set<string>>(new Set());
   const [optimisticActive, setOptimisticActive] = useState<Map<string, boolean>>(new Map());
   const { getDeviceLocationDisplay } = useLocationUtils();
+  const { projectId } = useActiveProject();
+  const currentProjectId = projectId ?? null;
+  const backfillRules = useAction(api.actions.hikvisionSync.backfillAllRulesToDevices);
+  const isDeviceSyncing = useDeviceSyncing();
+
+  const handleBackfill = async () => {
+    if (!currentProjectId) {
+      toast({
+        title: "Proje seçilmedi",
+        description: "Önce bir proje seçin.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const finish = deviceSyncStore.start();
+    try {
+      const res = await backfillRules({ projectId: currentProjectId });
+      toast({
+        title: "Cihazlara push tamam",
+        description: `${res.rulesProcessed} kural · ${res.synced} başarılı · ${res.failed} hata`,
+      });
+    } catch (e) {
+      toast({
+        title: "Push başarısız",
+        description: (e as Error).message,
+        variant: "destructive",
+      });
+    } finally {
+      finish();
+    }
+  };
 
   const handleToggleActive = async (rule: AccessRule, next: boolean) => {
     const ruleId = String(rule._id);
@@ -126,18 +162,6 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
     );
   }
 
-  const formatDays = (days: string[]) => {
-    const dayMap: Record<string, string> = {
-      'Monday': 'Pzt',
-      'Tuesday': 'Sal',
-      'Wednesday': 'Çar',
-      'Thursday': 'Per',
-      'Friday': 'Cum',
-      'Saturday': 'Cmt',
-      'Sunday': 'Paz'
-    };
-    return days.map(day => dayMap[day] || day).join(', ');
-  };
 
   const renderEmployees = (rule: AccessRule) => {
     const employees = rule.groupMembers?.map((gm: GroupMember) => gm.employees).filter(Boolean) ?? [];
@@ -192,19 +216,52 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Erişim Kuralları</h2>
-          <p className="text-muted-foreground mt-1">Çalışan erişim kurallarını yönetin ve düzenleyin</p>
+    <div className="space-y-3">
+      <div className="rounded-xl border bg-card shadow-xs p-4 md:p-6">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 mr-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+              <Shield className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold leading-tight">Erişim Kuralları</h2>
+              <p className="text-xs text-muted-foreground">
+                {(rules as AccessRule[]).length} kural tanımlı
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 ml-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleBackfill}
+              disabled={isDeviceSyncing || !currentProjectId}
+              className="h-8 gap-1.5 text-xs"
+              title={
+                !currentProjectId
+                  ? "Önce bir proje seçin"
+                  : isDeviceSyncing
+                  ? "Cihaz senkronizasyonu devam ediyor..."
+                  : "Aktif projedeki tüm kuralları Hikvision cihazlara push eder"
+              }
+            >
+              {isDeviceSyncing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <UploadCloud className="h-3.5 w-3.5" />
+              )}
+              {isDeviceSyncing ? "Senkronize ediliyor..." : "Cihazlara Push Et"}
+            </Button>
+            <Button onClick={onCreateRule} size="sm" className="h-8 gap-1.5 text-xs">
+              <Plus className="h-3.5 w-3.5" />
+              Yeni Kural
+            </Button>
+          </div>
         </div>
-        <Button onClick={onCreateRule} className="bg-primary hover:bg-primary/90">
-          <Plus className="h-4 w-4 mr-2" />
-          Yeni Kural
-        </Button>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {(rules as AccessRule[]).map((rule) => {
           const ruleId = String(rule._id);
           return (
@@ -322,7 +379,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                     <div>
                       <span className="text-sm font-medium">Günler</span>
                       <p className="text-xs text-muted-foreground">
-                        {formatDays(rule.days || [])}
+                        {formatWeekdaysAbbr(rule.days || [])}
                       </p>
                     </div>
                   </div>

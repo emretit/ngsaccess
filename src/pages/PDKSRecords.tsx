@@ -8,16 +8,23 @@ import { PDKSTableView } from "@/components/pdks/dashboard/PDKSTableView";
 import { PDKSHeatmapView } from "@/components/pdks/dashboard/PDKSHeatmapView";
 import { PDKSEmployeeDetailDrawer } from "@/components/pdks/dashboard/PDKSEmployeeDetailDrawer";
 import { PDKSChartView } from "@/components/pdks/dashboard/PDKSChartView";
-import { PDKSRealTimeWidget } from "@/components/pdks/dashboard/PDKSRealTimeWidget";
 import { PDKSEnhancedExportPanel } from "@/components/pdks/dashboard/PDKSEnhancedExportPanel";
 import { PDKSMobileDrawer } from "@/components/pdks/dashboard/PDKSMobileDrawer";
+import { PDKSQuickPresets } from "@/components/pdks/dashboard/PDKSQuickPresets";
+import { PDKSActiveFilterChips } from "@/components/pdks/dashboard/PDKSActiveFilterChips";
+import { PDKSSavedViews } from "@/components/pdks/dashboard/PDKSSavedViews";
+import { PDKSOvertimeAlert } from "@/components/pdks/dashboard/PDKSOvertimeAlert";
+import { PDKSImportDialog } from "@/components/pdks/dashboard/PDKSImportDialog";
+import { PDKSSmartPresets, type SmartPresetSelection } from "@/components/pdks/dashboard/PDKSSmartPresets";
+import { Upload } from "lucide-react";
 import { PDKSAiChat } from "@/components/pdks/PDKSAiChat";
-import { usePdksRecords } from "@/hooks/usePdksRecords";
+import { PDKSInlineQuery } from "@/components/pdks/PDKSInlineQuery";
 import { usePdksStats } from "@/hooks/usePdksStats";
 import { usePdksTableData } from "@/hooks/usePdksTableData";
+import { usePdksFilterParams } from "@/hooks/usePdksFilterParams";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, BarChart3, Table2, RefreshCw, Activity, Download, X, Calendar as CalendarIcon, LayoutGrid } from "lucide-react";
+import { MessageSquare, BarChart3, Table2, RefreshCw, Download, X, Calendar as CalendarIcon, LayoutGrid } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -36,14 +43,15 @@ const DEFAULT_FILTERS: FilterValues = {
 export default function PDKSRecords() {
   const [activeTab, setActiveTab] = useState("table");
   const [showAiChat, setShowAiChat] = useState(false);
-  const [filters, setFilters] = useState<FilterValues>(DEFAULT_FILTERS);
+  const [showImport, setShowImport] = useState(false);
+  const [smartPreset, setSmartPreset] = useState<SmartPresetSelection | null>(null);
+  const { filters, setFilters } = usePdksFilterParams(DEFAULT_FILTERS);
   const [drilldown, setDrilldown] = useState<{
     employeeId: Id<"employees">;
     date?: string;
   } | null>(null);
   const { toast } = useToast();
 
-  const { loading, handleRefresh } = usePdksRecords();
   const { stats: summaryData, isLoading: statsLoading } = usePdksStats({
     companyId: filters.companyId,
     departmentId: filters.departmentId,
@@ -53,7 +61,7 @@ export default function PDKSRecords() {
   });
 
   const {
-    tableRecords,
+    tableRecords: rawTableRecords,
     isLoading: tableLoading,
     selectedDate,
     dateRangeLabel,
@@ -61,8 +69,13 @@ export default function PDKSRecords() {
     endDate,
   } = usePdksTableData(filters);
 
+  const tableRecords = smartPreset
+    ? rawTableRecords.filter((r) =>
+        smartPreset.employeeIds.some((id) => String(id) === String(r.id)),
+      )
+    : rawTableRecords;
+
   const handleRefreshData = () => {
-    handleRefresh();
     toast({
       title: "Veriler güncellendi",
       description: "PDKS verileri yenilendi.",
@@ -79,9 +92,12 @@ export default function PDKSRecords() {
     (filters.statusFilter !== "all" ? 1 : 0) +
     (filters.person ? 1 : 0);
 
-  const handleCardClick = useCallback((status: StatusFilter) => {
-    setFilters((f) => ({ ...f, statusFilter: status }));
-  }, []);
+  const handleCardClick = useCallback(
+    (status: StatusFilter) => {
+      setFilters({ ...filters, statusFilter: status });
+    },
+    [filters, setFilters]
+  );
 
   const handleHeatmapCellClick = useCallback(
     (employeeId: string, date: string) => {
@@ -90,7 +106,7 @@ export default function PDKSRecords() {
     []
   );
 
-  if (loading || statsLoading) {
+  if (statsLoading) {
     return <LoadingSpinner text="PDKS kayıtları yükleniyor..." />;
   }
 
@@ -110,19 +126,6 @@ export default function PDKSRecords() {
             <Badge variant="secondary" className="text-xs">
               {tableRecords.length} çalışan
             </Badge>
-            {filters.statusFilter !== "all" && (
-              <Badge variant="default" className="text-xs gap-1">
-                Filtre: {filters.statusFilter}
-                <button
-                  onClick={() =>
-                    setFilters((f) => ({ ...f, statusFilter: "all" }))
-                  }
-                  className="hover:opacity-70"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -135,20 +138,21 @@ export default function PDKSRecords() {
             <RefreshCw className="h-4 w-4" />
             <span className="hidden sm:inline">Yenile</span>
           </Button>
+          <PDKSSavedViews filters={filters} onApply={setFilters} />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowImport(true)}
+            className="gap-2"
+          >
+            <Upload className="h-4 w-4" />
+            <span className="hidden sm:inline">İçe Aktar</span>
+          </Button>
           <PDKSMobileDrawer
             values={filters}
             onChange={setFilters}
             activeFilterCount={activeFilterCount}
           />
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowAiChat(true)}
-            className="gap-2 border-primary text-primary hover:bg-primary/5"
-          >
-            <MessageSquare className="h-4 w-4" />
-            <span className="hidden sm:inline">AI Asistan</span>
-          </Button>
         </div>
       </div>
 
@@ -156,12 +160,27 @@ export default function PDKSRecords() {
         <PDKSFilterBar values={filters} onChange={setFilters} />
       </div>
 
+      <div className="flex flex-wrap items-center gap-3">
+        <PDKSQuickPresets values={filters} onChange={setFilters} />
+        <PDKSActiveFilterChips values={filters} onChange={setFilters} />
+      </div>
+
+      <PDKSSmartPresets selection={smartPreset} onChange={setSmartPreset} />
+
+      <PDKSOvertimeAlert />
+
       <PDKSSummaryCards data={summaryData} onCardClick={handleCardClick} />
+
+      <PDKSInlineQuery
+        filters={filters}
+        onApplyFilters={setFilters}
+        onOpenChat={() => setShowAiChat(true)}
+      />
 
       <Card className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="px-4 py-3 border-b border-border">
-            <TabsList className="grid w-full grid-cols-5 h-10 bg-muted">
+            <TabsList className="grid w-full grid-cols-4 h-10 bg-muted">
               <TabsTrigger value="table" className="flex items-center gap-2 text-xs sm:text-sm">
                 <Table2 className="h-4 w-4" />
                 <span>Tablo</span>
@@ -173,10 +192,6 @@ export default function PDKSRecords() {
               <TabsTrigger value="charts" className="flex items-center gap-2 text-xs sm:text-sm">
                 <BarChart3 className="h-4 w-4" />
                 <span>Grafikler</span>
-              </TabsTrigger>
-              <TabsTrigger value="realtime" className="flex items-center gap-2 text-xs sm:text-sm">
-                <Activity className="h-4 w-4" />
-                <span>Canlı</span>
               </TabsTrigger>
               <TabsTrigger value="export" className="flex items-center gap-2 text-xs sm:text-sm">
                 <Download className="h-4 w-4" />
@@ -191,6 +206,7 @@ export default function PDKSRecords() {
                 records={tableRecords}
                 loading={tableLoading}
                 selectedDate={selectedDate}
+                onShowDetail={(employeeId) => setDrilldown({ employeeId })}
               />
             </TabsContent>
 
@@ -206,10 +222,6 @@ export default function PDKSRecords() {
 
             <TabsContent value="charts" className="mt-0">
               <PDKSChartView />
-            </TabsContent>
-
-            <TabsContent value="realtime" className="mt-0">
-              <PDKSRealTimeWidget />
             </TabsContent>
 
             <TabsContent value="export" className="mt-0">
@@ -231,6 +243,8 @@ export default function PDKSRecords() {
         endDate={endDate}
         highlightDate={drilldown?.date}
       />
+
+      <PDKSImportDialog open={showImport} onOpenChange={setShowImport} />
 
       <Sheet open={showAiChat} onOpenChange={setShowAiChat}>
         <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">

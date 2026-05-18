@@ -26,7 +26,14 @@ const LEAVE_TYPES = [
   { value: "excuse", label: "Mazeret İzni" },
   { value: "unpaid", label: "Ücretsiz İzin" },
   { value: "parental", label: "Doğum/Ebeveyn İzni" },
-];
+  { value: "marriage", label: "Evlilik İzni (3 gün)" },
+  { value: "bereavement", label: "Vefat İzni (3 gün)" },
+  { value: "paternity", label: "Babalık İzni (5 gün)" },
+  { value: "lactation", label: "Süt İzni" },
+  { value: "compensatory", label: "Telafi İzni" },
+] as const;
+
+type LeaveTypeValue = (typeof LEAVE_TYPES)[number]["value"];
 
 export default function Leaves() {
   const { loading: projectLoading } = useProjectAccess();
@@ -73,18 +80,31 @@ export default function Leaves() {
     LEAVE_TYPES.find((t) => t.value === type)?.label ?? type;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">İzin Yönetimi</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            İzin talepleri ve onay işlemleri
-          </p>
+    <div className="space-y-3">
+      <div className="rounded-xl border bg-card shadow-xs p-4 md:p-6">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 mr-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+              <Palmtree className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold leading-tight">İzin Yönetimi</h2>
+              <p className="text-xs text-muted-foreground">
+                {pendingLeaves.length} bekleyen, {leaves?.length ?? 0} toplam
+              </p>
+            </div>
+          </div>
+          <div className="ml-auto">
+            <Button
+              onClick={() => setShowForm(!showForm)}
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              İzin Talebi
+            </Button>
+          </div>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} className="bg-primary hover:bg-primary/90">
-          <Plus className="mr-2 h-4 w-4" />
-          İzin Talebi
-        </Button>
       </div>
 
       {showForm && (
@@ -170,7 +190,7 @@ export default function Leaves() {
                   await createLeave({
                     employeeId: formData.employeeId as Id<"employees">,
                     projectId: emp?.projectId,
-                    leaveType: formData.leaveType as "annual" | "sick" | "excuse" | "unpaid" | "parental",
+                    leaveType: formData.leaveType as LeaveTypeValue,
                     startDate: formData.startDate,
                     endDate: formData.endDate,
                     notes: formData.notes || undefined,

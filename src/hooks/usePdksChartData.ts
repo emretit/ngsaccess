@@ -24,6 +24,7 @@ export const usePdksChartData = (daysBack = 7) => {
     departmentAbsence: chartData?.departmentAbsence ?? [],
     lateDistribution: chartData?.lateDistribution ?? [],
     hourlyTrend: chartData?.hourlyTrend ?? [],
+    lateMinutesSamples: chartData?.lateMinutesSamples ?? [],
     isLoading: projectLoading || chartData === undefined,
   };
 };

@@ -18,6 +18,8 @@ export interface Employee {
   accessRuleId?: Id<"accessRules"> | null;
   isActive?: boolean;
   notes?: string;
+  hourlyRate?: number | null;
+  monthlySalary?: number | null;
   projectId?: Id<"projects">;
   createdAt?: string;
   updatedAt?: string;

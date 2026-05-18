@@ -52,7 +52,7 @@ export function ReportsSettings() {
   const [reportType, setReportType] = useState("sgk");
   const [scheduledEmail, setScheduledEmail] = useState("");
   const [scheduledEnabled, setScheduledEnabled] = useState(false);
-  const [hourlyRate, setHourlyRate] = useState(100);
+  const [hourlyRate, setHourlyRate] = useState<number | undefined>(undefined);
   const [overtimePeriod, setOvertimePeriod] = useState<"month" | "year">("month");
 
   const reportData = useQuery(
@@ -245,12 +245,18 @@ export function ReportsSettings() {
             )}
             {reportType === "department" && (
               <div className="space-y-2">
-                <Label>Saatlik Ücret (₺)</Label>
+                <Label>Saatlik Ücret Fallback (₺)</Label>
                 <Input
                   type="number"
-                  value={hourlyRate}
-                  onChange={(e) => setHourlyRate(Number(e.target.value) || 100)}
-                  className="w-[120px]"
+                  min={0}
+                  value={hourlyRate ?? ""}
+                  onChange={(e) =>
+                    setHourlyRate(
+                      e.target.value === "" ? undefined : Number(e.target.value)
+                    )
+                  }
+                  placeholder="Çalışan ücreti yoksa"
+                  className="w-[160px]"
                 />
               </div>
             )}
@@ -277,9 +283,21 @@ export function ReportsSettings() {
                   — {reportType === "overtime" && overtimePeriod === "year" ? year : `${MONTHS.find((m) => m.value === month)?.label} ${year}`}
                 </p>
                 {reportType === "overtime" && overtimeData && "totalOvertimeHours" in overtimeData && (
-                  <p className="text-sm font-medium mt-1">
-                    Toplam fazla mesai: {(overtimeData as { totalOvertimeHours: number }).totalOvertimeHours} saat
-                  </p>
+                  <>
+                    <p className="text-sm font-medium mt-1">
+                      Toplam fazla mesai: {(overtimeData as { totalOvertimeHours: number }).totalOvertimeHours} saat
+                    </p>
+                    {"totalOvertimePayTRY" in overtimeData &&
+                      (overtimeData as { totalOvertimePayTRY: number }).totalOvertimePayTRY > 0 && (
+                        <p className="text-sm font-medium">
+                          Toplam mesai ücreti:{" "}
+                          {(overtimeData as { totalOvertimePayTRY: number }).totalOvertimePayTRY.toLocaleString(
+                            "tr-TR",
+                            { style: "currency", currency: "TRY" }
+                          )}
+                        </p>
+                      )}
+                  </>
                 )}
               </div>
               <div className="flex gap-2">

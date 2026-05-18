@@ -1,15 +1,6 @@
-import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
-
-const LEAVE_TYPE_LABELS: Record<string, string> = {
-  annual: "Yıllık İzin",
-  sick: "Hastalık İzni",
-  excuse: "Mazeret İzni",
-  unpaid: "Ücretsiz İzin",
-  parental: "Doğum/Ebeveyn İzni",
-};
 
 export const list = authedQuery({
   args: {
@@ -61,7 +52,12 @@ export const create = authedMutation({
       v.literal("sick"),
       v.literal("excuse"),
       v.literal("unpaid"),
-      v.literal("parental")
+      v.literal("parental"),
+      v.literal("marriage"),
+      v.literal("bereavement"),
+      v.literal("paternity"),
+      v.literal("lactation"),
+      v.literal("compensatory")
     ),
     startDate: v.string(),
     endDate: v.string(),
@@ -127,6 +123,38 @@ export const reject = authedMutation({
       notes: args.notes,
       updatedAt: now,
     });
+  },
+});
+
+export const listForRange = authedQuery({
+  args: {
+    startDate: v.string(),
+    endDate: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    let leaves;
+    if (ctx.user.role === "super_admin") {
+      leaves = await ctx.db.query("leaves").collect();
+    } else if (allowedProjectIds.length > 0) {
+      const results = await Promise.all(
+        allowedProjectIds.map((pid) =>
+          ctx.db
+            .query("leaves")
+            .withIndex("by_project", (q) => q.eq("projectId", pid))
+            .collect()
+        )
+      );
+      leaves = results.flat();
+    } else {
+      return [];
+    }
+    return leaves.filter(
+      (l) =>
+        l.status === "approved" &&
+        l.startDate <= args.endDate &&
+        l.endDate >= args.startDate,
+    );
   },
 });
 

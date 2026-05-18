@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+
 import { v } from "convex/values";
 import { authedQuery, authedMutation, optionalAuthQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
@@ -198,6 +198,8 @@ export const upsertWork = authedMutation({
     allowLateEntry: v.optional(v.boolean()),
     annualOvertimeLimitHours: v.optional(v.number()),
     overtimeMultiplier: v.optional(v.number()),
+    overtimeStartToleranceMinutes: v.optional(v.number()),
+    monthlyHoursBase: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const now = new Date().toISOString();

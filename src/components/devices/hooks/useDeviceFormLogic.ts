@@ -2,30 +2,31 @@
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuthState } from "@/hooks/useAuthState";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { ServerDevice } from "@/types/device";
-import { formSchema, FormValues } from "./useDeviceFormSchema";
+import { formSchema, FormValues, type DeviceBrand } from "./useDeviceFormSchema";
 import { useDeviceDataLoader } from "./useDeviceDataLoader";
 import { useDeviceFormSubmission } from "./useDeviceFormSubmission";
 
 interface UseDeviceFormLogicProps {
   device?: ServerDevice | null;
   open: boolean;
+  defaultBrand?: DeviceBrand;
   onSuccess: () => void;
 }
 
-export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLogicProps) {
+export function useDeviceFormLogic({ device, open, defaultBrand, onSuccess }: UseDeviceFormLogicProps) {
   const { user } = useAuthState();
-  const { projectIds } = useProjectAccess();
+  const { projectId } = useActiveProject();
   const { zones, doors, loading: locationLoading } = useZonesAndDoors();
 
-  // Get the first project ID as current project ID
-  const currentProjectId = projectIds.length > 0 ? projectIds[0] : null;
+  const currentProjectId = projectId ?? null;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema) as Resolver<FormValues>,
     defaultValues: {
+      brand: defaultBrand ?? "other",
       name: "",
       device_serial: "",
       device_type: "Kart Okuyucu",
@@ -36,6 +37,8 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
       device_username: "",
       device_password: "",
       description: "",
+      ehome_id: "",
+      ehome_key: "",
     },
   });
 
@@ -46,7 +49,7 @@ export function useDeviceFormLogic({ device, open, onSuccess }: UseDeviceFormLog
   const filteredDoors = doors.filter((door) => String(door.zoneId) === String(selectedZoneId));
 
   // Load device data when dialog opens
-  useDeviceDataLoader({ device, open, form });
+  useDeviceDataLoader({ device, open, defaultBrand, form });
 
   // Handle form submission
   const { onSubmit, isLoading } = useDeviceFormSubmission({

@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { ChevronDown, ChevronRight, Download, Search, Filter, Pencil } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Search, Filter, Pencil, Eye, X } from "lucide-react";
 import {
   exportToExcel,
   exportToCsv,
@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PDKSMobileCardList } from "./PDKSMobileCardList";
 
 interface EmployeeRecord {
   id: string;
@@ -61,13 +63,15 @@ interface PDKSTableViewProps {
   records: EmployeeRecord[];
   loading?: boolean;
   selectedDate?: Date;
+  onShowDetail?: (employeeId: Id<"employees">) => void;
 }
 
-export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTableViewProps) {
+export function PDKSTableView({ records, loading = false, selectedDate, onShowDetail }: PDKSTableViewProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editingRecord, setEditingRecord] = useState<EmployeeRecord | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const convex = useConvex();
   const { profile } = useAuth();
@@ -138,6 +142,26 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
         {config.label}
       </Badge>
     );
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (allIds: string[], allSelected: boolean) => {
+    setSelectedIds(allSelected ? new Set() : new Set(allIds));
+  };
+
+  const handleExportSelected = async () => {
+    const rows = safeRecords.filter((r) => selectedIds.has(r.id));
+    if (rows.length === 0) return;
+    await exportToExcel(rows, { dateRange: selectedDate ? toLocalDateString(selectedDate) : "" });
+    toast({ title: "Excel indirildi", description: `${rows.length} seçili kayıt dışa aktarıldı.` });
   };
 
   const filteredRecords = safeRecords.filter((record) => {
@@ -235,11 +259,54 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
         </div>
       </CardHeader>
       
+      {selectedIds.size > 0 && (
+        <div className="sticky top-0 z-10 bg-primary/10 border-b border-primary/30 px-4 py-2 flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-medium">{selectedIds.size} satır seçildi</span>
+          <Button size="sm" variant="outline" onClick={handleExportSelected} className="gap-1.5">
+            <Download className="h-3.5 w-3.5" />
+            Seçilenleri Dışa Aktar
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSelectedIds(new Set())}
+            className="gap-1.5 ml-auto"
+          >
+            <X className="h-3.5 w-3.5" />
+            Temizle
+          </Button>
+        </div>
+      )}
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
+        <div className="md:hidden p-3">
+          <PDKSMobileCardList
+            records={filteredRecords}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onShowDetail={onShowDetail}
+            onEdit={(r) => setEditingRecord(r as EmployeeRecord)}
+            canEdit={canEdit}
+          />
+        </div>
+        <div className="overflow-x-auto hidden md:block">
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow className="border-border">
+                <TableHead className="w-[40px] font-semibold text-foreground">
+                  <Checkbox
+                    checked={
+                      filteredRecords.length > 0 &&
+                      filteredRecords.every((r) => selectedIds.has(r.id))
+                    }
+                    onCheckedChange={() =>
+                      toggleSelectAll(
+                        filteredRecords.map((r) => r.id),
+                        filteredRecords.every((r) => selectedIds.has(r.id)),
+                      )
+                    }
+                    aria-label="Tümünü seç"
+                  />
+                </TableHead>
                 <TableHead className="w-[50px] font-semibold text-foreground"></TableHead>
                 <TableHead className="font-semibold text-foreground">Çalışan</TableHead>
                 <TableHead className="font-semibold text-foreground">ID</TableHead>
@@ -250,8 +317,8 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
                 <TableHead className="font-semibold text-foreground">Mesai</TableHead>
                 <TableHead className="font-semibold text-foreground">İzin</TableHead>
                 <TableHead className="font-semibold text-foreground">Durum</TableHead>
-                {canEdit && (
-                  <TableHead className="font-semibold text-foreground w-20">
+                {(onShowDetail || canEdit) && (
+                  <TableHead className="font-semibold text-foreground w-28">
                     Aksiyon
                   </TableHead>
                 )}
@@ -264,9 +331,17 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
                     className={`
                       hover:bg-blue-50/50 transition-colors cursor-pointer border-b border-border
                       ${index % 2 === 0 ? 'bg-card' : 'bg-muted/30'}
+                      ${selectedIds.has(record.id) ? 'bg-primary/5' : ''}
                     `}
                     onClick={() => toggleRowExpansion(record.id)}
                   >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selectedIds.has(record.id)}
+                        onCheckedChange={() => toggleSelect(record.id)}
+                        aria-label={`${record.name} seç`}
+                      />
+                    </TableCell>
                     <TableCell className="text-center">
                       {expandedRows.has(record.id) ? (
                         <ChevronDown className="h-4 w-4 text-primary" />
@@ -276,7 +351,20 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
                     </TableCell>
                     <TableCell className="font-medium text-foreground">
                       <div className="flex items-center gap-2">
-                        {record.name}
+                        {onShowDetail ? (
+                          <button
+                            type="button"
+                            className="text-left hover:underline hover:text-primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onShowDetail(record.id as Id<"employees">);
+                            }}
+                          >
+                            {record.name}
+                          </button>
+                        ) : (
+                          record.name
+                        )}
                         {record.isManual && (
                           <span
                             title={
@@ -312,26 +400,43 @@ export function PDKSTableView({ records, loading = false, selectedDate }: PDKSTa
                         )}
                       </div>
                     </TableCell>
-                    {canEdit && (
+                    {(onShowDetail || canEdit) && (
                       <TableCell>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingRecord(record);
-                          }}
-                          title="Manuel düzelt"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          {onShowDetail && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onShowDetail(record.id as Id<"employees">);
+                              }}
+                              title="Detayı göster"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {canEdit && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingRecord(record);
+                              }}
+                              title="Manuel düzelt"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
                   
                   {expandedRows.has(record.id) && record.detailedLogs && (
                     <TableRow>
-                      <TableCell colSpan={canEdit ? 11 : 10} className="bg-linear-to-r from-blue-50 to-indigo-50 border-l-4 border-primary">
+                      <TableCell colSpan={onShowDetail || canEdit ? 12 : 11} className="bg-linear-to-r from-blue-50 to-indigo-50 border-l-4 border-primary">
                         <div className="p-6">
                           <h4 className="font-bold mb-4 text-foreground flex items-center gap-2">
                             🕐 Günlük Detaylı Kayıtlar - {record.name}

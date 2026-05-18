@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { Id } from "../../../convex/_generated/dataModel";
 
 interface AddDoorDialogProps {
@@ -23,7 +23,7 @@ export function AddDoorDialog({ open, onOpenChange, onSuccess, zoneId, zoneName 
   const [location, setLocation] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const { projectIds } = useProjectAccess();
+  const { projectId } = useActiveProject();
   const createDoor = useMutation(api.doors.create);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,7 +39,7 @@ export function AddDoorDialog({ open, onOpenChange, onSuccess, zoneId, zoneName 
         doorCode: doorCode.trim() || undefined,
         location: location.trim() || undefined,
         zoneId,
-        projectId: projectIds[0] as Id<"projects"> | undefined,
+        projectId,
         status: "active",
       });
       toast({ title: "Başarılı", description: `${zoneName} bölgesine kapı başarıyla eklendi.` });

@@ -9,6 +9,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { PDKSCalendarHeatmap } from "./PDKSCalendarHeatmap";
+import { PDKSAuditTimeline } from "./PDKSAuditTimeline";
 
 interface PDKSEmployeeDetailDrawerProps {
   open: boolean;
@@ -120,6 +122,42 @@ export function PDKSEmployeeDetailDrawer({
                     <div className="text-[10px] text-muted-foreground">Mesai</div>
                   </div>
                 </div>
+              </div>
+
+              {/* Değişiklik geçmişi */}
+              {employeeId && (
+                <details className="rounded-lg border border-border bg-card p-3 group">
+                  <summary className="text-xs font-semibold text-muted-foreground cursor-pointer flex items-center gap-1.5">
+                    <span>Değişiklik geçmişi</span>
+                    <span className="text-[10px] text-muted-foreground/70 group-open:hidden">
+                      (tıkla)
+                    </span>
+                  </summary>
+                  <div className="mt-2">
+                    <PDKSAuditTimeline
+                      employeeId={employeeId}
+                      startDate={startDate}
+                      endDate={endDate}
+                    />
+                  </div>
+                </details>
+              )}
+
+              {/* Calendar heatmap */}
+              <div className="rounded-lg border border-border bg-card p-3">
+                <PDKSCalendarHeatmap
+                  startDate={startDate}
+                  endDate={endDate}
+                  days={detail.days.map((d) => ({
+                    date: d.date,
+                    status: d.status,
+                    totalHours: d.totalHours,
+                  }))}
+                  highlightDate={expanded ?? highlightDate}
+                  onSelectDate={(d) =>
+                    setExpanded((prev) => (prev === d ? null : d))
+                  }
+                />
               </div>
 
               {/* Gün listesi */}

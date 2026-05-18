@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Employee } from "@/types/employee";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { Id } from "../../../../convex/_generated/dataModel";
 
 export interface EmployeeFormData {
@@ -21,12 +21,13 @@ export interface EmployeeFormData {
   photoUrl: string | null;
   notes: string;
   isActive: boolean;
+  hourlyRate: number | null;
+  monthlySalary: number | null;
   projectId?: Id<"projects">;
 }
 
 export const useEmployeeFormData = (employee?: Employee | null) => {
-  const { projectIds } = useProjectAccess();
-  const defaultProjectId = projectIds[0] as Id<"projects"> | undefined;
+  const { projectId: defaultProjectId } = useActiveProject();
 
   const [formData, setFormData] = useState<EmployeeFormData>({
     firstName: "",
@@ -44,6 +45,8 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
     photoUrl: null,
     notes: "",
     isActive: true,
+    hourlyRate: null,
+    monthlySalary: null,
   });
 
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -82,6 +85,8 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
         photoUrl: employee.photoUrl ?? null,
         notes: employee.notes || "",
         isActive: employee.isActive ?? true,
+        hourlyRate: employee.hourlyRate ?? null,
+        monthlySalary: employee.monthlySalary ?? null,
         projectId: employee.projectId ?? defaultProjectId,
       });
       setPhotoPreview(employee.photoUrl ?? null);
@@ -102,6 +107,8 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
         photoUrl: null,
         notes: "",
         isActive: true,
+        hourlyRate: null,
+        monthlySalary: null,
         projectId: defaultProjectId,
       });
       setPhotoPreview(null);

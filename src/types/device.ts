@@ -1,5 +1,7 @@
 import type { Id } from "../../convex/_generated/dataModel";
+import type { DeviceBrand } from "@/components/devices/hooks/useDeviceFormSchema";
 
+export type { DeviceBrand };
 export type AccessDirection = "entry" | "exit" | "both";
 
 export interface Device {
@@ -18,6 +20,14 @@ export interface Device {
   lastSeen?: string;
   deviceUsername?: string;
   devicePassword?: string;
+  brand?: DeviceBrand;
+  // Hik Device Gateway entegrasyonu
+  hikDevIndex?: string;
+  ehomeID?: string;
+  ehomeKey?: string;
+  hikModel?: string;
+  hikLastSeenAt?: number;
+  hikOfflineHint?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -47,6 +57,14 @@ export interface ServerDevice {
   lastSeen?: string;
   deviceUsername?: string;
   devicePassword?: string;
+  brand?: DeviceBrand;
+  // Hik Device Gateway entegrasyonu
+  hikDevIndex?: string;
+  ehomeID?: string;
+  ehomeKey?: string;
+  hikModel?: string;
+  hikLastSeenAt?: number;
+  hikOfflineHint?: string;
   createdAt?: string;
   updatedAt?: string;
   projects?: {

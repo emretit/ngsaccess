@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Edit2, Mail } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { format } from 'date-fns';
+import { EmployeeConsentsCard } from './EmployeeConsentsCard';
+import type { Id } from "../../../convex/_generated/dataModel";
 
 interface EmployeeDetailProps {
   employee: Employee | null;
@@ -85,6 +87,13 @@ export default function EmployeeDetails({ employee, onEdit }: EmployeeDetailProp
               {employee.notes}
             </div>
           </div>
+        </>
+      )}
+
+      {employee._id && (
+        <>
+          <Separator />
+          <EmployeeConsentsCard employeeId={employee._id as Id<"employees">} />
         </>
       )}
     </div>

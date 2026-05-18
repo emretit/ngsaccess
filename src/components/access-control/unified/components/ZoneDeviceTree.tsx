@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -6,10 +5,10 @@ import { Label } from "@/components/ui/label";
 import { ChevronRight, ChevronDown, Building2, MapPin } from "lucide-react";
 import { useDevices } from "@/hooks/useDevices";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
+import { areAllSelected } from "./selectionHelpers";
 
 interface ZoneDeviceTreeFormData {
   selected_devices: string[];
-  selected_zones: string[];
 }
 
 interface ZoneDeviceTreeProps<T extends ZoneDeviceTreeFormData = ZoneDeviceTreeFormData> {
@@ -31,35 +30,36 @@ export const ZoneDeviceTree = <T extends ZoneDeviceTreeFormData,>({ formData, se
     }));
   };
 
+  const getDevicesForZone = (zoneId: string) => {
+    return devices.filter(device => String(device.zoneId ?? '') === zoneId);
+  };
+
   const handleZoneChange = (zoneId: string, checked: boolean) => {
-    const zoneDevices = devices.filter(device => String(device.zoneId ?? '') === zoneId);
+    const zoneDevices = getDevicesForZone(zoneId);
     const zoneDeviceIds = zoneDevices.map(device => String(device._id));
 
     setFormData(prev => {
-      const newZones = checked
-        ? [...prev.selected_zones, zoneId]
-        : prev.selected_zones.filter((id: string) => id !== zoneId);
-
-      const newDevices = checked
-        ? [...new Set([...prev.selected_devices, ...zoneDeviceIds])]
-        : prev.selected_devices.filter((id: string) => !zoneDeviceIds.includes(id));
-
+      if (checked) {
+        return {
+          ...prev,
+          selected_devices: [...new Set([...prev.selected_devices, ...zoneDeviceIds])],
+        };
+      }
+      const toRemove = new Set(zoneDeviceIds);
       return {
         ...prev,
-        selected_zones: newZones,
-        selected_devices: newDevices
+        selected_devices: prev.selected_devices.filter((id: string) => !toRemove.has(id)),
       };
     });
   };
 
   const handleSelectAllDevices = () => {
     const allDeviceIds = devices.map(device => String(device._id));
-    const allSelected = allDeviceIds.every(id => formData.selected_devices.includes(id));
+    const allSelected = areAllSelected(devices, formData.selected_devices);
 
     setFormData(prev => ({
       ...prev,
       selected_devices: allSelected ? [] : allDeviceIds,
-      selected_zones: allSelected ? [] : zones.map(zone => String(zone._id))
     }));
   };
 
@@ -75,17 +75,7 @@ export const ZoneDeviceTree = <T extends ZoneDeviceTreeFormData,>({ formData, se
     });
   };
 
-  const getDevicesForZone = (zoneId: string) => {
-    return devices.filter(device => String(device.zoneId ?? '') === zoneId);
-  };
-
-  const isZoneSelected = (zoneId: string) => {
-    return formData.selected_zones.includes(zoneId);
-  };
-
-  const allDevicesSelected = devices.length > 0 && devices.every(device =>
-    formData.selected_devices.includes(String(device._id))
-  );
+  const allDevicesSelected = areAllSelected(devices, formData.selected_devices);
 
   const getDeviceLocationDisplay = (device: { zoneId?: unknown }) => {
     const zone = zones.find(z => String(z._id) === String(device.zoneId));
@@ -97,7 +87,7 @@ export const ZoneDeviceTree = <T extends ZoneDeviceTreeFormData,>({ formData, se
       const zoneId = String(zone._id);
       const zoneDevices = getDevicesForZone(zoneId);
       const isExpanded = expandedZones.has(zoneId);
-      const isSelected = isZoneSelected(zoneId);
+      const isSelected = areAllSelected(zoneDevices, formData.selected_devices);
 
       return (
         <div key={`zone-${zoneId}`} className="space-y-1">
@@ -183,7 +173,7 @@ export const ZoneDeviceTree = <T extends ZoneDeviceTreeFormData,>({ formData, se
           {allDevicesSelected ? 'Tümünü Kaldır' : 'Tümünü Seç'}
         </Button>
       </div>
-      <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-1">
+      <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-1">
         {renderZoneTree()}
 
         {orphanDevices.length > 0 && (

@@ -2,9 +2,10 @@
 import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useAccessRules } from "@/hooks/useAccessRules";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import type { AccessRule, GroupMember, GroupDevice } from "@/types/access-control";
+import { DEFAULT_WORKDAYS } from "../components/weekdays";
 
 interface RuleFormData {
   name: string;
@@ -12,8 +13,6 @@ interface RuleFormData {
   target_type: 'all' | 'department' | 'position' | 'individual';
   selected_employees: string[];
   selected_devices: string[];
-  selected_zones: string[];
-  selected_departments: string[];
   start_time: string;
   end_time: string;
   days: string[];
@@ -23,7 +22,7 @@ interface RuleFormData {
 
 export const useRuleForm = (editingRule: AccessRule | null | undefined, open: boolean, onClose: () => void) => {
   const { toast } = useToast();
-  const { projectIds } = useProjectAccess();
+  const { projectId } = useActiveProject();
   const { createAccessRuleWithMembers, updateAccessRuleWithAdditionalMembers } = useAccessRules();
 
   const [formData, setFormData] = useState<RuleFormData>({
@@ -32,11 +31,9 @@ export const useRuleForm = (editingRule: AccessRule | null | undefined, open: bo
     target_type: 'individual',
     selected_employees: [],
     selected_devices: [],
-    selected_zones: [],
-    selected_departments: [],
     start_time: '',
     end_time: '',
-    days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+    days: DEFAULT_WORKDAYS,
     access_direction: 'both',
     priority: 100,
   });
@@ -57,11 +54,9 @@ export const useRuleForm = (editingRule: AccessRule | null | undefined, open: bo
           target_type: (editingRule.targetType as RuleFormData['target_type'] | undefined) ?? 'individual',
           selected_employees: employeeIds,
           selected_devices: deviceIds,
-          selected_zones: [],
-          selected_departments: [],
           start_time: editingRule.startTime || '',
           end_time: editingRule.endTime || '',
-          days: editingRule.days || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+          days: editingRule.days || DEFAULT_WORKDAYS,
           access_direction: (editingRule.accessDirection as RuleFormData['access_direction'] | undefined) ?? 'both',
           priority: editingRule.priority || 100,
         });
@@ -72,11 +67,9 @@ export const useRuleForm = (editingRule: AccessRule | null | undefined, open: bo
           target_type: 'individual',
           selected_employees: [],
           selected_devices: [],
-          selected_zones: [],
-          selected_departments: [],
           start_time: '',
           end_time: '',
-          days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+          days: DEFAULT_WORKDAYS,
           access_direction: 'both',
           priority: 100,
         });
@@ -106,11 +99,11 @@ export const useRuleForm = (editingRule: AccessRule | null | undefined, open: bo
         return;
       }
 
-      if (formData.selected_devices.length === 0 && formData.selected_zones.length === 0) {
+      if (formData.selected_devices.length === 0) {
         toast({
           variant: "destructive",
           title: "Hata",
-          description: "Lütfen en az bir cihaz veya bölge seçin.",
+          description: "Lütfen en az bir cihaz seçin.",
         });
         return;
       }
@@ -129,7 +122,7 @@ export const useRuleForm = (editingRule: AccessRule | null | undefined, open: bo
         days: formData.days,
         accessDirection: formData.access_direction,
         priority: formData.priority,
-        projectId: projectIds[0] as Id<"projects"> | undefined,
+        projectId,
       };
 
       // IDs are Convex string IDs, pass as-is (not parseInt)

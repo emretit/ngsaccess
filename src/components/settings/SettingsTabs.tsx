@@ -21,7 +21,7 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
         <TabsTrigger value="mail">Mail Ayarları</TabsTrigger>
         <TabsTrigger value="notifications">Bildirimler</TabsTrigger>
       </TabsList>
-      
+
       <TabsContent value="general">
         <GeneralSettings />
       </TabsContent>
@@ -29,7 +29,7 @@ export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
       <TabsContent value="users">
         <AdminUsersPanel />
       </TabsContent>
-      
+
       <TabsContent value="schedule">
         <ShiftSettings />
       </TabsContent>

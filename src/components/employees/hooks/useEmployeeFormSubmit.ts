@@ -11,7 +11,11 @@ export type { EmployeeFormData };
 const errorMessage = (err: unknown, fallback = "Bir hata oluştu"): string =>
   err instanceof Error ? err.message : typeof err === "string" ? err : fallback;
 
-const reportSyncResult = (synced: number, failed: number) => {
+const reportSyncResult = (
+  synced: number,
+  failed: number,
+  errors: string[] = [],
+) => {
   if (synced > 0) {
     toast({
       title: "Cihaz Senkronizasyonu",
@@ -19,9 +23,12 @@ const reportSyncResult = (synced: number, failed: number) => {
     });
   }
   if (failed > 0) {
+    const detail = errors.length > 0
+      ? errors.slice(0, 3).join(" • ") + (errors.length > 3 ? ` (+${errors.length - 3})` : "")
+      : `${failed} cihaza gönderilemedi`;
     toast({
-      title: "Senkronizasyon Uyarısı",
-      description: `${failed} cihaza gönderilemedi`,
+      title: `${failed} cihaza gönderilemedi`,
+      description: detail,
       variant: "destructive",
     });
   }
@@ -84,6 +91,8 @@ export const useEmployeeFormSubmit = (
         photoUrl: formData.photoUrl ?? undefined,
         notes: formData.notes?.trim() ?? undefined,
         isActive: formData.isActive ?? true,
+        hourlyRate: formData.hourlyRate ?? undefined,
+        monthlySalary: formData.monthlySalary ?? undefined,
       };
 
       if (editingId) {
@@ -97,7 +106,7 @@ export const useEmployeeFormSubmit = (
 
         try {
           const syncResult = await syncToDevices({ employeeId: editingId });
-          reportSyncResult(syncResult.synced, syncResult.failed);
+          reportSyncResult(syncResult.synced, syncResult.failed, syncResult.errors);
         } catch {
           // Sync hatası kaydı engellemez
         }
@@ -131,7 +140,7 @@ export const useEmployeeFormSubmit = (
 
         try {
           const syncResult = await syncToDevices({ employeeId: newId });
-          reportSyncResult(syncResult.synced, syncResult.failed);
+          reportSyncResult(syncResult.synced, syncResult.failed, syncResult.errors);
         } catch {
           // Sync hatası kaydı engellemez
         }

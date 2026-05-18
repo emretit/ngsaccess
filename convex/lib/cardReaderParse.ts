@@ -33,6 +33,21 @@ export type CardReaderParseResult = {
   /** Cihaz IP (event'te genelde üst seviyede ipAddress); serial yoksa cihaz eşlemesi için kullanılır */
   deviceIp: string | undefined;
   bodyForLog: Record<string, unknown>;
+  // Hikvision-spesifik event alanları (Device Gateway / ISAPI event push)
+  hikDevIndex?: string;
+  hikMajorEventType?: number;
+  hikSubEventType?: number;
+  hikCurrentVerifyMode?: string;
+  hikSerialNo?: number;
+  hikFrontSerialNo?: number;
+  hikDateTime?: string;
+  hikPictureURL?: string;
+  hikMask?: string;
+  hikHelmet?: string;
+  hikTemperature?: number;
+  hikEventState?: string;
+  /** Cihazın ehome/device ID'si (gateway register ederken atadığımız değer). */
+  hikEhomeID?: string;
 };
 
 function getFirstString(
@@ -45,6 +60,101 @@ function getFirstString(
     if (typeof v === "number" && !Number.isNaN(v)) return String(v);
   }
   return undefined;
+}
+
+function getFirstNumber(
+  obj: Record<string, unknown>,
+  fields: ReadonlyArray<string>
+): number | undefined {
+  for (const f of fields) {
+    const v = obj[f];
+    if (typeof v === "number" && !Number.isNaN(v)) return v;
+    if (typeof v === "string" && v.trim() && !Number.isNaN(Number(v))) return Number(v);
+  }
+  return undefined;
+}
+
+type HikEventFields = Pick<
+  CardReaderParseResult,
+  | "hikDevIndex"
+  | "hikMajorEventType"
+  | "hikSubEventType"
+  | "hikCurrentVerifyMode"
+  | "hikSerialNo"
+  | "hikFrontSerialNo"
+  | "hikDateTime"
+  | "hikPictureURL"
+  | "hikMask"
+  | "hikHelmet"
+  | "hikTemperature"
+  | "hikEventState"
+  | "hikEhomeID"
+>;
+
+/** Hikvision event-spesifik alanları aday objelerden çıkarır */
+function extractHikEventFields(
+  candidates: Array<Record<string, unknown> | undefined>,
+): HikEventFields {
+  const result: HikEventFields = {};
+
+  for (const c of candidates) {
+    if (!c || typeof c !== "object") continue;
+    if (result.hikDevIndex === undefined) {
+      result.hikDevIndex = getFirstString(c, ["devIndex", "devID", "deviceIndex"]);
+    }
+    if (result.hikEhomeID === undefined) {
+      result.hikEhomeID = getFirstString(c, ["deviceID", "DeviceID", "ehomeID"]);
+    }
+    if (result.hikMajorEventType === undefined) {
+      result.hikMajorEventType = getFirstNumber(c, ["majorEventType", "eventType"]);
+    }
+    if (result.hikSubEventType === undefined) {
+      result.hikSubEventType = getFirstNumber(c, [
+        "subEventType",
+        "minorEventType",
+        "subEventTypeCode",
+      ]);
+    }
+    if (result.hikCurrentVerifyMode === undefined) {
+      result.hikCurrentVerifyMode = getFirstString(c, [
+        "currentVerifyMode",
+        "verifyMode",
+      ]);
+    }
+    if (result.hikSerialNo === undefined) {
+      result.hikSerialNo = getFirstNumber(c, ["serialNo", "eventSerialNo"]);
+    }
+    if (result.hikFrontSerialNo === undefined) {
+      result.hikFrontSerialNo = getFirstNumber(c, ["frontSerialNo"]);
+    }
+    if (result.hikDateTime === undefined) {
+      result.hikDateTime = getFirstString(c, ["dateTime", "eventDateTime"]);
+    }
+    if (result.hikPictureURL === undefined) {
+      result.hikPictureURL = getFirstString(c, [
+        "pictureURL",
+        "picURL",
+        "subPicURL",
+        "snapshotURL",
+      ]);
+    }
+    if (result.hikMask === undefined) {
+      result.hikMask = getFirstString(c, ["mask", "maskWearStatus"]);
+    }
+    if (result.hikHelmet === undefined) {
+      result.hikHelmet = getFirstString(c, ["helmet", "helmetWearStatus"]);
+    }
+    if (result.hikTemperature === undefined) {
+      result.hikTemperature = getFirstNumber(c, [
+        "currentTemperature",
+        "temperature",
+      ]);
+    }
+    if (result.hikEventState === undefined) {
+      result.hikEventState = getFirstString(c, ["eventState"]);
+    }
+  }
+  return result;
 }
 
 /** XML/multipart body'den Hikvision alanlarını regex ile çıkarır */
@@ -149,7 +259,6 @@ export function parseCardReaderBody(
   contentType: string | null
 ): CardReaderParseResult {
   let jsonSource: string = raw;
-  const trimmed = raw.trim();
 
   if (contentType?.includes("multipart/form-data")) {
     const jsonPart = extractJsonFromMultipart(raw, contentType);
@@ -195,11 +304,18 @@ export function parseCardReaderBody(
           getFirstString(nestedAc ?? {}, SERIAL_FIELDS) ||
           getFirstString(nestedAlert ?? {}, SERIAL_FIELDS);
       }
+      const hikFields = extractHikEventFields([
+        payload as Record<string, unknown>,
+        nestedAc,
+        nestedAlert,
+        body,
+      ]);
       return {
         user_id,
         serial,
         deviceIp: deviceIp || undefined,
         bodyForLog: body,
+        ...hikFields,
       };
     } catch {
       /* JSON parse hatası, XML/multipart'a geç */
@@ -210,11 +326,28 @@ export function parseCardReaderBody(
     const { user_id, serial } = extractFromXmlOrMultipart(raw);
     const ipMatch = raw.match(/<ipAddress>([^<]+)<\/ipAddress>/i);
     const deviceIp = ipMatch?.[1]?.trim() || undefined;
+    const num = (tag: string): number | undefined => {
+      const m = raw.match(new RegExp(`<${tag}>([^<]+)</${tag}>`, "i"));
+      const n = m?.[1]?.trim();
+      return n && !Number.isNaN(Number(n)) ? Number(n) : undefined;
+    };
+    const str = (tag: string): string | undefined => {
+      const m = raw.match(new RegExp(`<${tag}>([^<]+)</${tag}>`, "i"));
+      return m?.[1]?.trim() || undefined;
+    };
     return {
       user_id,
       serial,
       deviceIp,
       bodyForLog: { _raw: raw.slice(0, 500), _format: "xml/multipart" },
+      hikDevIndex: str("devIndex"),
+      hikMajorEventType: num("majorEventType"),
+      hikSubEventType: num("subEventType"),
+      hikCurrentVerifyMode: str("currentVerifyMode"),
+      hikSerialNo: num("serialNo"),
+      hikFrontSerialNo: num("frontSerialNo"),
+      hikDateTime: str("dateTime"),
+      hikPictureURL: str("pictureURL") ?? str("picURL"),
     };
   }
 

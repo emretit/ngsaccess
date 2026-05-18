@@ -4,6 +4,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { AuthProvider } from '@/components/auth/AuthProvider';
+import { ActiveProjectProvider } from '@/contexts/ActiveProjectContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import Layout from '@/components/Layout';
 import { useDarkMode } from '@/hooks/useDarkMode';
@@ -20,7 +21,6 @@ const AccessControl = lazy(() => import('@/pages/AccessControl'));
 const PDKSRecords = lazy(() => import('@/pages/PDKSRecords'));
 const Shifts = lazy(() => import('@/pages/Shifts'));
 const Leaves = lazy(() => import('@/pages/Leaves'));
-const EmployeePortal = lazy(() => import('@/pages/EmployeePortal'));
 const CheckIn = lazy(() => import('@/pages/CheckIn'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const AuditLog = lazy(() => import('@/pages/AuditLog'));
@@ -67,7 +67,6 @@ function AppContent() {
           <Route path="/pdks-records" element={<PDKSRecords />} />
           <Route path="/shifts" element={<Shifts />} />
           <Route path="/leaves" element={<Leaves />} />
-          <Route path="/employee-portal" element={<EmployeePortal />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/audit-log" element={<AuditLog />} />
           <Route path="/profile" element={<Profile />} />
@@ -85,8 +84,10 @@ function App() {
       <TooltipProvider>
         <Router>
           <AuthProvider>
-            <AppContent />
-            <Toaster />
+            <ActiveProjectProvider>
+              <AppContent />
+              <Toaster />
+            </ActiveProjectProvider>
           </AuthProvider>
         </Router>
       </TooltipProvider>

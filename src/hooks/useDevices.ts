@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
-import { useProjectAccess } from "./useProjectAccess";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Device } from "@/types/device";
 
@@ -9,7 +9,7 @@ export type { Device };
 
 export function useDevices() {
   const { toast } = useToast();
-  const { projectIds, loading: projectLoading } = useProjectAccess();
+  const { projectId, loading: projectLoading } = useActiveProject();
 
   const devicesRaw = useQuery(api.devices.list, !projectLoading ? {} : "skip");
 
@@ -32,7 +32,6 @@ export function useDevices() {
   });
 
   const addDevice = async (deviceData: Partial<Device>) => {
-    const projectId = projectIds[0] as Id<"projects"> | undefined;
     try {
       const id = await createDevice({
         name: deviceData.name ?? "Yeni Cihaz",

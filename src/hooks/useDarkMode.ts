@@ -2,13 +2,11 @@ import { useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useProjectAccess } from "./useProjectAccess";
-import { Id } from "../../convex/_generated/dataModel";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
 export function useDarkMode() {
   const { isAuthenticated } = useConvexAuth();
-  const { projectIds } = useProjectAccess();
-  const projectId = projectIds[0] as Id<"projects"> | undefined;
+  const { projectId } = useActiveProject();
 
   const darkMode = useQuery(
     api.settings.getDarkMode,

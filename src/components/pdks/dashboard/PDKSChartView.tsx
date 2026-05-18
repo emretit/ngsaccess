@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { TrendingUp, Clock, Users, AlertTriangle } from "lucide-react";
 import { usePdksChartData } from "@/hooks/usePdksChartData";
+import { PDKSLateBoxplot } from "./PDKSLateBoxplot";
 
 const CHART_COLORS = {
   present: "#10B981",
@@ -29,6 +30,7 @@ export function PDKSChartView() {
     departmentAbsence,
     lateDistribution,
     hourlyTrend,
+    lateMinutesSamples,
     isLoading,
   } = usePdksChartData(7);
 
@@ -279,6 +281,8 @@ export function PDKSChartView() {
           </CardContent>
         </Card>
       </div>
+
+      <PDKSLateBoxplot samples={lateMinutesSamples} />
 
       <Card className="border border-border bg-card shadow-sm hover:shadow transition-shadow">
         <CardHeader>

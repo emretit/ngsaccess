@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Clock } from "lucide-react";
+import { Edit, Trash2, Clock, Plus } from "lucide-react";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 
 export interface ShiftRow {
@@ -11,6 +11,10 @@ export interface ShiftRow {
   endTime: string;
   breakStart?: string;
   breakEnd?: string;
+  lateToleranceMinutes?: number;
+  earlyExitToleranceMinutes?: number;
+  overtimeStartToleranceMinutes?: number;
+  overtimeEnabled?: boolean;
   isActive?: boolean;
 }
 
@@ -18,6 +22,7 @@ interface ShiftTableProps {
   shifts: ShiftRow[];
   onEdit: (shift: ShiftRow) => void;
   onDelete: (shiftId: Id<"shifts">) => void;
+  onAdd?: () => void;
 }
 
 function getBreakDuration(start?: string, end?: string): string {
@@ -29,13 +34,21 @@ function getBreakDuration(start?: string, end?: string): string {
   return `${duration} dk`;
 }
 
-export function ShiftTable({ shifts, onEdit, onDelete }: ShiftTableProps) {
+export function ShiftTable({ shifts, onEdit, onDelete, onAdd }: ShiftTableProps) {
   if (shifts.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
+      <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
         <Clock className="w-12 h-12 text-muted-foreground/70 mb-4" />
         <h3 className="text-lg font-medium text-foreground mb-2">Henüz vardiya tanımlanmamış</h3>
-        <p className="text-muted-foreground">İlk vardiyayı eklemek için yukarıdaki butonu kullanın</p>
+        <p className="text-muted-foreground mb-5 max-w-sm">
+          Çalışanlarınıza atama yapabilmek için önce çalışma saatlerini tanımlayın.
+        </p>
+        {onAdd && (
+          <Button onClick={onAdd}>
+            <Plus className="mr-1.5 h-4 w-4" />
+            İlk Vardiyayı Ekle
+          </Button>
+        )}
       </div>
     );
   }
@@ -49,6 +62,7 @@ export function ShiftTable({ shifts, onEdit, onDelete }: ShiftTableProps) {
             <TableHead className="font-semibold text-foreground">Başlangıç Saati</TableHead>
             <TableHead className="font-semibold text-foreground">Bitiş Saati</TableHead>
             <TableHead className="font-semibold text-foreground">Mola Aralığı</TableHead>
+            <TableHead className="font-semibold text-foreground">Mesai</TableHead>
             <TableHead className="font-semibold text-foreground">Durum</TableHead>
             <TableHead className="font-semibold text-foreground text-right">İşlemler</TableHead>
           </TableRow>
@@ -56,6 +70,7 @@ export function ShiftTable({ shifts, onEdit, onDelete }: ShiftTableProps) {
         <TableBody>
           {shifts.map((shift, index) => {
             const isActive = shift.isActive ?? true;
+            const overtimeOn = shift.overtimeEnabled ?? true;
             return (
               <TableRow
                 key={shift._id}
@@ -87,6 +102,14 @@ export function ShiftTable({ shifts, onEdit, onDelete }: ShiftTableProps) {
                   ) : (
                     <span className="text-muted-foreground/70 text-sm">—</span>
                   )}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant={overtimeOn ? "default" : "secondary"}
+                    className={overtimeOn ? "bg-blue-100 text-blue-800" : ""}
+                  >
+                    {overtimeOn ? "Açık" : "Kapalı"}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   <Badge

@@ -2,7 +2,7 @@ import { useMutation } from "convex/react";
 import { useModelStatus } from './useModelStatus';
 import { useExportUtils } from './useExportUtils';
 import { useMessageHandler } from './hooks/useMessageHandler';
-import { useProjectAccess } from '@/hooks/useProjectAccess';
+import { useActiveProject } from '@/contexts/ActiveProjectContext';
 import { useState } from 'react';
 
 import { useToast } from "@/hooks/use-toast";
@@ -12,7 +12,7 @@ export function useAiChat() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const { toast } = useToast();
-  const { projectIds, isSuperAdmin } = useProjectAccess();
+  const { projectId, isSuperAdmin } = useActiveProject();
   const saveConversation = useMutation(api.chatConversations.save);
 
   const { isOpenAIConnected, checkOpenAIStatus } = useModelStatus();
@@ -43,7 +43,7 @@ export function useAiChat() {
       }));
 
       await saveConversation({
-        projectId: isSuperAdmin ? undefined : projectIds[0],
+        projectId: isSuperAdmin ? undefined : projectId,
         title: messages[0]?.content?.slice(0, 50) ?? "Sohbet",
         messages: convexMessages,
       });

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { Id } from "../../../../convex/_generated/dataModel";
-import { FormValues } from "./useDeviceFormSchema";
+import { FormValues, type DeviceBrand } from "./useDeviceFormSchema";
 
 type AccessDirection = "entry" | "exit" | "both";
 
@@ -18,18 +18,23 @@ interface DeviceData {
   devicePassword?: string;
   description?: string;
   status?: string;
+  brand?: DeviceBrand;
+  ehomeID?: string;
+  ehomeKey?: string;
 }
 
 interface UseDeviceDataLoaderProps {
   device?: DeviceData | null;
   open: boolean;
+  defaultBrand?: DeviceBrand;
   form: UseFormReturn<FormValues>;
 }
 
-export function useDeviceDataLoader({ device, open, form }: UseDeviceDataLoaderProps) {
+export function useDeviceDataLoader({ device, open, defaultBrand, form }: UseDeviceDataLoaderProps) {
   useEffect(() => {
     if (device && open) {
       const formData: FormValues = {
+        brand: device.brand ?? "other",
         name: device.name ?? "",
         device_serial: device.deviceSerial ?? "",
         device_type: (device.deviceType ?? "Kart Okuyucu") as FormValues["device_type"],
@@ -41,10 +46,13 @@ export function useDeviceDataLoader({ device, open, form }: UseDeviceDataLoaderP
         device_password: device.devicePassword ?? "",
         description: device.description ?? "",
         status: (device.status === "active" || device.status === "inactive" ? device.status : "active") as "active" | "inactive",
+        ehome_id: device.ehomeID ?? "",
+        ehome_key: device.ehomeKey ?? "",
       };
       form.reset(formData);
     } else if (!device && open) {
       form.reset({
+        brand: defaultBrand ?? "other",
         name: "",
         device_serial: "",
         device_type: "Kart Okuyucu",
@@ -56,7 +64,9 @@ export function useDeviceDataLoader({ device, open, form }: UseDeviceDataLoaderP
         device_password: "",
         description: "",
         status: "active",
+        ehome_id: "",
+        ehome_key: "",
       });
     }
-  }, [device, open, form]);
+  }, [device, open, defaultBrand, form]);
 }

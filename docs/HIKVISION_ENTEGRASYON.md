@@ -2,6 +2,12 @@
 
 Bu doküman, ngsaccess projesinin Hikvision erişim kontrol cihazları ile ISAPI üzerinden nasıl entegre edileceğini adım adım açıklar.
 
+> 📚 **SDK Derin Referans:** Hikvision'ın resmi 526 sayfalık Device Network SDK PDF'inin Türkçe özetlenmiş hali için **[docs/sdk/](./sdk/README.md)** klasörüne bakın. En kritik:
+> - **[2.6 Alarm/Event Receiving](./sdk/02-typical-applications/2.6-alarm-event-receiving.md)** — Cihazdan event nasıl alınır (Listening / Arming mode)
+> - **[c.1 Access Control Event Types](./sdk/appendix-c/c.1-access-control-event-types.md)** — `majorEventType` + `subEventType` kodları
+> - **[Appendix A — Request URIs](./sdk/appendix-a-request-uris.md)** — Tüm 71 ISAPI endpoint katalogu
+> - **[c.3 SDK Errors](./sdk/appendix-c/c.3-sdk-errors.md)** + **[c.5 Response Codes](./sdk/appendix-c/c.5-text-protocol-response-codes.md)** — Hata yönetimi
+
 ---
 
 ## Hızlı Başlangıç: Hikvision Cihazı ISAPI ile Bağlama
@@ -174,6 +180,8 @@ ngsaccess, Hikvision'ın HTTP callback ile gönderdiği aşağıdaki formatları
 1. Hikvision cihazında HTTP callback / event forwarding ayarlarını yapılandır
 2. Hedef URL: `https://<convex-deployment>.convex.site/card-reader`
 3. Hikvision’ın gönderdiği event formatını ngsaccess formatına map et (gerekirse `convex/http.ts` içinde ek parser)
+
+> 📖 Detaylı akış (Listening vs Arming mode, callback yapısı, payload formatı): **[docs/sdk/02-typical-applications/2.6-alarm-event-receiving.md](./sdk/02-typical-applications/2.6-alarm-event-receiving.md)**
 
 ### 2. Cihaz Kaydı
 

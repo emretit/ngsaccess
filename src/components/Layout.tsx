@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { SyncIssuesBanner } from "@/components/sync/SyncIssuesBanner";
 
 const routeTitles: Record<string, string> = {
   "/employees": "Kişiler",
@@ -13,7 +14,6 @@ const routeTitles: Record<string, string> = {
   "/pdks-records": "PDKS Kayıtları",
   "/shifts": "Vardiyalar",
   "/leaves": "İzinler",
-  "/employee-portal": "Çalışan Portalı",
   "/settings": "Ayarlar",
   "/profile": "Profil",
   "/home": "Ana Sayfa",
@@ -54,6 +54,7 @@ export default function Layout() {
       <AppSidebar />
       <SidebarInset className="h-screen overflow-hidden bg-muted/50">
         <AppHeader title={pageTitle} />
+        <SyncIssuesBanner />
         <main className="flex-1 overflow-auto p-3 md:p-4 min-w-0 bg-muted/50">
           <Outlet />
         </main>

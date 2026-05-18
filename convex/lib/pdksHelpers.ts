@@ -8,6 +8,8 @@ export interface EffectiveWorkSettings {
   earlyExitToleranceMinutes: number;
   overtimeMultiplier: number;
   annualOvertimeLimitHours: number;
+  overtimeStartToleranceMinutes: number;
+  monthlyHoursBase: number;
 }
 
 export const DEFAULT_WORK_SETTINGS: EffectiveWorkSettings = {
@@ -17,6 +19,8 @@ export const DEFAULT_WORK_SETTINGS: EffectiveWorkSettings = {
   earlyExitToleranceMinutes: 15,
   overtimeMultiplier: 1.5,
   annualOvertimeLimitHours: 270,
+  overtimeStartToleranceMinutes: 15,
+  monthlyHoursBase: 225,
 };
 
 export interface EffectiveOvertimeRates {
@@ -60,6 +64,11 @@ export async function getEffectiveWorkSettings(
     annualOvertimeLimitHours:
       ws?.annualOvertimeLimitHours ??
       DEFAULT_WORK_SETTINGS.annualOvertimeLimitHours,
+    overtimeStartToleranceMinutes:
+      ws?.overtimeStartToleranceMinutes ??
+      DEFAULT_WORK_SETTINGS.overtimeStartToleranceMinutes,
+    monthlyHoursBase:
+      ws?.monthlyHoursBase ?? DEFAULT_WORK_SETTINGS.monthlyHoursBase,
   };
 }
 
@@ -117,6 +126,15 @@ export async function getHolidaysMap(
 export function parseHHMM(hhmm: string): number {
   const [h, m] = hhmm.split(":").map((x) => parseInt(x, 10));
   return (h || 0) * 60 + (m || 0);
+}
+
+/**
+ * UTC ISO string'i TR yerel zamanına (UTC+3) çevirip günün dakika offset'ini döner.
+ * Ör: "2026-05-18T16:30:00.000Z" → 19*60 + 30 = 1170.
+ */
+export function isoTimeToTRMinutes(iso: string): number {
+  const tr = new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000);
+  return tr.getUTCHours() * 60 + tr.getUTCMinutes();
 }
 
 export function dateToWeekdayName(dateStr: string): string {
@@ -186,12 +204,21 @@ export function payrollCodeForDay(opts: {
 export function evaluateLateEarly(
   entryISO: string | undefined,
   exitISO: string | undefined,
-  settings: EffectiveWorkSettings
+  settings: EffectiveWorkSettings,
+  shift?: {
+    startTime?: string;
+    endTime?: string;
+    lateToleranceMinutes?: number;
+    earlyExitToleranceMinutes?: number;
+  } | null,
 ): { isLate: boolean; isEarlyExit: boolean } {
-  const lateThresholdMin =
-    parseHHMM(settings.workStartTime) + settings.maxLateMinutes;
-  const earlyThresholdMin =
-    parseHHMM(settings.workEndTime) - settings.earlyExitToleranceMinutes;
+  const startStr = shift?.startTime ?? settings.workStartTime;
+  const endStr = shift?.endTime ?? settings.workEndTime;
+  const lateTolerance = shift?.lateToleranceMinutes ?? settings.maxLateMinutes;
+  const earlyTolerance =
+    shift?.earlyExitToleranceMinutes ?? settings.earlyExitToleranceMinutes;
+  const lateThresholdMin = parseHHMM(startStr) + lateTolerance;
+  const earlyThresholdMin = parseHHMM(endStr) - earlyTolerance;
 
   let isLate = false;
   let isEarlyExit = false;
@@ -207,4 +234,98 @@ export function evaluateLateEarly(
     isEarlyExit = min < earlyThresholdMin;
   }
   return { isLate, isEarlyExit };
+}
+
+/**
+ * Bir günün mesai dakikasını "vardiya bitiş saatinden sonra geçen süre" mantığıyla hesaplar.
+ *
+ * - Hafta sonu / tatil: tüm net çalışma süresi mesai (4857/41 — premium gün).
+ * - İş günü: lastExit - (shiftEnd + tolerans). Negatif olursa 0.
+ * - shiftEndTime yoksa global workSettings.workEndTime fallback.
+ * - Tolerans: vardiyada shiftOvertimeStartToleranceMinutes doluysa o, yoksa workSettings global'i.
+ */
+export function dailyOvertimeMinutes(opts: {
+  classification: DayClassification;
+  netMinutes: number;
+  lastExitMinutes: number | undefined;
+  shiftEndTime: string | undefined;
+  shiftOvertimeStartToleranceMinutes?: number;
+  workSettings: EffectiveWorkSettings;
+}): number {
+  if (opts.classification === "weekend" || opts.classification === "holiday") {
+    return Math.max(0, opts.netMinutes);
+  }
+  if (opts.lastExitMinutes === undefined) return 0;
+  const endStr = opts.shiftEndTime ?? opts.workSettings.workEndTime;
+  const tolerance =
+    opts.shiftOvertimeStartToleranceMinutes ??
+    opts.workSettings.overtimeStartToleranceMinutes;
+  const thresholdMin = parseHHMM(endStr) + tolerance;
+  return Math.max(0, opts.lastExitMinutes - thresholdMin);
+}
+
+/**
+ * dailyOvertimeMinutes için ince sarmalayıcı: bir vardiya kaydından
+ * endTime + overtimeStartToleranceMinutes alanlarını otomatik aktarır.
+ * Beş çağırıcıdaki kopya boilerplate'i tek noktaya indirir.
+ */
+export function dailyOvertimeForShift(opts: {
+  classification: DayClassification;
+  netMinutes: number;
+  lastExitMinutes: number | undefined;
+  shift:
+    | {
+        endTime?: string;
+        overtimeStartToleranceMinutes?: number;
+        overtimeEnabled?: boolean;
+      }
+    | null
+    | undefined;
+  workSettings: EffectiveWorkSettings;
+}): number {
+  if (opts.shift?.overtimeEnabled === false) return 0;
+  return dailyOvertimeMinutes({
+    classification: opts.classification,
+    netMinutes: opts.netMinutes,
+    lastExitMinutes: opts.lastExitMinutes,
+    shiftEndTime: opts.shift?.endTime,
+    shiftOvertimeStartToleranceMinutes: opts.shift?.overtimeStartToleranceMinutes,
+    workSettings: opts.workSettings,
+  });
+}
+
+/**
+ * Çalışan için saatlik ücreti çözer. Önce employee.hourlyRate, yoksa
+ * monthlySalary / workSettings.monthlyHoursBase ile fallback hesaplar.
+ * Hiçbiri yoksa null döner (TL hesabı yapılamaz).
+ */
+export function resolveHourlyRate(opts: {
+  hourlyRate: number | undefined | null;
+  monthlySalary: number | undefined | null;
+  monthlyHoursBase: number;
+}): number | null {
+  if (typeof opts.hourlyRate === "number" && opts.hourlyRate > 0) {
+    return opts.hourlyRate;
+  }
+  if (
+    typeof opts.monthlySalary === "number" &&
+    opts.monthlySalary > 0 &&
+    opts.monthlyHoursBase > 0
+  ) {
+    return opts.monthlySalary / opts.monthlyHoursBase;
+  }
+  return null;
+}
+
+/**
+ * Mesai TL hesabı: (dakika / 60) × çarpan × saatlik ücret.
+ * hourlyRate null ise null döner.
+ */
+export function overtimePayTRY(opts: {
+  overtimeMinutes: number;
+  multiplier: number;
+  hourlyRate: number | null;
+}): number | null {
+  if (opts.hourlyRate === null || opts.overtimeMinutes <= 0) return null;
+  return (opts.overtimeMinutes / 60) * opts.multiplier * opts.hourlyRate;
 }

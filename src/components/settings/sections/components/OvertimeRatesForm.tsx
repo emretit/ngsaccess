@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -10,8 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
 export function OvertimeRatesForm() {
-  const { projectIds, loading: projectLoading } = useProjectAccess();
-  const projectId = projectIds[0];
+  const { projectId, loading: projectLoading } = useActiveProject();
   const { toast } = useToast();
 
   const rates = useQuery(

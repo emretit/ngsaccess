@@ -1,8 +1,7 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
-import { useProjectAccess } from "./useProjectAccess";
-import { Id } from "../../convex/_generated/dataModel";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
 interface NotificationSettingsInput {
   emailNotifications?: boolean;
@@ -13,8 +12,7 @@ interface NotificationSettingsInput {
 
 export function useNotificationSettings() {
   const { toast } = useToast();
-  const { projectIds } = useProjectAccess();
-  const projectId = projectIds[0] as Id<"projects"> | undefined;
+  const { projectId } = useActiveProject();
 
   const notificationSettings = useQuery(api.settings.getNotification, { projectId });
   const upsertNotification = useMutation(api.settings.upsertNotification);
