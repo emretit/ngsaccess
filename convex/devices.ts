@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import {
   authedQuery,
   authedMutation,
+  adminMutation,
   employeeAuthedQuery,
 } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
@@ -271,6 +272,46 @@ export const updateLastSeen = internalMutation({
         hikLastSeenAt: Date.now(),
       });
     }
+  },
+});
+
+// ────────────────────────────────────────────────────────────
+// API token — /card-reader HTTP endpoint per-device auth
+// ────────────────────────────────────────────────────────────
+
+export const regenerateApiToken = adminMutation({
+  args: { deviceId: v.id("devices") },
+  returns: v.object({ token: v.string(), createdAt: v.string() }),
+  handler: async (ctx, args) => {
+    const device = await ctx.db.get(args.deviceId);
+    if (!device) throw new Error("Cihaz bulunamadı");
+    if (ctx.user.role !== "super_admin") {
+      const allowedProjectIds = await getProjectIdsForUser(ctx);
+      if (
+        !device.projectId ||
+        !allowedProjectIds.some((id) => id === device.projectId)
+      ) {
+        throw new Error("Bu cihaza erişim yetkiniz yok");
+      }
+    }
+    const token = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
+    await ctx.db.patch(args.deviceId, {
+      apiToken: token,
+      apiTokenCreatedAt: createdAt,
+      updatedAt: createdAt,
+    });
+    return { token, createdAt };
+  },
+});
+
+export const getByApiToken = internalQuery({
+  args: { token: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("devices")
+      .withIndex("by_api_token", (q) => q.eq("apiToken", args.token))
+      .first();
   },
 });
 

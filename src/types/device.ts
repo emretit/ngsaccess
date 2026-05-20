@@ -28,6 +28,8 @@ export interface Device {
   hikModel?: string;
   hikLastSeenAt?: number;
   hikOfflineHint?: string;
+  apiToken?: string;
+  apiTokenCreatedAt?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -65,6 +67,8 @@ export interface ServerDevice {
   hikModel?: string;
   hikLastSeenAt?: number;
   hikOfflineHint?: string;
+  apiToken?: string;
+  apiTokenCreatedAt?: string;
   createdAt?: string;
   updatedAt?: string;
   projects?: {

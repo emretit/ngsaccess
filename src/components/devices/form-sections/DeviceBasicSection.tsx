@@ -24,8 +24,6 @@ const DEVICE_TYPES = [
 export function DeviceBasicSection({ form }: DeviceBasicSectionProps) {
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide pb-2">Temel Bilgiler</h3>
-      
       <FormField
         control={form.control}
         name="name"

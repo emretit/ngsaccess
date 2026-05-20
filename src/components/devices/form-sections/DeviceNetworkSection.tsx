@@ -11,8 +11,6 @@ interface DeviceNetworkSectionProps {
 export function DeviceNetworkSection({ form }: DeviceNetworkSectionProps) {
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide pb-2">Ağ Bilgileri</h3>
-
       <FormField
         control={form.control}
         name="device_ip"

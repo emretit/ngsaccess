@@ -25,6 +25,7 @@ const HIK_IP = process.env.HIK_IP || "192.168.1.34";
 const HIK_PORT = Number(process.env.HIK_PORT || "80");
 const HIK_USER = process.env.HIK_USER || "admin";
 const HIK_PASS = process.env.HIK_PASS || "";
+const DEVICE_API_TOKEN = process.env.DEVICE_API_TOKEN || "";
 const CONVEX_URL =
   process.env.CONVEX_URL ||
   "https://notable-tern-4.convex.site/card-reader";
@@ -90,6 +91,9 @@ function postToConvex(eventBody) {
       headers: {
         "Content-Type": "application/json",
         "Content-Length": String(buf.length),
+        ...(DEVICE_API_TOKEN
+          ? { Authorization: `Bearer ${DEVICE_API_TOKEN}` }
+          : {}),
       },
     };
 

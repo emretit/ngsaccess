@@ -40,8 +40,9 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DatePicker } from "@/components/ui/date-picker";
+import { parseDateString, formatDateString } from "@/lib/date";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -269,22 +270,21 @@ export function AssignShiftDialog({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Başlangıç</Label>
-                <Input
-                  type="date"
-                  value={form.startDate}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, startDate: e.target.value }))
+                <DatePicker
+                  date={parseDateString(form.startDate)}
+                  onSelect={(d) =>
+                    setForm((p) => ({ ...p, startDate: formatDateString(d) }))
                   }
                 />
               </div>
               <div className="space-y-2">
                 <Label>Bitiş</Label>
-                <Input
-                  type="date"
-                  value={form.endDate}
-                  onChange={(e) =>
-                    setForm((p) => ({ ...p, endDate: e.target.value }))
+                <DatePicker
+                  date={parseDateString(form.endDate)}
+                  onSelect={(d) =>
+                    setForm((p) => ({ ...p, endDate: formatDateString(d) }))
                   }
+                  minDate={parseDateString(form.startDate)}
                 />
               </div>
             </div>

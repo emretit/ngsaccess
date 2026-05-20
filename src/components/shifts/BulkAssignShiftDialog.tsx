@@ -41,7 +41,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
+import { parseDateString, formatDateString } from "@/lib/date";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -295,18 +296,17 @@ export function BulkAssignShiftDialog({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label>Başlangıç</Label>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                  <DatePicker
+                    date={parseDateString(startDate)}
+                    onSelect={(d) => setStartDate(formatDateString(d))}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Bitiş</Label>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                  <DatePicker
+                    date={parseDateString(endDate)}
+                    onSelect={(d) => setEndDate(formatDateString(d))}
+                    minDate={parseDateString(startDate)}
                   />
                 </div>
               </div>

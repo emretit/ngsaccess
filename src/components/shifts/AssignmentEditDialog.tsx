@@ -27,7 +27,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
+import { parseDateString, formatDateString } from "@/lib/date";
 import { Label } from "@/components/ui/label";
 import { Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -168,18 +169,17 @@ export function AssignmentEditDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label className="text-xs">Başlangıç</Label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+              <DatePicker
+                date={parseDateString(startDate)}
+                onSelect={(d) => setStartDate(formatDateString(d))}
               />
             </div>
             <div className="space-y-2">
               <Label className="text-xs">Bitiş</Label>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+              <DatePicker
+                date={parseDateString(endDate)}
+                onSelect={(d) => setEndDate(formatDateString(d))}
+                minDate={parseDateString(startDate)}
               />
             </div>
           </div>

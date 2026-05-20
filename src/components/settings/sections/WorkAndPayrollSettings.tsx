@@ -1,5 +1,4 @@
-import { WorkScheduleForm } from "./components/WorkScheduleForm";
-import { OvertimeRatesForm } from "./components/OvertimeRatesForm";
+import { OvertimeSettingsForm } from "./components/OvertimeSettingsForm";
 import { HolidayCalendarManager } from "./components/HolidayCalendarManager";
 
 export function WorkAndPayrollSettings() {
@@ -8,11 +7,11 @@ export function WorkAndPayrollSettings() {
       <div>
         <h1 className="text-3xl font-bold text-foreground">Mesai & Tatil</h1>
         <p className="text-muted-foreground mt-2">
-          Çalışma saatleri, fazla mesai oranları ve resmi tatil takvimi
+          Mesai limitleri, fazla mesai oranları ve resmi tatil takvimi. Çalışma
+          saatleri ve mola/tolerans değerleri her vardiyada ayrı yönetilir.
         </p>
       </div>
-      <WorkScheduleForm />
-      <OvertimeRatesForm />
+      <OvertimeSettingsForm />
       <HolidayCalendarManager />
     </div>
   );

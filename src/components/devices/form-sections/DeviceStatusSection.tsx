@@ -12,8 +12,6 @@ interface DeviceStatusSectionProps {
 export function DeviceStatusSection({ form }: DeviceStatusSectionProps) {
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide pb-2">Durum ve Açıklama</h3>
-      
       <FormField
         control={form.control}
         name="status"

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { adminQuery } from "./lib/customFunctions";
+import { getProjectIdsForUser } from "./lib/auth";
 
 interface PdksAuditPayload {
   date?: string;
@@ -79,6 +80,18 @@ export const list = adminQuery({
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? 200;
+    const isSuperAdmin = ctx.user.role === "super_admin";
+
+    if (args.projectId !== undefined) {
+      if (!isSuperAdmin) {
+        const allowedProjectIds = await getProjectIdsForUser(ctx);
+        if (!allowedProjectIds.some((id) => id === args.projectId)) {
+          throw new Error("Bu projeye erişim yetkiniz yok");
+        }
+      }
+    } else if (!isSuperAdmin) {
+      throw new Error("Tüm projeler görünümü süper admin gerektirir");
+    }
 
     let rows;
     if (args.userId) {

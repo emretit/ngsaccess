@@ -206,6 +206,42 @@ HTTP event forwarding ayarları model ve firmware sürümüne göre farklı yerl
 
 ---
 
+## Per-device API Token (Sprint 3)
+
+`/card-reader` endpoint'i artık per-device API token destekliyor. Tenant izolasyonu için bridge config'lerinde token enjeksiyonu önerilir.
+
+### Token oluşturma / yenileme
+
+1. UI: Cihazlar > cihaz seç > "Cihaz API Token" kartı > "Token Oluştur" / "Yenile"
+2. CLI: `npx convex run devices:regenerateApiToken '{"deviceId":"..."}'`
+
+Token bir kez gösterilir; kopyalanıp bridge env'ine yapıştırılmalı.
+
+### Bridge config
+
+`scripts/hikvision-bridge.mjs` ve `scripts/forward-card-reader-to-convex.mjs`:
+
+```bash
+DEVICE_API_TOKEN=<token> \
+CONVEX_URL=https://<deployment>.convex.site/card-reader \
+node scripts/hikvision-bridge.mjs
+```
+
+Bridge POST'unda otomatik olarak `Authorization: Bearer <token>` header'ı yollanır.
+
+### Davranış
+
+- **Token doğru:** Token sahibi cihazın serial/devIndex/ehomeID'si request'le eşleşir. Eşleşmezse 403 (cross-tenant koruma).
+- **Token yok veya geçersiz:** Backwards-compat dönemi — eski serial/IP lookup + `console.warn`. Strict mode'a geçiş kararı alındıktan sonra reject.
+
+### Token rotation
+
+1. UI'dan "Yenile" → yeni token üretilir; eski immediately geçersiz olur
+2. Bridge config'ini güncelle (`DEVICE_API_TOKEN`)
+3. Bridge'i restart et
+
+---
+
 ## Netleştirilmesi Gerekenler
 
 1. **Cihaz modeli:** Hangi Hikvision modeli kullanılacak? (örn. DS-K1A802, DS-K1T671M)

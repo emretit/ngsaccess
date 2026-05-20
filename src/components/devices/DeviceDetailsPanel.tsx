@@ -8,7 +8,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DeviceForm } from "@/components/devices/DeviceForm";
 import { BrandPickerStep } from "@/components/devices/BrandPickerStep";
-import { HikDeviceActions } from "@/components/devices/HikDeviceActions";
+import { DeviceApiTokenCard } from "@/components/devices/DeviceApiTokenCard";
 import { ServerDevice } from "@/types/device";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -70,21 +70,27 @@ export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess }:
         ) : (
           <ScrollArea className="h-[calc(100vh-120px)]">
             <div className="p-6 space-y-6">
-              {selectedDevice?.brand === "hikvision" ? (
-                <HikDeviceActions device={selectedDevice} />
-              ) : null}
               {step === "picker" && !selectedDevice ? (
                 <BrandPickerStep onSelect={handleBrandSelect} onCancel={onClose} />
               ) : (
-                <DeviceForm
-                  open={open}
-                  device={selectedDevice}
-                  projects={projects}
-                  defaultBrand={pickedBrand}
-                  onBack={selectedDevice ? undefined : () => setStep("picker")}
-                  onSuccess={onSuccess}
-                  onClose={onClose}
-                />
+                <>
+                  <DeviceForm
+                    open={open}
+                    device={selectedDevice}
+                    projects={projects}
+                    defaultBrand={pickedBrand}
+                    onBack={selectedDevice ? undefined : () => setStep("picker")}
+                    onSuccess={onSuccess}
+                    onClose={onClose}
+                  />
+                  {selectedDevice && (
+                    <DeviceApiTokenCard
+                      deviceId={selectedDevice._id}
+                      currentToken={selectedDevice.apiToken}
+                      currentTokenCreatedAt={selectedDevice.apiTokenCreatedAt}
+                    />
+                  )}
+                </>
               )}
             </div>
           </ScrollArea>

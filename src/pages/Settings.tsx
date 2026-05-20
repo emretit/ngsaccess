@@ -1,5 +1,3 @@
-
-import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { SettingsSidebar } from "@/components/settings/SettingsSidebar";
 import { GeneralSettings } from "@/components/settings/sections/GeneralSettings";
@@ -22,24 +20,19 @@ const VALID_TABS = [
   "notifications",
 ] as const;
 
+type Tab = (typeof VALID_TABS)[number];
+
+function isValidTab(value: string | null): value is Tab {
+  return value !== null && (VALID_TABS as readonly string[]).includes(value);
+}
+
 export default function Settings() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab");
-  const initialTab =
-    tabFromUrl && (VALID_TABS as readonly string[]).includes(tabFromUrl)
-      ? tabFromUrl
-      : "general";
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const activeTab: Tab = isValidTab(tabFromUrl) ? tabFromUrl : "general";
   const { loading } = useGeneralSettings();
 
-  useEffect(() => {
-    if (tabFromUrl && tabFromUrl !== activeTab && (VALID_TABS as readonly string[]).includes(tabFromUrl)) {
-      setActiveTab(tabFromUrl);
-    }
-  }, [tabFromUrl, activeTab]);
-
   const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
     const next = new URLSearchParams(searchParams);
     if (tab === "general") {
       next.delete("tab");
@@ -69,8 +62,6 @@ export default function Settings() {
         return <MailSettings />;
       case "notifications":
         return <NotificationSettings />;
-      default:
-        return <GeneralSettings />;
     }
   };
 

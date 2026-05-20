@@ -1,19 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import type { User, Project, UserFormData, UserRole } from "../types/user-types";
 
 export type { User, Project, UserFormData, UserRole };
 
 export const useUserManagement = () => {
   const { toast } = useToast();
+  const { projectId: activeProjectId } = useActiveProject();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserFormData>({
     email: "",
     role: "project_user",
-    projectId: undefined,
+    projectId: activeProjectId,
   });
+
+  useEffect(() => {
+    setFormData((prev) =>
+      prev.projectId || !activeProjectId ? prev : { ...prev, projectId: activeProjectId },
+    );
+  }, [activeProjectId]);
 
   const usersRaw = useQuery(api.users.list);
   const projectsRaw = useQuery(api.projects.listActive);
@@ -28,7 +36,7 @@ export const useUserManagement = () => {
 
   const handleEditUser = (user: User) => {
     setCurrentUser(user);
-    setFormData({ email: user.email ?? "", role: user.role ?? "project_user", projectId: undefined });
+    setFormData({ email: user.email ?? "", role: user.role ?? "project_user", projectId: activeProjectId });
   };
 
   const handleSaveUser = async () => {
@@ -107,7 +115,7 @@ export const useUserManagement = () => {
 
   const resetForm = () => {
     setCurrentUser(null);
-    setFormData({ email: "", role: "project_user", projectId: undefined });
+    setFormData({ email: "", role: "project_user", projectId: activeProjectId });
   };
 
   return {

@@ -16,6 +16,7 @@ import https from "node:https";
 const UPSTREAM =
   process.env.CONVEX_CARD_READER_URL ||
   "https://notable-tern-4.convex.site/card-reader";
+const DEVICE_API_TOKEN = process.env.DEVICE_API_TOKEN || "";
 const PORT = Number(process.env.FORWARD_PORT || "8765");
 
 const server = http.createServer((req, res) => {
@@ -54,6 +55,9 @@ const server = http.createServer((req, res) => {
       headers: {
         "Content-Type": req.headers["content-type"] || "application/json",
         "Content-Length": String(body.length),
+        ...(DEVICE_API_TOKEN
+          ? { Authorization: `Bearer ${DEVICE_API_TOKEN}` }
+          : {}),
       },
     };
     const r = https.request(opts, (up) => {

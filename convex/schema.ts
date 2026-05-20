@@ -179,6 +179,8 @@ export default defineSchema({
     // Cihazdaki fiziksel kapı sayısı (Door/capabilities). Person RightPlan'ı
     // 1..N kapı için entry üretmek zorunda — eksik kapı reddedilir.
     hikDoorCount: v.optional(v.number()),
+    apiToken: v.optional(v.string()),
+    apiTokenCreatedAt: v.optional(v.string()),
     createdAt: v.string(),
     updatedAt: v.string(),
   })
@@ -187,7 +189,8 @@ export default defineSchema({
     .index("by_device_serial", ["deviceSerial"])
     .index("by_device_ip", ["deviceIp"])
     .index("by_hik_dev_index", ["hikDevIndex"])
-    .index("by_ehome_id", ["ehomeID"]),
+    .index("by_ehome_id", ["ehomeID"])
+    .index("by_api_token", ["apiToken"]),
 
   accessRules: defineTable({
     name: v.string(),

@@ -55,6 +55,54 @@ http.route({
         hikEhomeID,
       } = parsed;
 
+      const authHeader = request.headers.get("Authorization") ?? "";
+      const bearerToken = authHeader.startsWith("Bearer ")
+        ? authHeader.slice(7).trim()
+        : null;
+      const authedDevice = bearerToken
+        ? await ctx.runQuery(internal.devices.getByApiToken, { token: bearerToken })
+        : null;
+      if (bearerToken && !authedDevice) {
+        // Backwards-compat dönemi: warn log, eski serial/IP lookup'a düş
+        console.warn("[card-reader] geçersiz apiToken, serial/IP'ye düşülüyor", {
+          token: bearerToken.slice(0, 8) + "…",
+        });
+      }
+      if (!bearerToken) {
+        console.warn(
+          "[card-reader] Authorization header yok — eski serial/IP lookup kullanılıyor (deprecated)",
+        );
+      }
+
+      // Token doğrulandıysa: request'teki tüm cihaz tanımlayıcıları token sahibi cihazla
+      // eşleşmeli; en az bir tanımlayıcı eşleşmeli (saldırgan hepsini omit ederek farklı
+      // tenant cihazına yazamasın). Eşleşmezse cross-tenant attempt → 403.
+      if (authedDevice) {
+        const checks: Array<[string, string | undefined, string | undefined]> = [
+          ["serial", serial ?? undefined, authedDevice.deviceSerial],
+          ["devIndex", hikDevIndex ?? undefined, authedDevice.hikDevIndex],
+          ["ehomeID", hikEhomeID ?? undefined, authedDevice.ehomeID],
+          ["deviceIp", deviceIp ?? undefined, authedDevice.deviceIp],
+        ];
+        const mismatches: string[] = [];
+        let matched = 0;
+        for (const [label, reqVal, tokVal] of checks) {
+          if (!reqVal || !tokVal) continue;
+          if (reqVal !== tokVal) mismatches.push(`${label}=${reqVal} vs token=${tokVal}`);
+          else matched++;
+        }
+        if (mismatches.length > 0 || matched === 0) {
+          console.warn("[card-reader] cross-tenant attempt reddedildi", {
+            mismatches,
+            matched,
+          });
+          return new Response(
+            JSON.stringify({ cevap: "error", error: "device mismatch" }),
+            { status: 403, headers: { "Content-Type": "application/json" } },
+          );
+        }
+      }
+
       // Her POST'ta (heartbeat dahil) lastSeen güncelle — cihaz "online" görünsün
       if (serial || deviceIp || hikDevIndex || hikEhomeID) {
         await ctx.runMutation(internal.devices.updateLastSeen, {

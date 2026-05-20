@@ -15,6 +15,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
+import { parseDateString, formatDateString } from "@/lib/date";
 import { Label } from "@/components/ui/label";
 import { Palmtree, Plus, Check, X, Calendar } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -152,18 +154,21 @@ export default function Leaves() {
               </div>
               <div>
                 <Label>Başlangıç Tarihi</Label>
-                <Input
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) => setFormData((p) => ({ ...p, startDate: e.target.value }))}
+                <DatePicker
+                  date={parseDateString(formData.startDate)}
+                  onSelect={(d) =>
+                    setFormData((p) => ({ ...p, startDate: formatDateString(d) }))
+                  }
                 />
               </div>
               <div>
                 <Label>Bitiş Tarihi</Label>
-                <Input
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => setFormData((p) => ({ ...p, endDate: e.target.value }))}
+                <DatePicker
+                  date={parseDateString(formData.endDate)}
+                  onSelect={(d) =>
+                    setFormData((p) => ({ ...p, endDate: formatDateString(d) }))
+                  }
+                  minDate={parseDateString(formData.startDate)}
                 />
               </div>
               <div className="md:col-span-2">

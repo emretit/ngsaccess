@@ -217,36 +217,6 @@ export function DeviceHikvisionSection({
         )}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <FormField
-          control={form.control}
-          name="device_username"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Admin Kullanıcı (opsiyonel)</FormLabel>
-              <FormControl>
-                <Input placeholder="admin" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="device_password"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Admin Şifre (opsiyonel)</FormLabel>
-              <FormControl>
-                <Input type="password" placeholder="••••••" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
-
       <div className="flex flex-wrap items-start gap-2 pt-2 border-t">
         <Button
           type="button"

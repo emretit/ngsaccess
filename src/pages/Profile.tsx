@@ -3,6 +3,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import ProfilePhoto from '@/components/profile/ProfilePhoto';
 import ProfileForm from '@/components/profile/ProfileForm';
 import SecurityCard from '@/components/profile/SecurityCard';
+import UserProjectsCard from '@/components/profile/UserProjectsCard';
 import { useProfileUtils } from '@/hooks/useProfileUtils';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
@@ -42,6 +43,9 @@ export default function Profile() {
         />
       </div>
       
+      {/* Erişim Yetkim — proje listesi + rol */}
+      <UserProjectsCard />
+
       {/* Güvenlik Kartı */}
       <SecurityCard />
     </div>

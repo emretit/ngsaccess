@@ -1,7 +1,8 @@
 
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DatePicker } from "@/components/ui/date-picker";
+import { parseDateString, formatDateString } from "@/lib/date";
 
 interface DeviceAdditionalInfoProps {
   description: string;
@@ -30,14 +31,11 @@ export function DeviceAdditionalInfo({
       </div>
 
       <div className="space-y-1">
-        <label htmlFor="expiry_date" className="text-sm font-medium">
-          Son Kullanma Tarihi
-        </label>
-        <Input
-          id="expiry_date"
-          type="date"
-          value={expiryDate}
-          onChange={(e) => onExpiryDateChange(e.target.value)}
+        <Label htmlFor="expiry_date">Son Kullanma Tarihi</Label>
+        <DatePicker
+          date={parseDateString(expiryDate)}
+          onSelect={(d) => onExpiryDateChange(formatDateString(d))}
+          placeholder="Tarih seçin (opsiyonel)"
         />
         <p className="text-xs text-muted-foreground mt-1">
           Eğer cihazın bir son kullanma tarihi varsa belirtin, yoksa boş bırakın.

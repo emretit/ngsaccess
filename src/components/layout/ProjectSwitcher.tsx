@@ -10,12 +10,7 @@ import {
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { cn } from "@/lib/utils";
-
-const ROLE_LABELS: Record<string, string> = {
-  super_admin: "Süper Admin",
-  project_admin: "Proje Yöneticisi",
-  project_user: "Üye",
-};
+import { roleLabel as formatRole } from "@/lib/roleLabels";
 
 export function ProjectSwitcher() {
   const { profile } = useAuth();
@@ -35,7 +30,7 @@ export function ProjectSwitcher() {
   }
 
   const role = profile?.role;
-  const roleLabel = role ? ROLE_LABELS[role] ?? role : "";
+  const roleLabel = role ? formatRole(role) : "";
   const multi = projects.length > 1;
 
   const baseClass = cn(

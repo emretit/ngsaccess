@@ -4,10 +4,11 @@ import { api } from "../../convex/_generated/api";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { DatePicker } from "@/components/ui/date-picker";
+import { parseDateString, formatDateString } from "@/lib/date";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -53,11 +54,13 @@ function formatJson(value: unknown): string {
 export default function AuditLog() {
   const { profile } = useAuth();
   const { projectId, loading } = useActiveProject();
+  const isSuperAdmin = profile?.role === "super_admin";
 
   const [targetTable, setTargetTable] = useState<string>("all");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [showAllProjects, setShowAllProjects] = useState(false);
 
   const startTimestamp = startDate
     ? new Date(`${startDate}T00:00:00.000`).getTime()
@@ -66,12 +69,14 @@ export default function AuditLog() {
     ? new Date(`${endDate}T23:59:59.999`).getTime()
     : undefined;
 
+  const effectiveProjectId = isSuperAdmin && showAllProjects ? undefined : projectId;
+
   const rows = useQuery(
     api.auditLog.list,
     loading
       ? "skip"
       : {
-          projectId,
+          projectId: effectiveProjectId,
           targetTable: targetTable === "all" ? undefined : targetTable,
           startTimestamp,
           endTimestamp,
@@ -113,6 +118,15 @@ export default function AuditLog() {
           </div>
 
           <div className="flex items-center gap-2 ml-auto flex-wrap">
+            {isSuperAdmin && (
+              <label className="flex items-center gap-2 text-xs">
+                <Switch
+                  checked={showAllProjects}
+                  onCheckedChange={setShowAllProjects}
+                />
+                <span className="text-muted-foreground">Tüm projeler</span>
+              </label>
+            )}
             <Select value={targetTable} onValueChange={setTargetTable}>
               <SelectTrigger id="target" className="w-[160px] h-8 text-xs">
                 <SelectValue placeholder="Hedef Tablo" />
@@ -126,21 +140,18 @@ export default function AuditLog() {
                 ))}
               </SelectContent>
             </Select>
-            <Input
-              id="start"
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="h-8 w-[130px] text-xs"
-              aria-label="Başlangıç"
+            <DatePicker
+              date={parseDateString(startDate)}
+              onSelect={(d) => setStartDate(formatDateString(d))}
+              placeholder="Başlangıç"
+              className="w-[160px]"
             />
-            <Input
-              id="end"
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="h-8 w-[130px] text-xs"
-              aria-label="Bitiş"
+            <DatePicker
+              date={parseDateString(endDate)}
+              onSelect={(d) => setEndDate(formatDateString(d))}
+              placeholder="Bitiş"
+              className="w-[160px]"
+              minDate={parseDateString(startDate)}
             />
             <Button
               variant="outline"

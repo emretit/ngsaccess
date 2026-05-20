@@ -32,6 +32,8 @@ import { Trash2, CalendarPlus, Sparkles, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 import { z } from "zod";
+import { DatePicker } from "@/components/ui/date-picker";
+import { parseDateString, formatDateString } from "@/lib/date";
 
 const holidaySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tarih YYYY-MM-DD formatında olmalı"),
@@ -129,10 +131,10 @@ export function HolidayCalendarManager() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Resmi Tatil Takvimi</CardTitle>
-        <div className="flex gap-2 items-center">
-          <Label htmlFor="year-filter" className="text-sm">
+      <CardHeader className="flex flex-row items-center justify-between py-3">
+        <CardTitle className="text-base">Resmi Tatil Takvimi</CardTitle>
+        <div className="flex gap-1.5 items-center">
+          <Label htmlFor="year-filter" className="text-xs">
             Yıl
           </Label>
           <Input
@@ -140,61 +142,65 @@ export function HolidayCalendarManager() {
             type="number"
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
-            className="w-24"
+            className="w-20 h-8 text-xs"
           />
           <Button
+            size="sm"
             variant="outline"
             onClick={handleSeed}
             disabled={seeding}
+            className="h-8 text-xs"
           >
             {seeding ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Sparkles className="mr-2 h-4 w-4" />
+              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
             )}
-            {year} Tatillerini Otomatik Doldur
+            {year} Otomatik Doldur
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end p-4 border rounded-lg bg-muted/30">
-          <div className="space-y-2">
-            <Label htmlFor="hol-date">Tarih</Label>
-            <Input
-              id="hol-date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap items-end gap-2 p-2 border rounded-md bg-muted/30">
+          <div className="space-y-1">
+            <Label htmlFor="hol-date" className="text-xs">Tarih</Label>
+            <DatePicker
+              date={parseDateString(date)}
+              onSelect={(d) => setDate(formatDateString(d))}
+              className="w-40"
             />
           </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="hol-name">İsim</Label>
+          <div className="space-y-1 flex-1 min-w-[180px]">
+            <Label htmlFor="hol-name" className="text-xs">İsim</Label>
             <Input
               id="hol-name"
               placeholder="Cumhuriyet Bayramı"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              className="h-8 text-xs"
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 h-8">
             <Checkbox
               id="hol-half"
               checked={isHalfDay}
               onCheckedChange={(v) => setIsHalfDay(!!v)}
+              className="h-3.5 w-3.5"
             />
-            <Label htmlFor="hol-half" className="text-sm">
+            <Label htmlFor="hol-half" className="text-xs">
               Yarım gün
             </Label>
           </div>
           <Button
+            size="sm"
             onClick={handleAdd}
             disabled={adding}
-            className="md:col-span-4"
+            className="h-8 text-xs"
           >
             {adding ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
             ) : (
-              <CalendarPlus className="mr-2 h-4 w-4" />
+              <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
             )}
             Tatil Ekle
           </Button>
@@ -204,11 +210,11 @@ export function HolidayCalendarManager() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tarih</TableHead>
-                <TableHead>Gün</TableHead>
-                <TableHead>İsim</TableHead>
-                <TableHead>Tip</TableHead>
-                <TableHead className="w-20"></TableHead>
+                <TableHead className="h-8 px-3 py-1 text-xs">Tarih</TableHead>
+                <TableHead className="h-8 px-3 py-1 text-xs">Gün</TableHead>
+                <TableHead className="h-8 px-3 py-1 text-xs">İsim</TableHead>
+                <TableHead className="h-8 px-3 py-1 text-xs">Tip</TableHead>
+                <TableHead className="h-8 px-3 py-1 text-xs w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -216,37 +222,37 @@ export function HolidayCalendarManager() {
                 <TableRow>
                   <TableCell
                     colSpan={5}
-                    className="text-center text-muted-foreground py-8"
+                    className="text-center text-muted-foreground py-4 text-sm"
                   >
                     {year} yılı için tanımlı tatil yok
                   </TableCell>
                 </TableRow>
               ) : (
                 sortedHolidays.map((h) => (
-                  <TableRow key={h._id}>
-                    <TableCell className="font-mono">
+                  <TableRow key={h._id} className="h-8">
+                    <TableCell className="px-3 py-1 font-mono text-xs">
                       {format(new Date(`${h.date}T00:00:00`), "dd MMM yyyy", {
                         locale: tr,
                       })}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-3 py-1 text-xs">
                       {format(new Date(`${h.date}T00:00:00`), "EEEE", {
                         locale: tr,
                       })}
                     </TableCell>
-                    <TableCell>{h.name}</TableCell>
-                    <TableCell>
+                    <TableCell className="px-3 py-1 text-xs">{h.name}</TableCell>
+                    <TableCell className="px-3 py-1">
                       {h.isHalfDay ? (
-                        <Badge variant="secondary">Yarım gün</Badge>
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-5">Yarım gün</Badge>
                       ) : (
-                        <Badge>Tam gün</Badge>
+                        <Badge className="text-[10px] px-1.5 py-0 h-5">Tam gün</Badge>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-3 py-0.5">
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button size="sm" variant="ghost">
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
                           </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>

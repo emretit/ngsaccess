@@ -34,8 +34,6 @@ export function DeviceLocationSection({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide pb-2">Konum Bilgileri</h3>
-      
       <FormField
         control={form.control}
         name="zone_id"
