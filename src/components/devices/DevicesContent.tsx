@@ -18,6 +18,9 @@ interface DevicesContentProps {
   onEditDevice: (device: Device) => void;
   onNewDevice: () => void;
   onQRClick?: (device: Device) => void;
+  onReleaseDevice?: (device: Device) => void;
+  /** Yönetimsel aksiyonlar (havuzdan ekle butonu) yalnız admin'e gösterilir. */
+  canManage?: boolean;
 }
 
 export function DevicesContent({
@@ -31,7 +34,9 @@ export function DevicesContent({
   onAssignLocation,
   onEditDevice,
   onNewDevice,
-  onQRClick
+  onQRClick,
+  onReleaseDevice,
+  canManage = true
 }: DevicesContentProps) {
   // Use the extracted filter hook
   const {
@@ -56,6 +61,8 @@ export function DevicesContent({
         onTypeFilterChange={setTypeFilter}
         deviceTypes={deviceTypes}
         onNewDevice={onNewDevice}
+        newDeviceLabel="Havuzdan Cihaz Ekle"
+        showNewDevice={canManage}
         deviceCount={devices.length}
         filteredCount={filteredDevices.length}
       />
@@ -73,6 +80,7 @@ export function DevicesContent({
           onAssignLocation={onAssignLocation}
           onEditDevice={onEditDevice}
           onQRClick={onQRClick}
+          onReleaseDevice={onReleaseDevice}
         />
       </div>
     </div>

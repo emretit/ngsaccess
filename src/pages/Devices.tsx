@@ -1,11 +1,15 @@
 
 import { useState, useEffect } from 'react';
+import { useMutation } from 'convex/react';
+import { api } from '../../convex/_generated/api';
+import type { Id } from '../../convex/_generated/dataModel';
 import { DevicesContent } from '@/components/devices/DevicesContent';
 import { ZoneDoorTreePanel } from '@/components/access-control/ZoneDoorTreePanel';
 import { QRCodeDialog } from '@/components/devices/QRCodeDialog';
 import { DeviceDeleteDialog } from '@/components/devices/DeviceDeleteDialog';
 import { AssignLocationForm } from '@/components/devices/AssignLocationForm';
 import { DeviceDetailsPanel } from '@/components/devices/DeviceDetailsPanel';
+import { ClaimDeviceDialog } from '@/components/devices/ClaimDeviceDialog';
 import { useProjectFilteredDevices } from '@/hooks/useProjectFilteredDevices';
 import { useZonesAndDoors } from '@/hooks/useZonesAndDoors';
 import { useQRCodeDialog } from '@/components/devices/useQRCodeDialog';
@@ -19,13 +23,13 @@ import { AccessDenied } from '@/components/shared/AccessDenied';
 import { useToast } from '@/hooks/use-toast';
 
 const Devices = () => {
-  const { loading: projectLoading } = useProjectAccess();
+  const { loading: projectLoading, isAdmin } = useProjectAccess();
   const { devices, isLoading, hasProjectAccess } = useProjectFilteredDevices();
   const { zones, doors } = useZonesAndDoors();
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [selectedDoorId, setSelectedDoorId] = useState<string | null>(null);
   
-  // Device panel state
+  // Device panel state (yalnızca DÜZENLEME için — yeni cihaz havuzdan claim ile eklenir)
   const [devicePanel, setDevicePanel] = useState<{
     open: boolean;
     device: ServerDevice | null;
@@ -33,6 +37,7 @@ const Devices = () => {
     open: false,
     device: null
   });
+  const [claimOpen, setClaimOpen] = useState(false);
   
   const { toast } = useToast();
   
@@ -55,11 +60,26 @@ const Devices = () => {
     }
   }, [selectedZoneId]);
 
+  // "Havuzdan Cihaz Ekle" — sıfırdan oluşturma yerine havuzdan projeye claim.
   const handleNewDevice = () => {
-    setDevicePanel({
-      open: true,
-      device: null
-    });
+    setClaimOpen(true);
+  };
+
+  const handleClaimSuccess = () => {
+    setClaimOpen(false);
+    toast({ title: "İşlem başarılı", description: "Cihaz projeye eklendi" });
+  };
+
+  // Cihazı projeden çıkarıp havuza geri al (door/okuma silinir, cihaz havuzda kalır).
+  const releaseDeviceMut = useMutation(api.devices.releaseDevice);
+  const handleReleaseDevice = async (device: Device) => {
+    try {
+      await releaseDeviceMut({ deviceId: device._id as Id<"devices"> });
+      toast({ title: "İşlem başarılı", description: "Cihaz havuza geri alındı" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Cihaz havuza alınamadı";
+      toast({ title: "Hata", description: message, variant: "destructive" });
+    }
   };
 
   const handleEditDevice = (device: Device) => {
@@ -108,15 +128,24 @@ const Devices = () => {
           onEditDevice={handleEditDevice}
           onNewDevice={handleNewDevice}
           onQRClick={handleQRClick}
+          onReleaseDevice={isAdmin ? handleReleaseDevice : undefined}
+          canManage={isAdmin}
         />
       </div>
 
-      {/* Device Details Panel */}
+      {/* Device Details Panel (sadece düzenleme) */}
       <DeviceDetailsPanel
         open={devicePanel.open}
         onClose={handleDevicePanelClose}
         selectedDevice={devicePanel.device}
         onSuccess={handleDevicePanelSuccess}
+      />
+
+      {/* Havuzdan cihaz claim */}
+      <ClaimDeviceDialog
+        open={claimOpen}
+        onClose={() => setClaimOpen(false)}
+        onSuccess={handleClaimSuccess}
       />
 
       {/* QR Code Dialog */}

@@ -203,7 +203,9 @@ export const update = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const device = await ctx.db.get(args.deviceId);
     if (!device) throw new Error("Cihaz bulunamadı");
-    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
+    // super_admin tüm cihazları (havuzdaki atanmamış = projectId undefined dahil) düzenleyebilir;
+    // isProjectAllowed undefined'ı reddettiği için bypass gerekir (list/regenerateApiToken ile tutarlı).
+    if (ctx.user.role !== "super_admin" && !isProjectAllowed(allowedProjectIds, device.projectId)) {
       throw new Error("Bu cihaza erişim yetkiniz yok");
     }
 
@@ -262,7 +264,9 @@ export const remove = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const device = await ctx.db.get(args.deviceId);
     if (!device) throw new Error("Cihaz bulunamadı");
-    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
+    // super_admin havuzdaki atanmamış cihazı (projectId undefined) da silebilir;
+    // isProjectAllowed undefined'ı reddettiği için bypass gerekir (update ile tutarlı).
+    if (ctx.user.role !== "super_admin" && !isProjectAllowed(allowedProjectIds, device.projectId)) {
       throw new Error("Bu cihaza erişim yetkiniz yok");
     }
     // İlişkili card readings sayısını kontrol et
@@ -445,16 +449,72 @@ function defaultDoorName(io: number): string {
 }
 
 /**
+ * Bir panele bölge (zone) + N kapı (door) üretir/bağlar. createIdePanel ve claimDevice
+ * ortak kullanır — cross-tenant pointer kontrolleri (zone.projectId eşleşmesi) tek yerde.
+ *
+ * Bölge: `zoneId` verilirse mevcut bölgeye yerleştirilir (proje doğrulanır); verilmezse
+ * `newZoneName` ile yeni bölge oluşturulur (boşsa panel adından türetilir — geriye uyum).
+ * Kapılar `deviceId` ile panele, `zoneId` ile bölgeye bağlanır (Variant 1: panelin tüm
+ * kapıları tek bölgede). Cihaz satırının `zoneId`'sini PATCH'lemez — onu çağıran yapar.
+ */
+async function provisionPanelZoneAndDoors(
+  ctx: MutationCtx,
+  opts: {
+    deviceId: Id<"devices">;
+    projectId?: Id<"projects">;
+    allowedProjectIds: Id<"projects">[];
+    zoneId?: Id<"zones">;
+    newZoneName?: string;
+    panelName: string;
+    description?: string;
+    doorCount: number;
+    now: string;
+  },
+): Promise<{ zoneId: Id<"zones">; doorIds: Id<"doors">[] }> {
+  let zoneId: Id<"zones">;
+  if (opts.zoneId) {
+    const zone = await ctx.db.get(opts.zoneId);
+    if (!zone) throw new Error("Bölge bulunamadı");
+    if (!isProjectAllowed(opts.allowedProjectIds, zone.projectId)) {
+      throw new Error("Bu bölgeye erişim yetkiniz yok");
+    }
+    // Bölge ile panel aynı projede olmalı — aksi halde cross-project orphan oluşur.
+    if (zone.projectId !== opts.projectId) {
+      throw new Error("Seçilen bölge bu panelin projesinde değil");
+    }
+    zoneId = opts.zoneId;
+  } else {
+    zoneId = await ctx.db.insert("zones", {
+      name: opts.newZoneName?.trim() || opts.panelName,
+      projectId: opts.projectId,
+      description: opts.description,
+      createdAt: opts.now,
+      updatedAt: opts.now,
+    });
+  }
+
+  const doorIds: Id<"doors">[] = [];
+  for (let io = 0; io < opts.doorCount; io++) {
+    const doorId = await ctx.db.insert("doors", {
+      name: defaultDoorName(io),
+      projectId: opts.projectId,
+      zoneId,
+      deviceId: opts.deviceId,
+      ioId: io,
+      status: "active",
+      createdAt: opts.now,
+      updatedAt: opts.now,
+    });
+    doorIds.push(doorId);
+  }
+  return { zoneId, doorIds };
+}
+
+/**
  * IDE Smart paneli ekler: cihaz (device) + N kapı (door) üretir; cihazı bir
  * bölgeye (zone) yerleştirir. Bölge ve panel AYRI kavramlardır (endüstri modeli):
  * panel kendi adını taşır, bölge mantıksal alandır ve bağımsız adlandırılır.
- *
- * Bölge: `zoneId` verilirse mevcut bölgeye yerleştirilir; verilmezse `newZoneName`
- * ile yeni bir bölge oluşturulur (ikisi de yoksa panel adından bir bölge türetilir
- * — geriye uyum). Kapılar `deviceId` ile panele, `zoneId` ile bölgeye bağlanır
- * (Variant 1: panelin tüm kapıları tek bölgede). Panel komutları MQTT (bridge +
- * idePendingOperations kuyruğu) üzerinden iletilir; ayrı bir bağlantı testi yoktur —
- * panel ilk trigger'da (heartbeat/kart) otomatik canlanır.
+ * Bölge/kapı üretimi provisionPanelZoneAndDoors helper'ıyla paylaşılır.
  */
 export const createIdePanel = authedMutation({
   args: {
@@ -484,35 +544,10 @@ export const createIdePanel = authedMutation({
     const now = new Date().toISOString();
     const doorCount = Math.max(1, Math.min(args.ideDoorCount ?? 4, 8));
 
-    // 1) Bölge çözümü: mevcut seç / yeni oluştur / panel adından türet.
-    let zoneId: Id<"zones">;
-    if (args.zoneId) {
-      const zone = await ctx.db.get(args.zoneId);
-      if (!zone) throw new Error("Bölge bulunamadı");
-      if (!isProjectAllowed(allowedProjectIds, zone.projectId)) {
-        throw new Error("Bu bölgeye erişim yetkiniz yok");
-      }
-      // Bölge ile panel aynı projede olmalı — aksi halde bölge bir projede, cihaz/kapı
-      // başka projede kalır ve cihaz o bölge altında listelenmez (cross-project orphan).
-      if (zone.projectId !== args.projectId) {
-        throw new Error("Seçilen bölge bu panelin projesinde değil");
-      }
-      zoneId = args.zoneId;
-    } else {
-      zoneId = await ctx.db.insert("zones", {
-        name: args.newZoneName?.trim() || args.name,
-        projectId: args.projectId,
-        description: args.description,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
-
-    // 2) Cihaz (brand ide_smart, bölgeye yerleşik). zone.ideDeviceId YAZILMAZ.
+    // Cihaz (brand ide_smart). zoneId helper sonrası patch'lenir (tek transaction).
     const deviceId = await ctx.db.insert("devices", {
       name: args.name,
       projectId: args.projectId,
-      zoneId,
       brand: "ide_smart",
       deviceType: "Erişim Paneli",
       deviceIp: args.deviceIp,
@@ -530,23 +565,225 @@ export const createIdePanel = authedMutation({
       updatedAt: now,
     });
 
-    // 3) Kapılar (ioId 0..N-1) — deviceId ile panele, zoneId ile bölgeye bağlı.
-    const doorIds = [];
-    for (let io = 0; io < doorCount; io++) {
-      const doorId = await ctx.db.insert("doors", {
-        name: defaultDoorName(io),
-        projectId: args.projectId,
-        zoneId,
-        deviceId,
-        ioId: io,
-        status: "active",
-        createdAt: now,
-        updatedAt: now,
-      });
-      doorIds.push(doorId);
-    }
+    const { zoneId, doorIds } = await provisionPanelZoneAndDoors(ctx, {
+      deviceId,
+      projectId: args.projectId,
+      allowedProjectIds,
+      zoneId: args.zoneId,
+      newZoneName: args.newZoneName,
+      panelName: args.name,
+      description: args.description,
+      doorCount,
+      now,
+    });
+    await ctx.db.patch(deviceId, { zoneId, updatedAt: now });
 
     return { deviceId, zoneId, doorIds };
+  },
+});
+
+// ────────────────────────────────────────────────────────────
+// Havuz modeli: Admin UUID ile atanmamış panel ekler → Cihazlar'da projeye claim
+// ────────────────────────────────────────────────────────────
+
+/**
+ * Admin (super_admin) bir IDE Smart paneli UUID ile havuza ekler. Cihaz ATANMAMIŞ
+ * (projectId yok) doğar; ortak varsayılan MQTT kimliği (ideDefaults) satıra kopyalanır.
+ * Zone/door OLUŞTURULMAZ — onlar projeye claim anında üretilir (claimDevice).
+ * Panel önceden Hetzner broker'ına ayarlı geldiği için UUID girilince bağlanınca
+ * lastSeen üzerinden otomatik canlanır.
+ */
+export const registerUnassignedPanel = superAdminMutation({
+  args: {
+    ideUuid: v.string(),
+    brand: v.optional(
+      v.union(v.literal("ide_smart"), v.literal("hikvision"), v.literal("other")),
+    ),
+    name: v.optional(v.string()),
+  },
+  returns: v.id("devices"),
+  handler: async (ctx, args) => {
+    const ideUuid = args.ideUuid.trim();
+    if (!ideUuid) throw new Error("UUID gerekli");
+
+    // Tekillik: aynı UUID iki cihaza yazılırsa event/komut yönlendirmesi bozulur.
+    const existing = await ctx.db
+      .query("devices")
+      .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", ideUuid))
+      .first();
+    if (existing) throw new Error("Bu UUID zaten kayıtlı");
+
+    // Ortak varsayılan kimliği oku (singleton) → satıra kopyala. Bridge op-zamanı
+    // device.ideUser/idePassword okuduğu için dinamik değil, kopya gerekir.
+    const defaults = await ctx.db.query("ideDefaults").first();
+    const ideUser = defaults?.ideUser ?? "admin";
+    const idePassword = defaults?.idePassword ?? "admin12345";
+    const ideDoorCount = defaults?.ideDoorCount ?? 4;
+
+    const now = new Date().toISOString();
+    return await ctx.db.insert("devices", {
+      name: args.name?.trim() || ideUuid,
+      // projectId YOK → atanmamış (havuzda). isProjectAllowed undefined'ı reddeder,
+      // bu yüzden normal kullanıcıya görünmez; super_admin devices.list'te görür.
+      brand: args.brand ?? "ide_smart",
+      deviceType: "Erişim Paneli",
+      ideUuid,
+      ideUser,
+      idePassword,
+      ideHttpPort: 80,
+      ideDoorCount,
+      isActive: true,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+/**
+ * Havuzdaki atanmamış bir cihazı bir projeye claim eder (tek projeye özel).
+ * project_admin sadece kendi projesine; super_admin her projeye. Atama anında
+ * zone + door üretilir (provisionPanelZoneAndDoors). Cihaz zaten atanmışsa reddedilir
+ * (çift-claim; Convex OCC eşzamanlı claim'leri seri hale getirir → kaybeden bu guard'a takılır).
+ * adminMutation: claim yönetimsel iş (project_user değil) — listClaimable (adminQuery) ile tutarlı.
+ */
+export const claimDevice = adminMutation({
+  args: {
+    deviceId: v.id("devices"),
+    projectId: v.id("projects"),
+    zoneId: v.optional(v.id("zones")),
+    newZoneName: v.optional(v.string()),
+    name: v.optional(v.string()),
+    ideDoorCount: v.optional(v.number()),
+    description: v.optional(v.string()),
+  },
+  returns: v.object({
+    deviceId: v.id("devices"),
+    zoneId: v.id("zones"),
+    doorIds: v.array(v.id("doors")),
+  }),
+  handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (!allowedProjectIds.some((id) => id === args.projectId)) {
+      throw new Error("Bu projeye erişim yetkiniz yok");
+    }
+    const device = await ctx.db.get(args.deviceId);
+    if (!device) throw new Error("Cihaz bulunamadı");
+    if (device.projectId !== undefined) {
+      throw new Error("Bu cihaz zaten bir projeye atanmış");
+    }
+
+    const now = new Date().toISOString();
+    const doorCount = Math.max(1, Math.min(args.ideDoorCount ?? device.ideDoorCount ?? 4, 8));
+    const panelName = args.name?.trim() || device.name;
+
+    // Önce doğrula + üret; başarısız claim orphan bırakmasın diye device patch en sonda.
+    const { zoneId, doorIds } = await provisionPanelZoneAndDoors(ctx, {
+      deviceId: args.deviceId,
+      projectId: args.projectId,
+      allowedProjectIds,
+      zoneId: args.zoneId,
+      newZoneName: args.newZoneName,
+      panelName,
+      description: args.description,
+      doorCount,
+      now,
+    });
+
+    await ctx.db.patch(args.deviceId, {
+      projectId: args.projectId,
+      zoneId,
+      name: panelName,
+      ideDoorCount: doorCount,
+      updatedAt: now,
+    });
+
+    return { deviceId: args.deviceId, zoneId, doorIds };
+  },
+});
+
+/**
+ * Cihazı projeden çıkarıp havuza geri alır. remove temizliğini aynalar ama cihaz
+ * satırını SİLMEZ: card readings, groupDevices, kapılar silinir; bölge KORUNUR
+ * (paylaşılan mantıksal alan). apiToken temizlenir (başka projeye claim'de sızmasın).
+ * ideUuid/kimlik/lastSeen korunur → havuzda canlı tekrar görünür.
+ * adminMutation: yıkıcı + claim ile simetrik (project_user değil).
+ */
+export const releaseDevice = adminMutation({
+  args: { deviceId: v.id("devices") },
+  handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const device = await ctx.db.get(args.deviceId);
+    if (!device) throw new Error("Cihaz bulunamadı");
+    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
+      throw new Error("Bu cihaza erişim yetkiniz yok");
+    }
+
+    const readings = await ctx.db
+      .query("cardReadings")
+      .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
+      .collect();
+    await Promise.all(readings.map((r) => ctx.db.delete(r._id)));
+
+    const groupDevices = await ctx.db
+      .query("groupDevices")
+      .withIndex("by_project_device", (q) =>
+        q.eq("projectId", device.projectId).eq("deviceId", args.deviceId),
+      )
+      .collect();
+    await Promise.all(groupDevices.map((gd) => ctx.db.delete(gd._id)));
+
+    const ownedDoors = await ctx.db
+      .query("doors")
+      .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
+      .collect();
+    await Promise.all(ownedDoors.map((d) => ctx.db.delete(d._id)));
+
+    await ctx.db.patch(args.deviceId, {
+      projectId: undefined,
+      zoneId: undefined,
+      doorId: undefined,
+      apiToken: undefined,
+      apiTokenCreatedAt: undefined,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+/**
+ * Cihazlar sayfası claim picker'ı için: atanmamış (projectId yok) cihazlar.
+ * adminQuery — claim yönetimsel iş (super_admin + project_admin). devices.list
+ * bunları normal kullanıcıya açamaz çünkü isProjectAllowed undefined'ı reddeder.
+ */
+export const listClaimable = adminQuery({
+  args: {},
+  returns: v.array(
+    v.object({
+      _id: v.id("devices"),
+      name: v.string(),
+      brand: v.optional(
+        v.union(v.literal("hikvision"), v.literal("other"), v.literal("ide_smart")),
+      ),
+      ideUuid: v.optional(v.string()),
+      ideDoorCount: v.optional(v.number()),
+      lastSeen: v.optional(v.string()),
+    }),
+  ),
+  handler: async (ctx) => {
+    const rows = await ctx.db
+      .query("devices")
+      .withIndex("by_project", (q) => q.eq("projectId", undefined))
+      .collect();
+    // Yalnız picker'ın ihtiyacı olan alanlar — paylaşılan MQTT kimliği (ideUser/idePassword)
+    // ve apiToken project_admin'lere tel üstünden GÖNDERİLMEZ (least-privilege).
+    return rows.map((d) => ({
+      _id: d._id,
+      name: d.name,
+      brand: d.brand,
+      ideUuid: d.ideUuid,
+      ideDoorCount: d.ideDoorCount,
+      lastSeen: d.lastSeen,
+    }));
   },
 });
 

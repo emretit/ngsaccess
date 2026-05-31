@@ -12,6 +12,9 @@ interface DeviceFiltersProps {
   onTypeFilterChange: (value: string) => void;
   deviceTypes: string[];
   onNewDevice: () => void;
+  newDeviceLabel?: string;
+  /** "Yeni cihaz / Havuzdan ekle" butonunu gösterir (admin değilse gizlenir). Vars: true. */
+  showNewDevice?: boolean;
   deviceCount: number;
   filteredCount: number;
 }
@@ -25,6 +28,8 @@ export function DeviceFilters({
   onTypeFilterChange,
   deviceTypes,
   onNewDevice,
+  newDeviceLabel,
+  showNewDevice = true,
   deviceCount,
   filteredCount
 }: DeviceFiltersProps) {
@@ -84,7 +89,9 @@ export function DeviceFilters({
             </SelectContent>
           </Select>
 
-          <DeviceFormButton onOpenDevicePanel={onNewDevice} />
+          {showNewDevice && (
+            <DeviceFormButton onOpenDevicePanel={onNewDevice} label={newDeviceLabel} />
+          )}
         </div>
       </div>
     </div>

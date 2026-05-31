@@ -26,6 +26,7 @@ interface DeviceListProps {
   onAssignLocation?: (device: Device) => void;
   onEditDevice: (device: Device) => void;
   onQRClick?: (device: Device) => void;
+  onReleaseDevice?: (device: Device) => void;
   /** Admin görünümü: cihazın bağlı olduğu proje kolonunu göster. */
   showProject?: boolean;
   /** Admin görünümü: bölge/kapı/erişim yönü kolonlarını ve "Konum Ata" aksiyonunu gizler. */
@@ -43,6 +44,7 @@ export function DeviceList({
   onAssignLocation,
   onEditDevice,
   onQRClick,
+  onReleaseDevice,
   showProject,
   hideLocation,
   getProjectName
@@ -134,6 +136,7 @@ export function DeviceList({
                   onAssignLocation={onAssignLocation}
                   onEditDevice={onEditDevice}
                   onQRClick={onQRClick}
+                  onReleaseDevice={onReleaseDevice}
                   selected={selectedDevices.includes(device._id)}
                   onSelect={handleSelectDevice}
                 />

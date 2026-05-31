@@ -13,7 +13,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Device } from "@/types/device";
-import { Edit2, Trash2, MapPin, QrCode } from "lucide-react";
+import { Edit2, Trash2, MapPin, QrCode, Undo2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -31,6 +31,8 @@ interface DeviceTableRowProps {
   onAssignLocation?: (device: Device) => void;
   onEditDevice: (device: Device) => void;
   onQRClick?: (device: Device) => void;
+  /** Verilirse "Havuza geri al" aksiyonu gösterilir (cihazı projeden çıkarır). */
+  onReleaseDevice?: (device: Device) => void;
   selected: boolean;
   onSelect: (checked: boolean, deviceId: Id<"devices">) => void;
 }
@@ -47,6 +49,7 @@ export function DeviceTableRow({
   onAssignLocation,
   onEditDevice,
   onQRClick,
+  onReleaseDevice,
   selected,
   onSelect
 }: DeviceTableRowProps) {
@@ -145,6 +148,35 @@ export function DeviceTableRow({
           >
             <Edit2 className="h-4 w-4" />
           </Button>
+          {onReleaseDevice && device.brand === "ide_smart" && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-8 w-8"
+                  title="Havuza geri al"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Havuza geri al</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {device.name ? `"${device.name}" cihazını` : "Bu cihazı"} projeden çıkarıp havuza
+                    geri almak istediğinize emin misiniz? Cihazın kapıları ve okuma geçmişi silinir;
+                    cihaz havuzda kalır ve başka projeye atanabilir.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>İptal</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => onReleaseDevice(device)}>Havuza al</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button

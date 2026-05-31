@@ -27,6 +27,8 @@ interface ActiveProjectContextValue {
   activeProject: ProjectSummary | null;
   setActiveProjectId: (id: Id<"projects">) => void;
   isSuperAdmin: boolean;
+  /** super_admin VEYA project_admin — cihaz claim/release gibi yönetimsel aksiyonlar için. */
+  isAdmin: boolean;
   loading: boolean;
 }
 
@@ -56,6 +58,7 @@ export function ActiveProjectProvider({ children }: { children: ReactNode }) {
   const { profile, loading: authLoading } = useAuth();
   const { isAuthenticated } = useConvexAuth();
   const isSuperAdmin = profile?.role === "super_admin";
+  const isAdmin = isSuperAdmin || profile?.role === "project_admin";
 
   const userProjects = useQuery(
     api.userProjects.getByCurrentUser,
@@ -124,9 +127,10 @@ export function ActiveProjectProvider({ children }: { children: ReactNode }) {
       activeProject,
       setActiveProjectId,
       isSuperAdmin: !!isSuperAdmin,
+      isAdmin: !!isAdmin,
       loading,
     }),
-    [projectIds, projects, activeProjectId, activeProject, setActiveProjectId, isSuperAdmin, loading]
+    [projectIds, projects, activeProjectId, activeProject, setActiveProjectId, isSuperAdmin, isAdmin, loading]
   );
 
   return (

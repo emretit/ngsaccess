@@ -10,6 +10,7 @@ import { AdminDeviceDialog } from "@/components/admin/AdminDeviceDialog";
 import { useDeviceFilters } from "@/hooks/useDeviceFilters";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { toast } from "@/hooks/use-toast";
+import { computeDeviceStatus } from "@/lib/deviceStatus";
 
 export function AdminDevicesPanel() {
   const [selectedZoneId, _setSelectedZoneId] = useState<string | null>(null);
@@ -27,9 +28,13 @@ export function AdminDevicesPanel() {
 
   const removeDevice = useMutation(api.devices.remove);
 
+  // eslint-disable-next-line react-hooks/purity
+  const nowMs = Date.now();
   const rawDevices: Device[] = (rawDevicesData ?? []).map((device: Device & { _creationTime?: number }) => ({
     ...device,
-    status: device.status === "active" ? "online" : (device.status ?? "offline"),
+    // Online/offline lastSeen'den hesaplanır (Cihazlar sayfasıyla aynı util) — havuzdaki
+    // atanmamış cihazlar da panel bağlanınca canlı görünür.
+    status: computeDeviceStatus(device.lastSeen, nowMs),
     createdAt: device.createdAt ?? (device._creationTime ? new Date(device._creationTime).toISOString() : undefined),
   }));
 
@@ -88,7 +93,7 @@ export function AdminDevicesPanel() {
         onEditDevice={handleEditDevice}
         showProject
         hideLocation
-        getProjectName={(d) => (d.projectId ? projectNameById.get(String(d.projectId)) : undefined)}
+        getProjectName={(d) => (d.projectId ? projectNameById.get(String(d.projectId)) : "Havuzda (atanmamış)")}
       />
 
       <AdminDeviceDialog
