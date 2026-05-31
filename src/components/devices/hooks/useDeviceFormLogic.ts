@@ -1,11 +1,13 @@
 
+import { useMemo } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuthState } from "@/hooks/useAuthState";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { ServerDevice } from "@/types/device";
-import { formSchema, FormValues, type DeviceBrand } from "./useDeviceFormSchema";
+import type { Id } from "../../../../convex/_generated/dataModel";
+import { makeFormSchema, FormValues, type DeviceBrand } from "./useDeviceFormSchema";
 import { useDeviceDataLoader } from "./useDeviceDataLoader";
 import { useDeviceFormSubmission } from "./useDeviceFormSubmission";
 
@@ -14,17 +16,23 @@ interface UseDeviceFormLogicProps {
   open: boolean;
   defaultBrand?: DeviceBrand;
   onSuccess: () => void;
+  /** Admin akışı: cihazı aktif proje yerine seçilen projeye yazar. */
+  projectIdOverride?: Id<"projects"> | null;
+  /** Admin modu: yalnız bağlantı kimliği; isim seri/UUID'den türetilir, zorunlu değil. */
+  adminMode?: boolean;
 }
 
-export function useDeviceFormLogic({ device, open, defaultBrand, onSuccess }: UseDeviceFormLogicProps) {
+export function useDeviceFormLogic({ device, open, defaultBrand, onSuccess, projectIdOverride, adminMode }: UseDeviceFormLogicProps) {
   const { user } = useAuthState();
   const { projectId } = useActiveProject();
   const { zones, doors, loading: locationLoading } = useZonesAndDoors();
 
-  const currentProjectId = projectId ?? null;
+  const currentProjectId = projectIdOverride ?? projectId ?? null;
+
+  const schema = useMemo(() => makeFormSchema(!!adminMode), [adminMode]);
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema) as Resolver<FormValues>,
+    resolver: zodResolver(schema) as Resolver<FormValues>,
     defaultValues: {
       brand: defaultBrand ?? "other",
       name: "",
@@ -39,6 +47,10 @@ export function useDeviceFormLogic({ device, open, defaultBrand, onSuccess }: Us
       description: "",
       ehome_id: "",
       ehome_key: "",
+      // IDE Smart paneli ön-tanımlı kimliği (MQTT login token'ı için). Kullanıcı
+      // değiştirebilir; diğer marka cihazlarda bu alanlar yok sayılır.
+      ide_user: "admin",
+      ide_password: "admin12345",
     },
   });
 
@@ -56,6 +68,7 @@ export function useDeviceFormLogic({ device, open, defaultBrand, onSuccess }: Us
     device,
     currentProjectId,
     onSuccess,
+    adminMode,
   });
 
   return {

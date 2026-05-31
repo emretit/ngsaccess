@@ -24,6 +24,12 @@ interface ProjectForm {
   isActive: boolean;
 }
 
+const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
+  super_admin: { label: "Süper Admin", cls: "bg-red-100 text-red-800" },
+  project_admin: { label: "Proje Yöneticisi", cls: "bg-blue-100 text-blue-800" },
+  project_user: { label: "Kullanıcı", cls: "bg-green-100 text-green-800" },
+};
+
 const AdminProjectsPanel = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -63,16 +69,8 @@ const AdminProjectsPanel = () => {
   };
 
   const getRoleDisplay = (role: string) => {
-    switch (role) {
-      case "super_admin":
-        return <Badge className="bg-red-500/20 text-red-400 border-red-500/30 font-bold px-2 py-1">Süper Admin</Badge>;
-      case "project_admin":
-        return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 font-bold px-2 py-1">Proje Yöneticisi</Badge>;
-      case "project_user":
-        return <Badge className="bg-green-500/20 text-green-400 border-green-500/30 font-bold px-2 py-1">Kullanıcı</Badge>;
-      default:
-        return <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 font-bold px-2 py-1">Bilinmiyor</Badge>;
-    }
+    const { label, cls } = ROLE_BADGE[role] ?? { label: "Bilinmiyor", cls: "bg-gray-100 text-gray-700" };
+    return <Badge variant="secondary" className={cls}>{label}</Badge>;
   };
 
   const handleCreateProject = () => {
@@ -125,147 +123,130 @@ const AdminProjectsPanel = () => {
   const currentProject = currentProjectId ? projects.find((p: { _id: Id<"projects"> }) => p._id === currentProjectId) : null;
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between mb-10">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-3xl font-bold bg-linear-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent">
-            Proje Yönetimi
-          </h3>
-          <p className="text-purple-300 mt-2 text-lg">Sistemdeki tüm projeleri ve kullanıcıları yönetin</p>
+          <h3 className="text-lg font-semibold text-foreground">Proje Yönetimi</h3>
+          <p className="text-sm text-muted-foreground">Sistemdeki tüm projeleri ve kullanıcıları yönetin</p>
         </div>
-        <Button
-          onClick={handleCreateProject}
-          className="bg-linear-to-r from-purple-600 via-pink-600 to-blue-600 hover:from-purple-700 hover:via-pink-700 hover:to-blue-700 text-white font-bold px-8 py-4 rounded-xl shadow-xl hover:scale-105 transition-all duration-300 border-0"
-        >
-          <Plus className="h-5 w-5 mr-3" />
+        <Button onClick={handleCreateProject}>
+          <Plus className="h-4 w-4 mr-2" />
           Yeni Proje
         </Button>
       </div>
 
-      <div className="bg-white/5 backdrop-blur-xl border border-white/20 rounded-3xl overflow-hidden shadow-2xl">
-        <div className="p-8">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-white/20 hover:bg-white/5">
-                <TableHead className="text-purple-200 font-bold text-lg"><div className="flex items-center space-x-2"><Hash className="w-5 h-5" /><span>ID</span></div></TableHead>
-                <TableHead className="text-purple-200 font-bold text-lg">Proje Adı</TableHead>
-                <TableHead className="text-purple-200 font-bold text-lg">Açıklama</TableHead>
-                <TableHead className="text-purple-200 font-bold text-lg">Oluşturma Tarihi</TableHead>
-                <TableHead className="text-purple-200 font-bold text-lg">Durum</TableHead>
-                <TableHead className="text-purple-200 font-bold text-lg">Kullanıcılar</TableHead>
-                <TableHead className="text-right text-purple-200 font-bold text-lg">İşlemler</TableHead>
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead><div className="flex items-center gap-1.5"><Hash className="w-4 h-4" /><span>ID</span></div></TableHead>
+              <TableHead>Proje Adı</TableHead>
+              <TableHead>Açıklama</TableHead>
+              <TableHead>Oluşturma Tarihi</TableHead>
+              <TableHead>Durum</TableHead>
+              <TableHead>Kullanıcılar</TableHead>
+              <TableHead className="text-right">İşlemler</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Yükleniyor...</span>
+                  </div>
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-16 text-purple-300">
-                    <div className="flex items-center justify-center gap-2">
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      <span>Yükleniyor...</span>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : projects.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-16 text-purple-300 text-lg">
-                    <div className="flex flex-col items-center space-y-4">
-                      <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center">
-                        <Plus className="w-8 h-8 text-purple-400" />
-                      </div>
-                      <span>Henüz proje bulunmamaktadır</span>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                projects.map((project: { _id: Id<"projects">; name: string; description?: string; isActive?: boolean; _creationTime?: number }) => {
-                  const projectUsersList = getProjectUsers(project._id);
-                  const isExpanded = expandedProjects.has(project._id);
-                  return (
-                    <React.Fragment key={project._id}>
-                      <TableRow className="border-white/10 hover:bg-white/5 transition-all duration-300 group">
-                        <TableCell className="font-mono text-purple-300 text-sm bg-purple-500/10 rounded-lg group-hover:bg-purple-500/20 transition-colors duration-300 border border-purple-500/30">
-                          {project._id.slice(-6)}
-                        </TableCell>
-                        <TableCell className="font-bold text-white text-lg group-hover:text-purple-300 transition-colors duration-300">
-                          {project.name}
-                        </TableCell>
-                        <TableCell className="text-purple-200">
-                          {project.description
-                            ? project.description.length > 100
-                              ? `${project.description.substring(0, 100)}...`
-                              : project.description
-                            : <span className="text-purple-400 italic">Açıklama yok</span>}
-                        </TableCell>
-                        <TableCell className="text-purple-200">
-                          {project._creationTime ? format(new Date(project._creationTime), "dd.MM.yyyy HH:mm") : "-"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={project.isActive ? "default" : "secondary"}
-                            className={project.isActive
-                              ? "bg-green-500/20 text-green-400 border-green-500/30 font-bold px-4 py-2"
-                              : "bg-gray-500/20 text-gray-400 border-gray-500/30 font-bold px-4 py-2"}
-                          >
-                            {project.isActive ? "Aktif" : "Pasif"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" onClick={() => toggleProjectExpansion(project._id)} className="flex items-center space-x-2 text-purple-300 hover:text-purple-100">
-                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                            <Users className="h-4 w-4" />
-                            <span>({projectUsersList.length})</span>
+            ) : projects.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                  Henüz proje bulunmamaktadır
+                </TableCell>
+              </TableRow>
+            ) : (
+              projects.map((project: { _id: Id<"projects">; name: string; description?: string; isActive?: boolean; _creationTime?: number }) => {
+                const projectUsersList = getProjectUsers(project._id);
+                const isExpanded = expandedProjects.has(project._id);
+                return (
+                  <React.Fragment key={project._id}>
+                    <TableRow>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {project._id.slice(-6)}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {project.name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {project.description
+                          ? project.description.length > 100
+                            ? `${project.description.substring(0, 100)}...`
+                            : project.description
+                          : <span className="text-muted-foreground italic">Açıklama yok</span>}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {project._creationTime ? format(new Date(project._creationTime), "dd.MM.yyyy HH:mm") : "-"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={project.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-700"}>
+                          {project.isActive ? "Aktif" : "Pasif"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" onClick={() => toggleProjectExpansion(project._id)} className="flex items-center gap-1.5">
+                          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          <Users className="h-4 w-4" />
+                          <span>({projectUsersList.length})</span>
+                        </Button>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" onClick={() => handleEditProject(project)}>
+                            <Edit className="h-4 w-4" />
                           </Button>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end space-x-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleEditProject(project)} className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/20 transition-all duration-300 rounded-xl">
-                              <Edit className="h-5 w-5" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(project._id)} className="text-red-400 hover:text-red-300 hover:bg-red-500/20 transition-all duration-300 rounded-xl">
-                              <Trash2 className="h-5 w-5" />
-                            </Button>
+                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(project._id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="p-0">
+                          <div className="bg-muted/40 border-t p-4">
+                            <h4 className="text-sm font-medium mb-3 flex items-center gap-1.5">
+                              <Users className="h-4 w-4" /><span>Proje Kullanıcıları</span>
+                            </h4>
+                            {projectUsersList.length === 0 ? (
+                              <p className="text-muted-foreground text-sm italic">Bu projeye atanmış kullanıcı bulunmamaktadır</p>
+                            ) : (
+                              <div className="grid gap-2">
+                                {projectUsersList.map((user: { _id: Id<"users">; email?: string; role?: string }) => (
+                                  <div key={user._id} className="flex items-center justify-between rounded-lg border bg-background p-3">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                                        <Users className="h-4 w-4 text-muted-foreground" />
+                                      </div>
+                                      <div>
+                                        <p className="font-medium">{user.email}</p>
+                                        <p className="text-muted-foreground text-xs">ID: {user._id.slice(-6)}</p>
+                                      </div>
+                                    </div>
+                                    <div>{getRoleDisplay(user.role ?? "project_user")}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
-                      {isExpanded && (
-                        <TableRow>
-                          <TableCell colSpan={7} className="p-0">
-                            <div className="bg-white/5 border-t border-white/10 p-4">
-                              <h4 className="text-purple-200 font-semibold mb-3 flex items-center space-x-2">
-                                <Users className="h-4 w-4" /><span>Proje Kullanıcıları</span>
-                              </h4>
-                              {projectUsersList.length === 0 ? (
-                                <p className="text-purple-400 text-sm italic">Bu projeye atanmış kullanıcı bulunmamaktadır</p>
-                              ) : (
-                                <div className="grid gap-3">
-                                  {projectUsersList.map((user: { _id: Id<"users">; email?: string; role?: string }) => (
-                                    <div key={user._id} className="flex items-center justify-between bg-white/5 rounded-lg p-3 border border-white/10">
-                                      <div className="flex items-center space-x-3">
-                                        <div className="w-8 h-8 bg-purple-500/30 rounded-full flex items-center justify-center">
-                                          <Users className="h-4 w-4 text-purple-300" />
-                                        </div>
-                                        <div>
-                                          <p className="text-white font-medium">{user.email}</p>
-                                          <p className="text-purple-300 text-xs">ID: {user._id.slice(-6)}</p>
-                                        </div>
-                                      </div>
-                                      <div>{getRoleDisplay(user.role ?? "project_user")}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </React.Fragment>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                    )}
+                  </React.Fragment>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
       </div>
 
       <Dialog

@@ -11,12 +11,15 @@ const routeTitles: Record<string, string> = {
   "/employees": "Kişiler",
   "/devices": "Cihazlar",
   "/access-control": "Geçiş Kontrol",
+  "/visitors": "Ziyaretçiler",
+  "/live-monitoring": "Canlı İzleme",
   "/pdks-records": "PDKS Kayıtları",
   "/shifts": "Vardiyalar",
   "/leaves": "İzinler",
   "/settings": "Ayarlar",
   "/profile": "Profil",
   "/home": "Ana Sayfa",
+  "/system-admin": "Admin",
 };
 
 export default function Layout() {

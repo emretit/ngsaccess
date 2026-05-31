@@ -12,7 +12,7 @@ import { ALL_DAYS, type Weekday, type WeekScheduleEntry } from "./hikGateway";
 
 export interface HikSyncEligibleDevice {
   _id: Id<"devices">;
-  brand?: "hikvision" | "other";
+  brand?: "hikvision" | "other" | "ide_smart";
   hikDevIndex?: string;
   projectId?: Id<"projects">;
   name: string;

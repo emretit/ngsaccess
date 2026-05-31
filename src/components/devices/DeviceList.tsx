@@ -23,9 +23,14 @@ interface DeviceListProps {
   zones: Zone[];
   doors: Door[];
   onDeleteDevice: (deviceId: string) => void;
-  onAssignLocation: (device: Device) => void;
+  onAssignLocation?: (device: Device) => void;
   onEditDevice: (device: Device) => void;
   onQRClick?: (device: Device) => void;
+  /** Admin görünümü: cihazın bağlı olduğu proje kolonunu göster. */
+  showProject?: boolean;
+  /** Admin görünümü: bölge/kapı/erişim yönü kolonlarını ve "Konum Ata" aksiyonunu gizler. */
+  hideLocation?: boolean;
+  getProjectName?: (device: Device) => string | undefined;
 }
 
 export function DeviceList({
@@ -37,7 +42,10 @@ export function DeviceList({
   onDeleteDevice,
   onAssignLocation,
   onEditDevice,
-  onQRClick
+  onQRClick,
+  showProject,
+  hideLocation,
+  getProjectName
 }: DeviceListProps) {
   const {
     selectedDevices,
@@ -64,6 +72,9 @@ export function DeviceList({
     return door?.name;
   }
 
+  // Sabit kolonlar: seçim + # + Seri No + Cihaz Modeli + Durum + İşlemler = 6.
+  const colCount = 6 + (showProject ? 1 : 0) + (hideLocation ? 0 : 3);
+
   return (
     <div className="space-y-4">
       {selectedDevices.length > 0 && (
@@ -84,11 +95,16 @@ export function DeviceList({
                 />
               </TableHead>
               <TableHead className="bg-muted/50 font-semibold">#</TableHead>
-              <TableHead className="bg-muted/50 font-semibold">Cihaz Seri No</TableHead>
+              {showProject && <TableHead className="bg-muted/50 font-semibold">Proje</TableHead>}
+              <TableHead className="bg-muted/50 font-semibold">Seri No / UUID</TableHead>
               <TableHead className="bg-muted/50 font-semibold">Cihaz Modeli</TableHead>
-              <TableHead className="bg-muted/50 font-semibold">Bölge</TableHead>
-              <TableHead className="bg-muted/50 font-semibold">Kapı</TableHead>
-              <TableHead className="bg-muted/50 font-semibold">Erişim Yönü</TableHead>
+              {!hideLocation && (
+                <>
+                  <TableHead className="bg-muted/50 font-semibold">Bölge</TableHead>
+                  <TableHead className="bg-muted/50 font-semibold">Kapı</TableHead>
+                  <TableHead className="bg-muted/50 font-semibold">Erişim Yönü</TableHead>
+                </>
+              )}
               <TableHead className="bg-muted/50 font-semibold">Durum</TableHead>
               <TableHead className="text-right bg-muted/50 font-semibold">İşlemler</TableHead>
             </TableRow>
@@ -96,7 +112,7 @@ export function DeviceList({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-16">
+                <TableCell colSpan={colCount} className="text-center py-16">
                   <div className="flex flex-col items-center justify-center">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
                     <span className="text-muted-foreground font-medium">Cihazlar yükleniyor...</span>
@@ -111,6 +127,9 @@ export function DeviceList({
                   rowIndex={i + 1}
                   zoneName={getZoneName(device)}
                   doorName={getDoorName(device)}
+                  showProject={showProject}
+                  hideLocation={hideLocation}
+                  projectName={getProjectName?.(device)}
                   onDeleteDevice={onDeleteDevice}
                   onAssignLocation={onAssignLocation}
                   onEditDevice={onEditDevice}
@@ -121,7 +140,7 @@ export function DeviceList({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-16">
+                <TableCell colSpan={colCount} className="text-center py-16">
                   <div className="flex flex-col items-center justify-center space-y-4">
                     <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
                       <Smartphone className="h-8 w-8 text-muted-foreground/70" />

@@ -72,13 +72,38 @@ export default defineSchema({
     shift: v.optional(v.string()),
     hourlyRate: v.optional(v.number()),
     monthlySalary: v.optional(v.number()),
+    // --- Ziyaretçi modülü (geçici erişim) ---
+    // Bu kayıt bir ziyaretçi mi? true ise Kişiler listesinden gizlenir, Ziyaretçiler
+    // sekmesinde görünür. Cihaz sync / kart eşleştirme / canlı izleme aynen çalışır.
+    isVisitor: v.optional(v.boolean()),
+    // ISO UTC — bu andan sonra erişim cron ile otomatik iptal (isActive=false → desync).
+    accessExpiresAt: v.optional(v.string()),
+    // Ziyaret başlangıcı (log/raporlama; cihaz erişimini etkilemez).
+    accessStartsAt: v.optional(v.string()),
+    visitorCompany: v.optional(v.string()),
+    visitorPhone: v.optional(v.string()),
+    visitPurpose: v.optional(v.string()),
+    // Ziyaret edilen personel.
+    hostEmployeeId: v.optional(v.id("employees")),
+    // UI yaşam döngüsü; cihaz erişimini isActive belirler.
+    visitorStatus: v.optional(
+      v.union(
+        v.literal("preRegistered"),
+        v.literal("checkedIn"),
+        v.literal("checkedOut"),
+        v.literal("expired"),
+      ),
+    ),
     createdAt: v.optional(v.string()),
     updatedAt: v.optional(v.string()),
   })
     .index("by_project", ["projectId"])
     .index("by_email", ["email"])
     .index("by_card", ["cardNumber"])
-    .index("by_tc", ["tcNo"]),
+    .index("by_tc", ["tcNo"])
+    .index("by_visitor", ["isVisitor"])
+    // Expiry cron: isVisitor=true ∧ isActive=true ∧ accessExpiresAt<=now (ISO-UTC sıralanabilir).
+    .index("by_visitor_active_expiry", ["isVisitor", "isActive", "accessExpiresAt"]),
 
   checkInTokens: defineTable({
     employeeId: v.id("employees"),
@@ -130,22 +155,43 @@ export default defineSchema({
     name: v.string(),
     projectId: v.optional(v.id("projects")),
     description: v.optional(v.string()),
-    createdAt: v.optional(v.string()),
-    updatedAt: v.optional(v.string()),
-  }).index("by_project", ["projectId"]),
-
-  doors: defineTable({
-    name: v.string(),
-    projectId: v.optional(v.id("projects")),
-    zoneId: v.optional(v.id("zones")),
-    location: v.optional(v.string()),
-    doorCode: v.optional(v.string()),
-    status: v.optional(v.string()),
+    // DEPRECATED: panel↔bölge 1:1 bağı kaldırıldı. Bölge artık saf mantıksal alan;
+    // bir bölge birden çok panel/cihaz barındırabilir. Kapının paneli artık
+    // doors.deviceId'de tutulur. Bu alan migration ile temizleniyor; geriye kalan
+    // eski kayıtlar için optional bırakıldı (yeni kod yazmaz/okumaz).
+    ideDeviceId: v.optional(v.id("devices")),
     createdAt: v.optional(v.string()),
     updatedAt: v.optional(v.string()),
   })
     .index("by_project", ["projectId"])
-    .index("by_zone", ["zoneId"]),
+    .index("by_ide_device", ["ideDeviceId"]),
+
+  doors: defineTable({
+    name: v.string(),
+    projectId: v.optional(v.id("projects")),
+    // Kapının bölgesi (mantıksal alan). Variant 1: panele bağlı kapılar panelin
+    // bölgesini (device.zoneId) yansıtır; panel taşınınca eşitlenir.
+    zoneId: v.optional(v.id("zones")),
+    // Kapıyı kontrol eden fiziksel cihaz/panel (controller). IDE Smart panellerde
+    // panel device'ı; tek-kapılı cihazlarda da bağlanabilir. Boşsa manuel kapı.
+    deviceId: v.optional(v.id("devices")),
+    location: v.optional(v.string()),
+    doorCode: v.optional(v.string()),
+    status: v.optional(v.string()),
+    // IDE Smart aktüatör index'i (io_id 0–3). Diğer markalarda boş.
+    ioId: v.optional(v.number()),
+    // Okuyucu (Wiegand giriş yüzü) — kapıyla 1:1. Boşsa UI door.name'den türetir.
+    readerName: v.optional(v.string()),
+    // Okuyucu yön etiketi (görsel). Boşsa ioId'den türetilir (0=entry,1=exit,diğer=both).
+    readerDirection: v.optional(
+      v.union(v.literal("entry"), v.literal("exit"), v.literal("both"))
+    ),
+    createdAt: v.optional(v.string()),
+    updatedAt: v.optional(v.string()),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_zone", ["zoneId"])
+    .index("by_device", ["deviceId"]),
 
   devices: defineTable({
     name: v.string(),
@@ -164,8 +210,18 @@ export default defineSchema({
     lastSeen: v.optional(v.string()),
     deviceUsername: v.optional(v.string()),
     devicePassword: v.optional(v.string()),
-    // Marka (Hikvision / generic). Form akışını + alan setini belirler.
-    brand: v.optional(v.union(v.literal("hikvision"), v.literal("other"))),
+    // Marka (Hikvision / generic / IDE Smart panel). Form akışını + alan setini belirler.
+    brand: v.optional(
+      v.union(v.literal("hikvision"), v.literal("other"), v.literal("ide_smart"))
+    ),
+    // IDE Smart panel entegrasyonu. Komutlar MQTT (Hetzner broker + bridge +
+    // idePendingOperations kuyruğu) üzerinden iletilir; Convex panele doğrudan bağlanmaz.
+    // Panel = bölge (zoneId); kapılar zone altındaki doors (ioId 0..N-1).
+    ideUuid: v.optional(v.string()), // SYSTEM.UUID — event lookup + dst-id eşleşmesi
+    ideUser: v.optional(v.string()), // panel kimliği (MQTT login token'ı için; örn "admin")
+    idePassword: v.optional(v.string()), // panel şifresi (AUTH.USER1..5)
+    ideHttpPort: v.optional(v.number()), // opsiyonel LAN yedeği (HTTPSERVER.PORT)
+    ideDoorCount: v.optional(v.number()), // panel aktüatör/kapı sayısı (default 4)
     // Hik Device Gateway entegrasyonu
     hikDevIndex: v.optional(v.string()),
     ehomeID: v.optional(v.string()),
@@ -190,7 +246,8 @@ export default defineSchema({
     .index("by_device_ip", ["deviceIp"])
     .index("by_hik_dev_index", ["hikDevIndex"])
     .index("by_ehome_id", ["ehomeID"])
-    .index("by_api_token", ["apiToken"]),
+    .index("by_api_token", ["apiToken"])
+    .index("by_ide_uuid", ["ideUuid"]),
 
   accessRules: defineTable({
     name: v.string(),
@@ -201,6 +258,8 @@ export default defineSchema({
     endTime: v.optional(v.string()),
     days: v.optional(v.array(v.string())),
     hikWeekPlanNo: v.optional(v.number()),
+    // IDE Smart permission record id (1–65535). hikWeekPlanNo analogu, ayrı namespace.
+    idePermissionNo: v.optional(v.number()),
     priority: v.optional(v.number()),
     accessDirection: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
@@ -245,6 +304,9 @@ export default defineSchema({
     direction: v.optional(
       v.union(v.literal("entry"), v.literal("exit"))
     ),
+    // IDE Smart panel: hangi aktüatör/kapıdan (io_id) okundu. Okuyucu-bazlı
+    // canlı son-okuma için gerekli. deviceId panel cihazını tanımlar.
+    ideIoId: v.optional(v.number()),
     rawData: v.optional(v.string()),
     // Hikvision event detayları (Device Gateway / ISAPI event push)
     hikMajorEventType: v.optional(v.number()),
@@ -268,7 +330,8 @@ export default defineSchema({
     .index("by_device", ["deviceId"])
     .index("by_employee", ["employeeId"])
     .index("by_access_time", ["accessTime"])
-    .index("by_employee_device_time", ["employeeId", "deviceId", "accessTime"]),
+    .index("by_employee_device_time", ["employeeId", "deviceId", "accessTime"])
+    .index("by_device_io_time", ["deviceId", "ideIoId", "accessTime"]),
 
   // Cihaz offline iken biriken Convex → cihaz komutları kuyruğu.
   // Worker (hikQueueWorker) `status=pending AND nextRetryAt<=now` olanları işler.
@@ -290,6 +353,9 @@ export default defineSchema({
       v.literal("syncHoliday"),
       v.literal("syncDoorParam"),
       v.literal("openDoor"),
+      // NOT: IDE Smart komutları Faz 1'de anlık (action) çalışır, kuyruğa girmez.
+      // Faz 2'de offline retry kuyruğu eklenecekse buraya ide* op literal'leri +
+      // worker case'leri + recordSyncFailure union'ı birlikte eklenmeli.
     ),
     /**
      * Operation-spesifik payload. Şekil:
@@ -318,6 +384,60 @@ export default defineSchema({
     .index("by_device_status", ["deviceId", "status"])
     .index("by_status_created", ["status", "createdAt"])
     .index("by_status_nextRetry", ["status", "nextRetryAt"]),
+
+  /**
+   * IDE Smart bulut→panel komut kuyruğu. Convex serverless MQTT tutamaz; Hetzner'daki
+   * ide-mqtt-bridge daemon bu kuyruğu /ide-bridge/poll ile çeker, broker'a publish eder,
+   * panel response'unu msx-id ile /ide-bridge/ack'e bildirir.
+   * (hikPendingOperations'ın MQTT eşdeğeri — ayrı tablo, op tipleri IDE'ye özgü.)
+   */
+  idePendingOperations: defineTable({
+    projectId: v.optional(v.id("projects")),
+    deviceId: v.id("devices"),
+    opType: v.union(
+      v.literal("openDoor"),
+      v.literal("upsertUser"),
+      v.literal("deleteUser"),
+      v.literal("upsertPermission"),
+      v.literal("deletePermission"),
+      v.literal("triggerSync"),
+    ),
+    /**
+     * Bridge'in MQTT envelope üretmesi için materialize edilmiş alanlar.
+     * Şekil (opType'a göre; hepsi bridge'in envelopeForOp'una geçer):
+     * - openDoor:         { dstId, ioId, keep }
+     * - upsertUser:       { dstId, mode:"create"|"update", userRecord:{id,start?,end?,status?,permissions?} }
+     * - deleteUser:       { dstId, ideUserId }
+     * - upsertPermission: { dstId, mode, permissionRecord:{id,io,schedule,...} }
+     * - deletePermission: { dstId, ideId }
+     * - triggerSync:      { dstId, reset }
+     */
+    payload: v.any(),
+    status: v.union(
+      v.literal("pending"), // yazıldı, teslim girişimi yok
+      v.literal("sent"), // bridge publish etti, panel ack bekleniyor
+      v.literal("acked"), // panel result:"success" — terminal
+      v.literal("failed"), // terminal hata (maxAttempts aşıldı / kalıcı red)
+    ),
+    /** Bridge'in ürettiği transaction msx-id — panel response correlation anahtarı. */
+    msxId: v.optional(v.number()),
+    /** (deviceId|opType|hedef) — aynı pending op'un çift insert'ini engeller. */
+    idempotencyKey: v.string(),
+    attempts: v.number(),
+    maxAttempts: v.optional(v.number()),
+    /** pending için: bridge bu eşikten önce çekmez (backoff). epoch ms. */
+    nextRetryAt: v.optional(v.number()),
+    /** "sent"e geçiş — ack timeout hesabı. epoch ms. */
+    sentAt: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+    responseMessage: v.optional(v.string()),
+    createdAt: v.number(),
+    ackedAt: v.optional(v.number()),
+  })
+    .index("by_device_status", ["deviceId", "status"])
+    .index("by_status_nextRetry", ["status", "nextRetryAt"])
+    .index("by_msx", ["deviceId", "msxId"])
+    .index("by_idempotency", ["idempotencyKey"]),
 
   // Çalışan başına yüz fotoğrafı (Convex storage). Tek kişi → tek yüz.
   // Cihaza yazılan kayıt için ayrı status field yok — hikPendingOperations queue tutar.
@@ -463,6 +583,16 @@ export default defineSchema({
     updatedAt: v.optional(v.string()),
   }).index("by_project", ["projectId"]),
 
+  // IDE Smart panelleri için sistem geneli ortak varsayılanlar (singleton — proje
+  // index'i yok, `.first()` ile okunur). Admin "UUID ile ekle" yaparken bu kimlik
+  // cihaz satırına KOPYALANIR (bridge op-zamanı device.ideUser/idePassword okur).
+  ideDefaults: defineTable({
+    ideUser: v.string(),
+    idePassword: v.string(),
+    ideDoorCount: v.optional(v.number()),
+    updatedAt: v.string(),
+  }),
+
   chatConversations: defineTable({
     projectId: v.optional(v.id("projects")),
     title: v.optional(v.string()),
@@ -547,6 +677,8 @@ export default defineSchema({
       v.literal("biometric_fingerprint"),
       v.literal("card"),
       v.literal("photo"),
+      // Ziyaretçi KVKK aydınlatma/açık rıza onayı (kayıt sırasında alınır).
+      v.literal("visitor_kvkk"),
     ),
     grantedAt: v.string(),
     revokedAt: v.optional(v.string()),

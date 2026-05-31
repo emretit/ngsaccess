@@ -1,0 +1,8 @@
+# Sırlar ve runtime — repoya GİRMEZ
+certs/
+secrets/
+data/
+log/
+*.key
+*.crt
+*.srl

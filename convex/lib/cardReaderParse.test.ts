@@ -2,9 +2,87 @@ import { describe, it, expect } from "vitest";
 import {
   parseCardReaderBody,
   extractFromXmlOrMultipart,
+  ideResultGranted,
   CARD_FIELDS,
   SERIAL_FIELDS,
 } from "./cardReaderParse";
+
+// ─── IDE Smart panel event'leri ──────────────────────────────────────────────
+
+describe("parseCardReaderBody – IDE Smart", () => {
+  it("GERÇEK access_event şeklinden user_id + actuator + result + uuid çıkarır", () => {
+    // Canlı panelden yakalanan birebir şekil (2026-05-29, panel 289833329732592, WIEGAND2/W34):
+    const body = JSON.stringify({
+      payload: {
+        result: 0,
+        time: "2026-05-29 15:10:08",
+        user_id: 4240722371,
+        actuator: 2,
+      },
+      transaction: {
+        token: null,
+        type: "access_event",
+        "msx-id": "mfiTps",
+        "src-id": 289833329732592,
+        "dst-id": 0,
+      },
+    });
+    const result = parseCardReaderBody(body, "application/json");
+    expect(result.user_id).toBe("4240722371");
+    expect(result.ideIoId).toBe(2);
+    expect(result.ideResult).toBe(0);
+    expect(result.ideTime).toBe("2026-05-29 15:10:08");
+    // transaction.src-id panel UUID → ideUuid + serial fallback
+    expect(result.ideUuid).toBe("289833329732592");
+    expect(result.serial).toBe("289833329732592");
+    // Hikvision alanları boş kalmalı
+    expect(result.hikMajorEventType).toBeUndefined();
+  });
+
+  it("granted event (result:1) → ideResult 1", () => {
+    const body = JSON.stringify({
+      payload: { result: 1, time: "2026-05-29 15:11:00", user_id: 4240722371, actuator: 0 },
+      transaction: { type: "access_event", "src-id": 289833329732592, "dst-id": 0 },
+    });
+    const result = parseCardReaderBody(body, "application/json");
+    expect(result.ideResult).toBe(1);
+    expect(result.ideIoId).toBe(0);
+  });
+
+  it("heartbeat (user_id yok) IDE dalına DÜŞMEZ → user_id undefined (http.ts heartbeat olarak atlar)", () => {
+    const body = JSON.stringify({
+      payload: { TIME: "2026-05-29 15:08:14", IP: "192.168.1.4", WIFI_RSSI: null },
+      transaction: { type: "heartbeat", "src-id": 289833329732592, "dst-id": 0 },
+    });
+    const result = parseCardReaderBody(body, "application/json");
+    expect(result.user_id).toBeUndefined();
+    expect(result.ideIoId).toBeUndefined();
+  });
+
+  it("düz access-log objesi (actuator + uuid) IDE dalına düşer", () => {
+    const body = JSON.stringify({ user_id: "777", actuator: 0, uuid: "Q711N586" });
+    const result = parseCardReaderBody(body, "application/json");
+    expect(result.user_id).toBe("777");
+    expect(result.ideIoId).toBe(0);
+    expect(result.ideUuid).toBe("Q711N586");
+    expect(result.serial).toBe("Q711N586");
+  });
+});
+
+// ─── IDE result kodu → grant mapping (docs §6.3 + §9) ────────────────────────
+
+describe("ideResultGranted", () => {
+  it("1 = granted, 2 = granted-but-not-consumed, 3 = soft APB → hepsi grant (kapı açılır)", () => {
+    expect(ideResultGranted(1)).toBe(true);
+    expect(ideResultGranted(2)).toBe(true); // canlı doğrulandı 2026-05-31: result=2'de kapı açıldı
+    expect(ideResultGranted(3)).toBe(true);
+  });
+  it("0 / bilinmeyen kod / undefined → reddedildi", () => {
+    expect(ideResultGranted(0)).toBe(false);
+    expect(ideResultGranted(4)).toBe(false);
+    expect(ideResultGranted(undefined)).toBe(false);
+  });
+});
 
 // ─── JSON Testleri ─────────────────────────────────────────────────────────
 

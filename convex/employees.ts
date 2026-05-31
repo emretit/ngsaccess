@@ -1,15 +1,16 @@
 import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { authedQuery, adminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, QueryCtx } from "./_generated/server";
 import { cascadeRemoveEmployeePII } from "./lib/employeeCascade";
+import { resolveEmployeeIdeDeviceIds } from "./lib/accessGraph";
 
 type DuplicateField = "cardNumber" | "email" | "tcNo";
 
-async function findDuplicateEmployee(
+export async function findDuplicateEmployee(
   ctx: QueryCtx,
   field: DuplicateField,
   value: string,
@@ -28,15 +29,18 @@ async function findDuplicateEmployee(
   return existing.find((e) => e._id !== excludeId) ?? null;
 }
 
-const DUPLICATE_MESSAGES: Record<DuplicateField, string> = {
+export const DUPLICATE_MESSAGES: Record<DuplicateField, string> = {
   cardNumber: "Bu kart numarası başka bir personelde kullanılıyor",
   email: "Bu e-posta adresi başka bir personelde kullanılıyor",
   tcNo: "Bu TC kimlik numarası başka bir personelde kullanılıyor",
 };
 
+// IDE panel çözümleme (resolveEmployeeIdeDeviceIds) lib/accessGraph.ts'e taşındı —
+// accessRules.ts (removeGroupMember orphan temizliği) ile paylaşılır.
+
 // Form add-only: dropdown sadece eklemek için; var olan diğer kuralları silmez
 // (Erişim Yönetimi sayfası bunun için). Returns true if a new row was inserted.
-async function upsertGroupMembership(
+export async function upsertGroupMembership(
   ctx: MutationCtx,
   employeeId: Id<"employees">,
   accessRuleId: Id<"accessRules"> | undefined,
@@ -85,6 +89,9 @@ export const list = authedQuery({
       return [];
     }
 
+    // Ziyaretçiler (isVisitor) Kişiler listesinde görünmez — Ziyaretçiler sekmesinde yönetilir.
+    employees = employees.filter((e) => e.isVisitor !== true);
+
     return await Promise.all(
       employees.map(async (emp) => {
         const department = emp.departmentId
@@ -124,12 +131,14 @@ export const listLightForImport = authedQuery({
               ),
             )
           ).flat();
-    return employees.map((e) => ({
-      _id: String(e._id),
-      tcNo: e.tcNo ?? "",
-      firstName: e.firstName,
-      lastName: e.lastName,
-    }));
+    return employees
+      .filter((e) => e.isVisitor !== true)
+      .map((e) => ({
+        _id: String(e._id),
+        tcNo: e.tcNo ?? "",
+        firstName: e.firstName,
+        lastName: e.lastName,
+      }));
   },
 });
 
@@ -220,6 +229,11 @@ export const create = adminMutation({
     await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
       employeeId: id,
     });
+    // IDE Smart panellerine de otomatik push (MQTT kuyruğu üzerinden). internalAction:
+    // scheduler context'inde auth identity yok, authedAction throw ederdi.
+    await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+      employeeId: id,
+    });
     return id;
   },
   returns: v.id("employees"),
@@ -292,8 +306,26 @@ export const update = adminMutation({
       updates.cardNumber !== undefined && updates.cardNumber !== emp.cardNumber;
     const activeChanged =
       updates.isActive !== undefined && updates.isActive !== emp.isActive;
+
+    // Kart no değiştiyse ESKİ kartı IDE panellerinden sök (yoksa orphan kalır → eski
+    // kart hâlâ kapı açar). Paneller groupMembers'tan çözülür (kart değişiminden bağımsız);
+    // eski değer (emp.cardNumber) ile, yeni kartı yazacak sync'ten ÖNCE enqueue edilir.
+    if (cardChanged) {
+      const ideDeviceIds = await resolveEmployeeIdeDeviceIds(ctx, employeeId, emp.projectId);
+      if (ideDeviceIds.length > 0) {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.actions.ideGatewayDevice.deleteIdeUserFromPanels,
+          { cardNumber: emp.cardNumber, deviceIds: ideDeviceIds, projectId: emp.projectId },
+        );
+      }
+    }
+
     if (cardChanged || activeChanged || groupMemberAdded) {
       await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+        employeeId,
+      });
+      await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
         employeeId,
       });
     }
@@ -320,6 +352,20 @@ export const remove = adminMutation({
       api.actions.hikvisionSync.deleteEmployeeFromDevices,
       { employeeId: args.employeeId },
     );
+    // IDE: kayıt + groupMembers birazdan silinecek → getEmployeeWithDevices null döner.
+    // Panelleri ŞİMDİ (commit öncesi) çöz, kart no'yu açıkça geçir.
+    const ideDeviceIds = await resolveEmployeeIdeDeviceIds(
+      ctx,
+      args.employeeId,
+      emp.projectId,
+    );
+    if (ideDeviceIds.length > 0) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.ideGatewayDevice.deleteIdeUserFromPanels,
+        { cardNumber: emp.cardNumber, deviceIds: ideDeviceIds, projectId: emp.projectId },
+      );
+    }
 
     const groupMembers = await ctx.db
       .query("groupMembers")
@@ -397,17 +443,31 @@ export const bulkUpdateStatus = adminMutation({
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const changed: Id<"employees">[] = [];
     for (const id of args.employeeIds) {
       const emp = await ctx.db.get(id);
       if (emp && emp.projectId && !allowedProjectIds.some((pid) => pid === emp.projectId)) {
         throw new Error(`Çalışan ${emp.firstName} ${emp.lastName} için erişim yetkiniz yok`);
       }
+      if (emp && emp.isActive !== args.isActive) changed.push(id);
     }
     const now = new Date().toISOString();
     await Promise.all(
       args.employeeIds.map((id) =>
         ctx.db.patch(id, { isActive: args.isActive, updatedAt: now })
       )
+    );
+    // Aktiflik değişen çalışanları cihazlara sync et (panel user.status = 0/1). Tek tek
+    // update() ile aynı desen; toplu işlemde de pasif çalışan panel erişimi kaybetsin.
+    await Promise.all(
+      changed.flatMap((id) => [
+        ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+          employeeId: id,
+        }),
+        ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+          employeeId: id,
+        }),
+      ]),
     );
   },
   returns: v.null(),

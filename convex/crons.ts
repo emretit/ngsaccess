@@ -32,4 +32,21 @@ crons.daily(
   internal.actions.hikGatewayDevice.syncHikDeviceTimes,
 );
 
+// IDE Smart komut kuyruğu: "sent"te asılı kalan (bridge ack'i kaçırdı / broker koptu)
+// op'ları geri "pending"e al veya maxAttempts dolduysa "failed" yap. Bridge'in kendi
+// timeout'unu (CMD_ACK_TIMEOUT_MS) kaçırdığı durumlar için güvenlik ağı.
+crons.interval(
+  "requeue-ide-timeouts",
+  { minutes: 1 },
+  internal.ideSync.requeueTimedOut,
+);
+
+// Ziyaretçi geçici erişimi: süresi dolan (accessExpiresAt<=now) aktif ziyaretçileri pasife çek
+// → mevcut isActive=false desync yolu cihazdan söker.
+crons.interval(
+  "expire-visitor-access",
+  { minutes: 5 },
+  internal.visitors.expireVisitorAccess,
+);
+
 export default crons;

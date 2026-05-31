@@ -1,8 +1,9 @@
 
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
+import { resolveEmployeeIdeDeviceIds, resolveRuleIdeDeviceIds } from "./lib/accessGraph";
 
 export const list = authedQuery({
   args: {
@@ -163,6 +164,9 @@ export const update = authedMutation({
       await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncWeekPlanToDevices, {
         accessRuleId: ruleId,
       });
+      await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncPermissionToIdePanels, {
+        accessRuleId: ruleId,
+      });
     }
     return ruleId;
   },
@@ -199,11 +203,14 @@ export const remove = authedMutation({
     // Etkilenen üyeleri yeniden sync et — kalan kurallarına göre RightPlan
     // güncellensin, hiç kuralı kalmadıysa cihazdan sökülecek (Phase 5 reconcile).
     await Promise.all(
-      affectedEmployeeIds.map((empId) =>
+      affectedEmployeeIds.flatMap((empId) => [
         ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
           employeeId: empId,
         }),
-      ),
+        ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+          employeeId: empId,
+        }),
+      ]),
     );
   },
 });
@@ -267,10 +274,16 @@ export const createWithGroups = authedMutation({
       ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncWeekPlanToDevices, {
         accessRuleId: ruleId,
       }),
+      ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncPermissionToIdePanels, {
+        accessRuleId: ruleId,
+      }),
     ];
     for (const empId of employeeIds ?? []) {
       syncJobs.push(
         ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+          employeeId: empId,
+        }),
+        ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
           employeeId: empId,
         }),
       );
@@ -359,11 +372,17 @@ export const updateWithGroups = authedMutation({
       ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncWeekPlanToDevices, {
         accessRuleId: ruleId,
       }),
+      ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncPermissionToIdePanels, {
+        accessRuleId: ruleId,
+      }),
     ];
     if (employeeIds !== undefined) {
       for (const empId of employeeIds) {
         syncJobs.push(
           ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+            employeeId: empId,
+          }),
+          ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
             employeeId: empId,
           }),
         );
@@ -396,6 +415,9 @@ export const addGroupMember = authedMutation({
     await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
       employeeId: args.employeeId,
     });
+    await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+      employeeId: args.employeeId,
+    });
     return id;
   },
 });
@@ -410,8 +432,31 @@ export const removeGroupMember = authedMutation({
       throw new Error("Bu üyeye erişim yetkiniz yok");
     }
     const employeeId = member.employeeId;
+    const employee = await ctx.db.get(employeeId);
+    // Silinen kuralın IDE panelleri (commit ÖNCESİ; üyelik silinince zincir kopar).
+    const removedRulePanels = await resolveRuleIdeDeviceIds(ctx, member.groupId, member.projectId);
+
     await ctx.db.delete(args.memberId);
     await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.deleteEmployeeFromDevices, {
+      employeeId,
+    });
+
+    // IDE: çalışanın KALAN panellerini çöz. Silinen kuralın panellerinden artık erişilmeyenler
+    // (orphan) kart sökülür; hâlâ erişilenler RE-SYNC ile permissions[] güncellenir.
+    if (employee) {
+      const remaining = new Set(
+        await resolveEmployeeIdeDeviceIds(ctx, employeeId, member.projectId),
+      );
+      const orphanPanels = removedRulePanels.filter((d) => !remaining.has(d));
+      if (orphanPanels.length > 0) {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.actions.ideGatewayDevice.deleteIdeUserFromPanels,
+          { cardNumber: employee.cardNumber, deviceIds: orphanPanels, projectId: member.projectId },
+        );
+      }
+    }
+    await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
       employeeId,
     });
   },
@@ -439,6 +484,25 @@ export const addGroupDevice = authedMutation({
     await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncWeekPlanToDevices, {
       accessRuleId: args.groupId,
     });
+    await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncPermissionToIdePanels, {
+      accessRuleId: args.groupId,
+    });
+    // IDE: syncPermissionToIdePanels yalnızca permission RECORD'unu yazar; o izne sahip
+    // USER'lar da yeni panele yazılmalı yoksa kimse geçemez (Hikvision'da
+    // syncWeekPlanToDevices üyeleri zaten bind eder). Gruptaki üyeleri yeni panele sync et.
+    const groupMembersForDevice = await ctx.db
+      .query("groupMembers")
+      .withIndex("by_project_group", (q) =>
+        q.eq("projectId", rule.projectId).eq("groupId", args.groupId),
+      )
+      .collect();
+    await Promise.all(
+      groupMembersForDevice.map((m) =>
+        ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+          employeeId: m.employeeId,
+        }),
+      ),
+    );
     return id;
   },
 });
@@ -464,11 +528,14 @@ export const removeGroupDevice = authedMutation({
       )
       .collect();
     await Promise.all(
-      members.map((m) =>
+      members.flatMap((m) => [
         ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
           employeeId: m.employeeId,
         }),
-      ),
+        ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+          employeeId: m.employeeId,
+        }),
+      ]),
     );
   },
 });

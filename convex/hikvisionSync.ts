@@ -25,7 +25,7 @@ export const getEmployeeWithDevices = internalQuery({
       device: {
         _id: Id<"devices">;
         name: string;
-        brand?: "hikvision" | "other";
+        brand?: "hikvision" | "other" | "ide_smart";
         projectId?: Id<"projects">;
         hikDevIndex?: string;
         ehomeID?: string;
@@ -36,6 +36,7 @@ export const getEmployeeWithDevices = internalQuery({
         _id: Id<"accessRules">;
         name?: string;
         hikWeekPlanNo?: number;
+        idePermissionNo?: number;
         startTime?: string;
         endTime?: string;
         days?: string[];
@@ -72,6 +73,7 @@ export const getEmployeeWithDevices = internalQuery({
             _id: rule._id,
             name: rule.name,
             hikWeekPlanNo: rule.hikWeekPlanNo,
+            idePermissionNo: rule.idePermissionNo,
             startTime: rule.startTime,
             endTime: rule.endTime,
             days: rule.days,
@@ -114,7 +116,7 @@ export const getAccessRuleWithDevices = internalQuery({
     const devices: {
       _id: Id<"devices">;
       name: string;
-      brand?: "hikvision" | "other";
+      brand?: "hikvision" | "other" | "ide_smart";
       projectId?: Id<"projects">;
       hikDevIndex?: string;
       deviceIp?: string;
@@ -169,6 +171,7 @@ export const getAccessRuleWithDevices = internalQuery({
         endTime: rule.endTime,
         days: rule.days,
         hikWeekPlanNo: rule.hikWeekPlanNo,
+        idePermissionNo: rule.idePermissionNo,
         projectId: rule.projectId,
       },
       devices,

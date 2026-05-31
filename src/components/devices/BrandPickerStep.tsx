@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Cpu, Wifi } from "lucide-react";
+import { Cpu, Wifi, LayoutGrid } from "lucide-react";
 import type { DeviceBrand } from "./hooks/useDeviceFormSchema";
 import { BRAND_LABELS } from "./hooks/useDeviceFormSchema";
 
@@ -21,6 +21,12 @@ const OPTIONS: BrandOption[] = [
     description: "Erişim terminali / yüz tanıma — Device Gateway (ISUP 5.0) üzerinden",
     Icon: Cpu,
     iconClass: "text-red-600",
+  },
+  {
+    value: "ide_smart",
+    description: "Çok kapılı erişim paneli — bölge olarak eklenir, kapıları otomatik oluşturulur (HTTP/JSON)",
+    Icon: LayoutGrid,
+    iconClass: "text-emerald-600",
   },
   {
     value: "other",

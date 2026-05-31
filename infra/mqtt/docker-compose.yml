@@ -1,0 +1,34 @@
+# NGS Access — IDE Smart MQTT broker (Mosquitto) — Hetzner 157.90.114.86
+#
+# Kurulum/işletim: infra/mqtt/RUNBOOK.md
+# Bu sunucu paylaşımlı (OpenClaw 80/8080, Hik ISUP 766x, nginx 8090).
+# Mosquitto: 8883 (TLS) + 1883 (plaintext) dünyaya açık.
+# NOT: Paneller TLS için CA dosyası yükleme yolu firmware'de olmadığından ("CA file missing"),
+# plaintext 1883 kullanıyor — şifreleme YOK ama parola auth (passwd) + topic ACL korunuyor.
+# İleride panele CA yüklenebilirse 8883'e (TLS) dönülmeli.
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: ngs-mqtt
+    restart: unless-stopped
+    ports:
+      - "8883:8883"   # TLS — CA upload çözülünce paneller buraya (UFW + auth + TLS)
+      - "1883:1883"   # plaintext — paneller + bridge (auth + ACL; şifreleme yok)
+    volumes:
+      - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./config/acl:/mosquitto/config/acl:ro
+      - ./secrets/passwd:/mosquitto/config/passwd:ro
+      - ./certs:/mosquitto/certs:ro
+      - mqtt-data:/mosquitto/data
+      - mqtt-log:/mosquitto/log
+    healthcheck:
+      # Broker process'i ayakta mı (1883 loopback dinliyor mu).
+      test: ["CMD-SHELL", "timeout 3 mosquitto_sub -h 127.0.0.1 -p 1883 -t '$$SYS/broker/version' -C 1 2>/dev/null; [ $$? -ne 124 ]"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  mqtt-data:
+  mqtt-log:

@@ -36,5 +36,20 @@ const ABBR_BY_VALUE: Record<string, string> = Object.fromEntries(
   WEEKDAYS.map((d) => [d.value, d.abbr]),
 );
 
+const ORDER_BY_VALUE: Record<string, number> = Object.fromEntries(
+  WEEKDAYS.map((d, i) => [d.value, i]),
+);
+
+// Günleri her zaman sabit hafta sırasına (Pzt→Paz) göre sırala; seçim/silme
+// sırasından bağımsız tutarlı görünsün. Bilinmeyen değerler sona gider.
+export const sortWeekdays = <T extends string>(days: T[]): T[] =>
+  [...days].sort(
+    (a, b) =>
+      (ORDER_BY_VALUE[a] ?? WEEKDAYS.length) -
+      (ORDER_BY_VALUE[b] ?? WEEKDAYS.length),
+  );
+
 export const formatWeekdaysAbbr = (days: string[]): string =>
-  days.map((d) => ABBR_BY_VALUE[d] ?? d).join(", ");
+  sortWeekdays(days)
+    .map((d) => ABBR_BY_VALUE[d] ?? d)
+    .join(", ");

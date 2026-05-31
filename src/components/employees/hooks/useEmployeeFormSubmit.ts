@@ -18,6 +18,7 @@ const reportSyncResult = (
 ) => {
   if (synced > 0) {
     toast({
+      variant: "success",
       title: "Cihaz Senkronizasyonu",
       description: `${synced} cihaza senkronize edildi`,
     });

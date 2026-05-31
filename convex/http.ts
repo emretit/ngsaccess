@@ -1,6 +1,7 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { auth } from "./auth";
 import { parseCardReaderBody } from "./lib/cardReaderParse";
 
@@ -53,6 +54,10 @@ http.route({
         hikTemperature,
         hikEventState,
         hikEhomeID,
+        ideIoId,
+        ideUuid,
+        ideResult,
+        ideTime,
       } = parsed;
 
       const authHeader = request.headers.get("Authorization") ?? "";
@@ -83,6 +88,7 @@ http.route({
           ["devIndex", hikDevIndex ?? undefined, authedDevice.hikDevIndex],
           ["ehomeID", hikEhomeID ?? undefined, authedDevice.ehomeID],
           ["deviceIp", deviceIp ?? undefined, authedDevice.deviceIp],
+          ["ideUuid", ideUuid ?? undefined, authedDevice.ideUuid],
         ];
         const mismatches: string[] = [];
         let matched = 0;
@@ -104,12 +110,13 @@ http.route({
       }
 
       // Her POST'ta (heartbeat dahil) lastSeen güncelle — cihaz "online" görünsün
-      if (serial || deviceIp || hikDevIndex || hikEhomeID) {
+      if (serial || deviceIp || hikDevIndex || hikEhomeID || ideUuid) {
         await ctx.runMutation(internal.devices.updateLastSeen, {
           deviceSerial: serial ?? undefined,
           deviceIp: deviceIp ?? undefined,
           hikDevIndex: hikDevIndex ?? undefined,
           ehomeID: hikEhomeID ?? undefined,
+          ideUuid: ideUuid ?? undefined,
         });
       }
 
@@ -151,6 +158,10 @@ http.route({
           hikHelmet: hikHelmet ?? undefined,
           hikTemperature: hikTemperature ?? undefined,
           hikEventState: hikEventState ?? undefined,
+          ideUuid: ideUuid ?? undefined,
+          ideIoId: ideIoId ?? undefined,
+          ideResult: ideResult ?? undefined,
+          ideTime: ideTime ?? undefined,
         }
       );
 
@@ -171,6 +182,136 @@ http.route({
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
+  }),
+});
+
+// ────────────────────────────────────────────────────────────────────
+// IDE Smart MQTT bridge köprüsü (Hetzner ide-mqtt-bridge daemon ↔ Convex).
+// Bridge tek secret (IDE_BRIDGE_SECRET) ile authenticate olur; broker'dan
+// güvenilir gelen event/komut akışını taşır. Convex serverless MQTT tutamaz,
+// bu yüzden komutlar idePendingOperations kuyruğunda durur, bridge poll eder.
+// ────────────────────────────────────────────────────────────────────
+
+/** Bridge Bearer secret doğrulaması. Geçersizse 401 Response döner, geçerliyse null. */
+function checkBridgeAuth(request: Request): Response | null {
+  const expected = process.env.IDE_BRIDGE_SECRET;
+  const authHeader = request.headers.get("Authorization") ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
+  if (!expected || !token || token !== expected) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  return null;
+}
+
+const jsonResponse = (body: unknown, status = 200): Response =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+
+/**
+ * Bridge → Convex: panel event'i (MQTT topic + ham body). /card-reader'ın IDE
+ * akışını yeniden kullanır ama panel-token cross-tenant guard'ı yerine bridge
+ * secret'ı kullanır (cihaz ideUuid ile bulunur).
+ */
+http.route({
+  path: "/ide-bridge/event",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const unauth = checkBridgeAuth(request);
+    if (unauth) return unauth;
+    try {
+      const { body } = (await request.json()) as { topic?: string; body?: string };
+      const raw = typeof body === "string" ? body : JSON.stringify(body ?? {});
+      const parsed = parseCardReaderBody(raw, "application/json");
+      const { user_id, ideUuid, ideIoId, ideResult, ideTime } = parsed;
+
+      // Bu route YALNIZCA IDE Smart paneli event'leri içindir → ideUuid zorunlu.
+      // Yoksa cihaz çözülemez ve processCardReading kartı yanlış branch'te (token/
+      // genel kart) işleyip ideResult/ideIoId'yi yok sayardı.
+      if (!ideUuid) {
+        console.warn("[ide-bridge/event] ideUuid yok, atlanıyor", { rawHead: raw.slice(0, 120) });
+        return jsonResponse({ ok: false, error: "ideUuid required" }, 400);
+      }
+      await ctx.runMutation(internal.devices.updateLastSeen, { ideUuid });
+      // Heartbeat / kart no yok → sadece lastSeen.
+      if (!user_id) return jsonResponse({ ok: true, kind: "heartbeat" });
+
+      const result = await ctx.runMutation(internal.cardReadings.processCardReading, {
+        cardNo: user_id,
+        deviceSerial: "",
+        rawBody: raw.length > 10000 ? raw.slice(0, 10000) : raw,
+        ideUuid: ideUuid ?? undefined,
+        ideIoId: ideIoId ?? undefined,
+        ideResult: ideResult ?? undefined,
+        ideTime: ideTime ?? undefined,
+      });
+      return jsonResponse({ ok: true, granted: result.granted });
+    } catch (error) {
+      console.error("[ide-bridge/event] error:", error);
+      return jsonResponse({ ok: false, error: "system error" }, 500);
+    }
+  }),
+});
+
+/** Bridge → Convex: pending komutları çek (materialize edilmiş, msx-id bridge'de üretilir). */
+http.route({
+  path: "/ide-bridge/poll",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const unauth = checkBridgeAuth(request);
+    if (unauth) return unauth;
+    const { max } = (await request.json().catch(() => ({}))) as { max?: number };
+    const result = await ctx.runQuery(internal.ideSync.listPendingForBridge, {
+      max: typeof max === "number" ? max : undefined,
+    });
+    return jsonResponse(result);
+  }),
+});
+
+/** Bridge → Convex: komut panele publish edildi (status sent, msxId yaz). */
+http.route({
+  path: "/ide-bridge/sent",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const unauth = checkBridgeAuth(request);
+    if (unauth) return unauth;
+    const { opId, msxId } = (await request.json()) as { opId?: string; msxId?: number };
+    if (!opId || typeof msxId !== "number") return jsonResponse({ ok: false, error: "opId+msxId gerekli" }, 400);
+    await ctx.runMutation(internal.ideSync.markSent, {
+      opId: opId as Id<"idePendingOperations">,
+      msxId,
+    });
+    return jsonResponse({ ok: true });
+  }),
+});
+
+/** Bridge → Convex: panel komut sonucu (acked/failed/timeout). */
+http.route({
+  path: "/ide-bridge/ack",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const unauth = checkBridgeAuth(request);
+    if (unauth) return unauth;
+    const { opId, msxId, result, message } = (await request.json()) as {
+      opId?: string;
+      msxId?: number;
+      result?: string;
+      message?: string;
+    };
+    if (!opId) return jsonResponse({ ok: false, error: "opId gerekli" }, 400);
+    const normalized: "success" | "fail" | "timeout" =
+      result === "success" ? "success" : result === "timeout" ? "timeout" : "fail";
+    await ctx.runMutation(internal.ideSync.markAck, {
+      opId: opId as Id<"idePendingOperations">,
+      msxId: typeof msxId === "number" ? msxId : undefined,
+      result: normalized,
+      message,
+    });
+    return jsonResponse({ ok: true });
   }),
 });
 

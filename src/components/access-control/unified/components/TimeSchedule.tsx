@@ -1,7 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { WEEKDAYS } from "./weekdays";
+import { WEEKDAYS, sortWeekdays } from "./weekdays";
 
 interface TimeScheduleFormData {
   start_time: string;
@@ -44,7 +44,7 @@ export const TimeSchedule = <T extends TimeScheduleFormData,>({ formData, setFor
           variant="outline"
           size="sm"
           value={formData.days}
-          onValueChange={(days) => setFormData(prev => ({ ...prev, days }))}
+          onValueChange={(days) => setFormData(prev => ({ ...prev, days: sortWeekdays(days) }))}
           className="justify-start gap-1.5"
         >
           {WEEKDAYS.map((day) => (

@@ -1,0 +1,26 @@
+# NGS Access — IDE Smart MQTT Bridge (systemd unit)
+# Kurulum:
+#   1) Repo'yu/scripts'i sunucuya kopyala (örn /opt/ngs-bridge/) + `npm ci --omit=dev` (mqtt paketi)
+#   2) /etc/ide-mqtt-bridge.env doldur (RUNBOOK §bridge)
+#   3) cp infra/mqtt/ide-mqtt-bridge.service /etc/systemd/system/
+#      systemctl daemon-reload && systemctl enable --now ide-mqtt-bridge
+#   4) journalctl -u ide-mqtt-bridge -f
+[Unit]
+Description=NGS Access IDE Smart MQTT Bridge
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/ide-mqtt-bridge.env
+WorkingDirectory=/opt/ngs-bridge
+ExecStart=/usr/bin/node /opt/ngs-bridge/scripts/ide-mqtt-bridge.mjs
+Restart=always
+RestartSec=3
+# Tek instance garantisi (çift publish'i önler)
+# (systemd zaten tek ExecStart; ek lock gerekmez)
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

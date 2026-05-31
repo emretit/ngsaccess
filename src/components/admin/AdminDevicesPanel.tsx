@@ -6,6 +6,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { Device } from "@/types/device";
 import { DeviceList } from "@/components/devices/DeviceList";
 import { DeviceFilters } from "@/components/devices/DeviceFilters";
+import { AdminDeviceDialog } from "@/components/admin/AdminDeviceDialog";
 import { useDeviceFilters } from "@/hooks/useDeviceFilters";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { toast } from "@/hooks/use-toast";
@@ -13,9 +14,15 @@ import { toast } from "@/hooks/use-toast";
 export function AdminDevicesPanel() {
   const [selectedZoneId, _setSelectedZoneId] = useState<string | null>(null);
   const [selectedDoorId, _setSelectedDoorId] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingDevice, setEditingDevice] = useState<Device | null>(null);
 
   const { zones, doors } = useZonesAndDoors();
   const rawDevicesData = useQuery(api.devices.list);
+  const projectsData = useQuery(api.projects.list);
+  const projectNameById = new Map(
+    (projectsData ?? []).map((p) => [String(p._id), p.name])
+  );
   const isLoading = rawDevicesData === undefined;
 
   const removeDevice = useMutation(api.devices.remove);
@@ -47,16 +54,14 @@ export function AdminDevicesPanel() {
     }
   };
 
-  const handleAssignLocation = (_device: Device) => {
-    // TODO: open assign-location dialog
-  };
-
-  const handleEditDevice = (_device: Device) => {
-    // TODO: open edit-device dialog
+  const handleEditDevice = (device: Device) => {
+    setEditingDevice(device);
+    setDialogOpen(true);
   };
 
   const handleNewDevice = () => {
-    // TODO: open new-device dialog
+    setEditingDevice(null);
+    setDialogOpen(true);
   };
 
   return (
@@ -80,8 +85,17 @@ export function AdminDevicesPanel() {
         zones={zones}
         doors={doors}
         onDeleteDevice={handleDeleteDevice}
-        onAssignLocation={handleAssignLocation}
         onEditDevice={handleEditDevice}
+        showProject
+        hideLocation
+        getProjectName={(d) => (d.projectId ? projectNameById.get(String(d.projectId)) : undefined)}
+      />
+
+      <AdminDeviceDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        device={editingDevice}
+        onSuccess={() => setDialogOpen(false)}
       />
     </div>
   );

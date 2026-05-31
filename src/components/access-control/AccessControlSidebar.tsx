@@ -1,4 +1,4 @@
-import { Shield, Clock, History } from "lucide-react";
+import { Shield, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface AccessControlSidebarProps {
@@ -11,11 +11,6 @@ const sidebarItems = [
     key: "unified",
     label: "Erişim Yönetimi",
     icon: Shield,
-  },
-  {
-    key: "temporary",
-    label: "Geçici Erişim",
-    icon: Clock,
   },
   {
     key: "readings",

@@ -77,11 +77,6 @@ export const ZoneDeviceTree = <T extends ZoneDeviceTreeFormData,>({ formData, se
 
   const allDevicesSelected = areAllSelected(devices, formData.selected_devices);
 
-  const getDeviceLocationDisplay = (device: { zoneId?: unknown }) => {
-    const zone = zones.find(z => String(z._id) === String(device.zoneId));
-    return zone ? zone.name : 'Konum Belirtilmemiş';
-  };
-
   const renderZoneTree = () => {
     return zones.map(zone => {
       const zoneId = String(zone._id);
@@ -145,7 +140,7 @@ export const ZoneDeviceTree = <T extends ZoneDeviceTreeFormData,>({ formData, se
                       htmlFor={`device-${deviceId}`}
                       className="text-sm font-normal cursor-pointer"
                     >
-                      {device.name} ({getDeviceLocationDisplay(device)})
+                      {device.name}
                     </Label>
                   </div>
                 );
@@ -200,7 +195,7 @@ export const ZoneDeviceTree = <T extends ZoneDeviceTreeFormData,>({ formData, se
                     htmlFor={`orphan-device-${deviceId}`}
                     className="text-sm font-normal cursor-pointer"
                   >
-                    {device.name} ({getDeviceLocationDisplay(device)})
+                    {device.name}
                   </Label>
                 </div>
               );

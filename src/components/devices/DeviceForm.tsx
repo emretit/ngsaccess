@@ -1,7 +1,8 @@
 
 import { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
-import { Form } from "@/components/ui/form";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { ServerDevice, Project } from "@/types/device";
 import { useDeviceFormLogic } from "./hooks/useDeviceFormLogic";
 import { DeviceBasicSection } from "./form-sections/DeviceBasicSection";
@@ -9,6 +10,9 @@ import { DeviceLocationSection } from "./form-sections/DeviceLocationSection";
 import { DeviceNetworkSection } from "./form-sections/DeviceNetworkSection";
 import { DeviceStatusSection } from "./form-sections/DeviceStatusSection";
 import { DeviceHikvisionSection } from "./form-sections/DeviceHikvisionSection";
+import { DeviceIdeSmartSection } from "./form-sections/DeviceIdeSmartSection";
+import { DeviceNameSection } from "./form-sections/DeviceNameSection";
+import { DeviceZoneSection } from "./form-sections/DeviceZoneSection";
 import type { DeviceBrand } from "./hooks/useDeviceFormSchema";
 
 interface DeviceFormProps {
@@ -19,6 +23,10 @@ interface DeviceFormProps {
   defaultBrand?: DeviceBrand;
   onBack?: () => void;
   onSuccess: () => void;
+  /** Admin akışı: cihazı aktif proje yerine seçilen projeye yazar. */
+  projectIdOverride?: Id<"projects"> | null;
+  /** Admin modu: yalnız bağlantı kimliği alanları; isim/bölge/kapı/yön/tip/durum gizli. */
+  adminMode?: boolean;
 }
 
 export function DeviceForm({
@@ -29,6 +37,8 @@ export function DeviceForm({
   defaultBrand,
   onBack,
   onSuccess,
+  projectIdOverride,
+  adminMode,
 }: DeviceFormProps) {
   const {
     form,
@@ -39,7 +49,7 @@ export function DeviceForm({
     selectedZoneId,
     filteredDoors: _filteredDoors,
     onSubmit,
-  } = useDeviceFormLogic({ device, open, defaultBrand, onSuccess });
+  } = useDeviceFormLogic({ device, open, defaultBrand, onSuccess, projectIdOverride, adminMode });
 
   if (!open) return null;
 
@@ -50,30 +60,65 @@ export function DeviceForm({
     (d) => String(d.zone_id) === String(selectedZoneId)
   );
 
-  // eslint-disable-next-line react-hooks/incompatible-library
   const brand = form.watch("brand");
+
+  const isIdeSmart = brand === "ide_smart";
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit as never)} className="space-y-5">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-5">
+        {adminMode ? (
+          // Admin: yalnız bağlantı kimliği. İsim seri/UUID'den türetilir; bölge,
+          // kapı, erişim yönü, tip, durum proje tarafında kararlaştırılır.
+          brand === "ide_smart" ? (
+            <DeviceIdeSmartSection form={form} />
+          ) : (
+            <div className="space-y-5">
+              <FormField
+                control={form.control}
+                name="device_serial"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Seri Numarası</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Seri numarasını giriniz" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {brand === "other" && <DeviceNetworkSection form={form} />}
+            </div>
+          )
+        ) : isIdeSmart ? (
+          // IDE Smart paneli: panel adı + bölge (ayrı seçim) + bağlantı; kapılar
+          // otomatik üretilir. Serial/type alanları gizli.
           <div className="space-y-5">
-            <DeviceBasicSection form={form} />
-            {brand !== "hikvision" && <DeviceNetworkSection form={form} />}
-          </div>
-
-          <div className="space-y-5">
-            <DeviceLocationSection
-              form={form}
-              zones={zonesForForm}
-              doors={doorsForForm}
-              locationLoading={locationLoading}
-              selectedZoneId={selectedZoneId}
-              filteredDoors={filteredDoorsForForm}
-            />
+            <DeviceNameSection form={form} />
+            <DeviceZoneSection form={form} zones={zonesForForm} allowCreate={!device} />
+            <DeviceIdeSmartSection form={form} />
             <DeviceStatusSection form={form} />
           </div>
-        </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-5">
+            <div className="space-y-5">
+              <DeviceBasicSection form={form} />
+              {brand !== "hikvision" && <DeviceNetworkSection form={form} />}
+            </div>
+
+            <div className="space-y-5">
+              <DeviceLocationSection
+                form={form}
+                zones={zonesForForm}
+                doors={doorsForForm}
+                locationLoading={locationLoading}
+                selectedZoneId={selectedZoneId}
+                filteredDoors={filteredDoorsForForm}
+              />
+              <DeviceStatusSection form={form} />
+            </div>
+          </div>
+        )}
 
         {brand === "hikvision" && (
           <DeviceHikvisionSection

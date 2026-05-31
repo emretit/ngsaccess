@@ -48,7 +48,35 @@ export type CardReaderParseResult = {
   hikEventState?: string;
   /** Cihazın ehome/device ID'si (gateway register ederken atadığımız değer). */
   hikEhomeID?: string;
+  // IDE Smart panel event alanları (docs/ide-smart §6.3 access log)
+  // GERÇEK event şekli (canlı yakalandı 2026-05-29):
+  //   { payload:{ result, time, user_id, actuator }, transaction:{ type:"access_event", src-id:<UUID> } }
+  /** Aktüatör/kapı index'i (payload.actuator, 0..N-1) → panel bölgesindeki door'a map'lenir. */
+  ideIoId?: number;
+  /** Panel UUID (transaction.src-id) — serial yoksa cihaz eşlemesi için. */
+  ideUuid?: string;
+  /** Panel erişim kararı (payload.result). Kod anlamları için bkz. {@link ideResultGranted}. */
+  ideResult?: number;
+  /** Panel olay zamanı (payload.time, "YYYY-MM-DD HH:MM:SS", panel TZ = UTC+3). */
+  ideTime?: string;
 };
+
+/**
+ * IDE Smart access_event `payload.result` kodları (docs/ide-smart §6.3 + §9):
+ *   0 = denied (reddedildi)
+ *   1 = granted (izin verildi)
+ *   2 = granted-but-not-consumed — kullanım sayacı tüketilmeden grant; KAPI AÇILIR (§9 max_uses)
+ *   3 = SOFT_APB_VIOLATION — soft anti-passback; grant proceeds, KAPI AÇILIR (§9.2)
+ *   4+ = diğer ret nedenleri (reddedildi)
+ * Kapı açan tüm kodlar grant sayılır (canlı doğrulandı 2026-05-31: result=2'de kapı açıldı).
+ * accessStatus enum yalnızca izin_verildi/reddedildi taşıdığı için tek bayrağa indirilir.
+ */
+export const IDE_GRANTED_RESULT_CODES: ReadonlySet<number> = new Set([1, 2, 3]);
+
+/** payload.result → erişim verildi mi? undefined / bilinmeyen kod = reddedildi. */
+export function ideResultGranted(result: number | undefined): boolean {
+  return result !== undefined && IDE_GRANTED_RESULT_CODES.has(result);
+}
 
 function getFirstString(
   obj: Record<string, unknown>,
@@ -272,6 +300,57 @@ export function parseCardReaderBody(
   ) {
     try {
       const body = JSON.parse(jsonSource) as Record<string, unknown>;
+
+      // IDE Smart envelope (GERÇEK şekil, canlı yakalandı 2026-05-29):
+      //   { transaction: { type:"access_event", src-id:<panelUUID> },
+      //     payload: { result:0|1, time:"YYYY-MM-DD HH:MM:SS", user_id:<num>, actuator:<num> } }
+      // Hikvision şekillerinden ÖNCE kontrol edilir. Düz access-log objesi de desteklenir.
+      const ideTx =
+        typeof body.transaction === "object" && body.transaction !== null
+          ? (body.transaction as Record<string, unknown>)
+          : undefined;
+      const idePayload =
+        typeof body.payload === "object" && body.payload !== null
+          ? (body.payload as Record<string, unknown>)
+          : undefined;
+      const ideEvt = idePayload ?? body;
+      const ideType = ideTx ? getFirstString(ideTx, ["type"]) : undefined;
+      // Kart no: payload.user_id (number/string). Eski varsayım alanları da fallback.
+      const ideUserId = getFirstString(ideEvt, ["user_id", "userId", "card", "cardNo"]);
+      // Kapı/aktüatör: gerçek alan "actuator"; io_id eski varsayım (fallback).
+      const ideIoId = getFirstNumber(ideEvt, ["actuator", "io_id", "ioId"]);
+      const ideHasIo = ideIoId !== undefined;
+      const ideSrcUuid =
+        getFirstString(ideEvt, ["uuid", "device_uuid", "dst-id"]) ??
+        (ideTx ? getFirstString(ideTx, ["src-id", "dst-id"]) : undefined);
+      // IDE heartbeat/connected: user_id yok ama transaction.src-id = panel UUID.
+      // ideUuid'yi döndür ki lastSeen güncellenebilsin (user_id boş → kart işlenmez).
+      // (MQTT'de panel heartbeat'i src-id taşır; HTTP'de de aynı şekil.)
+      if (!ideUserId && ideSrcUuid && (ideType === "heartbeat" || ideType === "mqtt_connected_event")) {
+        return {
+          user_id: undefined,
+          serial: ideSrcUuid,
+          deviceIp: getFirstString(ideEvt, ["ipAddress", "ip", "IP"]) || undefined,
+          bodyForLog: body,
+          ideUuid: ideSrcUuid,
+        };
+      }
+      // IDE dalı: access_event tipi VEYA (user_id + actuator/io) varsa.
+      if (ideUserId && (ideType === "access_event" || ideHasIo)) {
+        const ideUuid = ideSrcUuid;
+        const serial = getFirstString(ideEvt, SERIAL_FIELDS) ?? ideUuid;
+        return {
+          user_id: ideUserId,
+          serial,
+          deviceIp: getFirstString(ideEvt, ["ipAddress", "ip", "IP"]) || undefined,
+          bodyForLog: body,
+          ideIoId,
+          ideUuid,
+          ideResult: getFirstNumber(ideEvt, ["result"]),
+          ideTime: getFirstString(ideEvt, ["time", "TIME"]),
+        };
+      }
+
       const payload = pickHikvisionPayload(body);
       let user_id = getFirstString(payload as Record<string, unknown>, CARD_FIELDS);
       let serial = getFirstString(payload as Record<string, unknown>, SERIAL_FIELDS);

@@ -11,6 +11,7 @@ import { useEmployees } from "@/hooks/useEmployees";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { AccessDenied } from "@/components/shared/AccessDenied";
+import { DeviceSyncStatusBanner } from "@/components/sync/DeviceSyncStatusBanner";
 
 export default function Employees() {
   const { loading: projectLoading } = useProjectAccess();
@@ -113,6 +114,7 @@ export default function Employees() {
       <DepartmentTree onSelectDepartment={setSelectedDepartment} />
 
       <div className="flex-1 min-w-0 space-y-3">
+        <DeviceSyncStatusBanner />
         <EmployeeFilters
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}

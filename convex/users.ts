@@ -158,6 +158,35 @@ export const initializeAdmin = authedMutation({
 });
 
 /**
+ * Dev/admin bootstrap: bir email'in rolünü ayarlar (örn. ilk super_admin).
+ * Sadece `npx convex run` ile çağrılabilir (internal). Sistemde super_admin
+ * varken normal rol değişimi UI'dan `users.updateRole` ile yapılır.
+ */
+export const setRoleByEmail = internalMutation({
+  args: {
+    email: v.string(),
+    role: v.union(
+      v.literal("super_admin"),
+      v.literal("project_admin"),
+      v.literal("project_user"),
+    ),
+  },
+  returns: v.object({ updated: v.boolean(), email: v.string() }),
+  handler: async (ctx, args) => {
+    const u = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", args.email.toLowerCase()))
+      .first();
+    if (!u) return { updated: false, email: args.email };
+    await ctx.db.patch(u._id, {
+      role: args.role,
+      updatedAt: new Date().toISOString(),
+    });
+    return { updated: true, email: args.email };
+  },
+});
+
+/**
  * Dev/admin: belirli bir email için users + authAccounts + authSessions kayıtlarını siler.
  * Sadece `npx convex run` ile çağrılabilir (internal).
  */

@@ -4,6 +4,7 @@ import { api } from "../../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
 import { Id } from "../../../convex/_generated/dataModel";
 import { deviceSyncStore } from "./deviceSyncStore";
+import { friendlySyncError } from "@/lib/syncErrorMessages";
 
 interface CreateRuleWithMembersParams {
   rule: {
@@ -40,6 +41,9 @@ interface UpdateRuleWithMembersParams {
 }
 
 type SyncResult = FunctionReturnType<typeof api.actions.hikvisionSync.syncWeekPlanToDevices>;
+type IdeSyncResult = FunctionReturnType<
+  typeof api.actions.ideGatewayDevice.syncRuleToIdePanelsAndWait
+>;
 
 export const useComplexAccessRuleMutations = () => {
   const { toast } = useToast();
@@ -47,13 +51,17 @@ export const useComplexAccessRuleMutations = () => {
   const createWithGroups = useMutation(api.accessRules.createWithGroups);
   const updateWithGroups = useMutation(api.accessRules.updateWithGroups);
   const syncWeekPlan = useAction(api.actions.hikvisionSync.syncWeekPlanToDevices);
+  const syncIdeRule = useAction(api.actions.ideGatewayDevice.syncRuleToIdePanelsAndWait);
 
   const startBackgroundSync = (ruleId: Id<"accessRules">) => {
     const finish = deviceSyncStore.start();
-    void syncWeekPlan({ accessRuleId: ruleId })
+
+    // Hikvision: senkron sonuç → toast.
+    const hik = syncWeekPlan({ accessRuleId: ruleId })
       .then((syncResult: SyncResult) => {
         if (syncResult.synced > 0) {
           toast({
+            variant: "success",
             title: "Cihaz Senkronizasyonu",
             description: `${syncResult.synced} cihaza zaman planı gönderildi, ${syncResult.employeesSynced} kişi senkronize edildi`,
           });
@@ -73,8 +81,52 @@ export const useComplexAccessRuleMutations = () => {
           title: "Cihaz senkronizasyon hatası",
           description: message,
         });
+      });
+
+    // IDE Smart: op'lar kuyruğa atılır, panel ack'i beklenir → toast (Hikvision paritesi).
+    const ide = syncIdeRule({ accessRuleId: ruleId })
+      .then((r: IdeSyncResult) => {
+        // Gerçekten IDE paneli yoksa (op yok + atlanan yok) sessiz kal.
+        if (r.queued === 0 && r.skipped.length === 0) return;
+        if (r.queued > 0) {
+          if (r.failed > 0) {
+            // Kısmi başarıyı da göster (Hikvision'ın çift-toast'ına denk bilgi).
+            toast({
+              variant: "destructive",
+              title: "IDE Panel Senkronizasyonu",
+              description: `${r.acked}/${r.queued} panele yazıldı, ${r.failed} başarısız${r.errors[0] ? `: ${friendlySyncError(r.errors[0])}` : ""}`,
+            });
+          } else if (r.pending > 0) {
+            toast({
+              title: "IDE Panel Senkronizasyonu",
+              description: `${r.acked}/${r.queued} panele yazıldı, ${r.pending} işlem panel yanıtını bekliyor`,
+            });
+          } else {
+            toast({
+              variant: "success",
+              title: "IDE Panel Senkronizasyonu",
+              description: `${r.acked} işlem panele yazıldı`,
+            });
+          }
+        }
+        if (r.skipped.length > 0) {
+          toast({
+            variant: "destructive",
+            title: "IDE Panel uyarısı",
+            description: r.skipped.join("; "),
+          });
+        }
       })
-      .finally(finish);
+      .catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+        toast({
+          variant: "destructive",
+          title: "IDE senkronizasyon hatası",
+          description: message,
+        });
+      });
+
+    void Promise.allSettled([hik, ide]).finally(finish);
   };
 
   const createAccessRuleWithMembers = {

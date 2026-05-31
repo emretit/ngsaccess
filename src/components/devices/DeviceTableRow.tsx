@@ -1,6 +1,17 @@
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Device } from "@/types/device";
 import { Edit2, Trash2, MapPin, QrCode } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,8 +22,13 @@ interface DeviceTableRowProps {
   rowIndex?: number;
   zoneName?: string;
   doorName?: string;
+  /** Admin görünümü: cihazın bağlı olduğu proje kolonunu göster. */
+  showProject?: boolean;
+  projectName?: string;
+  /** Admin görünümü: bölge/kapı/erişim yönü kolonlarını ve "Konum Ata" aksiyonunu gizler. */
+  hideLocation?: boolean;
   onDeleteDevice: (deviceId: string) => void;
-  onAssignLocation: (device: Device) => void;
+  onAssignLocation?: (device: Device) => void;
   onEditDevice: (device: Device) => void;
   onQRClick?: (device: Device) => void;
   selected: boolean;
@@ -24,6 +40,9 @@ export function DeviceTableRow({
   rowIndex,
   zoneName,
   doorName,
+  showProject,
+  projectName,
+  hideLocation,
   onDeleteDevice,
   onAssignLocation,
   onEditDevice,
@@ -58,11 +77,6 @@ export function DeviceTableRow({
   };
 
   const deviceId = String(device._id ?? "");
-  const handleDeleteClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onDeleteDevice(deviceId);
-  };
 
   return (
     <TableRow 
@@ -79,11 +93,24 @@ export function DeviceTableRow({
         />
       </TableCell>
       <TableCell className="font-medium text-muted-foreground">{rowIndex ?? '-'}</TableCell>
-      <TableCell>{device.deviceSerial || '-'}</TableCell>
+      {showProject && (
+        <TableCell>
+          {projectName ? <Badge variant="secondary">{projectName}</Badge> : <span className="text-muted-foreground">—</span>}
+        </TableCell>
+      )}
+      <TableCell>
+        {device.brand === "ide_smart"
+          ? device.ideUuid || "-"
+          : device.deviceSerial || "-"}
+      </TableCell>
       <TableCell>{device.deviceType || '-'}</TableCell>
-      <TableCell>{zoneName || '-'}</TableCell>
-      <TableCell>{doorName || '-'}</TableCell>
-      <TableCell>{getAccessDirectionText(device.accessDirection)}</TableCell>
+      {!hideLocation && (
+        <>
+          <TableCell>{zoneName || '-'}</TableCell>
+          <TableCell>{doorName || '-'}</TableCell>
+          <TableCell>{getAccessDirectionText(device.accessDirection)}</TableCell>
+        </>
+      )}
       <TableCell>{getStatusBadge(device.status as 'online' | 'offline' | 'expired')}</TableCell>
       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-1">
@@ -98,15 +125,17 @@ export function DeviceTableRow({
               <QrCode className="h-4 w-4" />
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onAssignLocation(device)}
-            className="h-8 w-8"
-            title="Konum Ata"
-          >
-            <MapPin className="h-4 w-4" />
-          </Button>
+          {!hideLocation && onAssignLocation && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onAssignLocation(device)}
+              className="h-8 w-8"
+              title="Konum Ata"
+            >
+              <MapPin className="h-4 w-4" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -116,15 +145,31 @@ export function DeviceTableRow({
           >
             <Edit2 className="h-4 w-4" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleDeleteClick}
-            className="h-8 w-8 text-destructive hover:text-destructive"
-            title="Sil"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => e.stopPropagation()}
+                className="h-8 w-8 text-destructive hover:text-destructive"
+                title="Sil"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Cihazı Sil</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {device.name ? `"${device.name}" cihazını` : "Bu cihazı"} silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>İptal</AlertDialogCancel>
+                <AlertDialogAction onClick={() => onDeleteDevice(deviceId)}>Sil</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </TableCell>
     </TableRow>

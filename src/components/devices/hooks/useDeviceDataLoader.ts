@@ -21,6 +21,11 @@ interface DeviceData {
   brand?: DeviceBrand;
   ehomeID?: string;
   ehomeKey?: string;
+  ideUuid?: string;
+  ideUser?: string;
+  idePassword?: string;
+  ideHttpPort?: number;
+  ideDoorCount?: number;
 }
 
 interface UseDeviceDataLoaderProps {
@@ -48,6 +53,11 @@ export function useDeviceDataLoader({ device, open, defaultBrand, form }: UseDev
         status: (device.status === "active" || device.status === "inactive" ? device.status : "active") as "active" | "inactive",
         ehome_id: device.ehomeID ?? "",
         ehome_key: device.ehomeKey ?? "",
+        ide_uuid: device.ideUuid ?? "",
+        ide_user: device.ideUser ?? "",
+        ide_password: device.idePassword ?? "",
+        ide_http_port: device.ideHttpPort,
+        ide_door_count: device.ideDoorCount,
       };
       form.reset(formData);
     } else if (!device && open) {
@@ -66,6 +76,9 @@ export function useDeviceDataLoader({ device, open, defaultBrand, form }: UseDev
         status: "active",
         ehome_id: "",
         ehome_key: "",
+        // IDE Smart paneli ön-tanımlı kimliği (MQTT login token'ı için).
+        ide_user: "admin",
+        ide_password: "admin12345",
       });
     }
   }, [device, open, defaultBrand, form]);

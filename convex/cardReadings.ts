@@ -31,6 +31,47 @@ import {
 import { netWorkMinutes } from "./lib/breakDeduction";
 import { bucketWeeklyOvertime, type DayEntry } from "./lib/overtimeCalc";
 import { inferAccessStatus, inferDenialReason } from "./lib/hikEventCodes";
+import { ideResultGranted } from "./lib/cardReaderParse";
+
+/**
+ * Ziyaretçi kayıt ekranı için: seçilen okuyucuda (device) okutulan en son BİLİNMEYEN
+ * (atanmamış = `employeeId` yok) kartı döner. Reaktif — kart bastırılınca `useQuery`
+ * anında günceller. `sinceTime` (kayıt ekranının açıldığı an) eski okumaları eler.
+ */
+export const getLastUnknownByDevice = authedQuery({
+  args: {
+    deviceId: v.id("devices"),
+    sinceTime: v.optional(v.string()),
+  },
+  returns: v.union(
+    v.object({ cardNo: v.string(), accessTime: v.string() }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const device = await ctx.db.get(args.deviceId);
+    if (!device) return null;
+    if (device.projectId && ctx.user.role !== "super_admin") {
+      const allowed = await getProjectIdsForUser(ctx);
+      if (!allowed.some((id) => id === device.projectId)) return null;
+    }
+    const since = args.sinceTime;
+    const reading = await ctx.db
+      .query("cardReadings")
+      .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
+      .order("desc")
+      .filter((q) =>
+        since
+          ? q.and(
+              q.eq(q.field("employeeId"), undefined),
+              q.gt(q.field("accessTime"), since),
+            )
+          : q.eq(q.field("employeeId"), undefined),
+      )
+      .first();
+    if (!reading) return null;
+    return { cardNo: reading.cardNo, accessTime: reading.accessTime };
+  },
+});
 
 export const list = authedQuery({
   args: {
@@ -1305,6 +1346,20 @@ export const insert = mutation({
 
 type AccessDirection = "entry" | "exit";
 
+// IDE Smart panel olay zamanı ("YYYY-MM-DD HH:MM:SS", panel TZ = UTC+3) → UTC ISO.
+// Geçersiz/boş ise undefined döner (çağıran sunucu alış anına düşer).
+function ideTimeToISO(ideTime: string | undefined): string | undefined {
+  if (!ideTime) return undefined;
+  const m = ideTime.trim().match(
+    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/,
+  );
+  if (!m) return undefined;
+  // Panel saatini UTC+3 kabul edip ISO offset'li string olarak ver; Date doğrular.
+  const iso = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}+03:00`;
+  const t = new Date(iso);
+  return Number.isNaN(t.getTime()) ? undefined : t.toISOString();
+}
+
 // Türkiye saatiyle (UTC+3, DST yok) verilen ISO timestamp'inin günü başlangıcının
 // UTC ISO karşılığını döndürür. Toggle'ı günlük resetlemek için kullanılır.
 function startOfTurkeyDayISO(nowISO: string): string {
@@ -1323,8 +1378,17 @@ async function resolveDirection(
     device: Doc<"devices"> | null;
     employeeId: Id<"employees"> | null;
     nowISO: string;
+    /** IDE Smart panel: hangi aktüatör/kapıdan geçildi (io_id). */
+    ideIoId?: number;
   }
 ): Promise<AccessDirection> {
+  // IDE Smart paneli: yön kapı (io_id) düzeyinde. Varsayılan adlandırma io 0=Giriş, 1=Çıkış.
+  if (params.device?.brand === "ide_smart" && params.ideIoId !== undefined) {
+    if (params.ideIoId === 0) return "entry";
+    if (params.ideIoId === 1) return "exit";
+    // Diğer kapılar için cihaz/çalışan toggle'ına düş.
+  }
+
   const cfg = params.device?.accessDirection ?? "both";
   if (cfg === "entry") return "entry";
   if (cfg === "exit") return "exit";
@@ -1369,6 +1433,13 @@ export const processCardReading = internalMutation({
     hikHelmet: v.optional(v.string()),
     hikTemperature: v.optional(v.number()),
     hikEventState: v.optional(v.string()),
+    // IDE Smart panel event alanları
+    ideUuid: v.optional(v.string()),
+    ideIoId: v.optional(v.number()),
+    /** Panel erişim kararı (payload.result). Kod anlamları: lib/cardReaderParse ideResultGranted. */
+    ideResult: v.optional(v.number()),
+    /** Panel olay zamanı ("YYYY-MM-DD HH:MM:SS", panel TZ = UTC+3). */
+    ideTime: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const accessTime = new Date().toISOString();
@@ -1420,6 +1491,13 @@ export const processCardReading = internalMutation({
         .withIndex("by_ehome_id", (q) =>
           q.eq("ehomeID", args.hikEhomeID!.trim())
         )
+        .first();
+    }
+    // IDE Smart panel event'i: serial yerine panel UUID gelebilir.
+    if (!device && args.ideUuid?.trim()) {
+      device = await ctx.db
+        .query("devices")
+        .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", args.ideUuid!.trim()))
         .first();
     }
     if (!device && args.deviceIp?.trim()) {
@@ -1491,6 +1569,51 @@ export const processCardReading = internalMutation({
         rawData: args.rawBody,
         ...hikFields,
         hikDenialReason: denialReason,
+        createdAt: accessTime,
+        updatedAt: accessTime,
+      });
+      return { granted };
+    }
+
+    // IDE Smart brand-dispatch: erişim kararını PANEL verir (payload.result).
+    // Hikvision gibi: biz sadece audit yazarız, kartı ekrana düşürürüz.
+    // Kayıtlı olmayan kart da yazılır (employee yoksa isim boş, accessStatus panel kararı).
+    if (device?.brand === "ide_smart") {
+      // Erişim kararını PANEL verir; result kodu (1/2/3 = grant, kapı açılır) → ideResultGranted.
+      const granted = ideResultGranted(args.ideResult);
+      const accessStatus: "izin_verildi" | "reddedildi" = granted
+        ? "izin_verildi"
+        : "reddedildi";
+
+      // Panel olay zamanı (payload.time, panel TZ = UTC+3) → UTC ISO. Offline kuyruktan
+      // toplu push edilen event'lerde gerçek okutma anı korunur (sunucu alış anı değil).
+      const ideAccessTime = ideTimeToISO(args.ideTime) ?? accessTime;
+
+      const employee = await ctx.db
+        .query("employees")
+        .withIndex("by_card", (q) => q.eq("cardNumber", args.cardNo))
+        .first();
+
+      const direction = await resolveDirection(ctx, {
+        device,
+        employeeId: employee?._id ?? null,
+        nowISO: ideAccessTime,
+        ideIoId: args.ideIoId,
+      });
+
+      await ctx.db.insert("cardReadings", {
+        projectId: projectForRow(employee?.projectId, device.projectId),
+        deviceId: device._id,
+        employeeId: employee?._id,
+        cardNo: args.cardNo,
+        employeeName: employee
+          ? `${employee.firstName} ${employee.lastName}`
+          : undefined,
+        accessTime: ideAccessTime,
+        accessStatus,
+        direction,
+        ideIoId: args.ideIoId,
+        rawData: args.rawBody,
         createdAt: accessTime,
         updatedAt: accessTime,
       });

@@ -18,6 +18,8 @@ const Employees = lazy(() => import('@/pages/Employees'));
 const Devices = lazy(() => import('@/pages/Devices'));
 const VirtualReaders = lazy(() => import('@/pages/VirtualReaders'));
 const AccessControl = lazy(() => import('@/pages/AccessControl'));
+const Visitors = lazy(() => import('@/pages/Visitors'));
+const LiveMonitoring = lazy(() => import('@/pages/LiveMonitoring'));
 const PDKSRecords = lazy(() => import('@/pages/PDKSRecords'));
 const Shifts = lazy(() => import('@/pages/Shifts'));
 const Leaves = lazy(() => import('@/pages/Leaves'));
@@ -57,13 +59,15 @@ function AppContent() {
         <Route path="/user-setup" element={<UserSetup />} />
         <Route path="/admin-setup" element={<AdminSetup />} />
         <Route path="/employee-setup" element={<EmployeeSetup />} />
-        <Route path="/system-admin" element={<SystemAdmin />} />
         <Route element={<Layout />}>
           <Route path="/home" element={<Index />} />
+          <Route path="/system-admin" element={<SystemAdmin />} />
           <Route path="/employees" element={<Employees />} />
           <Route path="/devices" element={<Devices />} />
           <Route path="/virtual-readers" element={<VirtualReaders />} />
           <Route path="/access-control" element={<AccessControl />} />
+          <Route path="/visitors" element={<Visitors />} />
+          <Route path="/live-monitoring" element={<LiveMonitoring />} />
           <Route path="/pdks-records" element={<PDKSRecords />} />
           <Route path="/shifts" element={<Shifts />} />
           <Route path="/leaves" element={<Leaves />} />

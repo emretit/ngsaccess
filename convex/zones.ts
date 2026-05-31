@@ -1,7 +1,7 @@
 
 import { v } from "convex/values";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
+import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 
 export const list = authedQuery({
   args: {},
@@ -22,6 +22,9 @@ export const list = authedQuery({
 });
 
 export const create = authedMutation({
+  // Bölge = saf mantıksal alan. ideDeviceId KABUL EDİLMEZ (panel↔bölge 1:1 bağı
+  // kaldırıldı; kapının paneli doors.deviceId'de). Eski deprecated alanı yazma
+  // yüzeyi kapatıldı — aksi halde yeni orphan panel-bölge üretilebilirdi.
   args: {
     name: v.string(),
     projectId: v.optional(v.id("projects")),
@@ -47,7 +50,7 @@ export const update = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const zone = await ctx.db.get(args.zoneId);
     if (!zone) throw new Error("Bölge bulunamadı");
-    if (zone.projectId && !allowedProjectIds.some((id) => id === zone.projectId)) {
+    if (!isProjectAllowed(allowedProjectIds, zone.projectId)) {
       throw new Error("Bu bölgeye erişim yetkiniz yok");
     }
     const { zoneId, ...updates } = args;
@@ -61,8 +64,27 @@ export const remove = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const zone = await ctx.db.get(args.zoneId);
     if (!zone) throw new Error("Bölge bulunamadı");
-    if (zone.projectId && !allowedProjectIds.some((id) => id === zone.projectId)) {
+    if (!isProjectAllowed(allowedProjectIds, zone.projectId)) {
       throw new Error("Bu bölgeye erişim yetkiniz yok");
+    }
+    // Bölge mantıksal alandır; içinde cihaz/kapı varsa silinemez (önce taşı/sil).
+    const deviceInZone = await ctx.db
+      .query("devices")
+      .withIndex("by_zone", (q) => q.eq("zoneId", args.zoneId))
+      .first();
+    if (deviceInZone) {
+      throw new Error(
+        "Bu bölgede cihaz var — önce cihazları başka bölgeye taşıyın veya silin.",
+      );
+    }
+    const doorInZone = await ctx.db
+      .query("doors")
+      .withIndex("by_zone", (q) => q.eq("zoneId", args.zoneId))
+      .first();
+    if (doorInZone) {
+      throw new Error(
+        "Bu bölgede kapı var — önce kapıları başka bölgeye taşıyın veya silin.",
+      );
     }
     await ctx.db.delete(args.zoneId);
   },

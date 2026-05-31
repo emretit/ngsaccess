@@ -1,12 +1,16 @@
 import { internalMutation, internalQuery } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+import type { Id } from "./_generated/dataModel";
 import {
   authedQuery,
   authedMutation,
   adminMutation,
+  adminQuery,
+  superAdminMutation,
   employeeAuthedQuery,
 } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
+import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 
 export const list = authedQuery({
   args: {},
@@ -111,7 +115,7 @@ export const getById = authedQuery({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const device = await ctx.db.get(args.deviceId);
     if (!device) return null;
-    if (device.projectId && !allowedProjectIds.some((id) => id === device.projectId)) {
+    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
       throw new Error("Bu cihaza erişim yetkiniz yok");
     }
     const zone = device.zoneId ? await ctx.db.get(device.zoneId) : null;
@@ -137,10 +141,17 @@ export const create = authedMutation({
     description: v.optional(v.string()),
     deviceUsername: v.optional(v.string()),
     devicePassword: v.optional(v.string()),
-    brand: v.optional(v.union(v.literal("hikvision"), v.literal("other"))),
+    brand: v.optional(
+      v.union(v.literal("hikvision"), v.literal("other"), v.literal("ide_smart"))
+    ),
     ehomeID: v.optional(v.string()),
     ehomeKey: v.optional(v.string()),
     hikModel: v.optional(v.string()),
+    ideUuid: v.optional(v.string()),
+    ideUser: v.optional(v.string()),
+    idePassword: v.optional(v.string()),
+    ideHttpPort: v.optional(v.number()),
+    ideDoorCount: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -176,24 +187,71 @@ export const update = authedMutation({
     lastSeen: v.optional(v.string()),
     deviceUsername: v.optional(v.string()),
     devicePassword: v.optional(v.string()),
-    brand: v.optional(v.union(v.literal("hikvision"), v.literal("other"))),
+    brand: v.optional(
+      v.union(v.literal("hikvision"), v.literal("other"), v.literal("ide_smart"))
+    ),
     ehomeID: v.optional(v.string()),
     ehomeKey: v.optional(v.string()),
     hikModel: v.optional(v.string()),
+    ideUuid: v.optional(v.string()),
+    ideUser: v.optional(v.string()),
+    idePassword: v.optional(v.string()),
+    ideHttpPort: v.optional(v.number()),
+    ideDoorCount: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const device = await ctx.db.get(args.deviceId);
     if (!device) throw new Error("Cihaz bulunamadı");
-    if (device.projectId && !allowedProjectIds.some((id) => id === device.projectId)) {
+    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
       throw new Error("Bu cihaza erişim yetkiniz yok");
     }
+
+    // args.zoneId/doorId verildiyse hedefin sahibini doğrula. Cihaz RBAC'ı yalnız
+    // device.projectId'yi denetler; doğrulamadan patch'lersek başka tenant'ın zone/door
+    // id'si cihaza (ve aşağıda kapılara) yazılır → cross-tenant pointer + readerStatus
+    // (zone bazlı RBAC) üzerinden kart okuma sızıntısı. createIdePanel ile aynı kontrol.
+    if (args.zoneId !== undefined) {
+      const targetZone = await ctx.db.get(args.zoneId);
+      if (!targetZone) throw new Error("Bölge bulunamadı");
+      if (!isProjectAllowed(allowedProjectIds, targetZone.projectId)) {
+        throw new Error("Bu bölgeye erişim yetkiniz yok");
+      }
+      if (targetZone.projectId !== device.projectId) {
+        throw new Error("Seçilen bölge bu cihazın projesinde değil");
+      }
+    }
+    if (args.doorId !== undefined) {
+      const targetDoor = await ctx.db.get(args.doorId);
+      if (!targetDoor) throw new Error("Kapı bulunamadı");
+      if (!isProjectAllowed(allowedProjectIds, targetDoor.projectId)) {
+        throw new Error("Bu kapıya erişim yetkiniz yok");
+      }
+      if (targetDoor.projectId !== device.projectId) {
+        throw new Error("Seçilen kapı bu cihazın projesinde değil");
+      }
+    }
+
     const { deviceId, ...updates } = args;
     const clean: Record<string, unknown> = { updatedAt: new Date().toISOString() };
     for (const [k, v] of Object.entries(updates)) {
       if (v !== undefined) clean[k] = v;
     }
     await ctx.db.patch(deviceId, clean);
+
+    // Panel başka bölgeye taşınırsa (zoneId değişti), o panele bağlı tüm kapıların
+    // door.zoneId'sini eşitle (Variant 1 değişmezi: panelin tüm kapıları tek bölgede).
+    if (args.zoneId !== undefined && args.zoneId !== device.zoneId) {
+      const panelDoors = await ctx.db
+        .query("doors")
+        .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
+        .collect();
+      await Promise.all(
+        panelDoors.map((door) =>
+          ctx.db.patch(door._id, { zoneId: args.zoneId, updatedAt: new Date().toISOString() })
+        )
+      );
+    }
     return deviceId;
   },
 });
@@ -204,7 +262,7 @@ export const remove = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const device = await ctx.db.get(args.deviceId);
     if (!device) throw new Error("Cihaz bulunamadı");
-    if (device.projectId && !allowedProjectIds.some((id) => id === device.projectId)) {
+    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
       throw new Error("Bu cihaza erişim yetkiniz yok");
     }
     // İlişkili card readings sayısını kontrol et
@@ -222,6 +280,14 @@ export const remove = authedMutation({
       .collect();
     await Promise.all(groupDevices.map((gd) => ctx.db.delete(gd._id)));
 
+    // Cihaza/panele bağlı kapıları temizle (door.deviceId). Bölge SİLİNMEZ —
+    // artık paylaşılan mantıksal alan; başka cihaz/kapı barındırabilir.
+    const ownedDoors = await ctx.db
+      .query("doors")
+      .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
+      .collect();
+    await Promise.all(ownedDoors.map((d) => ctx.db.delete(d._id)));
+
     await ctx.db.delete(args.deviceId);
   },
 });
@@ -233,8 +299,9 @@ export const updateLastSeen = internalMutation({
     deviceIp: v.optional(v.string()),
     hikDevIndex: v.optional(v.string()),
     ehomeID: v.optional(v.string()),
+    ideUuid: v.optional(v.string()),
   },
-  handler: async (ctx, { deviceSerial, deviceIp, hikDevIndex, ehomeID }) => {
+  handler: async (ctx, { deviceSerial, deviceIp, hikDevIndex, ehomeID, ideUuid }) => {
     const now = new Date().toISOString();
     let device = null;
 
@@ -242,6 +309,12 @@ export const updateLastSeen = internalMutation({
       device = await ctx.db
         .query("devices")
         .withIndex("by_device_serial", (q) => q.eq("deviceSerial", deviceSerial))
+        .first();
+    }
+    if (!device && ideUuid) {
+      device = await ctx.db
+        .query("devices")
+        .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", ideUuid))
         .first();
     }
     if (!device && hikDevIndex) {
@@ -312,6 +385,168 @@ export const getByApiToken = internalQuery({
       .query("devices")
       .withIndex("by_api_token", (q) => q.eq("apiToken", args.token))
       .first();
+  },
+});
+
+// ────────────────────────────────────────────────────────────
+// IDE Smart panel — bölge + cihaz + kapılar tek akışta
+// ────────────────────────────────────────────────────────────
+
+/** Event lookup: panel UUID → device. */
+export const getByIdeUuid = internalQuery({
+  args: { ideUuid: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("devices")
+      .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", args.ideUuid))
+      .first();
+  },
+});
+
+/** setIdeUuid: panelden okunan gerçek UUID'i yazar (event lookup için). */
+export const setIdeUuid = internalMutation({
+  args: { deviceId: v.id("devices"), ideUuid: v.string() },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.deviceId, {
+      ideUuid: args.ideUuid,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+/** Başarılı login/komut sonrası paneli online işaretle. */
+export const markIdeOnline = internalMutation({
+  args: { deviceId: v.id("devices") },
+  handler: async (ctx, args) => {
+    const now = new Date().toISOString();
+    await ctx.db.patch(args.deviceId, {
+      lastSeen: now,
+      status: "active",
+      updatedAt: now,
+    });
+  },
+});
+
+/** io_id (aktüatör index) → o panele bağlı door (doors.deviceId + ioId). */
+export const getPanelDoorByIo = internalQuery({
+  args: { deviceId: v.id("devices"), ioId: v.number() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("doors")
+      .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
+      .filter((q) => q.eq(q.field("ioId"), args.ioId))
+      .first();
+  },
+});
+
+/** IDE Smart kapı varsayılan adı: tüm aktüatörler "Kapı N" (1-indeksli). */
+function defaultDoorName(io: number): string {
+  return `Kapı ${io + 1}`;
+}
+
+/**
+ * IDE Smart paneli ekler: cihaz (device) + N kapı (door) üretir; cihazı bir
+ * bölgeye (zone) yerleştirir. Bölge ve panel AYRI kavramlardır (endüstri modeli):
+ * panel kendi adını taşır, bölge mantıksal alandır ve bağımsız adlandırılır.
+ *
+ * Bölge: `zoneId` verilirse mevcut bölgeye yerleştirilir; verilmezse `newZoneName`
+ * ile yeni bir bölge oluşturulur (ikisi de yoksa panel adından bir bölge türetilir
+ * — geriye uyum). Kapılar `deviceId` ile panele, `zoneId` ile bölgeye bağlanır
+ * (Variant 1: panelin tüm kapıları tek bölgede). Panel komutları MQTT (bridge +
+ * idePendingOperations kuyruğu) üzerinden iletilir; ayrı bir bağlantı testi yoktur —
+ * panel ilk trigger'da (heartbeat/kart) otomatik canlanır.
+ */
+export const createIdePanel = authedMutation({
+  args: {
+    name: v.string(),
+    projectId: v.optional(v.id("projects")),
+    // Bölge: mevcut bölge id'si VEYA yeni bölge adı. İkisi de boşsa panel adından türetilir.
+    zoneId: v.optional(v.id("zones")),
+    newZoneName: v.optional(v.string()),
+    ideUuid: v.optional(v.string()),
+    ideUser: v.optional(v.string()),
+    idePassword: v.optional(v.string()),
+    deviceIp: v.optional(v.string()),
+    ideHttpPort: v.optional(v.number()),
+    ideDoorCount: v.optional(v.number()),
+    description: v.optional(v.string()),
+  },
+  returns: v.object({
+    deviceId: v.id("devices"),
+    zoneId: v.id("zones"),
+    doorIds: v.array(v.id("doors")),
+  }),
+  handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
+      throw new Error("Bu projeye erişim yetkiniz yok");
+    }
+    const now = new Date().toISOString();
+    const doorCount = Math.max(1, Math.min(args.ideDoorCount ?? 4, 8));
+
+    // 1) Bölge çözümü: mevcut seç / yeni oluştur / panel adından türet.
+    let zoneId: Id<"zones">;
+    if (args.zoneId) {
+      const zone = await ctx.db.get(args.zoneId);
+      if (!zone) throw new Error("Bölge bulunamadı");
+      if (!isProjectAllowed(allowedProjectIds, zone.projectId)) {
+        throw new Error("Bu bölgeye erişim yetkiniz yok");
+      }
+      // Bölge ile panel aynı projede olmalı — aksi halde bölge bir projede, cihaz/kapı
+      // başka projede kalır ve cihaz o bölge altında listelenmez (cross-project orphan).
+      if (zone.projectId !== args.projectId) {
+        throw new Error("Seçilen bölge bu panelin projesinde değil");
+      }
+      zoneId = args.zoneId;
+    } else {
+      zoneId = await ctx.db.insert("zones", {
+        name: args.newZoneName?.trim() || args.name,
+        projectId: args.projectId,
+        description: args.description,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    // 2) Cihaz (brand ide_smart, bölgeye yerleşik). zone.ideDeviceId YAZILMAZ.
+    const deviceId = await ctx.db.insert("devices", {
+      name: args.name,
+      projectId: args.projectId,
+      zoneId,
+      brand: "ide_smart",
+      deviceType: "Erişim Paneli",
+      deviceIp: args.deviceIp,
+      ideUuid: args.ideUuid,
+      // Panel MQTT login token'ı bu kimlikle alınır → ikisi de garanti edilir
+      // (frontend zorunlu kılar; doğrudan/script çağrıları için backend default'u).
+      ideUser: args.ideUser ?? "admin",
+      idePassword: args.idePassword ?? "admin12345",
+      ideHttpPort: args.ideHttpPort ?? 80,
+      ideDoorCount: doorCount,
+      isActive: true,
+      status: "active",
+      description: args.description,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // 3) Kapılar (ioId 0..N-1) — deviceId ile panele, zoneId ile bölgeye bağlı.
+    const doorIds = [];
+    for (let io = 0; io < doorCount; io++) {
+      const doorId = await ctx.db.insert("doors", {
+        name: defaultDoorName(io),
+        projectId: args.projectId,
+        zoneId,
+        deviceId,
+        ioId: io,
+        status: "active",
+        createdAt: now,
+        updatedAt: now,
+      });
+      doorIds.push(doorId);
+    }
+
+    return { deviceId, zoneId, doorIds };
   },
 });
 

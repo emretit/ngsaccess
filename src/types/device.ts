@@ -28,6 +28,12 @@ export interface Device {
   hikModel?: string;
   hikLastSeenAt?: number;
   hikOfflineHint?: string;
+  // IDE Smart panel
+  ideUuid?: string;
+  ideUser?: string;
+  idePassword?: string;
+  ideHttpPort?: number;
+  ideDoorCount?: number;
   apiToken?: string;
   apiTokenCreatedAt?: string;
   createdAt?: string;
@@ -67,6 +73,12 @@ export interface ServerDevice {
   hikModel?: string;
   hikLastSeenAt?: number;
   hikOfflineHint?: string;
+  // IDE Smart panel
+  ideUuid?: string;
+  ideUser?: string;
+  idePassword?: string;
+  ideHttpPort?: number;
+  ideDoorCount?: number;
   apiToken?: string;
   apiTokenCreatedAt?: string;
   createdAt?: string;

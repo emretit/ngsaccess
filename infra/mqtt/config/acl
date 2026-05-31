@@ -1,0 +1,34 @@
+# NGS Access — Mosquitto ACL (topic erişim kontrolü)
+# RUNBOOK: infra/mqtt/RUNBOOK.md
+#
+# Roller:
+#   device  → panel filosu. Event YAYINLAR, komut DİNLER.
+#   bridge  → bizim daemon. Event DİNLER, komut YAYINLAR.
+#
+# Topic şeması (set-mqtt-target.mjs panele bunları yazar):
+#   event/access/online      — access event (panel publish → bridge subscribe)
+#   event/access/offline     — offline-queue flush
+#   event/heartbeat          — heartbeat
+#   event/connected          — MQTT connect bildirimi
+#   event/disconnected       — LWT (broker yayınlar)
+#   device/publish/<uuid>    — komut response'u (panel publish → bridge subscribe)
+#   device/subscribe/<uuid>  — komut (bridge publish → panel subscribe)
+
+# ── device rolü (panel filosu) ──────────────────────────────────────
+# NOT: Tüm filo tek "device" kullanıcısını paylaşır → bu kullanıcı device/publish/#
+# (tüm panellerin response topic'i) write yetkisine sahip. Bir panel teorik olarak
+# başka panelin response topic'ine yazabilir. Bridge bunu topic-uuid correlation +
+# tahmin edilemez msx-id ile savunuyor (scripts/ide-mqtt-bridge.mjs). HARDENING:
+# her panele ayrı MQTT kullanıcısı + `pattern write device/publish/%u` ile izole et.
+user device
+topic write event/#
+topic write device/publish/#
+topic read device/subscribe/#
+
+# ── bridge rolü (bizim daemon) ──────────────────────────────────────
+user bridge
+topic read event/#
+topic read device/publish/#
+topic write device/subscribe/#
+# $SYS health/monitoring (opsiyonel)
+topic read $SYS/#
