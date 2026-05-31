@@ -21,6 +21,7 @@
     "forward:card-reader": "node scripts/forward-card-reader-to-convex.mjs",
     "setup:hikvision-forward": "bash scripts/setup-hikvision-forward-full.sh",
     "bridge:hikvision": "node scripts/hikvision-bridge.mjs",
+    "ide-agent": "node --env-file=.env.local scripts/ide-provision-agent.mjs",
     "test:endpoint": "bash scripts/test-convex-endpoint.sh",
     "test": "vitest run",
     "test:watch": "vitest"

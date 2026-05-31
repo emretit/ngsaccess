@@ -5,6 +5,7 @@ import { Building2, Users, Shield } from 'lucide-react';
 import AdminProjectsPanel from '@/components/admin/AdminProjectsPanel';
 import { AdminDevicesPanel } from '@/components/admin/AdminDevicesPanel';
 import { IdeDefaultsSettings } from '@/components/admin/IdeDefaultsSettings';
+import { IdeProvisioningCard } from '@/components/admin/IdeProvisioningCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function AdminDashboard() {
@@ -53,7 +54,10 @@ export function AdminDashboard() {
           <AdminDevicesPanel />
         </TabsContent>
         <TabsContent value="mqtt" className="mt-4">
-          <IdeDefaultsSettings />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <IdeProvisioningCard />
+            <IdeDefaultsSettings />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
