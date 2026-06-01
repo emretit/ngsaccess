@@ -145,6 +145,26 @@ export const list = authedQuery({
     const from = (page - 1) * pageSize;
     const paginated = readings.slice(from, from + pageSize);
 
+    // IDE Smart okumaların kapı/okuyucu eşlemesi: ideIoId (panel actuator) →
+    // doors.ioId. Sayfadaki paneller için doors'u bir kez topla (N+1 önler).
+    const ideDeviceIds = [
+      ...new Set(
+        paginated
+          .filter((r) => r.ideIoId !== undefined && r.deviceId)
+          .map((r) => r.deviceId as Id<"devices">),
+      ),
+    ];
+    const doorsByDevice = new Map<Id<"devices">, Doc<"doors">[]>();
+    await Promise.all(
+      ideDeviceIds.map(async (did) => {
+        const doors = await ctx.db
+          .query("doors")
+          .withIndex("by_device", (q) => q.eq("deviceId", did))
+          .collect();
+        doorsByDevice.set(did, doors);
+      }),
+    );
+
     const enriched = await Promise.all(
       paginated.map(async (r) => {
         const device = r.deviceId ? await ctx.db.get(r.deviceId) as Doc<"devices"> | null : null;
@@ -153,10 +173,21 @@ export const list = authedQuery({
         if (employee?.departmentId) {
           department = await ctx.db.get(employee.departmentId) as Doc<"departments"> | null;
         }
+        const door =
+          r.ideIoId !== undefined && r.deviceId
+            ? doorsByDevice.get(r.deviceId)?.find((d) => d.ioId === r.ideIoId)
+            : undefined;
         return {
           ...r,
           devices: device
             ? { name: device.name, deviceSerial: device.deviceSerial }
+            : null,
+          door: door
+            ? {
+                name: door.name,
+                readerName: door.readerName,
+                readerDirection: door.readerDirection,
+              }
             : null,
           employees: employee
             ? {

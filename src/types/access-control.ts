@@ -9,6 +9,8 @@ export interface CardReading {
   employeeId?: Id<"employees"> | null;
   employeeName?: string | null;
   deviceId?: Id<"devices">;
+  // IDE Smart panel aktüatör/okuyucu index'i (0–3) = hangi WIEGAND/kapı okudu.
+  ideIoId?: number;
   rawData?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -20,6 +22,12 @@ export interface CardReading {
   devices?: {
     name: string;
     deviceSerial?: string;
+  } | null;
+  // ideIoId → doors.ioId eşlemesinden gelen kapı/okuyucu bilgisi.
+  door?: {
+    name: string;
+    readerName?: string;
+    readerDirection?: "entry" | "exit" | "both";
   } | null;
 }
 

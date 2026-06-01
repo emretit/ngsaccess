@@ -56,6 +56,21 @@ export const CardReadingsTable = ({
     return "Bilinmeyen Cihaz";
   };
 
+  // Okuyucu/kapı: IDE Smart okumalarda hangi WIEGAND/io okudu (ideIoId → doors).
+  // Kapı tanımlıysa adını, değilse ham io index'ini, IDE dışı okumada "-" göster.
+  const getReaderDisplay = (reading: CardReading) => {
+    if (reading.door?.readerName) {
+      return reading.door.readerName;
+    }
+    if (reading.door?.name) {
+      return reading.door.name;
+    }
+    if (reading.ideIoId !== undefined) {
+      return `IO ${reading.ideIoId}`;
+    }
+    return "-";
+  };
+
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -66,6 +81,7 @@ export const CardReadingsTable = ({
             <TableHead>Zaman</TableHead>
             <TableHead>Departman</TableHead>
             <TableHead>Cihaz</TableHead>
+            <TableHead>Okuyucu / Kapı</TableHead>
             <TableHead>Yön</TableHead>
             <TableHead>Durum</TableHead>
           </TableRow>
@@ -73,7 +89,7 @@ export const CardReadingsTable = ({
         <TableBody>
           {readings.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                 <div className="flex flex-col items-center gap-2">
                   <p>{emptyMessage}</p>
                   {showClearFilters && onClearFilters && (
@@ -94,6 +110,7 @@ export const CardReadingsTable = ({
                 </TableCell>
                 <TableCell>{reading.employees?.departments?.name || "-"}</TableCell>
                 <TableCell>{getDeviceDisplay(reading)}</TableCell>
+                <TableCell>{getReaderDisplay(reading)}</TableCell>
                 <TableCell>{getDirectionBadge(reading)}</TableCell>
                 <TableCell>{getStatusBadge(reading)}</TableCell>
               </TableRow>
