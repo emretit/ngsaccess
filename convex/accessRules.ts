@@ -3,7 +3,12 @@ import { api, internal } from "./_generated/api";
 import { v } from "convex/values";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
-import { resolveEmployeeIdeDeviceIds, resolveRuleIdeDeviceIds } from "./lib/accessGraph";
+import {
+  resolveRuleIdeDeviceIds,
+  reconcileRemovedEmployeeIde,
+} from "./lib/accessGraph";
+import { diffIds } from "./lib/reconcileMath";
+import type { Id } from "./_generated/dataModel";
 
 export const list = authedQuery({
   args: {
@@ -328,14 +333,20 @@ export const updateWithGroups = authedMutation({
     }
     await ctx.db.patch(ruleId, clean);
 
+    // Düzenleme-ÖNCESİ durumu yakala: çıkarılan üye/cihazların erişim kaybettiği panelleri
+    // reconcile için SİLMEDEN önce çöz (resolver'lar groupMembers/groupDevices üstünden yürür;
+    // satırlar silinince zincir kopar).
+    const oldMembers = await ctx.db
+      .query("groupMembers")
+      .withIndex("by_project_group", (q) =>
+        q.eq("projectId", rule.projectId).eq("groupId", ruleId),
+      )
+      .collect();
+    const oldEmployeeIds = oldMembers.map((m) => m.employeeId);
+    const ruleIdePanelsBefore = await resolveRuleIdeDeviceIds(ctx, ruleId, rule.projectId);
+
     if (employeeIds !== undefined) {
-      const existing = await ctx.db
-        .query("groupMembers")
-        .withIndex("by_project_group", (q) =>
-          q.eq("projectId", rule.projectId).eq("groupId", ruleId),
-        )
-        .collect();
-      await Promise.all(existing.map((m) => ctx.db.delete(m._id)));
+      await Promise.all(oldMembers.map((m) => ctx.db.delete(m._id)));
       await Promise.all(
         employeeIds.map((empId) =>
           ctx.db.insert("groupMembers", {
@@ -348,14 +359,15 @@ export const updateWithGroups = authedMutation({
       );
     }
 
+    const removedIdePanels: Id<"devices">[] = [];
     if (deviceIds !== undefined) {
-      const existing = await ctx.db
+      const oldDevices = await ctx.db
         .query("groupDevices")
         .withIndex("by_project_group", (q) =>
           q.eq("projectId", rule.projectId).eq("groupId", ruleId),
         )
         .collect();
-      await Promise.all(existing.map((d) => ctx.db.delete(d._id)));
+      await Promise.all(oldDevices.map((d) => ctx.db.delete(d._id)));
       await Promise.all(
         deviceIds.map((devId) =>
           ctx.db.insert("groupDevices", {
@@ -366,7 +378,23 @@ export const updateWithGroups = authedMutation({
           })
         )
       );
+      const removedDeviceIds = diffIds(
+        oldDevices.map((d) => d.deviceId),
+        deviceIds,
+      ).removed;
+      for (const devId of removedDeviceIds) {
+        const device = await ctx.db.get(devId);
+        if (device && device.isActive && device.brand === "ide_smart") {
+          removedIdePanels.push(devId);
+        }
+      }
     }
+
+    // Düzenleme-SONRASI: kalan ve çıkarılan üyeler.
+    const survivingMemberIds =
+      employeeIds !== undefined ? employeeIds : oldEmployeeIds;
+    const removedEmployeeIds =
+      employeeIds !== undefined ? diffIds(oldEmployeeIds, employeeIds).removed : [];
 
     const syncJobs: Promise<unknown>[] = [
       ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncWeekPlanToDevices, {
@@ -376,14 +404,35 @@ export const updateWithGroups = authedMutation({
         accessRuleId: ruleId,
       }),
     ];
-    if (employeeIds !== undefined) {
-      for (const empId of employeeIds) {
+
+    // Çıkarılan üyeler: kuralın eski panellerinden orphan kart sökülür, başka kuralla erişilen
+    // panellerde permissions[] AZALTILIR (kişi silinmez).
+    for (const empId of removedEmployeeIds) {
+      syncJobs.push(
+        ctx.scheduler.runAfter(0, api.actions.hikvisionSync.deleteEmployeeFromDevices, {
+          employeeId: empId,
+        }),
+        reconcileRemovedEmployeeIde(ctx, {
+          employeeId: empId,
+          projectId: rule.projectId,
+          candidatePanels: ruleIdePanelsBefore,
+        }),
+      );
+    }
+
+    // Kalan üyeler: güncel kuralla yeniden sync + (varsa) çıkarılan cihazlardan orphan reconcile.
+    // Yalnız üye listesi değiştiğinde veya bir IDE paneli çıkarıldığında gerek var (sadece
+    // saat/gün değişiminde syncPermissionToIdePanels yeterli).
+    if (employeeIds !== undefined || removedIdePanels.length > 0) {
+      for (const empId of survivingMemberIds) {
         syncJobs.push(
           ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
             employeeId: empId,
           }),
-          ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+          reconcileRemovedEmployeeIde(ctx, {
             employeeId: empId,
+            projectId: rule.projectId,
+            candidatePanels: removedIdePanels,
           }),
         );
       }
@@ -432,7 +481,6 @@ export const removeGroupMember = authedMutation({
       throw new Error("Bu üyeye erişim yetkiniz yok");
     }
     const employeeId = member.employeeId;
-    const employee = await ctx.db.get(employeeId);
     // Silinen kuralın IDE panelleri (commit ÖNCESİ; üyelik silinince zincir kopar).
     const removedRulePanels = await resolveRuleIdeDeviceIds(ctx, member.groupId, member.projectId);
 
@@ -441,23 +489,11 @@ export const removeGroupMember = authedMutation({
       employeeId,
     });
 
-    // IDE: çalışanın KALAN panellerini çöz. Silinen kuralın panellerinden artık erişilmeyenler
-    // (orphan) kart sökülür; hâlâ erişilenler RE-SYNC ile permissions[] güncellenir.
-    if (employee) {
-      const remaining = new Set(
-        await resolveEmployeeIdeDeviceIds(ctx, employeeId, member.projectId),
-      );
-      const orphanPanels = removedRulePanels.filter((d) => !remaining.has(d));
-      if (orphanPanels.length > 0) {
-        await ctx.scheduler.runAfter(
-          0,
-          internal.actions.ideGatewayDevice.deleteIdeUserFromPanels,
-          { cardNumber: employee.cardNumber, deviceIds: orphanPanels, projectId: member.projectId },
-        );
-      }
-    }
-    await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+    // IDE: gerçek orphan panellerden kart sökülür, hâlâ erişilenlerde permissions[] azaltılır.
+    await reconcileRemovedEmployeeIde(ctx, {
       employeeId,
+      projectId: member.projectId,
+      candidatePanels: removedRulePanels,
     });
   },
 });
@@ -516,11 +552,18 @@ export const removeGroupDevice = authedMutation({
     if (gd.projectId && !allowedProjectIds.some((id) => id === gd.projectId)) {
       throw new Error("Bu kayda erişim yetkiniz yok");
     }
+    // Çıkarılan cihaz aktif bir IDE paneli mi? (SİLMEDEN önce yakala.)
+    const removedDevice = await ctx.db.get(gd.deviceId);
+    const removedIdePanels: Id<"devices">[] =
+      removedDevice && removedDevice.isActive && removedDevice.brand === "ide_smart"
+        ? [gd.deviceId]
+        : [];
+
     await ctx.db.delete(args.groupDeviceId);
 
     // Bu gruba bağlı üyeleri yeniden sync — diğer kurallarla cihazda kalabilirler.
-    // Tam söküm (kişi bu cihazda artık hiçbir kuralla yoksa cihazdan sil) Phase 5
-    // reconcile cron'da. Şimdilik üyelerin RightPlan'ı güncel olsun.
+    // reconcileRemovedEmployeeIde: çıkarılan panele başka kuralla erişemeyen üyenin kartı
+    // sökülür (orphan), erişebilenin permissions[] azaltılır (kişi silinmez).
     const members = await ctx.db
       .query("groupMembers")
       .withIndex("by_project_group", (q) =>
@@ -532,8 +575,10 @@ export const removeGroupDevice = authedMutation({
         ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
           employeeId: m.employeeId,
         }),
-        ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+        reconcileRemovedEmployeeIde(ctx, {
           employeeId: m.employeeId,
+          projectId: gd.projectId,
+          candidatePanels: removedIdePanels,
         }),
       ]),
     );
