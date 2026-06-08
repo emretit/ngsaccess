@@ -348,6 +348,15 @@ export const updateLastSeen = internalMutation({
         lastSeen: now,
         hikLastSeenAt: Date.now(),
       });
+    } else if (ideUuid) {
+      // Cihaz henüz projeye atanmamış (adminDevices'ta) olabilir — orada da lastSeen güncelle.
+      const adminDevice = await ctx.db
+        .query("adminDevices")
+        .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", ideUuid))
+        .first();
+      if (adminDevice) {
+        await ctx.db.patch(adminDevice._id, { lastSeen: now });
+      }
     }
   },
 });
@@ -641,15 +650,15 @@ export const registerUnassignedPanel = superAdminMutation({
 });
 
 /**
- * Havuzdaki atanmamış bir cihazı bir projeye claim eder (tek projeye özel).
- * project_admin sadece kendi projesine; super_admin her projeye. Atama anında
- * zone + door üretilir (provisionPanelZoneAndDoors). Cihaz zaten atanmışsa reddedilir
- * (çift-claim; Convex OCC eşzamanlı claim'leri seri hale getirir → kaybeden bu guard'a takılır).
- * adminMutation: claim yönetimsel iş (project_user değil) — listClaimable (adminQuery) ile tutarlı.
+ * adminDevices havuzundaki cihazı bir projeye claim eder.
+ * adminDevices kaydı SİLİNMEZ — assignedDeviceId + assignedProjectId set edilir.
+ * devices tablosuna projectId + adminDeviceId ile yeni kayıt eklenir.
+ * Zone + door atama anında üretilir (provisionPanelZoneAndDoors).
+ * adminMutation: claim yönetimsel iş (project_user değil).
  */
 export const claimDevice = adminMutation({
   args: {
-    deviceId: v.id("devices"),
+    adminDeviceId: v.id("adminDevices"),
     projectId: v.id("projects"),
     zoneId: v.optional(v.id("zones")),
     newZoneName: v.optional(v.string()),
@@ -667,19 +676,38 @@ export const claimDevice = adminMutation({
     if (!allowedProjectIds.some((id) => id === args.projectId)) {
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
-    const device = await ctx.db.get(args.deviceId);
-    if (!device) throw new Error("Cihaz bulunamadı");
-    if (device.projectId !== undefined) {
+    const adminDevice = await ctx.db.get(args.adminDeviceId);
+    if (!adminDevice) throw new Error("Cihaz bulunamadı");
+    if (adminDevice.assignedDeviceId) {
       throw new Error("Bu cihaz zaten bir projeye atanmış");
     }
 
     const now = new Date().toISOString();
-    const doorCount = Math.max(1, Math.min(args.ideDoorCount ?? device.ideDoorCount ?? 4, 8));
-    const panelName = args.name?.trim() || device.name;
+    const doorCount = Math.max(1, Math.min(args.ideDoorCount ?? adminDevice.ideDoorCount ?? 4, 8));
+    const panelName = args.name?.trim() || adminDevice.name;
 
-    // Önce doğrula + üret; başarısız claim orphan bırakmasın diye device patch en sonda.
+    // devices tablosuna ekle (projectId + adminDeviceId geri bağlantısı ile)
+    const deviceId = await ctx.db.insert("devices", {
+      name: panelName,
+      projectId: args.projectId,
+      brand: adminDevice.brand ?? "ide_smart",
+      deviceType: "Erişim Paneli",
+      ideUuid: adminDevice.ideUuid,
+      ideUser: adminDevice.ideUser,
+      idePassword: adminDevice.idePassword,
+      ideHttpPort: adminDevice.ideHttpPort ?? 80,
+      ideDoorCount: doorCount,
+      isActive: true,
+      status: "active",
+      lastSeen: adminDevice.lastSeen,
+      description: args.description,
+      adminDeviceId: args.adminDeviceId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
     const { zoneId, doorIds } = await provisionPanelZoneAndDoors(ctx, {
-      deviceId: args.deviceId,
+      deviceId,
       projectId: args.projectId,
       allowedProjectIds,
       zoneId: args.zoneId,
@@ -690,23 +718,22 @@ export const claimDevice = adminMutation({
       now,
     });
 
-    await ctx.db.patch(args.deviceId, {
-      projectId: args.projectId,
-      zoneId,
-      name: panelName,
-      ideDoorCount: doorCount,
+    await ctx.db.patch(deviceId, { zoneId, updatedAt: now });
+
+    // adminDevices'ı güncelle — atandı olarak işaretle
+    await ctx.db.patch(args.adminDeviceId, {
+      assignedDeviceId: deviceId,
+      assignedProjectId: args.projectId,
       updatedAt: now,
     });
 
-    return { deviceId: args.deviceId, zoneId, doorIds };
+    return { deviceId, zoneId, doorIds };
   },
 });
 
 /**
- * Cihazı projeden çıkarıp havuza geri alır. remove temizliğini aynalar ama cihaz
- * satırını SİLMEZ: card readings, groupDevices, kapılar silinir; bölge KORUNUR
- * (paylaşılan mantıksal alan). apiToken temizlenir (başka projeye claim'de sızmasın).
- * ideUuid/kimlik/lastSeen korunur → havuzda canlı tekrar görünür.
+ * Cihazı projeden çıkarır ve adminDevices havuzuna geri koyar.
+ * card readings, groupDevices ve panelin kapıları silinir; bölge KORUNUR.
  * adminMutation: yıkıcı + claim ile simetrik (project_user değil).
  */
 export const releaseDevice = adminMutation({
@@ -739,43 +766,57 @@ export const releaseDevice = adminMutation({
       .collect();
     await Promise.all(ownedDoors.map((d) => ctx.db.delete(d._id)));
 
-    await ctx.db.patch(args.deviceId, {
-      projectId: undefined,
-      zoneId: undefined,
-      doorId: undefined,
-      apiToken: undefined,
-      apiTokenCreatedAt: undefined,
-      updatedAt: new Date().toISOString(),
-    });
+    // adminDevices kaydı varsa atama bilgisini temizle (sil değil)
+    const adminDeviceId = device.adminDeviceId;
+    if (adminDeviceId) {
+      await ctx.db.patch(adminDeviceId, {
+        assignedDeviceId: undefined,
+        assignedProjectId: undefined,
+        // lastSeen güncellenmesi için cihazın son görülme zamanını koru
+        lastSeen: device.lastSeen ?? undefined,
+        updatedAt: new Date().toISOString(),
+      });
+    } else if (device.ideUuid) {
+      // Eski akışla eklenmiş (adminDeviceId yok) — UUID ile bul
+      const existing = await ctx.db
+        .query("adminDevices")
+        .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", device.ideUuid!))
+        .first();
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          assignedDeviceId: undefined,
+          assignedProjectId: undefined,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    // devices tablosundan sil
+    await ctx.db.delete(args.deviceId);
   },
 });
 
 /**
- * Cihazlar sayfası claim picker'ı için: atanmamış (projectId yok) cihazlar.
- * adminQuery — claim yönetimsel iş (super_admin + project_admin). devices.list
- * bunları normal kullanıcıya açamaz çünkü isProjectAllowed undefined'ı reddeder.
+ * Cihazlar sayfası claim picker'ı için: adminDevices tablosundaki kayıtlar.
+ * adminQuery — claim yönetimsel iş (super_admin + project_admin).
+ * @deprecated Kullan: api.adminDevices.listForClaim — bu alias geriye uyum için kalır.
  */
 export const listClaimable = adminQuery({
   args: {},
   returns: v.array(
     v.object({
-      _id: v.id("devices"),
+      _id: v.id("adminDevices"),
       name: v.string(),
       brand: v.optional(
         v.union(v.literal("hikvision"), v.literal("other"), v.literal("ide_smart")),
       ),
-      ideUuid: v.optional(v.string()),
+      ideUuid: v.string(),
       ideDoorCount: v.optional(v.number()),
       lastSeen: v.optional(v.string()),
     }),
   ),
   handler: async (ctx) => {
-    const rows = await ctx.db
-      .query("devices")
-      .withIndex("by_project", (q) => q.eq("projectId", undefined))
-      .collect();
-    // Yalnız picker'ın ihtiyacı olan alanlar — paylaşılan MQTT kimliği (ideUser/idePassword)
-    // ve apiToken project_admin'lere tel üstünden GÖNDERİLMEZ (least-privilege).
+    const rows = await ctx.db.query("adminDevices").collect();
     return rows.map((d) => ({
       _id: d._id,
       name: d.name,

@@ -180,6 +180,10 @@ export default defineSchema({
     status: v.optional(v.string()),
     // IDE Smart aktüatör index'i (io_id 0–3). Diğer markalarda boş.
     ioId: v.optional(v.number()),
+    // Kapıda fiziksel "kapı açıldı" sensörü var mı → panel ACTUATOR{ioId}.REQUIRE_SENSOR_ACTIVATION.
+    // true = sensör onayı beklenir (1); false = pulse sensör beklemeden tamamlanır (0).
+    // Boşsa panelin mevcut değerine dokunulmaz. Sensörsüz kapıda false yapılmazsa actuator "busy"de takılır.
+    requireSensor: v.optional(v.boolean()),
     // Okuyucu (Wiegand giriş yüzü) — kapıyla 1:1. Boşsa UI door.name'den türetir.
     readerName: v.optional(v.string()),
     // Okuyucu yön etiketi (görsel). Boşsa ioId'den türetilir (0=entry,1=exit,diğer=both).
@@ -237,6 +241,8 @@ export default defineSchema({
     hikDoorCount: v.optional(v.number()),
     apiToken: v.optional(v.string()),
     apiTokenCreatedAt: v.optional(v.string()),
+    // adminDevices geri bağlantısı — claim ile oluşturulur, release ile temizlenir.
+    adminDeviceId: v.optional(v.id("adminDevices")),
     createdAt: v.string(),
     updatedAt: v.string(),
   })
@@ -247,7 +253,8 @@ export default defineSchema({
     .index("by_hik_dev_index", ["hikDevIndex"])
     .index("by_ehome_id", ["ehomeID"])
     .index("by_api_token", ["apiToken"])
-    .index("by_ide_uuid", ["ideUuid"]),
+    .index("by_ide_uuid", ["ideUuid"])
+    .index("by_admin_device", ["adminDeviceId"]),
 
   accessRules: defineTable({
     name: v.string(),
@@ -289,6 +296,20 @@ export default defineSchema({
     .index("by_group", ["groupId"])
     .index("by_device", ["deviceId"])
     .index("by_project_device", ["projectId", "deviceId"])
+    .index("by_project_group", ["projectId", "groupId"]),
+
+  // Kural × kapı (groupDevices'ın kapı granülaritesi). Bir kuralda belirli kapılar
+  // seçildiğinde IDE permission.io o kuralın bu panele ait kapılarının ioId'lerinden türer.
+  // Bir kuralın bir panel için hiç kaydı yoksa → panelin tüm kapıları (geriye uyumlu).
+  groupDoors: defineTable({
+    groupId: v.id("accessRules"),
+    doorId: v.id("doors"),
+    deviceId: v.optional(v.id("devices")),
+    projectId: v.optional(v.id("projects")),
+    createdAt: v.string(),
+  })
+    .index("by_group", ["groupId"])
+    .index("by_door", ["doorId"])
     .index("by_project_group", ["projectId", "groupId"]),
 
   cardReadings: defineTable({
@@ -401,6 +422,7 @@ export default defineSchema({
       v.literal("upsertPermission"),
       v.literal("deletePermission"),
       v.literal("triggerSync"),
+      v.literal("parameterWrite"),
     ),
     /**
      * Bridge'in MQTT envelope üretmesi için materialize edilmiş alanlar.
@@ -411,6 +433,7 @@ export default defineSchema({
      * - upsertPermission: { dstId, mode, permissionRecord:{id,io,schedule,...} }
      * - deletePermission: { dstId, ideId }
      * - triggerSync:      { dstId, reset }
+     * - parameterWrite:   { dstId, parameterName, parameterRecord:{[name]:number|string} }
      */
     payload: v.any(),
     status: v.union(
@@ -586,6 +609,29 @@ export default defineSchema({
   // IDE Smart panelleri için sistem geneli ortak varsayılanlar (singleton — proje
   // index'i yok, `.first()` ile okunur). Admin "UUID ile ekle" yaparken bu kimlik
   // cihaz satırına KOPYALANIR (bridge op-zamanı device.ideUser/idePassword okur).
+  // Fiziksel cihaz envanteri — super_admin burada UUID ile kaydeder.
+  // Projeye atama (claim) anında bu tablodan `devices` tablosuna taşınır.
+  // `releaseDevice` cihazı `devices`'dan kaldırıp buraya geri koyar.
+  adminDevices: defineTable({
+    ideUuid: v.string(),
+    name: v.string(),
+    brand: v.optional(
+      v.union(v.literal("ide_smart"), v.literal("hikvision"), v.literal("other"))
+    ),
+    ideUser: v.string(),
+    idePassword: v.string(),
+    ideHttpPort: v.optional(v.number()),
+    ideDoorCount: v.optional(v.number()),
+    lastSeen: v.optional(v.string()),
+    // Projeye atandığında set edilir; clear olunca havuza geri döner.
+    assignedDeviceId: v.optional(v.id("devices")),
+    assignedProjectId: v.optional(v.id("projects")),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_ide_uuid", ["ideUuid"])
+    .index("by_assigned_device", ["assignedDeviceId"]),
+
   ideDefaults: defineTable({
     ideUser: v.string(),
     idePassword: v.string(),

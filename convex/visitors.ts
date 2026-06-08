@@ -1,7 +1,7 @@
 import { internalMutation } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { authedQuery, adminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import { Doc, Id } from "./_generated/dataModel";
@@ -248,7 +248,7 @@ export const create = adminMutation({
     if (args.kvkkConsent) {
       await grantKvkkConsent(ctx, ctx.user, id, args.projectId);
     }
-    await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
       employeeId: id,
     });
     await ctx.scheduler.runAfter(
@@ -331,7 +331,7 @@ export const update = adminMutation({
       }
     }
     if (cardChanged || activeChanged) {
-      await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+      await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
         employeeId: args.visitorId,
       });
       await ctx.scheduler.runAfter(
@@ -364,7 +364,7 @@ export const checkOut = adminMutation({
       visitorStatus: "checkedOut",
       updatedAt: new Date().toISOString(),
     });
-    await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
       employeeId: args.visitorId,
     });
     await ctx.scheduler.runAfter(
@@ -417,7 +417,7 @@ export const expireVisitorAccess = internalMutation({
         visitorStatus: "expired",
         updatedAt: now,
       });
-      await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+      await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
         employeeId: vz._id,
       });
       await ctx.scheduler.runAfter(

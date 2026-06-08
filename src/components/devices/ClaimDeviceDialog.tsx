@@ -32,7 +32,7 @@ interface ClaimDeviceDialogProps {
   onSuccess: () => void;
 }
 
-type ClaimableDevice = FunctionReturnType<typeof api.devices.listClaimable>[number];
+type ClaimableDevice = FunctionReturnType<typeof api.adminDevices.listForClaim>[number];
 
 const NEW_ZONE = "__new__";
 
@@ -45,12 +45,12 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
   const { isSuperAdmin } = useProjectAccess();
   const { projectId: activeProjectId } = useActiveProject();
 
-  const claimable = useQuery(api.devices.listClaimable, open ? {} : "skip");
+  const claimable = useQuery(api.adminDevices.listForClaim, open ? {} : "skip");
   const projects = useQuery(api.projects.list, open && isSuperAdmin ? {} : "skip");
   const zones = useQuery(api.zones.list, open ? {} : "skip");
   const claimDevice = useMutation(api.devices.claimDevice);
 
-  const [selectedId, setSelectedId] = useState<Id<"devices"> | null>(null);
+  const [selectedId, setSelectedId] = useState<Id<"adminDevices"> | null>(null);
   const [targetProjectId, setTargetProjectId] = useState<Id<"projects"> | null>(null);
   const [name, setName] = useState("");
   const [doorCount, setDoorCount] = useState(4);
@@ -76,7 +76,7 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
   );
 
   // Cihaz seçilince varsayılanları doldur (isim, kapı sayısı, yeni bölge adı).
-  const onSelectDevice = (id: Id<"devices">) => {
+  const onSelectDevice = (id: Id<"adminDevices">) => {
     const dev = (claimable ?? []).find((d) => d._id === id);
     setSelectedId(id);
     setName(dev?.name ?? "");
@@ -101,7 +101,7 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
     setSubmitting(true);
     try {
       await claimDevice({
-        deviceId: selectedId,
+        adminDeviceId: selectedId,
         projectId: targetProjectId,
         name: name.trim() || undefined,
         ideDoorCount: doorCount,
@@ -150,7 +150,7 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
               <>
                 <div className="space-y-2">
                   <Label>Cihaz</Label>
-                  <Select value={selectedId ?? undefined} onValueChange={(v) => onSelectDevice(v as Id<"devices">)}>
+                  <Select value={selectedId ?? undefined} onValueChange={(v) => onSelectDevice(v as Id<"adminDevices">)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Havuzdan bir cihaz seçin" />
                     </SelectTrigger>

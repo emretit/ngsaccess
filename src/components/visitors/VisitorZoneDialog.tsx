@@ -25,6 +25,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 interface ZoneFormData {
   name: string;
   selected_devices: string[];
+  selected_doors: string[];
   start_time: string;
   end_time: string;
   days: string[];
@@ -33,6 +34,7 @@ interface ZoneFormData {
 const emptyZone = (): ZoneFormData => ({
   name: "",
   selected_devices: [],
+  selected_doors: [],
   start_time: "",
   end_time: "",
   days: DEFAULT_WORKDAYS,
@@ -72,6 +74,7 @@ export default function VisitorZoneDialog({ isOpen, onClose }: VisitorZoneDialog
         days: formData.days,
         accessDirection: "both",
         deviceIds: formData.selected_devices as Id<"devices">[],
+        doorIds: formData.selected_doors as Id<"doors">[],
       });
       toast({ title: "Başarılı", description: "Ziyaretçi bölgesi oluşturuldu" });
       setFormData(emptyZone());

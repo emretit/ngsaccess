@@ -60,6 +60,7 @@ const LEVEL1_OPS = new Set([
   "upsertPermission",
   "deletePermission",
   "triggerSync",
+  "parameterWrite",
 ]);
 
 // token = level.iat.exp.uuid.sig (exp saniye). exp'ten ms döner; çözülemezse ~9dk.
@@ -169,6 +170,9 @@ function envelopeForOp(op, msxId, token) {
       return buildEnvelope("delete_data", { data_type: "permission", id: op.ideId }, base);
     case "triggerSync":
       return buildEnvelope(op.reset ? "sync_reset" : "sync", {}, base);
+    case "parameterWrite":
+      // parameterRecord = { "ACTUATOR0.REQUIRE_SENSOR_ACTIVATION": 0 } gibi düz key→değer.
+      return buildEnvelope("parameter_write", { ...op.parameterRecord }, base);
     default:
       return null;
   }

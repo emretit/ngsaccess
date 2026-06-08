@@ -44,6 +44,10 @@ export interface Door {
   _id: Id<"doors">;
   name: string;
   zoneId?: Id<"zones">;
+  deviceId?: Id<"devices">;
+  // IDE Smart aktüatör index'i (io_id 0–3). Kural bazlı kapı seçiminde permission.io kaynağı.
+  ioId?: number;
+  requireSensor?: boolean;
   doorCode?: string;
   location?: string;
   status?: string;
@@ -75,10 +79,17 @@ export interface GroupDevice {
   devices?: {
     id: Id<"devices">;
     name: string;
+    brand?: string;
+    ideUuid?: string;
     deviceSerial?: string;
     zoneId?: Id<"zones">;
     doorId?: Id<"doors">;
   } | null;
+}
+
+export interface GroupDoor {
+  doorId: Id<"doors">;
+  deviceId?: Id<"devices">;
 }
 
 export interface AccessRule {
@@ -100,6 +111,7 @@ export interface AccessRule {
   updatedAt?: string;
   groupMembers?: GroupMember[];
   groupDevices?: GroupDevice[];
+  groupDoors?: GroupDoor[];
 }
 
 export interface CreateRuleInput {

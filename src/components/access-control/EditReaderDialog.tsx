@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -23,6 +24,10 @@ interface EditReaderDialogProps {
   doorId: Id<"doors">;
   readerName: string;
   readerDirection: ReaderDirection;
+  // IDE Smart kapısı için mevcut sensör ayarı. undefined → panel default (true) varsayılır.
+  requireSensor?: boolean;
+  // IDE Smart paneline bağlı kapı mı (sensör toggle yalnızca o zaman gösterilir).
+  isIdeDoor?: boolean;
 }
 
 export function EditReaderDialog({
@@ -31,9 +36,12 @@ export function EditReaderDialog({
   doorId,
   readerName,
   readerDirection,
+  requireSensor: initialRequireSensor,
+  isIdeDoor = false,
 }: EditReaderDialogProps) {
   const [name, setName] = useState(readerName);
   const [direction, setDirection] = useState<ReaderDirection>(readerDirection);
+  const [requireSensor, setRequireSensor] = useState(initialRequireSensor ?? true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const updateDoor = useMutation(api.doors.update);
@@ -50,6 +58,8 @@ export function EditReaderDialog({
         doorId,
         readerName: name.trim(),
         readerDirection: direction,
+        // Sensör ayarı yalnızca IDE kapısında anlamlı; değiştiyse panele yazılır.
+        ...(isIdeDoor ? { requireSensor } : {}),
       });
       toast({ title: "Başarılı", description: "Okuyucu güncellendi." });
       onOpenChange(false);
@@ -96,6 +106,18 @@ export function EditReaderDialog({
                 </SelectContent>
               </Select>
             </div>
+            {isIdeDoor && (
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="requireSensor" className="text-right pt-1">Kapı Sensörü</Label>
+                <div className="col-span-3 flex items-start gap-2">
+                  <Switch id="requireSensor" checked={requireSensor} onCheckedChange={setRequireSensor} />
+                  <span className="text-xs text-muted-foreground">
+                    Açık: kapıda fiziksel sensör var, açılış sensörle onaylanır. Kapalı: sensörsüz kapı —
+                    role darbesi sensör beklemeden tamamlanır (sensörsüzde kapalı olmalı, yoksa erişim "busy"de takılır).
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>İptal</Button>

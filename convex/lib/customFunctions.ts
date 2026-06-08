@@ -70,6 +70,20 @@ export const adminMutation = customMutation(
 );
 
 /**
+ * Sadece super_admin için query.
+ */
+export const superAdminQuery = customQuery(
+  query,
+  customCtx(async (ctx) => {
+    const user = await getCurrentUser(ctx);
+    if (user.role !== "super_admin") {
+      throw new Error("Bu işlem için süper admin yetkisi gerekli");
+    }
+    return { user };
+  })
+);
+
+/**
  * Sadece super_admin için mutation (kullanıcı yönetimi vb.).
  */
 export const superAdminMutation = customMutation(

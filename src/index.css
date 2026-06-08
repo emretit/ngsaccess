@@ -30,6 +30,16 @@
         --chart-4: 43 74% 66%;
         --chart-5: 27 87% 67%;
         --radius: 0.75rem;
+        /* Semantic status tokens */
+        --success: 142 71% 45%;
+        --success-foreground: 0 0% 100%;
+        --success-subtle: 142 71% 95%;
+        --warning: 38 92% 50%;
+        --warning-foreground: 0 0% 0%;
+        --warning-subtle: 38 92% 95%;
+        --info: 221 83% 53%;
+        --info-foreground: 0 0% 100%;
+        --info-subtle: 221 83% 95%;
         /* Sidebar (shadcn) - burgundy arka plan, beyaz yazı */
         --sidebar-background: 0 59% 28%;
         --sidebar-foreground: 0 0% 100%;
@@ -61,6 +71,16 @@
         --border: 217.2 32.6% 17.5%;
         --input: 217.2 32.6% 17.5%;
         --ring: 0 59% 65%; /* Lighter burgundy for dark mode */
+        /* Semantic status tokens (dark) */
+        --success: 142 71% 55%;
+        --success-foreground: 0 0% 0%;
+        --success-subtle: 142 71% 15%;
+        --warning: 38 92% 60%;
+        --warning-foreground: 0 0% 0%;
+        --warning-subtle: 38 92% 15%;
+        --info: 221 83% 65%;
+        --info-foreground: 0 0% 0%;
+        --info-subtle: 221 83% 15%;
         --chart-1: 0 59% 65%; /* Lighter burgundy for dark mode */
         --chart-2: 160 60% 45%;
         --chart-3: 30 80% 55%;
@@ -88,22 +108,6 @@
         text-rendering: optimizeLegibility;
     }
 
-    .btn-primary {
-        @apply bg-primary hover:bg-primary/90 text-white font-medium py-2 px-4 rounded-md transition-colors;
-    }
-
-    .btn-secondary {
-        @apply bg-secondary hover:bg-secondary/90 text-secondary-foreground font-medium py-2 px-4 rounded-md transition-colors;
-    }
-
-    .card {
-        @apply bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 transition-all hover:shadow-lg;
-    }
-
-    .input {
-        @apply w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
-    }
-    
     .glass-card {
         @apply rounded-2xl border bg-card/50 shadow-lg backdrop-blur-sm transition-all duration-200 hover:shadow-xl dark:bg-card/30;
     }
@@ -148,6 +152,63 @@
 }
 
 @layer utilities {
+    /* Status semantic utilities — dark mode aware */
+    .status-success-bg   { background-color: hsl(var(--success)); }
+    .status-success-text { color: hsl(var(--success-foreground)); }
+    .status-success-badge {
+        background-color: hsl(var(--success-subtle));
+        /* darkened for AA contrast on subtle bg (4.5:1+) */
+        color: hsl(142 71% 28%);
+        border-color: hsl(var(--success) / 0.3);
+    }
+    .dark .status-success-badge {
+        background-color: hsl(var(--success-subtle));
+        color: hsl(142 71% 75%);
+    }
+    .status-warning-bg   { background-color: hsl(var(--warning)); }
+    .status-warning-text { color: hsl(var(--warning-foreground)); }
+    .status-warning-badge {
+        background-color: hsl(var(--warning-subtle));
+        /* darkened amber for AA contrast on subtle bg */
+        color: hsl(38 92% 30%);
+        border-color: hsl(var(--warning) / 0.3);
+    }
+    .dark .status-warning-badge {
+        background-color: hsl(var(--warning-subtle));
+        color: hsl(38 92% 75%);
+    }
+    .status-danger-bg   { background-color: hsl(var(--destructive)); }
+    .status-danger-text { color: hsl(var(--destructive-foreground)); }
+    .status-danger-badge {
+        background-color: hsl(var(--destructive) / 0.1);
+        color: hsl(var(--destructive));
+        border-color: hsl(var(--destructive) / 0.3);
+    }
+    .status-info-bg   { background-color: hsl(var(--info)); }
+    .status-info-text { color: hsl(var(--info-foreground)); }
+    .status-info-badge {
+        background-color: hsl(var(--info-subtle));
+        /* blue at 53% L on near-white is already ~5.4:1 but darken for safety */
+        color: hsl(221 83% 38%);
+        border-color: hsl(var(--info) / 0.3);
+    }
+    .dark .status-info-badge {
+        background-color: hsl(var(--info-subtle));
+        color: hsl(221 83% 75%);
+    }
+    .status-purple-bg   { background-color: hsl(270 60% 50%); }
+    .status-purple-text { color: #fff; }
+    .status-purple-badge {
+        background-color: hsl(270 60% 95%);
+        color: hsl(270 60% 35%);
+        border-color: hsl(270 60% 80%);
+    }
+    .dark .status-purple-badge {
+        background-color: hsl(270 60% 15%);
+        color: hsl(270 60% 75%);
+        border-color: hsl(270 60% 30%);
+    }
+
     .animation-delay-200 {
         animation-delay: 0.2s;
     }

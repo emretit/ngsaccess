@@ -1,6 +1,6 @@
 import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { authedQuery, adminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import { Doc, Id } from "./_generated/dataModel";
@@ -226,7 +226,7 @@ export const create = adminMutation({
     });
     await upsertGroupMembership(ctx, id, args.accessRuleId, args.projectId);
     // DB import gibi UI dışı insert akışlarında da push tetiklensin diye burada (idempotent).
-    await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
       employeeId: id,
     });
     // IDE Smart panellerine de otomatik push (MQTT kuyruğu üzerinden). internalAction:
@@ -322,7 +322,7 @@ export const update = adminMutation({
     }
 
     if (cardChanged || activeChanged || groupMemberAdded) {
-      await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+      await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
         employeeId,
       });
       await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
@@ -349,7 +349,7 @@ export const remove = adminMutation({
     // Önce cihazlardan sil (employeeId bilgisi gerektiği için DB silinmeden çağrılır).
     await ctx.scheduler.runAfter(
       0,
-      api.actions.hikvisionSync.deleteEmployeeFromDevices,
+      internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal,
       { employeeId: args.employeeId },
     );
     // IDE: kayıt + groupMembers birazdan silinecek → getEmployeeWithDevices null döner.
@@ -461,7 +461,7 @@ export const bulkUpdateStatus = adminMutation({
     // update() ile aynı desen; toplu işlemde de pasif çalışan panel erişimi kaybetsin.
     await Promise.all(
       changed.flatMap((id) => [
-        ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+        ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
           employeeId: id,
         }),
         ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {

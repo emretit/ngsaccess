@@ -129,6 +129,9 @@ function targetKey(opType: IdeOpType, payload: Record<string, unknown>): string 
     }
     case "triggerSync":
       return "sync";
+    case "parameterWrite":
+      // Aynı parametre için tek pending — en son yazım kazanır.
+      return `param:${String(payload.parameterName)}`;
     default:
       return "unknown";
   }
@@ -149,6 +152,7 @@ export const enqueueIdeOp = internalMutation({
       v.literal("upsertPermission"),
       v.literal("deletePermission"),
       v.literal("triggerSync"),
+      v.literal("parameterWrite"),
     ),
     payload: v.any(),
     maxAttempts: v.optional(v.number()),
@@ -369,15 +373,31 @@ export const ensureIdePermissionNo = internalMutation({
   },
 });
 
-/** Bir IDE panelinin kapı io_id listesi (panele bağlı doors.ioId). */
-export const getIdePanelIoIds = internalQuery({
-  args: { deviceId: v.id("devices") },
+/**
+ * Bir kural + panel için IDE permission.io listesi.
+ * Kuralın bu panele ait seçili kapıları (groupDoors) varsa onların ioId'leri;
+ * hiç yoksa panelin tüm kapıları (geriye uyumlu — eski kurallar bozulmaz).
+ */
+export const getRuleIoIdsForPanel = internalQuery({
+  args: { ruleId: v.id("accessRules"), deviceId: v.id("devices") },
   handler: async (ctx, args): Promise<number[]> => {
+    const groupDoors = await ctx.db
+      .query("groupDoors")
+      .withIndex("by_group", (q) => q.eq("groupId", args.ruleId))
+      .collect();
+    const ioIds = new Set<number>();
+    for (const gd of groupDoors) {
+      const door = await ctx.db.get(gd.doorId);
+      if (!door || door.deviceId !== args.deviceId) continue;
+      if (typeof door.ioId === "number") ioIds.add(door.ioId);
+    }
+    if (ioIds.size > 0) return Array.from(ioIds).sort((a, b) => a - b);
+
+    // Fallback: kuralın bu panel için kapı seçimi yok → panelin tüm kapıları.
     const doors = await ctx.db
       .query("doors")
       .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
       .collect();
-    const ioIds = new Set<number>();
     for (const d of doors) {
       if (typeof d.ioId === "number") ioIds.add(d.ioId);
     }

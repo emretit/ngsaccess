@@ -124,18 +124,22 @@ export const syncEmployeeToIdePanels = internalAction({
         skipped.push(`${rules[0].device.name}: panel UUID yok`);
         continue;
       }
-      const ioIds = await ctx.runQuery(internal.ideSync.getIdePanelIoIds, { deviceId });
-      const droppedIo = outOfRangeIoIds(ioIds);
-      if (droppedIo.length > 0) {
-        skipped.push(`${panel.name}: spec-dışı io ${droppedIo.join(",")} atlandı (0–7 beklenir)`);
-      }
-
       // Önce her kuralın permission RECORD'unu panele yaz (upsertUser'dan ÖNCE).
+      // io listesi kural BAZLI: kuralın bu panele ait seçili kapıları (groupDoors); yoksa
+      // panelin tüm kapıları (getRuleIoIdsForPanel fallback'i geriye uyumlu davranır).
       const permNos: number[] = [];
       for (const dr of rules) {
         const permNo = await ctx.runMutation(internal.ideSync.ensureIdePermissionNo, {
           accessRuleId: dr.rule._id,
         });
+        const ioIds = await ctx.runQuery(internal.ideSync.getRuleIoIdsForPanel, {
+          ruleId: dr.rule._id,
+          deviceId,
+        });
+        const droppedIo = outOfRangeIoIds(ioIds);
+        if (droppedIo.length > 0) {
+          skipped.push(`${panel.name}: spec-dışı io ${droppedIo.join(",")} atlandı (0–7 beklenir)`);
+        }
         const permissionRecord = buildIdePermissionRecord(permNo, ioIds, {
           startTime: dr.rule.startTime,
           endTime: dr.rule.endTime,
@@ -284,7 +288,10 @@ export const syncPermissionToIdePanels = internalAction({
       const panel = await ctx.runQuery(internal.devices.getByIdInternal, { id: device._id });
       if (!panel?.ideUuid) continue;
 
-      const ioIds = await ctx.runQuery(internal.ideSync.getIdePanelIoIds, { deviceId: device._id });
+      const ioIds = await ctx.runQuery(internal.ideSync.getRuleIoIdsForPanel, {
+        ruleId: args.accessRuleId,
+        deviceId: device._id,
+      });
       const droppedIo = outOfRangeIoIds(ioIds);
       if (droppedIo.length > 0) {
         skipped.push(`${panel.name}: spec-dışı io ${droppedIo.join(",")} atlandı (0–7 beklenir)`);

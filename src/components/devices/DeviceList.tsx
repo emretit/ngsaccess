@@ -86,7 +86,7 @@ export function DeviceList({
         />
       )}
       
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader className="sticky top-0 bg-card border-b-2 border-border">
             <TableRow>

@@ -19,6 +19,7 @@ import type * as actions_pdksImport from "../actions/pdksImport.js";
 import type * as actions_sendEmail from "../actions/sendEmail.js";
 import type * as actions_sendScheduledReports from "../actions/sendScheduledReports.js";
 import type * as actions_setPassword from "../actions/setPassword.js";
+import type * as adminDevices from "../adminDevices.js";
 import type * as auditLog from "../auditLog.js";
 import type * as auth from "../auth.js";
 import type * as cardReadings from "../cardReadings.js";
@@ -101,6 +102,7 @@ declare const fullApi: ApiFromModules<{
   "actions/sendEmail": typeof actions_sendEmail;
   "actions/sendScheduledReports": typeof actions_sendScheduledReports;
   "actions/setPassword": typeof actions_setPassword;
+  adminDevices: typeof adminDevices;
   auditLog: typeof auditLog;
   auth: typeof auth;
   cardReadings: typeof cardReadings;

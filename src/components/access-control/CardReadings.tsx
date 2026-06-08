@@ -3,6 +3,7 @@ import { EmployeePagination } from "@/components/employees/EmployeePagination";
 import { useProjectFilteredCardReadings } from "@/hooks/useProjectFilteredCardReadings";
 import { CardReadingsFilters } from "./CardReadingsFilters";
 import { CardReadingsTable } from "./CardReadingsTable";
+import { ErrorState } from "@/components/shared/ErrorState";
 
 const PAGE_SIZE = 100;
 
@@ -40,9 +41,7 @@ const CardReadings = () => {
 
   if (error) {
     return (
-      <div className="p-6 text-center text-red-500">
-        <p>Kart okutma kayıtları yüklenirken bir hata oluştu.</p>
-      </div>
+      <ErrorState description="Kart okutma kayıtları yüklenirken bir hata oluştu." />
     );
   }
 

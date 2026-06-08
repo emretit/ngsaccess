@@ -1,105 +1,138 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-
-import { Device } from "@/types/device";
-import { DeviceList } from "@/components/devices/DeviceList";
-import { DeviceFilters } from "@/components/devices/DeviceFilters";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { AdminDeviceDialog } from "@/components/admin/AdminDeviceDialog";
-import { useDeviceFilters } from "@/hooks/useDeviceFilters";
-import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
-import { toast } from "@/hooks/use-toast";
 import { computeDeviceStatus } from "@/lib/deviceStatus";
+import { toast } from "@/hooks/use-toast";
+
+type AdminDevice = FunctionReturnType<typeof api.adminDevices.list>[number];
+
+const nowMs = Date.now();
 
 export function AdminDevicesPanel() {
-  const [selectedZoneId, _setSelectedZoneId] = useState<string | null>(null);
-  const [selectedDoorId, _setSelectedDoorId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingDevice, setEditingDevice] = useState<Device | null>(null);
+  const adminDevices = useQuery(api.adminDevices.list);
+  const removeDevice = useMutation(api.adminDevices.remove);
 
-  const { zones, doors } = useZonesAndDoors();
-  const rawDevicesData = useQuery(api.devices.list);
-  const projectsData = useQuery(api.projects.list);
-  const projectNameById = new Map(
-    (projectsData ?? []).map((p) => [String(p._id), p.name])
-  );
-  const isLoading = rawDevicesData === undefined;
-
-  const removeDevice = useMutation(api.devices.remove);
-
-  // eslint-disable-next-line react-hooks/purity
-  const nowMs = Date.now();
-  const rawDevices: Device[] = (rawDevicesData ?? []).map((device: Device & { _creationTime?: number }) => ({
-    ...device,
-    // Online/offline lastSeen'den hesaplanır (Cihazlar sayfasıyla aynı util) — havuzdaki
-    // atanmamış cihazlar da panel bağlanınca canlı görünür.
-    status: computeDeviceStatus(device.lastSeen, nowMs),
-    createdAt: device.createdAt ?? (device._creationTime ? new Date(device._creationTime).toISOString() : undefined),
-  }));
-
-  const {
-    search,
-    setSearch,
-    statusFilter,
-    setStatusFilter,
-    typeFilter,
-    setTypeFilter,
-    deviceTypes,
-    filteredDevices,
-  } = useDeviceFilters(rawDevices, selectedZoneId, selectedDoorId);
-
-  const handleDeleteDevice = async (deviceId: string) => {
+  const handleDelete = async (id: Id<"adminDevices">, name: string) => {
+    if (!confirm(`"${name}" cihazını envanterden kaldırmak istediğinize emin misiniz?`)) return;
     try {
-      await removeDevice({ deviceId: deviceId as Id<"devices"> });
-      toast({ title: "Başarılı", description: "Cihaz silindi" });
+      await removeDevice({ adminDeviceId: id });
+      toast({ title: "Başarılı", description: "Cihaz envanterden kaldırıldı" });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Cihaz silinemedi";
       toast({ title: "Hata", description: message, variant: "destructive" });
     }
   };
 
-  const handleEditDevice = (device: Device) => {
-    setEditingDevice(device);
-    setDialogOpen(true);
-  };
-
-  const handleNewDevice = () => {
-    setEditingDevice(null);
-    setDialogOpen(true);
-  };
+  const isLoading = adminDevices === undefined;
 
   return (
-    <div className="space-y-6">
-      <DeviceFilters
-        search={search}
-        onSearchChange={setSearch}
-        statusFilter={statusFilter}
-        onStatusFilterChange={setStatusFilter}
-        typeFilter={typeFilter}
-        onTypeFilterChange={setTypeFilter}
-        deviceTypes={deviceTypes}
-        onNewDevice={handleNewDevice}
-        deviceCount={rawDevices.length}
-        filteredCount={filteredDevices.length}
-      />
-      <DeviceList
-        devices={rawDevices}
-        filteredDevices={filteredDevices}
-        isLoading={isLoading}
-        zones={zones}
-        doors={doors}
-        onDeleteDevice={handleDeleteDevice}
-        onEditDevice={handleEditDevice}
-        showProject
-        hideLocation
-        getProjectName={(d) => (d.projectId ? projectNameById.get(String(d.projectId)) : "Havuzda (atanmamış)")}
-      />
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Tüm kayıtlı fiziksel cihazlar. Projeye atamak için{" "}
+          <span className="font-medium">Cihazlar → Havuzdan Ekle</span>'yi kullanın.
+        </p>
+        <Button size="sm" onClick={() => setDialogOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Cihaz Ekle
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      ) : adminDevices.length === 0 ? (
+        <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground text-sm">
+          Envanterde kayıtlı cihaz yok. "Cihaz Ekle" ile UUID girin.
+        </div>
+      ) : (
+        <div className="rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Cihaz Adı</TableHead>
+                <TableHead>UUID</TableHead>
+                <TableHead>Marka</TableHead>
+                <TableHead>Kapı</TableHead>
+                <TableHead>Bağlantı</TableHead>
+                <TableHead>Proje</TableHead>
+                <TableHead className="w-16" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {adminDevices.map((device: AdminDevice) => {
+                const online = computeDeviceStatus(device.lastSeen, nowMs) === "online";
+                const isAssigned = !!device.assignedDeviceId;
+                return (
+                  <TableRow key={device._id}>
+                    <TableCell className="font-medium">{device.name}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {device.ideUuid}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-xs">
+                        {device.brand ?? "ide_smart"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {device.ideDoorCount ?? 4}
+                    </TableCell>
+                    <TableCell>
+                      <span className="flex items-center gap-1.5 text-xs">
+                        <span
+                          className={`h-2 w-2 rounded-full ${online ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
+                        />
+                        {online ? "Online" : "Offline"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      {isAssigned ? (
+                        <span className="text-xs font-medium text-foreground">
+                          {device.assignedProjectName ?? "Atanmış"}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        disabled={isAssigned}
+                        title={isAssigned ? "Önce projeden çıkarın" : "Envanterden kaldır"}
+                        onClick={() => handleDelete(device._id, device.name)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       <AdminDeviceDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
-        device={editingDevice}
         onSuccess={() => setDialogOpen(false)}
       />
     </div>

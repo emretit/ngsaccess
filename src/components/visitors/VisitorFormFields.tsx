@@ -13,6 +13,7 @@ import { VisitorFormData } from "./hooks/useVisitorFormData";
 import VisitorCardCapture from "./VisitorCardCapture";
 import { formatVisitorTime } from "./visitorTime";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { FieldError } from "@/components/shared/FormFieldWrapper";
 
 interface VisitorFormFieldsProps {
   formData: VisitorFormData;
@@ -21,6 +22,7 @@ interface VisitorFormFieldsProps {
   hostEmployees: { id: string; name: string }[];
   isEditing: boolean;
   kvkkConsentAt?: string | null;
+  errors?: Partial<Record<string, string>>;
 }
 
 export default function VisitorFormFields({
@@ -30,6 +32,7 @@ export default function VisitorFormFields({
   hostEmployees,
   isEditing,
   kvkkConsentAt,
+  errors = {},
 }: VisitorFormFieldsProps) {
   const handleChange = <K extends keyof VisitorFormData>(field: K, value: VisitorFormData[K]) => {
     setFormData({ ...formData, [field]: value });
@@ -47,8 +50,10 @@ export default function VisitorFormFields({
             id="v_first_name"
             value={formData.firstName}
             onChange={(e) => handleChange("firstName", e.target.value)}
-            required
+            aria-invalid={!!errors.firstName}
+            aria-describedby={errors.firstName ? "v_first_name-error" : undefined}
           />
+          <FieldError id="v_first_name-error" message={errors.firstName} />
         </div>
 
         <div>
@@ -57,8 +62,10 @@ export default function VisitorFormFields({
             id="v_last_name"
             value={formData.lastName}
             onChange={(e) => handleChange("lastName", e.target.value)}
-            required
+            aria-invalid={!!errors.lastName}
+            aria-describedby={errors.lastName ? "v_last_name-error" : undefined}
           />
+          <FieldError id="v_last_name-error" message={errors.lastName} />
         </div>
 
         <div>
@@ -126,8 +133,10 @@ export default function VisitorFormFields({
             value={formData.cardNumber}
             onChange={(e) => handleChange("cardNumber", e.target.value)}
             placeholder="Karta okutun veya elle girin"
-            required
+            aria-invalid={!!errors.cardNumber}
+            aria-describedby={errors.cardNumber ? "v_card-error" : undefined}
           />
+          <FieldError id="v_card-error" message={errors.cardNumber} />
         </div>
 
         <div>

@@ -86,9 +86,9 @@ export default function Header() {
           </div>
           
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-[#711A1A] dark:hover:text-[#f2b4b4] relative">
+            <Button variant="ghost" size="icon" aria-label="Bildirimler" className="text-muted-foreground hover:text-[#711A1A] dark:hover:text-[#f2b4b4] relative">
               <Bell className="h-5 w-5" />
-              <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+              <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full" aria-hidden="true" />
             </Button>
             
             {/* User Dropdown */}

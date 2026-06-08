@@ -50,7 +50,7 @@ export const UserTable: React.FC<UserTableProps> = ({
 
   return (
     <>
-      <div className="rounded-lg border bg-card shadow-xs">
+      <div className="rounded-lg border bg-card shadow-xs overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>

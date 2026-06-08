@@ -1,4 +1,4 @@
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import { SettingsSidebar } from "@/components/settings/SettingsSidebar";
 import { GeneralSettings } from "@/components/settings/sections/GeneralSettings";
 import { WorkAndPayrollSettings } from "@/components/settings/sections/WorkAndPayrollSettings";
@@ -9,6 +9,10 @@ import { IntegrationsSettings } from "@/components/settings/sections/Integration
 import AdminUsersPanel from "@/components/admin/AdminUsersPanel";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useGeneralSettings } from "@/components/settings/sections/hooks/useGeneralSettings";
+import {
+  Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList,
+  BreadcrumbPage, BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 const VALID_TABS = [
   "general",
@@ -19,6 +23,16 @@ const VALID_TABS = [
   "mail",
   "notifications",
 ] as const;
+
+const TAB_LABELS: Record<string, string> = {
+  general: "Genel",
+  users: "Kullanıcı Yönetimi",
+  "work-payroll": "Mesai & Tatil",
+  reports: "Raporlar",
+  integrations: "Entegrasyonlar",
+  mail: "Mail Ayarları",
+  notifications: "Bildirimler",
+};
 
 type Tab = (typeof VALID_TABS)[number];
 
@@ -66,11 +80,41 @@ export default function Settings() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-4 min-h-full">
-      <SettingsSidebar selected={activeTab} onSelect={handleTabChange} />
+    <div className="flex flex-col gap-4 min-h-full">
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link to="/home">Ana Sayfa</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            {activeTab === "general" ? (
+              <BreadcrumbPage>Ayarlar</BreadcrumbPage>
+            ) : (
+              <BreadcrumbLink asChild>
+                <Link to="/settings">Ayarlar</Link>
+              </BreadcrumbLink>
+            )}
+          </BreadcrumbItem>
+          {activeTab !== "general" && (
+            <>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{TAB_LABELS[activeTab] ?? activeTab}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </>
+          )}
+        </BreadcrumbList>
+      </Breadcrumb>
 
-      <div className="flex-1 min-w-0 overflow-auto">
-        {renderActiveContent()}
+      <div className="flex flex-col md:flex-row gap-4 flex-1">
+        <SettingsSidebar selected={activeTab} onSelect={handleTabChange} />
+
+        <div className="flex-1 min-w-0 overflow-auto">
+          {renderActiveContent()}
+        </div>
       </div>
     </div>
   );

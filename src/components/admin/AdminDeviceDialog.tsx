@@ -12,39 +12,32 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { DeviceForm } from "@/components/devices/DeviceForm";
-import type { ServerDevice } from "@/types/device";
 import { toast } from "@/hooks/use-toast";
 
 interface AdminDeviceDialogProps {
   open: boolean;
   onClose: () => void;
-  /** Düzenleme modu; null/undefined ise yeni cihaz (havuza UUID ile ekle). */
-  device?: ServerDevice | null;
   onSuccess: () => void;
 }
 
 /**
- * Admin cihaz yönetimi (super_admin):
- * - Yeni cihaz: IDE Smart paneli UUID ile HAVUZA ekler (atanmamış; projectId yok). Ortak
- *   varsayılan MQTT kimliği backend'de otomatik uygulanır. Projeye atama Cihazlar'da claim ile.
- *   (Havuz şimdilik IDE-Smart only; Hikvision kendi gateway akışında.)
- * - Düzenleme: mevcut cihazın bağlantı alanları (DeviceForm adminMode).
+ * Super admin bir IDE Smart paneli UUID ile envantere (adminDevices) ekler.
+ * Projeye atama Cihazlar → Havuzdan Ekle akışında yapılır.
  */
-export function AdminDeviceDialog({ open, onClose, device, onSuccess }: AdminDeviceDialogProps) {
-  const registerPanel = useMutation(api.devices.registerUnassignedPanel);
+export function AdminDeviceDialog({ open, onClose, onSuccess }: AdminDeviceDialogProps) {
+  const registerDevice = useMutation(api.adminDevices.register);
 
   const [ideUuid, setIdeUuid] = useState("");
   const [name, setName] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (open && !device) {
+    if (open) {
       setIdeUuid("");
       setName("");
       setSubmitting(false);
     }
-  }, [open, device]);
+  }, [open]);
 
   const handleRegister = async () => {
     const trimmed = ideUuid.trim();
@@ -54,9 +47,8 @@ export function AdminDeviceDialog({ open, onClose, device, onSuccess }: AdminDev
     }
     setSubmitting(true);
     try {
-      // brand omit → backend ide_smart varsayar (havuz IDE-only).
-      await registerPanel({ ideUuid: trimmed, name: name.trim() || undefined });
-      toast({ title: "Başarılı", description: "Cihaz havuza eklendi (atanmamış)" });
+      await registerDevice({ ideUuid: trimmed, name: name.trim() || undefined });
+      toast({ title: "Başarılı", description: "Cihaz envantere eklendi" });
       onSuccess();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Cihaz eklenemedi";
@@ -66,67 +58,51 @@ export function AdminDeviceDialog({ open, onClose, device, onSuccess }: AdminDev
     }
   };
 
-  const title = device ? "Cihazı Düzenle" : "Havuza Cihaz Ekle (UUID ile)";
-
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <SheetContent size="lg" className="p-0">
         <div className="p-6 border-b">
           <SheetHeader>
-            <SheetTitle>{title}</SheetTitle>
+            <SheetTitle>Envantere Cihaz Ekle</SheetTitle>
           </SheetHeader>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Cihaz envantere eklendikten sonra Cihazlar sayfasından projeye atanabilir.
+          </p>
         </div>
 
-        <ScrollArea className="h-[calc(100vh-120px)]">
-          <div className="p-6 space-y-6">
-            {device ? (
-              // Düzenleme: mevcut bağlantı alanları (adminMode). Proje değiştirilmez.
-              <DeviceForm
-                open={open}
-                device={device}
-                projects={[]}
-                defaultBrand={device.brand ?? "ide_smart"}
-                projectIdOverride={device.projectId ?? null}
-                adminMode
-                onSuccess={onSuccess}
-                onClose={onClose}
+        <ScrollArea className="h-[calc(100vh-140px)]">
+          <div className="p-6 space-y-4">
+            <div className="space-y-2">
+              <Label>Panel UUID</Label>
+              <Input
+                autoFocus
+                value={ideUuid}
+                onChange={(e) => setIdeUuid(e.target.value)}
+                placeholder="ör. 289833329732592 (panelin SYSTEM.UUID'i — src-id)"
               />
-            ) : (
-              // Yeni: UUID ile havuza ekle. Kimlik (ideUser/idePassword) ortak varsayılandan
-              // backend'de uygulanır — burada girilmez. Proje yok → claim Cihazlar'da.
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Panel UUID</Label>
-                  <Input
-                    autoFocus
-                    value={ideUuid}
-                    onChange={(e) => setIdeUuid(e.target.value)}
-                    placeholder="ör. 289833329732592 (panelin SYSTEM.UUID'i — src-id)"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Panelin gerçek MQTT kimliği (15 haneli). Seri no DEĞİL. Panel önceden Hetzner
-                    broker'ına ayarlı geldiği için, eklenince bağlanınca otomatik canlanır.
-                  </p>
-                </div>
+              <p className="text-xs text-muted-foreground">
+                Panelin gerçek MQTT kimliği (15 haneli). Seri no DEĞİL.
+              </p>
+            </div>
 
-                <div className="space-y-2">
-                  <Label>İsim (opsiyonel)</Label>
-                  <Input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Boş bırakılırsa UUID kullanılır"
-                  />
-                </div>
+            <div className="space-y-2">
+              <Label>Cihaz Adı (opsiyonel)</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Boş bırakılırsa UUID kullanılır"
+              />
+            </div>
 
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button variant="outline" onClick={onClose} disabled={submitting}>İptal</Button>
-                  <Button onClick={handleRegister} disabled={submitting || !ideUuid.trim()}>
-                    {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Havuza Ekle
-                  </Button>
-                </div>
-              </div>
-            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={onClose} disabled={submitting}>
+                İptal
+              </Button>
+              <Button onClick={handleRegister} disabled={submitting || !ideUuid.trim()}>
+                {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Envantere Ekle
+              </Button>
+            </div>
           </div>
         </ScrollArea>
       </SheetContent>

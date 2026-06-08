@@ -3,7 +3,10 @@ import { api } from "../../../convex/_generated/api";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { Loader2, Plus, LayoutGrid, DoorOpen } from "lucide-react";
 
 const ZonesAndDoors = () => {
   const zonesData = useQuery(api.zones.list, {});
@@ -34,12 +37,12 @@ const ZonesAndDoors = () => {
           <CardHeader><CardTitle>Bölgeler</CardTitle></CardHeader>
           <CardContent>
             {zonesLoading ? (
-              <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Yükleniyor...
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-4 w-4 animate-spin mr-2 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Yükleniyor...</span>
               </div>
             ) : zones.length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground py-8">Bölge yok</p>
+              <EmptyState icon={LayoutGrid} title="Bölge yok" className="py-8" />
             ) : (
               <div className="space-y-2">
                 {zones.map((zone: { _id: string; name: string; description?: string }) => (
@@ -57,12 +60,12 @@ const ZonesAndDoors = () => {
           <CardHeader><CardTitle>Kapılar</CardTitle></CardHeader>
           <CardContent>
             {doorsLoading ? (
-              <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Yükleniyor...
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-4 w-4 animate-spin mr-2 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Yükleniyor...</span>
               </div>
             ) : doors.length === 0 ? (
-              <p className="text-center text-sm text-muted-foreground py-8">Kapı yok</p>
+              <EmptyState icon={DoorOpen} title="Kapı yok" className="py-8" />
             ) : (
               <div className="space-y-2">
                 {doors.map((door: { _id: string; name: string; location?: string; status?: string }) => (
@@ -70,9 +73,9 @@ const ZonesAndDoors = () => {
                     <div className="font-medium">{door.name}</div>
                     <div className="text-sm text-muted-foreground">{door.location ?? "Konum belirtilmemiş"}</div>
                     <div className="mt-2">
-                      <span className={`px-2 py-1 rounded-full text-xs ${door.status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                      <Badge variant={door.status === "active" ? "success" : "destructive"}>
                         {door.status === "active" ? "Aktif" : "Pasif"}
-                      </span>
+                      </Badge>
                     </div>
                   </div>
                 ))}

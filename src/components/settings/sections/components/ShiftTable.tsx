@@ -54,7 +54,7 @@ export function ShiftTable({ shifts, onEdit, onDelete, onAdd }: ShiftTableProps)
   }
 
   return (
-    <div className="overflow-hidden">
+    <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50">
@@ -104,18 +104,12 @@ export function ShiftTable({ shifts, onEdit, onDelete, onAdd }: ShiftTableProps)
                   )}
                 </TableCell>
                 <TableCell>
-                  <Badge
-                    variant={overtimeOn ? "default" : "secondary"}
-                    className={overtimeOn ? "bg-blue-100 text-blue-800" : ""}
-                  >
+                  <Badge variant={overtimeOn ? "info" : "secondary"}>
                     {overtimeOn ? "Açık" : "Kapalı"}
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <Badge
-                    variant={isActive ? "default" : "secondary"}
-                    className={isActive ? "bg-green-100 text-green-800" : ""}
-                  >
+                  <Badge variant={isActive ? "success" : "secondary"}>
                     {isActive ? "Aktif" : "Pasif"}
                   </Badge>
                 </TableCell>
@@ -125,7 +119,7 @@ export function ShiftTable({ shifts, onEdit, onDelete, onAdd }: ShiftTableProps)
                       variant="outline"
                       size="sm"
                       onClick={() => onEdit(shift)}
-                      className="hover:bg-blue-50 hover:border-blue-300"
+                      className="hover:bg-accent/10 hover:border-accent"
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
@@ -133,7 +127,7 @@ export function ShiftTable({ shifts, onEdit, onDelete, onAdd }: ShiftTableProps)
                       variant="outline"
                       size="sm"
                       onClick={() => onDelete(shift._id)}
-                      className="hover:bg-red-50 hover:border-red-300 text-red-600"
+                      className="hover:bg-destructive/10 hover:border-destructive text-destructive"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

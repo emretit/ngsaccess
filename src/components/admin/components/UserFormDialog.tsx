@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { 
@@ -29,6 +30,7 @@ interface UserFormDialogProps {
   formData: UserFormData;
   onFormDataChange: (data: UserFormData) => void;
   onSave: () => void;
+  isSaving?: boolean;
   projects: Project[];
 }
 
@@ -39,6 +41,7 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
   formData,
   onFormDataChange,
   onSave,
+  isSaving = false,
   projects
 }) => {
   return (
@@ -118,8 +121,12 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
           <Button variant="outline" onClick={onClose}>
             İptal
           </Button>
-          <Button onClick={onSave}>
-            {currentUser ? 'Güncelle' : 'Oluştur'}
+          <Button onClick={onSave} disabled={isSaving}>
+            {isSaving ? (
+              <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Kaydediliyor</>
+            ) : (
+              currentUser ? 'Güncelle' : 'Oluştur'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

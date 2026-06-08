@@ -10,6 +10,10 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,15 +28,16 @@ interface ProjectForm {
   isActive: boolean;
 }
 
-const ROLE_BADGE: Record<string, { label: string; cls: string }> = {
-  super_admin: { label: "Süper Admin", cls: "bg-red-100 text-red-800" },
-  project_admin: { label: "Proje Yöneticisi", cls: "bg-blue-100 text-blue-800" },
-  project_user: { label: "Kullanıcı", cls: "bg-green-100 text-green-800" },
+const ROLE_BADGE: Record<string, { label: string; variant: "destructive" | "info" | "success" }> = {
+  super_admin:   { label: "Süper Admin",       variant: "destructive" },
+  project_admin: { label: "Proje Yöneticisi",  variant: "info" },
+  project_user:  { label: "Kullanıcı",          variant: "success" },
 };
 
 const AdminProjectsPanel = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isSavingProject, setIsSavingProject] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<Id<"projects"> | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [formData, setFormData] = useState<ProjectForm>({ name: "", description: "", isActive: true });
@@ -69,8 +74,8 @@ const AdminProjectsPanel = () => {
   };
 
   const getRoleDisplay = (role: string) => {
-    const { label, cls } = ROLE_BADGE[role] ?? { label: "Bilinmiyor", cls: "bg-gray-100 text-gray-700" };
-    return <Badge variant="secondary" className={cls}>{label}</Badge>;
+    const meta = ROLE_BADGE[role] ?? { label: "Bilinmiyor", variant: "secondary" as const };
+    return <Badge variant={meta.variant}>{meta.label}</Badge>;
   };
 
   const handleCreateProject = () => {
@@ -95,6 +100,7 @@ const AdminProjectsPanel = () => {
       toast({ variant: "destructive", title: "Hata", description: "Proje adı zorunludur" });
       return;
     }
+    setIsSavingProject(true);
     try {
       if (currentProjectId) {
         await updateProject({ id: currentProjectId, name: formData.name, description: formData.description, isActive: formData.isActive });
@@ -106,6 +112,8 @@ const AdminProjectsPanel = () => {
       setIsDialogOpen(false);
     } catch (error: unknown) {
       toast({ variant: "destructive", title: "Hata", description: (error as Error)?.message ?? "Proje kaydedilirken bir hata oluştu" });
+    } finally {
+      setIsSavingProject(false);
     }
   };
 
@@ -135,7 +143,7 @@ const AdminProjectsPanel = () => {
         </Button>
       </div>
 
-      <div className="rounded-lg border">
+      <div className="rounded-lg border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -188,7 +196,7 @@ const AdminProjectsPanel = () => {
                         {project._creationTime ? format(new Date(project._creationTime), "dd.MM.yyyy HH:mm") : "-"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className={project.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-700"}>
+                        <Badge variant={project.isActive ? "success" : "secondary"}>
                           {project.isActive ? "Aktif" : "Pasif"}
                         </Badge>
                       </TableCell>
@@ -201,10 +209,10 @@ const AdminProjectsPanel = () => {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => handleEditProject(project)}>
+                          <Button variant="ghost" size="icon" aria-label="Projeyi düzenle" onClick={() => handleEditProject(project)}>
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(project._id)}>
+                          <Button variant="ghost" size="icon" aria-label="Projeyi sil" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(project._id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -278,25 +286,31 @@ const AdminProjectsPanel = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>İptal</Button>
-            <Button onClick={handleSaveProject}>{currentProjectId ? "Güncelle" : "Oluştur"}</Button>
+            <Button onClick={handleSaveProject} disabled={isSavingProject}>
+              {isSavingProject ? (
+                <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Kaydediliyor</>
+              ) : (
+                currentProjectId ? "Güncelle" : "Oluştur"
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Proje Silme</DialogTitle>
-            <DialogDescription>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Proje Silme</AlertDialogTitle>
+            <AlertDialogDescription>
               Bu işlem geri alınamaz. "{currentProject?.name}" projesini silmek istediğinize emin misiniz?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>İptal</Button>
             <Button variant="destructive" onClick={handleDeleteProject}>Sil</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

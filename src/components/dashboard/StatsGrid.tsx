@@ -19,17 +19,17 @@ const StatsGrid: React.FC<StatsGridProps> = ({ stats }) => {
       <StatusCard
         title="Aktif Cihazlar"
         value={stats.devices.toString()}
-        icon={<Cpu className="h-4 w-4 text-green-500" />}
+        icon={<Cpu className="h-4 w-4 text-[hsl(var(--success))]" />}
       />
       <StatusCard
         title="Bugünkü Geçişler"
         value={stats.cardReadings.toString()}
-        icon={<Key className="h-4 w-4 text-yellow-500" />}
+        icon={<Key className="h-4 w-4 text-[hsl(var(--warning))]" />}
       />
       <StatusCard
         title="Bekleyen İstekler"
         value={stats.pendingRequests.toString()}
-        icon={<AlertCircle className="h-4 w-4 text-red-500" />}
+        icon={<AlertCircle className="h-4 w-4 text-destructive" />}
       />
     </div>
   );

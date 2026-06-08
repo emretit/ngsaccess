@@ -1,7 +1,8 @@
 "use node";
 
-import { api, internal } from "../_generated/api";
+import { internal } from "../_generated/api";
 import { v } from "convex/values";
+import { internalAction } from "../_generated/server";
 import { authedAction } from "../lib/customFunctions";
 import { isProjectAllowed } from "../lib/auth";
 import { filterHikvisionDevices, defaultRuleSchedule } from "../lib/hikSync";
@@ -20,22 +21,38 @@ import {
 } from "../lib/hikGateway";
 
 /**
+ * Proje kapsam denetimi. Scheduler/internal tetikli çağrılar `allowedProjectIds`
+ * vermez → güvenilir kabul edilir (tetikleyen mutation zaten yetki denetledi; tüm
+ * projelere izinli sayılır ama orphan projectId hâlâ atlanır). Public authed wrapper
+ * kullanıcının eriştiği proje ID'lerini geçirir ve kapsam zorlanır.
+ */
+function makeProjectGuard(
+  allowed: Id<"projects">[] | undefined,
+): (pid: Id<"projects"> | undefined) => boolean {
+  return (pid) => (allowed === undefined ? !!pid : isProjectAllowed(allowed, pid));
+}
+
+/**
  * Çalışanı erişim gruplarındaki tüm cihazlara senkronize eder.
  * Convex → Hetzner Gateway (HTTP Digest) → ISUP 5.0 → Cihaz (LAN).
  *
  * Cihazlara doğrudan değil, gateway ISAPI passthrough üzerinden bağlanır.
  * devices.hikDevIndex set edilmiş cihazlar dikkate alınır.
+ *
+ * internalAction: scheduler (employees/accessRules/visitors mutation'ları) ve UI'ın
+ * authed wrapper'ı (`syncEmployeeToDevices`) tarafından tetiklenir. Scheduler auth
+ * identity taşımadığı için authedAction burada "Giriş yapmanız gerekiyor" fırlatırdı.
  */
-export const syncEmployeeToDevices = authedAction({
-  args: { employeeId: v.id("employees") },
+export const syncEmployeeToDevicesInternal = internalAction({
+  args: {
+    employeeId: v.id("employees"),
+    allowedProjectIds: v.optional(v.array(v.id("projects"))),
+  },
   handler: async (
     ctx,
     args,
   ): Promise<{ synced: number; failed: number; errors: string[] }> => {
-    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
-      internal.users.listProjectIdsForCurrentUser,
-      {},
-    );
+    const isAllowed = makeProjectGuard(args.allowedProjectIds);
     const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, {
       employeeId: args.employeeId,
     });
@@ -43,15 +60,16 @@ export const syncEmployeeToDevices = authedAction({
     if (!data?.employee.cardNumber || data.deviceRules.length === 0) {
       return { synced: 0, failed: 0, errors: [] };
     }
-    if (!isProjectAllowed(allowedProjectIds, data.employee.projectId)) {
+    if (!isAllowed(data.employee.projectId)) {
       return { synced: 0, failed: 0, errors: ["Bu çalışana erişim yetkiniz yok"] };
     }
 
     // Pasif çalışan cihazlardan silinmeli — cihazda kalırsa erişim 24/7 geçerli kalır
     // (Valid.enable cihazda true olarak yazılıydı). isActive: false olunca delete tetiklenir.
     if (data.employee.isActive === false) {
-      await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.deleteEmployeeFromDevices, {
+      await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
         employeeId: args.employeeId,
+        allowedProjectIds: args.allowedProjectIds,
       });
       return { synced: 0, failed: 0, errors: [] };
     }
@@ -65,7 +83,7 @@ export const syncEmployeeToDevices = authedAction({
     // Non-Hikvision cihazlar (QR, vs.) bu pipeline'a hiç girmez — silent skip.
     const hikRules = deviceRules.filter((dr) => dr.device.brand === "hikvision");
     for (const { device, rule } of hikRules) {
-      if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
+      if (!isAllowed(device.projectId)) {
         tasks.push({ kind: "skip", device, rule, reason: "erişim yetkiniz yok" });
         continue;
       }
@@ -197,6 +215,27 @@ export const syncEmployeeToDevices = authedAction({
   },
 });
 
+/**
+ * UI'dan manuel "cihazlara sync" için public authed sarmalayıcı. Kullanıcının
+ * eriştiği proje ID'lerini çözüp internal core'a kapsam olarak geçirir (IDOR önler).
+ */
+export const syncEmployeeToDevices = authedAction({
+  args: { employeeId: v.id("employees") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ synced: number; failed: number; errors: string[] }> => {
+    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
+      internal.users.listProjectIdsForCurrentUser,
+      {},
+    );
+    return await ctx.runAction(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
+      employeeId: args.employeeId,
+      allowedProjectIds,
+    });
+  },
+});
+
 type ResolveOp =
   | "addPerson"
   | "updatePerson"
@@ -235,24 +274,25 @@ function resolveSuccesses(
 
 /**
  * Çalışanı tüm gateway-cihazlarından siler (employeeNo bazlı).
+ * Yalnızca scheduler/internal tetikli (frontend doğrudan çağırmaz) → internalAction.
  */
-export const deleteEmployeeFromDevices = authedAction({
-  args: { employeeId: v.id("employees") },
+export const deleteEmployeeFromDevicesInternal = internalAction({
+  args: {
+    employeeId: v.id("employees"),
+    allowedProjectIds: v.optional(v.array(v.id("projects"))),
+  },
   handler: async (
     ctx,
     args,
   ): Promise<{ removed: number; failed: number; errors: string[] }> => {
-    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
-      internal.users.listProjectIdsForCurrentUser,
-      {},
-    );
+    const isAllowed = makeProjectGuard(args.allowedProjectIds);
     const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, {
       employeeId: args.employeeId,
     });
     if (!data?.employee.cardNumber || data.deviceRules.length === 0) {
       return { removed: 0, failed: 0, errors: [] };
     }
-    if (!isProjectAllowed(allowedProjectIds, data.employee.projectId)) {
+    if (!isAllowed(data.employee.projectId)) {
       return { removed: 0, failed: 0, errors: ["Bu çalışana erişim yetkiniz yok"] };
     }
     const seen = new Set<string>();
@@ -263,7 +303,7 @@ export const deleteEmployeeFromDevices = authedAction({
       (dr) => dr.device.brand === "hikvision",
     );
     for (const { device } of hikDeviceRules) {
-      if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
+      if (!isAllowed(device.projectId)) {
         skipped.push({ device, reason: "bu cihaza erişim yetkiniz yok" });
         continue;
       }
@@ -343,8 +383,11 @@ export const deleteEmployeeFromDevices = authedAction({
  * Erişim kuralındaki haftalık planı gateway-cihazlara push eder,
  * sonra gruptaki çalışanları güncel planTemplateNo ile yeniden sync eder.
  */
-export const syncWeekPlanToDevices = authedAction({
-  args: { accessRuleId: v.id("accessRules") },
+export const syncWeekPlanToDevicesInternal = internalAction({
+  args: {
+    accessRuleId: v.id("accessRules"),
+    allowedProjectIds: v.optional(v.array(v.id("projects"))),
+  },
   handler: async (
     ctx,
     args,
@@ -354,10 +397,7 @@ export const syncWeekPlanToDevices = authedAction({
     errors: string[];
     employeesSynced: number;
   }> => {
-    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
-      internal.users.listProjectIdsForCurrentUser,
-      {},
-    );
+    const isAllowed = makeProjectGuard(args.allowedProjectIds);
     const data = await ctx.runQuery(internal.hikvisionSync.getAccessRuleWithDevices, {
       accessRuleId: args.accessRuleId,
     });
@@ -365,7 +405,7 @@ export const syncWeekPlanToDevices = authedAction({
     if (!data) return { synced: 0, failed: 0, errors: [], employeesSynced: 0 };
 
     const { rule, devices, employees } = data;
-    if (!isProjectAllowed(allowedProjectIds, rule.projectId)) {
+    if (!isAllowed(rule.projectId)) {
       return {
         synced: 0,
         failed: 0,
@@ -394,7 +434,7 @@ export const syncWeekPlanToDevices = authedAction({
     const skippedDevices: { device: typeof devices[number]; reason: string }[] = [];
     const hikDevices = filterHikvisionDevices(devices);
     const allowedDevices = hikDevices.filter((d) => {
-      if (!isProjectAllowed(allowedProjectIds, d.projectId)) {
+      if (!isAllowed(d.projectId)) {
         skippedDevices.push({ device: d, reason: "bu cihaza erişim yetkiniz yok" });
         return false;
       }
@@ -489,6 +529,31 @@ export const syncWeekPlanToDevices = authedAction({
 });
 
 /**
+ * UI'dan manuel kural sync'i için public authed sarmalayıcı.
+ */
+export const syncWeekPlanToDevices = authedAction({
+  args: { accessRuleId: v.id("accessRules") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    synced: number;
+    failed: number;
+    errors: string[];
+    employeesSynced: number;
+  }> => {
+    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
+      internal.users.listProjectIdsForCurrentUser,
+      {},
+    );
+    return await ctx.runAction(internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, {
+      accessRuleId: args.accessRuleId,
+      allowedProjectIds,
+    });
+  },
+});
+
+/**
  * Bir projedeki tüm aktif access rule'ları cihazlara push eder.
  * Mevcut kayıtların ilk kez Hikvision tarafına geçirilmesi için kullanılır
  * (mutation trigger'ları yeni; eski kurallar UI'dan tek tıkla backfill edilir).
@@ -522,8 +587,9 @@ export const backfillAllRulesToDevices = authedAction({
     // Sıralı çağrı — paralel push gateway'i boğmasın (her kural N cihaz x M çalışan).
     for (const rid of ruleIds) {
       try {
-        const res = await ctx.runAction(api.actions.hikvisionSync.syncWeekPlanToDevices, {
+        const res = await ctx.runAction(internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, {
           accessRuleId: rid,
+          allowedProjectIds: scope,
         });
         synced += res.synced;
         failed += res.failed;

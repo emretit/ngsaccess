@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { EmployeeFormData } from './hooks/useEmployeeFormData';
 import type { Id } from '../../../convex/_generated/dataModel';
+import { FieldError } from '@/components/shared/FormFieldWrapper';
 
 interface EmployeeFormFieldsProps {
   formData: EmployeeFormData;
@@ -15,6 +16,7 @@ interface EmployeeFormFieldsProps {
   departments: { id: string; name: string }[];
   accessRules: { id: string; name: string }[];
   positions: { id: string; name: string }[];
+  errors?: Partial<Record<string, string>>;
 }
 
 export default function EmployeeFormFields({
@@ -24,6 +26,7 @@ export default function EmployeeFormFields({
   departments,
   accessRules,
   positions,
+  errors = {},
 }: EmployeeFormFieldsProps) {
   const handleInputChange = <K extends keyof EmployeeFormData>(field: K, value: EmployeeFormData[K]) => {
     setFormData({ ...formData, [field]: value });
@@ -41,8 +44,10 @@ export default function EmployeeFormFields({
             id="first_name"
             value={formData.firstName}
             onChange={(e) => handleInputChange('firstName', e.target.value)}
-            required
+            aria-invalid={!!errors.firstName}
+            aria-describedby={errors.firstName ? "first_name-error" : undefined}
           />
+          <FieldError id="first_name-error" message={errors.firstName} />
         </div>
 
         <div>
@@ -51,8 +56,10 @@ export default function EmployeeFormFields({
             id="last_name"
             value={formData.lastName}
             onChange={(e) => handleInputChange('lastName', e.target.value)}
-            required
+            aria-invalid={!!errors.lastName}
+            aria-describedby={errors.lastName ? "last_name-error" : undefined}
           />
+          <FieldError id="last_name-error" message={errors.lastName} />
         </div>
 
         <div>
@@ -62,8 +69,10 @@ export default function EmployeeFormFields({
             type="email"
             value={formData.email}
             onChange={(e) => handleInputChange('email', e.target.value)}
-            required
+            aria-invalid={!!errors.email}
+            aria-describedby={errors.email ? "email-error" : undefined}
           />
+          <FieldError id="email-error" message={errors.email} />
         </div>
 
         <div>
@@ -73,7 +82,10 @@ export default function EmployeeFormFields({
             value={formData.tcNo}
             onChange={(e) => handleInputChange('tcNo', e.target.value)}
             maxLength={11}
+            aria-invalid={!!errors.tcNo}
+            aria-describedby={errors.tcNo ? "tc_no-error" : undefined}
           />
+          <FieldError id="tc_no-error" message={errors.tcNo} />
         </div>
 
         <div>
@@ -82,8 +94,10 @@ export default function EmployeeFormFields({
             id="card_number"
             value={formData.cardNumber}
             onChange={(e) => handleInputChange('cardNumber', e.target.value)}
-            required
+            aria-invalid={!!errors.cardNumber}
+            aria-describedby={errors.cardNumber ? "card_number-error" : undefined}
           />
+          <FieldError id="card_number-error" message={errors.cardNumber} />
         </div>
 
         <div>

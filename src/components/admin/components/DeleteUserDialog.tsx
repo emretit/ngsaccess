@@ -1,14 +1,13 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { User } from '../types/user-types';
 
 interface DeleteUserDialogProps {
@@ -22,26 +21,23 @@ export const DeleteUserDialog: React.FC<DeleteUserDialogProps> = ({
   isOpen,
   onClose,
   user,
-  onDelete
+  onDelete,
 }) => {
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Kullanıcı Silme</DialogTitle>
-          <DialogDescription>
-            Bu işlem geri alınamaz. "{user?.email}" kullanıcısını ve tüm proje atamalarını silmek istediğinize emin misiniz?
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            İptal
-          </Button>
-          <Button variant="destructive" onClick={onDelete}>
-            Sil
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <AlertDialog open={isOpen} onOpenChange={onClose}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Kullanıcı Silme</AlertDialogTitle>
+          <AlertDialogDescription>
+            Bu işlem geri alınamaz. "{user?.email}" kullanıcısını ve tüm proje atamalarını
+            silmek istediğinize emin misiniz?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <Button variant="outline" onClick={onClose}>İptal</Button>
+          <Button variant="destructive" onClick={onDelete}>Sil</Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 };

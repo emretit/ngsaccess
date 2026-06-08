@@ -38,6 +38,7 @@ const IDE_OP_LABELS: Record<IdeOpType, string> = {
   upsertPermission: "Yetki yazma",
   deletePermission: "Yetki silme",
   triggerSync: "Tam senkron",
+  parameterWrite: "Cihaz parametresi",
 };
 
 // Hikvision + IDE Smart başarısız op'larını tek banner'da birleştirir (discriminated union

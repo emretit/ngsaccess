@@ -1,5 +1,5 @@
 
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
@@ -81,6 +81,8 @@ export const list = authedQuery({
                 ? {
                     id: device._id,
                     name: device.name,
+                    brand: device.brand,
+                    ideUuid: device.ideUuid,
                     deviceSerial: device.deviceSerial,
                     zoneId: device.zoneId,
                     doorId: device.doorId,
@@ -90,10 +92,19 @@ export const list = authedQuery({
           })
         );
 
+        const groupDoors = await ctx.db
+          .query("groupDoors")
+          .withIndex("by_group", (q) => q.eq("groupId", rule._id))
+          .collect();
+
         return {
           ...rule,
           groupMembers: membersWithEmployees,
           groupDevices: devicesWithDetails,
+          groupDoors: groupDoors.map((gd) => ({
+            doorId: gd.doorId,
+            deviceId: gd.deviceId,
+          })),
         };
       })
     );
@@ -166,7 +177,7 @@ export const update = authedMutation({
       updates.days !== undefined ||
       updates.isActive !== undefined;
     if (planAffected) {
-      await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncWeekPlanToDevices, {
+      await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, {
         accessRuleId: ruleId,
       });
       await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncPermissionToIdePanels, {
@@ -203,13 +214,19 @@ export const remove = authedMutation({
       .collect();
     await Promise.all(devices.map((d) => ctx.db.delete(d._id)));
 
+    const doors = await ctx.db
+      .query("groupDoors")
+      .withIndex("by_group", (q) => q.eq("groupId", args.ruleId))
+      .collect();
+    await Promise.all(doors.map((d) => ctx.db.delete(d._id)));
+
     await ctx.db.delete(args.ruleId);
 
     // Etkilenen üyeleri yeniden sync et — kalan kurallarına göre RightPlan
     // güncellensin, hiç kuralı kalmadıysa cihazdan sökülecek (Phase 5 reconcile).
     await Promise.all(
       affectedEmployeeIds.flatMap((empId) => [
-        ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+        ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
           employeeId: empId,
         }),
         ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
@@ -234,13 +251,14 @@ export const createWithGroups = authedMutation({
     isActive: v.optional(v.boolean()),
     employeeIds: v.optional(v.array(v.id("employees"))),
     deviceIds: v.optional(v.array(v.id("devices"))),
+    doorIds: v.optional(v.array(v.id("doors"))),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
-    const { employeeIds, deviceIds, ...ruleData } = args;
+    const { employeeIds, deviceIds, doorIds, ...ruleData } = args;
     const now = new Date().toISOString();
     const ruleId = await ctx.db.insert("accessRules", {
       ...ruleData,
@@ -275,8 +293,24 @@ export const createWithGroups = authedMutation({
       );
     }
 
+    // Kural bazlı kapı seçimi (IDE permission.io kaynağı). doorId → o kapının paneli.
+    if (doorIds?.length) {
+      await Promise.all(
+        doorIds.map(async (doorId) => {
+          const door = await ctx.db.get(doorId);
+          await ctx.db.insert("groupDoors", {
+            groupId: ruleId,
+            doorId,
+            deviceId: door?.deviceId,
+            projectId: args.projectId,
+            createdAt: now,
+          });
+        })
+      );
+    }
+
     const syncJobs: Promise<unknown>[] = [
-      ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncWeekPlanToDevices, {
+      ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, {
         accessRuleId: ruleId,
       }),
       ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncPermissionToIdePanels, {
@@ -285,7 +319,7 @@ export const createWithGroups = authedMutation({
     ];
     for (const empId of employeeIds ?? []) {
       syncJobs.push(
-        ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+        ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
           employeeId: empId,
         }),
         ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
@@ -313,6 +347,7 @@ export const updateWithGroups = authedMutation({
     isActive: v.optional(v.boolean()),
     employeeIds: v.optional(v.array(v.id("employees"))),
     deviceIds: v.optional(v.array(v.id("devices"))),
+    doorIds: v.optional(v.array(v.id("doors"))),
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
@@ -325,7 +360,7 @@ export const updateWithGroups = authedMutation({
     if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
-    const { ruleId, employeeIds, deviceIds, projectId: _ignoredProjectId, ...updates } = args;
+    const { ruleId, employeeIds, deviceIds, doorIds, projectId: _ignoredProjectId, ...updates } = args;
     const now = new Date().toISOString();
     const clean: Record<string, unknown> = { updatedAt: now };
     for (const [k, v] of Object.entries(updates)) {
@@ -390,6 +425,28 @@ export const updateWithGroups = authedMutation({
       }
     }
 
+    // Kural bazlı kapı seçimi (IDE permission.io kaynağı). Tam değişim: eski sil, yeni yaz.
+    // io güncellemesi aşağıdaki syncPermissionToIdePanels ile panele yansır.
+    if (doorIds !== undefined) {
+      const oldDoors = await ctx.db
+        .query("groupDoors")
+        .withIndex("by_group", (q) => q.eq("groupId", ruleId))
+        .collect();
+      await Promise.all(oldDoors.map((d) => ctx.db.delete(d._id)));
+      await Promise.all(
+        doorIds.map(async (doorId) => {
+          const door = await ctx.db.get(doorId);
+          await ctx.db.insert("groupDoors", {
+            groupId: ruleId,
+            doorId,
+            deviceId: door?.deviceId,
+            projectId: rule.projectId,
+            createdAt: now,
+          });
+        })
+      );
+    }
+
     // Düzenleme-SONRASI: kalan ve çıkarılan üyeler.
     const survivingMemberIds =
       employeeIds !== undefined ? employeeIds : oldEmployeeIds;
@@ -397,7 +454,7 @@ export const updateWithGroups = authedMutation({
       employeeIds !== undefined ? diffIds(oldEmployeeIds, employeeIds).removed : [];
 
     const syncJobs: Promise<unknown>[] = [
-      ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncWeekPlanToDevices, {
+      ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, {
         accessRuleId: ruleId,
       }),
       ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncPermissionToIdePanels, {
@@ -409,7 +466,7 @@ export const updateWithGroups = authedMutation({
     // panellerde permissions[] AZALTILIR (kişi silinmez).
     for (const empId of removedEmployeeIds) {
       syncJobs.push(
-        ctx.scheduler.runAfter(0, api.actions.hikvisionSync.deleteEmployeeFromDevices, {
+        ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
           employeeId: empId,
         }),
         reconcileRemovedEmployeeIde(ctx, {
@@ -426,7 +483,7 @@ export const updateWithGroups = authedMutation({
     if (employeeIds !== undefined || removedIdePanels.length > 0) {
       for (const empId of survivingMemberIds) {
         syncJobs.push(
-          ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+          ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
             employeeId: empId,
           }),
           reconcileRemovedEmployeeIde(ctx, {
@@ -461,7 +518,7 @@ export const addGroupMember = authedMutation({
       ...args,
       createdAt: new Date().toISOString(),
     });
-    await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
       employeeId: args.employeeId,
     });
     await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
@@ -485,7 +542,7 @@ export const removeGroupMember = authedMutation({
     const removedRulePanels = await resolveRuleIdeDeviceIds(ctx, member.groupId, member.projectId);
 
     await ctx.db.delete(args.memberId);
-    await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.deleteEmployeeFromDevices, {
+    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
       employeeId,
     });
 
@@ -517,7 +574,7 @@ export const addGroupDevice = authedMutation({
       createdAt: new Date().toISOString(),
     });
     // Bu gruba bağlı tüm çalışanları yeni cihaza sync et + week-plan'ı cihaza yaz.
-    await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncWeekPlanToDevices, {
+    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, {
       accessRuleId: args.groupId,
     });
     await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncPermissionToIdePanels, {
@@ -572,7 +629,7 @@ export const removeGroupDevice = authedMutation({
       .collect();
     await Promise.all(
       members.flatMap((m) => [
-        ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeToDevices, {
+        ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
           employeeId: m.employeeId,
         }),
         reconcileRemovedEmployeeIde(ctx, {

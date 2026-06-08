@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { deviceDisplayName } from "@/lib/deviceDisplay";
 import { useAccessRules } from "@/hooks/useAccessRules";
 import { toast } from "@/hooks/use-toast";
 import { Loader2, Plus, Users, Monitor, ChevronDown, ChevronUp, Edit, Trash2, Clock, Calendar, UploadCloud, Shield } from "lucide-react";
@@ -207,7 +208,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
         <div className="flex flex-col">
           <span className="text-sm font-medium">{devices.length} cihaz</span>
           <span className="text-xs text-muted-foreground">
-            {devices.slice(0, 2).map((device) => device?.name ?? '').join(', ')}
+            {devices.slice(0, 2).map((device) => device ? deviceDisplayName(device) : '').join(', ')}
             {devices.length > 2 && ` +${devices.length - 2} diğer`}
           </span>
         </div>
@@ -417,7 +418,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                                 <div key={gd._id} className="flex items-center gap-2 p-2 bg-green-50 rounded-lg">
                                   <Monitor className="h-4 w-4 text-green-500" />
                                   <div>
-                                    <span className="text-sm font-medium">{gd.devices?.name}</span>
+                                    <span className="text-sm font-medium">{gd.devices ? deviceDisplayName(gd.devices) : ''}</span>
                                     <p className="text-xs text-muted-foreground">
                                       {gd.devices ? getDeviceLocationDisplay({
                                         zoneId: gd.devices.zoneId,

@@ -20,6 +20,7 @@ interface CreateRuleWithMembersParams {
   };
   employeeIds?: Id<"employees">[];
   deviceIds?: Id<"devices">[];
+  doorIds?: Id<"doors">[];
 }
 
 interface UpdateRuleWithMembersParams {
@@ -38,6 +39,7 @@ interface UpdateRuleWithMembersParams {
   };
   employeeIds?: Id<"employees">[];
   deviceIds?: Id<"devices">[];
+  doorIds?: Id<"doors">[];
 }
 
 type SyncResult = FunctionReturnType<typeof api.actions.hikvisionSync.syncWeekPlanToDevices>;
@@ -135,6 +137,7 @@ export const useComplexAccessRuleMutations = () => {
         ...params.rule,
         employeeIds: params.employeeIds,
         deviceIds: params.deviceIds,
+        doorIds: params.doorIds,
       });
       toast({ title: "Başarılı", description: "Erişim kuralı ve üyeleri oluşturuldu." });
       startBackgroundSync(result);
@@ -150,6 +153,7 @@ export const useComplexAccessRuleMutations = () => {
         ...params.updates,
         employeeIds: params.employeeIds,
         deviceIds: params.deviceIds,
+        doorIds: params.doorIds,
       });
       toast({ title: "Başarılı", description: "Erişim kuralı güncellendi." });
       startBackgroundSync(params.id);

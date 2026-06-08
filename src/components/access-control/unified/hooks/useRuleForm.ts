@@ -13,6 +13,9 @@ interface RuleFormData {
   target_type: 'all' | 'department' | 'position' | 'individual';
   selected_employees: string[];
   selected_devices: string[];
+  // IDE Smart permission.io kaynağı: kuralın etki ettiği kapılar (groupDoors).
+  // Boşsa o cihazın tüm kapıları varsayılır (backend getRuleIoIdsForPanel fallback).
+  selected_doors: string[];
   start_time: string;
   end_time: string;
   days: string[];
@@ -31,6 +34,7 @@ export const useRuleForm = (editingRule: AccessRule | null | undefined, open: bo
     target_type: 'individual',
     selected_employees: [],
     selected_devices: [],
+    selected_doors: [],
     start_time: '',
     end_time: '',
     days: DEFAULT_WORKDAYS,
@@ -47,6 +51,8 @@ export const useRuleForm = (editingRule: AccessRule | null | undefined, open: bo
           ?.map((gm: GroupMember) => String(gm.employeeId || '')).filter(Boolean) ?? [];
         const deviceIds = editingRule.groupDevices
           ?.map((gd: GroupDevice) => String(gd.deviceId || '')).filter(Boolean) ?? [];
+        const doorIds = editingRule.groupDoors
+          ?.map((gd) => String(gd.doorId || '')).filter(Boolean) ?? [];
 
         setFormData({
           name: editingRule.name || '',
@@ -54,6 +60,7 @@ export const useRuleForm = (editingRule: AccessRule | null | undefined, open: bo
           target_type: (editingRule.targetType as RuleFormData['target_type'] | undefined) ?? 'individual',
           selected_employees: employeeIds,
           selected_devices: deviceIds,
+          selected_doors: doorIds,
           start_time: editingRule.startTime || '',
           end_time: editingRule.endTime || '',
           days: editingRule.days || DEFAULT_WORKDAYS,
@@ -67,6 +74,7 @@ export const useRuleForm = (editingRule: AccessRule | null | undefined, open: bo
           target_type: 'individual',
           selected_employees: [],
           selected_devices: [],
+          selected_doors: [],
           start_time: '',
           end_time: '',
           days: DEFAULT_WORKDAYS,
@@ -128,6 +136,7 @@ export const useRuleForm = (editingRule: AccessRule | null | undefined, open: bo
       // IDs are Convex string IDs, pass as-is (not parseInt)
       const employeeIds = formData.selected_employees as Id<"employees">[];
       const deviceIds = formData.selected_devices as Id<"devices">[];
+      const doorIds = formData.selected_doors as Id<"doors">[];
 
       if (editingRule) {
         const ruleId = editingRule._id as Id<"accessRules">;
@@ -136,12 +145,14 @@ export const useRuleForm = (editingRule: AccessRule | null | undefined, open: bo
           updates: ruleData,
           employeeIds,
           deviceIds,
+          doorIds,
         });
       } else {
         await createAccessRuleWithMembers.mutateAsync({
           rule: ruleData,
           employeeIds,
           deviceIds,
+          doorIds,
         });
       }
 

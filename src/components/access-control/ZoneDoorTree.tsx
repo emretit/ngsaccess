@@ -5,6 +5,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 
 import { ChevronRight, Building2, Cpu, HardDrive, Plus, Trash2, DoorClosed, DoorOpen, Loader2, ScanLine, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { deviceDisplayName } from "@/lib/deviceDisplay";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AddDoorDialog } from "./AddDoorDialog";
@@ -19,8 +20,8 @@ interface ZoneDoorTreeProps {
 
 // Tree veri tipleri (Convex query çıktısının kullandığımız alt kümesi).
 type ZoneNode = { _id: Id<"zones">; name: string };
-type DeviceNode = { _id: Id<"devices">; name: string; zoneId?: Id<"zones">; brand?: string };
-type DoorNode = { _id: Id<"doors">; name: string; zoneId?: Id<"zones">; deviceId?: Id<"devices">; ioId?: number };
+type DeviceNode = { _id: Id<"devices">; name: string; zoneId?: Id<"zones">; brand?: string; ideUuid?: string };
+type DoorNode = { _id: Id<"doors">; name: string; zoneId?: Id<"zones">; deviceId?: Id<"devices">; ioId?: number; requireSensor?: boolean };
 
 export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDoorTreeProps) => {
   const zonesData = useQuery(api.zones.list, {});
@@ -50,6 +51,8 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
     doorId: Id<"doors">;
     readerName: string;
     readerDirection: "entry" | "exit" | "both";
+    requireSensor?: boolean;
+    isIdeDoor: boolean;
   } | null>(null);
 
   const handleOpenIdeDoor = async (deviceId: Id<"devices">, doorId: Id<"doors">) => {
@@ -152,12 +155,14 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
           size="icon"
           className="h-5 w-5 opacity-0 transition-opacity group-hover/reader:opacity-100"
           title="Okuyucuyu Düzenle"
-          onClick={(e) => {
-            e.stopPropagation();
+          aria-label="Okuyucuyu Düzenle"
+          onClick={() => {
             setEditReader({
               doorId: door._id,
               readerName: reader.readerName,
               readerDirection: reader.readerDirection,
+              requireSensor: door.requireSensor,
+              isIdeDoor: door.ioId != null,
             });
           }}
         >
@@ -168,23 +173,29 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
   };
 
   // Tek bir kapı satırı (panel altında veya bölge altında manuel).
+  // Outer div = layout + hover/selected styling. Inner <button> = klavye/fare seçim hedefi.
+  // Action butonlar sibling — iç içe interactive element ARIA ihlali yok.
   const renderDoor = (door: DoorNode, panelDeviceId: Id<"devices"> | null) => (
     <li key={door._id}>
       <div
         className={cn(
-          "group flex items-center gap-1 rounded-md p-2 transition-all ml-6",
+          "group flex items-center rounded-md transition-all ml-6",
           "hover:bg-accent hover:text-accent-foreground",
           selectedDoor === door._id && "bg-accent/80 text-accent-foreground font-medium"
         )}
-        onClick={() => {
-          const next = door._id === selectedDoor ? null : door._id;
-          setSelectedDoor(next);
-          onSelectDoor?.(next);
-        }}
       >
-        <DoorClosed className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="flex-1 truncate text-sm">{door.name}</span>
-        <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
+        <button
+          className="flex flex-1 items-center gap-1 p-2 text-left bg-transparent border-0 cursor-pointer text-current min-w-0"
+          onClick={() => {
+            const next = door._id === selectedDoor ? null : door._id;
+            setSelectedDoor(next);
+            onSelectDoor?.(next);
+          }}
+        >
+          <DoorClosed className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="flex-1 truncate text-sm">{door.name}</span>
+        </button>
+        <div className="flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pr-1">
           {panelDeviceId ? (
             <Button
               variant="ghost"
@@ -192,10 +203,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
               className="h-6 w-6 hover:bg-emerald-100"
               title="Kapıyı Aç"
               disabled={openingDoorId === door._id}
-              onClick={(e) => {
-                e.stopPropagation();
-                void handleOpenIdeDoor(panelDeviceId, door._id);
-              }}
+              onClick={() => void handleOpenIdeDoor(panelDeviceId, door._id)}
             >
               {openingDoorId === door._id ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -204,7 +212,13 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
               )}
             </Button>
           ) : (
-            <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-accent/80" onClick={(e) => { e.stopPropagation(); handleDeleteDoor(door._id); }}>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Kapıyı sil"
+              className="h-6 w-6 hover:bg-accent/80"
+              onClick={() => handleDeleteDoor(door._id)}
+            >
               <Trash2 className="h-3 w-3" />
             </Button>
           )}
@@ -235,46 +249,65 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
         {zones.map((zone) => {
           const isExpanded = expandedZones.includes(zone._id);
           const zoneDevices = devices.filter((d) => String(d.zoneId) === String(zone._id));
-          // Cihaza bağlı olmayan manuel kapılar (door.deviceId yok) doğrudan bölge altında.
           const manualDoors = doors.filter(
             (door) => String(door.zoneId) === String(zone._id) && !door.deviceId
           );
 
           return (
             <li key={zone._id} role="treeitem" aria-expanded={isExpanded}>
+              {/* Outer div = layout + hover/selected styling. Bölge adı <button> = seçim hedefi. */}
               <div
                 className={cn(
-                  "group flex items-center gap-1 rounded-md p-2 transition-all",
+                  "group flex items-center rounded-md transition-all",
                   "hover:bg-accent hover:text-accent-foreground",
                   selectedZone === zone._id && "bg-accent/80 text-accent-foreground font-medium"
                 )}
-                onClick={() => {
-                  const next = zone._id === selectedZone ? null : zone._id;
-                  setSelectedZone(next);
-                  setSelectedDoor(null);
-                  onSelectZone?.(next);
-                }}
               >
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-5 w-5 p-0 hover:bg-transparent"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleZone(zone._id);
-                  }}
+                  className="h-8 w-7 shrink-0 hover:bg-transparent ml-1"
+                  onClick={() => toggleZone(zone._id)}
                 >
                   <ChevronRight className={cn("h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200", isExpanded && "rotate-90")} />
                 </Button>
 
-                <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <span className="flex-1 truncate text-sm">{zone.name}</span>
+                <button
+                  className="flex flex-1 items-center gap-1 py-2 pr-1 text-left bg-transparent border-0 cursor-pointer text-current min-w-0"
+                  onClick={() => {
+                    const next = zone._id === selectedZone ? null : zone._id;
+                    setSelectedZone(next);
+                    setSelectedDoor(null);
+                    onSelectZone?.(next);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowRight") { e.preventDefault(); if (!isExpanded) toggleZone(zone._id); }
+                    if (e.key === "ArrowLeft")  { e.preventDefault(); if (isExpanded)  toggleZone(zone._id); }
+                  }}
+                >
+                  <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="flex-1 truncate text-sm">{zone.name}</span>
+                </button>
 
-                <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
-                  <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-accent/80" title="Kapı ekle" onClick={(e) => { e.stopPropagation(); handleAddDoor(zone._id, zone.name); }}>
+                <div className="flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pr-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 hover:bg-accent/80"
+                    title="Kapı ekle"
+                    aria-label="Kapı ekle"
+                    onClick={() => handleAddDoor(zone._id, zone.name)}
+                  >
                     <Plus className="h-3 w-3" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-accent/80" title="Bölgeyi sil" onClick={(e) => { e.stopPropagation(); handleDeleteZone(zone._id); }}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 hover:bg-accent/80"
+                    title="Bölgeyi sil"
+                    aria-label="Bölgeyi sil"
+                    onClick={() => handleDeleteZone(zone._id)}
+                  >
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>
@@ -285,7 +318,6 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
                   <li className="text-xs text-muted-foreground pl-8 py-2">Cihaz/kapı yok</li>
                 ) : (
                   <>
-                    {/* Cihazlar (panel) → altında kapıları */}
                     {zoneDevices.map((device) => {
                       const isPanel = device.brand === "ide_smart";
                       const deviceDoors = doors.filter((door) => String(door.deviceId) === String(device._id));
@@ -302,7 +334,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
                               variant="ghost"
                               size="icon"
                               className="h-5 w-5 p-0 hover:bg-transparent"
-                              onClick={(e) => { e.stopPropagation(); toggleDevice(device._id); }}
+                              onClick={() => toggleDevice(device._id)}
                             >
                               <ChevronRight className={cn("h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200", devExpanded && "rotate-90")} />
                             </Button>
@@ -311,7 +343,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
                             ) : (
                               <HardDrive className="h-4 w-4 shrink-0 text-muted-foreground" />
                             )}
-                            <span className="flex-1 truncate text-sm">{device.name}</span>
+                            <span className="flex-1 truncate text-sm">{deviceDisplayName(device)}</span>
                             <Badge variant="secondary" className="h-4 px-1 text-[10px] font-normal">
                               {deviceDoors.length} kapı
                             </Badge>
@@ -327,7 +359,6 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
                       );
                     })}
 
-                    {/* Manuel kapılar (cihaza bağlı değil) */}
                     {manualDoors.map((door) => renderDoor(door, null))}
                   </>
                 )}
@@ -354,6 +385,8 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
           doorId={editReader.doorId}
           readerName={editReader.readerName}
           readerDirection={editReader.readerDirection}
+          requireSensor={editReader.requireSensor}
+          isIdeDoor={editReader.isIdeDoor}
         />
       )}
     </>

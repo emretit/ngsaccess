@@ -1,11 +1,39 @@
 
 import { v } from "convex/values";
 import { internalQuery } from "./_generated/server";
-import type { Doc } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
+import type { Doc, Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 
 type ReaderDirection = "entry" | "exit" | "both";
+
+/**
+ * Kapı IDE Smart panele bağlıysa (deviceId → brand ide_smart, ioId var) sensör onayı
+ * ayarını panele yaz: ACTUATOR{ioId}.REQUIRE_SENSOR_ACTIVATION = requireSensor ? 1 : 0.
+ * Sensörsüz kapıda 1 kalırsa actuator "busy"de takılır (docs §9.1 Step 1).
+ */
+async function scheduleSensorSync(
+  ctx: MutationCtx,
+  deviceId: Id<"devices"> | undefined,
+  ioId: number | undefined,
+  requireSensor: boolean,
+): Promise<void> {
+  if (!deviceId || typeof ioId !== "number") return;
+  const device = await ctx.db.get(deviceId);
+  if (!device || device.brand !== "ide_smart") return;
+  const parameterName = `ACTUATOR${ioId}.REQUIRE_SENSOR_ACTIVATION`;
+  await ctx.scheduler.runAfter(0, internal.ideSync.enqueueIdeOp, {
+    deviceId,
+    projectId: device.projectId,
+    opType: "parameterWrite",
+    payload: {
+      parameterName,
+      parameterRecord: { [parameterName]: requireSensor ? 1 : 0 },
+    },
+  });
+}
 
 // IDE Smart aktüatör index'ine göre okuyucu yön etiketini türetir.
 // cardReadings.resolveDirection ile aynı eşleme: io 0=entry, 1=exit, diğer=both.
@@ -60,10 +88,12 @@ export const create = authedMutation({
     name: v.string(),
     projectId: v.optional(v.id("projects")),
     zoneId: v.optional(v.id("zones")),
+    deviceId: v.optional(v.id("devices")),
     location: v.optional(v.string()),
     doorCode: v.optional(v.string()),
     status: v.optional(v.string()),
     ioId: v.optional(v.number()),
+    requireSensor: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -82,12 +112,16 @@ export const create = authedMutation({
       }
     }
     const now = new Date().toISOString();
-    return await ctx.db.insert("doors", {
+    const doorId = await ctx.db.insert("doors", {
       ...args,
       status: args.status ?? "active",
       createdAt: now,
       updatedAt: now,
     });
+    if (args.requireSensor !== undefined) {
+      await scheduleSensorSync(ctx, args.deviceId, args.ioId, args.requireSensor);
+    }
+    return doorId;
   },
 });
 
@@ -96,10 +130,12 @@ export const update = authedMutation({
     doorId: v.id("doors"),
     name: v.optional(v.string()),
     zoneId: v.optional(v.id("zones")),
+    deviceId: v.optional(v.id("devices")),
     location: v.optional(v.string()),
     doorCode: v.optional(v.string()),
     status: v.optional(v.string()),
     ioId: v.optional(v.number()),
+    requireSensor: v.optional(v.boolean()),
     readerName: v.optional(v.string()),
     readerDirection: v.optional(
       v.union(v.literal("entry"), v.literal("exit"), v.literal("both"))
@@ -126,6 +162,15 @@ export const update = authedMutation({
     }
     const { doorId, ...updates } = args;
     await ctx.db.patch(doorId, { ...updates, updatedAt: new Date().toISOString() });
+    // Sensör ayarı değiştiyse panele yaz (ioId güncellenmiş olabilir → yeni değer öncelikli).
+    if (args.requireSensor !== undefined) {
+      await scheduleSensorSync(
+        ctx,
+        door.deviceId,
+        args.ioId ?? door.ioId,
+        args.requireSensor,
+      );
+    }
   },
 });
 

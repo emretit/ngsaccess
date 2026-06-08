@@ -1,6 +1,6 @@
 "use node";
 
-import { api, internal } from "../_generated/api";
+import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import { internalAction } from "../_generated/server";
 import { authedAction } from "../lib/customFunctions";
@@ -121,12 +121,12 @@ export const backfillDeviceFromGroups = internalAction({
     // bind edileceği planTemplateNo cihazda mevcut olmalı yoksa "no permission".
     await Promise.all(
       ruleIds.map((id) =>
-        ctx.runAction(api.actions.hikvisionSync.syncWeekPlanToDevices, { accessRuleId: id }),
+        ctx.runAction(internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, { accessRuleId: id }),
       ),
     );
     await Promise.all(
       empIds.map((id) =>
-        ctx.runAction(api.actions.hikvisionSync.syncEmployeeToDevices, { employeeId: id }),
+        ctx.runAction(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId: id }),
       ),
     );
 
