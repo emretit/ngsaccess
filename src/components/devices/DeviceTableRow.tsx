@@ -101,6 +101,7 @@ export function DeviceTableRow({
           {projectName ? <Badge variant="secondary">{projectName}</Badge> : <span className="text-muted-foreground">—</span>}
         </TableCell>
       )}
+      <TableCell className="font-medium">{device.name || "—"}</TableCell>
       <TableCell>
         {device.brand === "ide_smart"
           ? device.ideUuid || "-"

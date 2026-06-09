@@ -74,8 +74,8 @@ export function DeviceList({
     return door?.name;
   }
 
-  // Sabit kolonlar: seçim + # + Seri No + Cihaz Modeli + Durum + İşlemler = 6.
-  const colCount = 6 + (showProject ? 1 : 0) + (hideLocation ? 0 : 3);
+  // Sabit kolonlar: seçim + # + Cihaz Adı + Seri No + Cihaz Modeli + Durum + İşlemler = 7.
+  const colCount = 7 + (showProject ? 1 : 0) + (hideLocation ? 0 : 3);
 
   return (
     <div className="space-y-4">
@@ -98,6 +98,7 @@ export function DeviceList({
               </TableHead>
               <TableHead className="bg-muted/50 font-semibold">#</TableHead>
               {showProject && <TableHead className="bg-muted/50 font-semibold">Proje</TableHead>}
+              <TableHead className="bg-muted/50 font-semibold">Cihaz Adı</TableHead>
               <TableHead className="bg-muted/50 font-semibold">Seri No / UUID</TableHead>
               <TableHead className="bg-muted/50 font-semibold">Cihaz Modeli</TableHead>
               {!hideLocation && (

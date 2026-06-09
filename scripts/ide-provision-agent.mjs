@@ -21,7 +21,7 @@
  *   # veya: node --env-file=.env.local scripts/ide-provision-agent.mjs
  */
 import { createServer } from "node:http";
-import { provisionPanel, readPanelMqttStatus } from "./lib/ide-provision.mjs";
+import { provisionPanel, readPanelMqttStatus, scanSubnet } from "./lib/ide-provision.mjs";
 
 const PORT = Number(process.env.IDE_AGENT_PORT || 8765);
 const HOST = "127.0.0.1";
@@ -37,6 +37,25 @@ const ENV = {
 };
 
 const log = (...a) => console.log(`[ide-agent ${new Date().toISOString()}]`, ...a);
+
+/** Eş zamanlı /scan isteklerini engeller. */
+let scanInProgress = false;
+
+/**
+ * Subnet'in RFC 1918 private bloklarından biri olduğunu doğrular.
+ * "192.168.1", "10.0.0", "172.20.0" gibi 3 oktetli formları kabul eder.
+ * Metadata endpoint (169.254.x), loopback (127.x) ve harici IP'leri reddeder.
+ */
+function isValidPrivateSubnet(subnet) {
+  const m = subnet.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!m) return false;
+  const [, a, b] = m.map(Number);
+  if ([a, b].some((n) => n < 0 || n > 255)) return false;
+  if (a === 10) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  return false;
+}
 
 /** CORS + Private Network Access başlıkları (HTTPS admin → http://localhost için). */
 function setCors(res) {
@@ -121,6 +140,34 @@ const server = createServer(async (req, res) => {
         l3Pass: ENV.l3Pass,
       });
       sendJson(res, 200, result);
+      return;
+    }
+
+    // GET /scan?subnet=192.168.1&port=80 — ağdaki IDE Smart panelleri bul
+    if (req.method === "GET" && path === "/scan") {
+      const rawSubnet = url.searchParams.get("subnet") || "192.168.1";
+      // Subnet: sadece rfc1918 private bloklarına izin ver (SSRF önlemi).
+      if (!isValidPrivateSubnet(rawSubnet)) {
+        return sendJson(res, 400, { ok: false, error: "Geçersiz subnet. Yalnızca 10.x.x, 172.16-31.x, 192.168.x kabul edilir." });
+      }
+      const rawPort = url.searchParams.get("port");
+      const port = rawPort ? Number(rawPort) : (ENV.idePort || 80);
+      if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        return sendJson(res, 400, { ok: false, error: "Geçersiz port (1-65535)." });
+      }
+      // Eş zamanlı tarama engellemesi.
+      if (scanInProgress) {
+        return sendJson(res, 429, { ok: false, error: "Tarama zaten devam ediyor, lütfen bekleyin." });
+      }
+      scanInProgress = true;
+      log(`scan -> subnet ${rawSubnet}.x:${port}`);
+      try {
+        const panels = await scanSubnet(rawSubnet, port);
+        log(`scan done -> ${panels.length} panel bulundu: ${panels.join(", ") || "—"}`);
+        sendJson(res, 200, { ok: true, subnet: rawSubnet, panels });
+      } finally {
+        scanInProgress = false;
+      }
       return;
     }
 

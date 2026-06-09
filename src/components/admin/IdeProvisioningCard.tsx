@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Info, CheckCircle2, XCircle, RefreshCw, Radio } from "lucide-react";
+import { Loader2, Info, CheckCircle2, XCircle, RefreshCw, Radio, Search, ChevronDown } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 /**
@@ -54,7 +54,13 @@ const READBACK_KEYS = [
 export function IdeProvisioningCard() {
   const [health, setHealth] = useState<AgentHealth | null>(null);
   const [healthChecking, setHealthChecking] = useState(true);
-  const [ip, setIp] = useState("192.168.1.4");
+
+  const [subnet, setSubnet] = useState("192.168.1");
+  const [scanning, setScanning] = useState(false);
+  const [foundPanels, setFoundPanels] = useState<string[] | null>(null);
+
+  const [ip, setIp] = useState("");
+  const [showManualIp, setShowManualIp] = useState(false);
   const [l3Pass, setL3Pass] = useState("");
   const [provisioning, setProvisioning] = useState(false);
   const [result, setResult] = useState<ProvisionResult | null>(null);
@@ -85,6 +91,37 @@ export function IdeProvisioningCard() {
   useEffect(() => {
     void checkHealth();
   }, [checkHealth]);
+
+  const handleScan = async () => {
+    const s = subnet.trim();
+    if (!s) {
+      toast({ title: "Hata", description: "Subnet gerekli (örn. 192.168.1)", variant: "destructive" });
+      return;
+    }
+    setScanning(true);
+    setFoundPanels(null);
+    setResult(null);
+    setIp("");
+    setShowManualIp(false);
+    try {
+      const res = await fetch(`${AGENT_BASE}/scan?subnet=${encodeURIComponent(s)}`);
+      const json: unknown = await res.json();
+      if (!res.ok || !isRecord(json)) throw new Error(`HTTP ${res.status}`);
+      const panels = Array.isArray(json.panels) ? (json.panels as string[]) : [];
+      setFoundPanels(panels);
+      if (panels.length === 0) {
+        toast({ title: "Panel bulunamadı", description: `${s}.x ağında IDE Smart panel yok`, variant: "destructive" });
+      } else {
+        setIp(panels[0]);
+        toast({ title: `${panels.length} panel bulundu`, description: panels.join(", ") });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Tarama başarısız";
+      toast({ title: "Hata", description: message, variant: "destructive" });
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const handleProvision = async () => {
     if (!ip.trim()) {
@@ -144,7 +181,7 @@ export function IdeProvisioningCard() {
   };
 
   return (
-    <Card className="max-w-lg">
+    <Card className="max-w-xl">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Radio className="h-4 w-4" />
@@ -203,10 +240,70 @@ export function IdeProvisioningCard() {
           </span>
         </div>
 
+        {/* Ağ tarama */}
         <div className="space-y-2">
-          <Label>Panel IP</Label>
-          <Input value={ip} onChange={(e) => setIp(e.target.value)} placeholder="192.168.1.4" />
+          <Label>Subnet (ağ tarama)</Label>
+          <div className="flex gap-2">
+            <Input
+              value={subnet}
+              onChange={(e) => setSubnet(e.target.value)}
+              placeholder="192.168.1"
+              className="font-mono"
+            />
+            <Button
+              variant="outline"
+              onClick={() => void handleScan()}
+              disabled={scanning || !health?.ok}
+              className="shrink-0"
+            >
+              {scanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+              <span className="ml-2">{scanning ? "Taranıyor…" : "Tara"}</span>
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {subnet}.1 – {subnet}.254 aralığı taranır (~15-20sn)
+          </p>
         </div>
+
+        {/* Bulunan paneller listesi */}
+        {foundPanels !== null && foundPanels.length > 0 && (
+          <div className="space-y-1">
+            <Label>Bulunan Paneller</Label>
+            <div className="rounded-md border divide-y">
+              {foundPanels.map((panelIp) => (
+                <button
+                  key={panelIp}
+                  type="button"
+                  onClick={() => setIp(panelIp)}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-sm text-left hover:bg-muted/50 transition-colors ${
+                    ip === panelIp ? "bg-primary/10 font-medium text-primary" : ""
+                  }`}
+                >
+                  <span className="font-mono">{panelIp}</span>
+                  {ip === panelIp && <CheckCircle2 className="h-4 w-4 text-primary" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Manuel IP — tarama sonucu yoksa veya toggle açıksa */}
+        {(foundPanels === null || foundPanels.length === 0 || showManualIp) ? (
+          <div className="space-y-2">
+            <Label>Panel IP {foundPanels !== null && foundPanels.length === 0 && <span className="text-muted-foreground">(taramada bulunamadı)</span>}</Label>
+            <Input value={ip} onChange={(e) => setIp(e.target.value)} placeholder="192.168.1.4" className="font-mono" />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowManualIp(true)}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <ChevronDown className="h-3 w-3" />
+            Manuel IP gir
+          </button>
+        )}
+
         <div className="space-y-2">
           <Label>L3 şifre (opsiyonel)</Label>
           <Input
@@ -224,7 +321,7 @@ export function IdeProvisioningCard() {
               Durumu kontrol et
             </Button>
           )}
-          <Button onClick={() => void handleProvision()} disabled={provisioning || !health?.ok}>
+          <Button onClick={() => void handleProvision()} disabled={provisioning || !health?.ok || !ip.trim()}>
             {provisioning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Broker'a Al
           </Button>

@@ -54,6 +54,8 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
   const [targetProjectId, setTargetProjectId] = useState<Id<"projects"> | null>(null);
   const [name, setName] = useState("");
   const [doorCount, setDoorCount] = useState(4);
+  const [ideUser, setIdeUser] = useState("");
+  const [idePassword, setIdePassword] = useState("");
   const [zoneChoice, setZoneChoice] = useState<string>(NEW_ZONE);
   const [newZoneName, setNewZoneName] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -64,6 +66,8 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
       setTargetProjectId(activeProjectId ?? null);
       setName("");
       setDoorCount(4);
+      setIdeUser("");
+      setIdePassword("");
       setZoneChoice(NEW_ZONE);
       setNewZoneName("");
       setSubmitting(false);
@@ -75,14 +79,18 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
     [claimable, selectedId],
   );
 
-  // Cihaz seçilince varsayılanları doldur (isim, kapı sayısı, yeni bölge adı).
+  // Cihaz seçilince varsayılanları doldur (isim, kapı sayısı, kimlik bilgisi, yeni bölge adı).
   const onSelectDevice = (id: Id<"adminDevices">) => {
     const dev = (claimable ?? []).find((d) => d._id === id);
     setSelectedId(id);
     setName(dev?.name ?? "");
     setDoorCount(dev?.ideDoorCount ?? 4);
+    setIdeUser(dev?.ideUser ?? "");
+    setIdePassword(dev?.idePassword ?? "");
     setNewZoneName(dev?.name ?? "");
   };
+
+  const isIde = selected?.brand === "ide_smart";
 
   // eslint-disable-next-line react-hooks/purity
   const nowMs = Date.now();
@@ -94,6 +102,8 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
   const canSubmit =
     !!selectedId &&
     !!targetProjectId &&
+    // IDE Smart paneller MQTT login için kullanıcı+şifre ister; boşsa sync sonsuza pending kalır.
+    (!isIde || (ideUser.trim().length > 0 && idePassword.trim().length > 0)) &&
     (zoneChoice === NEW_ZONE ? newZoneName.trim().length > 0 : true);
 
   const handleSubmit = async () => {
@@ -105,6 +115,9 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
         projectId: targetProjectId,
         name: name.trim() || undefined,
         ideDoorCount: doorCount,
+        ...(isIde
+          ? { ideUser: ideUser.trim(), idePassword: idePassword.trim() }
+          : {}),
         ...(zoneChoice === NEW_ZONE
           ? { newZoneName: newZoneName.trim() }
           : { zoneId: zoneChoice as Id<"zones"> }),
@@ -212,6 +225,34 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
                   <Label>Panel adı</Label>
                   <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Panel adı" />
                 </div>
+
+                {isIde && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>Panel kullanıcı adı</Label>
+                      <Input
+                        value={ideUser}
+                        onChange={(e) => setIdeUser(e.target.value)}
+                        placeholder="admin"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Panel şifresi</Label>
+                      <Input
+                        type="password"
+                        value={idePassword}
+                        onChange={(e) => setIdePassword(e.target.value)}
+                        placeholder="Panel şifresi"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <p className="col-span-2 text-xs text-muted-foreground">
+                      Panelin MQTT giriş bilgisi. Boş bırakılırsa cihaza komut gönderilemez ve
+                      senkronizasyon takılı kalır.
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label>Bölge</Label>

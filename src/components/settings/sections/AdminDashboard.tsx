@@ -4,7 +4,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Building2, Users, Shield } from 'lucide-react';
 import AdminProjectsPanel from '@/components/admin/AdminProjectsPanel';
 import { AdminDevicesPanel } from '@/components/admin/AdminDevicesPanel';
-import { IdeDefaultsSettings } from '@/components/admin/IdeDefaultsSettings';
 import { IdeProvisioningCard } from '@/components/admin/IdeProvisioningCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -45,18 +44,14 @@ export function AdminDashboard() {
         <TabsList>
           <TabsTrigger value="projects">Proje & Kullanıcı</TabsTrigger>
           <TabsTrigger value="devices">Cihaz Yönetimi</TabsTrigger>
-          <TabsTrigger value="mqtt">MQTT Varsayılanları</TabsTrigger>
         </TabsList>
         <TabsContent value="projects" className="mt-4">
           <AdminProjectsPanel />
         </TabsContent>
         <TabsContent value="devices" className="mt-4">
-          <AdminDevicesPanel />
-        </TabsContent>
-        <TabsContent value="mqtt" className="mt-4">
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="space-y-6">
             <IdeProvisioningCard />
-            <IdeDefaultsSettings />
+            <AdminDevicesPanel />
           </div>
         </TabsContent>
       </Tabs>

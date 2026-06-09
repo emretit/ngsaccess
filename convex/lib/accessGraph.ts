@@ -2,6 +2,7 @@ import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
 import { orphanPanels } from "./reconcileMath";
+import { normalizeIdeCard } from "../ideSync";
 
 /**
  * Erişim grafı çözümleme yardımcıları (groupMembers → kural → groupDevices → cihaz).
@@ -87,6 +88,67 @@ export async function reconcileRemovedEmployeeIde(
     internal.actions.ideGatewayDevice.syncEmployeeToIdePanels,
     { employeeId: args.employeeId },
   );
+}
+
+/**
+ * Bir IDE panelinin roster'ını kuralla EŞİTLER: panelde olup (idePanelUsers) artık hiçbir aktif
+ * kuralla yetkisi olmayan kartları söker (deleteUser). "Güncelle"de çağrılır → re-claim veya
+ * eski düzenlemelerden kalan hayalet kartları temizler.
+ *
+ * ÖLÇEKLENİR: yalnız (panelde-olan − yetkili) farkı için deleteUser üretir; 1000 kullanıcıda
+ * tüm roster taranmaz, sadece gerçek fazlalıklar silinir. idePanelUsers ideUuid bazlı olduğundan
+ * panelin device _id'si değişmiş olsa bile (re-claim) doğru roster bulunur.
+ *
+ * NOT: çağıran mutation üyelik/cihaz satırlarını GÜNCELLEDİKTEN sonra çağırmalı ki "yetkili"
+ * kümesi düzenleme-sonrası durumu yansıtsın.
+ */
+export async function reconcilePanelRosterIde(
+  ctx: MutationCtx,
+  args: { deviceId: Id<"devices">; projectId: Id<"projects"> | undefined },
+): Promise<void> {
+  const panel = await ctx.db.get(args.deviceId);
+  if (!panel || panel.brand !== "ide_smart" || !panel.ideUuid) return;
+  const ideUuid = panel.ideUuid;
+
+  // Yetkili kartlar: bu paneli hedefleyen TÜM aktif kuralların üyeleri (union).
+  const authorized = new Set<string>();
+  const links = await ctx.db
+    .query("groupDevices")
+    .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
+    .collect();
+  for (const link of links) {
+    const rule = await ctx.db.get(link.groupId);
+    if (!rule || rule.isActive === false) continue;
+    const members = await ctx.db
+      .query("groupMembers")
+      .withIndex("by_project_group", (q) =>
+        q.eq("projectId", rule.projectId).eq("groupId", link.groupId),
+      )
+      .collect();
+    for (const m of members) {
+      const emp = await ctx.db.get(m.employeeId);
+      const card = normalizeIdeCard(emp?.cardNumber);
+      if (card) authorized.add(card);
+    }
+  }
+
+  // Panelde olan (roster yansıması) − yetkili = sökülecek hayaletler.
+  const onPanel = await ctx.db
+    .query("idePanelUsers")
+    .withIndex("by_uuid", (q) => q.eq("ideUuid", ideUuid))
+    .collect();
+  for (const row of onPanel) {
+    if (authorized.has(row.cardNumber)) continue;
+    await ctx.scheduler.runAfter(
+      0,
+      internal.actions.ideGatewayDevice.deleteIdeUserFromPanels,
+      {
+        cardNumber: row.cardNumber,
+        deviceIds: [args.deviceId],
+        projectId: args.projectId,
+      },
+    );
+  }
 }
 
 async function collectRuleIdeDevices(

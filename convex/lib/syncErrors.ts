@@ -9,7 +9,9 @@
 
 /**
  * "Sorun" sayılmayan durumlar: kayıt panelde zaten var ("already exists") → cihaz güncel,
- * problem listesine/sayısına dahil edilmez.
+ * problem listesine/sayısına dahil edilmez. (Hem IDE hem Hik failed op'ları için kullanılır,
+ * o yüzden DAR tutulur — delete'in "not found" idempotansı opType'a özgüdür ve çağıran tarafta
+ * ele alınır, bkz. ideSync.markAck.)
  */
 export function isBenignSyncError(raw: string | null | undefined): boolean {
   if (!raw) return false;

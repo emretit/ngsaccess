@@ -1,8 +1,19 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
+
+/**
+ * Delete op'unun "kayıt zaten yok" yanıtı (idempotent). Yalnız markAck'in delete dalında
+ * kullanılır — global isBenignSyncError'a EKLENMEZ, çünkü o Hik failed sayımını da etkiler ve
+ * "not found"u tüm op tipleri için gizlerdi.
+ */
+function isAlreadyGoneError(raw: string | null | undefined): boolean {
+  if (!raw) return false;
+  return /not found|does ?n'?t exist|no such|not exist/i.test(raw);
+}
 
 /**
  * IDE Smart bulut→panel komut kuyruğu (idePendingOperations) yaşam döngüsü.
@@ -105,6 +116,57 @@ const DEFAULT_ACK_TIMEOUT_MS = 90_000;
 /** Retry backoff: attempt sayısına göre artan gecikme (ms). */
 function backoffMs(attempts: number): number {
   return Math.min(60_000, 2_000 * 2 ** Math.max(0, attempts - 1));
+}
+
+// ── idePanelUsers (panel roster yansıması) yardımcıları ──────────────
+
+/**
+ * Kart no'yu panel kimliğine normalize eder: panel user.id sayısaldır, employees.cardNumber
+ * ise "0008219041" gibi baştan sıfırlı olabilir. String(Number(x)) ile iki taraf eşitlenir
+ * ("0008219041" → "8219041"). Geçersiz/≤0 ise null (panele yazılmaz).
+ */
+export function normalizeIdeCard(raw: unknown): string | null {
+  const n = Number(raw);
+  if (!Number.isSafeInteger(n) || n < 1) return null;
+  return String(n);
+}
+
+/** Panel roster'a kart ekle/güncelle (ideUuid+card tekil). */
+async function upsertPanelUser(
+  ctx: MutationCtx,
+  ideUuid: string,
+  deviceId: Id<"devices">,
+  card: string,
+  projectId: Id<"projects"> | undefined,
+): Promise<void> {
+  const existing = await ctx.db
+    .query("idePanelUsers")
+    .withIndex("by_uuid_card", (q) => q.eq("ideUuid", ideUuid).eq("cardNumber", card))
+    .first();
+  if (existing) {
+    await ctx.db.patch(existing._id, { deviceId, projectId, syncedAt: Date.now() });
+  } else {
+    await ctx.db.insert("idePanelUsers", {
+      ideUuid,
+      deviceId,
+      cardNumber: card,
+      projectId,
+      syncedAt: Date.now(),
+    });
+  }
+}
+
+/** Panel roster'dan kartı çıkar (deleteUser ack'lendiğinde). */
+async function removePanelUser(
+  ctx: MutationCtx,
+  ideUuid: string,
+  card: string,
+): Promise<void> {
+  const existing = await ctx.db
+    .query("idePanelUsers")
+    .withIndex("by_uuid_card", (q) => q.eq("ideUuid", ideUuid).eq("cardNumber", card))
+    .first();
+  if (existing) await ctx.db.delete(existing._id);
 }
 
 export type IdeOpType = Doc<"idePendingOperations">["opType"];
@@ -247,6 +309,29 @@ export const markSent = internalMutation({
   },
 });
 
+/**
+ * idePanelUsers'ı panelden okunan gerçek roster'la doldurur (tek seferlik seed / yeniden eşitleme).
+ * `rawCards` panelin döndürdüğü user.id listesi (LAN'dan get_data sayfalama ile okunur). Tablo
+ * yeni özellikten önce var olan hayalet kartları içermediğinden, mevcut paneller için bir kez
+ * çalıştırılır → sonraki "Güncelle"de reconcilePanelRosterIde fazlalıkları söker.
+ */
+export const seedPanelUsers = internalMutation({
+  args: { deviceId: v.id("devices"), rawCards: v.array(v.union(v.number(), v.string())) },
+  returns: v.number(),
+  handler: async (ctx, args): Promise<number> => {
+    const device = await ctx.db.get(args.deviceId);
+    if (!device?.ideUuid) return 0;
+    let n = 0;
+    for (const raw of args.rawCards) {
+      const card = normalizeIdeCard(raw);
+      if (!card) continue;
+      await upsertPanelUser(ctx, device.ideUuid, args.deviceId, card, device.projectId);
+      n++;
+    }
+    return n;
+  },
+});
+
 /** Bridge ack/timeout bildirdi: result'a göre terminal veya retry. */
 export const markAck = internalMutation({
   args: {
@@ -272,6 +357,27 @@ export const markAck = internalMutation({
         responseMessage: args.message,
         lastError: undefined,
       });
+      // Panel roster yansımasını güncelle (idePanelUsers): upsertUser → kart panelde,
+      // deleteUser → panelden gitti. reconcilePanelRosterIde bu tabloyla "panelde olan −
+      // yetkili" farkını hesaplar. ideUuid bazlı (re-claim'e dayanıklı).
+      if (op.opType === "upsertUser" || op.opType === "deleteUser") {
+        const device = await ctx.db.get(op.deviceId);
+        if (device?.ideUuid) {
+          const payload = (op.payload ?? {}) as Record<string, unknown>;
+          const rawId =
+            op.opType === "upsertUser"
+              ? (payload.userRecord as { id?: unknown } | undefined)?.id
+              : payload.ideUserId;
+          const card = normalizeIdeCard(rawId);
+          if (card) {
+            if (op.opType === "upsertUser") {
+              await upsertPanelUser(ctx, device.ideUuid, op.deviceId, card, op.projectId);
+            } else {
+              await removePanelUser(ctx, device.ideUuid, card);
+            }
+          }
+        }
+      }
       return;
     }
     // "already exists": create_data var olan kayıtta reddedildi (panel create≠update).
@@ -295,6 +401,29 @@ export const markAck = internalMutation({
         });
         return;
       }
+    }
+    // deleteUser/deletePermission "not found" → kayıt zaten yok; istenen son durum (kayıt yok)
+    // sağlanmış → idempotent terminal başarı. deleteUser ise roster yansımasından da düş; aksi
+    // halde idePanelUsers satırı kalır ve her Güncelle yeni (yine başarısız) deleteUser üretirdi.
+    if (
+      args.result === "fail" &&
+      (op.opType === "deleteUser" || op.opType === "deletePermission") &&
+      isAlreadyGoneError(args.message)
+    ) {
+      await ctx.db.patch(args.opId, {
+        status: "acked",
+        ackedAt: Date.now(),
+        responseMessage: args.message,
+        lastError: undefined,
+      });
+      if (op.opType === "deleteUser") {
+        const device = await ctx.db.get(op.deviceId);
+        const card = normalizeIdeCard(
+          ((op.payload ?? {}) as Record<string, unknown>).ideUserId,
+        );
+        if (device?.ideUuid && card) await removePanelUser(ctx, device.ideUuid, card);
+      }
+      return;
     }
     // fail / timeout → retry veya terminal failed
     const maxAttempts = op.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;

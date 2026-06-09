@@ -9,6 +9,54 @@
  * MQTT modu reboot'ta aktifleşir (LOGGER/MQTT boot'ta okunur).
  */
 
+/**
+ * Verilen IP'nin IDE Smart panel olup olmadığını hızlıca kontrol eder.
+ * Anonim parameter_read atar — başarılı yanıt veya login-required = panel var.
+ * @returns {{ ip: string, reachable: boolean, isPanel: boolean }}
+ */
+export async function probePanel(ip, port = 80, timeoutMs = 1500) {
+  const url = `http://${ip}:${port}/`;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ transaction: { "msx-id": 1, "src-id": 1001, type: "parameter_read" }, payload: { parameters: ["MQTT.STATUS"] } }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) return { ip, reachable: true, isPanel: false };
+    const text = await res.text();
+    // Panel her zaman { transaction, payload } döner; result "success" veya "login_required"
+    const json = JSON.parse(text);
+    const result = json?.payload?.result;
+    const isPanel = result === "success" || result === "login_required";
+    return { ip, reachable: true, isPanel };
+  } catch (err) {
+    clearTimeout(timer);
+    if (err?.name === "SyntaxError") return { ip, reachable: true, isPanel: false };
+    return { ip, reachable: false, isPanel: false };
+  }
+}
+
+/**
+ * Verilen subnet'teki (örn. "192.168.1") tüm .1-.254 adreslerini paralel tarar.
+ * @returns {Promise<string[]>} bulunan panel IP'leri
+ */
+export async function scanSubnet(subnet, port = 80, concurrency = 30, timeoutMs = 1500) {
+  const candidates = Array.from({ length: 254 }, (_, i) => `${subnet}.${i + 1}`);
+  const found = [];
+  for (let i = 0; i < candidates.length; i += concurrency) {
+    const batch = candidates.slice(i, i + concurrency);
+    const results = await Promise.all(batch.map((ip) => probePanel(ip, port, timeoutMs)));
+    for (const r of results) {
+      if (r.isPanel) found.push(r.ip);
+    }
+  }
+  return found;
+}
+
 /** Panel envelope'u (msx-id artan sayaç caller'da tutulur). */
 function makeEnvelope(msx, type, payload, { token, dstId } = {}) {
   const transaction = { "msx-id": msx, "src-id": 1001, type };

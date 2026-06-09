@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { superAdminQuery, superAdminMutation, adminQuery } from "./lib/customFunctions";
+import { purgeDeviceCascade } from "./devices";
 
 /**
  * Fiziksel cihaz envanteri (super_admin yönetir).
@@ -12,7 +13,6 @@ export const list = superAdminQuery({
   args: {},
   handler: async (ctx) => {
     const rows = await ctx.db.query("adminDevices").collect();
-    // Atanmış cihazlar için proje adını ekle
     return await Promise.all(
       rows.map(async (d) => {
         const project = d.assignedProjectId
@@ -25,7 +25,7 @@ export const list = superAdminQuery({
 });
 
 /**
- * Claim picker için: sadece atanmamış (assignedDeviceId yok) cihazlar.
+ * Claim picker için: sadece atanmamış (assignedDeviceId yok) ve havuzdan gelen cihazlar.
  * adminQuery: project_admin da kendi projesine claim yapabilir.
  */
 export const listForClaim = adminQuery({
@@ -37,7 +37,9 @@ export const listForClaim = adminQuery({
       brand: v.optional(
         v.union(v.literal("ide_smart"), v.literal("hikvision"), v.literal("other"))
       ),
-      ideUuid: v.string(),
+      ideUuid: v.optional(v.string()),
+      ideUser: v.optional(v.string()),
+      idePassword: v.optional(v.string()),
       ideDoorCount: v.optional(v.number()),
       lastSeen: v.optional(v.string()),
     })
@@ -45,12 +47,14 @@ export const listForClaim = adminQuery({
   handler: async (ctx) => {
     const rows = await ctx.db.query("adminDevices").collect();
     return rows
-      .filter((d) => !d.assignedDeviceId)
+      .filter((d) => !d.assignedDeviceId && !d.createdFromDevice)
       .map((d) => ({
         _id: d._id,
         name: d.name,
         brand: d.brand,
         ideUuid: d.ideUuid,
+        ideUser: d.ideUser,
+        idePassword: d.idePassword,
         ideDoorCount: d.ideDoorCount,
         lastSeen: d.lastSeen,
       }));
@@ -102,13 +106,55 @@ export const register = superAdminMutation({
   },
 });
 
+/**
+ * Mevcut devices kayıtlarını adminDevices'a senkronize eder.
+ * adminDeviceId'si olmayan her device için bir adminDevices satırı oluşturur.
+ * Idempotent: zaten bağlı olanları atlar.
+ */
+export const backfillExisting = superAdminMutation({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    const allDevices = await ctx.db.query("devices").collect();
+    const orphans = allDevices.filter((d) => !d.adminDeviceId);
+    const now = new Date().toISOString();
+    let count = 0;
+    for (const device of orphans) {
+      const adminDeviceId = await ctx.db.insert("adminDevices", {
+        name: device.name,
+        brand: device.brand,
+        ideUuid: device.ideUuid,
+        deviceSerial: device.deviceSerial,
+        ideUser: device.ideUser,
+        idePassword: device.idePassword,
+        ideHttpPort: device.ideHttpPort,
+        ideDoorCount: device.ideDoorCount,
+        lastSeen: device.lastSeen,
+        assignedDeviceId: device._id,
+        assignedProjectId: device.projectId,
+        createdFromDevice: true,
+        createdAt: now,
+        updatedAt: now,
+      });
+      await ctx.db.patch(device._id, { adminDeviceId, updatedAt: now });
+      count++;
+    }
+    return count;
+  },
+});
+
 export const remove = superAdminMutation({
   args: { adminDeviceId: v.id("adminDevices") },
   handler: async (ctx, args) => {
     const device = await ctx.db.get(args.adminDeviceId);
     if (!device) throw new Error("Cihaz bulunamadı");
+    // Atanmışsa önce projedeki cihazı ve bağlı kayıtlarını (kapı/okuma/grup) temizle,
+    // sonra envanter kaydını sil. Böylece tek tıkla tamamen kaldırılabilir.
     if (device.assignedDeviceId) {
-      throw new Error("Bu cihaz bir projeye atanmış. Önce projeden çıkarın.");
+      const assigned = await ctx.db.get(device.assignedDeviceId);
+      if (assigned) {
+        await purgeDeviceCascade(ctx, assigned._id, assigned.projectId);
+      }
     }
     await ctx.db.delete(args.adminDeviceId);
   },

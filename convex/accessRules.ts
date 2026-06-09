@@ -6,6 +6,7 @@ import { getProjectIdsForUser } from "./lib/auth";
 import {
   resolveRuleIdeDeviceIds,
   reconcileRemovedEmployeeIde,
+  reconcilePanelRosterIde,
 } from "./lib/accessGraph";
 import { diffIds } from "./lib/reconcileMath";
 import type { Id } from "./_generated/dataModel";
@@ -494,6 +495,18 @@ export const updateWithGroups = authedMutation({
         );
       }
     }
+
+    // Roster eşitleme: kuralın hedeflediği her IDE paneli için, panelde olup (idePanelUsers)
+    // artık HİÇBİR aktif kuralla yetkisi olmayan kartları sök. Bu, diffIds'in kaçırdığı
+    // hayaletleri (geçmişte fix'ten önce çıkarılmış üyeler + panel re-claim artıkları) yakalar.
+    // Ölçeklenir: yalnız (panelde-olan − yetkili) farkına deleteUser üretir.
+    const ideePanelsNow = await resolveRuleIdeDeviceIds(ctx, ruleId, rule.projectId);
+    for (const panelId of ideePanelsNow) {
+      syncJobs.push(
+        reconcilePanelRosterIde(ctx, { deviceId: panelId, projectId: rule.projectId }),
+      );
+    }
+
     await Promise.all(syncJobs);
 
     return ruleId;

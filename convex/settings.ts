@@ -223,6 +223,10 @@ export const getDarkMode = optionalAuthQuery({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
     if (!ctx.user) return false;
+    // Doğrulanmamış self-signup kullanıcısı (verified=false): henüz erişimi yok.
+    // getProjectIdsForUser guard'ı Error fırlatır ve uygulamayı çökertir — burada
+    // sessizce false dönüp AuthProvider'ın signOut'una izin ver.
+    if (ctx.user.verified === false) return false;
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
       return false;

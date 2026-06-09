@@ -159,13 +159,30 @@ export const create = authedMutation({
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
     const now = new Date().toISOString();
-    return await ctx.db.insert("devices", {
+    const deviceId = await ctx.db.insert("devices", {
       ...args,
       isActive: args.isActive ?? true,
       status: args.status ?? "active",
       createdAt: now,
       updatedAt: now,
     });
+    const adminDeviceId = await ctx.db.insert("adminDevices", {
+      name: args.name,
+      brand: args.brand,
+      ideUuid: args.ideUuid,
+      deviceSerial: args.deviceSerial,
+      ideUser: args.ideUser,
+      idePassword: args.idePassword,
+      ideHttpPort: args.ideHttpPort,
+      ideDoorCount: args.ideDoorCount,
+      assignedDeviceId: deviceId,
+      assignedProjectId: args.projectId,
+      createdFromDevice: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.patch(deviceId, { adminDeviceId, updatedAt: now });
+    return deviceId;
   },
 });
 
@@ -258,6 +275,39 @@ export const update = authedMutation({
   },
 });
 
+/**
+ * Bir cihazı ve doğrudan bağlı kayıtlarını (cardReadings, groupDevices, doors) siler.
+ * Bölge SİLİNMEZ — artık paylaşılan mantıksal alan; başka cihaz/kapı barındırabilir.
+ * adminDevices kaydına DOKUNMAZ — assignment temizleme/silme mantığı çağırana aittir.
+ */
+export async function purgeDeviceCascade(
+  ctx: MutationCtx,
+  deviceId: Id<"devices">,
+  projectId: Id<"projects"> | undefined,
+) {
+  const readings = await ctx.db
+    .query("cardReadings")
+    .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
+    .collect();
+  await Promise.all(readings.map((r) => ctx.db.delete(r._id)));
+
+  const groupDevices = await ctx.db
+    .query("groupDevices")
+    .withIndex("by_project_device", (q) =>
+      q.eq("projectId", projectId).eq("deviceId", deviceId),
+    )
+    .collect();
+  await Promise.all(groupDevices.map((gd) => ctx.db.delete(gd._id)));
+
+  const ownedDoors = await ctx.db
+    .query("doors")
+    .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
+    .collect();
+  await Promise.all(ownedDoors.map((d) => ctx.db.delete(d._id)));
+
+  await ctx.db.delete(deviceId);
+}
+
 export const remove = authedMutation({
   args: { deviceId: v.id("devices") },
   handler: async (ctx, args) => {
@@ -269,30 +319,25 @@ export const remove = authedMutation({
     if (ctx.user.role !== "super_admin" && !isProjectAllowed(allowedProjectIds, device.projectId)) {
       throw new Error("Bu cihaza erişim yetkiniz yok");
     }
-    // İlişkili card readings sayısını kontrol et
-    const readings = await ctx.db
-      .query("cardReadings")
-      .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
-      .collect();
-    await Promise.all(readings.map((r) => ctx.db.delete(r._id)));
 
-    const groupDevices = await ctx.db
-      .query("groupDevices")
-      .withIndex("by_project_device", (q) =>
-        q.eq("projectId", device.projectId).eq("deviceId", args.deviceId),
-      )
-      .collect();
-    await Promise.all(groupDevices.map((gd) => ctx.db.delete(gd._id)));
+    // Otomatik oluşturulan adminDevices kaydını da sil.
+    // Havuzdan gelen (createdFromDevice olmayan) kayıtlar silinmez, sadece assignment temizlenir.
+    if (device.adminDeviceId) {
+      const adminDevice = await ctx.db.get(device.adminDeviceId);
+      if (adminDevice) {
+        if (adminDevice.createdFromDevice) {
+          await ctx.db.delete(device.adminDeviceId);
+        } else {
+          await ctx.db.patch(device.adminDeviceId, {
+            assignedDeviceId: undefined,
+            assignedProjectId: undefined,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+    }
 
-    // Cihaza/panele bağlı kapıları temizle (door.deviceId). Bölge SİLİNMEZ —
-    // artık paylaşılan mantıksal alan; başka cihaz/kapı barındırabilir.
-    const ownedDoors = await ctx.db
-      .query("doors")
-      .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
-      .collect();
-    await Promise.all(ownedDoors.map((d) => ctx.db.delete(d._id)));
-
-    await ctx.db.delete(args.deviceId);
+    await purgeDeviceCascade(ctx, args.deviceId, device.projectId);
   },
 });
 
@@ -550,6 +595,18 @@ export const createIdePanel = authedMutation({
     if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
+    if (args.ideUuid) {
+      const existingDevice = await ctx.db
+        .query("devices")
+        .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", args.ideUuid!))
+        .first();
+      if (existingDevice) throw new Error("Bu UUID zaten bir cihaza kayıtlı");
+      const existingAdmin = await ctx.db
+        .query("adminDevices")
+        .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", args.ideUuid!))
+        .first();
+      if (existingAdmin) throw new Error("Bu UUID zaten havuzda kayıtlı");
+    }
     const now = new Date().toISOString();
     const doorCount = Math.max(1, Math.min(args.ideDoorCount ?? 4, 8));
 
@@ -586,6 +643,23 @@ export const createIdePanel = authedMutation({
       now,
     });
     await ctx.db.patch(deviceId, { zoneId, updatedAt: now });
+
+    // adminDevices'a otomatik kaydet (createdFromDevice=true → cihaz silinince de silinir)
+    const adminDeviceId = await ctx.db.insert("adminDevices", {
+      name: args.name,
+      brand: "ide_smart",
+      ideUuid: args.ideUuid,
+      ideUser: args.ideUser ?? "admin",
+      idePassword: args.idePassword ?? "admin12345",
+      ideHttpPort: args.ideHttpPort ?? 80,
+      ideDoorCount: doorCount,
+      assignedDeviceId: deviceId,
+      assignedProjectId: args.projectId,
+      createdFromDevice: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.patch(deviceId, { adminDeviceId, updatedAt: now });
 
     return { deviceId, zoneId, doorIds };
   },
@@ -664,6 +738,8 @@ export const claimDevice = adminMutation({
     newZoneName: v.optional(v.string()),
     name: v.optional(v.string()),
     ideDoorCount: v.optional(v.number()),
+    ideUser: v.optional(v.string()),
+    idePassword: v.optional(v.string()),
     description: v.optional(v.string()),
   },
   returns: v.object({
@@ -685,6 +761,10 @@ export const claimDevice = adminMutation({
     const now = new Date().toISOString();
     const doorCount = Math.max(1, Math.min(args.ideDoorCount ?? adminDevice.ideDoorCount ?? 4, 8));
     const panelName = args.name?.trim() || adminDevice.name;
+    // Claim ekranında girilen kimlik bilgisi öncelikli; boşsa havuz kaydındakine düş.
+    // Bridge MQTT login için device.ideUser/idePassword okur — boş kalırsa op sonsuza pending'de bekler.
+    const ideUser = args.ideUser?.trim() || adminDevice.ideUser;
+    const idePassword = args.idePassword?.trim() || adminDevice.idePassword;
 
     // devices tablosuna ekle (projectId + adminDeviceId geri bağlantısı ile)
     const deviceId = await ctx.db.insert("devices", {
@@ -693,8 +773,8 @@ export const claimDevice = adminMutation({
       brand: adminDevice.brand ?? "ide_smart",
       deviceType: "Erişim Paneli",
       ideUuid: adminDevice.ideUuid,
-      ideUser: adminDevice.ideUser,
-      idePassword: adminDevice.idePassword,
+      ideUser,
+      idePassword,
       ideHttpPort: adminDevice.ideHttpPort ?? 80,
       ideDoorCount: doorCount,
       isActive: true,
@@ -720,10 +800,13 @@ export const claimDevice = adminMutation({
 
     await ctx.db.patch(deviceId, { zoneId, updatedAt: now });
 
-    // adminDevices'ı güncelle — atandı olarak işaretle
+    // adminDevices'ı güncelle — atandı olarak işaretle + kimlik bilgisini havuz kaydına da yaz
+    // (release edilirse havuza güncel kimlikle döner).
     await ctx.db.patch(args.adminDeviceId, {
       assignedDeviceId: deviceId,
       assignedProjectId: args.projectId,
+      ideUser,
+      idePassword,
       updatedAt: now,
     });
 
@@ -766,16 +849,24 @@ export const releaseDevice = adminMutation({
       .collect();
     await Promise.all(ownedDoors.map((d) => ctx.db.delete(d._id)));
 
-    // adminDevices kaydı varsa atama bilgisini temizle (sil değil)
+    // adminDevices kaydını temizle:
+    // - createdFromDevice=true → cihazla birlikte doğdu, birlikte ölmeli
+    // - pool kaydı → havuza geri döner (sadece assignment temizlenir)
     const adminDeviceId = device.adminDeviceId;
     if (adminDeviceId) {
-      await ctx.db.patch(adminDeviceId, {
-        assignedDeviceId: undefined,
-        assignedProjectId: undefined,
-        // lastSeen güncellenmesi için cihazın son görülme zamanını koru
-        lastSeen: device.lastSeen ?? undefined,
-        updatedAt: new Date().toISOString(),
-      });
+      const adminDevice = await ctx.db.get(adminDeviceId);
+      if (adminDevice) {
+        if (adminDevice.createdFromDevice) {
+          await ctx.db.delete(adminDeviceId);
+        } else {
+          await ctx.db.patch(adminDeviceId, {
+            assignedDeviceId: undefined,
+            assignedProjectId: undefined,
+            lastSeen: device.lastSeen ?? undefined,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
     } else if (device.ideUuid) {
       // Eski akışla eklenmiş (adminDeviceId yok) — UUID ile bul
       const existing = await ctx.db
@@ -783,11 +874,15 @@ export const releaseDevice = adminMutation({
         .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", device.ideUuid!))
         .first();
       if (existing) {
-        await ctx.db.patch(existing._id, {
-          assignedDeviceId: undefined,
-          assignedProjectId: undefined,
-          updatedAt: new Date().toISOString(),
-        });
+        if (existing.createdFromDevice) {
+          await ctx.db.delete(existing._id);
+        } else {
+          await ctx.db.patch(existing._id, {
+            assignedDeviceId: undefined,
+            assignedProjectId: undefined,
+            updatedAt: new Date().toISOString(),
+          });
+        }
       }
     }
 
@@ -810,21 +905,23 @@ export const listClaimable = adminQuery({
       brand: v.optional(
         v.union(v.literal("hikvision"), v.literal("other"), v.literal("ide_smart")),
       ),
-      ideUuid: v.string(),
+      ideUuid: v.optional(v.string()),
       ideDoorCount: v.optional(v.number()),
       lastSeen: v.optional(v.string()),
     }),
   ),
   handler: async (ctx) => {
     const rows = await ctx.db.query("adminDevices").collect();
-    return rows.map((d) => ({
-      _id: d._id,
-      name: d.name,
-      brand: d.brand,
-      ideUuid: d.ideUuid,
-      ideDoorCount: d.ideDoorCount,
-      lastSeen: d.lastSeen,
-    }));
+    return rows
+      .filter((d) => !d.assignedDeviceId && !d.createdFromDevice)
+      .map((d) => ({
+        _id: d._id,
+        name: d.name,
+        brand: d.brand,
+        ideUuid: d.ideUuid,
+        ideDoorCount: d.ideDoorCount,
+        lastSeen: d.lastSeen,
+      }));
   },
 });
 
