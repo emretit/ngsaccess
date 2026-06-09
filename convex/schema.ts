@@ -30,10 +30,19 @@ export default defineSchema({
         v.literal("project_user")
       )
     ),
+    // E-posta doğrulama (self-signup): verified=false olan kullanıcı login olamaz.
+    // Eski kullanıcılar undefined → guard yalnızca === false olanları engeller.
+    // NOT: "emailVerified" adı kullanılamaz — Convex Auth onu profile()'dan ayıklayıp
+    // kendi iç mantığında (emailVerificationTime) kullanır, users'a yazmaz.
+    verified: v.optional(v.boolean()),
+    // Kayıt formundaki firma adı; ilk doğrulanmış girişte projeye dönüştürülür.
+    firstCompanyName: v.optional(v.string()),
     setupToken: v.optional(v.string()),
     tokenExpiresAt: v.optional(v.string()),
     updatedAt: v.optional(v.string()),
-  }).index("email", ["email"]),
+  })
+    .index("email", ["email"])
+    .index("by_setup_token", ["setupToken"]),
 
   userProjects: defineTable({
     userId: v.id("users"),
@@ -462,6 +471,26 @@ export default defineSchema({
     .index("by_msx", ["deviceId", "msxId"])
     .index("by_idempotency", ["idempotencyKey"]),
 
+  /**
+   * IDE Smart panelinde GERÇEKTE bulunan kullanıcıların (kart) takibi.
+   * Convex panele doğrudan bağlanamadığı için "panelde kim var?" sorusunu okuyamayız;
+   * bunun yerine başarılı upsertUser/deleteUser ack'lerini burada işleyerek panel
+   * roster'ının yansımasını tutarız (markAck). Kural güncellemede (reconcilePanelRosterIde)
+   * "panelde olan − yetkili" farkını silmek için kullanılır → O(çıkarılan), 1000 kullanıcıda
+   * tüm roster'ı taramaz. ideUuid bazlı: panel yeniden-claim edilse (device _id değişse) bile
+   * aynı fiziksel panelin roster'ı korunur. cardNumber normalize edilir: String(Number(x))
+   * (panel id'si sayısal; "0008219041" → "8219041").
+   */
+  idePanelUsers: defineTable({
+    ideUuid: v.string(),
+    deviceId: v.id("devices"),
+    cardNumber: v.string(), // normalize: String(Number(employee.cardNumber))
+    projectId: v.optional(v.id("projects")),
+    syncedAt: v.number(),
+  })
+    .index("by_uuid", ["ideUuid"])
+    .index("by_uuid_card", ["ideUuid", "cardNumber"]),
+
   // Çalışan başına yüz fotoğrafı (Convex storage). Tek kişi → tek yüz.
   // Cihaza yazılan kayıt için ayrı status field yok — hikPendingOperations queue tutar.
   employeeFaces: defineTable({
@@ -613,16 +642,21 @@ export default defineSchema({
   // Projeye atama (claim) anında bu tablodan `devices` tablosuna taşınır.
   // `releaseDevice` cihazı `devices`'dan kaldırıp buraya geri koyar.
   adminDevices: defineTable({
-    ideUuid: v.string(),
+    // IDE Smart paneller için SYSTEM.UUID; non-IDE cihazlarda kullanılmaz.
+    ideUuid: v.optional(v.string()),
+    // QR/Hikvision/diğer donanımlar için seri no.
+    deviceSerial: v.optional(v.string()),
     name: v.string(),
     brand: v.optional(
       v.union(v.literal("ide_smart"), v.literal("hikvision"), v.literal("other"))
     ),
-    ideUser: v.string(),
-    idePassword: v.string(),
+    ideUser: v.optional(v.string()),
+    idePassword: v.optional(v.string()),
     ideHttpPort: v.optional(v.number()),
     ideDoorCount: v.optional(v.number()),
     lastSeen: v.optional(v.string()),
+    // devices.create/createIdePanel ile otomatik oluşturuldu; cihaz silinince bu da silinir.
+    createdFromDevice: v.optional(v.boolean()),
     // Projeye atandığında set edilir; clear olunca havuza geri döner.
     assignedDeviceId: v.optional(v.id("devices")),
     assignedProjectId: v.optional(v.id("projects")),
@@ -630,6 +664,7 @@ export default defineSchema({
     updatedAt: v.string(),
   })
     .index("by_ide_uuid", ["ideUuid"])
+    .index("by_device_serial", ["deviceSerial"])
     .index("by_assigned_device", ["assignedDeviceId"]),
 
   ideDefaults: defineTable({

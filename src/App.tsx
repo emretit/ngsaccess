@@ -13,6 +13,7 @@ import './App.css';
 const Index = lazy(() => import('@/pages/Index'));
 const Login = lazy(() => import('@/pages/Login'));
 const Register = lazy(() => import('@/pages/Register'));
+const VerifyEmail = lazy(() => import('@/pages/VerifyEmail'));
 const Auth = lazy(() => import('@/pages/Auth'));
 const Employees = lazy(() => import('@/pages/Employees'));
 const Devices = lazy(() => import('@/pages/Devices'));
@@ -53,6 +54,7 @@ function AppContent() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/check-in" element={<CheckIn />} />
         <Route path="/demo-request" element={<DemoRequest />} />

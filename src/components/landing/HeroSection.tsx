@@ -58,7 +58,7 @@ const HeroSection = () => {
 
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <Button size="lg" className="text-base shadow-lg shadow-primary/20" asChild>
-                <Link to="/demo-request">
+                <Link to="/register">
                   14 Gün Ücretsiz Dene
                   <ChevronRight className="ml-1 h-4 w-4" />
                 </Link>

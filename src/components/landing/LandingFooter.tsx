@@ -27,7 +27,7 @@ const COLUMNS: FooterColumn[] = [
       { label: 'Nasıl Çalışır', href: '#how-it-works' },
       { label: 'Fiyatlandırma', href: '#pricing' },
       { label: 'Mobil Uygulama', href: '#features' },
-      { label: 'Demo İste', href: '/demo-request' },
+      { label: 'Ücretsiz Dene', href: '/register' },
     ],
   },
   {

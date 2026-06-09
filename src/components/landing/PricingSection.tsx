@@ -29,7 +29,7 @@ const PLANS: Plan[] = [
     yearlyPrice: 319,
     buttonText: 'Hemen Başla',
     buttonVariant: 'outline',
-    ctaPath: '/demo-request?plan=starter',
+    ctaPath: '/register',
     features: [
       '10 çalışana kadar',
       'QR kodla giriş çıkış',
@@ -45,7 +45,7 @@ const PLANS: Plan[] = [
     buttonText: '14 Gün Ücretsiz Dene',
     buttonVariant: 'default',
     popular: true,
-    ctaPath: '/demo-request?plan=pro',
+    ctaPath: '/register',
     features: [
       '50 çalışana kadar',
       'Kart okuyucu entegrasyonu',

@@ -78,7 +78,7 @@ const LandingHeader = () => {
                 Giriş Yap
               </Button>
               <Button
-                onClick={() => navigate('/demo-request')}
+                onClick={() => navigate('/register')}
                 className="bg-primary hover:bg-primary/90 shadow-sm"
               >
                 Ücretsiz Demo
@@ -127,7 +127,7 @@ const LandingHeader = () => {
                   <Button
                     onClick={() => {
                       setMobileOpen(false);
-                      navigate('/demo-request');
+                      navigate('/register');
                     }}
                     className="bg-primary hover:bg-primary/90"
                   >

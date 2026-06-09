@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { authedMutation } from "./lib/customFunctions";
-import { limiter } from "./lib/rateLimit";
 import { requireSetupSecret } from "./lib/auth";
 
 /**
@@ -32,23 +31,21 @@ export const ensureProjectForNewUser = authedMutation({
       return null;
     }
 
-    await limiter.limit(ctx, "register", {
-      key: user.email ?? user._id,
-      throws: true,
-    });
-
-    // Proje adı: kullanıcı adı veya email
+    // Proje adı: kayıt formundaki firma adı > kullanıcı adı > email.
+    // firstCompanyName, signUp sırasında requestVerification ile users'a yazıldı.
     const projectName =
+      user.firstCompanyName?.trim() ||
       user.fullName?.trim() ||
       user.name?.trim() ||
       (user.email ? `${user.email.split("@")[0]} Projesi` : "Yeni Proje");
 
     const now = new Date().toISOString();
 
-    // 1. Proje oluştur
+    // 1. Proje oluştur (kayıt olan kullanıcı = owner)
     const projectId = await ctx.db.insert("projects", {
       name: projectName,
       description: "Otomatik oluşturulan proje",
+      ownerId: user._id,
       isActive: true,
       createdAt: now,
       updatedAt: now,
@@ -65,6 +62,14 @@ export const ensureProjectForNewUser = authedMutation({
       userId: user._id,
       projectId,
       createdAt: now,
+    });
+
+    // 4. Firma ayarlarına firma adını yaz (firma ayarları ekranında görünür)
+    await ctx.db.insert("generalSettings", {
+      projectId,
+      companyName: projectName,
+      createdAt: now,
+      updatedAt: now,
     });
 
     return projectId;

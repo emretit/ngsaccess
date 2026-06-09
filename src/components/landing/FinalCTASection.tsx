@@ -47,7 +47,7 @@ const FinalCTASection = () => {
               className="bg-card text-primary hover:bg-card/90 shadow-xl text-base font-semibold"
               asChild
             >
-              <Link to="/demo-request">
+              <Link to="/register">
                 14 Gün Ücretsiz Dene
                 <ChevronRight className="ml-1 h-4 w-4" />
               </Link>

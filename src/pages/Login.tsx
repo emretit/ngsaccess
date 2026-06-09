@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from 'convex/react';
-import { ArrowRight, Eye, EyeOff, Home, Lock, Mail, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Home, Lock, Mail, MailCheck, ShieldCheck } from 'lucide-react';
 
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/button';
@@ -14,15 +14,25 @@ export default function Login() {
   const navigate = useNavigate();
   const { user, loading, signIn } = useAuth();
   const hasAdmin = useQuery(api.users.hasSuperAdmin);
+  const [searchParams] = useSearchParams();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Kayıttan yeni gelindi mi? (Register → /login?confirmEmail=true)
+  const [showConfirmBanner, setShowConfirmBanner] = useState(
+    searchParams.get('confirmEmail') === 'true',
+  );
+  // Doğrulanmamış hesapla giriş denendi mi? (signIn guard tetikledi)
+  const [emailNotConfirmed, setEmailNotConfirmed] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) {
+    // Yalnızca DOĞRULANMIŞ kullanıcıyı /home'a yönlendir. Doğrulanmamış (verified=false)
+    // kullanıcı signUp sonrası bir an oturumlu görünebilir; onu /home'a atma (dashboard
+    // flash'ı) — AuthProvider zaten signOut edip burada tutacak.
+    if (!loading && user && user.verified !== false) {
       navigate('/home');
     }
   }, [user, loading, navigate]);
@@ -35,11 +45,18 @@ export default function Login() {
     }
     setSubmitting(true);
     setError(null);
+    setShowConfirmBanner(false);
+    setEmailNotConfirmed(false);
     try {
       const { error: signInError } = await signIn(email.trim().toLowerCase(), password);
       if (signInError) {
         const message =
           (signInError as Error)?.message ?? 'Giriş yapılırken bir hata oluştu.';
+        // Doğrulanmamış hesap → sarı bilgi banner'ı göster, kırmızı hata değil.
+        if (message.includes('doğrula')) {
+          setEmailNotConfirmed(true);
+          return;
+        }
         setError(message);
         toast({
           title: 'Giriş hatası',
@@ -93,6 +110,31 @@ export default function Login() {
               Hesabınıza erişmek için bilgilerinizi girin
             </p>
           </div>
+
+          {/* Kayıt sonrası: doğrulama maili gönderildi bilgisi */}
+          {showConfirmBanner && !emailNotConfirmed && (
+            <div className="flex items-start gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-950/40">
+              <MailCheck className="mt-0.5 h-5 w-5 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                Hesabınız oluşturuldu. E-posta adresinize bir{' '}
+                <span className="font-semibold">doğrulama linki</span> gönderdik. Giriş yapmadan
+                önce maildeki <span className="font-semibold">Hesabı Doğrula</span> butonuna tıklayın.
+                Mail birkaç dakika içinde gelmezse spam klasörünü kontrol edin.
+              </p>
+            </div>
+          )}
+
+          {/* Doğrulanmamış hesapla giriş denendi */}
+          {emailNotConfirmed && (
+            <div className="flex items-start gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-950/40">
+              <MailCheck className="mt-0.5 h-5 w-5 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                E-posta adresiniz henüz doğrulanmamış. Size gönderdiğimiz maildeki{' '}
+                <span className="font-semibold">Hesabı Doğrula</span> butonuna tıkladıktan sonra
+                giriş yapabilirsiniz.
+              </p>
+            </div>
+          )}
 
           {/* Giriş formu */}
           <form onSubmit={handleSubmit} className="space-y-5">
