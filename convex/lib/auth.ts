@@ -17,6 +17,13 @@ export async function getCurrentUser(
   if (!user) {
     throw new Error("Kullanıcı bulunamadı");
   }
+  // Doğrulanmamış self-signup hesabı hiçbir korumalı veriye erişemez.
+  // Eski kullanıcılar verified=undefined → engellenmez (yalnızca === false).
+  // currentUser query'si getCurrentUserOrNull kullanır (guard'sız) — AuthProvider
+  // doğrulanmamış kullanıcıyı profile üzerinden tespit edip signOut eder.
+  if (user.verified === false) {
+    throw new Error("E-posta adresinizi doğrulamanız gerekiyor");
+  }
   return user;
 }
 

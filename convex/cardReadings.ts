@@ -1,7 +1,7 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import {
   authedQuery,
   employeeAuthedQuery,
@@ -1929,7 +1929,7 @@ export const processCardReading = internalMutation({
           notifSettings?.lateNotifications !== false &&
           notifyEmail
         ) {
-          ctx.scheduler.runAfter(0, api.actions.sendEmail.sendLateNotification, {
+          ctx.scheduler.runAfter(0, internal.actions.sendEmail.sendLateNotification, {
             to: notifyEmail,
             employeeName: `${employee.firstName} ${employee.lastName}`,
             lateTime: new Date(accessTime).toLocaleTimeString("tr-TR", {

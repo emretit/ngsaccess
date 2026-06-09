@@ -142,9 +142,13 @@ export const consume = mutation({
       throw new Error("Kullanıcı bulunamadı — önce kayıt olun");
     }
 
-    // Rol ata
+    // Rol ata + hesabı doğrulanmış işaretle. signUp anında verified=false set edilir
+    // (auth.ts profile); davet token'ı burada doğrulandığı için güvenilir kanal
+    // kanıtlanmış olur → verified=true. Bu olmadan davetli kullanıcı login guard'ına
+    // takılır (getCurrentUser: verified===false → reddeder).
     await ctx.db.patch(user._id, {
       role: invite.role,
+      verified: true,
       updatedAt: new Date().toISOString(),
     });
 

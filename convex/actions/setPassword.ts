@@ -32,7 +32,7 @@ export const setEmployeePassword = action({
 
     const passwordHash = await bcrypt.hash(args.password, BCRYPT_COST);
 
-    await ctx.runMutation(api.employeeAuth.update, {
+    await ctx.runMutation(internal.employeeAuth.update, {
       authId: authRecord._id,
       passwordHash,
       setupToken: null,

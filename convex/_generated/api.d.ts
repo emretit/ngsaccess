@@ -30,6 +30,7 @@ import type * as dashboard from "../dashboard.js";
 import type * as departments from "../departments.js";
 import type * as devices from "../devices.js";
 import type * as doors from "../doors.js";
+import type * as emailVerification from "../emailVerification.js";
 import type * as employeeAuth from "../employeeAuth.js";
 import type * as employeeCheckIn from "../employeeCheckIn.js";
 import type * as employeeConsents from "../employeeConsents.js";
@@ -113,6 +114,7 @@ declare const fullApi: ApiFromModules<{
   departments: typeof departments;
   devices: typeof devices;
   doors: typeof doors;
+  emailVerification: typeof emailVerification;
   employeeAuth: typeof employeeAuth;
   employeeCheckIn: typeof employeeCheckIn;
   employeeConsents: typeof employeeConsents;

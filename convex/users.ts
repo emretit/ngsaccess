@@ -1,6 +1,7 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { optionalAuthQuery, authedMutation, adminQuery, superAdminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 
@@ -104,7 +105,22 @@ export const updateProfile = authedMutation({
 export const list = adminQuery({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db.query("users").collect();
+    if (ctx.user.role === "super_admin") {
+      return await ctx.db.query("users").collect();
+    }
+    const projectIds = await getProjectIdsForUser(ctx);
+    if (projectIds.length === 0) return [];
+    const rows = await Promise.all(
+      projectIds.map((pid) =>
+        ctx.db
+          .query("userProjects")
+          .withIndex("by_project", (q) => q.eq("projectId", pid))
+          .collect()
+      )
+    );
+    const uniqueIds = [...new Set(rows.flat().map((r) => r.userId))];
+    const users = await Promise.all(uniqueIds.map((id) => ctx.db.get(id)));
+    return users.filter((u): u is NonNullable<typeof u> => u !== null);
   },
 });
 
@@ -134,10 +150,18 @@ export const setupUser = superAdminMutation({
  * Hiç super_admin yokken ve doğru gizli kod girildiğinde çalışır.
  * Sadece bir kez kullanılabilir.
  */
-export const initializeAdmin = authedMutation({
+// NOT: authedMutation DEĞİL ham mutation — ilk super_admin signUp anında
+// verified=false ile oluşur (auth.ts profile artık her zaman false set eder),
+// dolayısıyla getCurrentUser guard'ından geçemez (yumurta-tavuk). Bunun yerine
+// auth burada manuel yapılır; güvenlik secret + "henüz admin yok" ile sağlanır.
+export const initializeAdmin = mutation({
   args: { secret: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      throw new Error("Giriş yapmanız gerekiyor");
+    }
     const expectedSecret = process.env.ADMIN_SETUP_SECRET;
     if (!expectedSecret || args.secret !== expectedSecret) {
       throw new Error("Geçersiz gizli kod");
@@ -149,8 +173,10 @@ export const initializeAdmin = authedMutation({
     if (existingAdmin) {
       throw new Error("Süper admin zaten mevcut");
     }
-    await ctx.db.patch(ctx.user._id, {
+    // Secret doğrulandı → güvenilir kanal → hesabı super_admin + verified yap.
+    await ctx.db.patch(userId, {
       role: "super_admin",
+      verified: true,
       updatedAt: new Date().toISOString(),
     });
     return null;

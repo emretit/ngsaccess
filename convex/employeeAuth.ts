@@ -33,7 +33,11 @@ export const getByToken = query({
   },
 });
 
-export const create = mutation({
+// internalMutation: setup token / passwordHash yazar → public olarak açık kalırsa
+// anonim caller hedef çalışanın e-postasını + token'ını ezip hesabı ele geçirir.
+// Yalnızca yetkili action'lardan (sendEmployeeSetupEmail authedAction,
+// setEmployeePassword token-guard'lı) internal çağrılır.
+export const create = internalMutation({
   args: {
     employeeId: v.id("employees"),
     projectId: v.optional(v.id("projects")),
@@ -52,7 +56,7 @@ export const create = mutation({
   },
 });
 
-export const update = mutation({
+export const update = internalMutation({
   args: {
     authId: v.id("employeeAuth"),
     email: v.optional(v.string()),

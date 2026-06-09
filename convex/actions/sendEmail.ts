@@ -1,8 +1,9 @@
 "use node";
 
-import { action } from "../_generated/server";
-import { api } from "../_generated/api";
+import { internalAction } from "../_generated/server";
+import { api, internal } from "../_generated/api";
 import { v } from "convex/values";
+import { authedAction } from "../lib/customFunctions";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
@@ -51,6 +52,24 @@ async function sendResendEmail(params: {
     return { success: false, error: data.error?.message ?? "Email gönderilemedi" };
   }
   return { success: true };
+}
+
+/**
+ * Kullanıcı kontrollü string'leri HTML-escape eder. Email template'lerine
+ * interpolate edilen isim/firma gibi alanlara uygulanır; aksi halde
+ * project_admin gibi roller çalışan adına <a href> enjekte edip Resend
+ * altyapısından phishing maili gönderebilir (HTML injection).
+ * NOT: Template'in kendi sabit HTML iskeleti escape EDİLMEZ — yalnızca
+ * dışarıdan gelen değerler. body içinde kasıtlı <strong>/<br/> kullanan
+ * çağrılar, dinamik kısmı önce escape edip sonra markup ekler.
+ */
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 interface EmailTemplateParams {
@@ -125,7 +144,7 @@ function renderEmailTemplate(p: EmailTemplateParams): string {
 </html>`;
 }
 
-export const sendEmployeeSetupEmail = action({
+export const sendEmployeeSetupEmail = authedAction({
   args: {
     employeeId: v.id("employees"),
     email: v.string(),
@@ -134,6 +153,17 @@ export const sendEmployeeSetupEmail = action({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args): Promise<{ success: boolean; error?: string }> => {
+    // Yetki: caller, hedef employee'nin projesine erişebilmeli. employees.getById
+    // authedQuery'dir ve erişilemeyen projede hata fırlatır → yetkisiz çağrı burada durur.
+    // Bu olmadan anonim/yabancı bir caller setup token'ını kendi e-postasına yazıp
+    // çalışan mobil hesabını ele geçirebilir (authorization_bypass).
+    const employee = await ctx.runQuery(api.employees.getById, {
+      employeeId: args.employeeId,
+    });
+    if (!employee) {
+      return { success: false, error: "Çalışan bulunamadı veya erişim yetkiniz yok" };
+    }
+
     const setupToken = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -142,14 +172,14 @@ export const sendEmployeeSetupEmail = action({
     });
 
     if (existing) {
-      await ctx.runMutation(api.employeeAuth.update, {
+      await ctx.runMutation(internal.employeeAuth.update, {
         authId: existing._id,
         email: args.email,
         setupToken,
         tokenExpiresAt: expiresAt,
       });
     } else {
-      await ctx.runMutation(api.employeeAuth.create, {
+      await ctx.runMutation(internal.employeeAuth.create, {
         employeeId: args.employeeId,
         projectId: args.projectId,
         email: args.email,
@@ -163,7 +193,7 @@ export const sendEmployeeSetupEmail = action({
 
     const html = renderEmailTemplate({
       title: "NGS+ — Hesap Aktivasyonu",
-      heading: `Merhaba ${args.firstName} ${args.lastName} 👋`,
+      heading: `Merhaba ${escapeHtml(args.firstName)} ${escapeHtml(args.lastName)} 👋`,
       body: "NGS+ mobil uygulaması için şifrenizi belirleyin. Aşağıdaki butona tıklayarak hesabınızı aktif edebilirsiniz.",
       ctaUrl: setupUrl,
       ctaLabel: "Hesabı Aktif Et",
@@ -191,7 +221,7 @@ const ROLE_LABELS_TR: Record<"project_admin" | "project_user", string> = {
   project_user: "Kullanıcı",
 };
 
-export const sendUserInviteEmail = action({
+export const sendUserInviteEmail = authedAction({
   args: {
     email: v.string(),
     projectId: v.id("projects"),
@@ -201,6 +231,8 @@ export const sendUserInviteEmail = action({
   handler: async (ctx, args): Promise<{ success: boolean; error?: string }> => {
     const inviteType = args.type ?? "invite";
 
+    // invites.create kendi içinde yetki kontrolü yapar (super_admin/owner/project_admin),
+    // ama bu action artık authedAction olduğundan anonim caller buraya hiç ulaşamaz.
     const token: string = await ctx.runMutation(api.invites.create, {
       email: args.email,
       projectId: args.projectId,
@@ -211,7 +243,9 @@ export const sendUserInviteEmail = action({
     const project = await ctx.runQuery(api.projects.getById, {
       projectId: args.projectId,
     });
-    const projectName = project?.name ?? "NGS+";
+    // projectName kullanıcı kontrollü (firma/proje adı) → email'e ham basılırsa HTML
+    // injection olur; escape et.
+    const projectName = escapeHtml(project?.name ?? "NGS+");
 
     const baseUrl = process.env.SITE_URL ?? "https://ngsplus.app";
     const setupUrl = `${baseUrl}/user-setup?token=${token}`;
@@ -219,7 +253,7 @@ export const sendUserInviteEmail = action({
     const isReset = inviteType === "reset";
     const subject = isReset
       ? `NGS+ — Şifre sıfırlama bağlantısı`
-      : `${projectName} — NGS+ davetiniz`;
+      : `${project?.name ?? "NGS+"} — NGS+ davetiniz`;
     const heading = isReset ? "Şifrenizi sıfırlayın" : "NGS+'a davet edildiniz 👋";
     const roleLabel = ROLE_LABELS_TR[args.role];
     const body = isReset
@@ -244,7 +278,9 @@ export const sendUserInviteEmail = action({
   },
 });
 
-export const sendLateNotification = action({
+// internalAction: yalnızca scheduler/internal'dan çağrılır (cardReadings PDKS akışı).
+// Public action olarak açık kalırsa anonim caller keyfi alıcıya mail attırabilir.
+export const sendLateNotification = internalAction({
   args: {
     to: v.string(),
     employeeName: v.string(),
@@ -252,15 +288,52 @@ export const sendLateNotification = action({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (_ctx, args): Promise<{ success: boolean; error?: string }> => {
+    // employeeName/lateTime kullanıcı kontrollü → markup'a girmeden önce escape.
+    const safeName = escapeHtml(args.employeeName);
+    const safeTime = escapeHtml(args.lateTime);
     const html = renderEmailTemplate({
       title: "NGS+ PDKS — Geç Kalma Bildirimi",
       heading: "Geç Kalma Bildirimi",
-      body: `<strong>${args.employeeName}</strong> çalışanı işe geç kalmıştır.<br/>Giriş saati: <strong>${args.lateTime}</strong>`,
+      body: `<strong>${safeName}</strong> çalışanı işe geç kalmıştır.<br/>Giriş saati: <strong>${safeTime}</strong>`,
       footerNote: "Lütfen NGS+ PDKS panelinden detayları kontrol ediniz.",
     });
     return await sendResendEmail({
       to: args.to,
       subject: `PDKS — Geç Kalma: ${args.employeeName}`,
+      html,
+    });
+  },
+});
+
+/**
+ * Self-signup sonrası e-posta doğrulama maili.
+ * Maildeki "Hesabı Doğrula" butonu SITE_URL/verify-email?token=... adresine gider.
+ */
+// internalAction: yalnızca emailVerification (signUp sonrası scheduler) çağırır.
+export const sendVerificationEmail = internalAction({
+  args: {
+    to: v.string(),
+    token: v.string(),
+    name: v.optional(v.string()),
+  },
+  handler: async (_ctx, args): Promise<{ success: boolean; error?: string }> => {
+    const baseUrl = process.env.SITE_URL ?? "https://ngsplus.app";
+    const verifyUrl = `${baseUrl}/verify-email?token=${args.token}`;
+    // name kullanıcı kontrollü → escape.
+    const greeting = args.name ? `Hoş geldiniz, ${escapeHtml(args.name)}!` : "Hoş geldiniz!";
+
+    const html = renderEmailTemplate({
+      title: "NGS+ — Hesabınızı doğrulayın",
+      heading: greeting,
+      body: "NGS+ hesabınızı etkinleştirmek için aşağıdaki butona tıklayın. Doğrulama tamamlanmadan giriş yapamazsınız.",
+      ctaUrl: verifyUrl,
+      ctaLabel: "Hesabı Doğrula",
+      securityNote: "Bu link 24 saat geçerlidir. Eğer bu kaydı siz yapmadıysanız bu maili yok sayabilirsiniz.",
+    });
+
+    return await sendResendEmail({
+      to: args.to,
+      subject: "NGS+ — Hesabınızı doğrulayın",
       html,
     });
   },
