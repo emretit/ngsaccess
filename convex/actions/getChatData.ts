@@ -34,8 +34,17 @@ export const getCardReadings = authedAction({
 
     if (args.startDate) {
       const start = new Date(args.startDate);
-      start.setHours(0, 0, 0, 0);
       const end = new Date(args.endDate ?? args.startDate);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        const shown =
+          args.endDate && args.endDate !== args.startDate
+            ? `${args.startDate} - ${args.endDate}`
+            : args.startDate;
+        throw new Error(
+          `Tarih anlaşılamadı: "${shown}". Lütfen tarihi GG.AA.YYYY biçiminde belirtin.`
+        );
+      }
+      start.setHours(0, 0, 0, 0);
       end.setHours(23, 59, 59, 999);
       readings = readings.filter((r) => {
         const t = new Date(r.accessTime).getTime();
