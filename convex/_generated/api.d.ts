@@ -27,6 +27,7 @@ import type * as chatConversations from "../chatConversations.js";
 import type * as companies from "../companies.js";
 import type * as crons from "../crons.js";
 import type * as dashboard from "../dashboard.js";
+import type * as debugIde from "../debugIde.js";
 import type * as departments from "../departments.js";
 import type * as devices from "../devices.js";
 import type * as doors from "../doors.js";
@@ -112,6 +113,7 @@ declare const fullApi: ApiFromModules<{
   companies: typeof companies;
   crons: typeof crons;
   dashboard: typeof dashboard;
+  debugIde: typeof debugIde;
   departments: typeof departments;
   devices: typeof devices;
   doors: typeof doors;

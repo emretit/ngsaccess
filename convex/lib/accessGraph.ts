@@ -1,4 +1,4 @@
-import type { MutationCtx } from "../_generated/server";
+import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
 import { orphanPanels } from "./reconcileMath";
@@ -93,9 +93,85 @@ export async function reconcileRemovedEmployeeIde(
 }
 
 /**
+ * Bir paneli hedefleyen kuralları İKİ bacaktan çözer ve aktif olanların üye kartlarını
+ * (normalize) döndürür:
+ *   A) cihaz bağı — groupDevices.deviceId = panel
+ *   B) kapı bağı  — doors.deviceId = panel → groupDoors.doorId (CANLI doors.deviceId'den
+ *      gidilir; groupDoors.deviceId insert-anı snapshot'ıdır, taşınmış kapı eski panelde
+ *      yetki üretmesin — getRuleIoIdsForPanel'in canlı kontrolüyle tutarlı).
+ *
+ * Bilinçli asimetri: push hattı (syncEmployeeToIdePanels → getEmployeeWithDevices) yalnız
+ * cihaz bağını yazar; kapı bacağı burada yalnız KORUR (muhafazakar silme) — kapı bağıyla
+ * yetkili ama panelde olmayan kişiyi panele YAZMAZ.
+ *
+ * QueryCtx alır ki read-only dry-run ikizi (debugIde.panelRosterDiff) birebir aynı
+ * mantığı kullanabilsin — iki kopyanın sessizce ayrışması bu fonksiyonun en büyük riski.
+ */
+export async function resolvePanelAuthorizedCards(
+  ctx: QueryCtx,
+  deviceId: Id<"devices">,
+): Promise<{
+  deviceLegRuleIds: Id<"accessRules">[];
+  doorLegRuleIds: Id<"accessRules">[];
+  authorized: Set<string>;
+}> {
+  const [deviceLinks, panelDoors] = await Promise.all([
+    ctx.db
+      .query("groupDevices")
+      .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
+      .collect(),
+    ctx.db
+      .query("doors")
+      .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
+      .collect(),
+  ]);
+  const deviceLeg = new Set<Id<"accessRules">>(deviceLinks.map((l) => l.groupId));
+  const doorLeg = new Set<Id<"accessRules">>();
+  await Promise.all(
+    panelDoors.map(async (door) => {
+      const doorLinks = await ctx.db
+        .query("groupDoors")
+        .withIndex("by_door", (q) => q.eq("doorId", door._id))
+        .collect();
+      for (const dl of doorLinks) doorLeg.add(dl.groupId);
+    }),
+  );
+
+  // Benzersiz kural başına üyeler BİR kez çekilir (iki bacakta da görünen kural,
+  // duplicate groupDevices satırı vb. yinelenen okuma üretmez).
+  const ruleIds = new Set<Id<"accessRules">>([...deviceLeg, ...doorLeg]);
+  const authorized = new Set<string>();
+  await Promise.all(
+    Array.from(ruleIds).map(async (ruleId) => {
+      const rule = await ctx.db.get(ruleId);
+      if (!rule || rule.isActive === false) return;
+      const members = await ctx.db
+        .query("groupMembers")
+        .withIndex("by_project_group", (q) =>
+          q.eq("projectId", rule.projectId).eq("groupId", ruleId),
+        )
+        .collect();
+      await Promise.all(
+        members.map(async (m) => {
+          const emp = await ctx.db.get(m.employeeId);
+          const card = normalizeIdeCard(emp?.cardNumber);
+          if (card) authorized.add(card);
+        }),
+      );
+    }),
+  );
+  return {
+    deviceLegRuleIds: Array.from(deviceLeg),
+    doorLegRuleIds: Array.from(doorLeg),
+    authorized,
+  };
+}
+
+/**
  * Bir IDE panelinin roster'ını kuralla EŞİTLER: panelde olup (idePanelUsers) artık hiçbir aktif
  * kuralla yetkisi olmayan kartları söker (deleteUser). "Güncelle"de çağrılır → re-claim veya
- * eski düzenlemelerden kalan hayalet kartları temizler.
+ * eski düzenlemelerden kalan hayalet kartları temizler. Yetki kümesi cihaz VEYA kapı bağıyla
+ * kurulur (resolvePanelAuthorizedCards) — yalnız kapı bağıyla yetkili üye hayalet sayılmaz.
  *
  * ÖLÇEKLENİR: yalnız (panelde-olan − yetkili) farkı için deleteUser üretir; 1000 kullanıcıda
  * tüm roster taranmaz, sadece gerçek fazlalıklar silinir. idePanelUsers ideUuid bazlı olduğundan
@@ -112,31 +188,8 @@ export async function reconcilePanelRosterIde(
   if (!panel || panel.brand !== "ide_smart" || !panel.ideUuid) return;
   const ideUuid = panel.ideUuid;
 
-  // Yetkili kartlar: bu paneli hedefleyen TÜM aktif kuralların üyeleri (union).
-  const authorized = new Set<string>();
-  const links = await ctx.db
-    .query("groupDevices")
-    .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
-    .collect();
-  await Promise.all(
-    links.map(async (link) => {
-      const rule = await ctx.db.get(link.groupId);
-      if (!rule || rule.isActive === false) return;
-      const members = await ctx.db
-        .query("groupMembers")
-        .withIndex("by_project_group", (q) =>
-          q.eq("projectId", rule.projectId).eq("groupId", link.groupId),
-        )
-        .collect();
-      await Promise.all(
-        members.map(async (m) => {
-          const emp = await ctx.db.get(m.employeeId);
-          const card = normalizeIdeCard(emp?.cardNumber);
-          if (card) authorized.add(card);
-        }),
-      );
-    }),
-  );
+  // Yetkili kartlar: bu paneli (cihaz ∪ kapı bağı) hedefleyen TÜM aktif kuralların üyeleri.
+  const { authorized } = await resolvePanelAuthorizedCards(ctx, args.deviceId);
 
   // Panelde olan (roster yansıması) − yetkili = sökülecek hayaletler.
   const onPanel = await ctx.db
@@ -171,6 +224,19 @@ async function collectRuleIdeDevices(
     .collect();
   for (const gd of groupDevices) {
     const device = await ctx.db.get(gd.deviceId);
+    if (device && device.isActive && device.brand === "ide_smart") out.add(device._id);
+  }
+  // Kapı bağı: kuralın seçili kapıları → CANLI doors.deviceId → panel. by_group bilinçli
+  // (by_project_group değil): groupDoors okumaları her yerde by_group/by_door desenli ve
+  // projectId backfill migration'ı bu tabloyu kapsamıyor — eksik satır kaçırmayalım.
+  const groupDoors = await ctx.db
+    .query("groupDoors")
+    .withIndex("by_group", (q) => q.eq("groupId", ruleId))
+    .collect();
+  for (const gd of groupDoors) {
+    const door = await ctx.db.get(gd.doorId);
+    if (!door?.deviceId) continue;
+    const device = await ctx.db.get(door.deviceId);
     if (device && device.isActive && device.brand === "ide_smart") out.add(device._id);
   }
 }

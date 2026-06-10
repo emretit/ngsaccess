@@ -8,8 +8,33 @@ import {
   reconcileRemovedEmployeeIde,
   reconcilePanelRosterIde,
 } from "./lib/accessGraph";
-import { diffIds } from "./lib/reconcileMath";
+import { diffIds, staleGroupDoorIds } from "./lib/reconcileMath";
 import type { Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
+
+/**
+ * Kuraldan cihaz(lar) çıkarılırken o cihazlara ait (CANLI doors.deviceId) groupDoors
+ * satırlarını siler. Reconcile kapı bağını artık "yetki" saydığından stale satır,
+ * sökülen erişimi panelde yaşatırdı — temizlik bu yüzden zorunlu.
+ */
+async function deleteStaleGroupDoors(
+  ctx: MutationCtx,
+  ruleId: Id<"accessRules">,
+  removedDeviceIds: ReadonlySet<Id<"devices">>,
+): Promise<void> {
+  const doorRows = await ctx.db
+    .query("groupDoors")
+    .withIndex("by_group", (q) => q.eq("groupId", ruleId))
+    .collect();
+  if (doorRows.length === 0) return;
+  const doorDocs = await Promise.all(doorRows.map((row) => ctx.db.get(row.doorId)));
+  const doorDeviceById = new Map<Id<"doors">, Id<"devices"> | undefined>();
+  for (const door of doorDocs) {
+    if (door !== null) doorDeviceById.set(door._id, door.deviceId);
+  }
+  const staleIds = staleGroupDoorIds(doorRows, doorDeviceById, removedDeviceIds);
+  await Promise.all(staleIds.map((id) => ctx.db.delete(id)));
+}
 
 export const list = authedQuery({
   args: {
@@ -208,6 +233,10 @@ export const remove = authedMutation({
     if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
       throw new Error("Bu kurala erişim yetkiniz yok");
     }
+    // Silmeden ÖNCE: kuralın IDE panelleri (cihaz + kapı bağı). Satırlar silinince
+    // zincir koptuğu için sonradan çözülemez; aşağıdaki orphan reconcile bunu kullanır.
+    const candidatePanels = await resolveRuleIdeDeviceIds(ctx, args.ruleId, rule.projectId);
+
     const members = await ctx.db
       .query("groupMembers")
       .withIndex("by_project_group", (q) =>
@@ -235,13 +264,19 @@ export const remove = authedMutation({
 
     // Etkilenen üyeleri yeniden sync et — kalan kurallarına göre RightPlan
     // güncellensin, hiç kuralı kalmadıysa cihazdan sökülecek (Phase 5 reconcile).
+    // IDE: salt syncEmployeeToIdePanels YETMEZ — kalan IDE bağı olmayan üyede sessiz
+    // no-op kalır ve kart panelde yaşardı (silinmiş kuralla geçiş). Silme-öncesi
+    // candidatePanels ile gerçek orphan'lardan kart sökülür; helper kalan paneller
+    // için syncEmployeeToIdePanels'ı zaten kendisi schedule eder.
     await Promise.all(
       affectedEmployeeIds.flatMap((empId) => [
         ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
           employeeId: empId,
         }),
-        ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+        reconcileRemovedEmployeeIde(ctx, {
           employeeId: empId,
+          projectId: rule.projectId,
+          candidatePanels,
         }),
       ]),
     );
@@ -434,6 +469,11 @@ export const updateWithGroups = authedMutation({
           removedIdePanels.push(devId);
         }
       }
+      // Yalnız deviceIds verilen (API) çağrıda çıkarılan cihazların kapı bağlarını da
+      // temizle. UI her zaman doorIds da gönderir → aşağıdaki full-replace tek sahip.
+      if (doorIds === undefined && removedDeviceIds.length > 0) {
+        await deleteStaleGroupDoors(ctx, ruleId, new Set(removedDeviceIds));
+      }
     }
 
     // Kural bazlı kapı seçimi (IDE permission.io kaynağı). Tam değişim: eski sil, yeni yaz.
@@ -506,9 +546,15 @@ export const updateWithGroups = authedMutation({
       }
     }
 
-    // Roster eşitleme: üye/cihaz/kapı değiştiğinde paneldeki hayalet kartları sök.
-    // Salt isim/saat/gün güncellemelerinde (roster değişmez) atla.
-    const rosterChanged = employeeIds !== undefined || deviceIds !== undefined || doorIds !== undefined;
+    // Roster eşitleme: üye/cihaz/kapı veya isActive değiştiğinde paneldeki hayalet
+    // kartları sök (isActive-only API çağrısında atlanırsa pasif kuralın kartları
+    // panelde kalırdı — update() mutation'daki muadiliyle simetrik). Salt isim/saat/gün
+    // güncellemelerinde (roster değişmez) atla.
+    const rosterChanged =
+      employeeIds !== undefined ||
+      deviceIds !== undefined ||
+      doorIds !== undefined ||
+      updates.isActive !== undefined;
     if (rosterChanged) {
       // Panel listesi değişmediyse (deviceIds/doorIds dokunulmadı) ikinci DB gezisi gereksiz —
       // daha önce yakalanan ruleIdePanelsBefore ile aynı sonuç.
@@ -543,8 +589,11 @@ export const addGroupMember = authedMutation({
     if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
       throw new Error("Bu gruba erişim yetkiniz yok");
     }
+    // projectId istemciden değil kuraldan: farklı düşerse üye, reconcile'ın
+    // by_project_group sorgusuna görünmez ve kartı hayalet sanılıp süpürülürdü.
     const id = await ctx.db.insert("groupMembers", {
       ...args,
+      projectId: rule.projectId,
       createdAt: new Date().toISOString(),
     });
     await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
@@ -598,8 +647,10 @@ export const addGroupDevice = authedMutation({
     if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
       throw new Error("Bu gruba erişim yetkiniz yok");
     }
+    // projectId istemciden değil kuraldan (addGroupMember'daki gerekçeyle aynı).
     const id = await ctx.db.insert("groupDevices", {
       ...args,
+      projectId: rule.projectId,
       createdAt: new Date().toISOString(),
     });
     // Bu gruba bağlı tüm çalışanları yeni cihaza sync et + week-plan'ı cihaza yaz.
@@ -646,6 +697,21 @@ export const removeGroupDevice = authedMutation({
         : [];
 
     await ctx.db.delete(args.groupDeviceId);
+
+    // Cihazla birlikte o cihaza ait kapı bağlarını da sil — stale groupDoors satırı
+    // reconcile'ın kapı bacağında "yetki" üretip sökülen erişimi yaşatırdı. Aynı cihaza
+    // başka bir link kaldıysa DOKUNMA: kapı seçimini silmek getRuleIoIdsForPanel
+    // fallback'ini tetikleyip erişimi panelin TÜM kapılarına genişletirdi.
+    // Üye reconcile'ından ÖNCE olmalı ki `remaining` stale bağ yüzünden paneli
+    // "hâlâ erişiliyor" saymasın.
+    const siblingLinks = await ctx.db
+      .query("groupDevices")
+      .withIndex("by_group", (q) => q.eq("groupId", gd.groupId))
+      .collect();
+    const stillLinked = siblingLinks.some((l) => l.deviceId === gd.deviceId);
+    if (!stillLinked) {
+      await deleteStaleGroupDoors(ctx, gd.groupId, new Set([gd.deviceId]));
+    }
 
     // Bu gruba bağlı üyeleri yeniden sync — diğer kurallarla cihazda kalabilirler.
     // reconcileRemovedEmployeeIde: çıkarılan panele başka kuralla erişemeyen üyenin kartı

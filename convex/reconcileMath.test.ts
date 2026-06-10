@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { diffIds, orphanPanels } from "./lib/reconcileMath";
+import { diffIds, orphanPanels, staleGroupDoorIds } from "./lib/reconcileMath";
 
 describe("reconcileMath – diffIds", () => {
   it("çıkarılan / eklenen / korunan ayrımı", () => {
@@ -52,5 +52,52 @@ describe("reconcileMath – orphanPanels", () => {
 
   it("aday listesi tekilleşir", () => {
     expect(orphanPanels(["p1", "p1"], [])).toEqual(["p1"]);
+  });
+});
+
+describe("reconcileMath – staleGroupDoorIds", () => {
+  const rows = [
+    { _id: "gd1", doorId: "d1" },
+    { _id: "gd2", doorId: "d2" },
+    { _id: "gd3", doorId: "d3" },
+  ];
+
+  it("çıkarılan cihazın kapısına ait satır silinir, kalan cihazınki kalır", () => {
+    const doorDeviceById = new Map([
+      ["d1", "devA"],
+      ["d2", "devB"],
+      ["d3", "devA"],
+    ]);
+    expect(staleGroupDoorIds(rows, doorDeviceById, new Set(["devA"]))).toEqual([
+      "gd1",
+      "gd3",
+    ]);
+  });
+
+  it("taşınmış kapı (canlı deviceId artık başka cihazda) silinmez", () => {
+    // gd1 yazıldığında kapı devA'daydı; sonradan devC'ye taşındı → canlı harita devC der.
+    const doorDeviceById = new Map([["d1", "devC"]]);
+    expect(staleGroupDoorIds([rows[0]], doorDeviceById, new Set(["devA"]))).toEqual([]);
+  });
+
+  it("silinmiş kapı (haritada yok) dokunulmaz", () => {
+    const doorDeviceById = new Map<string, string | undefined>();
+    expect(staleGroupDoorIds([rows[0]], doorDeviceById, new Set(["devA"]))).toEqual([]);
+  });
+
+  it("cihaza bağlı olmayan kapı (deviceId undefined) dokunulmaz", () => {
+    const doorDeviceById = new Map<string, string | undefined>([["d1", undefined]]);
+    expect(staleGroupDoorIds([rows[0]], doorDeviceById, new Set(["devA"]))).toEqual([]);
+  });
+
+  it("birden çok çıkarılan cihaz aynı geçişte yakalanır", () => {
+    const doorDeviceById = new Map([
+      ["d1", "devA"],
+      ["d2", "devB"],
+      ["d3", "devC"],
+    ]);
+    expect(
+      staleGroupDoorIds(rows, doorDeviceById, new Set(["devA", "devB"])),
+    ).toEqual(["gd1", "gd2"]);
   });
 });

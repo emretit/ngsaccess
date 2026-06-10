@@ -42,3 +42,29 @@ export function orphanPanels<T extends string>(
   }
   return Array.from(out);
 }
+
+/**
+ * Kuraldan cihaz(lar) çıkarılırken silinmesi gereken groupDoors satırlarını seçer:
+ * kapısı (CANLI doors.deviceId) çıkarılan cihazlardan birine ait olan satırlar.
+ *
+ * `doorDeviceById` haritasında OLMAYAN kapı (doors kaydı silinmiş) ve `deviceId`'si
+ * undefined olan kapı (panele bağlı değil) dokunulmadan bırakılır — reconcile'ın kapı
+ * bacağı bunları zaten yetki saymaz; yanlış pozitif silme riskine girilmez.
+ */
+export function staleGroupDoorIds<
+  GD extends string,
+  D extends string,
+  Dev extends string,
+>(
+  rows: ReadonlyArray<{ _id: GD; doorId: D }>,
+  doorDeviceById: ReadonlyMap<D, Dev | undefined>,
+  removedDeviceIds: ReadonlySet<Dev>,
+): GD[] {
+  const out: GD[] = [];
+  for (const row of rows) {
+    if (!doorDeviceById.has(row.doorId)) continue;
+    const deviceId = doorDeviceById.get(row.doorId);
+    if (deviceId !== undefined && removedDeviceIds.has(deviceId)) out.push(row._id);
+  }
+  return out;
+}
