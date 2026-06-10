@@ -216,27 +216,31 @@ async function collectRuleIdeDevices(
   projectId: Id<"projects"> | undefined,
   out: Set<Id<"devices">>,
 ): Promise<void> {
-  const groupDevices = await ctx.db
-    .query("groupDevices")
-    .withIndex("by_project_group", (q) =>
-      q.eq("projectId", projectId).eq("groupId", ruleId),
-    )
-    .collect();
-  for (const gd of groupDevices) {
-    const device = await ctx.db.get(gd.deviceId);
-    if (device && device.isActive && device.brand === "ide_smart") out.add(device._id);
-  }
   // Kapı bağı: kuralın seçili kapıları → CANLI doors.deviceId → panel. by_group bilinçli
   // (by_project_group değil): groupDoors okumaları her yerde by_group/by_door desenli ve
   // projectId backfill migration'ı bu tabloyu kapsamıyor — eksik satır kaçırmayalım.
-  const groupDoors = await ctx.db
-    .query("groupDoors")
-    .withIndex("by_group", (q) => q.eq("groupId", ruleId))
-    .collect();
-  for (const gd of groupDoors) {
-    const door = await ctx.db.get(gd.doorId);
-    if (!door?.deviceId) continue;
-    const device = await ctx.db.get(door.deviceId);
-    if (device && device.isActive && device.brand === "ide_smart") out.add(device._id);
-  }
+  const [groupDevices, groupDoors] = await Promise.all([
+    ctx.db
+      .query("groupDevices")
+      .withIndex("by_project_group", (q) =>
+        q.eq("projectId", projectId).eq("groupId", ruleId),
+      )
+      .collect(),
+    ctx.db
+      .query("groupDoors")
+      .withIndex("by_group", (q) => q.eq("groupId", ruleId))
+      .collect(),
+  ]);
+  await Promise.all([
+    ...groupDevices.map(async (gd) => {
+      const device = await ctx.db.get(gd.deviceId);
+      if (device && device.isActive && device.brand === "ide_smart") out.add(device._id);
+    }),
+    ...groupDoors.map(async (gd) => {
+      const door = await ctx.db.get(gd.doorId);
+      if (!door?.deviceId) return;
+      const device = await ctx.db.get(door.deviceId);
+      if (device && device.isActive && device.brand === "ide_smart") out.add(device._id);
+    }),
+  ]);
 }
