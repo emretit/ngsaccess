@@ -57,6 +57,7 @@ export function IdeProvisioningCard() {
 
   const [subnet, setSubnet] = useState("192.168.1");
   const [scanning, setScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
   const [foundPanels, setFoundPanels] = useState<string[] | null>(null);
 
   const [ip, setIp] = useState("");
@@ -99,15 +100,23 @@ export function IdeProvisioningCard() {
       return;
     }
     setScanning(true);
+    setScanProgress(0);
     setFoundPanels(null);
     setResult(null);
     setIp("");
     setShowManualIp(false);
+
+    // Simüle edilmiş ilerleme — tarama ~15sn sürer, 100ms'de ~0.6% artış
+    const timer = setInterval(() => {
+      setScanProgress((p) => (p < 90 ? p + 0.6 : p));
+    }, 100);
+
     try {
       const res = await fetch(`${AGENT_BASE}/scan?subnet=${encodeURIComponent(s)}`);
       const json: unknown = await res.json();
       if (!res.ok || !isRecord(json)) throw new Error(`HTTP ${res.status}`);
       const panels = Array.isArray(json.panels) ? (json.panels as string[]) : [];
+      setScanProgress(100);
       setFoundPanels(panels);
       if (panels.length === 0) {
         toast({ title: "Panel bulunamadı", description: `${s}.x ağında IDE Smart panel yok`, variant: "destructive" });
@@ -119,6 +128,7 @@ export function IdeProvisioningCard() {
       const message = error instanceof Error ? error.message : "Tarama başarısız";
       toast({ title: "Hata", description: message, variant: "destructive" });
     } finally {
+      clearInterval(timer);
       setScanning(false);
     }
   };
@@ -263,6 +273,17 @@ export function IdeProvisioningCard() {
           <p className="text-xs text-muted-foreground">
             {subnet}.1 – {subnet}.254 aralığı taranır (~15-20sn)
           </p>
+          {scanning && (
+            <div className="space-y-1">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-all duration-100"
+                  style={{ width: `${scanProgress.toFixed(0)}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground text-right">{scanProgress.toFixed(0)}%</p>
+            </div>
+          )}
         </div>
 
         {/* Bulunan paneller listesi */}

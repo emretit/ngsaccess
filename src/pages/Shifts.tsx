@@ -16,6 +16,7 @@ export default function Shifts() {
   const { toast } = useToast();
   const [firstShiftOpen, setFirstShiftOpen] = useState(false);
   const createShift = useMutation(api.shifts.create);
+  const updateShift = useMutation(api.shifts.update);
 
   const employees = useQuery(api.employees.list, projectLoading ? "skip" : {});
   const shifts = useQuery(api.shifts.list, projectLoading ? "skip" : {});
@@ -104,7 +105,9 @@ export default function Shifts() {
         open={firstShiftOpen}
         onOpenChange={setFirstShiftOpen}
         onAdd={handleCreateFirstShift}
-        onUpdate={async () => {}}
+        onUpdate={async (id, payload) => {
+          await updateShift({ shiftId: id, ...payload });
+        }}
         editingShift={null}
         onClose={() => setFirstShiftOpen(false)}
       />

@@ -7,15 +7,17 @@ import { Badge } from "@/components/ui/badge";
 import { SampleQueries } from "./chat/SampleQueries";
 import { useMessageHandler } from "./chat/hooks/useMessageHandler";
 import { AiChatMessage } from "./chat/AiChatMessage";
+import { useExportUtils } from "./chat/useExportUtils";
 
 export function PDKSAiChat() {
   const [aiMode, setAiMode] = useState<'native' | 'openai'>('native');
   const { messages, input, setInput, isLoading, handleSendMessage } = useMessageHandler();
+  const { handleExportExcel, handleExportPDF } = useExportUtils();
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
-    
+
     const userMessage = input.trim();
     setInput('');
     await handleSendMessage(userMessage);
@@ -23,14 +25,6 @@ export function PDKSAiChat() {
 
   const handleQuerySelect = (query: string) => {
     setInput(query);
-  };
-
-  const handleExportExcel = () => {
-    // TODO: Excel export pipeline
-  };
-
-  const handleExportPDF = () => {
-    // TODO: PDF export pipeline
   };
 
   return (

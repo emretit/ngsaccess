@@ -12,10 +12,12 @@ export function useMessageHandler() {
   const getDatabaseContext = useAction(api.actions.getChatData.getDatabaseContext);
 
   const fetchers = {
-    fetchCardReadings: async (params: { department?: string | null; date?: string | null }) =>
+    fetchCardReadings: async (params: { department?: string | null; date?: string | null; startDate?: string | null; endDate?: string | null }) =>
       getCardReadings({
         department: params.department ?? undefined,
         date: params.date ?? undefined,
+        startDate: params.startDate ?? undefined,
+        endDate: params.endDate ?? undefined,
       }),
     fetchDatabaseContext: () => getDatabaseContext({}),
   };

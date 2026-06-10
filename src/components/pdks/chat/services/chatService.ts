@@ -23,7 +23,7 @@ export async function sendChatMessage(
     // Önce doğal dil servisimizle deneyelim
     console.log("Doğal dil servisi ile işleniyor...");
     
-    const nlResult = await NaturalLanguageService.processQuery(input);
+    const nlResult = await NaturalLanguageService.processQuery(input, fetchers);
     
     // Eğer doğal dil servisi başarıyla sonuç döndürdüyse onu kullan
     if (nlResult.source !== 'error' && (nlResult.data?.length || 0) > 0) {

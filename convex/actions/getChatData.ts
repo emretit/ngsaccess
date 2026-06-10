@@ -20,15 +20,28 @@ export const getCardReadings = authedAction({
   args: {
     department: v.optional(v.string()),
     date: v.optional(v.string()),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const result = await ctx.runQuery(api.cardReadings.list, {
       dateFilter: args.date,
-      pageSize: 100,
+      pageSize: args.startDate ? 500 : 100,
       page: 1,
     });
 
     let readings = result.readings as EnrichedReading[];
+
+    if (args.startDate) {
+      const start = new Date(args.startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(args.endDate ?? args.startDate);
+      end.setHours(23, 59, 59, 999);
+      readings = readings.filter((r) => {
+        const t = new Date(r.accessTime).getTime();
+        return t >= start.getTime() && t <= end.getTime();
+      });
+    }
 
     if (args.department) {
       const deptLower = args.department.toLowerCase();

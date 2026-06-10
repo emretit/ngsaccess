@@ -1,7 +1,11 @@
 import ExcelJS from "exceljs";
+import jsPDF from "jspdf";
 import { useToast } from "@/hooks/use-toast";
 import { MessageData } from './types';
 import { toLocalDateString } from "@/lib/date";
+
+const COL_HEADERS = ["Ad Soyad", "Giriş Saati", "Çıkış Saati", "Departman", "Cihaz", "Konum"] as const;
+const COL_KEYS: (keyof MessageData)[] = ["name", "check_in", "check_out", "department", "device", "location"];
 
 export function useExportUtils() {
   const { toast } = useToast();
@@ -21,7 +25,6 @@ export function useExportUtils() {
 
   const handleExportExcel = async (messageData: MessageData[]) => {
     if (!messageData || !Array.isArray(messageData) || messageData.length === 0) {
-      console.log("Export Excel error: No data to export", messageData);
       toast({
         title: "Dışa aktarılamadı",
         description: "Bu mesaj dışa aktarılabilir bir rapor içermiyor.",
@@ -33,10 +36,9 @@ export function useExportUtils() {
     try {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("PDKS Raporu");
-      const headers: (keyof MessageData)[] = ["name", "check_in", "check_out", "department", "device", "location"];
-      worksheet.addRow(["Ad Soyad", "Giriş Saati", "Çıkış Saati", "Departman", "Cihaz", "Konum"]);
+      worksheet.addRow([...COL_HEADERS]);
       messageData.forEach((row) =>
-        worksheet.addRow(headers.map((h) => row[h] ?? ""))
+        worksheet.addRow(COL_KEYS.map((h) => row[h] ?? ""))
       );
       worksheet.columns = [
         { width: 25 },
@@ -72,9 +74,8 @@ export function useExportUtils() {
     }
   };
 
-  const handleExportPDF = async (messageData: MessageData[]) => {
-    if (!messageData || !Array.isArray(messageData)) {
-      console.log("Export PDF error: No data to export", messageData);
+  const handleExportPDF = (messageData: MessageData[]) => {
+    if (!messageData || !Array.isArray(messageData) || messageData.length === 0) {
       toast({
         title: "Dışa aktarılamadı",
         description: "Bu mesaj dışa aktarılabilir bir rapor içermiyor.",
@@ -84,45 +85,60 @@ export function useExportUtils() {
     }
 
     try {
-      // Prepare data for PDF generation
-      const pdfData = {
-        title: "PDKS Rapor",
-        date: new Date().toLocaleDateString('tr-TR'),
-        headers: ["Ad Soyad", "Giriş Saati", "Çıkış Saati", "Departman", "Cihaz", "Konum"],
-        rows: messageData.map(item => [
-          item.name || '-',
-          item.check_in || '-',
-          item.check_out || '-',
-          item.department || '-',
-          item.device || '-',
-          item.location || '-'
-        ])
-      };
+      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
-      // TODO: Migrate PDF generation to Convex Action
-      const response = await fetch(`/api/generate-pdf`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(pdfData),
+      // Title
+      doc.setFontSize(14);
+      doc.text("PDKS Raporu", 14, 15);
+      doc.setFontSize(9);
+      doc.text(new Date().toLocaleDateString('tr-TR'), 14, 21);
+
+      // Table layout
+      const colWidths = [45, 35, 35, 35, 35, 35];
+      const rowH = 8;
+      const startX = 14;
+      let y = 28;
+
+      // Header row
+      doc.setFillColor(59, 130, 246);
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(8);
+      let x = startX;
+      COL_HEADERS.forEach((h, i) => {
+        doc.rect(x, y, colWidths[i], rowH, "F");
+        doc.text(h, x + 2, y + 5.5);
+        x += colWidths[i];
+      });
+      y += rowH;
+
+      // Data rows
+      doc.setTextColor(30, 30, 30);
+      messageData.forEach((row, rowIdx) => {
+        if (y > 185) {
+          doc.addPage();
+          y = 15;
+        }
+        const fill = rowIdx % 2 === 0 ? [248, 250, 252] : [255, 255, 255];
+        doc.setFillColor(fill[0], fill[1], fill[2]);
+        x = startX;
+        COL_KEYS.forEach((k, i) => {
+          doc.rect(x, y, colWidths[i], rowH, "F");
+          const cell = String(row[k] ?? "-");
+          const clipped = doc.splitTextToSize(cell, colWidths[i] - 3)[0] ?? cell;
+          doc.text(clipped, x + 2, y + 5.5);
+          x += colWidths[i];
+        });
+        // row border
+        doc.setDrawColor(220, 220, 220);
+        doc.rect(startX, y, colWidths.reduce((a, b) => a + b, 0), rowH, "S");
+        y += rowH;
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(`PDF generation failed: ${errorData.error || response.statusText}`);
-      }
+      doc.save(`pdks_rapor_${toLocalDateString()}.pdf`);
 
-      // For direct browser rendering of PDF
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      
-      // Open PDF in a new tab
-      window.open(url, '_blank');
-      
       toast({
-        title: "PDF oluşturuldu",
-        description: "Rapor PDF formatında başarıyla oluşturuldu ve yeni sekmede açıldı.",
+        title: "PDF indirildi",
+        description: "Rapor başarıyla PDF formatında dışa aktarıldı.",
       });
     } catch (error) {
       console.error('PDF export error:', error);
