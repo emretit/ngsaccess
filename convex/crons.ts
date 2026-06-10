@@ -49,4 +49,11 @@ crons.interval(
   internal.visitors.expireVisitorAccess,
 );
 
+// E-posta doğrulama token temizliği: her gün 03:00 UTC — setupToken+tokenExpiresAt sıfırla.
+crons.daily(
+  "cleanup-expired-email-tokens",
+  { hourUTC: 3, minuteUTC: 0 },
+  internal.emailVerification.cleanupExpiredTokens,
+);
+
 export default crons;

@@ -4,6 +4,7 @@ import { internalAction } from "../_generated/server";
 import { api, internal } from "../_generated/api";
 import { v } from "convex/values";
 import { authedAction } from "../lib/customFunctions";
+import { escapeHtml } from "../lib/escapers";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
@@ -54,24 +55,13 @@ async function sendResendEmail(params: {
   return { success: true };
 }
 
-/**
- * Kullanıcı kontrollü string'leri HTML-escape eder. Email template'lerine
- * interpolate edilen isim/firma gibi alanlara uygulanır; aksi halde
- * project_admin gibi roller çalışan adına <a href> enjekte edip Resend
- * altyapısından phishing maili gönderebilir (HTML injection).
- * NOT: Template'in kendi sabit HTML iskeleti escape EDİLMEZ — yalnızca
- * dışarıdan gelen değerler. body içinde kasıtlı <strong>/<br/> kullanan
- * çağrılar, dinamik kısmı önce escape edip sonra markup ekler.
- */
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
 
+/**
+ * GÜVENLIK: heading, body ve footerNote içine kullanıcı kontrolündeki tüm değerler
+ * (isim, şirket adı, vb.) buraya gelmeden önce escapeHtml() ile escape edilmeli.
+ * Template'in kendi sabit HTML iskeletindeki değerler escape edilmez.
+ * ctaUrl server-controlled olmalı (kullanıcı inputu KABUL ETMEz).
+ */
 interface EmailTemplateParams {
   title: string;
   heading: string;

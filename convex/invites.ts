@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
-import { authedMutation, superAdminMutation } from "./lib/customFunctions";
+import { authedMutation, superAdminMutation, superAdminQuery } from "./lib/customFunctions";
 import { limiter } from "./lib/rateLimit";
+import { verifyUser } from "./lib/auth";
 
 /**
  * Yetkili kullanıcı (super_admin / proje sahibi / proje admin) bir kullanıcıyı
@@ -47,7 +48,7 @@ export const create = authedMutation({
     const existing = await ctx.db
       .query("invites")
       .withIndex("by_email", (q) => q.eq("email", args.email))
-      .filter((q) => q.eq(q.field("used"), false))
+      .filter((q) => q.neq(q.field("used"), true))
       .first();
     if (existing) {
       await ctx.db.patch(existing._id, { used: true });
@@ -148,9 +149,9 @@ export const consume = mutation({
     // takılır (getCurrentUser: verified===false → reddeder).
     await ctx.db.patch(user._id, {
       role: invite.role,
-      verified: true,
       updatedAt: new Date().toISOString(),
     });
+    await verifyUser(ctx, user._id);
 
     // Projeye ekle (duplicate kontrolü)
     const existingAssignment = await ctx.db
@@ -177,6 +178,40 @@ export const consume = mutation({
 /**
  * super_admin tüm davetleri listeler.
  */
+/** Süresi dolmuş (ve henüz kullanılmamış) davetleri listeler. */
+export const listExpired = superAdminQuery({
+  args: {},
+  returns: v.array(
+    v.object({
+      _id: v.id("invites"),
+      email: v.string(),
+      projectId: v.id("projects"),
+      role: v.union(v.literal("project_admin"), v.literal("project_user")),
+      expiresAt: v.string(),
+    })
+  ),
+  handler: async (ctx) => {
+    const now = new Date().toISOString();
+    const rows = await ctx.db
+      .query("invites")
+      .filter((q) =>
+        q.and(
+          q.neq(q.field("used"), true),
+          q.lt(q.field("expiresAt"), now),
+        )
+      )
+      .order("desc")
+      .take(50);
+    return rows.map((r) => ({
+      _id: r._id,
+      email: r.email,
+      projectId: r.projectId,
+      role: r.role,
+      expiresAt: r.expiresAt,
+    }));
+  },
+});
+
 export const list = superAdminMutation({
   args: { projectId: v.optional(v.id("projects")) },
   returns: v.array(

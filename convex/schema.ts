@@ -42,7 +42,8 @@ export default defineSchema({
     updatedAt: v.optional(v.string()),
   })
     .index("email", ["email"])
-    .index("by_setup_token", ["setupToken"]),
+    .index("by_setup_token", ["setupToken"])
+    .index("by_role", ["role"]),
 
   userProjects: defineTable({
     userId: v.id("users"),

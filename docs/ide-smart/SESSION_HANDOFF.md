@@ -112,4 +112,4 @@ function escapeHtml(s: string): string {
 
 ## Temizlenecekler
 
-- `src/components/admin/IdeDefaultsSettings.tsx` — artık hiçbir yerde kullanılmıyor, silinebilir
+- ~~`src/components/admin/IdeDefaultsSettings.tsx`~~ — silindi (2026-06-10)

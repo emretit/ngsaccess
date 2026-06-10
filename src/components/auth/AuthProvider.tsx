@@ -190,6 +190,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signUp,
         signOut,
+        // Convex useQuery reaktif — mutation sonrası currentUser otomatik güncellenir.
+        // refreshProfile çağrısı gereksiz; uyumluluk için no-op olarak bırakıldı.
         refreshProfile: async () => {},
         checkUserRole: handleCheckUserRole,
       }}

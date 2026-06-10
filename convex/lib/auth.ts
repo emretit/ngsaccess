@@ -124,6 +124,22 @@ export async function requireEmployeeAccess(
 }
 
 /**
+ * Kullanıcıyı doğrulanmış olarak işaretler ve token'ı temizler.
+ * emailVerification, invites ve users.initializeAdmin — 3 güvenilir kanal — bunu çağırır.
+ */
+export async function verifyUser(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+): Promise<void> {
+  await ctx.db.patch(userId, {
+    verified: true,
+    setupToken: undefined,
+    tokenExpiresAt: undefined,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+/**
  * ADMIN_SETUP_SECRET env değişkeni ile gated maintenance/migration mutation'ları için.
  * Constant-time karşılaştırma timing attack engelliyor.
  */

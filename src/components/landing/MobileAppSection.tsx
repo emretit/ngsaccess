@@ -43,28 +43,32 @@ const MobileAppSection = () => {
             </ul>
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <a
-                href="#"
-                aria-label="App Store'dan indir"
-                className="flex items-center gap-3 bg-black text-white rounded-xl px-5 py-3 hover:bg-black/85 transition-colors"
+              <div
+                aria-label="App Store — Yakında"
+                className="relative flex items-center gap-3 bg-black/40 text-white/60 rounded-xl px-5 py-3 cursor-not-allowed select-none"
               >
                 <Apple className="h-7 w-7" />
                 <div className="text-left leading-tight">
                   <div className="text-[10px] opacity-80">İndir</div>
                   <div className="text-base font-semibold">App Store</div>
                 </div>
-              </a>
-              <a
-                href="#"
-                aria-label="Google Play'den indir"
-                className="flex items-center gap-3 bg-black text-white rounded-xl px-5 py-3 hover:bg-black/85 transition-colors"
+                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  Yakında
+                </span>
+              </div>
+              <div
+                aria-label="Google Play — Yakında"
+                className="relative flex items-center gap-3 bg-black/40 text-white/60 rounded-xl px-5 py-3 cursor-not-allowed select-none"
               >
                 <Play className="h-6 w-6" fill="currentColor" />
                 <div className="text-left leading-tight">
                   <div className="text-[10px] opacity-80">İndir</div>
                   <div className="text-base font-semibold">Google Play</div>
                 </div>
-              </a>
+                <span className="absolute -top-2 -right-2 bg-primary text-primary-foreground text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  Yakında
+                </span>
+              </div>
             </div>
           </motion.div>
 

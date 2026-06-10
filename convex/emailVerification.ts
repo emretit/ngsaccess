@@ -1,7 +1,8 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { internalMutation, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { limiter } from "./lib/rateLimit";
+import { verifyUser } from "./lib/auth";
 
 const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 saat
 
@@ -90,16 +91,40 @@ export const verifyEmail = mutation({
     }
 
     if (user.tokenExpiresAt && new Date(user.tokenExpiresAt) < new Date()) {
-      throw new Error("Doğrulama linkinin süresi dolmuş");
+      throw new Error("EXPIRED: Doğrulama linkinin süresi dolmuş");
     }
 
-    await ctx.db.patch(user._id, {
-      verified: true,
-      setupToken: undefined,
-      tokenExpiresAt: undefined,
-      updatedAt: new Date().toISOString(),
-    });
+    await verifyUser(ctx, user._id);
 
     return { success: true, email: user.email };
+  },
+});
+
+/**
+ * Süresi dolmuş e-posta doğrulama token'larını temizler.
+ * Cron tarafından çağrılır (günlük).
+ */
+export const cleanupExpiredTokens = internalMutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const now = new Date().toISOString();
+    const expired = await ctx.db
+      .query("users")
+      .withIndex("by_setup_token")
+      .filter((q) =>
+        q.and(
+          q.neq(q.field("setupToken"), undefined),
+          q.lt(q.field("tokenExpiresAt"), now),
+        ),
+      )
+      .collect();
+
+    await Promise.all(
+      expired.map((u) =>
+        ctx.db.patch(u._id, { setupToken: undefined, tokenExpiresAt: undefined }),
+      ),
+    );
+    return null;
   },
 });

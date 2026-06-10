@@ -29,6 +29,7 @@ export const useUserManagement = () => {
   const updateRoleMut = useMutation(api.users.updateRole);
   const assignProjectMut = useMutation(api.userProjects.assign);
   const _removeProjectMut = useMutation(api.userProjects.remove);
+  const deleteUserMut = useMutation(api.users.deleteUser);
   const sendInviteEmail = useAction(api.actions.sendEmail.sendUserInviteEmail);
 
   const users: User[] = (usersRaw ?? []) as User[];
@@ -108,9 +109,17 @@ export const useUserManagement = () => {
     }
   };
 
-  const handleDeleteUser = async (_user: User) => {
-    void _user;
-    toast({ title: "Bilgi", description: "Kullanıcı silme işlemi admin panelinden yapılabilir." });
+  const handleDeleteUser = async (user: User) => {
+    try {
+      await deleteUserMut({ userId: user._id });
+      toast({ title: "Kullanıcı silindi", description: `${user.email ?? user._id} kaldırıldı.` });
+    } catch (error: unknown) {
+      toast({
+        title: "Hata",
+        description: (error as Error)?.message ?? "Kullanıcı silinemedi",
+        variant: "destructive",
+      });
+    }
   };
 
   const resetForm = () => {

@@ -1,3 +1,5 @@
+import { escapeXml } from "./escapers";
+
 /**
  * SGK Aylık Prim ve Hizmet Belgesi (APHB) eksik gün nedeni kodları.
  * Kaynak: SGK 2008/85 sayılı Genelge.
@@ -43,14 +45,6 @@ export function sgkCodeForAbsence(): SgkEksikGunKodu {
   return SGK_EKSIK_GUN_KODU.DEVAMSIZLIK;
 }
 
-function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
 
 export interface AphbEmployeeEntry {
   tcKimlikNo: string;

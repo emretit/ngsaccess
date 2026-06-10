@@ -3,7 +3,7 @@ import { internalMutation, internalQuery, mutation, query } from "./_generated/s
 import type { Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { optionalAuthQuery, authedMutation, adminQuery, superAdminMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
+import { getProjectIdsForUser, verifyUser } from "./lib/auth";
 
 /** Kurulum sayfası için: Sistemde super_admin var mı? (Public - auth gerekmez) */
 export const hasSuperAdmin = query({
@@ -12,7 +12,7 @@ export const hasSuperAdmin = query({
   handler: async (ctx) => {
     const admin = await ctx.db
       .query("users")
-      .filter((q) => q.eq(q.field("role"), "super_admin"))
+      .withIndex("by_role", (q) => q.eq("role", "super_admin"))
       .first();
     return !!admin;
   },
@@ -176,9 +176,43 @@ export const initializeAdmin = mutation({
     // Secret doğrulandı → güvenilir kanal → hesabı super_admin + verified yap.
     await ctx.db.patch(userId, {
       role: "super_admin",
-      verified: true,
       updatedAt: new Date().toISOString(),
     });
+    await verifyUser(ctx, userId);
+    return null;
+  },
+});
+
+/**
+ * super_admin UI'dan kullanıcı siler. users + authAccounts + authSessions +
+ * userProjects kaldırır. super_admin kendi hesabını silemez.
+ */
+export const deleteUser = superAdminMutation({
+  args: { userId: v.id("users") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (args.userId === ctx.user._id) {
+      throw new Error("Kendi hesabınızı silemezsiniz");
+    }
+    const accounts = await ctx.db
+      .query("authAccounts")
+      .withIndex("userIdAndProvider", (q) => q.eq("userId", args.userId))
+      .collect();
+    await Promise.all(accounts.map((a) => ctx.db.delete(a._id)));
+
+    const sessions = await ctx.db
+      .query("authSessions")
+      .withIndex("userId", (q) => q.eq("userId", args.userId))
+      .collect();
+    await Promise.all(sessions.map((s) => ctx.db.delete(s._id)));
+
+    const userProjects = await ctx.db
+      .query("userProjects")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    await Promise.all(userProjects.map((up) => ctx.db.delete(up._id)));
+
+    await ctx.db.delete(args.userId);
     return null;
   },
 });

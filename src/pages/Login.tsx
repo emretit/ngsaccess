@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from 'convex/react';
-import { ArrowRight, Eye, EyeOff, Home, Lock, Mail, MailCheck, ShieldCheck } from 'lucide-react';
+import { useMutation, useQuery } from 'convex/react';
+import { ArrowRight, Eye, EyeOff, Home, Lock, Mail, MailCheck, RefreshCw, ShieldCheck } from 'lucide-react';
 
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,9 @@ export default function Login() {
   );
   // Doğrulanmamış hesapla giriş denendi mi? (signIn guard tetikledi)
   const [emailNotConfirmed, setEmailNotConfirmed] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendDone, setResendDone] = useState(false);
+  const requestVerification = useMutation(api.emailVerification.requestVerification);
 
   useEffect(() => {
     // Yalnızca DOĞRULANMIŞ kullanıcıyı /home'a yönlendir. Doğrulanmamış (verified=false)
@@ -36,6 +39,20 @@ export default function Login() {
       navigate('/home');
     }
   }, [user, loading, navigate]);
+
+  const handleResend = async () => {
+    if (!email || resending || resendDone) return;
+    setResending(true);
+    try {
+      await requestVerification({ email: email.trim().toLowerCase() });
+      setResendDone(true);
+      toast({ title: 'Doğrulama maili gönderildi', description: 'Gelen kutunuzu kontrol edin.' });
+    } catch {
+      toast({ title: 'Gönderilemedi', description: 'Lütfen birkaç dakika sonra tekrar deneyin.', variant: 'destructive' });
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,11 +145,22 @@ export default function Login() {
           {emailNotConfirmed && (
             <div className="flex items-start gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-950/40">
               <MailCheck className="mt-0.5 h-5 w-5 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
-              <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                E-posta adresiniz henüz doğrulanmamış. Size gönderdiğimiz maildeki{' '}
-                <span className="font-semibold">Hesabı Doğrula</span> butonuna tıkladıktan sonra
-                giriş yapabilirsiniz.
-              </p>
+              <div className="flex-1 space-y-2">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  E-posta adresiniz henüz doğrulanmamış. Size gönderdiğimiz maildeki{' '}
+                  <span className="font-semibold">Hesabı Doğrula</span> butonuna tıkladıktan sonra
+                  giriş yapabilirsiniz.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={resending || resendDone || !email}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-yellow-700 underline-offset-2 hover:underline disabled:opacity-50 dark:text-yellow-300"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${resending ? 'animate-spin' : ''}`} />
+                  {resendDone ? 'Mail gönderildi' : resending ? 'Gönderiliyor...' : 'Tekrar gönder'}
+                </button>
+              </div>
             </div>
           )}
 

@@ -54,6 +54,7 @@ import type * as lib_customFunctions from "../lib/customFunctions.js";
 import type * as lib_digestAuth from "../lib/digestAuth.js";
 import type * as lib_employeeAuth from "../lib/employeeAuth.js";
 import type * as lib_employeeCascade from "../lib/employeeCascade.js";
+import type * as lib_escapers from "../lib/escapers.js";
 import type * as lib_hikEventCodes from "../lib/hikEventCodes.js";
 import type * as lib_hikGateway from "../lib/hikGateway.js";
 import type * as lib_hikSync from "../lib/hikSync.js";
@@ -138,6 +139,7 @@ declare const fullApi: ApiFromModules<{
   "lib/digestAuth": typeof lib_digestAuth;
   "lib/employeeAuth": typeof lib_employeeAuth;
   "lib/employeeCascade": typeof lib_employeeCascade;
+  "lib/escapers": typeof lib_escapers;
   "lib/hikEventCodes": typeof lib_hikEventCodes;
   "lib/hikGateway": typeof lib_hikGateway;
   "lib/hikSync": typeof lib_hikSync;
