@@ -185,6 +185,16 @@ export const update = authedMutation({
         accessRuleId: ruleId,
       });
     }
+    // Kural deaktif edildiğinde IDE panellerindeki kart kayıtlarını sök.
+    // syncPermissionToIdePanels permission kaydını günceller ama fiziksel kartı kaldırmaz.
+    if (updates.isActive === false) {
+      const idePanels = await resolveRuleIdeDeviceIds(ctx, ruleId, rule.projectId);
+      await Promise.all(
+        idePanels.map((panelId) =>
+          reconcilePanelRosterIde(ctx, { deviceId: panelId, projectId: rule.projectId }),
+        ),
+      );
+    }
     return ruleId;
   },
 });
@@ -496,15 +506,21 @@ export const updateWithGroups = authedMutation({
       }
     }
 
-    // Roster eşitleme: kuralın hedeflediği her IDE paneli için, panelde olup (idePanelUsers)
-    // artık HİÇBİR aktif kuralla yetkisi olmayan kartları sök. Bu, diffIds'in kaçırdığı
-    // hayaletleri (geçmişte fix'ten önce çıkarılmış üyeler + panel re-claim artıkları) yakalar.
-    // Ölçeklenir: yalnız (panelde-olan − yetkili) farkına deleteUser üretir.
-    const ideePanelsNow = await resolveRuleIdeDeviceIds(ctx, ruleId, rule.projectId);
-    for (const panelId of ideePanelsNow) {
-      syncJobs.push(
-        reconcilePanelRosterIde(ctx, { deviceId: panelId, projectId: rule.projectId }),
-      );
+    // Roster eşitleme: üye/cihaz/kapı değiştiğinde paneldeki hayalet kartları sök.
+    // Salt isim/saat/gün güncellemelerinde (roster değişmez) atla.
+    const rosterChanged = employeeIds !== undefined || deviceIds !== undefined || doorIds !== undefined;
+    if (rosterChanged) {
+      // Panel listesi değişmediyse (deviceIds/doorIds dokunulmadı) ikinci DB gezisi gereksiz —
+      // daha önce yakalanan ruleIdePanelsBefore ile aynı sonuç.
+      const ideePanelsNow =
+        deviceIds === undefined && doorIds === undefined
+          ? ruleIdePanelsBefore
+          : await resolveRuleIdeDeviceIds(ctx, ruleId, rule.projectId);
+      for (const panelId of ideePanelsNow) {
+        syncJobs.push(
+          reconcilePanelRosterIde(ctx, { deviceId: panelId, projectId: rule.projectId }),
+        );
+      }
     }
 
     await Promise.all(syncJobs);

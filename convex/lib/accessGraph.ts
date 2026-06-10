@@ -25,11 +25,13 @@ export async function resolveEmployeeIdeDeviceIds(
     )
     .collect();
   const deviceIds = new Set<Id<"devices">>();
-  for (const gm of memberships) {
-    const rule = await ctx.db.get(gm.groupId);
-    if (!rule || !rule.isActive) continue;
-    await collectRuleIdeDevices(ctx, gm.groupId, projectId, deviceIds);
-  }
+  await Promise.all(
+    memberships.map(async (gm) => {
+      const rule = await ctx.db.get(gm.groupId);
+      if (!rule || !rule.isActive) return;
+      await collectRuleIdeDevices(ctx, gm.groupId, projectId, deviceIds);
+    }),
+  );
   return Array.from(deviceIds);
 }
 
@@ -116,21 +118,25 @@ export async function reconcilePanelRosterIde(
     .query("groupDevices")
     .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
     .collect();
-  for (const link of links) {
-    const rule = await ctx.db.get(link.groupId);
-    if (!rule || rule.isActive === false) continue;
-    const members = await ctx.db
-      .query("groupMembers")
-      .withIndex("by_project_group", (q) =>
-        q.eq("projectId", rule.projectId).eq("groupId", link.groupId),
-      )
-      .collect();
-    for (const m of members) {
-      const emp = await ctx.db.get(m.employeeId);
-      const card = normalizeIdeCard(emp?.cardNumber);
-      if (card) authorized.add(card);
-    }
-  }
+  await Promise.all(
+    links.map(async (link) => {
+      const rule = await ctx.db.get(link.groupId);
+      if (!rule || rule.isActive === false) return;
+      const members = await ctx.db
+        .query("groupMembers")
+        .withIndex("by_project_group", (q) =>
+          q.eq("projectId", rule.projectId).eq("groupId", link.groupId),
+        )
+        .collect();
+      await Promise.all(
+        members.map(async (m) => {
+          const emp = await ctx.db.get(m.employeeId);
+          const card = normalizeIdeCard(emp?.cardNumber);
+          if (card) authorized.add(card);
+        }),
+      );
+    }),
+  );
 
   // Panelde olan (roster yansıması) − yetkili = sökülecek hayaletler.
   const onPanel = await ctx.db
