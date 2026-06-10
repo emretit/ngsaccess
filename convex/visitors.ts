@@ -297,6 +297,18 @@ export const update = adminMutation({
       if (dup) throw new Error(DUPLICATE_MESSAGES.cardNumber);
     }
     const activeChanged = args.isActive !== undefined && args.isActive !== visitor.isActive;
+    const deactivating = activeChanged && args.isActive === false;
+
+    // IDE panellerini patch'ten ÖNCE çöz (capture-before-mutation): kart değişiminde ESKİ
+    // kartı, deaktivasyonda paneldeki kartı FİZİKSEL sökmek için kullanılır. Deaktivasyonda
+    // syncEmployeeToIdePanels YETMEZ — pasif kişiyi status=0 ile upsert eder, kart kaydı
+    // panelde kalır. reconcileRemovedEmployeeIde de işe yaramaz: ziyaretçi kuralına bağlı
+    // kaldığından remaining panel listesi boşalmaz (orphan üretmez) ve helper'ın trailing
+    // syncEmployeeToIdePanels'ı kartı status=0 ile geri yazardı.
+    let ideRemovalPanels: Id<"devices">[] = [];
+    if (cardChanged || deactivating) {
+      ideRemovalPanels = await resolveEmployeeIdeDeviceIds(ctx, args.visitorId, visitor.projectId);
+    }
 
     const now = new Date().toISOString();
     const patch: Record<string, unknown> = { updatedAt: now };
@@ -315,25 +327,24 @@ export const update = adminMutation({
     }
     await ctx.db.patch(args.visitorId, patch);
 
-    // Kart değiştiyse ESKİ kartı IDE panellerinden sök (orphan kalmasın).
-    if (cardChanged) {
-      const ideDeviceIds = await resolveEmployeeIdeDeviceIds(
-        ctx,
-        args.visitorId,
-        visitor.projectId,
+    // Kart değişiminde ESKİ kartı, deaktivasyonda paneldeki kartı IDE panellerinden FİZİKSEL
+    // sök (orphan kalmasın). Paneller patch'ten önce çözüldü (ideRemovalPanels).
+    if (ideRemovalPanels.length > 0) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.ideGatewayDevice.deleteIdeUserFromPanels,
+        { cardNumber: visitor.cardNumber, deviceIds: ideRemovalPanels, projectId: visitor.projectId },
       );
-      if (ideDeviceIds.length > 0) {
-        await ctx.scheduler.runAfter(
-          0,
-          internal.actions.ideGatewayDevice.deleteIdeUserFromPanels,
-          { cardNumber: visitor.cardNumber, deviceIds: ideDeviceIds, projectId: visitor.projectId },
-        );
-      }
     }
     if (cardChanged || activeChanged) {
       await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
         employeeId: args.visitorId,
       });
+    }
+    // IDE push yalnız kart panelde AKTİF durmalıysa (kart değişimi → yeni kartı yaz, ya da
+    // aktivasyon). Deaktivasyonda push YAPMA: yukarıdaki fiziksel sökmeyi status=0 upsert ile
+    // geri alırdı.
+    if ((cardChanged || activeChanged) && !deactivating) {
       await ctx.scheduler.runAfter(
         0,
         internal.actions.ideGatewayDevice.syncEmployeeToIdePanels,
@@ -359,6 +370,9 @@ export const checkOut = adminMutation({
       throw new Error("Bu ziyaretçiye erişim yetkiniz yok");
     }
     if (visitor.isActive === false) return args.visitorId;
+    // Deaktivasyondan ÖNCE bağlı IDE panellerini çöz; patch sonrası kartı FİZİKSEL sök.
+    // syncEmployeeToIdePanels tek başına status=0 yazıp kart kaydını panelde bırakırdı.
+    const idePanels = await resolveEmployeeIdeDeviceIds(ctx, args.visitorId, visitor.projectId);
     await ctx.db.patch(args.visitorId, {
       isActive: false,
       visitorStatus: "checkedOut",
@@ -367,11 +381,13 @@ export const checkOut = adminMutation({
     await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
       employeeId: args.visitorId,
     });
-    await ctx.scheduler.runAfter(
-      0,
-      internal.actions.ideGatewayDevice.syncEmployeeToIdePanels,
-      { employeeId: args.visitorId },
-    );
+    if (idePanels.length > 0) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.actions.ideGatewayDevice.deleteIdeUserFromPanels,
+        { cardNumber: visitor.cardNumber, deviceIds: idePanels, projectId: visitor.projectId },
+      );
+    }
     return args.visitorId;
   },
   returns: v.id("employees"),
@@ -412,6 +428,9 @@ export const expireVisitorAccess = internalMutation({
       )
       .collect();
     for (const vz of expired) {
+      // Deaktivasyondan ÖNCE IDE panellerini çöz; patch sonrası kartı FİZİKSEL sök
+      // (status=0 upsert kart kaydını panelde bırakırdı).
+      const idePanels = await resolveEmployeeIdeDeviceIds(ctx, vz._id, vz.projectId);
       await ctx.db.patch(vz._id, {
         isActive: false,
         visitorStatus: "expired",
@@ -420,11 +439,13 @@ export const expireVisitorAccess = internalMutation({
       await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
         employeeId: vz._id,
       });
-      await ctx.scheduler.runAfter(
-        0,
-        internal.actions.ideGatewayDevice.syncEmployeeToIdePanels,
-        { employeeId: vz._id },
-      );
+      if (idePanels.length > 0) {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.actions.ideGatewayDevice.deleteIdeUserFromPanels,
+          { cardNumber: vz.cardNumber, deviceIds: idePanels, projectId: vz.projectId },
+        );
+      }
     }
     return { expired: expired.length };
   },

@@ -220,6 +220,32 @@ export const update = authedMutation({
         ),
       );
     }
+    // Kural yeniden aktif edildiğinde üye kartlarını IDE panellerine GERİ YAZ — deaktivasyon
+    // dalıyla simetrik. syncPermissionToIdePanels yalnız permission RECORD'unu yazar; bunun
+    // tek başına çalışması kullanıcı kartlarını panele döndürmez (R6). Push hattı cihaz bağını
+    // yazar; salt kapı bağıyla yetkili üye getEmployeeWithDevices kapsamı dışında kalır
+    // (sistem geneli, bilinçli asimetri).
+    if (updates.isActive === true) {
+      // Önce kuralın IDE paneli var mı çöz (deaktivasyon dalıyla simetrik). Hikvision-only
+      // kuralda atla: aksi halde her üye için syncEmployeeToIdePanels boşa schedule edilir
+      // (action zaten panelsiz no-op'tur ama N kuyruk işi üretmemek için erken çıkıyoruz).
+      const idePanels = await resolveRuleIdeDeviceIds(ctx, ruleId, rule.projectId);
+      if (idePanels.length > 0) {
+        const members = await ctx.db
+          .query("groupMembers")
+          .withIndex("by_project_group", (q) =>
+            q.eq("projectId", rule.projectId).eq("groupId", ruleId),
+          )
+          .collect();
+        await Promise.all(
+          members.map((m) =>
+            ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+              employeeId: m.employeeId,
+            }),
+          ),
+        );
+      }
+    }
     return ruleId;
   },
 });
@@ -541,6 +567,25 @@ export const updateWithGroups = authedMutation({
             employeeId: empId,
             projectId: rule.projectId,
             candidatePanels: removedIdePanels,
+          }),
+        );
+      }
+    }
+
+    // Salt reaktivasyon: üye listesi ve panel değişmeden isActive:true yapıldığında yukarıdaki
+    // kalan-üye döngüsü (employeeIds !== undefined || removedIdePanels.length > 0 koşulu)
+    // atlandığından kartlar panele geri yazılmaz. update() mutation'ıyla simetrik olarak mevcut
+    // üyeleri IDE panellerine geri push et. Döngünün çalıştığı durumlarda zaten reconcileRemoved
+    // EmployeeIde → syncEmployeeToIdePanels schedule ettiğinden burada tekrar etme.
+    if (
+      updates.isActive === true &&
+      employeeIds === undefined &&
+      removedIdePanels.length === 0
+    ) {
+      for (const empId of survivingMemberIds) {
+        syncJobs.push(
+          ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+            employeeId: empId,
           }),
         );
       }
