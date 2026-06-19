@@ -22,6 +22,8 @@ public sealed class PanelManager : IAsyncDisposable
   private string _bridgeToken = "";
   private ConvexBridgeClient? _convex;
   private volatile string? _lastRosterError;
+  // Configure() yalnız bunu kaldırır; worker teardown'ı poll thread yapar (tek-sahip, #11).
+  private bool _needsWorkerReset;
 
   public PanelManager(
     HikvisionSdkRuntime runtime,
@@ -40,10 +42,11 @@ public sealed class PanelManager : IAsyncDisposable
   public string? LastRosterError => _lastRosterError;
   public bool HasToken => _convex?.HasToken ?? false;
 
-  /// <summary>Site URL / bridge token uygula. Değiştiyse Convex istemcisi + tüm worker'lar yeniden kurulur.</summary>
+  /// <summary>Site URL / bridge token uygula. Değiştiyse Convex istemcisi yeniden kurulur ve
+  /// worker reset bayrağı kaldırılır; gerçek teardown'ı poll thread yapar (cross-thread dispose
+  /// yarışı önlenir, #11).</summary>
   public void Configure(string siteUrl, string bridgeToken)
   {
-    List<PanelWorker> toStop = [];
     lock (_lock)
     {
       var unchanged = string.Equals(_siteUrl, siteUrl, StringComparison.Ordinal)
@@ -57,19 +60,32 @@ public sealed class PanelManager : IAsyncDisposable
       _convex = new ConvexBridgeClient(
         http, siteUrl, bridgeToken, _options.PollMaxOperations, _loggerFactory.CreateLogger("Convex:roster"));
 
-      // Bağlantı parametreleri değişti → mevcut worker'lar eski Convex istemcisini tutar; durdur,
-      // bir sonraki roster onları yeni istemciyle yeniden kurar.
-      foreach (var (_, w) in _workers.Values) toStop.Add(w);
-      _workers.Clear();
+      // Mevcut worker'lar eski Convex istemcisini tutar; burada (HTTP thread) durdurmak
+      // PollRosterAsync ile yarışırdı. Bayrağı kaldır — bir sonraki poll eski worker'ları
+      // durdurup yeni istemciyle yeniden kurar.
+      _needsWorkerReset = true;
     }
-    foreach (var w in toStop) _ = w.DisposeAsync();
   }
 
   /// <summary>Bir poll turu: roster çek → worker'ları uzlaştır → işleri uygula + ack.</summary>
   public async Task PollRosterAsync(CancellationToken ct)
   {
+    // Worker yaşam döngüsünün tek sahibi bu thread: Configure() reset istediyse eski
+    // worker'ları burada (await ile) durdur — fire-and-forget cross-thread dispose yok.
     ConvexBridgeClient? convex;
-    lock (_lock) { convex = _convex; }
+    List<PanelWorker> toReset = [];
+    lock (_lock)
+    {
+      if (_needsWorkerReset)
+      {
+        foreach (var (_, w) in _workers.Values) toReset.Add(w);
+        _workers.Clear();
+        _needsWorkerReset = false;
+      }
+      convex = _convex;
+    }
+    foreach (var w in toReset) await w.DisposeAsync();
+
     if (convex is null || !convex.HasToken)
     {
       _lastRosterError = "bridge token girilmemiş";
@@ -84,7 +100,7 @@ public sealed class PanelManager : IAsyncDisposable
     }
     _lastRosterError = null;
 
-    Reconcile(roster.Devices);
+    foreach (var w in Reconcile(roster.Devices)) await w.DisposeAsync();
 
     foreach (var op in roster.Operations)
     {
@@ -110,8 +126,9 @@ public sealed class PanelManager : IAsyncDisposable
     }
   }
 
-  /// <summary>Roster cihaz listesine göre worker'ları uzlaştır.</summary>
-  private void Reconcile(List<RosterDevice> rosterDevices)
+  /// <summary>Roster cihaz listesine göre worker'ları uzlaştır. Durdurulacak worker listesini
+  /// döner — çağıran await ile dispose eder (tek-sahip thread).</summary>
+  private List<PanelWorker> Reconcile(List<RosterDevice> rosterDevices)
   {
     List<PanelWorker> toStop = [];
     lock (_lock)
@@ -121,11 +138,19 @@ public sealed class PanelManager : IAsyncDisposable
         .Select(PanelConfig.FromRoster)
         .ToDictionary(p => p.Id);
 
-      // Kaldırılan / bağlantısı değişen worker'ları durdur.
+      // Kaldırılan / BAĞLANTISI (host/port/kullanıcı/şifre/token) değişen worker'ları durdur.
       foreach (var id in _workers.Keys.ToList())
       {
-        var keep = desired.TryGetValue(id, out var d) && SameConnection(_workers[id].Cfg, d);
-        if (!keep)
+        if (desired.TryGetValue(id, out var d) && SameConnection(_workers[id].Cfg, d))
+        {
+          // Bağlantı aynı → worker'ı yeniden kurma (relogin yok). Yalnız metadata'yı
+          // (Name/DoorCount) YERİNDE güncelle: Cfg, worker + HikvisionClient ile paylaşılan
+          // referans olduğundan değişiklik status/log/op'lara yansır (#6).
+          var cfg = _workers[id].Cfg;
+          cfg.Name = d.Name;
+          cfg.DoorCount = d.DoorCount;
+        }
+        else
         {
           toStop.Add(_workers[id].Worker);
           _workers.Remove(id);
@@ -142,7 +167,7 @@ public sealed class PanelManager : IAsyncDisposable
         _logger.LogInformation("Panel worker started: {Name} ({Host})", panel.Name, panel.Host);
       }
     }
-    foreach (var w in toStop) _ = w.DisposeAsync();
+    return toStop;
   }
 
   private PanelWorker CreateWorker(PanelConfig panel)
@@ -154,13 +179,14 @@ public sealed class PanelManager : IAsyncDisposable
     return new PanelWorker(panel, hik, convex, _loggerFactory.CreateLogger($"Panel:{panel.Name}"));
   }
 
+  // DoorCount KASITLI dışarıda: bağlantı kimliği değil (metadata). Değişince relogin yerine
+  // Reconcile yerinde günceller. Name de metadata — aynı şekilde restart'sız güncellenir.
   private static bool SameConnection(PanelConfig a, PanelConfig b) =>
     a.Host == b.Host
     && a.Port == b.Port
     && a.Username == b.Username
     && a.Password == b.Password
-    && a.DeviceToken == b.DeviceToken
-    && a.DoorCount == b.DoorCount;
+    && a.DeviceToken == b.DeviceToken;
 
   public List<PanelStatus> GetStatuses()
   {

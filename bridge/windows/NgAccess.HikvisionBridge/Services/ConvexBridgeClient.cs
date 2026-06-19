@@ -67,13 +67,14 @@ public sealed class ConvexBridgeClient
     }
   }
 
-  /// <summary>Kart event'i — cihazın kendi apiToken'ı ile (bridge token DEĞİL).</summary>
-  public async Task PostCardReaderEventAsync(string deviceApiToken, CardReaderEventPayload payload, CancellationToken cancellationToken)
+  /// <summary>Kart event'i — cihazın kendi apiToken'ı ile (bridge token DEĞİL).
+  /// Başarı/başarısızlık döner ki çağıran (PanelWorker relay) geçici hatada retry edebilsin.</summary>
+  public async Task<bool> PostCardReaderEventAsync(string deviceApiToken, CardReaderEventPayload payload, CancellationToken cancellationToken)
   {
     if (string.IsNullOrWhiteSpace(deviceApiToken))
     {
       _logger.LogWarning("Card event atlandı: cihaz apiToken boş");
-      return;
+      return false;
     }
     using var request = new HttpRequestMessage(HttpMethod.Post, "card-reader");
     request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", deviceApiToken);
@@ -83,6 +84,8 @@ public sealed class ConvexBridgeClient
     if (!response.IsSuccessStatusCode)
     {
       _logger.LogWarning("Card event post failed: HTTP {Status}", (int)response.StatusCode);
+      return false;
     }
+    return true;
   }
 }
