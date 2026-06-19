@@ -61,6 +61,15 @@ export async function getProjectIdsForUser(
 }
 
 /**
+ * Yönetici mi (super_admin veya project_admin)? Throw ETMEYEN boolean sürüm —
+ * list/update gibi handler'larda sırları koşullu gizlemek/atlamak için (reddetmek değil).
+ * requireAdmin bunun throw eden karşılığı; tek tanım kaynağı budur.
+ */
+export function isManager(user: Doc<"users">): boolean {
+  return user.role === "super_admin" || user.role === "project_admin";
+}
+
+/**
  * Admin yetkisi gerektirir (super_admin veya project_admin).
  * Yetkisiz kullanıcı için hata fırlatır.
  */
@@ -68,7 +77,7 @@ export async function requireAdmin(
   ctx: QueryCtx | MutationCtx
 ): Promise<Doc<"users">> {
   const user = await getCurrentUser(ctx);
-  if (user.role !== "super_admin" && user.role !== "project_admin") {
+  if (!isManager(user)) {
     throw new Error("Bu işlem için yetkiniz yok");
   }
   return user;

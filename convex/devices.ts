@@ -10,7 +10,16 @@ import {
   superAdminMutation,
   employeeAuthedQuery,
 } from "./lib/customFunctions";
-import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
+import { getProjectIdsForUser, isProjectAllowed, isManager } from "./lib/auth";
+
+/**
+ * Cihazın hassas alanları. list okuma-gate'i (non-manager'a gizle) ile update yazma-gate'i
+ * (non-manager yazamaz) AYNI listeyi kullanır — drift = wipe/leak regresyonu. apiToken update
+ * arg'larında yok (yalnız regenerateApiToken yazar) → write loop'ta hiç görünmez; sette durması
+ * zararsız ve okuma-gate'iyle simetriyi korur.
+ */
+const DEVICE_SECRET_FIELDS = ["devicePassword", "idePassword", "ehomeKey", "apiToken"] as const;
+const DEVICE_SECRET_FIELD_SET: ReadonlySet<string> = new Set(DEVICE_SECRET_FIELDS);
 
 export const list = authedQuery({
   args: { projectId: v.optional(v.id("projects")) },
@@ -42,24 +51,19 @@ export const list = authedQuery({
     }
 
     // Panel sırları (şifre/anahtar/event token) yalnız yönetebilen role döner. authedQuery
-    // herhangi bir proje kullanıcısına açık olduğundan, role-gate olmadan devicePassword /
-    // idePassword / ehomeKey / apiToken tüm üyelere sızardı. Cihaz yönetimi UI'da zaten
-    // isAdmin ile gated; admin tam veriyle pre-fill eder, izleyici sır almaz.
-    const isManager =
-      ctx.user.role === "super_admin" || ctx.user.role === "project_admin";
+    // herhangi bir proje kullanıcısına açık olduğundan, role-gate olmadan tüm üyelere sızardı.
+    // Cihaz yönetimi UI'da zaten isAdmin ile gated; admin tam veriyle pre-fill eder, izleyici
+    // sır almaz. update yazma-gate'iyle AYNI DEVICE_SECRET_FIELDS listesi (drift yok).
+    const manager = isManager(ctx.user);
     return await Promise.all(
       devices.map(async (device) => {
         const zone = device.zoneId ? await ctx.db.get(device.zoneId) : null;
         const door = device.doorId ? await ctx.db.get(device.doorId) : null;
-        return {
-          ...device,
-          devicePassword: isManager ? device.devicePassword : undefined,
-          idePassword: isManager ? device.idePassword : undefined,
-          ehomeKey: isManager ? device.ehomeKey : undefined,
-          apiToken: isManager ? device.apiToken : undefined,
-          zone,
-          door,
-        };
+        const result = { ...device, zone, door };
+        if (!manager) {
+          for (const f of DEVICE_SECRET_FIELDS) result[f] = undefined;
+        }
+        return result;
       })
     );
   },
@@ -283,13 +287,12 @@ export const update = authedMutation({
     // list okuma-gate'iyle SİMETRİK yazma-gate: panel sırlarını yalnız yönetici yazabilir.
     // list bu alanları non-manager'a undefined döndürdüğü için, form onları "" olarak geri
     // gönderir (localBridge'de boş=temizle); manager-olmayanın yazmasını engellemezsek bu
-    // paneli sessizce silerdi. UI gating'e güvenmeyiz — sunucu otoritedir.
-    const isManager =
-      ctx.user.role === "super_admin" || ctx.user.role === "project_admin";
-    const MANAGER_ONLY_SECRET_FIELDS = new Set(["devicePassword", "idePassword", "ehomeKey"]);
+    // paneli sessizce silerdi. UI gating'e güvenmeyiz — sunucu otoritedir. (apiToken zaten
+    // update arg'larında yok → DEVICE_SECRET_FIELD_SET'te durması bu loop'ta etkisiz.)
+    const manager = isManager(ctx.user);
     for (const [k, v] of Object.entries(updates)) {
       if (v === undefined) continue;
-      if (!isManager && MANAGER_ONLY_SECRET_FIELDS.has(k)) continue;
+      if (!manager && DEVICE_SECRET_FIELD_SET.has(k)) continue;
       clean[k] = v;
     }
     await ctx.db.patch(deviceId, clean);
