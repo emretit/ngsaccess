@@ -99,8 +99,15 @@ export function useDeviceFormSubmission({
       const connectionFields = {
         deviceSerial: values.device_serial || undefined,
         deviceIp: values.device_ip || undefined,
-        deviceUsername: values.device_username || undefined,
-        devicePassword: values.device_password || undefined,
+        // localBridge'de boş string'i koru: update handler undefined alanları skip eder,
+        // bu yüzden "" göndermezsek panel kullanıcı/şifresi temizlenemezdi. Bu alanlar
+        // yalnız localBridge bölümünde render edilir → diğer markalarda eski davranış.
+        deviceUsername: isHikLocalBridge
+          ? (values.device_username ?? "").trim()
+          : values.device_username || undefined,
+        devicePassword: isHikLocalBridge
+          ? (values.device_password ?? "")
+          : values.device_password || undefined,
         brand: values.brand,
         ...hikFields,
         ...ideFields,
