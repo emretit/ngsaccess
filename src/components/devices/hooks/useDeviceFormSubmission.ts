@@ -81,6 +81,7 @@ export function useDeviceFormSubmission({
               ehomeID: isHikLocalBridge ? undefined : values.ehome_id?.trim() || undefined,
               ehomeKey: isHikLocalBridge ? undefined : values.ehome_key?.trim() || undefined,
               hikDoorCount: isHikLocalBridge ? values.hik_door_count || undefined : undefined,
+              hikPort: isHikLocalBridge ? values.hik_port || undefined : undefined,
             }
           : {};
       const ideFields =

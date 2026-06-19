@@ -147,17 +147,12 @@ export function DeviceHikvisionSection({
   };
 
   return (
-    <div className="space-y-3 rounded-lg border bg-red-50/30 dark:bg-red-950/10 p-3">
+    <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium uppercase tracking-wide text-red-700 dark:text-red-400">
-          Hikvision · {isLocalBridge ? "Yerel Bridge" : "Gateway"}
+        <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+          {isLocalBridge ? "Yerel Bridge" : "Gateway"} Bağlantısı
         </h3>
-        <div className="flex items-center gap-2">
-          {renderStatusBadge()}
-          <Badge variant="outline" className="border-red-300 text-red-700">
-            Hikvision
-          </Badge>
-        </div>
+        {renderStatusBadge()}
       </div>
 
       <FormField
@@ -206,39 +201,41 @@ export function DeviceHikvisionSection({
             <p className="text-xs text-destructive">{device.hikOfflineHint}</p>
           )}
 
-          <FormField
-            control={form.control}
-            name="ehome_id"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Ehome ID (Cihaz Device ID) <span className="text-destructive">*</span></FormLabel>
-                <FormControl>
-                  <Input placeholder="Örn. FingerNGS" {...field} />
-                </FormControl>
-                <FormDescription>
-                  Cihaz web arayüzü → Network → Platform Access → "Cihaz Kimliği".
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FormField
+              control={form.control}
+              name="ehome_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Ehome ID <span className="text-destructive">*</span></FormLabel>
+                  <FormControl>
+                    <Input placeholder="Örn. FingerNGS" {...field} />
+                  </FormControl>
+                  <FormDescription className="text-xs">
+                    Cihaz → Network → Platform Access → "Cihaz Kimliği".
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-          <FormField
-            control={form.control}
-            name="ehome_key"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Şifreleme Anahtarı (16 karakter) <span className="text-destructive">*</span></FormLabel>
-                <FormControl>
-                  <Input type="password" placeholder="Cihazdaki ile birebir aynı" {...field} />
-                </FormControl>
-                <FormDescription>
-                  Cihaz ISUP ayarındaki "Şifreleme Anahtarı" ile eşleşmeli.
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+            <FormField
+              control={form.control}
+              name="ehome_key"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Şifreleme Anahtarı <span className="text-destructive">*</span></FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="16 karakter, cihazdaki ile aynı" {...field} />
+                  </FormControl>
+                  <FormDescription className="text-xs">
+                    Cihaz ISUP ayarındaki anahtarla eşleşmeli.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
 
           <FormField
             control={form.control}
@@ -249,8 +246,8 @@ export function DeviceHikvisionSection({
                 <FormControl>
                   <Input placeholder="192.168.1.37" {...field} />
                 </FormControl>
-                <FormDescription>
-                  Direkt ISAPI testleri için. Gateway üzerinden iletişim için zorunlu değil.
+                <FormDescription className="text-xs">
+                  Direkt ISAPI testleri için; gateway iletişimi için zorunlu değil.
                 </FormDescription>
                 <FormMessage />
               </FormItem>

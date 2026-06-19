@@ -253,6 +253,9 @@ export default defineSchema({
     // Cihazdaki fiziksel kapı sayısı (Door/capabilities). Person RightPlan'ı
     // 1..N kapı için entry üretmek zorunda — eksik kapı reddedilir.
     hikDoorCount: v.optional(v.number()),
+    // localBridge: panelin SDK portu (default 8000). Panel kullanıcı/şifresi
+    // deviceUsername/devicePassword alanlarında tutulur (tek-yer yönetim modeli).
+    hikPort: v.optional(v.number()),
     apiToken: v.optional(v.string()),
     apiTokenCreatedAt: v.optional(v.string()),
     // adminDevices geri bağlantısı — claim ile oluşturulur, release ile temizlenir.
@@ -269,6 +272,22 @@ export default defineSchema({
     .index("by_api_token", ["apiToken"])
     .index("by_ide_uuid", ["ideUuid"])
     .index("by_admin_device", ["adminDeviceId"]),
+
+  /**
+   * Bir LAN bridge kurulumunun kimliği. Tek-yer modelinde bridge EXE'ye yalnızca
+   * bu token girilir; bridge bu token ile ait olduğu projedeki tüm localBridge
+   * cihazlarını (IP/port/kullanıcı/şifre + bekleyen işler) /hik-bridge/roster'dan
+   * çeker. Panel bilgileri artık bridge'de değil ngsplus'ta yönetilir.
+   */
+  hikBridges: defineTable({
+    projectId: v.id("projects"),
+    token: v.string(),
+    name: v.optional(v.string()),
+    lastSeenAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_project", ["projectId"]),
 
   accessRules: defineTable({
     name: v.string(),

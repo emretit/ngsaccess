@@ -50,6 +50,12 @@ export function makeFormSchema(adminMode: boolean) {
   // Hikvision transport: "gateway" (ISUP→Hetzner) veya "localBridge" (LAN'daki Windows EXE).
   hik_transport: z.enum(["gateway", "localBridge"]).default("gateway"),
   hik_door_count: doorCountField,
+  // localBridge panel SDK portu (default 8000). Boş → undefined (backend default'u).
+  // max 65535: bridge tarafı Port'u 16-bit okur; aralık dışı değer roster'ı düşürür.
+  hik_port: z.preprocess(
+    (v) => (v === "" || v === null ? undefined : v),
+    z.coerce.number().int().min(1).max(65535).optional(),
+  ),
   // IDE Smart panel (brand === "ide_smart")
   ide_uuid: z.string().optional(),
   ide_user: z.string().optional(),

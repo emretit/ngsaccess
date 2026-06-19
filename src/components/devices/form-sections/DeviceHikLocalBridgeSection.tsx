@@ -24,8 +24,12 @@ interface DeviceHikLocalBridgeSectionProps {
 
 /**
  * Hikvision "localBridge" transport ayarları (ör. DS-K2804). Panelin HTTP/ISAPI portu
- * yoktur; LAN'daki Windows bridge EXE Convex'ten poll/ack ile iş alır ve HCNetSDK
- * (port 8000) ile panele uygular. Bridge, cihazın API token'ı ile kimlik doğrular.
+ * yoktur; LAN'daki Windows bridge EXE Convex'ten roster/ack ile iş alır ve HCNetSDK
+ * ile panele uygular.
+ *
+ * Tek-yer modeli: panelin IP/port/kullanıcı/şifresi BURADA (ngsplus'ta) tutulur ve
+ * bridge'e otomatik iletilir. Bridge'e elle panel girilmez; yalnız bir kez "Bridge
+ * Token" girilir (Ayarlar → Bridge).
  */
 export function DeviceHikLocalBridgeSection({
   form,
@@ -35,7 +39,7 @@ export function DeviceHikLocalBridgeSection({
 }: DeviceHikLocalBridgeSectionProps) {
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-[8rem_1fr] gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FormField
           control={form.control}
           name="hik_door_count"
@@ -65,7 +69,61 @@ export function DeviceHikLocalBridgeSection({
               <FormControl>
                 <Input placeholder="192.168.1.117" {...field} value={field.value ?? ""} />
               </FormControl>
-              <FormDescription className="text-xs">Bridge SDK port 8000 ile bağlanır</FormDescription>
+              <FormDescription className="text-xs">Bridge SDK port ile bağlanır</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="device_username"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Cihaz Kullanıcı Adı</FormLabel>
+              <FormControl>
+                <Input placeholder="admin" {...field} value={field.value ?? ""} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="device_password"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Cihaz Şifresi</FormLabel>
+              <FormControl>
+                <Input
+                  type="password"
+                  placeholder="Panel şifresi"
+                  autoComplete="new-password"
+                  {...field}
+                  value={field.value ?? ""}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="hik_port"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>SDK Port</FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  placeholder="8000"
+                  {...field}
+                  value={field.value ?? ""}
+                />
+              </FormControl>
+              <FormDescription className="text-xs">Default 8000</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -73,7 +131,8 @@ export function DeviceHikLocalBridgeSection({
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Bridge, cihazın API token'ı ile doğrular — aşağıdaki token kartından kopyalayıp bridge'e girin.
+        Panel bilgileri buluttan bridge'e otomatik iletilir. Bridge'e elle panel girilmez —
+        yalnız bir kez <strong>Bridge Token</strong> girilir (Ayarlar → Bridge).
       </p>
 
       {device && (

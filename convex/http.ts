@@ -82,7 +82,12 @@ http.route({
       // Token doğrulandıysa: request'teki tüm cihaz tanımlayıcıları token sahibi cihazla
       // eşleşmeli; en az bir tanımlayıcı eşleşmeli (saldırgan hepsini omit ederek farklı
       // tenant cihazına yazamasın). Eşleşmezse cross-tenant attempt → 403.
-      if (authedDevice) {
+      //
+      // localBridge istisnası: bu cihazların event'lerini LAN bridge, cihazın per-device
+      // apiToken'ı ile basar; token zaten tek bir cihaza bağlı (getByApiToken), dolayısıyla
+      // cross-tenant imkansız. Ayrıca bridge serial/devIndex/ehome göndermez (yalnız IP),
+      // tanımlayıcı-eşleşme guard'ı bu cihazlarda her event'i yanlışlıkla 403'lerdi.
+      if (authedDevice && authedDevice.hikTransport !== "localBridge") {
         const checks: Array<[string, string | undefined, string | undefined]> = [
           ["serial", serial ?? undefined, authedDevice.deviceSerial],
           ["devIndex", hikDevIndex ?? undefined, authedDevice.hikDevIndex],
@@ -361,7 +366,63 @@ http.route({
       token,
       opId: body.opId as Id<"hikPendingOperations">,
       ok: body.ok,
-      message: body.message,
+      // null → undefined: Convex v.optional(v.string()) açık null'ı reddeder; başarılı
+      // ack'te bridge message=null gönderir, bu satır olmadan op processing'te kalırdı.
+      message: typeof body.message === "string" ? body.message : undefined,
+    });
+    if (!result.ok && result.error === "unauthorized") {
+      return jsonResponse(result, 401);
+    }
+    if (!result.ok) return jsonResponse(result, 404);
+    return jsonResponse(result);
+  }),
+});
+
+/**
+ * Tek-yer modeli: Windows bridge -> Convex. Bir bridge token ile o projedeki TÜM
+ * localBridge cihazlarının roster'ı (IP/port/kullanıcı/şifre) + bekleyen SDK işleri.
+ * Panel bilgileri bridge'de değil ngsplus'ta yönetilir.
+ */
+http.route({
+  path: "/hik-bridge/roster",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const token = bridgeBearerToken(request);
+    if (!token) return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+    const body = (await request.json().catch(() => ({}))) as { max?: unknown };
+    const result = await ctx.runMutation(internal.hikBridge.claimBridgeRoster, {
+      token,
+      max: typeof body.max === "number" ? body.max : undefined,
+    });
+    if (!result.ok) return jsonResponse(result, 401);
+    return jsonResponse(result);
+  }),
+});
+
+/**
+ * Tek-yer modeli: bridge token ile claimed SDK işini done/failed kapat.
+ */
+http.route({
+  path: "/hik-bridge/roster-ack",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const token = bridgeBearerToken(request);
+    if (!token) return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+    const body = (await request.json()) as {
+      opId?: string;
+      ok?: boolean;
+      message?: string;
+    };
+    if (!body.opId || typeof body.ok !== "boolean") {
+      return jsonResponse({ ok: false, error: "opId+ok gerekli" }, 400);
+    }
+    const result = await ctx.runMutation(internal.hikBridge.ackBridgeOperation, {
+      token,
+      opId: body.opId as Id<"hikPendingOperations">,
+      ok: body.ok,
+      // null → undefined: Convex v.optional(v.string()) açık null'ı reddeder; başarılı
+      // ack'te bridge message=null gönderir, bu satır olmadan op processing'te kalırdı.
+      message: typeof body.message === "string" ? body.message : undefined,
     });
     if (!result.ok && result.error === "unauthorized") {
       return jsonResponse(result, 401);

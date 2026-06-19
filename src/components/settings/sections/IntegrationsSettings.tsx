@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Plug } from "lucide-react";
 import { PaftaIntegrationCard } from "./integrations/PaftaIntegrationCard";
+import { BridgeIntegrationCard } from "./integrations/BridgeIntegrationCard";
 
 const COMING_SOON = ["e-Fatura", "Logo", "Mikro", "Netsis"];
 
@@ -20,6 +21,7 @@ export function IntegrationsSettings() {
       </div>
 
       <div className="space-y-4">
+        <BridgeIntegrationCard />
         <PaftaIntegrationCard />
       </div>
 

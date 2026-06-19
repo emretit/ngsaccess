@@ -23,6 +23,7 @@ interface DeviceData {
   ehomeKey?: string;
   hikTransport?: "gateway" | "localBridge";
   hikDoorCount?: number;
+  hikPort?: number;
   ideUuid?: string;
   ideUser?: string;
   idePassword?: string;
@@ -57,6 +58,7 @@ export function useDeviceDataLoader({ device, open, defaultBrand, form }: UseDev
         ehome_key: device.ehomeKey ?? "",
         hik_transport: device.hikTransport ?? "gateway",
         hik_door_count: device.hikDoorCount,
+        hik_port: device.hikPort,
         ide_uuid: device.ideUuid ?? "",
         ide_user: device.ideUser ?? "",
         ide_password: device.idePassword ?? "",

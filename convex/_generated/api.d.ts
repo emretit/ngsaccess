@@ -39,6 +39,7 @@ import type * as employeeFaces from "../employeeFaces.js";
 import type * as employeeFingerprints from "../employeeFingerprints.js";
 import type * as employees from "../employees.js";
 import type * as files from "../files.js";
+import type * as hikBridge from "../hikBridge.js";
 import type * as hikvisionSync from "../hikvisionSync.js";
 import type * as holidays from "../holidays.js";
 import type * as http from "../http.js";
@@ -126,6 +127,7 @@ declare const fullApi: ApiFromModules<{
   employeeFingerprints: typeof employeeFingerprints;
   employees: typeof employees;
   files: typeof files;
+  hikBridge: typeof hikBridge;
   hikvisionSync: typeof hikvisionSync;
   holidays: typeof holidays;
   http: typeof http;
