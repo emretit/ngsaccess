@@ -6,6 +6,12 @@ import { Id } from "../../../../convex/_generated/dataModel";
 import { FormValues } from "./useDeviceFormSchema";
 import { NEW_ZONE_VALUE } from "../form-sections/DeviceZoneSection";
 
+// localBridge SDK varsayılanları (backend hikBridge.ts ile aynı). Sayısal alan boş
+// bırakılınca undefined yerine default gönderilir: update handler undefined'ı skip
+// ettiği için aksi halde alan "temizlenip varsayılana" döndürülemezdi.
+const HIK_DEFAULT_PORT = 8000;
+const HIK_DEFAULT_DOOR_COUNT = 4;
+
 interface UseDeviceFormSubmissionProps {
   device?: { _id?: Id<"devices">; hikDevIndex?: string } | null;
   currentProjectId: Id<"projects"> | null;
@@ -80,8 +86,10 @@ export function useDeviceFormSubmission({
               hikTransport: values.hik_transport,
               ehomeID: isHikLocalBridge ? undefined : values.ehome_id?.trim() || undefined,
               ehomeKey: isHikLocalBridge ? undefined : values.ehome_key?.trim() || undefined,
-              hikDoorCount: isHikLocalBridge ? values.hik_door_count || undefined : undefined,
-              hikPort: isHikLocalBridge ? values.hik_port || undefined : undefined,
+              hikDoorCount: isHikLocalBridge
+                ? values.hik_door_count || HIK_DEFAULT_DOOR_COUNT
+                : undefined,
+              hikPort: isHikLocalBridge ? values.hik_port || HIK_DEFAULT_PORT : undefined,
             }
           : {};
       const ideFields =
