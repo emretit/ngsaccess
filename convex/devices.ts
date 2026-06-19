@@ -280,8 +280,17 @@ export const update = authedMutation({
 
     const { deviceId, ...updates } = args;
     const clean: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+    // list okuma-gate'iyle SİMETRİK yazma-gate: panel sırlarını yalnız yönetici yazabilir.
+    // list bu alanları non-manager'a undefined döndürdüğü için, form onları "" olarak geri
+    // gönderir (localBridge'de boş=temizle); manager-olmayanın yazmasını engellemezsek bu
+    // paneli sessizce silerdi. UI gating'e güvenmeyiz — sunucu otoritedir.
+    const isManager =
+      ctx.user.role === "super_admin" || ctx.user.role === "project_admin";
+    const MANAGER_ONLY_SECRET_FIELDS = new Set(["devicePassword", "idePassword", "ehomeKey"]);
     for (const [k, v] of Object.entries(updates)) {
-      if (v !== undefined) clean[k] = v;
+      if (v === undefined) continue;
+      if (!isManager && MANAGER_ONLY_SECRET_FIELDS.has(k)) continue;
+      clean[k] = v;
     }
     await ctx.db.patch(deviceId, clean);
 
@@ -391,41 +400,44 @@ export const updateLastSeen = internalMutation({
   },
   handler: async (ctx, { deviceId, deviceSerial, deviceIp, hikDevIndex, ehomeID, ideUuid }) => {
     const now = new Date().toISOString();
+    // Token sahibine sabitle: pin (deviceId) varsa body tanımlayıcılarına HİÇ bakma —
+    // aksi halde bir token sahibi forged serial/IP ile başka tenant cihazının lastSeen'ini
+    // ("online") flip edebilirdi. Skip'i yapısal tut (processCardReading ile aynı şekil):
+    // tüm body lookup'ları else içinde → ileride dal eklenince guard unutulamaz.
     let device = null;
-
-    // Token sahibine sabitle: aksi halde bir token sahibi forged serial/IP ile başka
-    // tenant cihazının lastSeen'ini ("online") flip edebilirdi.
     if (deviceId) {
       device = await ctx.db.get(deviceId);
-    } else if (deviceSerial) {
-      device = await ctx.db
-        .query("devices")
-        .withIndex("by_device_serial", (q) => q.eq("deviceSerial", deviceSerial))
-        .first();
-    }
-    if (!device && !deviceId && ideUuid) {
-      device = await ctx.db
-        .query("devices")
-        .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", ideUuid))
-        .first();
-    }
-    if (!device && !deviceId && hikDevIndex) {
-      device = await ctx.db
-        .query("devices")
-        .withIndex("by_hik_dev_index", (q) => q.eq("hikDevIndex", hikDevIndex))
-        .first();
-    }
-    if (!device && !deviceId && ehomeID) {
-      device = await ctx.db
-        .query("devices")
-        .withIndex("by_ehome_id", (q) => q.eq("ehomeID", ehomeID))
-        .first();
-    }
-    if (!device && !deviceId && deviceIp) {
-      device = await ctx.db
-        .query("devices")
-        .withIndex("by_device_ip", (q) => q.eq("deviceIp", deviceIp))
-        .first();
+    } else {
+      if (deviceSerial) {
+        device = await ctx.db
+          .query("devices")
+          .withIndex("by_device_serial", (q) => q.eq("deviceSerial", deviceSerial))
+          .first();
+      }
+      if (!device && ideUuid) {
+        device = await ctx.db
+          .query("devices")
+          .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", ideUuid))
+          .first();
+      }
+      if (!device && hikDevIndex) {
+        device = await ctx.db
+          .query("devices")
+          .withIndex("by_hik_dev_index", (q) => q.eq("hikDevIndex", hikDevIndex))
+          .first();
+      }
+      if (!device && ehomeID) {
+        device = await ctx.db
+          .query("devices")
+          .withIndex("by_ehome_id", (q) => q.eq("ehomeID", ehomeID))
+          .first();
+      }
+      if (!device && deviceIp) {
+        device = await ctx.db
+          .query("devices")
+          .withIndex("by_device_ip", (q) => q.eq("deviceIp", deviceIp))
+          .first();
+      }
     }
     if (device) {
       // Sadece heartbeat/timestamp güncelle. deviceIp/hikDevIndex auto-populate
