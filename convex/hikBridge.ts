@@ -249,6 +249,7 @@ export const ackBridgeOperation = internalMutation({
       await ctx.db.patch(args.opId, {
         status: "done",
         completedAt: Date.now(),
+        claimedBy: undefined,
         lastError: undefined,
       });
     } else if (op.attemptCount < HIK_BRIDGE_MAX_ATTEMPTS) {
@@ -263,6 +264,7 @@ export const ackBridgeOperation = internalMutation({
     } else {
       await ctx.db.patch(args.opId, {
         status: "failed",
+        claimedBy: undefined,
         lastError: args.message ?? "Bridge operation failed",
       });
     }
