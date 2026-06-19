@@ -54,13 +54,21 @@ export function HolidayCalendarManager() {
 
   const holidays = useQuery(
     api.holidays.list,
-    projectLoading ? "skip" : { projectId, year }
+    !projectLoading && projectId ? { projectId, year } : "skip",
   );
   const create = useMutation(api.holidays.create);
   const remove = useMutation(api.holidays.remove);
   const seed = useMutation(api.holidays.seedTurkishHolidays);
 
   const handleAdd = async () => {
+    if (!projectId) {
+      toast({
+        title: "Hata",
+        description: "Önce bir proje seçin.",
+        variant: "destructive",
+      });
+      return;
+    }
     const parsed = holidaySchema.safeParse({ date, name, isHalfDay });
     if (!parsed.success) {
       toast({
@@ -89,6 +97,14 @@ export function HolidayCalendarManager() {
   };
 
   const handleSeed = async () => {
+    if (!projectId) {
+      toast({
+        title: "Hata",
+        description: "Önce bir proje seçin.",
+        variant: "destructive",
+      });
+      return;
+    }
     setSeeding(true);
     try {
       const result = await seed({ projectId, years: [year] });
@@ -148,7 +164,7 @@ export function HolidayCalendarManager() {
             size="sm"
             variant="outline"
             onClick={handleSeed}
-            disabled={seeding}
+            disabled={seeding || !projectId}
             className="h-8 text-xs"
           >
             {seeding ? (
@@ -194,7 +210,7 @@ export function HolidayCalendarManager() {
           <Button
             size="sm"
             onClick={handleAdd}
-            disabled={adding}
+            disabled={adding || !projectId}
             className="h-8 text-xs"
           >
             {adding ? (

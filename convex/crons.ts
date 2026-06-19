@@ -24,6 +24,13 @@ crons.interval(
   internal.hikvisionSync.cleanupStaleSyncIssues,
 );
 
+// Windows localBridge claim edip kapanırsa processing'te asılı kalan işleri geri aç.
+crons.interval(
+  "requeue-stale-hik-local-bridge-ops",
+  { minutes: 1 },
+  internal.hikvisionSync.requeueStaleLocalBridgeOperations,
+);
+
 // Cihaz saat senkronu: her gün 01:00 UTC (TR 04:00) — drift'le Valid window
 // ve week plan time evaluation'ı bozulmasın.
 crons.daily(

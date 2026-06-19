@@ -6,7 +6,7 @@ import { Building2, Plus } from "lucide-react";
 import { ZoneDoorTree } from "./ZoneDoorTree";
 import { AddZoneDialog } from "./AddZoneDialog";
 import { Button } from "@/components/ui/button";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
 interface ZoneDoorTreePanelProps {
   onSelectZone?: (zoneId: string | null) => void;
@@ -14,12 +14,17 @@ interface ZoneDoorTreePanelProps {
 }
 
 export function ZoneDoorTreePanel({ onSelectZone, onSelectDoor }: ZoneDoorTreePanelProps) {
-  const { isSuperAdmin } = useProjectAccess();
+  const { activeProject, isSuperAdmin, projectId, loading: projectLoading } = useActiveProject();
   const [showAddZoneDialog, setShowAddZoneDialog] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  const generalSettings = useQuery(api.settings.getGeneral, {});
-  const companyName = isSuperAdmin ? "Tüm Projeler" : (generalSettings?.companyName ?? "Ana Proje");
+  const generalSettings = useQuery(
+    api.settings.getGeneral,
+    !projectLoading && projectId ? { projectId } : "skip",
+  );
+  const companyName = isSuperAdmin
+    ? (activeProject?.name ?? "Proje seç")
+    : (generalSettings?.companyName ?? activeProject?.name ?? "Ana Proje");
 
   const handleZoneAdded = () => {
     setRefreshKey((prev) => prev + 1);

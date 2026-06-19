@@ -32,6 +32,47 @@ function makeProjectGuard(
   return (pid) => (allowed === undefined ? !!pid : isProjectAllowed(allowed, pid));
 }
 
+type HikDeviceRef = {
+  _id: Id<"devices">;
+  name: string;
+  brand?: "hikvision" | "other" | "ide_smart";
+  projectId?: Id<"projects">;
+  hikDevIndex?: string;
+  hikTransport?: "gateway" | "localBridge";
+  hikDoorCount?: number;
+};
+
+function isLocalBridgeDevice(device: HikDeviceRef): boolean {
+  return device.brand === "hikvision" && device.hikTransport === "localBridge";
+}
+
+function bridgeDedupeKey(device: HikDeviceRef): string | null {
+  if (isLocalBridgeDevice(device)) return device._id;
+  return device.hikDevIndex ?? null;
+}
+
+async function enqueueLocalBridgeOp(
+  ctx: ActionCtx,
+  device: HikDeviceRef,
+  operation: ResolveOp,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  await ctx.runMutation(internal.hikvisionSync.enqueueLocalBridgeOperation, {
+    deviceId: device._id,
+    projectId: device.projectId,
+    operation,
+    payload,
+  });
+}
+
+function doorCountFor(device: HikDeviceRef): number {
+  return Math.max(1, device.hikDoorCount ?? 4);
+}
+
+function allDoorRights(device: HikDeviceRef): number[] {
+  return Array.from({ length: doorCountFor(device) }, (_, i) => i + 1);
+}
+
 /**
  * Çalışanı erişim gruplarındaki tüm cihazlara senkronize eder.
  * Convex → Hetzner Gateway (HTTP Digest) → ISUP 5.0 → Cihaz (LAN).
@@ -87,12 +128,13 @@ export const syncEmployeeToDevicesInternal = internalAction({
         tasks.push({ kind: "skip", device, rule, reason: "erişim yetkiniz yok" });
         continue;
       }
-      if (!device.hikDevIndex) {
+      const key = bridgeDedupeKey(device);
+      if (!key) {
         tasks.push({ kind: "skip", device, rule, reason: "gateway'e kayıtlı değil" });
         continue;
       }
-      if (seen.has(device.hikDevIndex)) continue;
-      seen.add(device.hikDevIndex);
+      if (seen.has(key)) continue;
+      seen.add(key);
       tasks.push({ kind: "sync", device, rule });
     }
 
@@ -143,6 +185,32 @@ export const syncEmployeeToDevicesInternal = internalAction({
           };
         }
         const schedule = defaultRuleSchedule(t.rule);
+        if (isLocalBridgeDevice(t.device)) {
+          await enqueueLocalBridgeOp(ctx, t.device, "syncWeekPlan", {
+            accessRuleId: t.rule._id,
+            weekPlanNo: planNo,
+            templateName: t.rule.name ?? `Rule ${planNo}`,
+            schedule,
+          });
+          await enqueueLocalBridgeOp(ctx, t.device, "addPerson", {
+            employeeId: args.employeeId,
+            employeeNo: employee.cardNumber,
+            cardNumber: employee.cardNumber,
+            name: `${employee.firstName} ${employee.lastName}`,
+            planTemplateNo: planNo,
+            doorCount: doorCountFor(t.device),
+            doorRights: allDoorRights(t.device),
+          });
+          return { ok: true as const, device: t.device };
+        }
+        if (!t.device.hikDevIndex) {
+          return {
+            ok: false,
+            device: t.device,
+            operation: "addPerson" as const,
+            error: `${t.device.name}: gateway'e kayıtlı değil`,
+          };
+        }
         const wpRes = await setWeekPlanOnDevice(t.device.hikDevIndex!, planNo, schedule);
         if (wpRes.ok) {
           await setPlanTemplate(t.device.hikDevIndex!, planNo, {
@@ -296,7 +364,7 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
       return { removed: 0, failed: 0, errors: ["Bu çalışana erişim yetkiniz yok"] };
     }
     const seen = new Set<string>();
-    type DelTarget = { deviceId: Id<"devices">; projectId?: Id<"projects">; name: string; devIndex: string };
+    type DelTarget = { device: typeof data.deviceRules[number]["device"]; devIndex?: string };
     const targets: DelTarget[] = [];
     const skipped: { device: typeof data.deviceRules[number]["device"]; reason: string }[] = [];
     const hikDeviceRules = data.deviceRules.filter(
@@ -307,26 +375,30 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
         skipped.push({ device, reason: "bu cihaza erişim yetkiniz yok" });
         continue;
       }
-      if (!device.hikDevIndex) {
+      const key = bridgeDedupeKey(device);
+      if (!key) {
         skipped.push({ device, reason: "gateway'e kayıtlı değil" });
         continue;
       }
-      if (seen.has(device.hikDevIndex)) continue;
-      seen.add(device.hikDevIndex);
-      targets.push({
-        deviceId: device._id,
-        projectId: device.projectId,
-        name: device.name,
-        devIndex: device.hikDevIndex,
-      });
+      if (seen.has(key)) continue;
+      seen.add(key);
+      targets.push({ device, devIndex: device.hikDevIndex });
     }
     const results = await Promise.all(
-      targets.map((t) =>
-        deletePersonFromDevice(t.devIndex, data.employee.cardNumber).then((r) => ({
-          ...r,
-          target: t,
-        })),
-      ),
+      targets.map(async (t) => {
+        if (isLocalBridgeDevice(t.device)) {
+          await enqueueLocalBridgeOp(ctx, t.device, "deleteCard", {
+            employeeId: args.employeeId,
+            cardNumber: data.employee.cardNumber,
+          });
+          return { ok: true as const, target: t };
+        }
+        if (!t.devIndex) {
+          return { ok: false as const, error: "gateway'e kayıtlı değil", target: t };
+        }
+        const r = await deletePersonFromDevice(t.devIndex, data.employee.cardNumber);
+        return { ...r, target: t };
+      }),
     );
 
     const errors: string[] = [];
@@ -350,16 +422,16 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
     for (const r of results) {
       if (r.ok) {
         removed++;
-        successDeviceIds.push(r.target.deviceId);
+        successDeviceIds.push(r.target.device._id);
         continue;
       }
       failed++;
       const errMsg = r.error ?? "Bilinmeyen hata";
-      errors.push(`${r.target.name}: ${errMsg}`);
+      errors.push(`${r.target.device.name}: ${errMsg}`);
       failureWrites.push(
         ctx.runMutation(internal.hikvisionSync.recordSyncFailure, {
-          deviceId: r.target.deviceId,
-          projectId: r.target.projectId,
+          deviceId: r.target.device._id,
+          projectId: r.target.device.projectId,
           operation: "deletePerson",
           lastError: errMsg,
           payload: { employeeId: args.employeeId },
@@ -438,7 +510,8 @@ export const syncWeekPlanToDevicesInternal = internalAction({
         skippedDevices.push({ device: d, reason: "bu cihaza erişim yetkiniz yok" });
         return false;
       }
-      if (!d.hikDevIndex) {
+      const key = bridgeDedupeKey(d);
+      if (!key) {
         skippedDevices.push({ device: d, reason: "gateway'e kayıtlı değil" });
         return false;
       }
@@ -463,6 +536,18 @@ export const syncWeekPlanToDevicesInternal = internalAction({
     // cihaz lokal karar olarak "no permission" döner.
     const planResults = await Promise.all(
       allowedDevices.map(async (d) => {
+        if (isLocalBridgeDevice(d)) {
+          await enqueueLocalBridgeOp(ctx, d, "syncWeekPlan", {
+            accessRuleId: args.accessRuleId,
+            weekPlanNo,
+            templateName: rule.name ?? `Rule ${weekPlanNo}`,
+            schedule,
+          });
+          return { ok: true as const, device: d };
+        }
+        if (!d.hikDevIndex) {
+          return { ok: false as const, error: "gateway'e kayıtlı değil", device: d };
+        }
         const wp = await setWeekPlanOnDevice(d.hikDevIndex!, weekPlanNo, schedule);
         if (!wp.ok) return { ...wp, device: d };
         // Aynı numarayı template no olarak da kullan — basitlik için 1-1 eşleme.
@@ -506,6 +591,19 @@ export const syncWeekPlanToDevicesInternal = internalAction({
     const employeeSyncs = await Promise.all(
       allowedDevices.flatMap((d) =>
         employees.map(async (emp) => {
+          if (isLocalBridgeDevice(d)) {
+            await enqueueLocalBridgeOp(ctx, d, "addPerson", {
+              accessRuleId: args.accessRuleId,
+              employeeNo: emp.cardNumber,
+              cardNumber: emp.cardNumber,
+              name: `${emp.firstName} ${emp.lastName}`,
+              planTemplateNo: weekPlanNo,
+              doorCount: doorCountFor(d),
+              doorRights: allDoorRights(d),
+            });
+            return true;
+          }
+          if (!d.hikDevIndex) return false;
           const r = await upsertPersonToDevice(d.hikDevIndex!, {
             employeeNo: emp.cardNumber,
             name: `${emp.firstName} ${emp.lastName}`,

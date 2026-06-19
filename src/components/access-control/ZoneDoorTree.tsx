@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { AddDoorDialog } from "./AddDoorDialog";
 import { EditReaderDialog } from "./EditReaderDialog";
 import { toast } from "@/hooks/use-toast";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
 interface ZoneDoorTreeProps {
   onSelectDoor?: (doorId: string | null) => void;
@@ -24,11 +25,19 @@ type DeviceNode = { _id: Id<"devices">; name: string; zoneId?: Id<"zones">; bran
 type DoorNode = { _id: Id<"doors">; name: string; zoneId?: Id<"zones">; deviceId?: Id<"devices">; ioId?: number; requireSensor?: boolean };
 
 export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDoorTreeProps) => {
-  const zonesData = useQuery(api.zones.list, {});
-  const doorsData = useQuery(api.doors.list, {});
-  const devicesData = useQuery(api.devices.list, {});
-  const readerStatusData = useQuery(api.doors.readerStatus, {});
-  const isLoading = zonesData === undefined || doorsData === undefined || devicesData === undefined;
+  const { projectId, loading: projectLoading } = useActiveProject();
+  const queryArgs = !projectLoading && projectId ? { projectId } : "skip";
+  const zonesData = useQuery(api.zones.list, queryArgs);
+  const doorsData = useQuery(api.doors.list, queryArgs);
+  const devicesData = useQuery(api.devices.list, queryArgs);
+  const readerStatusData = useQuery(api.doors.readerStatus, queryArgs);
+  const isLoading =
+    projectLoading ||
+    (!!projectId &&
+      (zonesData === undefined ||
+        doorsData === undefined ||
+        devicesData === undefined ||
+        readerStatusData === undefined));
   const zones = (zonesData ?? []) as ZoneNode[];
   const doors = (doorsData ?? []) as DoorNode[];
   const devices = (devicesData ?? []) as DeviceNode[];

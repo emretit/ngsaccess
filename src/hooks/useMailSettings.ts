@@ -16,12 +16,23 @@ interface MailSettingsInput {
 
 export function useMailSettings() {
   const { toast } = useToast();
-  const { projectId } = useActiveProject();
+  const { projectId, loading: projectLoading } = useActiveProject();
 
-  const mailSettings = useQuery(api.settings.getMail, { projectId });
+  const mailSettings = useQuery(
+    api.settings.getMail,
+    !projectLoading && projectId ? { projectId } : "skip",
+  );
   const upsertMail = useMutation(api.settings.upsertMail);
 
   const saveMailSettings = async (settings: MailSettingsInput) => {
+    if (!projectId) {
+      toast({
+        title: "Hata",
+        description: "Önce bir proje seçin.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       await upsertMail({ ...settings, projectId });
       toast({
@@ -39,7 +50,7 @@ export function useMailSettings() {
 
   return {
     mailSettings: mailSettings ?? null,
-    isLoading: mailSettings === undefined,
+    isLoading: projectLoading || (!!projectId && mailSettings === undefined),
     saveMailSettings,
     isSaving: false,
   };

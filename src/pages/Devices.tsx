@@ -29,7 +29,7 @@ const Devices = () => {
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [selectedDoorId, setSelectedDoorId] = useState<string | null>(null);
   
-  // Device panel state (yalnızca DÜZENLEME için — yeni cihaz havuzdan claim ile eklenir)
+  // Device panel state: device=null → sıfırdan yeni cihaz (marka seçici), device=X → düzenleme.
   const [devicePanel, setDevicePanel] = useState<{
     open: boolean;
     device: ServerDevice | null;
@@ -60,8 +60,13 @@ const Devices = () => {
     }
   }, [selectedZoneId]);
 
-  // "Havuzdan Cihaz Ekle" — sıfırdan oluşturma yerine havuzdan projeye claim.
+  // "Yeni Cihaz Ekle" — sıfırdan oluşturma (marka seçici → form), aktif projeye yazar.
   const handleNewDevice = () => {
+    setDevicePanel({ open: true, device: null });
+  };
+
+  // "Buluttan Ekle" — havuzdaki (atanmamış) cihazı aktif projeye claim eder.
+  const handleClaimFromCloud = () => {
     setClaimOpen(true);
   };
 
@@ -126,7 +131,8 @@ const Devices = () => {
           onDeleteDevice={handleDeleteDevice}
           onAssignLocation={openLocationForm}
           onEditDevice={handleEditDevice}
-          onNewDevice={handleNewDevice}
+          onAddNew={handleNewDevice}
+          onAddFromCloud={handleClaimFromCloud}
           onQRClick={handleQRClick}
           onReleaseDevice={isAdmin ? handleReleaseDevice : undefined}
           canManage={isAdmin}

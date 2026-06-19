@@ -1,13 +1,17 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useProjectAccess } from "./useProjectAccess";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import type { Device } from "@/types/device";
 import { computeDeviceStatus } from "@/lib/deviceStatus";
 
 export const useProjectFilteredDevices = () => {
-  const { projectIds, isSuperAdmin, loading: projectLoading } = useProjectAccess();
+  const { projectIds, isSuperAdmin, projectId, loading: projectLoading } = useActiveProject();
 
-  const devicesRaw = useQuery(api.devices.list, !projectLoading ? {} : "skip");
+  // Aktif projeye göre filtrele — super_admin dahil yalnızca seçili projenin cihazları.
+  const devicesRaw = useQuery(
+    api.devices.list,
+    !projectLoading && projectId ? { projectId } : "skip",
+  );
 
   // eslint-disable-next-line react-hooks/purity
   const nowMs = Date.now();
@@ -21,7 +25,7 @@ export const useProjectFilteredDevices = () => {
 
   return {
     devices,
-    isLoading: projectLoading || devicesRaw === undefined,
+    isLoading: projectLoading || (!!projectId && devicesRaw === undefined),
     hasProjectAccess,
     error: null,
     refetch: () => {},

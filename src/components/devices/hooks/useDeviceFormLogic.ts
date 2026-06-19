@@ -47,6 +47,7 @@ export function useDeviceFormLogic({ device, open, defaultBrand, onSuccess, proj
       description: "",
       ehome_id: "",
       ehome_key: "",
+      hik_transport: "gateway",
       // IDE Smart paneli ön-tanımlı kimliği (MQTT login token'ı için). Kullanıcı
       // değiştirebilir; diğer marka cihazlarda bu alanlar yok sayılır.
       ide_user: "admin",

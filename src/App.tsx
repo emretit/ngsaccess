@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -14,7 +14,6 @@ const Index = lazy(() => import('@/pages/Index'));
 const Login = lazy(() => import('@/pages/Login'));
 const Register = lazy(() => import('@/pages/Register'));
 const VerifyEmail = lazy(() => import('@/pages/VerifyEmail'));
-const Auth = lazy(() => import('@/pages/Auth'));
 const Employees = lazy(() => import('@/pages/Employees'));
 const Devices = lazy(() => import('@/pages/Devices'));
 const VirtualReaders = lazy(() => import('@/pages/VirtualReaders'));
@@ -55,7 +54,7 @@ function AppContent() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
-        <Route path="/auth" element={<Auth />} />
+        <Route path="/auth" element={<Navigate to="/login" replace />} />
         <Route path="/check-in" element={<CheckIn />} />
         <Route path="/demo-request" element={<DemoRequest />} />
         <Route path="/user-setup" element={<UserSetup />} />

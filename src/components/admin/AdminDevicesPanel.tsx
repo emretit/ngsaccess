@@ -23,6 +23,7 @@ const nowMs = Date.now();
 
 export function AdminDevicesPanel() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDevice, setEditDevice] = useState<AdminDevice | null>(null);
   const adminDevices = useQuery(api.adminDevices.list);
   const removeDevice = useMutation(api.adminDevices.remove);
   const backfill = useMutation(api.adminDevices.backfillExisting);
@@ -104,7 +105,11 @@ export function AdminDevicesPanel() {
                 const online = computeDeviceStatus(device.lastSeen, nowMs) === "online";
                 const isAssigned = !!device.assignedDeviceId;
                 return (
-                  <TableRow key={device._id}>
+                  <TableRow
+                    key={device._id}
+                    className="cursor-pointer"
+                    onClick={() => setEditDevice(device)}
+                  >
                     <TableCell className="font-medium">{device.name}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">
                       {device.ideUuid ?? device.deviceSerial ?? "—"}
@@ -140,7 +145,10 @@ export function AdminDevicesPanel() {
                         variant="ghost"
                         className="h-7 w-7 text-destructive hover:text-destructive"
                         title={isAssigned ? "Projeden çıkar ve envanterden kaldır" : "Envanterden kaldır"}
-                        onClick={() => handleDelete(device)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(device);
+                        }}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -157,6 +165,13 @@ export function AdminDevicesPanel() {
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         onSuccess={() => setDialogOpen(false)}
+      />
+
+      <AdminDeviceDialog
+        open={editDevice !== null}
+        device={editDevice}
+        onClose={() => setEditDevice(null)}
+        onSuccess={() => setEditDevice(null)}
       />
     </div>
   );

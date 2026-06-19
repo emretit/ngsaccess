@@ -241,6 +241,10 @@ export default defineSchema({
     ehomeID: v.optional(v.string()),
     ehomeKey: v.optional(v.string()),
     hikModel: v.optional(v.string()),
+    // Hikvision transport:
+    // - gateway: Convex -> Hik Device Gateway -> device (current cloud path)
+    // - localBridge: Windows bridge polls Convex and talks to HCNetSDK on LAN
+    hikTransport: v.optional(v.union(v.literal("gateway"), v.literal("localBridge"))),
     hikLastSeenAt: v.optional(v.number()),
     hikOfflineHint: v.optional(v.string()),
     // En son işlenen event'in serialNo'su — sonraki event'in frontSerialNo'su ile karşılaştırılır.
@@ -364,9 +368,9 @@ export default defineSchema({
     .index("by_employee_device_time", ["employeeId", "deviceId", "accessTime"])
     .index("by_device_io_time", ["deviceId", "ideIoId", "accessTime"]),
 
-  // Cihaz offline iken biriken Convex → cihaz komutları kuyruğu.
-  // Worker (hikQueueWorker) `status=pending AND nextRetryAt<=now` olanları işler.
-  // `recordSyncFailure` doğrudan `status=failed` yazar (worker tarafından retry edilmez).
+  // Cihaz offline iken biriken Convex -> cihaz komutları kuyruğu.
+  // Gateway cihazlarda worker failed kayıtları retry eder; localBridge cihazlarda
+  // Windows bridge pending kayıtları claim edip SDK ile panele uygular.
   hikPendingOperations: defineTable({
     projectId: v.optional(v.id("projects")),
     deviceId: v.id("devices"),
@@ -408,6 +412,8 @@ export default defineSchema({
     attemptCount: v.number(),
     /** Bir sonraki retry için epoch ms. pending status için worker bu eşiği bekler. */
     nextRetryAt: v.optional(v.number()),
+    /** localBridge claim zamanı. Stuck processing kayıtları bununla geri pending yapılır. */
+    processingStartedAt: v.optional(v.number()),
     lastError: v.optional(v.string()),
     createdAt: v.number(),
     completedAt: v.optional(v.number()),

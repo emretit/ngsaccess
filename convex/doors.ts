@@ -49,6 +49,7 @@ const ONLINE_WINDOW_MS = 5 * 60 * 1000;
 export const list = authedQuery({
   args: {
     zoneId: v.optional(v.id("zones")),
+    projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -68,6 +69,14 @@ export const list = authedQuery({
       // kapı gösterilmez). super_admin tüm projelere yetkili olduğundan etkilenmez.
       if (ctx.user.role === "super_admin") return zoneDoors;
       return zoneDoors.filter((d) => isProjectAllowed(allowedProjectIds, d.projectId));
+    }
+    if (args.projectId) {
+      // Aktif proje filtresi — super_admin dahil yalnızca seçili projenin kapıları.
+      if (!allowedProjectIds.some((id) => id === args.projectId)) return [];
+      return await ctx.db
+        .query("doors")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .collect();
     }
     if (ctx.user.role === "super_admin") return await ctx.db.query("doors").collect();
     if (allowedProjectIds.length === 0) return [];
@@ -201,7 +210,10 @@ export const remove = authedMutation({
  * doorId ile bağlı cihazın son okuması. Çevrimiçi = son okuma veya panel.lastSeen pencere içinde.
  */
 export const readerStatus = authedQuery({
-  args: { zoneId: v.optional(v.id("zones")) },
+  args: {
+    zoneId: v.optional(v.id("zones")),
+    projectId: v.optional(v.id("projects")),
+  },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
 
@@ -224,6 +236,12 @@ export const readerStatus = authedQuery({
         ctx.user.role === "super_admin"
           ? zoneDoors
           : zoneDoors.filter((d) => isProjectAllowed(allowedProjectIds, d.projectId));
+    } else if (args.projectId) {
+      if (!allowedProjectIds.some((id) => id === args.projectId)) return [];
+      doors = await ctx.db
+        .query("doors")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .collect();
     } else if (ctx.user.role === "super_admin") {
       doors = await ctx.db.query("doors").collect();
     } else if (allowedProjectIds.length === 0) {

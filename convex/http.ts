@@ -315,6 +315,62 @@ http.route({
   }),
 });
 
+function bridgeBearerToken(request: Request): string | null {
+  const authHeader = request.headers.get("Authorization") ?? "";
+  return authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
+}
+
+/**
+ * Windows Hikvision bridge -> Convex: localBridge cihazı için pending SDK işlerini çek.
+ * Auth per-device apiToken ile yapılır; token sahibi olmayan cihazın op'ları dönmez.
+ */
+http.route({
+  path: "/hik-bridge/poll",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const token = bridgeBearerToken(request);
+    if (!token) return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+    const body = (await request.json().catch(() => ({}))) as { max?: unknown };
+    const result = await ctx.runMutation(internal.hikvisionSync.claimLocalBridgeOperations, {
+      token,
+      max: typeof body.max === "number" ? body.max : undefined,
+    });
+    if (!result.ok) return jsonResponse(result, 401);
+    return jsonResponse(result);
+  }),
+});
+
+/**
+ * Windows Hikvision bridge -> Convex: claimed SDK işini done/failed olarak kapat.
+ */
+http.route({
+  path: "/hik-bridge/ack",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const token = bridgeBearerToken(request);
+    if (!token) return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+    const body = (await request.json()) as {
+      opId?: string;
+      ok?: boolean;
+      message?: string;
+    };
+    if (!body.opId || typeof body.ok !== "boolean") {
+      return jsonResponse({ ok: false, error: "opId+ok gerekli" }, 400);
+    }
+    const result = await ctx.runMutation(internal.hikvisionSync.ackLocalBridgeOperation, {
+      token,
+      opId: body.opId as Id<"hikPendingOperations">,
+      ok: body.ok,
+      message: body.message,
+    });
+    if (!result.ok && result.error === "unauthorized") {
+      return jsonResponse(result, 401);
+    }
+    if (!result.ok) return jsonResponse(result, 404);
+    return jsonResponse(result);
+  }),
+});
+
 /**
  * Relay onay endpoint'i - eski /confirm-relay uyumluluğu için
  */

@@ -66,7 +66,7 @@ export function DeviceForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit as never)} className="space-y-5">
+      <form onSubmit={form.handleSubmit(onSubmit as never)} className="space-y-4">
         {adminMode ? (
           // Admin: yalnız bağlantı kimliği. İsim seri/UUID'den türetilir; bölge,
           // kapı, erişim yönü, tip, durum proje tarafında kararlaştırılır.
@@ -100,13 +100,13 @@ export function DeviceForm({
             <DeviceStatusSection form={form} />
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-5">
-            <div className="space-y-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
+            <div className="space-y-4">
               <DeviceBasicSection form={form} />
               {brand !== "hikvision" && <DeviceNetworkSection form={form} />}
             </div>
 
-            <div className="space-y-5">
+            <div className="space-y-4">
               <DeviceLocationSection
                 form={form}
                 zones={zonesForForm}

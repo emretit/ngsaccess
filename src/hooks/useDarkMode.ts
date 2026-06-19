@@ -1,18 +1,17 @@
 import { useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useQuery } from "convex/react";
 import { useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
 export function useDarkMode() {
   const { isAuthenticated } = useConvexAuth();
-  const { projectId } = useActiveProject();
+  const { projectId, loading: projectLoading } = useActiveProject();
 
   const darkMode = useQuery(
     api.settings.getDarkMode,
-    isAuthenticated ? { projectId } : "skip"
+    isAuthenticated && !projectLoading && projectId ? { projectId } : "skip"
   );
-  const upsertGeneral = useMutation(api.settings.upsertGeneral);
 
   useEffect(() => {
     if (darkMode === true) {
@@ -22,22 +21,5 @@ export function useDarkMode() {
     }
   }, [darkMode]);
 
-  const toggleDarkMode = async (enabled: boolean) => {
-    if (enabled) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-    try {
-      await upsertGeneral({
-        projectId,
-        companyName: "NGS Access",
-        darkMode: enabled,
-      });
-    } catch {
-      // sessizce devam et
-    }
-  };
-
-  return { isDarkMode: darkMode ?? false, toggleDarkMode };
+  return { isDarkMode: darkMode ?? false };
 }

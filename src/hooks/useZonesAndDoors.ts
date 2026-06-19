@@ -1,17 +1,20 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useProjectAccess } from "./useProjectAccess";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import type { Zone, Door } from "@/types/access-control";
 
 export type { Zone, Door };
 
 export function useZonesAndDoors() {
-  const { loading: projectLoading } = useProjectAccess();
+  const { projectId, loading: projectLoading } = useActiveProject();
 
-  const zones = useQuery(api.zones.list, !projectLoading ? {} : "skip");
-  const doors = useQuery(api.doors.list, !projectLoading ? {} : "skip");
+  const queryArgs = !projectLoading && projectId ? { projectId } : "skip";
+  const zones = useQuery(api.zones.list, queryArgs);
+  const doors = useQuery(api.doors.list, queryArgs);
 
-  const loading = projectLoading || zones === undefined || doors === undefined;
+  const loading =
+    projectLoading ||
+    (!!projectId && (zones === undefined || doors === undefined));
 
   return {
     zones: (zones ?? []) as Zone[],

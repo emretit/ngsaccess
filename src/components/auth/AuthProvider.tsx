@@ -2,21 +2,13 @@ import React, { createContext, useContext, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useQuery, useMutation } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import { toast } from '@/hooks/use-toast';
 import { checkUserRole } from '@/services/authService';
 
 type UserRole = "super_admin" | "project_admin" | "project_user";
-
-interface UserProfile {
-  _id?: string;
-  email?: string;
-  name?: string;
-  role?: UserRole;
-  verified?: boolean;
-  photo_url?: string;
-  [key: string]: unknown;
-}
+type UserProfile = NonNullable<FunctionReturnType<typeof api.users.currentUser>>;
 
 interface AuthContextType {
   session: unknown | null;
@@ -27,8 +19,8 @@ interface AuthContextType {
   signUp: (
     email: string,
     password: string,
-    name?: string,
-    companyName?: string,
+    name: string,
+    companyName: string,
   ) => Promise<{ error: unknown | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -38,7 +30,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const PUBLIC_PATHS = [
-  '/', '/login', '/register', '/auth', '/verify-email', '/demo-request',
+  '/', '/login', '/register', '/verify-email', '/demo-request',
   '/user-setup', '/admin-setup', '/employee-setup', '/system-admin',
 ];
 
@@ -135,10 +127,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (
     email: string,
     password: string,
-    name?: string,
-    companyName?: string,
+    name: string,
+    companyName: string,
   ) => {
     const normalizedEmail = email.trim().toLowerCase();
+    const normalizedName = name.trim();
+    const normalizedCompanyName = companyName.trim();
+
+    if (!normalizedEmail || !normalizedName || !normalizedCompanyName) {
+      return { error: new Error("Ad, firma ve e-posta alanları zorunludur.") };
+    }
+    if (password.length < 8) {
+      return { error: new Error("Şifre en az 8 karakter olmalıdır.") };
+    }
+
     // Bu pencerede effect'in /home'a yönlendirmesini engelle (dashboard flash'ı).
     signingUpRef.current = true;
     try {
@@ -148,8 +150,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await convexSignIn("password", {
         email: normalizedEmail,
         password,
-        name: name ?? normalizedEmail.split('@')[0],
-        companyName: companyName?.trim() ?? "",
+        name: normalizedName,
+        companyName: normalizedCompanyName,
         flow: "signUp",
       });
       // Doğrulama token'ını üret ve doğrulama mailini gönder.

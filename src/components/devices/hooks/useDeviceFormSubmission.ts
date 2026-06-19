@@ -68,11 +68,19 @@ export function useDeviceFormSubmission({
         onSuccess();
         return;
       }
+      // localBridge ↔ gateway geçişinde RHF gizli alanları temizlemediği için transport'a
+      // göre yalnız ilgili alanları gönder: aksi halde localBridge kaydında eski ehome metni
+      // hem yazılır hem de aşağıdaki otomatik gateway kaydını tetikler (gateway'de de
+      // alakasız hikDoorCount sızar). undefined alanlar update handler'ında skip edilir.
+      const isHikLocalBridge =
+        values.brand === "hikvision" && values.hik_transport === "localBridge";
       const hikFields =
         values.brand === "hikvision"
           ? {
-              ehomeID: values.ehome_id?.trim() || undefined,
-              ehomeKey: values.ehome_key?.trim() || undefined,
+              hikTransport: values.hik_transport,
+              ehomeID: isHikLocalBridge ? undefined : values.ehome_id?.trim() || undefined,
+              ehomeKey: isHikLocalBridge ? undefined : values.ehome_key?.trim() || undefined,
+              hikDoorCount: isHikLocalBridge ? values.hik_door_count || undefined : undefined,
             }
           : {};
       const ideFields =
@@ -152,6 +160,7 @@ export function useDeviceFormSubmission({
       const alreadyRegistered = !!device?.hikDevIndex;
       if (
         values.brand === "hikvision" &&
+        values.hik_transport !== "localBridge" &&
         deviceId &&
         values.ehome_id?.trim() &&
         !alreadyRegistered

@@ -1,7 +1,7 @@
 import { internalMutation, internalQuery } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import {
   authedQuery,
   authedMutation,
@@ -13,12 +13,19 @@ import {
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 
 export const list = authedQuery({
-  args: {},
-  handler: async (ctx) => {
+  args: { projectId: v.optional(v.id("projects")) },
+  handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
 
     let devices;
-    if (ctx.user.role === "super_admin") {
+    if (args.projectId) {
+      // Aktif proje filtresi — super_admin dahil yalnızca seçili projenin cihazları.
+      if (!allowedProjectIds.some((id) => id === args.projectId)) return [];
+      devices = await ctx.db
+        .query("devices")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .collect();
+    } else if (ctx.user.role === "super_admin") {
       devices = await ctx.db.query("devices").collect();
     } else if (allowedProjectIds.length > 0) {
       const results = await Promise.all(
@@ -147,6 +154,8 @@ export const create = authedMutation({
     ehomeID: v.optional(v.string()),
     ehomeKey: v.optional(v.string()),
     hikModel: v.optional(v.string()),
+    hikTransport: v.optional(v.union(v.literal("gateway"), v.literal("localBridge"))),
+    hikDoorCount: v.optional(v.number()),
     ideUuid: v.optional(v.string()),
     ideUser: v.optional(v.string()),
     idePassword: v.optional(v.string()),
@@ -210,6 +219,8 @@ export const update = authedMutation({
     ehomeID: v.optional(v.string()),
     ehomeKey: v.optional(v.string()),
     hikModel: v.optional(v.string()),
+    hikTransport: v.optional(v.union(v.literal("gateway"), v.literal("localBridge"))),
+    hikDoorCount: v.optional(v.number()),
     ideUuid: v.optional(v.string()),
     ideUser: v.optional(v.string()),
     idePassword: v.optional(v.string()),
@@ -724,6 +735,82 @@ export const registerUnassignedPanel = superAdminMutation({
 });
 
 /**
+ * Bir havuz (adminDevices) kaydını projeye bağlar: devices satırı + zone + door üretir,
+ * havuz kaydını assigned olarak işaretler. claimDevice ve reassignDevice ortak kullanır.
+ * Çağıran tarafın yetki + "zaten atanmış" kontrolünü yapması beklenir.
+ */
+async function claimAdminDeviceCore(
+  ctx: MutationCtx,
+  opts: {
+    adminDevice: Doc<"adminDevices">;
+    projectId: Id<"projects">;
+    allowedProjectIds: Id<"projects">[];
+    zoneId?: Id<"zones">;
+    newZoneName?: string;
+    name?: string;
+    ideDoorCount?: number;
+    ideUser?: string;
+    idePassword?: string;
+    description?: string;
+    now: string;
+  },
+): Promise<{ deviceId: Id<"devices">; zoneId: Id<"zones">; doorIds: Id<"doors">[] }> {
+  const { adminDevice, now } = opts;
+  const doorCount = Math.max(1, Math.min(opts.ideDoorCount ?? adminDevice.ideDoorCount ?? 4, 8));
+  const panelName = opts.name?.trim() || adminDevice.name;
+  // Girilen kimlik bilgisi öncelikli; boşsa havuz kaydındakine düş.
+  // Bridge MQTT login için device.ideUser/idePassword okur — boş kalırsa op sonsuza pending'de bekler.
+  const ideUser = opts.ideUser?.trim() || adminDevice.ideUser;
+  const idePassword = opts.idePassword?.trim() || adminDevice.idePassword;
+
+  // devices tablosuna ekle (projectId + adminDeviceId geri bağlantısı ile)
+  const deviceId = await ctx.db.insert("devices", {
+    name: panelName,
+    projectId: opts.projectId,
+    brand: adminDevice.brand ?? "ide_smart",
+    deviceType: "Erişim Paneli",
+    ideUuid: adminDevice.ideUuid,
+    ideUser,
+    idePassword,
+    ideHttpPort: adminDevice.ideHttpPort ?? 80,
+    ideDoorCount: doorCount,
+    isActive: true,
+    status: "active",
+    lastSeen: adminDevice.lastSeen,
+    description: opts.description,
+    adminDeviceId: adminDevice._id,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const { zoneId, doorIds } = await provisionPanelZoneAndDoors(ctx, {
+    deviceId,
+    projectId: opts.projectId,
+    allowedProjectIds: opts.allowedProjectIds,
+    zoneId: opts.zoneId,
+    newZoneName: opts.newZoneName,
+    panelName,
+    description: opts.description,
+    doorCount,
+    now,
+  });
+
+  await ctx.db.patch(deviceId, { zoneId, updatedAt: now });
+
+  // adminDevices'ı güncelle — atandı olarak işaretle + kimlik bilgisini havuz kaydına da yaz
+  // (release edilirse havuza güncel kimlikle döner).
+  await ctx.db.patch(adminDevice._id, {
+    assignedDeviceId: deviceId,
+    assignedProjectId: opts.projectId,
+    ideUser,
+    idePassword,
+    updatedAt: now,
+  });
+
+  return { deviceId, zoneId, doorIds };
+}
+
+/**
  * adminDevices havuzundaki cihazı bir projeye claim eder.
  * adminDevices kaydı SİLİNMEZ — assignedDeviceId + assignedProjectId set edilir.
  * devices tablosuna projectId + adminDeviceId ile yeni kayıt eklenir.
@@ -758,59 +845,89 @@ export const claimDevice = adminMutation({
       throw new Error("Bu cihaz zaten bir projeye atanmış");
     }
 
-    const now = new Date().toISOString();
-    const doorCount = Math.max(1, Math.min(args.ideDoorCount ?? adminDevice.ideDoorCount ?? 4, 8));
-    const panelName = args.name?.trim() || adminDevice.name;
-    // Claim ekranında girilen kimlik bilgisi öncelikli; boşsa havuz kaydındakine düş.
-    // Bridge MQTT login için device.ideUser/idePassword okur — boş kalırsa op sonsuza pending'de bekler.
-    const ideUser = args.ideUser?.trim() || adminDevice.ideUser;
-    const idePassword = args.idePassword?.trim() || adminDevice.idePassword;
-
-    // devices tablosuna ekle (projectId + adminDeviceId geri bağlantısı ile)
-    const deviceId = await ctx.db.insert("devices", {
-      name: panelName,
-      projectId: args.projectId,
-      brand: adminDevice.brand ?? "ide_smart",
-      deviceType: "Erişim Paneli",
-      ideUuid: adminDevice.ideUuid,
-      ideUser,
-      idePassword,
-      ideHttpPort: adminDevice.ideHttpPort ?? 80,
-      ideDoorCount: doorCount,
-      isActive: true,
-      status: "active",
-      lastSeen: adminDevice.lastSeen,
-      description: args.description,
-      adminDeviceId: args.adminDeviceId,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    const { zoneId, doorIds } = await provisionPanelZoneAndDoors(ctx, {
-      deviceId,
+    return await claimAdminDeviceCore(ctx, {
+      adminDevice,
       projectId: args.projectId,
       allowedProjectIds,
       zoneId: args.zoneId,
       newZoneName: args.newZoneName,
-      panelName,
+      name: args.name,
+      ideDoorCount: args.ideDoorCount,
+      ideUser: args.ideUser,
+      idePassword: args.idePassword,
       description: args.description,
-      doorCount,
-      now,
+      now: new Date().toISOString(),
     });
+  },
+});
 
-    await ctx.db.patch(deviceId, { zoneId, updatedAt: now });
+/**
+ * Envanter (admin) sayfasından cihaz düzenleme: isim ve/veya proje atamasını değiştirir.
+ * - Proje değişimi YIKICIDIR: atanmış cihaz önce mevcut projeden sökülür
+ *   (kapılar + groupDevices + kart okuma geçmişi silinir), sonra hedef projeye yeniden
+ *   claim edilir. adminDevices havuz kaydı KORUNUR (release'in createdFromDevice silme
+ *   davranışına girilmez) → kimlik/ad kaybolmaz.
+ * - Hedef proje undefined ise cihaz yalnızca havuza döner (atama temizlenir).
+ * - Proje değişmiyorsa yalnızca isim güncellenir (havuz + atanmış device).
+ * adminMutation: yönetimsel + yıkıcı.
+ */
+export const reassignDevice = adminMutation({
+  args: {
+    adminDeviceId: v.id("adminDevices"),
+    projectId: v.optional(v.id("projects")),
+    name: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const adminDevice = await ctx.db.get(args.adminDeviceId);
+    if (!adminDevice) throw new Error("Cihaz bulunamadı");
 
-    // adminDevices'ı güncelle — atandı olarak işaretle + kimlik bilgisini havuz kaydına da yaz
-    // (release edilirse havuza güncel kimlikle döner).
-    await ctx.db.patch(args.adminDeviceId, {
-      assignedDeviceId: deviceId,
-      assignedProjectId: args.projectId,
-      ideUser,
-      idePassword,
-      updatedAt: now,
-    });
+    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
+      throw new Error("Bu projeye erişim yetkiniz yok");
+    }
 
-    return { deviceId, zoneId, doorIds };
+    const now = new Date().toISOString();
+    const newName = args.name?.trim();
+    if (newName && newName !== adminDevice.name) {
+      await ctx.db.patch(args.adminDeviceId, { name: newName, updatedAt: now });
+    }
+
+    // Proje değişmiyorsa: atanmış device adını da senkronla, bitir.
+    if (adminDevice.assignedProjectId === args.projectId) {
+      if (newName && adminDevice.assignedDeviceId) {
+        await ctx.db.patch(adminDevice.assignedDeviceId, { name: newName, updatedAt: now });
+      }
+      return;
+    }
+
+    // Mevcut atamayı söküm (varsa) — havuz kaydı KORUNUR, yalnızca assignment temizlenir.
+    if (adminDevice.assignedDeviceId) {
+      const assigned = await ctx.db.get(adminDevice.assignedDeviceId);
+      if (assigned) {
+        if (!isProjectAllowed(allowedProjectIds, assigned.projectId)) {
+          throw new Error("Mevcut projeye erişim yetkiniz yok");
+        }
+        await purgeDeviceCascade(ctx, assigned._id, assigned.projectId);
+      }
+      await ctx.db.patch(args.adminDeviceId, {
+        assignedDeviceId: undefined,
+        assignedProjectId: undefined,
+        updatedAt: now,
+      });
+    }
+
+    // Hedef projeye yeniden ata (varsa). Patch sonrası güncel kaydı oku.
+    if (args.projectId) {
+      const fresh = await ctx.db.get(args.adminDeviceId);
+      if (!fresh) throw new Error("Cihaz bulunamadı");
+      await claimAdminDeviceCore(ctx, {
+        adminDevice: fresh,
+        projectId: args.projectId,
+        allowedProjectIds,
+        name: newName ?? fresh.name,
+        now,
+      });
+    }
   },
 });
 

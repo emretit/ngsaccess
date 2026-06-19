@@ -8,7 +8,7 @@ import { DepartmentTreeItem } from "./DepartmentTreeItem";
 import { AddDepartmentDialog } from "./AddDepartmentDialog";
 import { DepartmentProjectHeader } from "./DepartmentProjectHeader";
 import { useDepartments } from "@/hooks/useDepartments";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
 interface DepartmentTreeProps {
   onSelectDepartment: (id: Id<"departments"> | null) => void;
@@ -16,16 +16,19 @@ interface DepartmentTreeProps {
 
 export default function DepartmentTree({ onSelectDepartment }: DepartmentTreeProps) {
   const { departments, isLoading, addDepartment, deleteDepartment } = useDepartments();
-  const { isSuperAdmin } = useProjectAccess();
+  const { activeProject, isSuperAdmin, projectId, loading: projectLoading } = useActiveProject();
   const [selectedDepartment, setSelectedDepartment] = useState<Id<"departments"> | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAddTopLevelDialog, setShowAddTopLevelDialog] = useState(false);
   const [addingToParentId, setAddingToParentId] = useState<Id<"departments"> | null>(null);
 
-  const generalSettings = useQuery(api.settings.getGeneral, {});
+  const generalSettings = useQuery(
+    api.settings.getGeneral,
+    !projectLoading && projectId ? { projectId } : "skip",
+  );
   const companyName = isSuperAdmin
-    ? "Tüm Projeler"
-    : (generalSettings?.companyName ?? "Ana Proje");
+    ? (activeProject?.name ?? "Proje seç")
+    : (generalSettings?.companyName ?? activeProject?.name ?? "Ana Proje");
 
   const handleProjectHeaderClick = () => {
     setSelectedDepartment(null);

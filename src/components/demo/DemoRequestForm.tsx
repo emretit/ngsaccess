@@ -20,7 +20,12 @@ const DemoRequestForm = () => {
     e.preventDefault();
     setIsLoading(true);
     try {
-      const { error: signUpError } = await signUp(email, password, `${firstName} ${lastName}`);
+      const { error: signUpError } = await signUp(
+        email,
+        password,
+        `${firstName.trim()} ${lastName.trim()}`,
+        companyName.trim(),
+      );
       if (signUpError) {
         toast({
           title: "Kayıt hatası",
@@ -31,9 +36,9 @@ const DemoRequestForm = () => {
       }
       toast({
         title: "Demo kaydı başarılı!",
-        description: "Hesabınız oluşturuldu. Giriş yapabilirsiniz.",
+        description: "E-posta adresinize gönderilen linkle hesabınızı doğrulayın.",
       });
-      navigate("/login");
+      navigate("/login?confirmEmail=true");
     } catch (error: unknown) {
       toast({
         title: "Kayıt hatası",
@@ -62,7 +67,7 @@ const DemoRequestForm = () => {
             </div>
             <Input id="email" type="email" placeholder="E-posta" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <Input id="companyName" type="text" placeholder="Firma Adı" value={companyName} onChange={(e) => setCompanyName(e.target.value)} required />
-            <Input id="password" type="password" placeholder="Şifre" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+            <Input id="password" type="password" autoComplete="new-password" placeholder="En az 8 karakter" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
             <Button type="submit" className="w-full h-11 bg-primary hover:bg-primary/90" disabled={isLoading}>
               {isLoading ? "Demo erişimi oluşturuluyor..." : "Demo Talep Et"}
             </Button>

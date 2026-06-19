@@ -21,6 +21,8 @@ interface DeviceData {
   brand?: DeviceBrand;
   ehomeID?: string;
   ehomeKey?: string;
+  hikTransport?: "gateway" | "localBridge";
+  hikDoorCount?: number;
   ideUuid?: string;
   ideUser?: string;
   idePassword?: string;
@@ -53,6 +55,8 @@ export function useDeviceDataLoader({ device, open, defaultBrand, form }: UseDev
         status: (device.status === "active" || device.status === "inactive" ? device.status : "active") as "active" | "inactive",
         ehome_id: device.ehomeID ?? "",
         ehome_key: device.ehomeKey ?? "",
+        hik_transport: device.hikTransport ?? "gateway",
+        hik_door_count: device.hikDoorCount,
         ide_uuid: device.ideUuid ?? "",
         ide_user: device.ideUser ?? "",
         ide_password: device.idePassword ?? "",
@@ -76,6 +80,7 @@ export function useDeviceDataLoader({ device, open, defaultBrand, form }: UseDev
         status: "active",
         ehome_id: "",
         ehome_key: "",
+        hik_transport: "gateway",
         // IDE Smart paneli ön-tanımlı kimliği (MQTT login token'ı için).
         ide_user: "admin",
         ide_password: "admin12345",

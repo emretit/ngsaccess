@@ -1,13 +1,13 @@
 /**
- * LAN’daki Hikvision DS-K1T807 (192.168.1.164) cihazını devices tablosuna ekler veya seri no ile günceller.
+ * LAN’daki Hikvision cihazını devices tablosuna ekler veya seri no ile günceller.
  * Convex Dashboard → Functions → seedHikvisionLanDevice:run → Run
  * veya: npx convex run seedHikvisionLanDevice:run
  */
 import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
-const DEFAULT_IP = "192.168.1.34";
-const DEFAULT_SERIAL = "DS-K1T807EBFWX-E120250619V042400ENGB8172365";
+const DEFAULT_IP = "192.168.1.117";
+const DEFAULT_SERIAL = "DS-K2804-LOCAL-BRIDGE";
 
 export const run = internalMutation({
   args: {
@@ -15,12 +15,16 @@ export const run = internalMutation({
     name: v.optional(v.string()),
     deviceIp: v.optional(v.string()),
     deviceSerial: v.optional(v.string()),
+    hikTransport: v.optional(v.union(v.literal("gateway"), v.literal("localBridge"))),
+    hikDoorCount: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const now = new Date().toISOString();
     const deviceIp = args.deviceIp ?? DEFAULT_IP;
     const deviceSerial = args.deviceSerial ?? DEFAULT_SERIAL;
-    const name = args.name ?? `Hikvision DS-K1T807 (${deviceIp})`;
+    const name = args.name ?? `Hikvision DS-K2804 (${deviceIp})`;
+    const hikTransport = args.hikTransport ?? "localBridge";
+    const hikDoorCount = args.hikDoorCount ?? 4;
 
     let projectId = args.projectId;
     if (!projectId) {
@@ -47,6 +51,9 @@ export const run = internalMutation({
         deviceType: "access_control",
         deviceIp,
         deviceSerial,
+        brand: "hikvision",
+        hikTransport,
+        hikDoorCount,
         isActive: true,
         status: "active",
         updatedAt: now,
@@ -64,6 +71,9 @@ export const run = internalMutation({
       deviceType: "access_control",
       deviceIp,
       deviceSerial,
+      brand: "hikvision",
+      hikTransport,
+      hikDoorCount,
       isActive: true,
       status: "active",
       createdAt: now,

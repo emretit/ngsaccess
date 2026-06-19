@@ -4,15 +4,17 @@ import { api } from "../../../convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Loader2, Plus, LayoutGrid, DoorOpen } from "lucide-react";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
 const ZonesAndDoors = () => {
-  const zonesData = useQuery(api.zones.list, {});
-  const doorsData = useQuery(api.doors.list, {});
-  const zonesLoading = zonesData === undefined;
-  const doorsLoading = doorsData === undefined;
+  const { projectId, loading: projectLoading } = useActiveProject();
+  const queryArgs = !projectLoading && projectId ? { projectId } : "skip";
+  const zonesData = useQuery(api.zones.list, queryArgs);
+  const doorsData = useQuery(api.doors.list, queryArgs);
+  const zonesLoading = projectLoading || (!!projectId && zonesData === undefined);
+  const doorsLoading = projectLoading || (!!projectId && doorsData === undefined);
   const zones = zonesData ?? [];
   const doors = doorsData ?? [];
 

@@ -16,10 +16,13 @@ interface DevicesContentProps {
   onDeleteDevice: (deviceId: string) => void;
   onAssignLocation: (device: Device) => void;
   onEditDevice: (device: Device) => void;
-  onNewDevice: () => void;
+  /** Sıfırdan yeni cihaz oluşturma akışı. */
+  onAddNew: () => void;
+  /** Buluttan (havuzdan) cihaz ekleme akışı. */
+  onAddFromCloud: () => void;
   onQRClick?: (device: Device) => void;
   onReleaseDevice?: (device: Device) => void;
-  /** Yönetimsel aksiyonlar (havuzdan ekle butonu) yalnız admin'e gösterilir. */
+  /** Yönetimsel aksiyonlar (cihaz ekle menüsü) yalnız admin'e gösterilir. */
   canManage?: boolean;
 }
 
@@ -33,7 +36,8 @@ export function DevicesContent({
   onDeleteDevice,
   onAssignLocation,
   onEditDevice,
-  onNewDevice,
+  onAddNew,
+  onAddFromCloud,
   onQRClick,
   onReleaseDevice,
   canManage = true
@@ -60,8 +64,8 @@ export function DevicesContent({
         typeFilter={typeFilter}
         onTypeFilterChange={setTypeFilter}
         deviceTypes={deviceTypes}
-        onNewDevice={onNewDevice}
-        newDeviceLabel="Havuzdan Cihaz Ekle"
+        onAddNew={onAddNew}
+        onAddFromCloud={onAddFromCloud}
         showNewDevice={canManage}
         deviceCount={devices.length}
         filteredCount={filteredDevices.length}

@@ -28,7 +28,7 @@ export default function Profile() {
         <ProfilePhoto 
           photoUrl={formData.photoUrl} 
           userInitials={getUserInitials()} 
-          userId={String(user?.id ?? user?._id ?? '')}
+          userId={user._id}
           onPhotoUpdated={handlePhotoUpdated}
         />
         
@@ -37,7 +37,7 @@ export default function Profile() {
           email={formData.email}
           fullName={formData.fullName}
           role={profile?.role || 'Kullanıcı'}
-          userId={String(user?.id ?? user?._id ?? '')}
+          userId={user._id}
           onProfileUpdated={refreshProfile}
           onSignOut={signOut}
         />

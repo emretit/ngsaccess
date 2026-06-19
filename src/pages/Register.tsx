@@ -29,7 +29,18 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firstName || !lastName || !companyName || !email || !password) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedFirstName = firstName.trim();
+    const normalizedLastName = lastName.trim();
+    const normalizedCompanyName = companyName.trim();
+
+    if (
+      !normalizedFirstName ||
+      !normalizedLastName ||
+      !normalizedCompanyName ||
+      !normalizedEmail ||
+      !password
+    ) {
       setError('Lütfen tüm alanları doldurun.');
       return;
     }
@@ -40,13 +51,12 @@ export default function Register() {
     setSubmitting(true);
     setError(null);
     try {
-      const normalizedEmail = email.trim().toLowerCase();
-      const fullName = `${firstName.trim()} ${lastName.trim()}`;
+      const fullName = `${normalizedFirstName} ${normalizedLastName}`;
       const { error: signUpError } = await signUp(
         normalizedEmail,
         password,
         fullName,
-        companyName.trim(),
+        normalizedCompanyName,
       );
       if (signUpError) {
         const rawMessage =

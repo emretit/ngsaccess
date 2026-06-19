@@ -35,14 +35,26 @@ const EnhancedDemoRequestForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
+    const companyName = formData.companyName.trim();
+
+    if (!fullName || !companyName || formData.password.length < 8) {
+      toast({
+        title: "Eksik veya geçersiz bilgi",
+        description: "Ad, firma ve en az 8 karakterlik şifre gereklidir.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Kullanıcıyı kayıt et
       const { error: signUpError } = await signUp(
-        formData.email, 
-        formData.password, 
-        `${formData.firstName} ${formData.lastName}`
+        formData.email,
+        formData.password,
+        fullName,
+        companyName,
       );
       
       if (signUpError) {
@@ -56,9 +68,9 @@ const EnhancedDemoRequestForm = () => {
 
       toast({
         title: "Demo kaydı başarılı!",
-        description: "Hesabınız oluşturuldu. Giriş yapabilirsiniz.",
+        description: "E-posta adresinize gönderilen linkle hesabınızı doğrulayın.",
       });
-      navigate("/login");
+      navigate("/login?confirmEmail=true");
     } catch (error: unknown) {
       toast({
         title: "Kayıt hatası",
@@ -207,11 +219,12 @@ const EnhancedDemoRequestForm = () => {
                   id="password"
                   name="password"
                   type="password"
-                  placeholder="En az 6 karakter"
+                  autoComplete="new-password"
+                  placeholder="En az 8 karakter"
                   value={formData.password}
                   onChange={handleChange}
                   required
-                  minLength={6}
+                  minLength={8}
                   className="h-12"
                 />
               </div>

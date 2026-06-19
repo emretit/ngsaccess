@@ -32,8 +32,11 @@ function SyncingStrip({ count }: { count: number | undefined }) {
 }
 
 export function DeviceSyncStatusBanner() {
-  const { projectId } = useActiveProject();
-  const status = useQuery(api.syncStatus.deviceSyncStatus, { projectId });
+  const { projectId, loading: projectLoading } = useActiveProject();
+  const status = useQuery(
+    api.syncStatus.deviceSyncStatus,
+    !projectLoading && projectId ? { projectId } : "skip",
+  );
   const clientSyncing = useDeviceSyncing();
 
   // Loading: flicker'ı önlemek için hiçbir şey çizme — ama UI-tetikli sync uçuştaysa

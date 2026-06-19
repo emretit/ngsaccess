@@ -47,8 +47,6 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
 
   const claimable = useQuery(api.adminDevices.listForClaim, open ? {} : "skip");
   const projects = useQuery(api.projects.list, open && isSuperAdmin ? {} : "skip");
-  const zones = useQuery(api.zones.list, open ? {} : "skip");
-  const claimDevice = useMutation(api.devices.claimDevice);
 
   const [selectedId, setSelectedId] = useState<Id<"adminDevices"> | null>(null);
   const [targetProjectId, setTargetProjectId] = useState<Id<"projects"> | null>(null);
@@ -59,6 +57,12 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
   const [zoneChoice, setZoneChoice] = useState<string>(NEW_ZONE);
   const [newZoneName, setNewZoneName] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const zones = useQuery(
+    api.zones.list,
+    open && targetProjectId ? { projectId: targetProjectId } : "skip",
+  );
+  const claimDevice = useMutation(api.devices.claimDevice);
 
   useEffect(() => {
     if (open) {
@@ -95,9 +99,7 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
   // eslint-disable-next-line react-hooks/purity
   const nowMs = Date.now();
 
-  const projectZones = (zones ?? []).filter(
-    (z) => targetProjectId && z.projectId === targetProjectId,
-  );
+  const projectZones = zones ?? [];
 
   const canSubmit =
     !!selectedId &&

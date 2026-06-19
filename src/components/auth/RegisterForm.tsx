@@ -10,6 +10,7 @@ import { toast } from '@/hooks/use-toast';
 const RegisterForm = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -22,7 +23,12 @@ const RegisterForm = () => {
 
     try {
       // Kullanıcıyı kayıt et
-      const { error: signUpError } = await signUp(email, password, `${firstName} ${lastName}`);
+      const { error: signUpError } = await signUp(
+        email,
+        password,
+        `${firstName.trim()} ${lastName.trim()}`,
+        companyName.trim(),
+      );
       
       if (signUpError) {
         toast({
@@ -41,7 +47,7 @@ const RegisterForm = () => {
         description: "Projeniz oluşturuldu. Giriş yapabilirsiniz.",
       });
       
-      navigate('/home');
+      navigate('/login?confirmEmail=true');
       
     } catch (error: unknown) {
       toast({
@@ -89,6 +95,17 @@ const RegisterForm = () => {
             </div>
             <div className="space-y-2">
               <Input
+                id="companyName"
+                type="text"
+                autoComplete="organization"
+                placeholder="Firma adı"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Input
                 id="email"
                 type="email"
                 placeholder="E-posta"
@@ -101,11 +118,12 @@ const RegisterForm = () => {
               <Input
                 id="password"
                 type="password"
-                placeholder="Şifre"
+                autoComplete="new-password"
+                placeholder="En az 8 karakter"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                minLength={8}
               />
             </div>
             <Button 

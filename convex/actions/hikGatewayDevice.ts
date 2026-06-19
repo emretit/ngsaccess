@@ -270,6 +270,15 @@ export const remoteOpenDoor = authedAction({
     if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
       return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
     }
+    if (device.hikTransport === "localBridge") {
+      await ctx.runMutation(internal.hikvisionSync.enqueueLocalBridgeOperation, {
+        deviceId: device._id,
+        projectId: device.projectId,
+        operation: "openDoor",
+        payload: { doorNo: args.doorNo ?? 1 },
+      });
+      return { ok: true };
+    }
     if (!device.hikDevIndex) {
       return {
         ok: false,

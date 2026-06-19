@@ -15,11 +15,11 @@ export function OvertimeSettingsForm() {
 
   const workSettings = useQuery(
     api.settings.getWork,
-    projectLoading ? "skip" : { projectId }
+    !projectLoading && projectId ? { projectId } : "skip",
   );
   const rates = useQuery(
     api.holidays.getOvertimeRates,
-    projectLoading ? "skip" : { projectId }
+    !projectLoading && projectId ? { projectId } : "skip",
   );
   const upsertWork = useMutation(api.settings.upsertWork);
   const upsertRates = useMutation(api.holidays.upsertOvertimeRates);
@@ -55,6 +55,14 @@ export function OvertimeSettingsForm() {
   }, [rates]);
 
   const handleSave = async () => {
+    if (!projectId) {
+      toast({
+        title: "Hata",
+        description: "Önce bir proje seçin.",
+        variant: "destructive",
+      });
+      return;
+    }
     setSaving(true);
     try {
       await Promise.all([
@@ -222,7 +230,7 @@ export function OvertimeSettingsForm() {
           </div>
         </section>
 
-        <Button onClick={handleSave} disabled={saving}>
+        <Button onClick={handleSave} disabled={saving || !projectId}>
           {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Değişiklikleri Kaydet
         </Button>

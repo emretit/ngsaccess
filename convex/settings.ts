@@ -2,6 +2,24 @@
 import { v } from "convex/values";
 import { authedQuery, authedMutation, optionalAuthQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
+import type { Id } from "./_generated/dataModel";
+
+/**
+ * Ayar sorguları için tenant-güvenli proje çözümü.
+ * - projectId verilmezse kullanıcının ilk izinli projesine düşer.
+ * - ASLA tablo geneli `.first()` ile başka tenant'ın kaydını döndürmez
+ *   (çapraz-tenant sızıntısının kök nedeni buydu).
+ * - İzin yoksa veya hiç proje yoksa null.
+ */
+function resolveSettingsProjectId(
+  allowedProjectIds: Id<"projects">[],
+  argProjectId: Id<"projects"> | undefined,
+): Id<"projects"> | null {
+  const projectId = argProjectId ?? allowedProjectIds[0];
+  if (!projectId) return null;
+  if (!allowedProjectIds.some((id) => id === projectId)) return null;
+  return projectId;
+}
 
 // === General Settings ===
 export const getGeneral = authedQuery({
@@ -10,15 +28,11 @@ export const getGeneral = authedQuery({
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      return null;
-    }
-    if (!args.projectId) {
-      return await ctx.db.query("generalSettings").first();
-    }
+    const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
+    if (!projectId) return null;
     return await ctx.db
       .query("generalSettings")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
       .first();
   },
 });
@@ -45,23 +59,21 @@ export const upsertGeneral = authedMutation({
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      throw new Error("Bu projeye erişim yetkiniz yok");
-    }
+    const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
+    if (!projectId) throw new Error("Bu projeye erişim yetkiniz yok");
     const now = new Date().toISOString();
-    const existing = args.projectId
-      ? await ctx.db
-          .query("generalSettings")
-          .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-          .first()
-      : await ctx.db.query("generalSettings").first();
+    const existing = await ctx.db
+      .query("generalSettings")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .first();
 
     if (existing) {
-      await ctx.db.patch(existing._id, { ...args, updatedAt: now });
+      await ctx.db.patch(existing._id, { ...args, projectId, updatedAt: now });
       return existing._id;
     }
     return await ctx.db.insert("generalSettings", {
       ...args,
+      projectId,
       createdAt: now,
       updatedAt: now,
     });
@@ -73,13 +85,11 @@ export const getMail = authedQuery({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      return null;
-    }
-    if (!args.projectId) return await ctx.db.query("mailSettings").first();
+    const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
+    if (!projectId) return null;
     return await ctx.db
       .query("mailSettings")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
       .first();
   },
 });
@@ -98,23 +108,21 @@ export const upsertMail = authedMutation({
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      throw new Error("Bu projeye erişim yetkiniz yok");
-    }
+    const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
+    if (!projectId) throw new Error("Bu projeye erişim yetkiniz yok");
     const now = new Date().toISOString();
-    const existing = args.projectId
-      ? await ctx.db
-          .query("mailSettings")
-          .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-          .first()
-      : await ctx.db.query("mailSettings").first();
+    const existing = await ctx.db
+      .query("mailSettings")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .first();
 
     if (existing) {
-      await ctx.db.patch(existing._id, { ...args, updatedAt: now });
+      await ctx.db.patch(existing._id, { ...args, projectId, updatedAt: now });
       return existing._id;
     }
     return await ctx.db.insert("mailSettings", {
       ...args,
+      projectId,
       createdAt: now,
       updatedAt: now,
     });
@@ -126,13 +134,11 @@ export const getNotification = authedQuery({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      return null;
-    }
-    if (!args.projectId) return await ctx.db.query("notificationSettings").first();
+    const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
+    if (!projectId) return null;
     return await ctx.db
       .query("notificationSettings")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
       .first();
   },
 });
@@ -147,23 +153,21 @@ export const upsertNotification = authedMutation({
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      throw new Error("Bu projeye erişim yetkiniz yok");
-    }
+    const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
+    if (!projectId) throw new Error("Bu projeye erişim yetkiniz yok");
     const now = new Date().toISOString();
-    const existing = args.projectId
-      ? await ctx.db
-          .query("notificationSettings")
-          .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-          .first()
-      : await ctx.db.query("notificationSettings").first();
+    const existing = await ctx.db
+      .query("notificationSettings")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .first();
 
     if (existing) {
-      await ctx.db.patch(existing._id, { ...args, updatedAt: now });
+      await ctx.db.patch(existing._id, { ...args, projectId, updatedAt: now });
       return existing._id;
     }
     return await ctx.db.insert("notificationSettings", {
       ...args,
+      projectId,
       createdAt: now,
       updatedAt: now,
     });
@@ -175,13 +179,11 @@ export const getWork = authedQuery({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      return null;
-    }
-    if (!args.projectId) return await ctx.db.query("workSettings").first();
+    const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
+    if (!projectId) return null;
     return await ctx.db
       .query("workSettings")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
       .first();
   },
 });
@@ -202,19 +204,20 @@ export const upsertWork = authedMutation({
     monthlyHoursBase: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
+    if (!projectId) throw new Error("Bu projeye erişim yetkiniz yok");
     const now = new Date().toISOString();
-    const existing = args.projectId
-      ? await ctx.db
-          .query("workSettings")
-          .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-          .first()
-      : await ctx.db.query("workSettings").first();
+    const existing = await ctx.db
+      .query("workSettings")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .first();
 
     if (existing) {
-      await ctx.db.patch(existing._id, { ...args, updatedAt: now });
+      await ctx.db.patch(existing._id, { ...args, projectId, updatedAt: now });
       return existing._id;
     }
-    return await ctx.db.insert("workSettings", { ...args, updatedAt: now });
+    return await ctx.db.insert("workSettings", { ...args, projectId, updatedAt: now });
   },
 });
 
@@ -228,15 +231,12 @@ export const getDarkMode = optionalAuthQuery({
     // sessizce false dönüp AuthProvider'ın signOut'una izin ver.
     if (ctx.user.verified === false) return false;
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      return false;
-    }
-    const settings = args.projectId
-      ? await ctx.db
-          .query("generalSettings")
-          .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-          .first()
-      : await ctx.db.query("generalSettings").first();
+    const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
+    if (!projectId) return false;
+    const settings = await ctx.db
+      .query("generalSettings")
+      .withIndex("by_project", (q) => q.eq("projectId", projectId))
+      .first();
     return settings?.darkMode ?? false;
   },
 });

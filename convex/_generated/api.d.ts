@@ -53,6 +53,7 @@ import type * as lib_breakDeduction from "../lib/breakDeduction.js";
 import type * as lib_cardReaderParse from "../lib/cardReaderParse.js";
 import type * as lib_customFunctions from "../lib/customFunctions.js";
 import type * as lib_digestAuth from "../lib/digestAuth.js";
+import type * as lib_emailVerification from "../lib/emailVerification.js";
 import type * as lib_employeeAuth from "../lib/employeeAuth.js";
 import type * as lib_employeeCascade from "../lib/employeeCascade.js";
 import type * as lib_escapers from "../lib/escapers.js";
@@ -139,6 +140,7 @@ declare const fullApi: ApiFromModules<{
   "lib/cardReaderParse": typeof lib_cardReaderParse;
   "lib/customFunctions": typeof lib_customFunctions;
   "lib/digestAuth": typeof lib_digestAuth;
+  "lib/emailVerification": typeof lib_emailVerification;
   "lib/employeeAuth": typeof lib_employeeAuth;
   "lib/employeeCascade": typeof lib_employeeCascade;
   "lib/escapers": typeof lib_escapers;

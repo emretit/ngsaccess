@@ -79,3 +79,6 @@ build/
 
 # Reference docs (binary)
 *.pdf
+
+# Temp / local only
+tmp/

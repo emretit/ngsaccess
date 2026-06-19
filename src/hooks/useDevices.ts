@@ -11,7 +11,10 @@ export function useDevices() {
   const { toast } = useToast();
   const { projectId, loading: projectLoading } = useActiveProject();
 
-  const devicesRaw = useQuery(api.devices.list, !projectLoading ? {} : "skip");
+  const devicesRaw = useQuery(
+    api.devices.list,
+    !projectLoading && projectId ? { projectId } : "skip",
+  );
 
   const createDevice = useMutation(api.devices.create);
   const updateDevice = useMutation(api.devices.update);
@@ -96,11 +99,14 @@ export function useDevices() {
 
   return {
     devices,
-    isLoading: projectLoading || devicesRaw === undefined,
+    isLoading: projectLoading || (!!projectId && devicesRaw === undefined),
     error: null,
     addDevice,
     editDevice,
     removeDevice,
-    devicesQuery: { data: devices, isLoading: devicesRaw === undefined },
+    devicesQuery: {
+      data: devices,
+      isLoading: projectLoading || (!!projectId && devicesRaw === undefined),
+    },
   };
 }

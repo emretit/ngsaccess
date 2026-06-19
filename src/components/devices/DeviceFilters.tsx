@@ -1,7 +1,7 @@
 import { Search, Filter, Smartphone } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DeviceFormButton } from "./DeviceFormButton";
+import { DeviceAddMenu } from "./DeviceAddMenu";
 
 interface DeviceFiltersProps {
   search: string;
@@ -11,9 +11,11 @@ interface DeviceFiltersProps {
   typeFilter: string;
   onTypeFilterChange: (value: string) => void;
   deviceTypes: string[];
-  onNewDevice: () => void;
-  newDeviceLabel?: string;
-  /** "Yeni cihaz / Havuzdan ekle" butonunu gösterir (admin değilse gizlenir). Vars: true. */
+  /** Sıfırdan yeni cihaz oluşturma akışı. */
+  onAddNew: () => void;
+  /** Buluttan (havuzdan) cihaz ekleme akışı. */
+  onAddFromCloud: () => void;
+  /** "Cihaz Ekle" menüsünü gösterir (admin değilse gizlenir). Vars: true. */
   showNewDevice?: boolean;
   deviceCount: number;
   filteredCount: number;
@@ -27,8 +29,8 @@ export function DeviceFilters({
   typeFilter,
   onTypeFilterChange,
   deviceTypes,
-  onNewDevice,
-  newDeviceLabel,
+  onAddNew,
+  onAddFromCloud,
   showNewDevice = true,
   deviceCount,
   filteredCount
@@ -90,7 +92,7 @@ export function DeviceFilters({
           </Select>
 
           {showNewDevice && (
-            <DeviceFormButton onOpenDevicePanel={onNewDevice} label={newDeviceLabel} />
+            <DeviceAddMenu onAddNew={onAddNew} onAddFromCloud={onAddFromCloud} />
           )}
         </div>
       </div>

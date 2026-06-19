@@ -5,9 +5,12 @@ import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
 export const useGeneralSettings = () => {
   const { toast } = useToast();
-  const { projectId } = useActiveProject();
+  const { projectId, loading: projectLoading } = useActiveProject();
 
-  const settings = useQuery(api.settings.getGeneral, { projectId });
+  const settings = useQuery(
+    api.settings.getGeneral,
+    !projectLoading && projectId ? { projectId } : "skip",
+  );
   const upsertGeneral = useMutation(api.settings.upsertGeneral);
 
   const saveSettings = async (data: {
@@ -28,6 +31,14 @@ export const useGeneralSettings = () => {
     workingHoursEnd?: string;
     notificationsEnabled?: boolean;
   }) => {
+    if (!projectId) {
+      toast({
+        title: "Hata",
+        description: "Önce bir proje seçin.",
+        variant: "destructive",
+      });
+      return false;
+    }
     try {
       await upsertGeneral({
         projectId,
@@ -48,7 +59,7 @@ export const useGeneralSettings = () => {
 
   return {
     settings: settings ?? null,
-    loading: settings === undefined,
+    loading: projectLoading || (!!projectId && settings === undefined),
     saving: false,
     saveSettings,
   };

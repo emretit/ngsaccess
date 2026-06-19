@@ -1,8 +1,27 @@
 import { v } from "convex/values";
 import { internalQuery, internalMutation } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { adminQuery, authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
+
+const HIK_BRIDGE_PROCESSING_TIMEOUT_MS = 2 * 60 * 1000;
+const HIK_BRIDGE_MAX_POLL = 25;
+
+const hikOperationValidator = v.union(
+  v.literal("addPerson"),
+  v.literal("updatePerson"),
+  v.literal("deletePerson"),
+  v.literal("addCard"),
+  v.literal("deleteCard"),
+  v.literal("addFace"),
+  v.literal("deleteFace"),
+  v.literal("addFingerprint"),
+  v.literal("deleteFingerprint"),
+  v.literal("syncWeekPlan"),
+  v.literal("syncHoliday"),
+  v.literal("syncDoorParam"),
+  v.literal("openDoor"),
+);
 
 /**
  * Çalışanın erişim grupları üzerinden bağlı olduğu cihazları ve kuralları getirir.
@@ -30,6 +49,8 @@ export const getEmployeeWithDevices = internalQuery({
         hikDevIndex?: string;
         ehomeID?: string;
         deviceIp?: string;
+        deviceSerial?: string;
+        hikTransport?: "gateway" | "localBridge";
         hikDoorCount?: number;
       };
       rule: {
@@ -67,6 +88,8 @@ export const getEmployeeWithDevices = internalQuery({
             hikDevIndex: device.hikDevIndex,
             ehomeID: device.ehomeID,
             deviceIp: device.deviceIp,
+            deviceSerial: device.deviceSerial,
+            hikTransport: device.hikTransport,
             hikDoorCount: device.hikDoorCount,
           },
           rule: {
@@ -120,6 +143,8 @@ export const getAccessRuleWithDevices = internalQuery({
       projectId?: Id<"projects">;
       hikDevIndex?: string;
       deviceIp?: string;
+      deviceSerial?: string;
+      hikTransport?: "gateway" | "localBridge";
       hikDoorCount?: number;
     }[] = [];
 
@@ -133,6 +158,8 @@ export const getAccessRuleWithDevices = internalQuery({
         projectId: device.projectId,
         hikDevIndex: device.hikDevIndex,
         deviceIp: device.deviceIp,
+        deviceSerial: device.deviceSerial,
+        hikTransport: device.hikTransport,
         hikDoorCount: device.hikDoorCount,
       });
     }
@@ -359,6 +386,184 @@ export const recordSyncFailure = internalMutation({
       lastError: args.lastError,
       createdAt: Date.now(),
     });
+  },
+});
+
+export const enqueueLocalBridgeOperation = internalMutation({
+  args: {
+    deviceId: v.id("devices"),
+    projectId: v.optional(v.id("projects")),
+    operation: hikOperationValidator,
+    payload: v.any(),
+  },
+  handler: async (ctx, args) => {
+    const device = await ctx.db.get(args.deviceId);
+    if (!device || device.brand !== "hikvision") {
+      throw new Error("Local bridge op sadece Hikvision cihazlar için yazılabilir");
+    }
+    if (device.hikTransport !== "localBridge") {
+      throw new Error("Cihaz localBridge transport kullanmıyor");
+    }
+    return await ctx.db.insert("hikPendingOperations", {
+      deviceId: args.deviceId,
+      projectId: args.projectId,
+      operation: args.operation,
+      payload: args.payload,
+      status: "pending",
+      attemptCount: 0,
+      nextRetryAt: Date.now(),
+      createdAt: Date.now(),
+    });
+  },
+});
+
+function isLocalBridgeDevice(device: Doc<"devices"> | null): device is Doc<"devices"> {
+  return device !== null && device.brand === "hikvision" && device.hikTransport === "localBridge";
+}
+
+export const claimLocalBridgeOperations = internalMutation({
+  args: {
+    token: v.string(),
+    max: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const device = await ctx.db
+      .query("devices")
+      .withIndex("by_api_token", (q) => q.eq("apiToken", args.token))
+      .first();
+    if (!isLocalBridgeDevice(device)) {
+      return { ok: false, error: "unauthorized", operations: [] };
+    }
+
+    const now = Date.now();
+    const staleCutoff = now - HIK_BRIDGE_PROCESSING_TIMEOUT_MS;
+    const processing = await ctx.db
+      .query("hikPendingOperations")
+      .withIndex("by_device_status", (q) =>
+        q.eq("deviceId", device._id).eq("status", "processing"),
+      )
+      .take(100);
+    await Promise.all(
+      processing
+        .filter((op) => (op.processingStartedAt ?? op.createdAt) < staleCutoff)
+        .map((op) =>
+          ctx.db.patch(op._id, {
+            status: "pending",
+            nextRetryAt: now,
+            lastError: "Bridge claim timeout; pending'e alındı",
+          }),
+        ),
+    );
+
+    const requestedMax = Math.floor(args.max ?? 10);
+    const max = Math.min(Math.max(requestedMax, 1), HIK_BRIDGE_MAX_POLL);
+    const pending = await ctx.db
+      .query("hikPendingOperations")
+      .withIndex("by_device_status", (q) =>
+        q.eq("deviceId", device._id).eq("status", "pending"),
+      )
+      .take(max * 2);
+    const due = pending
+      .filter((op) => (op.nextRetryAt ?? 0) <= now)
+      .slice(0, max);
+
+    await Promise.all(
+      due.map((op) =>
+        ctx.db.patch(op._id, {
+          status: "processing",
+          attemptCount: op.attemptCount + 1,
+          processingStartedAt: now,
+          lastError: undefined,
+        }),
+      ),
+    );
+
+    return {
+      ok: true,
+      device: {
+        deviceId: device._id,
+        name: device.name,
+        deviceIp: device.deviceIp,
+        deviceSerial: device.deviceSerial,
+        hikDoorCount: device.hikDoorCount,
+      },
+      operations: due.map((op) => ({
+        opId: op._id,
+        operation: op.operation,
+        payload: op.payload,
+        attemptCount: op.attemptCount + 1,
+        createdAt: op.createdAt,
+      })),
+    };
+  },
+});
+
+export const ackLocalBridgeOperation = internalMutation({
+  args: {
+    token: v.string(),
+    opId: v.id("hikPendingOperations"),
+    ok: v.boolean(),
+    message: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const device = await ctx.db
+      .query("devices")
+      .withIndex("by_api_token", (q) => q.eq("apiToken", args.token))
+      .first();
+    if (!isLocalBridgeDevice(device)) {
+      return { ok: false, error: "unauthorized" };
+    }
+    const op = await ctx.db.get(args.opId);
+    if (!op || op.deviceId !== device._id) {
+      return { ok: false, error: "operation not found" };
+    }
+    if (args.ok) {
+      await ctx.db.patch(args.opId, {
+        status: "done",
+        completedAt: Date.now(),
+        lastError: undefined,
+      });
+      return { ok: true };
+    }
+    await ctx.db.patch(args.opId, {
+      status: "failed",
+      lastError: args.message ?? "Bridge operation failed",
+    });
+    return { ok: true };
+  },
+});
+
+export const requeueStaleLocalBridgeOperations = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    const staleCutoff = now - HIK_BRIDGE_PROCESSING_TIMEOUT_MS;
+    const processing = await ctx.db
+      .query("hikPendingOperations")
+      .withIndex("by_status_created", (q) => q.eq("status", "processing"))
+      .take(200);
+    const deviceIds = Array.from(new Set(processing.map((op) => op.deviceId)));
+    const devices = await Promise.all(deviceIds.map((id) => ctx.db.get(id)));
+    const localBridgeDeviceIds = new Set(
+      devices
+        .filter(isLocalBridgeDevice)
+        .map((device) => device._id),
+    );
+    const stale = processing.filter(
+      (op) =>
+        localBridgeDeviceIds.has(op.deviceId) &&
+        (op.processingStartedAt ?? op.createdAt) < staleCutoff,
+    );
+    await Promise.all(
+      stale.map((op) =>
+        ctx.db.patch(op._id, {
+          status: "pending",
+          nextRetryAt: now,
+          lastError: "Bridge processing timeout; pending'e alındı",
+        }),
+      ),
+    );
+    return { requeued: stale.length };
   },
 });
 

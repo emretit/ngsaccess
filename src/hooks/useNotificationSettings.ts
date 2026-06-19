@@ -12,12 +12,23 @@ interface NotificationSettingsInput {
 
 export function useNotificationSettings() {
   const { toast } = useToast();
-  const { projectId } = useActiveProject();
+  const { projectId, loading: projectLoading } = useActiveProject();
 
-  const notificationSettings = useQuery(api.settings.getNotification, { projectId });
+  const notificationSettings = useQuery(
+    api.settings.getNotification,
+    !projectLoading && projectId ? { projectId } : "skip",
+  );
   const upsertNotification = useMutation(api.settings.upsertNotification);
 
   const saveNotificationSettings = async (settings: NotificationSettingsInput) => {
+    if (!projectId) {
+      toast({
+        title: "Hata",
+        description: "Önce bir proje seçin.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       await upsertNotification({ ...settings, projectId });
       toast({
@@ -35,7 +46,8 @@ export function useNotificationSettings() {
 
   return {
     notificationSettings: notificationSettings ?? null,
-    isLoading: notificationSettings === undefined,
+    isLoading:
+      projectLoading || (!!projectId && notificationSettings === undefined),
     saveNotificationSettings,
     isSaving: false,
   };

@@ -3,8 +3,7 @@ import { internalMutation, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { limiter } from "./lib/rateLimit";
 import { verifyUser } from "./lib/auth";
-
-const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 saat
+import { prepareVerificationToken } from "./lib/emailVerification";
 
 /**
  * Self-signup sonrası e-posta doğrulama talebi.
@@ -44,19 +43,20 @@ export const requestVerification = mutation({
 
     // verified=false, firstCompanyName signUp anında (auth.ts profile) yazıldı.
     // Burada yalnızca doğrulama token'ı üretip maili gönderiyoruz.
-    const token = crypto.randomUUID();
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + TOKEN_TTL_MS).toISOString();
+    const tokenDecision = prepareVerificationToken(user, now.getTime());
 
-    await ctx.db.patch(user._id, {
-      setupToken: token,
-      tokenExpiresAt: expiresAt,
-      updatedAt: now.toISOString(),
-    });
+    if (tokenDecision.shouldPersist) {
+      await ctx.db.patch(user._id, {
+        setupToken: tokenDecision.token,
+        tokenExpiresAt: tokenDecision.expiresAt,
+        updatedAt: now.toISOString(),
+      });
+    }
 
     await ctx.scheduler.runAfter(0, internal.actions.sendEmail.sendVerificationEmail, {
       to: email,
-      token,
+      token: tokenDecision.token,
       name: user.fullName ?? user.name,
     });
 

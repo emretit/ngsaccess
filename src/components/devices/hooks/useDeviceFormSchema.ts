@@ -10,6 +10,16 @@ export const BRAND_LABELS: Record<DeviceBrand, string> = {
 };
 
 /**
+ * Kapı sayısı alanı — IDE Smart ve Hikvision localBridge ortak kullanır.
+ * Boş input ("") z.coerce.number() ile 0'a düşüp .min() validasyonuna takılmasın
+ * diye boş/null önce undefined'a indirilir (opsiyonel alan); 1–8 arası tam sayı.
+ */
+const doorCountField = z.preprocess(
+  (v) => (v === "" || v === null ? undefined : v),
+  z.coerce.number().int().min(1).max(8).optional(),
+);
+
+/**
  * Form şeması fabrikası.
  *
  * Admin akışında (super_admin cihazı projeye ekler) cihaz adı kullanıcıdan
@@ -37,6 +47,9 @@ export function makeFormSchema(adminMode: boolean) {
   // Hikvision-specific (brand === "hikvision" ise zorunlu)
   ehome_id: z.string().optional(),
   ehome_key: z.string().optional(),
+  // Hikvision transport: "gateway" (ISUP→Hetzner) veya "localBridge" (LAN'daki Windows EXE).
+  hik_transport: z.enum(["gateway", "localBridge"]).default("gateway"),
+  hik_door_count: doorCountField,
   // IDE Smart panel (brand === "ide_smart")
   ide_uuid: z.string().optional(),
   ide_user: z.string().optional(),
@@ -47,12 +60,11 @@ export function makeFormSchema(adminMode: boolean) {
     (v) => (v === "" || v === null ? undefined : v),
     z.coerce.number().int().positive().optional(),
   ),
-  ide_door_count: z.preprocess(
-    (v) => (v === "" || v === null ? undefined : v),
-    z.coerce.number().int().min(1).max(8).optional(),
-  ),
+  ide_door_count: doorCountField,
 }).superRefine((data, ctx) => {
-  if (data.brand === "hikvision") {
+  // localBridge transport ehome/gateway kimliği kullanmaz (LAN bridge token ile auth olur);
+  // ehome alanları yalnız gateway transport'ta zorunludur.
+  if (data.brand === "hikvision" && data.hik_transport !== "localBridge") {
     if (!data.ehome_id?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

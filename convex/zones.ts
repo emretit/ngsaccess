@@ -4,9 +4,17 @@ import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 
 export const list = authedQuery({
-  args: {},
-  handler: async (ctx) => {
+  args: { projectId: v.optional(v.id("projects")) },
+  handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (args.projectId) {
+      // Aktif proje filtresi — super_admin dahil yalnızca seçili projenin bölgeleri.
+      if (!allowedProjectIds.some((id) => id === args.projectId)) return [];
+      return await ctx.db
+        .query("zones")
+        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+        .collect();
+    }
     if (ctx.user.role === "super_admin") return await ctx.db.query("zones").collect();
     if (allowedProjectIds.length === 0) return [];
     const results = await Promise.all(

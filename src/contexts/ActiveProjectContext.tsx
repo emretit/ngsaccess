@@ -113,17 +113,21 @@ export function ActiveProjectProvider({ children }: { children: ReactNode }) {
     [projects, activeProjectId]
   );
 
+  const projectSelectionResolved =
+    projectIds.length === 0 ? activeProjectId === null : activeProject !== null;
+
   const loading =
     authLoading ||
     (isAuthenticated && isSuperAdmin && allProjects === undefined) ||
-    (isAuthenticated && !isSuperAdmin && userProjects === undefined);
+    (isAuthenticated && !isSuperAdmin && userProjects === undefined) ||
+    !projectSelectionResolved;
 
   const value = useMemo<ActiveProjectContextValue>(
     () => ({
       projectIds,
       projects,
       activeProjectId,
-      projectId: activeProjectId ?? undefined,
+      projectId: activeProject?._id,
       activeProject,
       setActiveProjectId,
       isSuperAdmin: !!isSuperAdmin,
