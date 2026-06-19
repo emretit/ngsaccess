@@ -25,6 +25,11 @@ const MAX_PANEL_PORT = 65535;
 const DEFAULT_PANEL_PORT = 8000;
 const DEFAULT_PANEL_USERNAME = "admin";
 const DEFAULT_DOOR_COUNT = 4;
+// Pending tarama penceresi — due-aware index yok; backoff'lu (not-due) op'lar take
+// budgötünü doldurup gerçekten due op'ları dışarıda bırakmasın diye geniş tutulur.
+const HIK_BRIDGE_PENDING_SCAN = 200;
+// IP girilmemiş panelin bekleyen op'larına yazılan teşhis notu (neden pending görünür olsun).
+const HIK_BRIDGE_IP_MISSING_NOTE = "Panel IP'si girilmemiş; IP girilince uygulanacak";
 
 type RosterDevice = {
   deviceId: Id<"devices">;
@@ -106,19 +111,33 @@ export const claimBridgeRoster = internalMutation({
     const operations: RosterOperation[] = [];
 
     for (const panel of panels) {
-      if (operations.length >= max) break;
       // IP girilmemiş panelin işini claim ETME — bridge worker'ı host'suz cihaz için
       // oluşmaz; claim edilirse op "panel worker bulunamadı" ile kalıcı failed olurdu.
-      // IP girilene kadar pending'de bekler.
-      if (!panel.deviceIp) continue;
+      // Pending'de bekler; ama "neden pending?" görünür olsun diye teşhis notu yaz (#7).
+      if (!panel.deviceIp) {
+        const waiting = await ctx.db
+          .query("hikPendingOperations")
+          .withIndex("by_device_status", (q) =>
+            q.eq("deviceId", panel._id).eq("status", "pending"),
+          )
+          .take(HIK_BRIDGE_PENDING_SCAN);
+        await Promise.all(
+          waiting
+            .filter((op) => op.lastError !== HIK_BRIDGE_IP_MISSING_NOTE)
+            .map((op) => ctx.db.patch(op._id, { lastError: HIK_BRIDGE_IP_MISSING_NOTE })),
+        );
+        continue;
+      }
 
-      // Stuck processing kayıtlarını pending'e çek (bridge crash/timeout sonrası).
+      // ── Housekeeping (quota'dan BAĞIMSIZ — her panel için çalışır). Aksi halde quota'yı
+      //    dolduran ilk panel sonraki panellerin stuck op'larını kurtarmadan döngüyü kırardı
+      //    (#10 multi-panel starvation). Önce stuck processing → pending self-heal.
       const processing = await ctx.db
         .query("hikPendingOperations")
         .withIndex("by_device_status", (q) =>
           q.eq("deviceId", panel._id).eq("status", "processing"),
         )
-        .take(50);
+        .take(HIK_BRIDGE_PENDING_SCAN);
       await Promise.all(
         processing
           .filter((op) => (op.processingStartedAt ?? op.createdAt) < staleCutoff)
@@ -126,32 +145,38 @@ export const claimBridgeRoster = internalMutation({
             ctx.db.patch(op._id, {
               status: "pending",
               nextRetryAt: now,
+              claimedBy: undefined,
               lastError: "Bridge claim timeout; pending'e alındı",
             }),
           ),
       );
 
-      const remaining = max - operations.length;
+      // Pending'leri geniş pencereyle tara: backoff'lu (not-due) op'lar take budget'ını
+      // doldurup due op'ları dışarıda bırakmasın (#8 starvation).
       const pending = await ctx.db
         .query("hikPendingOperations")
         .withIndex("by_device_status", (q) =>
           q.eq("deviceId", panel._id).eq("status", "pending"),
         )
-        .take(remaining * 2 + 10);
+        .take(HIK_BRIDGE_PENDING_SCAN);
       const dueAll = pending.filter((op) => (op.nextRetryAt ?? 0) <= now);
 
-      // Maksimum denemeyi aşanları terminal failed yap (sonsuz claim→stale→requeue önlenir).
+      // Maksimum denemeyi aşanları terminal failed yap (her panel için — quota'dan bağımsız).
       await Promise.all(
         dueAll
           .filter((op) => op.attemptCount >= HIK_BRIDGE_MAX_ATTEMPTS)
           .map((op) =>
             ctx.db.patch(op._id, {
               status: "failed",
+              claimedBy: undefined,
               lastError: `Maksimum deneme (${HIK_BRIDGE_MAX_ATTEMPTS}) aşıldı`,
             }),
           ),
       );
 
+      // ── Claim (quota-gated). Housekeeping yukarıda tüm paneller için zaten yapıldı.
+      if (operations.length >= max) continue;
+      const remaining = max - operations.length;
       const due = dueAll
         .filter((op) => op.attemptCount < HIK_BRIDGE_MAX_ATTEMPTS)
         .slice(0, remaining);
@@ -162,6 +187,8 @@ export const claimBridgeRoster = internalMutation({
             status: "processing",
             attemptCount: op.attemptCount + 1,
             processingStartedAt: now,
+            // Op'u bu bridge'e damgala — başka bridge bunu ack edemesin (#9).
+            claimedBy: bridge._id,
             lastError: undefined,
           }),
         ),
@@ -211,6 +238,12 @@ export const ackBridgeOperation = internalMutation({
     if (!device || device.projectId !== bridge.projectId) {
       return { ok: false as const, error: "operation not found" };
     }
+    // Cross-bridge koruması: op başka bir bridge tarafından claim edildiyse bu bridge
+    // ack edemez (aynı projede iki token → çift-uygulama/çift-ack sinyali). claimedBy
+    // yoksa (eski op veya stale-requeue sonrası) izin ver.
+    if (op.claimedBy && op.claimedBy !== bridge._id) {
+      return { ok: false as const, error: "operation claimed by another bridge" };
+    }
 
     if (args.ok) {
       await ctx.db.patch(args.opId, {
@@ -224,6 +257,7 @@ export const ackBridgeOperation = internalMutation({
       await ctx.db.patch(args.opId, {
         status: "pending",
         nextRetryAt: Date.now() + Math.min(60_000, 5_000 * Math.max(1, op.attemptCount)),
+        claimedBy: undefined,
         lastError: args.message ?? "Bridge operation failed (yeniden denenecek)",
       });
     } else {

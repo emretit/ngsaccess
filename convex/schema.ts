@@ -436,6 +436,12 @@ export default defineSchema({
     lastError: v.optional(v.string()),
     createdAt: v.number(),
     completedAt: v.optional(v.number()),
+    /**
+     * Bu op'u claim eden bridge. Aynı projede iki bridge token varsa, B bridge'i
+     * A'nın claim ettiği op'u ack edemesin (cross-bridge çift-uygulama sinyali).
+     * Stale-requeue bunu temizler; yeni claim yeniden damgalar.
+     */
+    claimedBy: v.optional(v.id("hikBridges")),
   })
     .index("by_device_status", ["deviceId", "status"])
     .index("by_status_created", ["status", "createdAt"])
