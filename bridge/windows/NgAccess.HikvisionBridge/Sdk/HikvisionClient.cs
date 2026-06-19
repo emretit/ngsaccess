@@ -10,7 +10,7 @@ namespace NgAccess.HikvisionBridge.Sdk;
 /// SDK init/cleanup ve global mesaj callback'i HikvisionSdkRuntime'da (süreç-genel).
 /// `unsafe` yalnız pointer kullanan senkron metotlarda; async metotlar kilidi alıp onları çağırır.
 /// </summary>
-public sealed class HikvisionClient : IDisposable
+public sealed class HikvisionClient : IAsyncDisposable
 {
   private static readonly string[] Weekdays =
     ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -23,6 +23,7 @@ public sealed class HikvisionClient : IDisposable
   private RemoteConfigCallback? _activeRemoteConfigCallback;
   private int _userId = -1;
   private int _alarmHandle = -1;
+  private bool _disposed;
 
   public HikvisionClient(PanelConfig panel, HikvisionSdkRuntime runtime, string sdkDllDirectory, ILogger logger)
   {
@@ -80,6 +81,7 @@ public sealed class HikvisionClient : IDisposable
   /// <summary>Panele login (gerekirse) + alarm kanalı. Caller _sdkLock'u tutuyor olmalı.</summary>
   private unsafe SdkResult ConnectInsideLock()
   {
+    if (_disposed) return SdkResult.Failure("client disposed");
     if (_userId >= 0) return SdkResult.Success();
     if (string.IsNullOrWhiteSpace(_panel.Password))
     {
@@ -179,7 +181,9 @@ public sealed class HikvisionClient : IDisposable
         enable = true,
         templateName = payload.TemplateName ?? $"Rule {weekPlanNo}",
         weekPlanNo,
-        holidayGroupNo = "",
+        // holidayGroupNo sayısal bir No. alanıdır (SDK: 0-invalid). Boş string "" tip
+        // uyumsuzdur ve bazı firmware'lerde STDXMLConfig'i reddedebilir. Tatil grubu
+        // desteklenene kadar alanı HİÇ göndermiyoruz (cihaz default'u = tatil grubu yok).
       },
     };
     return StdXmlPut(
@@ -420,18 +424,29 @@ public sealed class HikvisionClient : IDisposable
     for (var i = 0; i < count; i++) destination[i] = bytes[i];
   }
 
-  public void Dispose()
+  public async ValueTask DisposeAsync()
   {
-    if (_alarmHandle >= 0)
+    // In-flight SDK komutu (ControlGateway/STDXMLConfig/remote-config) bitene kadar bekle;
+    // aksi halde paralel NET_DVR_Logout aynı userId üzerinde native çakışma/crash riski.
+    await _sdkLock.WaitAsync();
+    try
     {
-      NET_DVR_CloseAlarmChan_V30(_alarmHandle);
-      _alarmHandle = -1;
+      _disposed = true;
+      if (_alarmHandle >= 0)
+      {
+        NET_DVR_CloseAlarmChan_V30(_alarmHandle);
+        _alarmHandle = -1;
+      }
+      if (_userId >= 0)
+      {
+        _runtime.UnregisterHandler(_userId);
+        NET_DVR_Logout(_userId);
+        _userId = -1;
+      }
     }
-    if (_userId >= 0)
+    finally
     {
-      _runtime.UnregisterHandler(_userId);
-      NET_DVR_Logout(_userId);
-      _userId = -1;
+      _sdkLock.Release();
     }
     _sdkLock.Dispose();
   }

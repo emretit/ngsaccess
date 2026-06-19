@@ -22,24 +22,35 @@ Copy Hikvision Windows x64 SDK runtime DLLs into:
 publish\hikvision-sdk\win-x64\
 ```
 
-## Verify Against HCNetSDK.h Before Trusting Card/Event Paths
+## SDK Struct Audit Status
 
-The P/Invoke layer (`Sdk/HikvisionNative.cs`) was validated against the SDK
-*Card-Based Access Control Developer Guide*. Door-open (`NET_DVR_ControlGateway`,
-door 1..4 / cmd 1) and login are confirmed correct. Two items cannot be confirmed
-from the PDF and MUST be checked against the real `HCNetSDK.h` shipped with your DLLs;
-both only affect the card-event and remote-config-send paths:
+The P/Invoke layer (`Sdk/HikvisionNative.cs`) was audited field-by-field against the
+SDK *Card-Based Access Control Developer Guide* (V6.1.5.X) **and** real `HCNetSDK.h`
+reference ports (open.hikvision.com + JNA/C# implementations). Confirmed correct:
+login (`NET_DVR_USER_LOGIN_INFO`), door-open (`NET_DVR_ControlGateway`, door 1..4 /
+cmd 1), alarm-channel setup, `NET_DVR_CARD_CFG_COND`, `NET_DVR_VALID_PERIOD_CFG`,
+`NET_DVR_ACS_EVENT_INFO`, all 7 function signatures, and the card-write semantics
+(`dwModifyParamType` mask `0x95F`, `byDoorRight`/`wCardRightPlan`/`byBelongGroup`).
 
-1. **`NET_DVR_IPADDR_UNION` size/shape.** `HikvisionNative.cs` models `NET_DVR_IPADDR`
-   as `sIpV4[16] + byIPv6[128]` (sequential, 144 bytes). The guide describes a *union*
-   with `szIPv6` up to 256 bytes. If the header is a union or `byIPv6` is 256, fix the
-   struct (size, or `[StructLayout(LayoutKind.Explicit)]`). This sets the `byCardNo`
-   offset inside `NET_DVR_ACS_ALARM_INFO` — if card numbers in swipe events come back
-   as garbage, this is the cause.
-2. **`ENUM_ACS_SEND_DATA == 3`?** Used as `dwDataType` in `NET_DVR_SendRemoteConfig`.
-   The guide names the enum but never gives its numeric value. Confirm it in the header
-   and fix `HikvisionNative.EnumAcsSendData` if different (a wrong value makes the panel
-   silently reject card writes).
+**`NET_DVR_IPADDR` — RESOLVED.** Earlier notes (and the PDF §4.1.56 table) claimed
+`szIPv6` is 256 bytes. That is **misleading**: the real type is a *sequential struct*
+(not a union) `sIpV4[16] + byRes[128]` = **144 bytes**, confirmed by HCNetSDK.h ports
+and the cross-check `NET_DVR_MANAGE_UNIT_RELATEDEV = IPADDR + byRes[880] = 1024`. The
+struct is now 144 bytes; `byCardNo` offset inside `NET_DVR_ACS_ALARM_INFO` is correct.
+**Do not** change it back to 256/272 — that re-introduces the garbage-card-number bug.
+
+**Still open — verify against your shipped `HCNetSDK.h`:**
+
+- **`ENUM_ACS_SEND_DATA == 3`?** Used as `dwDataType` in `NET_DVR_SendRemoteConfig`.
+  The ACS guide names the enum but never gives its numeric value (it lives in
+  `HCEnumDVR.h`/`HCNetSDK.h`, not this PDF). The accepted value is `3`; confirm it and
+  fix `HikvisionNative.EnumAcsSendData` if different (a wrong value makes the panel
+  silently reject card writes).
+- **`UserRightPlanTemplate` JSON body** (`HikvisionClient.PutWeekPlan`) is an ISAPI
+  shape not defined in this PDF. `holidayGroupNo` is now omitted (it is a numeric No.,
+  `0-invalid`); if a firmware rejects the template, pull
+  `/ISAPI/AccessControl/UserRightPlanTemplate/capabilities?format=json` to confirm the
+  expected field shape.
 
 Card deletion uses `NET_DVR_SET_CARD_CFG_V50` (2179) with `byCardValid=0` — the guide's
 canonical method — so no separate (header-only) delete command is required.

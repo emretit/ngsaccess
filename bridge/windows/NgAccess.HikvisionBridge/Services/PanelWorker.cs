@@ -3,30 +3,32 @@ using NgAccess.HikvisionBridge.Sdk;
 namespace NgAccess.HikvisionBridge.Services;
 
 /// <summary>
-/// Tek panelin çalışma döngüsü: login → Convex poll → komut uygula → ack; ayrıca kart event'lerini
-/// (SDK runtime'dan gelen) Convex'e relay eder. PanelManager her etkin panel için bir tane kurar.
+/// Tek panelin SDK bağlantısı: login + alarm kanalı (kart event dinleme). Tek-yer modelinde
+/// Convex poll'unu PanelManager merkezî olarak yapar; bu worker yalnız panele bağlı kalır,
+/// kart event'lerini cihazın apiToken'ı ile Convex'e relay eder ve merkezden gelen işleri
+/// (ExecuteOperationAsync) SDK ile uygular.
 /// </summary>
 public sealed class PanelWorker : IAsyncDisposable
 {
+  private const int HealthCheckSeconds = 30;
+  private const int RetryAfterErrorSeconds = 10;
+
   private readonly PanelConfig _panel;
   private readonly HikvisionClient _hik;
   private readonly ConvexBridgeClient _convex;
-  private readonly int _pollIntervalSeconds;
   private readonly ILogger _logger;
   private readonly CancellationTokenSource _cts = new();
   private Task? _loop;
 
   private volatile string _state = "stopped";
   private volatile string? _lastError;
-  private DateTime? _lastPollAt;
   private DateTime? _lastEventAt;
 
-  public PanelWorker(PanelConfig panel, HikvisionClient hik, ConvexBridgeClient convex, int pollIntervalSeconds, ILogger logger)
+  public PanelWorker(PanelConfig panel, HikvisionClient hik, ConvexBridgeClient convex, ILogger logger)
   {
     _panel = panel;
     _hik = hik;
     _convex = convex;
-    _pollIntervalSeconds = pollIntervalSeconds;
     _logger = logger;
     _hik.CardEventReceived += OnCardEvent;
   }
@@ -35,24 +37,24 @@ public sealed class PanelWorker : IAsyncDisposable
 
   public PanelStatus Status() => new()
   {
-    Id = _panel.Id,
+    DeviceId = _panel.Id,
     Name = _panel.Name,
     Host = _panel.Host,
     Port = _panel.Port,
     DoorCount = _panel.DoorCount,
-    Enabled = _panel.Enabled,
-    HasPassword = !string.IsNullOrWhiteSpace(_panel.Password),
-    HasToken = !string.IsNullOrWhiteSpace(_panel.DeviceToken),
     State = _state,
     PanelLoggedIn = _hik.IsLoggedIn,
     LastError = _lastError,
-    LastPollAt = _lastPollAt?.ToString("o"),
     LastEventAt = _lastEventAt?.ToString("o"),
   };
 
   public Task<SdkResult> OpenDoorAsync(int doorNo) => _hik.OpenDoorAsync(doorNo, _cts.Token);
 
   public Task<SdkResult> TestAsync() => _hik.EnsureConnectedAsync(_cts.Token);
+
+  /// <summary>Merkezden gelen iş — panele bağlanıp SDK ile uygular.</summary>
+  public Task<SdkResult> ExecuteOperationAsync(BridgeOperation operation) =>
+    _hik.ExecuteOperationAsync(operation, _cts.Token);
 
   private async Task RunAsync(CancellationToken ct)
   {
@@ -66,30 +68,13 @@ public sealed class PanelWorker : IAsyncDisposable
         {
           _state = "error";
           _lastError = connect.Error;
-          await DelayAsync(10, ct);
+          await DelayAsync(RetryAfterErrorSeconds, ct);
           continue;
         }
         _state = "connected";
         _lastError = null;
-
-        var poll = await _convex.PollAsync(ct);
-        _lastPollAt = DateTime.UtcNow;
-        if (!poll.Ok)
-        {
-          _lastError = poll.Error;
-          await DelayAsync(_pollIntervalSeconds, ct);
-          continue;
-        }
-
-        foreach (var op in poll.Operations)
-        {
-          _logger.LogInformation("[{Panel}] op {OpId} {Operation}", _panel.Name, op.OpId, op.Operation);
-          var result = await _hik.ExecuteOperationAsync(op, ct);
-          if (!result.Ok) _logger.LogWarning("[{Panel}] op {OpId} failed: {Error}", _panel.Name, op.OpId, result.Error);
-          await _convex.AckAsync(op.OpId, result.Ok, result.Error, ct);
-        }
-
-        await DelayAsync(_pollIntervalSeconds, ct);
+        // SDK otomatik reconnect ediyor; periyodik sağlık kontrolü dışında beklemeye gerek yok.
+        await DelayAsync(HealthCheckSeconds, ct);
       }
       catch (OperationCanceledException)
       {
@@ -100,7 +85,7 @@ public sealed class PanelWorker : IAsyncDisposable
         _state = "error";
         _lastError = ex.Message;
         _logger.LogWarning(ex, "[{Panel}] loop error", _panel.Name);
-        await DelayAsync(_pollIntervalSeconds, ct);
+        await DelayAsync(RetryAfterErrorSeconds, ct);
       }
     }
     _state = "stopped";
@@ -118,15 +103,16 @@ public sealed class PanelWorker : IAsyncDisposable
     var payload = new CardReaderEventPayload
     {
       CardNo = ev.CardNo,
+      // Yalnız IP (ipAddress) gönderilir; serialNumber'a IP yazmak backend cross-tenant
+      // guard'ında (serial-set Hikvision cihazlarda) mismatch/403 üretirdi.
       DeviceIp = _panel.Host,
-      SerialNumber = _panel.Host,
       MajorEventType = ev.Major,
       SubEventType = ev.Minor,
       DoorNo = ev.DoorNo,
       DateTime = ev.DateTime,
     };
     _logger.LogInformation("[{Panel}] card event cardNo={Card} door={Door}", _panel.Name, ev.CardNo, ev.DoorNo);
-    _ = _convex.PostCardReaderEventAsync(payload, CancellationToken.None);
+    _ = _convex.PostCardReaderEventAsync(_panel.DeviceToken, payload, CancellationToken.None);
   }
 
   public async ValueTask DisposeAsync()
@@ -137,7 +123,7 @@ public sealed class PanelWorker : IAsyncDisposable
     {
       try { await _loop; } catch { /* shutdown */ }
     }
-    _hik.Dispose();
+    await _hik.DisposeAsync();
     _cts.Dispose();
   }
 }

@@ -2,7 +2,11 @@ using System.Text.Json.Serialization;
 
 namespace NgAccess.HikvisionBridge;
 
-public sealed class BridgePollResponse
+/// <summary>
+/// /hik-bridge/roster cevabı: bu projedeki tüm localBridge cihazları + bekleyen işler.
+/// Tek-yer modeli — panel bilgileri buluttan gelir, bridge'de panel listesi tutulmaz.
+/// </summary>
+public sealed class RosterResponse
 {
   [JsonPropertyName("ok")]
   public bool Ok { get; init; }
@@ -10,14 +14,15 @@ public sealed class BridgePollResponse
   [JsonPropertyName("error")]
   public string? Error { get; init; }
 
-  [JsonPropertyName("device")]
-  public BridgeDevice? Device { get; init; }
+  [JsonPropertyName("devices")]
+  public List<RosterDevice> Devices { get; init; } = [];
 
   [JsonPropertyName("operations")]
   public List<BridgeOperation> Operations { get; init; } = [];
 }
 
-public sealed class BridgeDevice
+/// <summary>Roster'dan gelen tek bir panelin bağlantı bilgileri (buluttan).</summary>
+public sealed class RosterDevice
 {
   [JsonPropertyName("deviceId")]
   public string DeviceId { get; init; } = "";
@@ -25,20 +30,35 @@ public sealed class BridgeDevice
   [JsonPropertyName("name")]
   public string Name { get; init; } = "";
 
-  [JsonPropertyName("deviceIp")]
-  public string? DeviceIp { get; init; }
+  [JsonPropertyName("host")]
+  public string Host { get; init; } = "";
 
-  [JsonPropertyName("deviceSerial")]
-  public string? DeviceSerial { get; init; }
+  // int (ushort değil): aralık dışı bir port tek başına TÜM roster deserializasyonunu
+  // patlatıp tüm panelleri düşürürdü. PanelConfig.FromRoster güvenli aralığa clamp'ler.
+  [JsonPropertyName("port")]
+  public int Port { get; init; } = 8000;
 
-  [JsonPropertyName("hikDoorCount")]
-  public int? HikDoorCount { get; init; }
+  [JsonPropertyName("username")]
+  public string Username { get; init; } = "admin";
+
+  [JsonPropertyName("password")]
+  public string Password { get; init; } = "";
+
+  [JsonPropertyName("doorCount")]
+  public int DoorCount { get; init; } = 4;
+
+  /// <summary>Kart-okutma event'lerini /card-reader'a basmak için per-device token.</summary>
+  [JsonPropertyName("apiToken")]
+  public string ApiToken { get; init; } = "";
 }
 
 public sealed class BridgeOperation
 {
   [JsonPropertyName("opId")]
   public string OpId { get; init; } = "";
+
+  [JsonPropertyName("deviceId")]
+  public string DeviceId { get; init; } = "";
 
   [JsonPropertyName("operation")]
   public string Operation { get; init; } = "";
@@ -106,7 +126,9 @@ public sealed class CardReaderEventPayload
   [JsonPropertyName("cardNo")]
   public string CardNo { get; init; } = "";
 
-  [JsonPropertyName("deviceIp")]
+  // "ipAddress": parseCardReaderBody IP'yi yalnız ipAddress/ip/IP anahtarlarından okur;
+  // "deviceIp" anahtarı parse edilmez → cihaz eşleşmesi/lastSeen çalışmazdı.
+  [JsonPropertyName("ipAddress")]
   public string DeviceIp { get; init; } = "";
 
   [JsonPropertyName("serialNumber")]
@@ -131,42 +153,54 @@ public sealed record SdkResult(bool Ok, string? Error = null)
   public static SdkResult Failure(string error) => new(false, error);
 }
 
-/// <summary>Tek panelin yerel ayarı (panels.json içinde saklanır; buluta gitmez).</summary>
+/// <summary>
+/// Tek panelin runtime bağlantı ayarı. Roster'dan (buluttan) türetilir; artık
+/// panels.json'da saklanmaz. DeviceToken = cihazın /card-reader apiToken'ı.
+/// </summary>
 public sealed class PanelConfig
 {
-  [JsonPropertyName("id")] public string Id { get; set; } = "";
-  [JsonPropertyName("name")] public string Name { get; set; } = "";
-  [JsonPropertyName("host")] public string Host { get; set; } = "";
-  [JsonPropertyName("port")] public ushort Port { get; set; } = 8000;
-  [JsonPropertyName("username")] public string Username { get; set; } = "admin";
-  [JsonPropertyName("password")] public string Password { get; set; } = "";
-  [JsonPropertyName("deviceToken")] public string DeviceToken { get; set; } = "";
-  [JsonPropertyName("doorCount")] public int DoorCount { get; set; } = 4;
-  [JsonPropertyName("enabled")] public bool Enabled { get; set; } = true;
+  public string Id { get; set; } = "";
+  public string Name { get; set; } = "";
+  public string Host { get; set; } = "";
+  public ushort Port { get; set; } = 8000;
+  public string Username { get; set; } = "admin";
+  public string Password { get; set; } = "";
+  public string DeviceToken { get; set; } = "";
+  public int DoorCount { get; set; } = 4;
+  public bool Enabled { get; set; } = true;
+
+  public static PanelConfig FromRoster(RosterDevice d) => new()
+  {
+    Id = d.DeviceId,
+    Name = d.Name,
+    Host = d.Host,
+    Port = (ushort)Math.Clamp(d.Port, 1, 65535),
+    Username = string.IsNullOrWhiteSpace(d.Username) ? "admin" : d.Username,
+    Password = d.Password,
+    DeviceToken = d.ApiToken,
+    DoorCount = d.DoorCount <= 0 ? 4 : d.DoorCount,
+    Enabled = true,
+  };
 }
 
-/// <summary>Bridge'in tüm yerel ayarı: site Convex URL'i + panel listesi.</summary>
+/// <summary>Bridge'in tüm yerel ayarı: site Convex URL'i + bridge token (tek-yer modeli).</summary>
 public sealed class BridgeConfig
 {
   [JsonPropertyName("convexSiteUrl")] public string ConvexSiteUrl { get; set; } = "";
-  [JsonPropertyName("panels")] public List<PanelConfig> Panels { get; set; } = [];
+  [JsonPropertyName("bridgeToken")] public string BridgeToken { get; set; } = "";
 }
 
 /// <summary>UI'a dönen anlık panel durumu (şifre/token içermez).</summary>
 public sealed class PanelStatus
 {
-  [JsonPropertyName("id")] public string Id { get; init; } = "";
+  [JsonPropertyName("deviceId")] public string DeviceId { get; init; } = "";
   [JsonPropertyName("name")] public string Name { get; init; } = "";
   [JsonPropertyName("host")] public string Host { get; init; } = "";
   [JsonPropertyName("port")] public ushort Port { get; init; }
   [JsonPropertyName("doorCount")] public int DoorCount { get; init; }
-  [JsonPropertyName("enabled")] public bool Enabled { get; init; }
-  [JsonPropertyName("hasPassword")] public bool HasPassword { get; init; }
-  [JsonPropertyName("hasToken")] public bool HasToken { get; init; }
   [JsonPropertyName("state")] public string State { get; init; } = "stopped";
   [JsonPropertyName("panelLoggedIn")] public bool PanelLoggedIn { get; init; }
   [JsonPropertyName("lastError")] public string? LastError { get; init; }
-  [JsonPropertyName("lastPollAt")] public string? LastPollAt { get; init; }
   [JsonPropertyName("lastEventAt")] public string? LastEventAt { get; init; }
 }
 

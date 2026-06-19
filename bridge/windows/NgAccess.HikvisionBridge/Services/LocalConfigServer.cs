@@ -8,9 +8,9 @@ namespace NgAccess.HikvisionBridge.Services;
 /// <summary>
 /// 127.0.0.1'de yerel web sunucu:
 ///  - "/" ve diğer yollar → wwwroot içindeki ngsplus arayüzü (statik SPA, bulut Convex'e bağlanır).
-///  - "/__bridge" → köprünün kendi config sayfası (panel ekle/sil/test/kapı).
-///  - "/__bridge/api/*" → köprü JSON API'si.
-/// Panel bilgileri panels.json'da yerel kalır.
+///  - "/__bridge" → bridge ayar sayfası (site URL + bridge token + cihaz durum tablosu).
+///  - "/__bridge/api/*" → bridge JSON API'si.
+/// Tek-yer modeli: panel ekleme/IP/şifre YOK — paneller ngsplus'tan yönetilir, buluttan roster ile gelir.
 /// </summary>
 public sealed class LocalConfigServer
 {
@@ -66,7 +66,7 @@ public sealed class LocalConfigServer
     _listener = new HttpListener();
     _listener.Prefixes.Add(url);
     _listener.Start();
-    _logger.LogInformation("Local server listening on {Url} (ngsplus UI + köprü config /__bridge)", url);
+    _logger.LogInformation("Local server listening on {Url} (ngsplus UI + köprü ayarı /__bridge)", url);
     if (!Directory.Exists(_webRoot))
     {
       _logger.LogWarning("wwwroot bulunamadı ({Path}); ngsplus arayüzü sunulamayacak", _webRoot);
@@ -91,7 +91,6 @@ public sealed class LocalConfigServer
       var method = req.HttpMethod;
       var path = req.Url?.AbsolutePath ?? "/";
 
-      // --- Köprü config arayüzü + API'si (/__bridge) ---
       if (path == BridgePrefix || path == BridgePrefix + "/")
       {
         await HtmlAsync(res, BridgeHtml);
@@ -103,7 +102,6 @@ public sealed class LocalConfigServer
         return;
       }
 
-      // --- ngsplus arayüzü (statik SPA) ---
       if (method == "GET" || method == "HEAD")
       {
         await ServeStaticAsync(path, res);
@@ -122,85 +120,32 @@ public sealed class LocalConfigServer
 
   private async Task HandleBridgeApiAsync(string method, string path, HttpListenerRequest req, HttpListenerResponse res)
   {
-    // /__bridge/api/... → kalan segmentler
     var rest = path[(BridgePrefix.Length)..];
     var segments = rest.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries); // [api, ...]
 
     if (method == "GET" && segments is ["api", "config"])
     {
       var config = _store.Load();
-      var statuses = _manager.GetStatuses().ToDictionary(s => s.Id);
-      var panels = config.Panels.Select(p =>
+      var devices = _manager.GetStatuses();
+      await JsonAsync(res, new
       {
-        statuses.TryGetValue(p.Id, out var st);
-        return new
-        {
-          id = p.Id,
-          name = p.Name,
-          host = p.Host,
-          port = p.Port,
-          doorCount = p.DoorCount,
-          enabled = p.Enabled,
-          hasPassword = !string.IsNullOrWhiteSpace(p.Password),
-          hasToken = !string.IsNullOrWhiteSpace(p.DeviceToken),
-          state = st?.State ?? (p.Enabled ? "stopped" : "disabled"),
-          panelLoggedIn = st?.PanelLoggedIn ?? false,
-          lastError = st?.LastError,
-          lastPollAt = st?.LastPollAt,
-          lastEventAt = st?.LastEventAt,
-        };
-      }).ToList();
-      await JsonAsync(res, new { convexSiteUrl = config.ConvexSiteUrl, panels });
+        convexSiteUrl = config.ConvexSiteUrl,
+        hasToken = !string.IsNullOrWhiteSpace(config.BridgeToken),
+        rosterError = _manager.LastRosterError,
+        devices,
+      });
       return;
     }
 
     if (method == "POST" && segments is ["api", "config"])
     {
-      var body = await ReadJsonAsync<SiteUrlBody>(req);
+      var body = await ReadJsonAsync<ConfigBody>(req);
       var config = _store.Load();
-      config.ConvexSiteUrl = body?.ConvexSiteUrl?.Trim() ?? config.ConvexSiteUrl;
+      if (!string.IsNullOrWhiteSpace(body?.ConvexSiteUrl)) config.ConvexSiteUrl = body.ConvexSiteUrl.Trim();
+      // Boş token gönderilirse mevcut korunur (UI token'ı düzenlemede göstermez).
+      if (!string.IsNullOrWhiteSpace(body?.BridgeToken)) config.BridgeToken = body.BridgeToken.Trim();
       _store.Save(config);
-      _manager.ApplyConfig(config);
-      await JsonAsync(res, new { ok = true });
-      return;
-    }
-
-    if (method == "POST" && segments is ["api", "panels"])
-    {
-      var incoming = await ReadJsonAsync<PanelConfig>(req);
-      if (incoming is null || string.IsNullOrWhiteSpace(incoming.Host))
-      {
-        await JsonAsync(res, new { ok = false, error = "host gerekli" }, 400);
-        return;
-      }
-      var config = _store.Load();
-      var existing = string.IsNullOrWhiteSpace(incoming.Id)
-        ? null
-        : config.Panels.FirstOrDefault(p => p.Id == incoming.Id);
-      if (existing is null)
-      {
-        if (string.IsNullOrWhiteSpace(incoming.Id)) incoming.Id = Guid.NewGuid().ToString("n");
-        config.Panels.Add(incoming);
-      }
-      else
-      {
-        // Şifre/token boş gelirse mevcut değeri koru (UI bunları düzenlemede göstermez).
-        if (string.IsNullOrEmpty(incoming.Password)) incoming.Password = existing.Password;
-        if (string.IsNullOrEmpty(incoming.DeviceToken)) incoming.DeviceToken = existing.DeviceToken;
-        config.Panels[config.Panels.IndexOf(existing)] = incoming;
-      }
-      _store.Save(config);
-      _manager.ApplyConfig(config);
-      await JsonAsync(res, new { ok = true, id = incoming.Id });
-      return;
-    }
-
-    if (method == "DELETE" && segments is ["api", "panels", var delId])
-    {
-      var config = _store.Load();
-      config.Panels.RemoveAll(p => p.Id == delId);
-      _store.Save(config);
-      _manager.ApplyConfig(config);
+      _manager.Configure(config.ConvexSiteUrl, config.BridgeToken);
       await JsonAsync(res, new { ok = true });
       return;
     }
@@ -212,10 +157,10 @@ public sealed class LocalConfigServer
       return;
     }
 
-    if (method == "POST" && segments is ["api", "panels", var doorPanelId, "door", var doorStr]
+    if (method == "POST" && segments is ["api", "panels", var doorDeviceId, "door", var doorStr]
         && int.TryParse(doorStr, out var doorNo))
     {
-      var result = await _manager.OpenDoorAsync(doorPanelId, doorNo);
+      var result = await _manager.OpenDoorAsync(doorDeviceId, doorNo);
       await JsonAsync(res, new { ok = result.Ok, error = result.Error }, result.Ok ? 200 : 400);
       return;
     }
@@ -236,12 +181,10 @@ public sealed class LocalConfigServer
     var relative = path.Trim('/');
     if (string.IsNullOrEmpty(relative)) relative = "index.html";
 
-    // Path traversal koruması.
     var full = Path.GetFullPath(Path.Combine(_webRoot, relative));
     var rootFull = Path.GetFullPath(_webRoot);
     if (!full.StartsWith(rootFull, StringComparison.Ordinal) || !File.Exists(full))
     {
-      // SPA fallback: bilinmeyen yol → index.html (istemci yönlendirmesi çalışsın).
       full = Path.Combine(rootFull, "index.html");
       if (!File.Exists(full))
       {
@@ -286,9 +229,10 @@ public sealed class LocalConfigServer
     response.Close();
   }
 
-  private sealed class SiteUrlBody
+  private sealed class ConfigBody
   {
     public string? ConvexSiteUrl { get; set; }
+    public string? BridgeToken { get; set; }
   }
 
   private const string BridgeHtml =
@@ -298,7 +242,7 @@ public sealed class LocalConfigServer
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NGS Access Bridge — Panel Ayarlari</title>
+<title>NGS Access Bridge — Ayarlar</title>
 <style>
  body{font-family:system-ui,Segoe UI,sans-serif;margin:0;background:#0f1115;color:#e6e6e6}
  header{padding:16px 20px;background:#161a22;border-bottom:1px solid #2a2f3a;display:flex;justify-content:space-between;align-items:center}
@@ -313,73 +257,65 @@ public sealed class LocalConfigServer
  th{color:#9aa0aa;font-weight:500}
  .badge{padding:2px 8px;border-radius:10px;font-size:12px}
  .ok{background:#0f5132;color:#7be0a0}.err{background:#5c1a1a;color:#f0a0a0}.idle{background:#30343d;color:#bbb}
- input,select,button{font-size:14px;padding:6px 9px;border-radius:6px;border:1px solid #2a2f3a;background:#1b2029;color:#e6e6e6}
+ input,button{font-size:14px;padding:6px 9px;border-radius:6px;border:1px solid #2a2f3a;background:#1b2029;color:#e6e6e6}
  button{cursor:pointer;background:#2563eb;border-color:#2563eb}
  button.sec{background:#2a2f3a;border-color:#2a2f3a}
- button.danger{background:#5c1a1a;border-color:#5c1a1a}
  label{display:block;font-size:12px;color:#9aa0aa;margin:8px 0 2px}
  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
  .muted{color:#9aa0aa;font-size:12px}
 </style>
 </head>
 <body>
-<header><h1>Kopru — Panel Ayarlari</h1><a href="/">← ngsplus arayuzune don</a></header>
+<header><h1>Kopru — Ayarlar</h1><a href="/">← ngsplus arayuzune don</a></header>
 <div class="wrap">
  <div class="card">
-   <h3>Paneller</h3>
-   <table><thead><tr><th>Ad</th><th>Adres</th><th>Kapi</th><th>Durum</th><th>Son poll</th><th>Son event</th><th></th></tr></thead><tbody id="rows"></tbody></table>
- </div>
- <div class="card">
-   <h3 id="formTitle">Panel ekle</h3>
-   <input type="hidden" id="pid">
+   <h3>Baglanti</h3>
    <div class="grid">
-     <div><label>Ad</label><input id="pname" placeholder="Giris Paneli"></div>
-     <div><label>Host (IP)</label><input id="phost" placeholder="192.168.1.117"></div>
-     <div><label>Port</label><input id="pport" value="8000"></div>
-     <div><label>Kullanici</label><input id="puser" value="admin"></div>
-     <div><label>Sifre <span class="muted">(bos = degistirme)</span></label><input id="ppass" type="password" placeholder="****"></div>
-     <div><label>Device Token <span class="muted">(bos = degistirme)</span></label><input id="ptoken" type="password" placeholder="ngsplus token"></div>
-     <div><label>Kapi sayisi</label><input id="pdoors" value="4"></div>
-     <div><label>Etkin</label><select id="penabled"><option value="true">Evet</option><option value="false">Hayir</option></select></div>
+     <div><label>Convex Site URL</label><input id="url" placeholder="https://....convex.site"></div>
+     <div><label>Bridge Token <span class="muted">(bos = degistirme)</span></label><input id="token" type="password" placeholder="ngsplus Ayarlar > Bridge"></div>
    </div>
-   <div class="row" style="margin-top:12px"><button onclick="savePanel()">Kaydet</button><button class="sec" onclick="resetForm()">Temizle</button></div>
+   <div class="row" style="margin-top:12px"><button onclick="saveCfg()">Kaydet</button><span id="tokenState" class="muted"></span></div>
    <div id="msg" class="muted" style="margin-top:8px"></div>
  </div>
- <p class="muted">Panel bilgileri bu makinede (panels.json) yerel kalir. Device Token'i ngsplus'taki cihaz kartindan kopyalayin.</p>
+ <div class="card">
+   <h3>Paneller <span class="muted">(ngsplus'tan yonetilir — buradan eklenmez)</span></h3>
+   <div id="rosterErr" class="muted"></div>
+   <table><thead><tr><th>Ad</th><th>Adres</th><th>Kapi</th><th>Durum</th><th>Son event</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+ </div>
+ <p class="muted">Panel IP/sifre/kapi ngsplus cihaz formunda girilir; bridge bunlari token ile otomatik ceker.</p>
 </div>
 <script>
 const B='/__bridge';
 async function api(p,o){const r=await fetch(B+p,o);try{return await r.json()}catch(e){return{ok:r.ok}}}
-function badge(s){const m={connected:'ok',error:'err',connecting:'idle',stopped:'idle',disabled:'idle'};return '<span class="badge '+(m[s.state]||'idle')+'">'+s.state+(s.panelLoggedIn?' · login':'')+'</span>'}
+function badge(s){const m={connected:'ok',error:'err',connecting:'idle',stopped:'idle'};return '<span class="badge '+(m[s.state]||'idle')+'">'+s.state+(s.panelLoggedIn?' · login':'')+'</span>'}
 function fmt(t){return t?new Date(t).toLocaleTimeString('tr-TR'):'-'}
 function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function g(id){return document.getElementById(id)}
 async function load(){
   const c=await api('/api/config');
+  g('url').value=c.convexSiteUrl||'';
+  g('tokenState').textContent=c.hasToken?'Token girili.':'Token henuz girilmedi.';
+  g('rosterErr').innerHTML=c.rosterError?('<span class="badge err">roster: '+esc(c.rosterError)+'</span>'):'';
   const rows=g('rows');rows.innerHTML='';
-  (c.panels||[]).forEach(p=>{
+  (c.devices||[]).forEach(p=>{
     const tr=document.createElement('tr');
-    tr.innerHTML='<td>'+esc(p.name||'-')+(p.hasToken?'':' <span class="badge err">token yok</span>')+'</td>'
+    tr.innerHTML='<td>'+esc(p.name||'-')+'</td>'
       +'<td>'+esc(p.host)+':'+p.port+'</td><td>'+p.doorCount+'</td>'
       +'<td>'+badge(p)+(p.lastError?' <span class="muted">'+esc(p.lastError)+'</span>':'')+'</td>'
-      +'<td>'+fmt(p.lastPollAt)+'</td><td>'+fmt(p.lastEventAt)+'</td>'
+      +'<td>'+fmt(p.lastEventAt)+'</td>'
       +'<td class="row">'
-      +'<button class="sec" onclick="test(\''+p.id+'\')">Test</button>'
-      +'<button class="sec" onclick="openDoor(\''+p.id+'\')">Kapi</button>'
-      +'<button class="sec" onclick=\'edit('+JSON.stringify(p).replace(/'/g,"&#39;")+')\'>Duzenle</button>'
-      +'<button class="danger" onclick="del(\''+p.id+'\')">Sil</button>'
+      +'<button class="sec" onclick="test(\''+p.deviceId+'\')">Test</button>'
+      +'<button class="sec" onclick="openDoor(\''+p.deviceId+'\')">Kapi</button>'
       +'</td>';
     rows.appendChild(tr);
   });
+  if(!(c.devices||[]).length) rows.innerHTML='<tr><td colspan="6" class="muted">Henuz panel yok. ngsplus\\'ta localBridge cihazi ekleyin.</td></tr>';
 }
-function edit(p){g('formTitle').textContent='Panel duzenle';g('pid').value=p.id;g('pname').value=p.name||'';g('phost').value=p.host||'';g('pport').value=p.port||8000;g('puser').value='admin';g('pdoors').value=p.doorCount||4;g('penabled').value=String(p.enabled);g('ppass').value='';g('ptoken').value='';g('msg').textContent='Sifre/token bos birakilirsa degismez.'}
-function resetForm(){g('formTitle').textContent='Panel ekle';['pid','pname','phost','ppass','ptoken'].forEach(i=>g(i).value='');g('pport').value='8000';g('puser').value='admin';g('pdoors').value='4';g('penabled').value='true';g('msg').textContent=''}
-async function savePanel(){
-  const body={id:g('pid').value,name:g('pname').value,host:g('phost').value,port:parseInt(g('pport').value)||8000,username:g('puser').value,password:g('ppass').value,deviceToken:g('ptoken').value,doorCount:parseInt(g('pdoors').value)||4,enabled:g('penabled').value==='true'};
-  const r=await api('/api/panels',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  g('msg').textContent=r.ok?'Kaydedildi.':'Hata: '+(r.error||'?');if(r.ok)resetForm();load();
+async function saveCfg(){
+  const body={convexSiteUrl:g('url').value,bridgeToken:g('token').value};
+  const r=await api('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  g('msg').textContent=r.ok?'Kaydedildi.':'Hata: '+(r.error||'?');g('token').value='';load();
 }
-async function del(id){if(!confirm('Panel silinsin mi?'))return;await api('/api/panels/'+id,{method:'DELETE'});load()}
 async function test(id){g('msg').textContent='Test ediliyor...';const r=await api('/api/panels/'+id+'/test',{method:'POST'});g('msg').textContent=r.ok?'Baglanti OK':'Hata: '+(r.error||'?')}
 async function openDoor(id){const r=await api('/api/panels/'+id+'/door/1',{method:'POST'});g('msg').textContent=r.ok?'Kapi komutu gonderildi':'Hata: '+(r.error||'?')}
 load();setInterval(load,5000);

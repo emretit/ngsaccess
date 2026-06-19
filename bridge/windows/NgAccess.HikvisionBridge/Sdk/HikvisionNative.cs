@@ -276,6 +276,13 @@ internal static unsafe class HikvisionNative
     public uint dwSecond;
   }
 
+  // NET_DVR_IPADDR: ardışık STRUCT (union DEĞİL) — sIpV4[16] + byRes[128] = 144 byte.
+  // DOĞRULANDI (open.hikvision.com + HCNetSDK.h referans portları + aritmetik):
+  //   NET_DVR_ACS_ALARM_INFO.struRemoteHostAddr tipi NET_DVR_IPADDR'dır (UNION değil),
+  //   ve gerçek ikinci alan byRes[128] → toplam 144 byte. Çapraz teyit:
+  //   NET_DVR_MANAGE_UNIT_RELATEDEV = IPADDR + byRes[880] = 144+880 = 1024 (tam yuvarlak).
+  // NOT: ACS Developer Guide PDF §4.1.56 tablosu "szIPv6 256 byte" der; bu YANILTICIDIR.
+  //   256/272 yapılırsa struAcsEventInfo/byCardNo offset'i kayar → kart no garbage olur.
   [StructLayout(LayoutKind.Sequential)]
   public unsafe struct NET_DVR_IPADDR
   {

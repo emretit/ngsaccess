@@ -2,3 +2,11 @@ bin/
 obj/
 *.user
 .vs/
+
+# Hikvision vendor DLL'leri — lisans nedeniyle commit edilmez (SDK'dan kopyalanır).
+# README'deki listeye göre hikvision-sdk/win-x64/ klasörüne elle yerleştirilir.
+hikvision-sdk/win-x64/*.dll
+hikvision-sdk/win-x64/HCNetSDKCom/
+
+# Yerel panel sırları (IP / panel şifresi / device token) — buluta gitmez.
+panels.json

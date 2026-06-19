@@ -1,23 +1,30 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace NgAccess.HikvisionBridge.Services;
 
 /// <summary>
-/// Tek panel için Convex istemcisi: o panelin device token'ı ile poll/ack/event yapar.
-/// Panel başına bir instance (PanelManager kurar); singleton DEĞİL.
+/// Tek-yer modeli Convex istemcisi. Bridge token ile roster çeker (proje cihazları + işler)
+/// ve işleri ack'ler. Kart-okutma event'leri ilgili cihazın per-device apiToken'ı ile
+/// /card-reader'a basılır. Süreç-genel tek instance (PanelManager kurar).
 /// </summary>
 public sealed class ConvexBridgeClient
 {
+  // message=null gönderilmesin: Convex v.optional(v.string()) açık null'ı reddeder.
+  private static readonly JsonSerializerOptions NullSkipping =
+    new() { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
+
   private readonly HttpClient _http;
-  private readonly string _token;
+  private readonly string _bridgeToken;
   private readonly int _pollMax;
   private readonly ILogger _logger;
 
-  public ConvexBridgeClient(HttpClient http, string siteUrl, string token, int pollMax, ILogger logger)
+  public ConvexBridgeClient(HttpClient http, string siteUrl, string bridgeToken, int pollMax, ILogger logger)
   {
     _http = http;
-    _token = token;
+    _bridgeToken = bridgeToken;
     _pollMax = pollMax;
     _logger = logger;
     if (!string.IsNullOrWhiteSpace(siteUrl))
@@ -26,30 +33,32 @@ public sealed class ConvexBridgeClient
     }
   }
 
-  public async Task<BridgePollResponse> PollAsync(CancellationToken cancellationToken)
+  public bool HasToken => !string.IsNullOrWhiteSpace(_bridgeToken);
+
+  public async Task<RosterResponse> RosterAsync(CancellationToken cancellationToken)
   {
-    if (string.IsNullOrWhiteSpace(_token))
+    if (!HasToken)
     {
-      return new BridgePollResponse { Ok = false, Error = "device token empty" };
+      return new RosterResponse { Ok = false, Error = "bridge token boş" };
     }
-    using var request = new HttpRequestMessage(HttpMethod.Post, "hik-bridge/poll");
-    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+    using var request = new HttpRequestMessage(HttpMethod.Post, "hik-bridge/roster");
+    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _bridgeToken);
     request.Content = JsonContent.Create(new { max = Math.Clamp(_pollMax, 1, 25) });
 
     using var response = await _http.SendAsync(request, cancellationToken);
-    var body = await response.Content.ReadFromJsonAsync<BridgePollResponse>(cancellationToken: cancellationToken);
-    if (!response.IsSuccessStatusCode || body is null)
+    if (!response.IsSuccessStatusCode)
     {
-      return new BridgePollResponse { Ok = false, Error = $"poll HTTP {(int)response.StatusCode}" };
+      return new RosterResponse { Ok = false, Error = $"roster HTTP {(int)response.StatusCode}" };
     }
-    return body;
+    var body = await response.Content.ReadFromJsonAsync<RosterResponse>(cancellationToken: cancellationToken);
+    return body ?? new RosterResponse { Ok = false, Error = "roster boş cevap" };
   }
 
   public async Task AckAsync(string opId, bool ok, string? message, CancellationToken cancellationToken)
   {
-    using var request = new HttpRequestMessage(HttpMethod.Post, "hik-bridge/ack");
-    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
-    request.Content = JsonContent.Create(new { opId, ok, message });
+    using var request = new HttpRequestMessage(HttpMethod.Post, "hik-bridge/roster-ack");
+    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _bridgeToken);
+    request.Content = JsonContent.Create(new { opId, ok, message }, options: NullSkipping);
 
     using var response = await _http.SendAsync(request, cancellationToken);
     if (!response.IsSuccessStatusCode)
@@ -58,10 +67,16 @@ public sealed class ConvexBridgeClient
     }
   }
 
-  public async Task PostCardReaderEventAsync(CardReaderEventPayload payload, CancellationToken cancellationToken)
+  /// <summary>Kart event'i — cihazın kendi apiToken'ı ile (bridge token DEĞİL).</summary>
+  public async Task PostCardReaderEventAsync(string deviceApiToken, CardReaderEventPayload payload, CancellationToken cancellationToken)
   {
+    if (string.IsNullOrWhiteSpace(deviceApiToken))
+    {
+      _logger.LogWarning("Card event atlandı: cihaz apiToken boş");
+      return;
+    }
     using var request = new HttpRequestMessage(HttpMethod.Post, "card-reader");
-    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", deviceApiToken);
     request.Content = JsonContent.Create(payload);
 
     using var response = await _http.SendAsync(request, cancellationToken);
