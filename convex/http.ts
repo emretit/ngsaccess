@@ -79,14 +79,14 @@ http.route({
         );
       }
 
-      // Token doğrulandıysa: request'teki tüm cihaz tanımlayıcıları token sahibi cihazla
-      // eşleşmeli; en az bir tanımlayıcı eşleşmeli (saldırgan hepsini omit ederek farklı
-      // tenant cihazına yazamasın). Eşleşmezse cross-tenant attempt → 403.
+      // Token doğrulandıysa attribution zaten token cihazına SABİTLENİR (aşağıda
+      // updateLastSeen/processCardReading'e authedDeviceId/deviceId geçilir) → body
+      // serial/IP ile başka tenant'a yazmak imkansız. Bu guard ek savunma: body'deki
+      // tanımlayıcılar token cihazıyla çelişiyorsa erken 403 (yanlış yapılandırma sinyali).
       //
-      // localBridge istisnası: bu cihazların event'lerini LAN bridge, cihazın per-device
-      // apiToken'ı ile basar; token zaten tek bir cihaza bağlı (getByApiToken), dolayısıyla
-      // cross-tenant imkansız. Ayrıca bridge serial/devIndex/ehome göndermez (yalnız IP),
-      // tanımlayıcı-eşleşme guard'ı bu cihazlarda her event'i yanlışlıkla 403'lerdi.
+      // localBridge istisnası: bridge serial/devIndex/ehome göndermez (yalnız IP), ve panel
+      // IP'si cihazın deviceIp'siyle birebir aynı olmayabilir; tanımlayıcı-eşleşme guard'ı bu
+      // cihazlarda geçerli event'i yanlışlıkla 403'lerdi. Pin sayesinde skip güvenli.
       if (authedDevice && authedDevice.hikTransport !== "localBridge") {
         const checks: Array<[string, string | undefined, string | undefined]> = [
           ["serial", serial ?? undefined, authedDevice.deviceSerial],
@@ -114,9 +114,13 @@ http.route({
         }
       }
 
-      // Her POST'ta (heartbeat dahil) lastSeen güncelle — cihaz "online" görünsün
-      if (serial || deviceIp || hikDevIndex || hikEhomeID || ideUuid) {
+      // Her POST'ta (heartbeat dahil) lastSeen güncelle — cihaz "online" görünsün.
+      // Token doğrulanmışsa cihaz o token'a sabitlenir (deviceId); aksi halde body
+      // serial/IP ile çözen mutation bir token sahibinin başka tenant cihazının
+      // lastSeen'ini flip etmesine izin verirdi.
+      if (authedDevice || serial || deviceIp || hikDevIndex || hikEhomeID || ideUuid) {
         await ctx.runMutation(internal.devices.updateLastSeen, {
+          deviceId: authedDevice?._id,
           deviceSerial: serial ?? undefined,
           deviceIp: deviceIp ?? undefined,
           hikDevIndex: hikDevIndex ?? undefined,
@@ -149,6 +153,8 @@ http.route({
           cardNo: user_id,
           deviceSerial: serial ?? "",
           deviceIp: deviceIp ?? undefined,
+          // Token sahibi cihaza sabitle — body serial/IP cross-tenant forge için kullanılamaz.
+          authedDeviceId: authedDevice?._id,
           rawBody: raw.length > 10000 ? raw.slice(0, 10000) : raw,
           hikDevIndex: hikDevIndex ?? undefined,
           hikEhomeID: hikEhomeID ?? undefined,

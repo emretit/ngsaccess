@@ -1450,6 +1450,11 @@ export const processCardReading = internalMutation({
     cardNo: v.string(),
     deviceSerial: v.string(),
     deviceIp: v.optional(v.string()),
+    /**
+     * Token doğrulanmış istekte (per-device apiToken) cihaz buradan SABİTLENİR;
+     * body serial/IP'ye güvenilmez (cross-tenant forge önlenir). Yoksa eski lookup.
+     */
+    authedDeviceId: v.optional(v.id("devices")),
     rawBody: v.optional(v.string()),
     hikDevIndex: v.optional(v.string()),
     hikEhomeID: v.optional(v.string()),
@@ -1496,48 +1501,56 @@ export const processCardReading = internalMutation({
       hikEventState: args.hikEventState,
     } as const;
 
-    // 1. Cihazı serial veya IP ile bul (her zaman - kayıt için gerekli)
+    // 1. Cihazı bul. Token doğrulanmış istekte (authedDeviceId) attribution o cihaza
+    //    SABİTLENİR — body'deki serial/IP/uuid'ye GÜVENİLMEZ. Bu, /card-reader'daki
+    //    localBridge guard-skip + IP-global lookup ile bir token sahibinin BAŞKA tenant'ın
+    //    cihazına forged kart/audit satırı yazmasını engeller. Token yoksa (deprecated
+    //    unauth yol) eski serial→devIndex→ehome→uuid→IP zincirine düşülür.
     let device = null;
-    if (args.deviceSerial?.trim()) {
-      device = await ctx.db
-        .query("devices")
-        .withIndex("by_device_serial", (q) =>
-          q.eq("deviceSerial", args.deviceSerial!.trim())
-        )
-        .first();
-    }
-    // Gateway-passthrough event'inde serial yerine devIndex gelir → indexli lookup
-    if (!device && args.hikDevIndex?.trim()) {
-      device = await ctx.db
-        .query("devices")
-        .withIndex("by_hik_dev_index", (q) =>
-          q.eq("hikDevIndex", args.hikDevIndex!.trim())
-        )
-        .first();
-    }
-    // Cihaz event'i `deviceID` field'ında ehomeID gönderir (gateway register'da atadığımız)
-    if (!device && args.hikEhomeID?.trim()) {
-      device = await ctx.db
-        .query("devices")
-        .withIndex("by_ehome_id", (q) =>
-          q.eq("ehomeID", args.hikEhomeID!.trim())
-        )
-        .first();
-    }
-    // IDE Smart panel event'i: serial yerine panel UUID gelebilir.
-    if (!device && args.ideUuid?.trim()) {
-      device = await ctx.db
-        .query("devices")
-        .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", args.ideUuid!.trim()))
-        .first();
-    }
-    if (!device && args.deviceIp?.trim()) {
-      device = await ctx.db
-        .query("devices")
-        .withIndex("by_device_ip", (q) =>
-          q.eq("deviceIp", args.deviceIp!.trim())
-        )
-        .first();
+    if (args.authedDeviceId) {
+      device = await ctx.db.get(args.authedDeviceId);
+    } else {
+      if (args.deviceSerial?.trim()) {
+        device = await ctx.db
+          .query("devices")
+          .withIndex("by_device_serial", (q) =>
+            q.eq("deviceSerial", args.deviceSerial!.trim())
+          )
+          .first();
+      }
+      // Gateway-passthrough event'inde serial yerine devIndex gelir → indexli lookup
+      if (!device && args.hikDevIndex?.trim()) {
+        device = await ctx.db
+          .query("devices")
+          .withIndex("by_hik_dev_index", (q) =>
+            q.eq("hikDevIndex", args.hikDevIndex!.trim())
+          )
+          .first();
+      }
+      // Cihaz event'i `deviceID` field'ında ehomeID gönderir (gateway register'da atadığımız)
+      if (!device && args.hikEhomeID?.trim()) {
+        device = await ctx.db
+          .query("devices")
+          .withIndex("by_ehome_id", (q) =>
+            q.eq("ehomeID", args.hikEhomeID!.trim())
+          )
+          .first();
+      }
+      // IDE Smart panel event'i: serial yerine panel UUID gelebilir.
+      if (!device && args.ideUuid?.trim()) {
+        device = await ctx.db
+          .query("devices")
+          .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", args.ideUuid!.trim()))
+          .first();
+      }
+      if (!device && args.deviceIp?.trim()) {
+        device = await ctx.db
+          .query("devices")
+          .withIndex("by_device_ip", (q) =>
+            q.eq("deviceIp", args.deviceIp!.trim())
+          )
+          .first();
+      }
     }
 
     // Hikvision brand-dispatch: karar cihazda verilir, biz sadece audit yazarız.

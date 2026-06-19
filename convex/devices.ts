@@ -41,11 +41,25 @@ export const list = authedQuery({
       return [];
     }
 
+    // Panel sırları (şifre/anahtar/event token) yalnız yönetebilen role döner. authedQuery
+    // herhangi bir proje kullanıcısına açık olduğundan, role-gate olmadan devicePassword /
+    // idePassword / ehomeKey / apiToken tüm üyelere sızardı. Cihaz yönetimi UI'da zaten
+    // isAdmin ile gated; admin tam veriyle pre-fill eder, izleyici sır almaz.
+    const isManager =
+      ctx.user.role === "super_admin" || ctx.user.role === "project_admin";
     return await Promise.all(
       devices.map(async (device) => {
         const zone = device.zoneId ? await ctx.db.get(device.zoneId) : null;
         const door = device.doorId ? await ctx.db.get(device.doorId) : null;
-        return { ...device, zone, door };
+        return {
+          ...device,
+          devicePassword: isManager ? device.devicePassword : undefined,
+          idePassword: isManager ? device.idePassword : undefined,
+          ehomeKey: isManager ? device.ehomeKey : undefined,
+          apiToken: isManager ? device.apiToken : undefined,
+          zone,
+          door,
+        };
       })
     );
   },
@@ -318,6 +332,16 @@ export async function purgeDeviceCascade(
     .collect();
   await Promise.all(ownedDoors.map((d) => ctx.db.delete(d._id)));
 
+  // localBridge SDK iş kuyruğu — cihaz silinince orphan kalmasın. Aksi halde "processing"
+  // bir op cihaz silindikten sonra ack edilemez (ackBridgeOperation cihaz yoksa
+  // not-found döner) ve sonsuza dek processing'de takılırdı. by_device_status index'i
+  // sadece deviceId prefix'iyle tüm statüleri verir.
+  const pendingOps = await ctx.db
+    .query("hikPendingOperations")
+    .withIndex("by_device_status", (q) => q.eq("deviceId", deviceId))
+    .collect();
+  await Promise.all(pendingOps.map((op) => ctx.db.delete(op._id)));
+
   await ctx.db.delete(deviceId);
 }
 
@@ -357,41 +381,47 @@ export const remove = authedMutation({
 /** HTTP action'dan çağrılır — cihazdan herhangi bir POST gelince lastSeen günceller. */
 export const updateLastSeen = internalMutation({
   args: {
+    /** Token doğrulanmış istekte cihaz buraya sabitlenir; body serial/IP'ye güvenilmez. */
+    deviceId: v.optional(v.id("devices")),
     deviceSerial: v.optional(v.string()),
     deviceIp: v.optional(v.string()),
     hikDevIndex: v.optional(v.string()),
     ehomeID: v.optional(v.string()),
     ideUuid: v.optional(v.string()),
   },
-  handler: async (ctx, { deviceSerial, deviceIp, hikDevIndex, ehomeID, ideUuid }) => {
+  handler: async (ctx, { deviceId, deviceSerial, deviceIp, hikDevIndex, ehomeID, ideUuid }) => {
     const now = new Date().toISOString();
     let device = null;
 
-    if (deviceSerial) {
+    // Token sahibine sabitle: aksi halde bir token sahibi forged serial/IP ile başka
+    // tenant cihazının lastSeen'ini ("online") flip edebilirdi.
+    if (deviceId) {
+      device = await ctx.db.get(deviceId);
+    } else if (deviceSerial) {
       device = await ctx.db
         .query("devices")
         .withIndex("by_device_serial", (q) => q.eq("deviceSerial", deviceSerial))
         .first();
     }
-    if (!device && ideUuid) {
+    if (!device && !deviceId && ideUuid) {
       device = await ctx.db
         .query("devices")
         .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", ideUuid))
         .first();
     }
-    if (!device && hikDevIndex) {
+    if (!device && !deviceId && hikDevIndex) {
       device = await ctx.db
         .query("devices")
         .withIndex("by_hik_dev_index", (q) => q.eq("hikDevIndex", hikDevIndex))
         .first();
     }
-    if (!device && ehomeID) {
+    if (!device && !deviceId && ehomeID) {
       device = await ctx.db
         .query("devices")
         .withIndex("by_ehome_id", (q) => q.eq("ehomeID", ehomeID))
         .first();
     }
-    if (!device && deviceIp) {
+    if (!device && !deviceId && deviceIp) {
       device = await ctx.db
         .query("devices")
         .withIndex("by_device_ip", (q) => q.eq("deviceIp", deviceIp))
@@ -406,8 +436,9 @@ export const updateLastSeen = internalMutation({
         lastSeen: now,
         hikLastSeenAt: Date.now(),
       });
-    } else if (ideUuid) {
+    } else if (!deviceId && ideUuid) {
       // Cihaz henüz projeye atanmamış (adminDevices'ta) olabilir — orada da lastSeen güncelle.
+      // (Token-pinned istekte buraya düşülmez: yanlış adminDevices'a attribution olmasın.)
       const adminDevice = await ctx.db
         .query("adminDevices")
         .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", ideUuid))
