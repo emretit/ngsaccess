@@ -32,6 +32,7 @@ import { netWorkMinutes } from "./lib/breakDeduction";
 import { bucketWeeklyOvertime, type DayEntry } from "./lib/overtimeCalc";
 import { inferAccessStatus, inferDenialReason } from "./lib/hikEventCodes";
 import { ideResultGranted } from "./lib/cardReaderParse";
+import { canEmployeeAccessDevice } from "./lib/accessDecision";
 
 /**
  * Ziyaretçi kayıt ekranı için: seçilen okuyucuda (device) okutulan en son BİLİNMEYEN
@@ -1442,6 +1443,26 @@ async function resolveDirection(
 }
 
 /**
+ * Cihaz ∩ çalışan kesişimindeki kurallardan AKTİF olanların id kümesini çözer.
+ * Saf karar (`canEmployeeAccessDevice`) için gereken tek DB-bağımlı adım: yalnız
+ * kesişimdeki kuralları okur (tüm kuralları değil) — küçük küme, ucuz.
+ */
+async function resolveActiveMatchingRuleIds(
+  ctx: MutationCtx,
+  deviceGroupIds: Id<"accessRules">[],
+  employeeGroupIds: Id<"accessRules">[],
+): Promise<Set<Id<"accessRules">>> {
+  const employeeSet = new Set(employeeGroupIds);
+  const matching = deviceGroupIds.filter((gid) => employeeSet.has(gid));
+  const rules = await Promise.all(matching.map((gid) => ctx.db.get(gid)));
+  return new Set(
+    rules
+      .filter((r): r is NonNullable<typeof r> => r?.isActive === true)
+      .map((r) => r._id),
+  );
+}
+
+/**
  * Kart okuyucu cihazlarından gelen istekleri işler (internal - HTTP action'dan çağrılır).
  * Erişim kontrolü yapar ve card_readings kaydı oluşturur.
  */
@@ -1746,26 +1767,24 @@ export const processCardReading = internalMutation({
             q.eq("projectId", device.projectId).eq("deviceId", device._id),
           )
           .collect();
-        const groupIds = deviceGroups.map((gd) => gd.groupId);
+        const deviceGroupIds = deviceGroups.map((gd) => gd.groupId);
         const employeeAccessGroups = await ctx.db
           .query("groupMembers")
           .withIndex("by_project_employee", (q) =>
             q.eq("projectId", tokenEmployee.projectId).eq("employeeId", tokenEmployee._id),
           )
           .collect();
-        const employeeGroupIds = new Set(
-          employeeAccessGroups.map((gm) => gm.groupId)
+        const employeeGroupIds = employeeAccessGroups.map((gm) => gm.groupId);
+        const activeRuleIds = await resolveActiveMatchingRuleIds(
+          ctx,
+          deviceGroupIds,
+          employeeGroupIds,
         );
-        const matchingGroupIds = groupIds.filter((gid) =>
-          employeeGroupIds.has(gid)
-        );
-        for (const groupId of matchingGroupIds) {
-          const rule = await ctx.db.get(groupId);
-          if (rule?.isActive) {
-            tokenHasAccess = true;
-            break;
-          }
-        }
+        tokenHasAccess = canEmployeeAccessDevice({
+          deviceGroupIds,
+          employeeGroupIds,
+          activeRuleIds,
+        });
       }
 
       await ctx.db.patch(tokenRow._id, { usedAt: accessTime });
@@ -1877,25 +1896,24 @@ export const processCardReading = internalMutation({
     }
 
     // 4. Çalışanın bu cihaza erişimi var mı? (groupMembers + accessRules)
-    const groupIds = deviceGroups.map((gd) => gd.groupId);
+    const deviceGroupIds = deviceGroups.map((gd) => gd.groupId);
     const employeeAccessGroups = await ctx.db
       .query("groupMembers")
       .withIndex("by_project_employee", (q) =>
         q.eq("projectId", employee.projectId).eq("employeeId", employee._id),
       )
       .collect();
-
-    const employeeGroupIds = new Set(employeeAccessGroups.map((gm) => gm.groupId));
-    const matchingGroupIds = groupIds.filter((gid) => employeeGroupIds.has(gid));
-
-    let hasAccess = false;
-    for (const groupId of matchingGroupIds) {
-      const rule = await ctx.db.get(groupId);
-      if (rule?.isActive) {
-        hasAccess = true;
-        break;
-      }
-    }
+    const employeeGroupIds = employeeAccessGroups.map((gm) => gm.groupId);
+    const activeRuleIds = await resolveActiveMatchingRuleIds(
+      ctx,
+      deviceGroupIds,
+      employeeGroupIds,
+    );
+    const hasAccess = canEmployeeAccessDevice({
+      deviceGroupIds,
+      employeeGroupIds,
+      activeRuleIds,
+    });
 
     // 5. Kayıt oluştur
     const cardDirection = await resolveDirection(ctx, {
@@ -2318,5 +2336,99 @@ export const getEmployeeAttendanceDetail = authedQuery({
       },
       days,
     };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// AcsEvent backfill — tek event satırı yazar, dedup kontrolü yapar.
+// ---------------------------------------------------------------------------
+
+/**
+ * Cihazdan tarihsel olarak çekilen tek bir AcsEvent satırını cardReadings'e yazar.
+ * Dedup: by_device_hik_serial index ile (deviceId, hikSerialNo) çifti daha önce
+ * yazılmışsa insert atlanır.
+ * NOT: hikLastSerialNo (canlı cursor) PATCH'lenmez — backfill yalnız hikBackfillCursor'u kullanır.
+ */
+export const backfillHikEventRow = internalMutation({
+  args: {
+    deviceId: v.id("devices"),
+    event: v.object({
+      time: v.string(),
+      cardNo: v.string(),
+      cardType: v.optional(v.string()),
+      name: v.optional(v.string()),
+      employeeNoString: v.optional(v.string()),
+      major: v.number(),
+      minor: v.number(),
+      doorNo: v.optional(v.number()),
+      currentVerifyMode: v.optional(v.string()),
+      serialNo: v.number(),
+      pictureURL: v.optional(v.string()),
+      attendanceStatus: v.optional(v.string()),
+    }),
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ inserted: boolean; reason?: string }> => {
+    // Dedup: (deviceId, serialNo) çifti zaten kayıtlıysa atla.
+    const existing = await ctx.db
+      .query("cardReadings")
+      .withIndex("by_device_hik_serial", (q) =>
+        q.eq("deviceId", args.deviceId).eq("hikSerialNo", args.event.serialNo),
+      )
+      .first();
+    if (existing) {
+      return { inserted: false, reason: "duplicate" };
+    }
+
+    // Device'ı al (projectId için).
+    const device = await ctx.db.get(args.deviceId);
+    if (!device) {
+      return { inserted: false, reason: "device-not-found" };
+    }
+
+    const accessStatus: "izin_verildi" | "reddedildi" =
+      inferAccessStatus(args.event.major, args.event.minor) ?? "reddedildi";
+    const granted = accessStatus === "izin_verildi";
+    const denialReason = granted
+      ? undefined
+      : inferDenialReason(args.event.minor);
+
+    // cardNo'dan çalışan ara (by_card index — canlı branch ile aynı yol)
+    const employee = await ctx.db
+      .query("employees")
+      .withIndex("by_card", (q) => q.eq("cardNumber", args.event.cardNo))
+      .first();
+
+    // projectId: employee'nin projesi > cihazın projesi
+    const projectId = employee?.projectId ?? device.projectId;
+
+    const employeeName = employee
+      ? `${employee.firstName} ${employee.lastName}`
+      : (args.event.name?.trim() || undefined);
+
+    await ctx.db.insert("cardReadings", {
+      projectId,
+      deviceId: args.deviceId,
+      employeeId: employee?._id,
+      cardNo: args.event.cardNo,
+      employeeName,
+      // accessTime = event'in cihaz zamanı (Date.now() DEĞİL — backfill)
+      accessTime: args.event.time,
+      accessStatus,
+      hikMajorEventType: args.event.major,
+      hikSubEventType: args.event.minor,
+      hikCurrentVerifyMode: args.event.currentVerifyMode,
+      hikSerialNo: args.event.serialNo,
+      hikDevIndex: device.hikDevIndex,
+      hikPictureURL: args.event.pictureURL,
+      hikDateTime: args.event.time,
+      hikDenialReason: denialReason,
+      createdAt: args.event.time,
+      updatedAt: args.event.time,
+    });
+
+    return { inserted: true };
   },
 });

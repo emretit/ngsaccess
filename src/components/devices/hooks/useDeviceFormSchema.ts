@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MANUAL_MODEL_ID } from "../../../../convex/lib/hikModels";
 
 export const DEVICE_BRANDS = ["hikvision", "other", "ide_smart"] as const;
 export type DeviceBrand = (typeof DEVICE_BRANDS)[number];
@@ -28,16 +29,18 @@ const doorCountField = z.preprocess(
  * tipi değişmez). Diğer tüm zorunluluklar (seri no, ehome, UUID/IP) admin'in de
  * ihtiyacı olduğundan superRefine aynen korunur.
  */
-export function makeFormSchema(adminMode: boolean) {
+export function makeFormSchema(adminMode: boolean, isEdit = false) {
   return z.object({
   brand: z.enum(DEVICE_BRANDS).default("other"),
   name: adminMode ? z.string().default("") : z.string().min(1, "Cihaz adı gereklidir"),
   device_serial: z.string().optional(),
-  device_type: z.enum(["Kart Okuyucu", "Parmak İzi Okuyucu", "Yüz Tanıma", "QR Kod Okuyucu", "RFID Okuyucu", "Erişim Terminali", "Erişim Paneli", "Turnike", "Kapı Kontrolörü", "Diğer"]),
+  device_type: z.enum(["Kontrol Paneli", "Kart Okuyucu", "Parmak İzi Okuyucu", "Yüz Tanıma", "QR Kod Okuyucu", "RFID Okuyucu", "Erişim Terminali", "Erişim Paneli", "Turnike", "Kapı Kontrolörü", "Diğer"]),
   zone_id: z.string().optional(),
   // IDE panel eklerken yeni bölge oluşturma adı (zone_id === "__new__" iken kullanılır).
   new_zone_name: z.string().optional(),
   door_id: z.string().optional(),
+  // Cihazın kontrol ettiği genel kapı sayısı (1–8). Kapı seçimi yerine bu girilir.
+  door_count: doorCountField,
   access_direction: z.enum(["entry", "exit", "both"]),
   device_ip: z.string().optional(),
   device_username: z.string().optional(),
@@ -48,7 +51,12 @@ export function makeFormSchema(adminMode: boolean) {
   ehome_id: z.string().optional(),
   ehome_key: z.string().optional(),
   // Hikvision transport: "gateway" (ISUP→Hetzner) veya "localBridge" (LAN'daki Windows EXE).
-  hik_transport: z.enum(["gateway", "localBridge"]).default("gateway"),
+  // Opsiyonel: düzenlemede kayıtlı değer yüklenir; seçilmemiş cihazda "Seçin" kalır (zorla
+  // gateway'e düşürmek yanıltıcıydı). Hikvision için superRefine'da seçim zorunlu tutulur.
+  hik_transport: z.enum(["gateway", "localBridge"]).optional(),
+  // Hikvision cihaz modeli (katalog id'si veya MANUAL_MODEL_ID). Kapı/okuyucu sayısı
+  // bundan türetilir; yeni cihaz eklerken zorunlu (superRefine), manuel ise kapı sayısı istenir.
+  hik_model: z.string().optional(),
   hik_door_count: doorCountField,
   // localBridge panel SDK portu (default 8000). Boş → undefined (backend default'u).
   // max 65535: bridge tarafı Port'u 16-bit okur; aralık dışı değer roster'ı düşürür.
@@ -70,7 +78,33 @@ export function makeFormSchema(adminMode: boolean) {
 }).superRefine((data, ctx) => {
   // localBridge transport ehome/gateway kimliği kullanmaz (LAN bridge token ile auth olur);
   // ehome alanları yalnız gateway transport'ta zorunludur.
-  if (data.brand === "hikvision" && data.hik_transport !== "localBridge") {
+  if (data.brand === "hikvision" && !data.hik_transport) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["hik_transport"],
+      message: "İletişim yöntemi seçin",
+    });
+  }
+  // Yeni cihaz eklerken (admin/düzenleme değil) model zorunlu — kapı/okuyucu sayısı modelden
+  // türetilir. Düzenlemede legacy cihazlar modelsiz olabilir → zorlamayız. Manuel modelde
+  // kapı sayısı elle girilir.
+  if (data.brand === "hikvision" && !adminMode && !isEdit) {
+    if (!data.hik_model) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["hik_model"],
+        message: "Cihaz modeli seçin",
+      });
+    } else if (data.hik_model === MANUAL_MODEL_ID && data.hik_door_count === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["hik_door_count"],
+        message: "Kapı sayısı gerekli",
+      });
+    }
+  }
+  // ehome yalnız gateway transport'ta zorunlu (localBridge LAN bridge token ile auth olur).
+  if (data.brand === "hikvision" && data.hik_transport === "gateway") {
     if (!data.ehome_id?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

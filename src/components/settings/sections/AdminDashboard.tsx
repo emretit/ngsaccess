@@ -4,7 +4,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Building2, Users, Shield } from 'lucide-react';
 import AdminProjectsPanel from '@/components/admin/AdminProjectsPanel';
 import { AdminDevicesPanel } from '@/components/admin/AdminDevicesPanel';
-import { IdeProvisioningCard } from '@/components/admin/IdeProvisioningCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function AdminDashboard() {
@@ -49,10 +48,7 @@ export function AdminDashboard() {
           <AdminProjectsPanel />
         </TabsContent>
         <TabsContent value="devices" className="mt-4">
-          <div className="space-y-6">
-            <IdeProvisioningCard />
-            <AdminDevicesPanel />
-          </div>
+          <AdminDevicesPanel />
         </TabsContent>
       </Tabs>
     </div>

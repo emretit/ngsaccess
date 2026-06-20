@@ -1,15 +1,19 @@
 import { useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { getHikModelSpec } from "../../../convex/lib/hikModels";
 
-import { ChevronRight, Building2, Cpu, HardDrive, Plus, Trash2, DoorClosed, DoorOpen, Loader2, ScanLine, Pencil } from "lucide-react";
+import { ChevronRight, Building2, Cpu, HardDrive, Plus, Trash2, DoorClosed, DoorOpen, Loader2, ScanLine, Pencil, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { deviceDisplayName } from "@/lib/deviceDisplay";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AddDoorDialog } from "./AddDoorDialog";
+import { EditDoorDialog, type DoorForEdit } from "./EditDoorDialog";
 import { EditReaderDialog } from "./EditReaderDialog";
+import { AddReaderDialog } from "./AddReaderDialog";
 import { toast } from "@/hooks/use-toast";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
@@ -21,8 +25,25 @@ interface ZoneDoorTreeProps {
 
 // Tree veri tipleri (Convex query çıktısının kullandığımız alt kümesi).
 type ZoneNode = { _id: Id<"zones">; name: string };
-type DeviceNode = { _id: Id<"devices">; name: string; zoneId?: Id<"zones">; brand?: string; ideUuid?: string };
-type DoorNode = { _id: Id<"doors">; name: string; zoneId?: Id<"zones">; deviceId?: Id<"devices">; ioId?: number; requireSensor?: boolean };
+type DeviceNode = {
+  _id: Id<"devices">;
+  name: string;
+  zoneId?: Id<"zones">;
+  brand?: string;
+  ideUuid?: string;
+  hikTransport?: string;
+  hikModel?: string;
+};
+// readerStatus satırı (okuyucu başına) — kapı başına N satır dönebilir.
+type ReaderRow = FunctionReturnType<typeof api.doors.readerStatus>[number];
+// DoorNode: EditDoorDialog'un DoorForEdit tipiyle uyumlu (ortak alanlar) +
+// ağaç görüntüleme için gerekli ek alanlar.
+type DoorNode = DoorForEdit & {
+  zoneId?: Id<"zones">;
+  deviceId?: Id<"devices">;
+  ioId?: number;
+  requireSensor?: boolean;
+};
 
 export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDoorTreeProps) => {
   const { projectId, loading: projectLoading } = useActiveProject();
@@ -41,13 +62,27 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
   const zones = (zonesData ?? []) as ZoneNode[];
   const doors = (doorsData ?? []) as DoorNode[];
   const devices = (devicesData ?? []) as DeviceNode[];
-  const readerByDoor = new Map(
-    (readerStatusData ?? []).map((r) => [String(r.doorId), r])
-  );
+  // Okuyucuları kapı bazında grupla (kapı başına 1..2 okuyucu).
+  const readersByDoor = new Map<string, ReaderRow[]>();
+  for (const r of readerStatusData ?? []) {
+    const k = String(r.doorId);
+    const arr = readersByDoor.get(k);
+    if (arr) arr.push(r);
+    else readersByDoor.set(k, [r]);
+  }
 
   const removeZone = useMutation(api.zones.remove);
   const removeDoor = useMutation(api.doors.remove);
+  const removeReader = useMutation(api.readers.remove);
   const openIdeDoor = useAction(api.actions.ideGatewayDevice.openIdeDoor);
+
+  // Kapı başına izin verilen en çok okuyucu — cihaz markası/modeline göre (UI tarafı; sunucu da doğrular).
+  const maxReadersForDevice = (device: DeviceNode | null | undefined): number => {
+    if (!device) return 2;
+    if (device.brand === "ide_smart") return 1;
+    if (device.brand === "hikvision") return getHikModelSpec(device.hikModel)?.maxReadersPerDoor ?? 2;
+    return 2;
+  };
 
   const [selectedZone, setSelectedZone] = useState<Id<"zones"> | null>(null);
   const [selectedDoor, setSelectedDoor] = useState<Id<"doors"> | null>(null);
@@ -57,11 +92,21 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
   const [selectedZoneForDoor, setSelectedZoneForDoor] = useState<{ id: Id<"zones">; name: string } | null>(null);
   const [openingDoorId, setOpeningDoorId] = useState<Id<"doors"> | null>(null);
   const [editReader, setEditReader] = useState<{
+    readerId: Id<"readers"> | null;
     doorId: Id<"doors">;
     readerName: string;
     readerDirection: "entry" | "exit" | "both";
     requireSensor?: boolean;
     isIdeDoor: boolean;
+  } | null>(null);
+  const [addReader, setAddReader] = useState<{
+    doorId: Id<"doors">;
+    doorName: string;
+    defaultDirection: "entry" | "exit" | "both";
+  } | null>(null);
+  const [editDoor, setEditDoor] = useState<{
+    door: DoorNode;
+    device: DeviceNode | undefined;
   } | null>(null);
 
   const handleOpenIdeDoor = async (deviceId: Id<"devices">, doorId: Id<"doors">) => {
@@ -120,15 +165,31 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
     setShowAddDoorDialog(true);
   };
 
+  const handleDeleteReader = async (readerId: Id<"readers">) => {
+    try {
+      await removeReader({ readerId });
+      toast({ title: "Başarılı", description: "Okuyucu silindi" });
+    } catch (e) {
+      toast({
+        title: "Hata",
+        description: e instanceof Error ? e.message : "Okuyucu silinirken hata oluştu",
+        variant: "destructive",
+      });
+    }
+  };
+
   const toggleZone = (id: Id<"zones">) =>
     setExpandedZones((prev) => (prev.includes(id) ? prev.filter((z) => z !== id) : [...prev, id]));
   const toggleDevice = (id: Id<"devices">) =>
     setExpandedDevices((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]));
 
-  // Okuyucu alt-satırı (kapının altında).
-  const renderReader = (door: DoorNode) => {
-    const reader = readerByDoor.get(String(door._id));
-    if (!reader) return null;
+  // Tek okuyucu alt-satırı (kapının altında). total = kapıdaki okuyucu sayısı (son okuyucu silinemez).
+  const renderReaderRow = (
+    door: DoorNode,
+    reader: ReaderRow,
+    total: number,
+    isIdeDoor: boolean,
+  ) => {
     const dirLabel =
       reader.readerDirection === "exit"
         ? "Çıkış"
@@ -143,9 +204,15 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
         })
       : "—";
     return (
-      <div className="group/reader flex items-center gap-2 rounded-md px-2 py-1 ml-12 text-xs text-muted-foreground hover:bg-accent/50">
+      <div
+        key={reader.readerId ?? `legacy-${door._id}`}
+        className="group/reader flex items-center gap-2 rounded-md px-2 py-1 ml-12 text-xs text-muted-foreground hover:bg-accent/50"
+      >
         <ScanLine className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">{reader.readerName}</span>
+        {/* Okuyucu adı kapı adıyla aynıysa (readerName boş→door.name türetimi) tekrarı gizle. */}
+        {reader.readerName !== door.name && (
+          <span className="truncate">{reader.readerName}</span>
+        )}
         <Badge variant="secondary" className="h-4 px-1 text-[10px] font-normal">
           {dirLabel}
         </Badge>
@@ -167,24 +234,66 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
           aria-label="Okuyucuyu Düzenle"
           onClick={() => {
             setEditReader({
+              readerId: reader.readerId,
               doorId: door._id,
               readerName: reader.readerName,
               readerDirection: reader.readerDirection,
               requireSensor: door.requireSensor,
-              isIdeDoor: door.ioId != null,
+              isIdeDoor,
             });
           }}
         >
           <Pencil className="h-3 w-3" />
         </Button>
+        {reader.readerId && total > 1 && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 opacity-0 transition-opacity group-hover/reader:opacity-100 hover:bg-accent/80"
+            title="Okuyucuyu Sil"
+            aria-label="Okuyucuyu Sil"
+            onClick={() => handleDeleteReader(reader.readerId as Id<"readers">)}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        )}
       </div>
+    );
+  };
+
+  // Kapının okuyucuları + "okuyucu ekle" satırı (kapı başına 1..max okuyucu).
+  const renderReaders = (door: DoorNode, device: DeviceNode | null) => {
+    const readers = readersByDoor.get(String(door._id)) ?? [];
+    const max = maxReadersForDevice(device);
+    const isIdeDoor = door.ioId != null;
+    const hasEntry = readers.some((r) => r.readerDirection === "entry");
+    return (
+      <>
+        {readers.map((reader) => renderReaderRow(door, reader, readers.length, isIdeDoor))}
+        {readers.length < max && (
+          <button
+            type="button"
+            className="ml-12 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent/50"
+            onClick={() =>
+              setAddReader({
+                doorId: door._id,
+                doorName: door.name,
+                defaultDirection: hasEntry ? "exit" : "entry",
+              })
+            }
+          >
+            <Plus className="h-3 w-3" />
+            Okuyucu ekle
+          </button>
+        )}
+      </>
     );
   };
 
   // Tek bir kapı satırı (panel altında veya bölge altında manuel).
   // Outer div = layout + hover/selected styling. Inner <button> = klavye/fare seçim hedefi.
   // Action butonlar sibling — iç içe interactive element ARIA ihlali yok.
-  const renderDoor = (door: DoorNode, panelDeviceId: Id<"devices"> | null) => (
+  const renderDoor = (door: DoorNode, panelDeviceId: Id<"devices"> | null, panelDevice: DeviceNode | null) => (
     <li key={door._id}>
       <div
         className={cn(
@@ -205,6 +314,16 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
           <span className="flex-1 truncate text-sm">{door.name}</span>
         </button>
         <div className="flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pr-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Kapıyı düzenle"
+            className="h-6 w-6 hover:bg-accent/80"
+            title="Kapıyı Düzenle"
+            onClick={() => setEditDoor({ door, device: panelDevice ?? undefined })}
+          >
+            <Settings2 className="h-3 w-3" />
+          </Button>
           {panelDeviceId ? (
             <Button
               variant="ghost"
@@ -233,7 +352,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
           )}
         </div>
       </div>
-      {renderReader(door)}
+      {renderReaders(door, panelDevice)}
     </li>
   );
 
@@ -361,14 +480,14 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
                             {deviceDoors.length === 0 ? (
                               <li className="text-xs text-muted-foreground pl-12 py-1.5">Kapı yok</li>
                             ) : (
-                              deviceDoors.map((door) => renderDoor(door, isPanel ? device._id : null))
+                              deviceDoors.map((door) => renderDoor(door, isPanel ? device._id : null, device))
                             )}
                           </ul>
                         </li>
                       );
                     })}
 
-                    {manualDoors.map((door) => renderDoor(door, null))}
+                    {manualDoors.map((door) => renderDoor(door, null, null))}
                   </>
                 )}
               </ul>
@@ -391,11 +510,32 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
         <EditReaderDialog
           open={!!editReader}
           onOpenChange={(open) => { if (!open) setEditReader(null); }}
+          readerId={editReader.readerId}
           doorId={editReader.doorId}
           readerName={editReader.readerName}
           readerDirection={editReader.readerDirection}
           requireSensor={editReader.requireSensor}
           isIdeDoor={editReader.isIdeDoor}
+        />
+      )}
+
+      {addReader && (
+        <AddReaderDialog
+          open={!!addReader}
+          onOpenChange={(open) => { if (!open) setAddReader(null); }}
+          doorId={addReader.doorId}
+          doorName={addReader.doorName}
+          defaultDirection={addReader.defaultDirection}
+        />
+      )}
+
+      {editDoor && (
+        <EditDoorDialog
+          open={!!editDoor}
+          onOpenChange={(open) => { if (!open) setEditDoor(null); }}
+          onSuccess={() => {}}
+          door={editDoor.door}
+          device={editDoor.device}
         />
       )}
     </>

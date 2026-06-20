@@ -8,12 +8,11 @@ import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { ServerDevice } from "@/types/device";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { makeFormSchema, FormValues, type DeviceBrand } from "./useDeviceFormSchema";
-import { useDeviceDataLoader } from "./useDeviceDataLoader";
+import { buildDeviceFormValues } from "./buildDeviceFormValues";
 import { useDeviceFormSubmission } from "./useDeviceFormSubmission";
 
 interface UseDeviceFormLogicProps {
   device?: ServerDevice | null;
-  open: boolean;
   defaultBrand?: DeviceBrand;
   onSuccess: () => void;
   /** Admin akışı: cihazı aktif proje yerine seçilen projeye yazar. */
@@ -22,37 +21,28 @@ interface UseDeviceFormLogicProps {
   adminMode?: boolean;
 }
 
-export function useDeviceFormLogic({ device, open, defaultBrand, onSuccess, projectIdOverride, adminMode }: UseDeviceFormLogicProps) {
+export function useDeviceFormLogic({ device, defaultBrand, onSuccess, projectIdOverride, adminMode }: UseDeviceFormLogicProps) {
   const { user } = useAuthState();
   const { projectId } = useActiveProject();
   const { zones, doors, loading: locationLoading } = useZonesAndDoors();
 
   const currentProjectId = projectIdOverride ?? projectId ?? null;
 
-  const schema = useMemo(() => makeFormSchema(!!adminMode), [adminMode]);
+  const schema = useMemo(() => makeFormSchema(!!adminMode, !!device), [adminMode, device]);
+
+  // "Yeni Cihaz" ve "Düzenle" TEK form; tek fark verinin dolu gelmesidir. react-hook-form'un
+  // `values` API'si device değişince formu deterministik senkronlar — eski reset-in-useEffect
+  // yaklaşımındaki mount/brand yarışı (Select'lerin boş gelmesi) burada hiç oluşmaz. device
+  // referansı handleEditDevice anında sabitlenir (devicePanel state), bu yüzden useMemo edit
+  // boyunca stabildir ve kullanıcının girdiği değerleri ezmez.
+  const values = useMemo(
+    () => buildDeviceFormValues(device, defaultBrand),
+    [device, defaultBrand],
+  );
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: {
-      brand: defaultBrand ?? "other",
-      name: "",
-      device_serial: "",
-      device_type: "Kart Okuyucu",
-      zone_id: undefined,
-      door_id: undefined,
-      access_direction: "both",
-      status: "active",
-      device_username: "",
-      device_password: "",
-      description: "",
-      ehome_id: "",
-      ehome_key: "",
-      hik_transport: "gateway",
-      // IDE Smart paneli ön-tanımlı kimliği (MQTT login token'ı için). Kullanıcı
-      // değiştirebilir; diğer marka cihazlarda bu alanlar yok sayılır.
-      ide_user: "admin",
-      ide_password: "admin12345",
-    },
+    values,
   });
 
   // Watch zone selection for filtering doors
@@ -60,9 +50,6 @@ export function useDeviceFormLogic({ device, open, defaultBrand, onSuccess, proj
   // eslint-disable-next-line react-hooks/incompatible-library
   const selectedZoneId = form.watch("zone_id");
   const filteredDoors = doors.filter((door) => String(door.zoneId) === String(selectedZoneId));
-
-  // Load device data when dialog opens
-  useDeviceDataLoader({ device, open, defaultBrand, form });
 
   // Handle form submission
   const { onSubmit, isLoading } = useDeviceFormSubmission({

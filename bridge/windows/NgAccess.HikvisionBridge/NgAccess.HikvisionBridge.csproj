@@ -22,5 +22,8 @@
     <Content Include="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Scripts\*.ps1" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="hikvision-sdk\win-x64\**\*.*" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Gömülü ngsplus arayüzü: `npm run build` → dist → wwwroot (scripts/copy-bridge-web.mjs).
+         Yoksa publish yine çalışır; "/" kökü "arayüz paketlenmemiş" uyarısı döner. -->
+    <Content Include="wwwroot\**\*.*" CopyToOutputDirectory="PreserveNewest" Condition="Exists('wwwroot')" />
   </ItemGroup>
 </Project>

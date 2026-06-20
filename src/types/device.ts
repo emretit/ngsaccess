@@ -16,6 +16,7 @@ export interface Device {
   isActive?: boolean;
   zoneId?: Id<"zones">;
   doorId?: Id<"doors">;
+  doorCount?: number;
   projectId?: Id<"projects">;
   lastSeen?: string;
   deviceUsername?: string;
@@ -64,6 +65,7 @@ export interface ServerDevice {
   isActive?: boolean;
   zoneId?: Id<"zones">;
   doorId?: Id<"doors">;
+  doorCount?: number;
   projectId?: Id<"projects">;
   lastSeen?: string;
   deviceUsername?: string;

@@ -21,6 +21,8 @@ const hikOperationValidator = v.union(
   v.literal("syncHoliday"),
   v.literal("syncDoorParam"),
   v.literal("openDoor"),
+  v.literal("syncDoorStatusPlan"),
+  v.literal("syncVerifyPlan"),
 );
 
 /**
@@ -371,6 +373,8 @@ export const recordSyncFailure = internalMutation({
       v.literal("syncHoliday"),
       v.literal("syncDoorParam"),
       v.literal("openDoor"),
+      v.literal("syncDoorStatusPlan"),
+      v.literal("syncVerifyPlan"),
     ),
     lastError: v.string(),
     payload: v.optional(v.any()),
@@ -786,6 +790,8 @@ export const resolveTargetFailures = internalMutation({
         v.literal("syncHoliday"),
         v.literal("syncDoorParam"),
         v.literal("openDoor"),
+        v.literal("syncDoorStatusPlan"),
+        v.literal("syncVerifyPlan"),
       ),
     ),
     employeeId: v.optional(v.id("employees")),

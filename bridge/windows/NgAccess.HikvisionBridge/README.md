@@ -1,12 +1,36 @@
 # NGS Access Hikvision Windows Bridge
 
-Windows service/console bridge for DS-K2804 panels that expose Hikvision SDK port `8000` without HTTP/ISAPI port.
+Windows service/console bridge for DS-K2804 panels that expose the Hikvision SDK port
+`8000` without an HTTP/ISAPI port. The bridge polls a **roster** from cloud Convex
+(panels + pending operations), applies them over the LAN SDK, acks results, and relays
+card events to `POST /card-reader`. Operators manage everything from the ngsplus web UI.
+
+**Tek-yer (roster) modeli:** panel IP / password / device-token are **not** entered in
+the bridge. They live in ngsplus (the device form, `hikTransport=localBridge`) and reach
+the bridge automatically via the roster, authenticated by a single **Bridge Token**. The
+bridge only stores the Convex site URL + bridge token locally (`bridge.json`).
 
 ## Build
 
-Run on a Windows x64 machine with .NET 8 SDK:
+Two parts: the embedded ngsplus web UI (Vite) and the .NET bridge. The one-shot script
+from the **repo root** does all of it:
 
-```powershell
+```bash
+npm run build:hikvision-windows-bridge
+```
+
+That runs `vite build` → `node scripts/copy-bridge-web.mjs` (dist → `wwwroot/`) →
+`dotnet publish`. The Vite build must use the production Convex URL (`VITE_CONVEX_URL`),
+since the embedded app talks to cloud Convex, not a local backend.
+
+To run the parts manually:
+
+```bash
+# 1) Embedded ngsplus UI → wwwroot/  (from repo root)
+npm run build
+node scripts/copy-bridge-web.mjs
+
+# 2) .NET bridge (Windows x64, .NET 8 SDK) — from this folder
 dotnet publish .\NgAccess.HikvisionBridge.csproj -c Release -r win-x64 --self-contained true
 ```
 
@@ -16,7 +40,8 @@ Output is under:
 bin\Release\net8.0-windows\win-x64\publish\
 ```
 
-Copy Hikvision Windows x64 SDK runtime DLLs into:
+The publish output includes `wwwroot/` (when built in step 1) so `/` serves the full
+ngsplus UI. Copy the Hikvision Windows x64 SDK runtime DLLs into:
 
 ```text
 publish\hikvision-sdk\win-x64\
@@ -57,8 +82,7 @@ canonical method — so no separate (header-only) delete command is required.
 
 ## Configure
 
-`appsettings.json` holds only install-level settings — panels are NOT configured here.
-Panels (IP / password / device token) live in `panels.json`, managed from the local UI.
+`appsettings.json` holds only install-level defaults — **no panels here**:
 
 ```json
 {
@@ -67,42 +91,41 @@ Panels (IP / password / device token) live in `panels.json`, managed from the lo
     "ConvexSiteUrl": "https://notable-tern-4.convex.site",
     "PollIntervalSeconds": 3,
     "PollMaxOperations": 10,
-    "ConfigFile": "panels.json"
+    "BridgeToken": "",
+    "ConfigFile": "bridge.json"
   },
   "LocalApi": { "Enabled": true, "Url": "http://127.0.0.1:8787" }
 }
 ```
 
-## Run & Add Panels (local UI)
+At runtime the bridge writes the Convex URL + bridge token to `bridge.json` next to the
+exe (set from `/__bridge`). Do **not** commit `bridge.json`.
 
-One bridge service manages all of a site's panels. Start in console:
+## Run
+
+The local server at `http://127.0.0.1:8787` serves two surfaces:
+
+```text
+http://127.0.0.1:8787/          → ngsplus UI (embedded SPA from wwwroot/, talks to cloud Convex)
+http://127.0.0.1:8787/__bridge  → bridge config (Convex URL + Bridge Token + panel status)
+```
+
+First-time setup:
+
+1. Open `/__bridge`, paste the **Convex Site URL** and the **Bridge Token**
+   (ngsplus → Ayarlar → Bridge), then **Kaydet**.
+2. Add panels in **ngsplus** (device form, `hikTransport=localBridge`): name, host/IP,
+   port 8000, username, password, door count, device token. The bridge pulls them via the
+   roster — nothing is added in `/__bridge`.
+3. Open `/` for the full ngsplus UI. The `/__bridge` panel table shows each roster panel's
+   connection state, last poll and last event; use **Test** to verify login and **Kapı**
+   to pulse door 1.
+
+Console mode (auto-opens the browser at `/`):
 
 ```powershell
 .\Scripts\run-console.ps1
 ```
-
-In console mode the bridge auto-opens the browser. The local server at
-`http://127.0.0.1:8787` serves two surfaces:
-
-```text
-http://127.0.0.1:8787/          → ngsplus UI (embedded SPA, talks to cloud Convex)
-http://127.0.0.1:8787/__bridge  → bridge panel config (add/remove/test panels)
-```
-
-The embedded ngsplus is served from `wwwroot/` next to the exe (the packaged
-`npm run build` output). It needs internet — it connects to the cloud Convex
-deployment, not a local backend.
-
-Open `/__bridge` to manage panels. For each panel add a row with: name, host/IP,
-port (8000), username, **password**
-(panel admin password — kept locally in `panels.json`, never sent to the cloud), the
-**device token** (copied from that device's token card in ngsplus), and door count.
-Use **Test** to verify login and **Kapı** to pulse door 1; the status column shows
-connected / last poll / last event. The bridge polls Convex per panel and applies
-operations automatically.
-
-`panels.json` is created next to the exe and holds panel IPs / passwords / tokens
-locally — do not commit it.
 
 ## Install As Service
 

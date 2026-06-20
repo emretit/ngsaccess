@@ -6,6 +6,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
+import { deleteReadersForDoor } from "./readers";
 
 type ReaderDirection = "entry" | "exit" | "both";
 
@@ -103,6 +104,26 @@ export const create = authedMutation({
     status: v.optional(v.string()),
     ioId: v.optional(v.number()),
     requireSensor: v.optional(v.boolean()),
+    readerDirection: v.optional(
+      v.union(v.literal("entry"), v.literal("exit"), v.literal("both"))
+    ),
+    hikDoorNo: v.optional(v.number()),
+    hikDoorStatusPlan: v.optional(
+      v.object({
+        enabled: v.boolean(),
+        beginTime: v.string(),
+        endTime: v.string(),
+        mode: v.union(v.literal("remainOpen"), v.literal("normal")),
+      })
+    ),
+    hikVerifyPlan: v.optional(
+      v.object({
+        enabled: v.boolean(),
+        beginTime: v.string(),
+        endTime: v.string(),
+        verifyMode: v.string(),
+      })
+    ),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -127,6 +148,28 @@ export const create = authedMutation({
       createdAt: now,
       updatedAt: now,
     });
+    // Her kapı en az bir okuyucuyla doğar (kapı↔okuyucu ayrı tablo). Yön: verilen
+    // readerDirection veya ioId'den türetilir. Böylece readerStatus legacy fallback'e
+    // düşmeden çoklu-okuyucu modeliyle tutarlı olur.
+    const readerDirection = args.readerDirection ?? directionFromIo(args.ioId);
+    await ctx.db.insert("readers", {
+      doorId,
+      deviceId: args.deviceId,
+      projectId: args.projectId,
+      zoneId: args.zoneId,
+      name: args.name,
+      direction: readerDirection,
+      hikReaderNo:
+        args.hikDoorNo != null
+          ? readerDirection === "exit"
+            ? args.hikDoorNo * 2
+            : args.hikDoorNo * 2 - 1
+          : undefined,
+      ioId: args.ioId,
+      status: "active",
+      createdAt: now,
+      updatedAt: now,
+    });
     if (args.requireSensor !== undefined) {
       await scheduleSensorSync(ctx, args.deviceId, args.ioId, args.requireSensor);
     }
@@ -148,6 +191,23 @@ export const update = authedMutation({
     readerName: v.optional(v.string()),
     readerDirection: v.optional(
       v.union(v.literal("entry"), v.literal("exit"), v.literal("both"))
+    ),
+    hikDoorNo: v.optional(v.number()),
+    hikDoorStatusPlan: v.optional(
+      v.object({
+        enabled: v.boolean(),
+        beginTime: v.string(),
+        endTime: v.string(),
+        mode: v.union(v.literal("remainOpen"), v.literal("normal")),
+      })
+    ),
+    hikVerifyPlan: v.optional(
+      v.object({
+        enabled: v.boolean(),
+        beginTime: v.string(),
+        endTime: v.string(),
+        verifyMode: v.string(),
+      })
     ),
   },
   handler: async (ctx, args) => {
@@ -200,6 +260,8 @@ export const remove = authedMutation({
         );
       }
     }
+    // Önce kapının okuyucularını sil (cascade) — orphan reader sızıntısı engeli.
+    await deleteReadersForDoor(ctx, args.doorId);
     await ctx.db.delete(args.doorId);
   },
 });
@@ -277,8 +339,12 @@ export const readerStatus = authedQuery({
     const within = (iso: string | null | undefined): boolean =>
       iso ? now - new Date(iso).getTime() < ONLINE_WINDOW_MS : false;
 
-    // 3) Her kapı için okuyucu tanımı + son okuma + çevrimiçi bayrağı
-    return await Promise.all(
+    // 3) Her kapı için son okuma + çevrimiçi bayrağını BİR KEZ hesapla, okuyuculara paylaştır.
+    //    Okuyucu satırı varsa kapı başına N satır döner (giriş/çıkış); yoksa legacy alanlardan
+    //    tek sentetik satır (readerId: null) — migrasyon öncesi kapılar bugünküyle aynı görünür.
+    //    Hik event'i hangi okuyucudan geldiğini bildirmediğinden bir kapının okuyucuları aynı
+    //    son-okumayı paylaşır (izin kapı bazlı).
+    const perDoor = await Promise.all(
       doors.map(async (door) => {
         const panel = door.deviceId
           ? panelById.get(String(door.deviceId)) ?? null
@@ -309,10 +375,8 @@ export const readerStatus = authedQuery({
           }
         }
 
-        return {
+        const base = {
           doorId: door._id,
-          readerName: door.readerName ?? door.name,
-          readerDirection: door.readerDirection ?? directionFromIo(door.ioId),
           lastReadAt: last?.accessTime ?? null,
           lastCardNo: last?.cardNo ?? null,
           lastEmployeeName: last?.employeeName ?? null,
@@ -320,8 +384,32 @@ export const readerStatus = authedQuery({
           lastDirection: last?.direction ?? null,
           online: within(last?.accessTime) || within(panel?.lastSeen),
         };
+
+        const doorReaders = await ctx.db
+          .query("readers")
+          .withIndex("by_door", (q) => q.eq("doorId", door._id))
+          .collect();
+
+        if (doorReaders.length === 0) {
+          // Legacy fallback: kapıda okuyucu satırı yok → kapı alanlarından tek satır.
+          return [
+            {
+              readerId: null as Id<"readers"> | null,
+              readerName: door.readerName ?? door.name,
+              readerDirection: door.readerDirection ?? directionFromIo(door.ioId),
+              ...base,
+            },
+          ];
+        }
+        return doorReaders.map((r) => ({
+          readerId: r._id as Id<"readers"> | null,
+          readerName: r.name,
+          readerDirection: r.direction,
+          ...base,
+        }));
       })
     );
+    return perDoor.flat();
   },
 });
 

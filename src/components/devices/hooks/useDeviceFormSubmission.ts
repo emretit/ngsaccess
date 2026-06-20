@@ -5,6 +5,11 @@ import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { FormValues } from "./useDeviceFormSchema";
 import { NEW_ZONE_VALUE } from "../form-sections/DeviceZoneSection";
+import {
+  MANUAL_MODEL_ID,
+  getHikModelSpec,
+  resolveHikModelSpec,
+} from "../../../../convex/lib/hikModels";
 
 // localBridge SDK varsayılanları (backend hikBridge.ts ile aynı). Sayısal alan boş
 // bırakılınca undefined yerine default gönderilir: update handler undefined'ı skip
@@ -33,6 +38,7 @@ export function useDeviceFormSubmission({
   const updateDevice = useMutation(api.devices.update);
   const registerOnGateway = useAction(api.actions.hikGatewayDevice.registerDeviceOnGateway);
   const createIdePanel = useMutation(api.devices.createIdePanel);
+  const createHikDevice = useMutation(api.devices.createHikDevice);
 
   const onSubmit = async (values: FormValues) => {
     setIsLoading(true);
@@ -74,6 +80,62 @@ export function useDeviceFormSubmission({
         onSuccess();
         return;
       }
+      // Hikvision yeni cihaz (admin değil): cihaz + kapılar (hikDoorNo 1..N) + okuyucular
+      // model seçiminden tek mutation'da üretilir. Gateway ise ardından otomatik kaydolur.
+      if (values.brand === "hikvision" && !device?._id && !adminMode) {
+        const spec = resolveHikModelSpec(values.hik_model, values.hik_door_count);
+        const modelSpec = getHikModelSpec(values.hik_model);
+        const isLocalBridge = values.hik_transport === "localBridge";
+        const pickedZone =
+          values.zone_id && values.zone_id !== NEW_ZONE_VALUE
+            ? (values.zone_id as Id<"zones">)
+            : undefined;
+        const { deviceId: newId } = await createHikDevice({
+          name: values.name,
+          projectId: currentProjectId ?? undefined,
+          zoneId: pickedZone,
+          deviceType: values.device_type,
+          hikTransport: values.hik_transport,
+          // "Diğer (manuel)" gerçek bir model değil → hikModel boş bırakılır.
+          hikModel:
+            values.hik_model && values.hik_model !== MANUAL_MODEL_ID
+              ? values.hik_model
+              : undefined,
+          hikFamily: modelSpec?.family,
+          doorCount: spec.doorCount,
+          readersPerDoor: spec.defaultReadersPerDoor,
+          deviceIp: values.device_ip || undefined,
+          deviceSerial: values.device_serial || undefined,
+          deviceUsername: values.device_username || undefined,
+          devicePassword: values.device_password || undefined,
+          ehomeID: isLocalBridge ? undefined : values.ehome_id?.trim() || undefined,
+          ehomeKey: isLocalBridge ? undefined : values.ehome_key?.trim() || undefined,
+          hikPort: isLocalBridge ? values.hik_port || HIK_DEFAULT_PORT : undefined,
+          accessDirection: values.access_direction as "entry" | "exit" | "both",
+          status: values.status,
+          description: values.description || undefined,
+        });
+        toast({ title: "Başarılı", description: "Cihaz, kapılar ve okuyucular oluşturuldu" });
+
+        // Gateway transport + ehome dolu → otomatik gateway registration.
+        if (!isLocalBridge && values.ehome_id?.trim()) {
+          const reg = await registerOnGateway({ deviceId: newId });
+          if (reg.ok) {
+            toast({
+              title: "Gateway",
+              description: `Gateway'e kaydedildi: ${reg.devIndex?.slice(0, 8)}…`,
+            });
+          } else {
+            toast({
+              title: "Gateway kaydı başarısız",
+              description: reg.error ?? "Bilinmeyen hata",
+              variant: "destructive",
+            });
+          }
+        }
+        onSuccess();
+        return;
+      }
       // localBridge ↔ gateway geçişinde RHF gizli alanları temizlemediği için transport'a
       // göre yalnız ilgili alanları gönder: aksi halde localBridge kaydında eski ehome metni
       // hem yazılır hem de aşağıdaki otomatik gateway kaydını tetikler (gateway'de de
@@ -84,6 +146,11 @@ export function useDeviceFormSubmission({
         values.brand === "hikvision"
           ? {
               hikTransport: values.hik_transport,
+              // Model etiketi düzenlemede kalıcı (kapı/okuyucu yeniden üretilmez). "manuel" → boş.
+              hikModel:
+                values.hik_model && values.hik_model !== MANUAL_MODEL_ID
+                  ? values.hik_model
+                  : undefined,
               ehomeID: isHikLocalBridge ? undefined : values.ehome_id?.trim() || undefined,
               ehomeKey: isHikLocalBridge ? undefined : values.ehome_key?.trim() || undefined,
               hikDoorCount: isHikLocalBridge
@@ -131,6 +198,7 @@ export function useDeviceFormSubmission({
                 deviceType: values.device_type,
                 zoneId: (values.zone_id || undefined) as Id<"zones"> | undefined,
                 doorId: (values.door_id || undefined) as Id<"doors"> | undefined,
+                doorCount: values.door_count || undefined,
                 accessDirection: values.access_direction as "entry" | "exit" | "both",
                 description: values.description || undefined,
                 status: values.status,
@@ -159,6 +227,7 @@ export function useDeviceFormSubmission({
                 projectId: currentProjectId ?? undefined,
                 zoneId: (values.zone_id || undefined) as Id<"zones"> | undefined,
                 doorId: (values.door_id || undefined) as Id<"doors"> | undefined,
+                doorCount: values.door_count || undefined,
                 accessDirection: values.access_direction as "entry" | "exit" | "both",
                 deviceIp: values.device_ip || undefined,
                 deviceUsername: values.device_username || undefined,

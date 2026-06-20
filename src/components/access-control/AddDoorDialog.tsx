@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -20,7 +21,7 @@ interface AddDoorDialogProps {
 export function AddDoorDialog({ open, onOpenChange, onSuccess, zoneId, zoneName }: AddDoorDialogProps) {
   const [name, setName] = useState("");
   const [doorCode, setDoorCode] = useState("");
-  const [location, setLocation] = useState("");
+  const [readerDirection, setReaderDirection] = useState<"entry" | "exit" | "both">("both");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const { projectId } = useActiveProject();
@@ -37,7 +38,7 @@ export function AddDoorDialog({ open, onOpenChange, onSuccess, zoneId, zoneName 
       await createDoor({
         name: name.trim(),
         doorCode: doorCode.trim() || undefined,
-        location: location.trim() || undefined,
+        readerDirection,
         zoneId,
         projectId,
         status: "active",
@@ -45,7 +46,7 @@ export function AddDoorDialog({ open, onOpenChange, onSuccess, zoneId, zoneName 
       toast({ title: "Başarılı", description: `${zoneName} bölgesine kapı başarıyla eklendi.` });
       setName("");
       setDoorCode("");
-      setLocation("");
+      setReaderDirection("both");
       onSuccess();
       onOpenChange(false);
     } catch (error: unknown) {
@@ -60,6 +61,7 @@ export function AddDoorDialog({ open, onOpenChange, onSuccess, zoneId, zoneName 
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{zoneName} - Yeni Kapı Ekle</DialogTitle>
+          <DialogDescription>Bu bölgeye yeni bir kapı tanımlayın.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
@@ -72,8 +74,17 @@ export function AddDoorDialog({ open, onOpenChange, onSuccess, zoneId, zoneName 
               <Input id="doorCode" value={doorCode} onChange={(e) => setDoorCode(e.target.value)} className="col-span-3" placeholder="Kapı kodu (opsiyonel)" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="location" className="text-right">Konum</Label>
-              <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} className="col-span-3" placeholder="Kapı konumu (opsiyonel)" />
+              <Label htmlFor="readerDirection" className="text-right">Erişim Yönü</Label>
+              <Select value={readerDirection} onValueChange={(v) => setReaderDirection(v as "entry" | "exit" | "both")}>
+                <SelectTrigger id="readerDirection" className="col-span-3">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="entry">Giriş</SelectItem>
+                  <SelectItem value="exit">Çıkış</SelectItem>
+                  <SelectItem value="both">Giriş/Çıkış</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

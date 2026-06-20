@@ -52,12 +52,20 @@ public sealed class BridgeWorker : BackgroundService
       _ = OpenBrowserWhenReadyAsync(stoppingToken);
     }
 
-    var interval = TimeSpan.FromSeconds(Math.Max(1, _bridgeOptions.PollIntervalSeconds));
+    // Adaptive backoff: boşta (op/cihaz değişikliği yok) aralık 2x büyür, tavanda durur;
+    // aktivite olunca anında tabana döner. Boş roster çağrılarını (function-call maliyeti) seyreltir.
+    var minInterval = TimeSpan.FromSeconds(Math.Max(1, _bridgeOptions.PollIntervalSeconds));
+    var maxInterval = TimeSpan.FromSeconds(
+      Math.Max(_bridgeOptions.PollIntervalSeconds, _bridgeOptions.PollMaxIntervalSeconds));
+    var interval = minInterval;
     while (!stoppingToken.IsCancellationRequested)
     {
       try
       {
-        await _manager.PollRosterAsync(stoppingToken);
+        var active = await _manager.PollRosterAsync(stoppingToken);
+        interval = active
+          ? minInterval
+          : TimeSpan.FromTicks(Math.Min(interval.Ticks * 2, maxInterval.Ticks));
       }
       catch (OperationCanceledException)
       {
@@ -66,6 +74,8 @@ public sealed class BridgeWorker : BackgroundService
       catch (Exception ex)
       {
         _logger.LogWarning(ex, "Roster poll hatası");
+        // Hatada da yavaşla — sürekli başarısız çağrı yakma.
+        interval = TimeSpan.FromTicks(Math.Min(interval.Ticks * 2, maxInterval.Ticks));
       }
       try { await Task.Delay(interval, stoppingToken); }
       catch (OperationCanceledException) { break; }

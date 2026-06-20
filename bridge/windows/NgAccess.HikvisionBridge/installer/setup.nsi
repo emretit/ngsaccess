@@ -57,6 +57,7 @@ Section "Install"
 
   ; Baslat menusu kisayollari
   CreateDirectory "$SMPROGRAMS\${APPNAME}"
+  WriteINIStr "$SMPROGRAMS\${APPNAME}\NGS Access (arayuz).url" "InternetShortcut" "URL" "http://127.0.0.1:8787/"
   WriteINIStr "$SMPROGRAMS\${APPNAME}\Bridge Ayarlari.url" "InternetShortcut" "URL" "http://127.0.0.1:8787/__bridge"
   WriteUninstaller "$INSTDIR\uninstall.exe"
   CreateShortcut "$SMPROGRAMS\${APPNAME}\Kaldir.lnk" "$INSTDIR\uninstall.exe"

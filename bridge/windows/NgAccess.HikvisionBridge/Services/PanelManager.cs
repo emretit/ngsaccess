@@ -67,8 +67,10 @@ public sealed class PanelManager : IAsyncDisposable
     }
   }
 
-  /// <summary>Bir poll turu: roster çek → worker'ları uzlaştır → işleri uygula + ack.</summary>
-  public async Task PollRosterAsync(CancellationToken ct)
+  /// <summary>Bir poll turu: roster çek → worker'ları uzlaştır → işleri uygula + ack.
+  /// Dönüş: bu turda "aktivite" oldu mu (op işlendi veya cihaz listesi değişti) — caller
+  /// adaptive backoff için kullanır (aktivite → hızlı moda dön, boş → yavaşla).</summary>
+  public async Task<bool> PollRosterAsync(CancellationToken ct)
   {
     // Worker yaşam döngüsünün tek sahibi bu thread: Configure() reset istediyse eski
     // worker'ları burada (await ile) durdur — fire-and-forget cross-thread dispose yok.
@@ -89,18 +91,19 @@ public sealed class PanelManager : IAsyncDisposable
     if (convex is null || !convex.HasToken)
     {
       _lastRosterError = "bridge token girilmemiş";
-      return;
+      return false;
     }
 
     var roster = await convex.RosterAsync(ct);
     if (!roster.Ok)
     {
       _lastRosterError = roster.Error;
-      return;
+      return false;
     }
     _lastRosterError = null;
 
-    foreach (var w in Reconcile(roster.Devices)) await w.DisposeAsync();
+    var (toStop, devicesChanged) = Reconcile(roster.Devices);
+    foreach (var w in toStop) await w.DisposeAsync();
 
     foreach (var op in roster.Operations)
     {
@@ -124,11 +127,15 @@ public sealed class PanelManager : IAsyncDisposable
       }
       await convex.AckAsync(op.OpId, result.Ok, result.Error, ct);
     }
+
+    // Op işlendiyse veya cihaz listesi değiştiyse "aktivite" → backoff tabana döner.
+    return roster.Operations.Count > 0 || devicesChanged;
   }
 
   /// <summary>Roster cihaz listesine göre worker'ları uzlaştır. Durdurulacak worker listesini
-  /// döner — çağıran await ile dispose eder (tek-sahip thread).</summary>
-  private List<PanelWorker> Reconcile(List<RosterDevice> rosterDevices)
+  /// döner — çağıran await ile dispose eder (tek-sahip thread). İkinci eleman: bu turda worker
+  /// eklendi/çıkarıldı mı (cihaz listesi değişikliği) — caller backoff sıfırlama için kullanır.</summary>
+  private (List<PanelWorker> ToStop, bool Changed) Reconcile(List<RosterDevice> rosterDevices)
   {
     List<PanelWorker> toStop = [];
     lock (_lock)
@@ -158,16 +165,18 @@ public sealed class PanelManager : IAsyncDisposable
       }
 
       // Yeni (veya yeniden kurulacak) worker'ları başlat.
+      var added = 0;
       foreach (var (id, panel) in desired)
       {
         if (_workers.ContainsKey(id)) continue;
         var worker = CreateWorker(panel);
         _workers[id] = (panel, worker);
         worker.Start();
+        added++;
         _logger.LogInformation("Panel worker started: {Name} ({Host})", panel.Name, panel.Host);
       }
+      return (toStop, toStop.Count > 0 || added > 0);
     }
-    return toStop;
   }
 
   private PanelWorker CreateWorker(PanelConfig panel)

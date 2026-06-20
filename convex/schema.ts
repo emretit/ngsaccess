@@ -200,6 +200,27 @@ export default defineSchema({
     readerDirection: v.optional(
       v.union(v.literal("entry"), v.literal("exit"), v.literal("both"))
     ),
+    // Hikvision fiziksel kapı numarası (1..N). IDE Smart'ta boş (ioId kullanılır).
+    // openDoor/setDoorParam ile tutarlı; boşsa 1 default.
+    hikDoorNo: v.optional(v.number()),
+    // Kapı durum planı (DoorStatusPlan) — mesai saatinde kapıyı otomatik açık/kapalı tutar.
+    hikDoorStatusPlan: v.optional(
+      v.object({
+        enabled: v.boolean(),
+        beginTime: v.string(), // "HH:MM:SS"
+        endTime: v.string(),   // "HH:MM:SS"
+        mode: v.union(v.literal("remainOpen"), v.literal("normal")),
+      })
+    ),
+    // Doğrulama planı (VerifyWeekPlan) — saate göre doğrulama modunu değiştirir.
+    hikVerifyPlan: v.optional(
+      v.object({
+        enabled: v.boolean(),
+        beginTime: v.string(), // "HH:MM:SS"
+        endTime: v.string(),   // "HH:MM:SS"
+        verifyMode: v.string(), // "cardOrFace", "card", vb.
+      })
+    ),
     createdAt: v.optional(v.string()),
     updatedAt: v.optional(v.string()),
   })
@@ -207,11 +228,44 @@ export default defineSchema({
     .index("by_zone", ["zoneId"])
     .index("by_device", ["deviceId"]),
 
+  /**
+   * Okuyucu (kart/yüz tarama yüzü) — kapıyla N:1. Bir kapı 1..2 okuyucu taşır
+   * (giriş + çıkış). Önceden okuyucu doors.readerName/readerDirection ile 1:1
+   * modelleniyordu; o alanlar legacy fallback olarak korunur, yeni kayıtlar bu
+   * tabloya yazılır. İzin modeli kapı bazlı kalır — okuyucular panele gönderilmez
+   * (Hik event'i okuyucu no taşımaz; hikReaderNo şimdilik görsel/ileriye dönük).
+   */
+  readers: defineTable({
+    // Sahip kapı (zorunlu). Cascade: kapı silinince okuyucuları da silinir.
+    doorId: v.id("doors"),
+    // door.deviceId denormalize — by_device sorgusu + readerStatus RBAC için.
+    deviceId: v.optional(v.id("devices")),
+    projectId: v.optional(v.id("projects")),
+    zoneId: v.optional(v.id("zones")),
+    name: v.string(),
+    direction: v.union(v.literal("entry"), v.literal("exit"), v.literal("both")),
+    // Hikvision fiziksel okuyucu index'i — kapı N için entry=2N-1, exit=2N.
+    // Şu an sadece görsel/ileriye dönük; izin kapı bazlı olduğundan panele yazılmaz.
+    hikReaderNo: v.optional(v.number()),
+    // IDE Smart aktüatör index'i (door.ioId ile eşlenir) — son okuma çözümünde kullanılır.
+    ioId: v.optional(v.number()),
+    status: v.optional(v.string()), // "active" | "inactive"
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_door", ["doorId"])
+    .index("by_device", ["deviceId"])
+    .index("by_project", ["projectId"])
+    .index("by_zone", ["zoneId"]),
+
   devices: defineTable({
     name: v.string(),
     projectId: v.optional(v.id("projects")),
     zoneId: v.optional(v.id("zones")),
     doorId: v.optional(v.id("doors")),
+    // Cihazın kontrol ettiği genel kapı/röle sayısı (marka bağımsız, 1–8). Formda
+    // kapı seçimi yerine bu sayı girilir; kapılar ayrıca bölge altında yönetilir.
+    doorCount: v.optional(v.number()),
     deviceType: v.optional(v.string()),
     deviceIp: v.optional(v.string()),
     deviceSerial: v.optional(v.string()),
@@ -256,6 +310,22 @@ export default defineSchema({
     // localBridge: panelin SDK portu (default 8000). Panel kullanıcı/şifresi
     // deviceUsername/devicePassword alanlarında tutulur (tek-yer yönetim modeli).
     hikPort: v.optional(v.number()),
+    hikLastRebootAt: v.optional(v.number()),
+    // AcsEvent backfill: son işlenen event'in serialNo'su (canlı hikLastSerialNo'yu kirletmez).
+    hikBackfillCursor: v.optional(v.number()),
+    // AcsEvent backfill: son başarılı run'ın epoch ms zamanı.
+    hikLastBackfillAt: v.optional(v.number()),
+    hikWorkStatus: v.optional(
+      v.object({
+        updatedAt: v.number(),
+        doorStatus: v.optional(v.array(v.number())),
+        magneticStatus: v.optional(v.array(v.number())),
+        cardReaderOnlineStatus: v.optional(v.array(v.number())),
+        batteryVoltage: v.optional(v.number()),
+        powerSupplyStatus: v.optional(v.string()),
+        raw: v.optional(v.string()),
+      })
+    ),
     apiToken: v.optional(v.string()),
     apiTokenCreatedAt: v.optional(v.string()),
     // adminDevices geri bağlantısı — claim ile oluşturulur, release ile temizlenir.
@@ -385,7 +455,8 @@ export default defineSchema({
     .index("by_employee", ["employeeId"])
     .index("by_access_time", ["accessTime"])
     .index("by_employee_device_time", ["employeeId", "deviceId", "accessTime"])
-    .index("by_device_io_time", ["deviceId", "ideIoId", "accessTime"]),
+    .index("by_device_io_time", ["deviceId", "ideIoId", "accessTime"])
+    .index("by_device_hik_serial", ["deviceId", "hikSerialNo"]),
 
   // Cihaz offline iken biriken Convex -> cihaz komutları kuyruğu.
   // Gateway cihazlarda worker failed kayıtları retry eder; localBridge cihazlarda
@@ -407,6 +478,9 @@ export default defineSchema({
       v.literal("syncHoliday"),
       v.literal("syncDoorParam"),
       v.literal("openDoor"),
+      v.literal("rebootDevice"),
+      v.literal("syncDoorStatusPlan"),
+      v.literal("syncVerifyPlan"),
       // NOT: IDE Smart komutları Faz 1'de anlık (action) çalışır, kuyruğa girmez.
       // Faz 2'de offline retry kuyruğu eklenecekse buraya ide* op literal'leri +
       // worker case'leri + recordSyncFailure union'ı birlikte eklenmeli.

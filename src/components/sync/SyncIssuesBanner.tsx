@@ -29,6 +29,9 @@ const HIK_OPERATION_LABELS: Record<HikOperation, string> = {
   syncHoliday: "Tatil planı",
   syncDoorParam: "Kapı parametresi",
   openDoor: "Kapı açma",
+  rebootDevice: "Cihaz yeniden başlatma",
+  syncDoorStatusPlan: "Kapı durum planı",
+  syncVerifyPlan: "Doğrulama planı",
 };
 
 const IDE_OP_LABELS: Record<IdeOpType, string> = {

@@ -40,6 +40,13 @@ export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess }:
     }
   }, [open, selectedDevice]);
 
+  // Edit'te brand'i async pickedBrand state'ini beklemeden DOĞRUDAN cihazdan al. Aksi halde
+  // form ilk render'da "other" layout'uyla kurulup pickedBrand "hikvision"a geçince layout
+  // yeniden kuruluyor; bu yarış anında çağrılan form.reset değerleri Select'lere (Cihaz Tipi,
+  // Kapı Sayısı, İletişim Yöntemi) yapışmadan kayboluyordu. Yeni cihazda picker'ın seçtiği
+  // pickedBrand kullanılır.
+  const brandForForm: DeviceBrand = selectedDevice?.brand ?? pickedBrand;
+
   const handleBrandSelect = (brand: DeviceBrand) => {
     setPickedBrand(brand);
     setStep("form");
@@ -55,7 +62,7 @@ export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess }:
                 ? "Cihazı Düzenle"
                 : step === "picker"
                   ? "Yeni Cihaz"
-                  : `Yeni Cihaz — ${BRAND_LABELS[pickedBrand]}`}
+                  : `Yeni Cihaz — ${BRAND_LABELS[brandForForm]}`}
             </SheetTitle>
           </SheetHeader>
         </div>
@@ -75,10 +82,11 @@ export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess }:
               ) : (
                 <>
                   <DeviceForm
+                    key={selectedDevice?._id ?? "new"}
                     open={open}
                     device={selectedDevice}
                     projects={projects}
-                    defaultBrand={pickedBrand}
+                    defaultBrand={brandForForm}
                     onBack={selectedDevice ? undefined : () => setStep("picker")}
                     onSuccess={onSuccess}
                     onClose={onClose}

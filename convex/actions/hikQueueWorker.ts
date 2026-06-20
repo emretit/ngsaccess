@@ -1,8 +1,9 @@
 "use node";
 
-import { internalAction } from "../_generated/server";
+import { internalAction, type ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { FunctionReturnType } from "convex/server";
+import type { Id } from "../_generated/dataModel";
 import {
   upsertPersonToDevice,
   addCardToDevice,
@@ -11,9 +12,17 @@ import {
   deleteFaceFromDevice,
   addFingerprintToDevice,
   deleteFingerprintFromDevice,
+  rebootDeviceOnGateway,
   setWeekPlanOnDevice,
   setDoorParam,
   openDoor,
+  linkDoorStatusPlan,
+  linkVerifyPlan,
+  setDoorStatusPlanTemplate,
+  setDoorStatusWeekPlan,
+  setVerifyPlanTemplate,
+  setVerifyWeekPlan,
+  type Weekday,
 } from "../lib/hikGateway";
 import { defaultRuleSchedule } from "../lib/hikSync";
 
@@ -87,10 +96,9 @@ type Candidate = FunctionReturnType<typeof internal.hikvisionSync.listRetryCandi
  * 3) burada `case` ekle.
  */
 async function executeOperation(
-  ctx: unknown,
+  ctx: ActionCtx,
   c: Candidate,
 ): Promise<{ ok: boolean; error?: string }> {
-  void ctx;
   const devIndex = c.device.hikDevIndex;
   if (!devIndex) return { ok: false, error: "Cihaz gateway'e kayıtlı değil" };
 
@@ -185,6 +193,89 @@ async function executeOperation(
     case "openDoor": {
       const doorNo = (payload.doorNo as number | undefined) ?? 1;
       return await openDoor(devIndex, doorNo);
+    }
+    case "rebootDevice": {
+      return await rebootDeviceOnGateway(devIndex);
+    }
+    case "syncDoorStatusPlan": {
+      const doorId = payload.doorId as string | undefined;
+      if (!doorId) return { ok: false, error: "syncDoorStatusPlan: payload.doorId eksik" };
+
+      const door = await ctx.runQuery(internal.doors.getByIdInternal, {
+        id: doorId as Id<"doors">,
+      });
+      if (!door) return { ok: false, error: "Kapı bulunamadı" };
+
+      // hikDoorNo tanımsızsa sessiz 1 kullanma — aynı cihazda iki kapı slot 1'de çakışır.
+      if (door.hikDoorNo === undefined || door.hikDoorNo === null) {
+        return { ok: false, error: "Kapı numarası (hikDoorNo) tanımsız — kapıyı düzenleyip numara girin" };
+      }
+      const plan = door.hikDoorStatusPlan;
+      const doorNo = door.hikDoorNo;
+      const planNo = doorNo;
+      const templateNo = doorNo + 100;
+
+      if (!plan || !plan.enabled) {
+        return await linkDoorStatusPlan(devIndex, doorNo, 0);
+      }
+
+      const ALL_WEEKDAYS: Weekday[] = [
+        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+      ];
+      const segments = ALL_WEEKDAYS.map((week, idx) => ({
+        week,
+        id: idx + 1,
+        enable: true,
+        doorStatus: plan.mode as "remainOpen" | "normal",
+        beginTime: plan.beginTime,
+        endTime: plan.endTime,
+      }));
+
+      const r1 = await setDoorStatusWeekPlan(devIndex, planNo, segments);
+      if (!r1.ok) return r1;
+      const r2 = await setDoorStatusPlanTemplate(devIndex, templateNo, { weekPlanNo: planNo });
+      if (!r2.ok) return r2;
+      return await linkDoorStatusPlan(devIndex, doorNo, templateNo);
+    }
+    case "syncVerifyPlan": {
+      const doorId = payload.doorId as string | undefined;
+      if (!doorId) return { ok: false, error: "syncVerifyPlan: payload.doorId eksik" };
+
+      const door = await ctx.runQuery(internal.doors.getByIdInternal, {
+        id: doorId as Id<"doors">,
+      });
+      if (!door) return { ok: false, error: "Kapı bulunamadı" };
+
+      // hikDoorNo tanımsızsa sessiz 1 kullanma — aynı cihazda iki kapı slot 1'de çakışır.
+      if (door.hikDoorNo === undefined || door.hikDoorNo === null) {
+        return { ok: false, error: "Kapı numarası (hikDoorNo) tanımsız — kapıyı düzenleyip numara girin" };
+      }
+      const plan = door.hikVerifyPlan;
+      const doorNo = door.hikDoorNo;
+      const planNo = doorNo;
+      const templateNo = doorNo + 100;
+
+      if (!plan || !plan.enabled) {
+        return await linkVerifyPlan(devIndex, doorNo, 0);
+      }
+
+      const ALL_WEEKDAYS: Weekday[] = [
+        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+      ];
+      const segments = ALL_WEEKDAYS.map((week, idx) => ({
+        week,
+        id: idx + 1,
+        enable: true,
+        verifyMode: plan.verifyMode,
+        beginTime: plan.beginTime,
+        endTime: plan.endTime,
+      }));
+
+      const r1 = await setVerifyWeekPlan(devIndex, planNo, segments);
+      if (!r1.ok) return r1;
+      const r2 = await setVerifyPlanTemplate(devIndex, templateNo, { weekPlanNo: planNo });
+      if (!r2.ok) return r2;
+      return await linkVerifyPlan(devIndex, doorNo, templateNo);
     }
     // addFace + syncHoliday: retry yolu şimdilik desteklenmiyor (binary upload + tatil planı UI'sı yok).
     default:

@@ -11,6 +11,9 @@ import {
   employeeAuthedQuery,
 } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed, isManager } from "./lib/auth";
+import { resolvePanelAuthorizedCards } from "./lib/accessGraph";
+import { deleteReadersForDoor } from "./readers";
+import { resolveHikModelSpec } from "./lib/hikModels";
 
 /**
  * Cihazın hassas alanları. list okuma-gate'i (non-manager'a gizle) ile update yazma-gate'i
@@ -155,6 +158,7 @@ export const create = authedMutation({
     projectId: v.optional(v.id("projects")),
     zoneId: v.optional(v.id("zones")),
     doorId: v.optional(v.id("doors")),
+    doorCount: v.optional(v.number()),
     deviceType: v.optional(v.string()),
     deviceIp: v.optional(v.string()),
     deviceSerial: v.optional(v.string()),
@@ -220,6 +224,7 @@ export const update = authedMutation({
     name: v.optional(v.string()),
     zoneId: v.optional(v.id("zones")),
     doorId: v.optional(v.id("doors")),
+    doorCount: v.optional(v.number()),
     deviceType: v.optional(v.string()),
     deviceIp: v.optional(v.string()),
     deviceSerial: v.optional(v.string()),
@@ -309,6 +314,16 @@ export const update = authedMutation({
           ctx.db.patch(door._id, { zoneId: args.zoneId, updatedAt: new Date().toISOString() })
         )
       );
+      // Okuyucular da zoneId denormalize taşır (by_zone tutarlılığı) → onları da eşitle.
+      const panelReaders = await ctx.db
+        .query("readers")
+        .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
+        .collect();
+      await Promise.all(
+        panelReaders.map((reader) =>
+          ctx.db.patch(reader._id, { zoneId: args.zoneId, updatedAt: new Date().toISOString() })
+        )
+      );
     }
     return deviceId;
   },
@@ -342,6 +357,8 @@ export async function purgeDeviceCascade(
     .query("doors")
     .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
     .collect();
+  // Kapı silinmeden önce okuyucularını sil (orphan reader sızıntısı engeli).
+  await Promise.all(ownedDoors.map((d) => deleteReadersForDoor(ctx, d._id)));
   await Promise.all(ownedDoors.map((d) => ctx.db.delete(d._id)));
 
   // localBridge SDK iş kuyruğu — cihaz silinince orphan kalmasın. Aksi halde "processing"
@@ -561,14 +578,89 @@ function defaultDoorName(io: number): string {
   return `Kapı ${io + 1}`;
 }
 
+type ReaderDirection = "entry" | "exit" | "both";
+
+/** IDE Smart aktüatör index'ine göre okuyucu yönü (doors.ts/readers.ts ile aynı eşleme). */
+function readerDirectionFromIo(io: number): ReaderDirection {
+  if (io === 0) return "entry";
+  if (io === 1) return "exit";
+  return "both";
+}
+
 /**
- * Bir panele bölge (zone) + N kapı (door) üretir/bağlar. createIdePanel ve claimDevice
- * ortak kullanır — cross-tenant pointer kontrolleri (zone.projectId eşleşmesi) tek yerde.
- *
- * Bölge: `zoneId` verilirse mevcut bölgeye yerleştirilir (proje doğrulanır); verilmezse
- * `newZoneName` ile yeni bölge oluşturulur (boşsa panel adından türetilir — geriye uyum).
- * Kapılar `deviceId` ile panele, `zoneId` ile bölgeye bağlanır (Variant 1: panelin tüm
- * kapıları tek bölgede). Cihaz satırının `zoneId`'sini PATCH'lemez — onu çağıran yapar.
+ * Bir panele bölge (zone) bağlar/oluşturur. createIdePanel, claimDevice ve createHikDevice
+ * ortak kullanır — cross-tenant pointer kontrolü (zone.projectId eşleşmesi) tek yerde.
+ * `zoneId` verilirse mevcut bölge (proje doğrulanır); verilmezse `newZoneName` ile yeni
+ * bölge (boşsa `fallbackName`'den türetilir).
+ */
+async function resolveOrCreateZone(
+  ctx: MutationCtx,
+  opts: {
+    projectId?: Id<"projects">;
+    allowedProjectIds: Id<"projects">[];
+    zoneId?: Id<"zones">;
+    newZoneName?: string;
+    fallbackName: string;
+    description?: string;
+    now: string;
+  },
+): Promise<Id<"zones">> {
+  if (opts.zoneId) {
+    const zone = await ctx.db.get(opts.zoneId);
+    if (!zone) throw new Error("Bölge bulunamadı");
+    if (!isProjectAllowed(opts.allowedProjectIds, zone.projectId)) {
+      throw new Error("Bu bölgeye erişim yetkiniz yok");
+    }
+    // Bölge ile panel aynı projede olmalı — aksi halde cross-project orphan oluşur.
+    if (zone.projectId !== opts.projectId) {
+      throw new Error("Seçilen bölge bu panelin projesinde değil");
+    }
+    return opts.zoneId;
+  }
+  return await ctx.db.insert("zones", {
+    name: opts.newZoneName?.trim() || opts.fallbackName,
+    projectId: opts.projectId,
+    description: opts.description,
+    createdAt: opts.now,
+    updatedAt: opts.now,
+  });
+}
+
+/** Bir kapıya okuyucu satırı ekler (provizyon yardımcıları için ortak insert). */
+async function insertReaderRow(
+  ctx: MutationCtx,
+  opts: {
+    doorId: Id<"doors">;
+    deviceId?: Id<"devices">;
+    projectId?: Id<"projects">;
+    zoneId?: Id<"zones">;
+    name: string;
+    direction: ReaderDirection;
+    hikReaderNo?: number;
+    ioId?: number;
+    now: string;
+  },
+): Promise<Id<"readers">> {
+  return await ctx.db.insert("readers", {
+    doorId: opts.doorId,
+    deviceId: opts.deviceId,
+    projectId: opts.projectId,
+    zoneId: opts.zoneId,
+    name: opts.name,
+    direction: opts.direction,
+    hikReaderNo: opts.hikReaderNo,
+    ioId: opts.ioId,
+    status: "active",
+    createdAt: opts.now,
+    updatedAt: opts.now,
+  });
+}
+
+/**
+ * Bir panele bölge (zone) + N kapı (door) + her kapıya 1 okuyucu üretir/bağlar.
+ * createIdePanel ve claimDevice ortak kullanır. Kapılar `deviceId`/`zoneId` ile bağlanır
+ * (Variant 1: panelin tüm kapıları tek bölgede); okuyucu yönü ioId'den türetilir.
+ * Cihaz satırının `zoneId`'sini PATCH'lemez — onu çağıran yapar.
  */
 async function provisionPanelZoneAndDoors(
   ctx: MutationCtx,
@@ -584,32 +676,21 @@ async function provisionPanelZoneAndDoors(
     now: string;
   },
 ): Promise<{ zoneId: Id<"zones">; doorIds: Id<"doors">[] }> {
-  let zoneId: Id<"zones">;
-  if (opts.zoneId) {
-    const zone = await ctx.db.get(opts.zoneId);
-    if (!zone) throw new Error("Bölge bulunamadı");
-    if (!isProjectAllowed(opts.allowedProjectIds, zone.projectId)) {
-      throw new Error("Bu bölgeye erişim yetkiniz yok");
-    }
-    // Bölge ile panel aynı projede olmalı — aksi halde cross-project orphan oluşur.
-    if (zone.projectId !== opts.projectId) {
-      throw new Error("Seçilen bölge bu panelin projesinde değil");
-    }
-    zoneId = opts.zoneId;
-  } else {
-    zoneId = await ctx.db.insert("zones", {
-      name: opts.newZoneName?.trim() || opts.panelName,
-      projectId: opts.projectId,
-      description: opts.description,
-      createdAt: opts.now,
-      updatedAt: opts.now,
-    });
-  }
+  const zoneId = await resolveOrCreateZone(ctx, {
+    projectId: opts.projectId,
+    allowedProjectIds: opts.allowedProjectIds,
+    zoneId: opts.zoneId,
+    newZoneName: opts.newZoneName,
+    fallbackName: opts.panelName,
+    description: opts.description,
+    now: opts.now,
+  });
 
   const doorIds: Id<"doors">[] = [];
   for (let io = 0; io < opts.doorCount; io++) {
+    const name = defaultDoorName(io);
     const doorId = await ctx.db.insert("doors", {
-      name: defaultDoorName(io),
+      name,
       projectId: opts.projectId,
       zoneId,
       deviceId: opts.deviceId,
@@ -618,9 +699,87 @@ async function provisionPanelZoneAndDoors(
       createdAt: opts.now,
       updatedAt: opts.now,
     });
+    await insertReaderRow(ctx, {
+      doorId,
+      deviceId: opts.deviceId,
+      projectId: opts.projectId,
+      zoneId,
+      name,
+      direction: readerDirectionFromIo(io),
+      ioId: io,
+      now: opts.now,
+    });
     doorIds.push(doorId);
   }
   return { zoneId, doorIds };
+}
+
+/**
+ * Hikvision cihazına bölge + `doorCount` kapı (hikDoorNo 1..N) + kapı başına
+ * `readersPerDoor` okuyucu üretir. Kontrolörde okuyucu 1=giriş (hikReaderNo 2N-1),
+ * 2=çıkış (2N); terminalde tek "both" okuyucu (terminalin kendisi okuyucu).
+ * İzin modeli kapı bazlı — okuyucular panele gönderilmez (yalnız ngsplus modeli).
+ */
+async function provisionHikDoorsAndReaders(
+  ctx: MutationCtx,
+  opts: {
+    deviceId: Id<"devices">;
+    projectId?: Id<"projects">;
+    allowedProjectIds: Id<"projects">[];
+    zoneId?: Id<"zones">;
+    newZoneName?: string;
+    deviceName: string;
+    description?: string;
+    doorCount: number;
+    readersPerDoor: number;
+    family?: "controller" | "terminal";
+    now: string;
+  },
+): Promise<{ zoneId: Id<"zones">; doorIds: Id<"doors">[]; readerIds: Id<"readers">[] }> {
+  const zoneId = await resolveOrCreateZone(ctx, {
+    projectId: opts.projectId,
+    allowedProjectIds: opts.allowedProjectIds,
+    zoneId: opts.zoneId,
+    newZoneName: opts.newZoneName,
+    fallbackName: opts.deviceName,
+    description: opts.description,
+    now: opts.now,
+  });
+
+  const isTerminal = opts.family === "terminal";
+  const readerCount = Math.max(1, opts.readersPerDoor);
+  const doorIds: Id<"doors">[] = [];
+  const readerIds: Id<"readers">[] = [];
+  for (let n = 1; n <= opts.doorCount; n++) {
+    const doorName = defaultDoorName(n - 1);
+    const doorId = await ctx.db.insert("doors", {
+      name: doorName,
+      projectId: opts.projectId,
+      zoneId,
+      deviceId: opts.deviceId,
+      hikDoorNo: n,
+      status: "active",
+      createdAt: opts.now,
+      updatedAt: opts.now,
+    });
+    doorIds.push(doorId);
+    for (let r = 0; r < readerCount; r++) {
+      const direction: ReaderDirection = isTerminal ? "both" : r === 0 ? "entry" : "exit";
+      const suffix = isTerminal ? "" : direction === "entry" ? " Giriş" : " Çıkış";
+      const readerId = await insertReaderRow(ctx, {
+        doorId,
+        deviceId: opts.deviceId,
+        projectId: opts.projectId,
+        zoneId,
+        name: `${doorName}${suffix}`,
+        direction,
+        hikReaderNo: direction === "exit" ? n * 2 : n * 2 - 1,
+        now: opts.now,
+      });
+      readerIds.push(readerId);
+    }
+  }
+  return { zoneId, doorIds, readerIds };
 }
 
 /**
@@ -721,6 +880,111 @@ export const createIdePanel = authedMutation({
     await ctx.db.patch(deviceId, { adminDeviceId, updatedAt: now });
 
     return { deviceId, zoneId, doorIds };
+  },
+});
+
+/**
+ * Hikvision cihazı ekler: cihaz + kapıları (hikDoorNo 1..N) + okuyucuları tek mutation'da
+ * üretir, bir bölgeye yerleştirir. Model seçiminden gelen `doorCount`/`readersPerDoor`
+ * topolojiyi belirler (createIdePanel deseni). Gateway kaydı (ehome) ayrıca submission
+ * tarafında registerDeviceOnGateway ile yapılır — bu mutation panele bağlanmaz.
+ */
+export const createHikDevice = authedMutation({
+  args: {
+    name: v.string(),
+    projectId: v.optional(v.id("projects")),
+    zoneId: v.optional(v.id("zones")),
+    newZoneName: v.optional(v.string()),
+    deviceType: v.optional(v.string()),
+    hikTransport: v.optional(v.union(v.literal("gateway"), v.literal("localBridge"))),
+    hikModel: v.optional(v.string()),
+    hikFamily: v.optional(v.union(v.literal("controller"), v.literal("terminal"))),
+    doorCount: v.number(),
+    readersPerDoor: v.number(),
+    deviceIp: v.optional(v.string()),
+    deviceSerial: v.optional(v.string()),
+    deviceUsername: v.optional(v.string()),
+    devicePassword: v.optional(v.string()),
+    ehomeID: v.optional(v.string()),
+    ehomeKey: v.optional(v.string()),
+    hikPort: v.optional(v.number()),
+    accessDirection: v.optional(
+      v.union(v.literal("entry"), v.literal("exit"), v.literal("both"))
+    ),
+    status: v.optional(v.string()),
+    description: v.optional(v.string()),
+  },
+  returns: v.object({
+    deviceId: v.id("devices"),
+    zoneId: v.id("zones"),
+    doorIds: v.array(v.id("doors")),
+    readerIds: v.array(v.id("readers")),
+  }),
+  handler: async (ctx, args) => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
+      throw new Error("Bu projeye erişim yetkiniz yok");
+    }
+    const now = new Date().toISOString();
+    const doorCount = Math.max(1, Math.min(args.doorCount, 8));
+    // Okuyucu/kapı üst sınırını modele göre kıs — UI 1 gönderir; doğrudan API çağrısı
+    // sınırsız okuyucu yaratmasın (terminal=1, kontrolör=2). Sunucu otoritedir.
+    const maxReaders = resolveHikModelSpec(args.hikModel, doorCount).maxReadersPerDoor;
+    const readersPerDoor = Math.max(1, Math.min(args.readersPerDoor, maxReaders));
+
+    const deviceId = await ctx.db.insert("devices", {
+      name: args.name,
+      projectId: args.projectId,
+      brand: "hikvision",
+      deviceType: args.deviceType,
+      deviceIp: args.deviceIp,
+      deviceSerial: args.deviceSerial,
+      deviceUsername: args.deviceUsername,
+      devicePassword: args.devicePassword,
+      ehomeID: args.ehomeID,
+      ehomeKey: args.ehomeKey,
+      hikModel: args.hikModel,
+      hikTransport: args.hikTransport,
+      hikDoorCount: doorCount,
+      hikPort: args.hikPort,
+      accessDirection: args.accessDirection,
+      isActive: true,
+      status: args.status ?? "active",
+      description: args.description,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const { zoneId, doorIds, readerIds } = await provisionHikDoorsAndReaders(ctx, {
+      deviceId,
+      projectId: args.projectId,
+      allowedProjectIds,
+      zoneId: args.zoneId,
+      newZoneName: args.newZoneName,
+      deviceName: args.name,
+      description: args.description,
+      doorCount,
+      readersPerDoor,
+      family: args.hikFamily,
+      now,
+    });
+    await ctx.db.patch(deviceId, { zoneId, updatedAt: now });
+
+    // adminDevices'a otomatik kaydet (createdFromDevice=true → cihaz silinince de silinir) —
+    // generic create ile aynı havuz/temizlik davranışı.
+    const adminDeviceId = await ctx.db.insert("adminDevices", {
+      name: args.name,
+      brand: "hikvision",
+      deviceSerial: args.deviceSerial,
+      assignedDeviceId: deviceId,
+      assignedProjectId: args.projectId,
+      createdFromDevice: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.patch(deviceId, { adminDeviceId, updatedAt: now });
+
+    return { deviceId, zoneId, doorIds, readerIds };
   },
 });
 
@@ -1120,6 +1384,41 @@ export const listRegisteredHikDevIndexes = internalQuery({
   },
 });
 
+/**
+ * AcsEvent backfill cron için online gateway cihazlarını listeler.
+ * "Online" = son 10 dk içinde hikLastSeenAt'i güncellenmiş.
+ */
+export const listOnlineGatewayDevicesForBackfill = internalQuery({
+  args: {},
+  handler: async (ctx): Promise<
+    Array<{
+      _id: Id<"devices">;
+      hikDevIndex: string;
+      hikBackfillCursor?: number;
+      hikLastBackfillAt?: number;
+    }>
+  > => {
+    const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+    const devices = await ctx.db.query("devices").collect();
+    return devices
+      .filter(
+        (d) =>
+          d.brand === "hikvision" &&
+          d.hikTransport === "gateway" &&
+          !!d.hikDevIndex &&
+          d.isActive !== false &&
+          typeof d.hikLastSeenAt === "number" &&
+          d.hikLastSeenAt >= tenMinutesAgo,
+      )
+      .map((d) => ({
+        _id: d._id,
+        hikDevIndex: d.hikDevIndex as string,
+        hikBackfillCursor: d.hikBackfillCursor,
+        hikLastBackfillAt: d.hikLastBackfillAt,
+      }));
+  },
+});
+
 export const setHikDevIndex = internalMutation({
   args: {
     deviceId: v.id("devices"),
@@ -1151,6 +1450,230 @@ export const setHikOfflineHint = internalMutation({
       hikOfflineHint: args.hint,
       updatedAt: new Date().toISOString(),
     });
+  },
+});
+
+export const setHikWorkStatus = internalMutation({
+  args: {
+    deviceId: v.id("devices"),
+    workStatus: v.object({
+      updatedAt: v.number(),
+      doorStatus: v.optional(v.array(v.number())),
+      magneticStatus: v.optional(v.array(v.number())),
+      cardReaderOnlineStatus: v.optional(v.array(v.number())),
+      batteryVoltage: v.optional(v.number()),
+      powerSupplyStatus: v.optional(v.string()),
+      raw: v.optional(v.string()),
+    }),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.deviceId, {
+      hikWorkStatus: args.workStatus,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+export const setHikLastRebootAt = internalMutation({
+  args: { deviceId: v.id("devices"), at: v.number() },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.deviceId, {
+      hikLastRebootAt: args.at,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+export const setHikBackfillProgress = internalMutation({
+  args: {
+    deviceId: v.id("devices"),
+    cursor: v.optional(v.number()),
+    at: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.deviceId, {
+      ...(args.cursor !== undefined ? { hikBackfillCursor: args.cursor } : {}),
+      hikLastBackfillAt: args.at,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+/**
+ * Çalışanın cardNumber'ını döner (captureFaceFromDevice için employeeNo iletimi).
+ */
+export const getEmployeeCardNumber = internalQuery({
+  args: { employeeId: v.id("employees") },
+  handler: async (ctx, args): Promise<string | null> => {
+    const emp = await ctx.db.get(args.employeeId);
+    return emp?.cardNumber?.trim() ?? null;
+  },
+});
+
+/**
+ * Employee dokümanını internal olarak döner. Faz 7D: captureFaceFromDevice proje-scope
+ * kontrolü için — employee.projectId'yi doğrulamak gerekiyor.
+ */
+export const getEmployeeByIdInternal = internalQuery({
+  args: { employeeId: v.id("employees") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.employeeId);
+  },
+});
+
+/**
+ * Bir Hikvision cihazına yetkili çalışanların kart numaralarını döner.
+ * Reconcile action'ının "beklenen roster" bacağı için kullanılır.
+ *
+ * Kanonik iki-bacak yetki çözümünü accessGraph.resolvePanelAuthorizedCards'tan
+ * REUSE eder (cihaz bağı + CANLI kapı bağı + isActive guard + taşınmış-kapı inceliği).
+ * IDE normalize yerine Hik için ham trim geçilir — cardNumber cihazda ham string.
+ */
+export const getHikAuthorizedCardNumbers = internalQuery({
+  args: { deviceId: v.id("devices") },
+  handler: async (ctx, args): Promise<string[]> => {
+    const { authorized } = await resolvePanelAuthorizedCards(
+      ctx,
+      args.deviceId,
+      (c) => (typeof c === "string" && c.trim() ? c.trim() : null),
+    );
+    return Array.from(authorized);
+  },
+});
+
+/**
+ * Cihaza yetkili çalışanlardan ngsaccess'te YÜZ kaydı olanların cardNumber'larını döner.
+ *
+ * Eşleme (kanıt: hikvisionSync.ts satır 744 — addFaceToDevice(devIndex, employee.cardNumber, ...)):
+ *   cihaz employeeNo = ngsaccess employee.cardNumber
+ *
+ * Yetki çözümü: resolvePanelAuthorizedCards ile aynı iki-bacak mantığı (cihaz bağı + kapı bağı).
+ * Bunun üstüne: yetkili employee'lerin employeeFaces tablosunda kaydı var mı filtresi.
+ *
+ * Reconcile "beklenen yüz roster" bacağı.
+ */
+export const getHikDeviceFaceRoster = internalQuery({
+  args: { deviceId: v.id("devices") },
+  handler: async (ctx, args): Promise<string[]> => {
+    // ── Yetkili employee ID seti ─────────────────────────────────────────────
+    // resolvePanelAuthorizedCards'ın iki-bacak kural çözümünü burada da uyguluyoruz;
+    // fark: kart normalizer yerine employeeId'leri topluyoruz.
+    const [deviceLinks, panelDoors] = await Promise.all([
+      ctx.db
+        .query("groupDevices")
+        .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
+        .collect(),
+      ctx.db
+        .query("doors")
+        .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
+        .collect(),
+    ]);
+
+    const ruleIds = new Set<Id<"accessRules">>(deviceLinks.map((l) => l.groupId));
+    await Promise.all(
+      panelDoors.map(async (door) => {
+        const doorLinks = await ctx.db
+          .query("groupDoors")
+          .withIndex("by_door", (q) => q.eq("doorId", door._id))
+          .collect();
+        for (const dl of doorLinks) ruleIds.add(dl.groupId);
+      }),
+    );
+
+    const authorizedEmpIds = new Set<Id<"employees">>();
+    await Promise.all(
+      Array.from(ruleIds).map(async (ruleId) => {
+        const rule = await ctx.db.get(ruleId);
+        if (!rule || rule.isActive === false) return;
+        const members = await ctx.db
+          .query("groupMembers")
+          .withIndex("by_project_group", (q) =>
+            q.eq("projectId", rule.projectId).eq("groupId", ruleId),
+          )
+          .collect();
+        for (const m of members) authorizedEmpIds.add(m.employeeId);
+      }),
+    );
+
+    // ── Yüz kaydı olanları filtrele ─────────────────────────────────────────
+    const roster: string[] = [];
+    for (const employeeId of authorizedEmpIds) {
+      const face = await ctx.db
+        .query("employeeFaces")
+        .withIndex("by_employee", (q) => q.eq("employeeId", employeeId))
+        .first();
+      if (!face) continue;
+      const emp = await ctx.db.get(employeeId);
+      const cardNumber = emp?.cardNumber?.trim();
+      if (cardNumber) roster.push(cardNumber);
+    }
+    return roster;
+  },
+});
+
+/**
+ * Cihaza yetkili çalışanlardan ngsaccess'te PARMAK İZİ kaydı olanların cardNumber'larını döner.
+ *
+ * Eşleme (kanıt: hikvisionSync.ts satır 881 — addFingerprintToDevice({ employeeNo: employee.cardNumber, ... })):
+ *   cihaz employeeNo = ngsaccess employee.cardNumber
+ *
+ * Reconcile "beklenen parmak izi roster" bacağı.
+ */
+export const getHikDeviceFingerprintRoster = internalQuery({
+  args: { deviceId: v.id("devices") },
+  handler: async (ctx, args): Promise<string[]> => {
+    // ── Yetkili employee ID seti (getHikDeviceFaceRoster ile aynı yetki çözümü) ──
+    const [deviceLinks, panelDoors] = await Promise.all([
+      ctx.db
+        .query("groupDevices")
+        .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
+        .collect(),
+      ctx.db
+        .query("doors")
+        .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
+        .collect(),
+    ]);
+
+    const ruleIds = new Set<Id<"accessRules">>(deviceLinks.map((l) => l.groupId));
+    await Promise.all(
+      panelDoors.map(async (door) => {
+        const doorLinks = await ctx.db
+          .query("groupDoors")
+          .withIndex("by_door", (q) => q.eq("doorId", door._id))
+          .collect();
+        for (const dl of doorLinks) ruleIds.add(dl.groupId);
+      }),
+    );
+
+    const authorizedEmpIds = new Set<Id<"employees">>();
+    await Promise.all(
+      Array.from(ruleIds).map(async (ruleId) => {
+        const rule = await ctx.db.get(ruleId);
+        if (!rule || rule.isActive === false) return;
+        const members = await ctx.db
+          .query("groupMembers")
+          .withIndex("by_project_group", (q) =>
+            q.eq("projectId", rule.projectId).eq("groupId", ruleId),
+          )
+          .collect();
+        for (const m of members) authorizedEmpIds.add(m.employeeId);
+      }),
+    );
+
+    // ── Parmak izi kaydı olanları filtrele ──────────────────────────────────
+    // cardNumber başına tek kayıt — aynı employee'nin birden fazla parmağı olsa da tek entry.
+    const seen = new Set<string>();
+    for (const employeeId of authorizedEmpIds) {
+      const fp = await ctx.db
+        .query("employeeFingerprints")
+        .withIndex("by_employee", (q) => q.eq("employeeId", employeeId))
+        .first();
+      if (!fp) continue;
+      const emp = await ctx.db.get(employeeId);
+      const cardNumber = emp?.cardNumber?.trim();
+      if (cardNumber) seen.add(cardNumber);
+    }
+    return Array.from(seen);
   },
 });
 

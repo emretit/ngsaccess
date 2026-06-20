@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -18,37 +17,28 @@ import { Id } from "../../../convex/_generated/dataModel";
 
 type ReaderDirection = "entry" | "exit" | "both";
 
-interface EditReaderDialogProps {
+interface AddReaderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  // Okuyucu satırının id'si. null → legacy kapı (henüz readers satırı yok) → doors.update'e düşülür.
-  readerId?: Id<"readers"> | null;
   doorId: Id<"doors">;
-  readerName: string;
-  readerDirection: ReaderDirection;
-  // IDE Smart kapısı için mevcut sensör ayarı. undefined → panel default (true) varsayılır.
-  requireSensor?: boolean;
-  // IDE Smart paneline bağlı kapı mı (sensör toggle yalnızca o zaman gösterilir).
-  isIdeDoor?: boolean;
+  doorName: string;
+  /** Önerilen yön (ör. kapıda zaten giriş varsa "exit"). */
+  defaultDirection?: ReaderDirection;
 }
 
-export function EditReaderDialog({
+export function AddReaderDialog({
   open,
   onOpenChange,
-  readerId,
   doorId,
-  readerName,
-  readerDirection,
-  requireSensor: initialRequireSensor,
-  isIdeDoor = false,
-}: EditReaderDialogProps) {
-  const [name, setName] = useState(readerName);
-  const [direction, setDirection] = useState<ReaderDirection>(readerDirection);
-  const [requireSensor, setRequireSensor] = useState(initialRequireSensor ?? true);
+  doorName,
+  defaultDirection = "exit",
+}: AddReaderDialogProps) {
+  const dirSuffix = defaultDirection === "exit" ? " Çıkış" : defaultDirection === "entry" ? " Giriş" : "";
+  const [name, setName] = useState(`${doorName}${dirSuffix}`);
+  const [direction, setDirection] = useState<ReaderDirection>(defaultDirection);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  const updateDoor = useMutation(api.doors.update);
-  const updateReader = useMutation(api.readers.update);
+  const createReader = useMutation(api.readers.create);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,26 +48,14 @@ export function EditReaderDialog({
     }
     setIsSubmitting(true);
     try {
-      if (readerId) {
-        // Okuyucu ad/yönü readers tablosuna; sensör ayarı (IDE) ayrıca kapıya yazılır.
-        await updateReader({ readerId, name: name.trim(), direction });
-        if (isIdeDoor) await updateDoor({ doorId, requireSensor });
-      } else {
-        // Legacy kapı: readers satırı yok → eski davranış (kapı alanları).
-        await updateDoor({
-          doorId,
-          readerName: name.trim(),
-          readerDirection: direction,
-          ...(isIdeDoor ? { requireSensor } : {}),
-        });
-      }
-      toast({ title: "Başarılı", description: "Okuyucu güncellendi." });
+      await createReader({ doorId, name: name.trim(), direction });
+      toast({ title: "Başarılı", description: "Okuyucu eklendi." });
       onOpenChange(false);
     } catch (error: unknown) {
       toast({
         variant: "destructive",
         title: "Hata",
-        description: error instanceof Error ? error.message : "Okuyucu güncellenirken hata oluştu.",
+        description: error instanceof Error ? error.message : "Okuyucu eklenirken hata oluştu.",
       });
     } finally {
       setIsSubmitting(false);
@@ -88,7 +66,7 @@ export function EditReaderDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Okuyucuyu Düzenle</DialogTitle>
+          <DialogTitle>{doorName} — Okuyucu Ekle</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
@@ -116,22 +94,10 @@ export function EditReaderDialog({
                 </SelectContent>
               </Select>
             </div>
-            {isIdeDoor && (
-              <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="requireSensor" className="text-right pt-1">Kapı Sensörü</Label>
-                <div className="col-span-3 flex items-start gap-2">
-                  <Switch id="requireSensor" checked={requireSensor} onCheckedChange={setRequireSensor} />
-                  <span className="text-xs text-muted-foreground">
-                    Açık: kapıda fiziksel sensör var, açılış sensörle onaylanır. Kapalı: sensörsüz kapı —
-                    role darbesi sensör beklemeden tamamlanır (sensörsüzde kapalı olmalı, yoksa erişim "busy"de takılır).
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>İptal</Button>
-            <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Kaydediliyor..." : "Kaydet"}</Button>
+            <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Ekleniyor..." : "Ekle"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

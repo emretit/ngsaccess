@@ -25,7 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 const Devices = () => {
   const { loading: projectLoading, isAdmin } = useProjectAccess();
   const { devices, isLoading, hasProjectAccess } = useProjectFilteredDevices();
-  const { zones, doors } = useZonesAndDoors();
+  const { zones } = useZonesAndDoors();
   const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
   const [selectedDoorId, setSelectedDoorId] = useState<string | null>(null);
   
@@ -125,7 +125,6 @@ const Devices = () => {
           devices={devices}
           isLoading={isLoading}
           zones={zones}
-          doors={doors}
           selectedZoneId={selectedZoneId}
           selectedDoorId={selectedDoorId}
           onDeleteDevice={handleDeleteDevice}

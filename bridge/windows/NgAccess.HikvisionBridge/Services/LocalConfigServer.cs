@@ -266,23 +266,23 @@ public sealed class LocalConfigServer
 </style>
 </head>
 <body>
-<header><h1>Kopru — Ayarlar</h1><a href="/">← ngsplus arayuzune don</a></header>
+<header><h1>Köprü — Ayarlar</h1><a href="/">← ngsplus arayüzüne dön</a></header>
 <div class="wrap">
  <div class="card">
-   <h3>Baglanti</h3>
+   <h3>Bağlantı</h3>
    <div class="grid">
      <div><label>Convex Site URL</label><input id="url" placeholder="https://....convex.site"></div>
-     <div><label>Bridge Token <span class="muted">(bos = degistirme)</span></label><input id="token" type="password" placeholder="ngsplus Ayarlar > Bridge"></div>
+     <div><label>Bridge Token <span class="muted">(boş = değiştirme)</span></label><input id="token" type="password" placeholder="ngsplus Ayarlar > Bridge"></div>
    </div>
    <div class="row" style="margin-top:12px"><button onclick="saveCfg()">Kaydet</button><span id="tokenState" class="muted"></span></div>
    <div id="msg" class="muted" style="margin-top:8px"></div>
  </div>
  <div class="card">
-   <h3>Paneller <span class="muted">(ngsplus'tan yonetilir — buradan eklenmez)</span></h3>
+   <h3>Paneller <span class="muted">(ngsplus'tan yönetilir — buradan eklenmez)</span></h3>
    <div id="rosterErr" class="muted"></div>
-   <table><thead><tr><th>Ad</th><th>Adres</th><th>Kapi</th><th>Durum</th><th>Son event</th><th></th></tr></thead><tbody id="rows"></tbody></table>
+   <table><thead><tr><th>Ad</th><th>Adres</th><th>Kapı</th><th>Durum</th><th>Son event</th><th></th></tr></thead><tbody id="rows"></tbody></table>
  </div>
- <p class="muted">Panel IP/sifre/kapi ngsplus cihaz formunda girilir; bridge bunlari token ile otomatik ceker.</p>
+ <p class="muted">Panel IP/şifre/kapı ngsplus cihaz formunda girilir; bridge bunları token ile otomatik çeker.</p>
 </div>
 <script>
 const B='/__bridge';
@@ -294,7 +294,7 @@ function g(id){return document.getElementById(id)}
 async function load(){
   const c=await api('/api/config');
   g('url').value=c.convexSiteUrl||'';
-  g('tokenState').textContent=c.hasToken?'Token girili.':'Token henuz girilmedi.';
+  g('tokenState').textContent=c.hasToken?'Token girili.':'Token henüz girilmedi.';
   g('rosterErr').innerHTML=c.rosterError?('<span class="badge err">roster: '+esc(c.rosterError)+'</span>'):'';
   const rows=g('rows');rows.innerHTML='';
   (c.devices||[]).forEach(p=>{
@@ -305,19 +305,19 @@ async function load(){
       +'<td>'+fmt(p.lastEventAt)+'</td>'
       +'<td class="row">'
       +'<button class="sec" onclick="test(\''+p.deviceId+'\')">Test</button>'
-      +'<button class="sec" onclick="openDoor(\''+p.deviceId+'\')">Kapi</button>'
+      +'<button class="sec" onclick="openDoor(\''+p.deviceId+'\')">Kapı</button>'
       +'</td>';
     rows.appendChild(tr);
   });
-  if(!(c.devices||[]).length) rows.innerHTML='<tr><td colspan="6" class="muted">Henuz panel yok. ngsplus\\'ta localBridge cihazi ekleyin.</td></tr>';
+  if(!(c.devices||[]).length) rows.innerHTML="<tr><td colspan='6' class='muted'>Henüz panel yok. ngsplus'ta localBridge cihazı ekleyin.</td></tr>";
 }
 async function saveCfg(){
   const body={convexSiteUrl:g('url').value,bridgeToken:g('token').value};
   const r=await api('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   g('msg').textContent=r.ok?'Kaydedildi.':'Hata: '+(r.error||'?');g('token').value='';load();
 }
-async function test(id){g('msg').textContent='Test ediliyor...';const r=await api('/api/panels/'+id+'/test',{method:'POST'});g('msg').textContent=r.ok?'Baglanti OK':'Hata: '+(r.error||'?')}
-async function openDoor(id){const r=await api('/api/panels/'+id+'/door/1',{method:'POST'});g('msg').textContent=r.ok?'Kapi komutu gonderildi':'Hata: '+(r.error||'?')}
+async function test(id){g('msg').textContent='Test ediliyor...';const r=await api('/api/panels/'+id+'/test',{method:'POST'});g('msg').textContent=r.ok?'Bağlantı OK':'Hata: '+(r.error||'?')}
+async function openDoor(id){const r=await api('/api/panels/'+id+'/door/1',{method:'POST'});g('msg').textContent=r.ok?'Kapı komutu gönderildi':'Hata: '+(r.error||'?')}
 load();setInterval(load,5000);
 </script>
 </body>

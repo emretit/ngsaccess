@@ -33,6 +33,11 @@ const MQTT_CA_FILE = process.env.MQTT_CA_FILE || "";
 const CONVEX_SITE_URL = (process.env.CONVEX_SITE_URL || "").replace(/\/+$/, "");
 const BRIDGE_SECRET = process.env.IDE_BRIDGE_SECRET || "";
 const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS || 2000);
+// Adaptive backoff tavanı: bekleyen komut yokken poll aralığı her boş turda 2x büyür ve
+// burada durur; komut çekilince anında tabana (POLL_INTERVAL_MS) döner. Boş /ide-bridge/poll
+// çağrılarını (Convex function-call maliyeti) seyreltir. Idle'da ilk komut en fazla bu kadar
+// gecikir; panel→Convex event akışı (kart okuma) MQTT push olduğundan bundan etkilenmez.
+const POLL_MAX_INTERVAL_MS = Number(process.env.POLL_MAX_INTERVAL_MS || 30000);
 const CMD_ACK_TIMEOUT_MS = Number(process.env.CMD_ACK_TIMEOUT_MS || 12000);
 const DEBUG = process.env.BRIDGE_DEBUG === "1";
 
@@ -289,14 +294,15 @@ client.on("message", async (topic, buf) => {
 
 // ── Komut poll döngüsü (Convex → broker) ────────────────────────────
 let polling = false;
+// Dönüş: bu turda komut çekildi mi (true → caller backoff'u tabana çeker).
 async function pollCommands() {
-  if (polling || !client.connected) return;
+  if (polling || !client.connected) return false;
   polling = true;
   try {
     const r = await convexPost("/ide-bridge/poll", { max: 10 });
     if (!r.ok) {
       dbg(`poll ${r.status}: ${r.text?.slice(0, 120)}`);
-      return;
+      return false;
     }
     const ops = Array.isArray(r.json?.ops) ? r.json.ops : [];
     for (const op of ops) {
@@ -348,18 +354,40 @@ async function pollCommands() {
         }
       });
     }
+    return ops.length > 0;
   } catch (e) {
     log("poll exception:", e.message);
+    return false;
   } finally {
     polling = false;
   }
 }
-const pollTimer = setInterval(pollCommands, POLL_INTERVAL_MS);
+
+// Adaptive poll döngüsü: komut çekildiyse tabanda (hızlı) kal, boş turlarda kademeli yavaşla
+// (POLL_INTERVAL_MS → 2x → ... → POLL_MAX_INTERVAL_MS). setInterval yerine recursive setTimeout
+// kullanıyoruz ki aralık tura göre dinamik ayarlanabilsin.
+// POLL_INTERVAL_MS<=0 → komut poll'ü tamamen kapalı: Convex /ide-bridge/poll +
+// listPendingForBridge yükü sıfırlanır. Kart-event akışı (MQTT → /ide-bridge/event) devam
+// eder, yani canlı izleme çalışır; sadece Convex→panel komutları (kapı aç, kişi sync) gitmez.
+// Kota acil durumunda "kart okuma kalsın, poll dursun" için kullan.
+let currentPollMs = POLL_INTERVAL_MS;
+let pollTimer = null;
+if (POLL_INTERVAL_MS > 0) {
+  pollTimer = setTimeout(async function tick() {
+    const handled = await pollCommands();
+    currentPollMs = handled
+      ? POLL_INTERVAL_MS
+      : Math.min(currentPollMs * 2, POLL_MAX_INTERVAL_MS);
+    pollTimer = setTimeout(tick, currentPollMs);
+  }, POLL_INTERVAL_MS);
+} else {
+  log("komut poll DEVRE DIŞI (POLL_INTERVAL_MS<=0) — yalnız kart-event akışı aktif");
+}
 
 // ── Graceful shutdown ───────────────────────────────────────────────
 function shutdown() {
   log("kapanıyor...");
-  clearInterval(pollTimer);
+  clearTimeout(pollTimer);
   for (const { timer } of pending.values()) clearTimeout(timer);
   client.end(true, () => process.exit(0));
   setTimeout(() => process.exit(0), 2000);
@@ -367,4 +395,4 @@ function shutdown() {
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
-log(`başladı. Convex=${CONVEX_SITE_URL} poll=${POLL_INTERVAL_MS}ms ackTimeout=${CMD_ACK_TIMEOUT_MS}ms`);
+log(`başladı. Convex=${CONVEX_SITE_URL} poll=${POLL_INTERVAL_MS}–${POLL_MAX_INTERVAL_MS}ms (adaptive) ackTimeout=${CMD_ACK_TIMEOUT_MS}ms`);

@@ -4,7 +4,6 @@ import {
   FormLabel,
   FormControl,
   FormMessage,
-  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -39,37 +38,22 @@ export function DeviceHikLocalBridgeSection({
 }: DeviceHikLocalBridgeSectionProps) {
   return (
     <>
+      {/* Kapı sayısı artık cihaz modelinden türetilir (DeviceHikvisionSection) — burada input yok. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FormField
           control={form.control}
-          name="hik_door_count"
+          name="hik_port"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Kapı Sayısı</FormLabel>
+              <FormLabel>SDK Port</FormLabel>
               <FormControl>
                 <Input
                   type="number"
-                  placeholder="4"
+                  placeholder="8000"
                   {...field}
                   value={field.value ?? ""}
                 />
               </FormControl>
-              <FormDescription className="text-xs">1–8 (DS-K2804: 4)</FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="device_ip"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Panel IP (LAN)</FormLabel>
-              <FormControl>
-                <Input placeholder="192.168.1.117" {...field} value={field.value ?? ""} />
-              </FormControl>
-              <FormDescription className="text-xs">Bridge SDK port ile bağlanır</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -104,26 +88,6 @@ export function DeviceHikLocalBridgeSection({
                   value={field.value ?? ""}
                 />
               </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="hik_port"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>SDK Port</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  placeholder="8000"
-                  {...field}
-                  value={field.value ?? ""}
-                />
-              </FormControl>
-              <FormDescription className="text-xs">Default 8000</FormDescription>
               <FormMessage />
             </FormItem>
           )}

@@ -3,6 +3,7 @@ import { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ServerDevice, Project } from "@/types/device";
 import { useDeviceFormLogic } from "./hooks/useDeviceFormLogic";
 import { DeviceBasicSection } from "./form-sections/DeviceBasicSection";
@@ -49,7 +50,7 @@ export function DeviceForm({
     selectedZoneId,
     filteredDoors: _filteredDoors,
     onSubmit,
-  } = useDeviceFormLogic({ device, open, defaultBrand, onSuccess, projectIdOverride, adminMode });
+  } = useDeviceFormLogic({ device, defaultBrand, onSuccess, projectIdOverride, adminMode });
 
   if (!open) return null;
 
@@ -125,6 +126,26 @@ export function DeviceForm({
             form={form}
             device={device}
             onUpdated={onSuccess}
+          />
+        )}
+
+        {!adminMode && (
+          <FormField
+            control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Açıklama</FormLabel>
+                <FormControl>
+                  <Textarea
+                    placeholder="Cihaz hakkında açıklama giriniz"
+                    className="min-h-[80px]"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
         )}
 

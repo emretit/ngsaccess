@@ -10,10 +10,10 @@ crons.monthly(
   internal.reports.triggerScheduledReports
 );
 
-// Hikvision sync kuyruğu: her dakika failed op'ları (online cihazlar için) retry et.
+// Hikvision sync kuyruğu: her 3 dakikada failed op'ları (online cihazlar için) retry et.
 crons.interval(
   "process-hik-queue",
-  { minutes: 1 },
+  { minutes: 3 },
   internal.actions.hikQueueWorker.processHikQueue,
 );
 
@@ -27,7 +27,7 @@ crons.interval(
 // Windows localBridge claim edip kapanırsa processing'te asılı kalan işleri geri aç.
 crons.interval(
   "requeue-stale-hik-local-bridge-ops",
-  { minutes: 1 },
+  { minutes: 3 },
   internal.hikvisionSync.requeueStaleLocalBridgeOperations,
 );
 
@@ -39,14 +39,27 @@ crons.daily(
   internal.actions.hikGatewayDevice.syncHikDeviceTimes,
 );
 
+// Hikvision AcsEvent tarihsel backfill: her gün 02:00 UTC (TR 05:00).
+// Online gateway cihazlardan son 24-48s olay kaydını çeker, cardReadings'e yazar.
+// Dedup: (deviceId, hikSerialNo) by_device_hik_serial index ile.
+crons.daily(
+  "hik-backfill-events",
+  { hourUTC: 2, minuteUTC: 0 },
+  internal.actions.hikGatewayDevice.backfillAllDevicesEvents,
+);
+
 // IDE Smart komut kuyruğu: "sent"te asılı kalan (bridge ack'i kaçırdı / broker koptu)
 // op'ları geri "pending"e al veya maxAttempts dolduysa "failed" yap. Bridge'in kendi
 // timeout'unu (CMD_ACK_TIMEOUT_MS) kaçırdığı durumlar için güvenlik ağı.
-crons.interval(
-  "requeue-ide-timeouts",
-  { minutes: 1 },
-  internal.ideSync.requeueTimedOut,
-);
+//
+// GEÇİCİ DEVRE DIŞI (2026-06-20, function-call kotası tasarrufu): IDE daemon durdurulduğu
+// sürece bekleyen IDE op'u oluşmaz → bu cron boş iş yapar. Daemon geri açıldığında bu
+// bloğun yorumunu kaldır.
+// crons.interval(
+//   "requeue-ide-timeouts",
+//   { minutes: 3 },
+//   internal.ideSync.requeueTimedOut,
+// );
 
 // Ziyaretçi geçici erişimi: süresi dolan (accessExpiresAt<=now) aktif ziyaretçileri pasife çek
 // → mevcut isActive=false desync yolu cihazdan söker.

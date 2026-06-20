@@ -10,15 +10,11 @@ interface DeviceBasicSectionProps {
 }
 
 const DEVICE_TYPES = [
-  "Kart Okuyucu",
-  "Parmak İzi Okuyucu", 
+  "Kontrol Paneli",
+  "Parmak İzi Okuyucu",
   "Yüz Tanıma",
-  "QR Kod Okuyucu",
-  "RFID Okuyucu",
-  "Erişim Terminali",
-  "Turnike",
-  "Kapı Kontrolörü",
-  "Diğer"
+  "Kart Okuyucu",
+  "QR Kod Okuyucu"
 ] as const;
 
 export function DeviceBasicSection({ form }: DeviceBasicSectionProps) {
@@ -55,7 +51,13 @@ export function DeviceBasicSection({ form }: DeviceBasicSectionProps) {
       <FormField
         control={form.control}
         name="device_type"
-        render={({ field }) => (
+        render={({ field }) => {
+          // Kayıtlı tip standart listede yoksa (eski "Kapı Kontrolörü" vb.) onu da
+          // seçeneklere ekle — aksi halde düzenlemede Select boşalır ve değer kaybolur.
+          const options = field.value && !DEVICE_TYPES.includes(field.value as (typeof DEVICE_TYPES)[number])
+            ? [field.value, ...DEVICE_TYPES]
+            : DEVICE_TYPES;
+          return (
           <FormItem>
             <FormLabel>Cihaz Tipi</FormLabel>
             <Select onValueChange={field.onChange} value={field.value}>
@@ -65,7 +67,7 @@ export function DeviceBasicSection({ form }: DeviceBasicSectionProps) {
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
-                {DEVICE_TYPES.map(type => (
+                {options.map(type => (
                   <SelectItem key={type} value={type}>
                     {type}
                   </SelectItem>
@@ -74,30 +76,8 @@ export function DeviceBasicSection({ form }: DeviceBasicSectionProps) {
             </Select>
             <FormMessage />
           </FormItem>
-        )}
-      />
-
-      <FormField
-        control={form.control}
-        name="access_direction"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Erişim Yönü</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value}>
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Erişim yönünü seçiniz" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                <SelectItem value="entry">Giriş</SelectItem>
-                <SelectItem value="exit">Çıkış</SelectItem>
-                <SelectItem value="both">Her İkisi</SelectItem>
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )}
+          );
+        }}
       />
     </div>
   );

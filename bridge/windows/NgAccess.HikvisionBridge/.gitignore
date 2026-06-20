@@ -8,5 +8,10 @@ obj/
 hikvision-sdk/win-x64/*.dll
 hikvision-sdk/win-x64/HCNetSDKCom/
 
-# Yerel panel sırları (IP / panel şifresi / device token) — buluta gitmez.
+# Yerel köprü ayarı (Convex URL + bridge token) — buluta gitmez.
+bridge.json
+# Eski model artığı (artık kullanılmıyor; güvenlik için yine de ignore).
 panels.json
+
+# Gömülü ngsplus arayüzü — `npm run build` çıktısı; commit edilmez, build sırasında üretilir.
+wwwroot/

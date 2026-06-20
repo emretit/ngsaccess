@@ -2,20 +2,36 @@
 
 import { internal } from "../_generated/api";
 import { v } from "convex/values";
-import { internalAction } from "../_generated/server";
+import { internalAction, type ActionCtx } from "../_generated/server";
 import { authedAction } from "../lib/customFunctions";
 import { isProjectAllowed } from "../lib/auth";
 import type { Id } from "../_generated/dataModel";
 import {
   addDeviceToGateway,
+  captureCardOnDevice,
+  captureFaceOnDevice,
   deleteDeviceFromGateway,
   getDoorCapabilities,
+  getAcsWorkStatus,
   listGatewayDevices,
+  linkDoorStatusPlan,
+  linkVerifyPlan,
   openDoor,
   pingGateway,
+  rebootDeviceOnGateway,
+  searchAcsEventsOnDevice,
+  searchCardsOnDevice,
+  searchFacesOnDevice,
+  searchFingerprintsOnDevice,
   setDeviceTime,
+  setDoorStatusPlanTemplate,
+  setDoorStatusWeekPlan,
   setHttpHostForwarding,
+  setVerifyPlanTemplate,
+  setVerifyWeekPlan,
+  type Weekday,
 } from "../lib/hikGateway";
+import { diffIds } from "../lib/reconcileMath";
 
 /**
  * Cihazı Hik Device Gateway'e kaydeder (EHOME / ISUP 5.0).
@@ -286,5 +302,735 @@ export const remoteOpenDoor = authedAction({
       };
     }
     return await openDoor(device.hikDevIndex, args.doorNo ?? 1);
+  },
+});
+
+/**
+ * Cihazı gateway üzerinden yeniden başlatır.
+ * Cihaz ~30-60s offline olur; ok dönünce hikLastRebootAt güncellenir.
+ */
+export const rebootDevice = authedAction({
+  args: { deviceId: v.id("devices") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
+      internal.users.listProjectIdsForCurrentUser,
+      {},
+    );
+    const device = await ctx.runQuery(internal.devices.getByIdInternal, {
+      id: args.deviceId,
+    });
+    if (!device) return { ok: false, error: "Cihaz bulunamadı" };
+    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
+      return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
+    }
+    if (device.hikTransport !== "gateway") {
+      return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
+    }
+    if (!device.hikDevIndex) {
+      return {
+        ok: false,
+        error: "Cihaz gateway'e kayıtlı değil (önce 'Gateway'e Kaydet' tıkla)",
+      };
+    }
+    const result = await rebootDeviceOnGateway(device.hikDevIndex);
+    if (result.ok) {
+      await ctx.runMutation(internal.devices.setHikLastRebootAt, {
+        deviceId: args.deviceId,
+        at: Date.now(),
+      });
+    }
+    return result;
+  },
+});
+
+/**
+ * Cihazın anlık çalışma durumunu çeker ve DB'ye yazar.
+ * Dönüş: { ok, status?, error? } — status UI'da gösterilir.
+ */
+export const fetchDeviceWorkStatus = authedAction({
+  args: { deviceId: v.id("devices") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    ok: boolean;
+    status?: {
+      updatedAt: number;
+      doorStatus?: number[];
+      magneticStatus?: number[];
+      cardReaderOnlineStatus?: number[];
+      batteryVoltage?: number;
+      powerSupplyStatus?: string;
+      raw?: string;
+    };
+    error?: string;
+  }> => {
+    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
+      internal.users.listProjectIdsForCurrentUser,
+      {},
+    );
+    const device = await ctx.runQuery(internal.devices.getByIdInternal, {
+      id: args.deviceId,
+    });
+    if (!device) return { ok: false, error: "Cihaz bulunamadı" };
+    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
+      return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
+    }
+    if (device.hikTransport !== "gateway") {
+      return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
+    }
+    if (!device.hikDevIndex) {
+      return {
+        ok: false,
+        error: "Cihaz gateway'e kayıtlı değil (önce 'Gateway'e Kaydet' tıkla)",
+      };
+    }
+    const result = await getAcsWorkStatus(device.hikDevIndex);
+    if (!result.ok) return { ok: false, error: result.error };
+
+    const workStatus = {
+      updatedAt: Date.now(),
+      doorStatus: result.status?.doorStatus,
+      magneticStatus: result.status?.magneticStatus,
+      cardReaderOnlineStatus: result.status?.cardReaderOnlineStatus,
+      batteryVoltage: result.status?.batteryVoltage,
+      powerSupplyStatus: result.status?.powerSupplyStatus,
+      raw: result.status?.raw,
+    };
+    await ctx.runMutation(internal.devices.setHikWorkStatus, {
+      deviceId: args.deviceId,
+      workStatus,
+    });
+    return { ok: true, status: workStatus };
+  },
+});
+
+// ---------------------------------------------------------------------------
+// AcsEvent backfill (PR2)
+// ---------------------------------------------------------------------------
+
+const DEFAULT_BACKFILL_MAX_PAGES = 50;
+
+/**
+ * Tek cihaz için AcsEvent backfill yapar.
+ * - Sayfalı döngü: searchResultPosition += numMatches, total'a kadar veya maxPages.
+ * - Her event → backfillHikEventRow (dedup korumalı).
+ * - En yüksek serialNo → setHikBackfillProgress (hikLastSerialNo'ya DOKUNMAZ).
+ */
+export const backfillDeviceEvents = authedAction({
+  args: {
+    deviceId: v.id("devices"),
+    startTime: v.optional(v.string()),
+    maxPages: v.optional(v.number()),
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    ok: boolean;
+    scanned: number;
+    inserted: number;
+    skipped: number;
+    cursor?: number;
+    error?: string;
+  }> => {
+    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
+      internal.users.listProjectIdsForCurrentUser,
+      {},
+    );
+    const device = await ctx.runQuery(internal.devices.getByIdInternal, {
+      id: args.deviceId,
+    });
+    if (!device) return { ok: false, scanned: 0, inserted: 0, skipped: 0, error: "Cihaz bulunamadı" };
+    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
+      return { ok: false, scanned: 0, inserted: 0, skipped: 0, error: "Bu cihaza erişim yetkiniz yok" };
+    }
+    if (device.hikTransport !== "gateway") {
+      return { ok: false, scanned: 0, inserted: 0, skipped: 0, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
+    }
+    if (!device.hikDevIndex) {
+      return { ok: false, scanned: 0, inserted: 0, skipped: 0, error: "Cihaz gateway'e kayıtlı değil" };
+    }
+
+    return await _runBackfill(ctx, {
+      deviceId: args.deviceId,
+      devIndex: device.hikDevIndex,
+      startTime: args.startTime,
+      maxPages: args.maxPages,
+    });
+  },
+});
+
+/**
+ * Tüm online gateway cihazlar için backfill çalıştırır.
+ * Cron tarafından günlük 02:00 UTC'de tetiklenir.
+ * İlk çalışmada cursor yoksa son 48 saati backfill eder.
+ */
+export const backfillAllDevicesEvents = internalAction({
+  args: {},
+  handler: async (ctx): Promise<{ devices: number; errors: string[] }> => {
+    const onlineDevices = await ctx.runQuery(
+      internal.devices.listOnlineGatewayDevicesForBackfill,
+      {},
+    );
+
+    const errors: string[] = [];
+    const fortyEightHoursAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
+    for (const dev of onlineDevices) {
+      try {
+        // Son backfill zamanından 5dk overlap ile devam et; hiç çalışmadıysa 48 saati al.
+        // Not: hikBackfillCursor serial-no bilgisi taşır (filtreleme için KULLANILMAZ),
+        // zaman-penceresi hikLastBackfillAt üzerinden yönetilir.
+        const startTime = dev.hikLastBackfillAt
+          ? new Date(dev.hikLastBackfillAt - 5 * 60 * 1000).toISOString()
+          : fortyEightHoursAgo;
+        const result = await _runBackfill(ctx, {
+          deviceId: dev._id,
+          devIndex: dev.hikDevIndex,
+          startTime,
+          maxPages: DEFAULT_BACKFILL_MAX_PAGES,
+        });
+        if (!result.ok) {
+          errors.push(`${dev._id}: ${result.error ?? "bilinmeyen hata"}`);
+        }
+      } catch (e) {
+        errors.push(`${dev._id}: ${(e as Error).message}`);
+      }
+    }
+
+    return { devices: onlineDevices.length, errors };
+  },
+});
+
+/**
+ * Backfill döngüsü — hem authed action hem internal cron tarafından kullanılır.
+ */
+async function _runBackfill(
+  ctx: ActionCtx,
+  opts: {
+    deviceId: Id<"devices">;
+    devIndex: string;
+    startTime?: string;
+    maxPages?: number;
+  },
+): Promise<{
+  ok: boolean;
+  scanned: number;
+  inserted: number;
+  skipped: number;
+  cursor?: number;
+  error?: string;
+}> {
+  const maxPages = opts.maxPages ?? DEFAULT_BACKFILL_MAX_PAGES;
+  const searchID = `backfill-${opts.deviceId}-${Date.now()}`;
+
+  let position = 0;
+  let scanned = 0;
+  let inserted = 0;
+  let skipped = 0;
+  let maxSerialNo: number | undefined = undefined;
+  let pageCount = 0;
+
+  while (pageCount < maxPages) {
+    const page = await searchAcsEventsOnDevice(opts.devIndex, {
+      searchID,
+      position,
+      maxResults: 30,
+      ...(opts.startTime ? { startTime: opts.startTime } : {}),
+    });
+
+    if (!page.ok) {
+      return { ok: false, scanned, inserted, skipped, error: page.error };
+    }
+
+    for (const event of page.events) {
+      scanned++;
+      // serialNo garantili (searchAcsEventsOnDevice parse ederken kontrol eder)
+      const result: { inserted: boolean; reason?: string } = await ctx.runMutation(
+        internal.cardReadings.backfillHikEventRow,
+        { deviceId: opts.deviceId, event },
+      );
+      if (result.inserted) {
+        inserted++;
+        if (maxSerialNo === undefined || event.serialNo > maxSerialNo) {
+          maxSerialNo = event.serialNo;
+        }
+      } else {
+        skipped++;
+      }
+    }
+
+    pageCount++;
+
+    // hasMore=false → cihaz "daha yok" dedi (responseStatusStrg!=="MORE" ve tam-dolu sayfa değil)
+    // numMatches===0 → boş sayfa (döngü sonu guard)
+    if (page.numMatches === 0 || !page.hasMore) {
+      break;
+    }
+    position = page.nextPosition;
+  }
+
+  if (pageCount >= maxPages) {
+    console.warn(
+      `[hik-backfill] maxPages=${maxPages} aşıldı, device=${opts.deviceId}, position=${position}`,
+    );
+  }
+
+  // Cursor güncelle
+  await ctx.runMutation(internal.devices.setHikBackfillProgress, {
+    deviceId: opts.deviceId,
+    cursor: maxSerialNo,
+    at: Date.now(),
+  });
+
+  return { ok: true, scanned, inserted, skipped, cursor: maxSerialNo };
+}
+
+// ---------------------------------------------------------------------------
+// PR3: Reconcile + canlı kart/yüz okuma action'ları
+// ---------------------------------------------------------------------------
+
+/**
+ * Cihazın kart rosteriyle DB'deki beklenen roster'ı karşılaştırır.
+ * RAPOR MODU — silme/ekleme YAPMAZ.
+ *
+ * Beklenen roster: cihaza yetkili tüm çalışanların cardNumber'ları.
+ * Yetki zinciri: groupDevices.deviceId=cihaz VEYA doors.deviceId=cihaz → groupDoors
+ *   → aktif accessRules → groupMembers → employees.cardNumber
+ * (internal.devices.getHikAuthorizedCardNumbers)
+ *
+ * Cihaz roster: searchCardsOnDevice ile TÜM sayfalar gezilir.
+ *
+ * diffIds(expectedCards, onDeviceCards) → { removed=onDeviceNotExpected, added=expectedNotOnDevice }
+ */
+export const reconcileDevice = authedAction({
+  args: { deviceId: v.id("devices") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    ok: boolean;
+    // Kart diff
+    expectedCount: number;
+    onDeviceCount: number;
+    onDeviceNotExpected: string[];
+    expectedNotOnDevice: string[];
+    // Yüz diff
+    faceExpectedCount: number;
+    faceOnDeviceCount: number;
+    faceOnDeviceNotExpected: string[];
+    faceExpectedNotOnDevice: string[];
+    // Parmak izi diff
+    fingerprintExpectedCount: number;
+    fingerprintOnDeviceCount: number;
+    fingerprintOnDeviceNotExpected: string[];
+    fingerprintExpectedNotOnDevice: string[];
+    error?: string;
+  }> => {
+    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
+      internal.users.listProjectIdsForCurrentUser,
+      {},
+    );
+    const device = await ctx.runQuery(internal.devices.getByIdInternal, {
+      id: args.deviceId,
+    });
+    /** Boş diff — hata dönüşleri için sıfır-değer helper. */
+    const emptyDiff = () => ({
+      expectedCount: 0,
+      onDeviceCount: 0,
+      onDeviceNotExpected: [] as string[],
+      expectedNotOnDevice: [] as string[],
+      faceExpectedCount: 0,
+      faceOnDeviceCount: 0,
+      faceOnDeviceNotExpected: [] as string[],
+      faceExpectedNotOnDevice: [] as string[],
+      fingerprintExpectedCount: 0,
+      fingerprintOnDeviceCount: 0,
+      fingerprintOnDeviceNotExpected: [] as string[],
+      fingerprintExpectedNotOnDevice: [] as string[],
+    });
+
+    if (!device) {
+      return { ok: false, ...emptyDiff(), error: "Cihaz bulunamadı" };
+    }
+    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
+      return { ok: false, ...emptyDiff(), error: "Bu cihaza erişim yetkiniz yok" };
+    }
+    if (device.hikTransport !== "gateway") {
+      return { ok: false, ...emptyDiff(), error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
+    }
+    if (!device.hikDevIndex) {
+      return { ok: false, ...emptyDiff(), error: "Cihaz gateway'e kayıtlı değil (önce 'Gateway'e Kaydet' tıkla)" };
+    }
+    const devIndex = device.hikDevIndex;
+
+    // ── Beklenen roster'lar ─────────────────────────────────────────────────
+    const [expectedCards, expectedFaces, expectedFingerprints] = await Promise.all([
+      ctx.runQuery(internal.devices.getHikAuthorizedCardNumbers, { deviceId: args.deviceId }) as Promise<string[]>,
+      ctx.runQuery(internal.devices.getHikDeviceFaceRoster, { deviceId: args.deviceId }) as Promise<string[]>,
+      ctx.runQuery(internal.devices.getHikDeviceFingerprintRoster, { deviceId: args.deviceId }) as Promise<string[]>,
+    ]);
+
+    // ── Cihaz kart roster (tüm sayfalar) ────────────────────────────────────
+    const cardSearchID = `reconcile-card-${args.deviceId}-${Date.now()}`;
+    const MAX_RECONCILE_PAGES = 100;
+    const onDeviceCards: string[] = [];
+    let cardPos = 0;
+    let cardPageCount = 0;
+
+    while (cardPageCount < MAX_RECONCILE_PAGES) {
+      const page = await searchCardsOnDevice(devIndex, {
+        searchID: cardSearchID,
+        position: cardPos,
+        maxResults: 50,
+      });
+      if (!page.ok) {
+        return {
+          ok: false,
+          ...emptyDiff(),
+          expectedCount: expectedCards.length,
+          error: `Cihaz kart listesi alınamadı: ${page.error ?? "bilinmeyen hata"}`,
+        };
+      }
+      for (const card of page.cards) onDeviceCards.push(card.cardNo);
+      cardPageCount++;
+      if (page.numMatches === 0 || !page.hasMore) break;
+      cardPos = page.nextPosition;
+    }
+    if (cardPageCount >= MAX_RECONCILE_PAGES) {
+      console.warn(`[hik-reconcile] kart maxPages=${MAX_RECONCILE_PAGES} aşıldı, device=${args.deviceId}`);
+    }
+
+    // ── Cihaz yüz roster (tüm sayfalar) ─────────────────────────────────────
+    // VERIFY: FDSearch response shape (FPID/employeeNo/MatchList) canlı cihazda doğrula.
+    // Eşleme: cihaz yüz kaydı → FaceRecord.employeeNo = ngsaccess employee.cardNumber
+    const faceSearchID = `reconcile-face-${args.deviceId}-${Date.now()}`;
+    const onDeviceFaces: string[] = [];
+    let facePos = 0;
+    let facePageCount = 0;
+
+    while (facePageCount < MAX_RECONCILE_PAGES) {
+      const page = await searchFacesOnDevice(devIndex, {
+        searchID: faceSearchID,
+        position: facePos,
+        maxResults: 50,
+      });
+      if (!page.ok) {
+        // Yüz desteği olmayan cihazlar HTTP 4xx dönebilir — uyarı logla, kart sonucunu yine de dön.
+        console.warn(`[hik-reconcile] yüz listesi alınamadı, device=${args.deviceId}: ${page.error ?? "?"}`);
+        break;
+      }
+      for (const face of page.faces) {
+        // VERIFY: cihazdaki yüz kaydında employeeNo mu yoksa FPID mi kullanılan tanımlayıcı?
+        // hikvisionSync.ts addFaceToDevice'de FPID: employeeNo set ediliyor → employeeNo öncelikli.
+        const id = face.employeeNo ?? face.FPID;
+        if (id) onDeviceFaces.push(id);
+      }
+      facePageCount++;
+      if (page.numMatches === 0 || !page.hasMore) break;
+      facePos = page.nextPosition;
+    }
+
+    // ── Cihaz parmak izi roster (tüm sayfalar) ──────────────────────────────
+    // VERIFY: FingerPrintUpload response shape (FingerPrintList/FingerPrintInfo/employeeNo) canlı cihazda doğrula.
+    const fpSearchID = `reconcile-fp-${args.deviceId}-${Date.now()}`;
+    const onDeviceFingerprints: string[] = [];
+    let fpPos = 0;
+    let fpPageCount = 0;
+
+    while (fpPageCount < MAX_RECONCILE_PAGES) {
+      const page = await searchFingerprintsOnDevice(devIndex, {
+        searchID: fpSearchID,
+        position: fpPos,
+        maxResults: 50,
+      });
+      if (!page.ok) {
+        console.warn(`[hik-reconcile] parmak izi listesi alınamadı, device=${args.deviceId}: ${page.error ?? "?"}`);
+        break;
+      }
+      for (const fp of page.fingerprints) {
+        onDeviceFingerprints.push(fp.employeeNo);
+      }
+      fpPageCount++;
+      if (page.numMatches === 0 || !page.hasMore) break;
+      fpPos = page.nextPosition;
+    }
+
+    // ── Farkları hesapla ────────────────────────────────────────────────────
+    // diffIds(oldIds=expected, newIds=onDevice)
+    //   removed = expected'da var ama cihazda yok = expectedNotOnDevice
+    //   added   = cihazda var ama expected'da yok = onDeviceNotExpected
+    const cardDiff = diffIds(expectedCards, onDeviceCards);
+    const faceDiff = diffIds(expectedFaces, onDeviceFaces);
+    const fingerprintDiff = diffIds(expectedFingerprints, onDeviceFingerprints);
+
+    return {
+      ok: true,
+      // Kart
+      expectedCount: expectedCards.length,
+      onDeviceCount: onDeviceCards.length,
+      onDeviceNotExpected: cardDiff.added,
+      expectedNotOnDevice: cardDiff.removed,
+      // Yüz
+      faceExpectedCount: expectedFaces.length,
+      faceOnDeviceCount: onDeviceFaces.length,
+      faceOnDeviceNotExpected: faceDiff.added,
+      faceExpectedNotOnDevice: faceDiff.removed,
+      // Parmak izi
+      fingerprintExpectedCount: expectedFingerprints.length,
+      fingerprintOnDeviceCount: onDeviceFingerprints.length,
+      fingerprintOnDeviceNotExpected: fingerprintDiff.added,
+      fingerprintExpectedNotOnDevice: fingerprintDiff.removed,
+    };
+  },
+});
+
+/**
+ * Okuyucudan canlı kart okutma işlemi başlatır.
+ * GET /ISAPI/AccessControl/CaptureCardInfo
+ * Dönüş: { ok, cardNo?, error? }
+ */
+export const captureCardFromDevice = authedAction({
+  args: { deviceId: v.id("devices") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ ok: boolean; cardNo?: string; error?: string }> => {
+    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
+      internal.users.listProjectIdsForCurrentUser,
+      {},
+    );
+    const device = await ctx.runQuery(internal.devices.getByIdInternal, {
+      id: args.deviceId,
+    });
+    if (!device) return { ok: false, error: "Cihaz bulunamadı" };
+    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
+      return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
+    }
+    if (device.hikTransport !== "gateway") {
+      return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
+    }
+    if (!device.hikDevIndex) {
+      return { ok: false, error: "Cihaz gateway'e kayıtlı değil (önce 'Gateway'e Kaydet' tıkla)" };
+    }
+    const result = await captureCardOnDevice(device.hikDevIndex);
+    return { ok: result.ok, cardNo: result.cardNo, error: result.error };
+  },
+});
+
+/**
+ * Okuyucudan canlı yüz verisi alır.
+ * POST /ISAPI/AccessControl/CaptureFaceData (+ progress poll)
+ * Dönüş: { ok, faceDataBase64?, faceURL?, error? }
+ *
+ * employeeId verilirse çalışanın kart numarası employeeNo olarak cihaza iletilir.
+ */
+export const captureFaceFromDevice = authedAction({
+  args: {
+    deviceId: v.id("devices"),
+    employeeId: v.optional(v.id("employees")),
+  },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ ok: boolean; faceDataBase64?: string; faceURL?: string; error?: string }> => {
+    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
+      internal.users.listProjectIdsForCurrentUser,
+      {},
+    );
+    const device = await ctx.runQuery(internal.devices.getByIdInternal, {
+      id: args.deviceId,
+    });
+    if (!device) return { ok: false, error: "Cihaz bulunamadı" };
+    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
+      return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
+    }
+    if (device.hikTransport !== "gateway") {
+      return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
+    }
+    if (!device.hikDevIndex) {
+      return { ok: false, error: "Cihaz gateway'e kayıtlı değil (önce 'Gateway'e Kaydet' tıkla)" };
+    }
+
+    // employeeId verilmişse: (1) proje-scope kontrolü, (2) cardNumber'ı employeeNo olarak al
+    let employeeNo: string | undefined;
+    if (args.employeeId) {
+      // Faz 7D: defense-in-depth — cihaz gate'iyle simetri.
+      // getEmployeeCardNumber yalnız cardNumber döndürür; employee projesini bilmez.
+      // O yüzden employee'yi internal'dan çekip projectId'yi doğruluyoruz.
+      const employee = await ctx.runQuery(internal.devices.getEmployeeByIdInternal, {
+        employeeId: args.employeeId,
+      });
+      if (!employee) {
+        return { ok: false, error: "Çalışan bulunamadı" };
+      }
+      if (employee.projectId && !isProjectAllowed(allowedProjectIds, employee.projectId)) {
+        return { ok: false, error: "Bu çalışana erişim yetkiniz yok" };
+      }
+      employeeNo = employee.cardNumber?.trim() ?? undefined;
+    }
+
+    const result = await captureFaceOnDevice(device.hikDevIndex, { employeeNo });
+    return {
+      ok: result.ok,
+      faceDataBase64: result.faceDataBase64,
+      faceURL: result.faceURL,
+      error: result.error,
+    };
+  },
+});
+
+// ============================================================================
+// DOOR STATUS PLAN + VERIFY PLAN — Faz 5 (PR4)
+// ============================================================================
+
+/**
+ * Kapıya DoorStatus planı uygular.
+ * Plan kaynağı: door.hikDoorStatusPlan. enabled=false ise planı iptal eder.
+ *
+ * planNo / templateNo konvansiyonu: kapı-tabanlı sabit slot.
+ *   planNo     = (hikDoorNo ?? 1)
+ *   templateNo = (hikDoorNo ?? 1) + 100  (template slotları ayrı namespace'e alınır)
+ * Bu konvansiyonla her kapı kendi planNo/templateNo slot'una yazar; çakışma olmaz.
+ * Cihazda yalnız bir kapı varsa her zaman planNo=1, templateNo=101 olur.
+ */
+export const applyDoorStatusPlan = authedAction({
+  args: { doorId: v.id("doors") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
+      internal.users.listProjectIdsForCurrentUser,
+      {},
+    );
+    const door = await ctx.runQuery(internal.doors.getByIdInternal, { id: args.doorId });
+    if (!door) return { ok: false, error: "Kapı bulunamadı" };
+    if (!door.deviceId) return { ok: false, error: "Kapıya bağlı cihaz yok" };
+
+    const device = await ctx.runQuery(internal.devices.getByIdInternal, { id: door.deviceId });
+    if (!device) return { ok: false, error: "Cihaz bulunamadı" };
+    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
+      return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
+    }
+    if (device.hikTransport !== "gateway") {
+      return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
+    }
+    if (!device.hikDevIndex) {
+      return { ok: false, error: "Cihaz gateway'e kayıtlı değil (önce 'Gateway'e Kaydet' tıkla)" };
+    }
+
+    const devIndex = device.hikDevIndex;
+
+    // hikDoorNo tanımsızsa sessiz ?‌? 1 kullanma — aynı cihazda iki kapı slot 1'de çakışır.
+    if (door.hikDoorNo === undefined || door.hikDoorNo === null) {
+      return { ok: false, error: "Kapı numarası (hikDoorNo) tanımsız — kapıyı düzenleyip numara girin" };
+    }
+    const doorNo = door.hikDoorNo;
+    const planNo = doorNo;
+    const templateNo = doorNo + 100;
+    const plan = door.hikDoorStatusPlan;
+
+    // enabled=false veya plan yoksa iptal et
+    if (!plan || !plan.enabled) {
+      return await linkDoorStatusPlan(devIndex, doorNo, 0);
+    }
+
+    // Her gün aynı segment (basit tek-aralık plan)
+    const ALL_WEEKDAYS: Weekday[] = [
+      "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+    ];
+    const segments = ALL_WEEKDAYS.map((week, idx) => ({
+      week,
+      id: idx + 1,
+      enable: true,
+      doorStatus: plan.mode as "remainOpen" | "normal",
+      beginTime: plan.beginTime,
+      endTime: plan.endTime,
+    }));
+
+    const r1 = await setDoorStatusWeekPlan(devIndex, planNo, segments);
+    if (!r1.ok) return r1;
+
+    const r2 = await setDoorStatusPlanTemplate(devIndex, templateNo, { weekPlanNo: planNo });
+    if (!r2.ok) return r2;
+
+    return await linkDoorStatusPlan(devIndex, doorNo, templateNo);
+  },
+});
+
+/**
+ * Kapıya Verify planı uygular.
+ * Plan kaynağı: door.hikVerifyPlan. enabled=false ise planı iptal eder.
+ *
+ * planNo / templateNo konvansiyonu: applyDoorStatusPlan ile aynı slot kuralı ama
+ * ayrı ISAPI endpoint'leri (VerifyWeekPlanCfg / VerifyPlanTemplate / VerifyPlan).
+ * Çakışma yok — DoorStatus ve Verify plan numaraları ayrı cihaz-tarafı havuzlarda tutuluyor.
+ */
+export const applyVerifyPlan = authedAction({
+  args: { doorId: v.id("doors") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
+      internal.users.listProjectIdsForCurrentUser,
+      {},
+    );
+    const door = await ctx.runQuery(internal.doors.getByIdInternal, { id: args.doorId });
+    if (!door) return { ok: false, error: "Kapı bulunamadı" };
+    if (!door.deviceId) return { ok: false, error: "Kapıya bağlı cihaz yok" };
+
+    const device = await ctx.runQuery(internal.devices.getByIdInternal, { id: door.deviceId });
+    if (!device) return { ok: false, error: "Cihaz bulunamadı" };
+    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
+      return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
+    }
+    if (device.hikTransport !== "gateway") {
+      return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
+    }
+    if (!device.hikDevIndex) {
+      return { ok: false, error: "Cihaz gateway'e kayıtlı değil (önce 'Gateway'e Kaydet' tıkla)" };
+    }
+
+    const devIndex = device.hikDevIndex;
+
+    // hikDoorNo tanımsızsa sessiz ?‌? 1 kullanma — aynı cihazda iki kapı slot 1'de çakışır.
+    if (door.hikDoorNo === undefined || door.hikDoorNo === null) {
+      return { ok: false, error: "Kapı numarası (hikDoorNo) tanımsız — kapıyı düzenleyip numara girin" };
+    }
+    const doorNo = door.hikDoorNo;
+    const planNo = doorNo;
+    const templateNo = doorNo + 100;
+    const plan = door.hikVerifyPlan;
+
+    // enabled=false veya plan yoksa iptal et
+    if (!plan || !plan.enabled) {
+      return await linkVerifyPlan(devIndex, doorNo, 0);
+    }
+
+    const ALL_WEEKDAYS: Weekday[] = [
+      "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+    ];
+    const segments = ALL_WEEKDAYS.map((week, idx) => ({
+      week,
+      id: idx + 1,
+      enable: true,
+      verifyMode: plan.verifyMode,
+      beginTime: plan.beginTime,
+      endTime: plan.endTime,
+    }));
+
+    const r1 = await setVerifyWeekPlan(devIndex, planNo, segments);
+    if (!r1.ok) return r1;
+
+    const r2 = await setVerifyPlanTemplate(devIndex, templateNo, { weekPlanNo: planNo });
+    if (!r2.ok) return r2;
+
+    return await linkVerifyPlan(devIndex, doorNo, templateNo);
   },
 });

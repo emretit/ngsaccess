@@ -47,6 +47,7 @@ UninstallDisplayName={#AppName}
 Source: "{#SrcDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
+Name: "{group}\NGS Access (arayüz)"; Filename: "http://127.0.0.1:8787/"
 Name: "{group}\Bridge Ayarları (/__bridge)"; Filename: "http://127.0.0.1:8787/__bridge"
 Name: "{group}\Console Modda Çalıştır"; Filename: "{app}\{#ExeName}"; Parameters: "--console"
 Name: "{group}\Kaldır {#AppName}"; Filename: "{uninstallexe}"

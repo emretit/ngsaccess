@@ -1,7 +1,6 @@
 
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { UseFormReturn } from "react-hook-form";
 import type { FormValues } from "../hooks/useDeviceFormSchema";
 
@@ -29,24 +28,6 @@ export function DeviceStatusSection({ form }: DeviceStatusSectionProps) {
                 <SelectItem value="inactive">Pasif</SelectItem>
               </SelectContent>
             </Select>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      <FormField
-        control={form.control}
-        name="description"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Açıklama</FormLabel>
-            <FormControl>
-              <Textarea 
-                placeholder="Cihaz hakkında açıklama giriniz"
-                className="min-h-[100px]"
-                {...field}
-              />
-            </FormControl>
             <FormMessage />
           </FormItem>
         )}

@@ -27,10 +27,13 @@ export function DeviceLocationSection({
   form,
   zones,
   locationLoading,
-  selectedZoneId,
   filteredDoors,
 }: DeviceLocationSectionProps) {
   const userChangedZone = useRef(false);
+  // Hikvision'da kapı sayısı modelden türetilir (DeviceHikvisionSection) → generic
+  // "Kapı Sayısı" select'ini gizle. Diğer markalarda eski davranış korunur.
+  const brand = form.watch("brand");
+  const showDoorCount = brand !== "hikvision";
 
   return (
     <div className="space-y-4">
@@ -86,44 +89,35 @@ export function DeviceLocationSection({
         )}
       />
 
-      <FormField
-        control={form.control}
-        name="door_id"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Kapı</FormLabel>
-            <Select
-              value={field.value ?? ""}
-              onValueChange={(value) => {
-                field.onChange(value || undefined);
-              }}
-              disabled={!selectedZoneId || locationLoading}
-            >
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue 
-                    placeholder={
-                      !selectedZoneId 
-                        ? "Önce bölge seçiniz" 
-                        : filteredDoors.length === 0 
-                          ? "Seçili bölgede kapı yok" 
-                          : "Kapı seçiniz"
-                    } 
-                  />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {filteredDoors.map((door) => (
-                  <SelectItem key={door.id} value={String(door.id)}>
-                    {door.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
+      {showDoorCount && (
+        <FormField
+          control={form.control}
+          name="door_count"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Kapı Sayısı</FormLabel>
+              <Select
+                value={field.value ? String(field.value) : ""}
+                onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Kapı sayısı seçiniz" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+                    <SelectItem key={n} value={String(n)}>
+                      {n}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      )}
     </div>
   );
 }

@@ -21,11 +21,10 @@ interface DeviceTableRowProps {
   device: Device;
   rowIndex?: number;
   zoneName?: string;
-  doorName?: string;
   /** Admin görünümü: cihazın bağlı olduğu proje kolonunu göster. */
   showProject?: boolean;
   projectName?: string;
-  /** Admin görünümü: bölge/kapı/erişim yönü kolonlarını ve "Konum Ata" aksiyonunu gizler. */
+  /** Admin görünümü: bölge kolonunu ve "Konum Ata" aksiyonunu gizler. */
   hideLocation?: boolean;
   onDeleteDevice: (deviceId: string) => void;
   onAssignLocation?: (device: Device) => void;
@@ -41,7 +40,6 @@ export function DeviceTableRow({
   device,
   rowIndex,
   zoneName,
-  doorName,
   showProject,
   projectName,
   hideLocation,
@@ -63,19 +61,6 @@ export function DeviceTableRow({
         return <Badge variant="destructive">Süresi Dolmuş</Badge>;
       default:
         return <Badge variant="secondary">Bilinmiyor</Badge>;
-    }
-  };
-
-  const getAccessDirectionText = (direction?: string) => {
-    switch (direction) {
-      case 'entry':
-        return 'Giriş';
-      case 'exit':
-        return 'Çıkış';
-      case 'both':
-        return 'Giriş/Çıkış';
-      default:
-        return '-';
     }
   };
 
@@ -111,8 +96,6 @@ export function DeviceTableRow({
       {!hideLocation && (
         <>
           <TableCell>{zoneName || '-'}</TableCell>
-          <TableCell>{doorName || '-'}</TableCell>
-          <TableCell>{getAccessDirectionText(device.accessDirection)}</TableCell>
         </>
       )}
       <TableCell>{getStatusBadge(device.status as 'online' | 'offline' | 'expired')}</TableCell>

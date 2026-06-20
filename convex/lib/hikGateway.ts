@@ -1162,7 +1162,8 @@ export async function addFingerprintToDevice(
       error: `fingerPrintID 1-${MAX_FINGERPRINTS_PER_PERSON} arasında olmalı`,
     };
   }
-  return gatewayApiCallChecked(
+  // 1. FingerPrint verisi cihaza gönderilir (async yazma başlar).
+  const downloadResult = await gatewayApiCallChecked(
     "/ISAPI/AccessControl/FingerPrintDownload",
     "POST",
     {
@@ -1175,6 +1176,21 @@ export async function addFingerprintToDevice(
       },
     },
     devIndex,
+  );
+  if (!downloadResult.ok) return downloadResult;
+
+  // 2. Cihaz async apply eder; FingerPrintProgress polling ile tamamlanmasını bekle.
+  // VERIFY: wrapKey ve statusField DS-K2804 / DS-K1T8 serisinde bu şekilde;
+  //         diğer modellerde farklı olabilir — canlı yanıtla doğrula.
+  return pollApplyProgress(
+    devIndex,
+    "/ISAPI/AccessControl/FingerPrintProgress",
+    {
+      wrapKey: "FingerPrintProgress",
+      statusField: "status",
+      successValue: "success",
+      failValue: "failed",
+    },
   );
 }
 
@@ -1258,4 +1274,942 @@ export async function setHttpHostForwarding(
   const status = parseHikJsonStatus(result);
   if (status.ok || status.alreadyExists) return { ok: true };
   return { ok: false, error: status.error ?? `HTTP ${result.status}: ${result.raw}` };
+}
+
+/**
+ * Cihazı gateway üzerinden yeniden başlatır.
+ * PUT /ISAPI/System/reboot — yanıt XML veya boş olabilir; HTTP 2xx → başarı say.
+ */
+export async function rebootDeviceOnGateway(
+  devIndex: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const result = await gatewayApiCall("/ISAPI/System/reboot", "PUT", {}, devIndex);
+  if (result.status >= 200 && result.status < 300) return { ok: true };
+  // JSON statusCode kontrolü — XML/boş yanıta tolerans
+  const status = parseHikJsonStatus(result);
+  if (status.ok) return { ok: true };
+  return {
+    ok: false,
+    error: status.error ?? `HTTP ${result.status}: ${result.raw.slice(0, 200)}`,
+  };
+}
+
+export interface AcsWorkStatusResult {
+  doorStatus?: number[];
+  magneticStatus?: number[];
+  cardReaderOnlineStatus?: number[];
+  batteryVoltage?: number;
+  powerSupplyStatus?: string;
+  raw: string;
+}
+
+/**
+ * Cihazın anlık çalışma durumunu okur.
+ * GET /ISAPI/AccessControl/AcsWorkStatus
+ * // VERIFY: Alan adları cihaz modeline göre değişebilir — canlı yanıtla doğrula.
+ */
+export async function getAcsWorkStatus(devIndex: string): Promise<{
+  ok: boolean;
+  status?: AcsWorkStatusResult;
+  error?: string;
+}> {
+  const result = await gatewayApiCall(
+    "/ISAPI/AccessControl/AcsWorkStatus",
+    "GET",
+    undefined,
+    devIndex,
+  );
+  if (result.status !== 200) {
+    return { ok: false, error: `HTTP ${result.status}: ${result.raw.slice(0, 200)}` };
+  }
+  const raw = result.raw;
+  const data = result.data;
+  if (typeof data !== "object" || data === null) {
+    return { ok: false, error: "Yanıt parse edilemedi" };
+  }
+  // VERIFY: Bazı firmware'lar AcsWorkStatus wrap key kullanır, bazıları düz döner.
+  const wrap =
+    (data as Record<string, unknown>)["AcsWorkStatus"] ??
+    (data as Record<string, unknown>);
+  if (typeof wrap !== "object" || wrap === null) {
+    return { ok: false, error: "AcsWorkStatus alanı yok" };
+  }
+  const w = wrap as Record<string, unknown>;
+
+  // doorStatus: sayısal array — VERIFY: alan adı değişebilir (doorStatus / DoorStatus)
+  // Fix 6: boş [] geleni [] bırak, "alan yok" ile "alan boş (0 okuyucu)" ayrımı korunsun.
+  const parseMaybeNumberArray = (v: unknown): number[] | undefined => {
+    if (!Array.isArray(v)) return undefined;
+    return v.filter((x): x is number => typeof x === "number");
+  };
+
+  const doorStatus = parseMaybeNumberArray(w["doorStatus"] ?? w["DoorStatus"]);
+  const magneticStatus = parseMaybeNumberArray(w["magneticStatus"] ?? w["MagneticStatus"]);
+  const cardReaderOnlineStatus = parseMaybeNumberArray(
+    w["cardReaderOnlineStatus"] ?? w["CardReaderOnlineStatus"],
+  );
+
+  const rawBattery = w["batteryVoltage"] ?? w["BatteryVoltage"];
+  const batteryVoltage = typeof rawBattery === "number" ? rawBattery : undefined;
+
+  const rawPower = w["powerSupplyStatus"] ?? w["PowerSupplyStatus"];
+  const powerSupplyStatus = typeof rawPower === "string" ? rawPower : undefined;
+
+  return {
+    ok: true,
+    status: {
+      doorStatus,
+      magneticStatus,
+      cardReaderOnlineStatus,
+      batteryVoltage,
+      powerSupplyStatus,
+      raw,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// AcsEvent — geçmiş erişim olayları (PR2: backfill)
+// ---------------------------------------------------------------------------
+
+/**
+ * Cihazdan tek sayfa AcsEvent çeker.
+ * searchPersonOnDevice desenini birebir izler.
+ *
+ * VERIFY: InfoList, serialNo, cardType, currentVerifyMode alanları canlı cihazda
+ * doğrulanmalı — ISAPI spec ile uyumlu ama cihaz firmware farkı olabilir.
+ */
+export interface AcsEventRow {
+  time: string;
+  cardNo: string;
+  cardType?: string;
+  name?: string;
+  employeeNoString?: string;
+  major: number;
+  minor: number;
+  doorNo?: number;
+  currentVerifyMode?: string;
+  serialNo: number;
+  pictureURL?: string;
+  attendanceStatus?: string;
+}
+
+export interface SearchAcsEventsResult {
+  ok: boolean;
+  events: AcsEventRow[];
+  /** Cihazdaki toplam kayıt sayısı (totalMatches) */
+  total: number;
+  /** Bu sayfada dönen kayıt sayısı (numOfMatches) */
+  numMatches: number;
+  /** Sonraki sayfa için kullanılacak searchResultPosition */
+  nextPosition: number;
+  /**
+   * Devam eden sayfa var mı?
+   * responseStatusStrg==="MORE" VEYA tam-dolu sayfa (numMatches >= maxResults).
+   * Firmware totalMatches döndürmese bile güvenli döngü sonu için kullan.
+   */
+  hasMore: boolean;
+  error?: string;
+}
+
+export async function searchAcsEventsOnDevice(
+  devIndex: string,
+  opts: {
+    searchID: string;
+    position: number;
+    maxResults?: number;
+    startTime?: string;
+    endTime?: string;
+    major?: number;
+    minor?: number;
+  },
+): Promise<SearchAcsEventsResult> {
+  const body = {
+    AcsEventCond: {
+      searchID: opts.searchID,
+      searchResultPosition: opts.position,
+      maxResults: opts.maxResults ?? DEFAULT_SEARCH_PAGE_SIZE,
+      ...(opts.startTime ? { startTime: opts.startTime } : {}),
+      ...(opts.endTime ? { endTime: opts.endTime } : {}),
+      ...(opts.major !== undefined ? { major: opts.major } : {}),
+      ...(opts.minor !== undefined ? { minor: opts.minor } : {}),
+    },
+  };
+
+  const result = await gatewayApiCall(
+    "/ISAPI/AccessControl/AcsEvent",
+    "POST",
+    body,
+    devIndex,
+  );
+
+  if (result.status !== 200) {
+    return {
+      ok: false,
+      events: [],
+      total: 0,
+      numMatches: 0,
+      nextPosition: opts.position,
+      hasMore: false,
+      error: `HTTP ${result.status}: ${result.raw.slice(0, 200)}`,
+    };
+  }
+
+  const data = result.data as Record<string, unknown> | undefined;
+  const acsEvent = data?.AcsEvent as Record<string, unknown> | undefined;
+
+  const totalMatches = (acsEvent?.totalMatches as number | undefined) ?? 0;
+  const numOfMatches = (acsEvent?.numOfMatches as number | undefined) ?? 0;
+  const maxResults = opts.maxResults ?? DEFAULT_SEARCH_PAGE_SIZE;
+  const responseStatusStrg = acsEvent?.responseStatusStrg as string | undefined;
+  const hasMore = responseStatusStrg === "MORE" || numOfMatches >= maxResults;
+
+  // InfoList toleranslı oku — alan yoksa ya da boş array varsa boş dön
+  const rawList = acsEvent?.InfoList;
+  const infoList: AcsEventRow[] = [];
+
+  if (Array.isArray(rawList)) {
+    for (const item of rawList) {
+      if (typeof item !== "object" || item === null) continue;
+      const row = item as Record<string, unknown>;
+      // serialNo zorunlu; yoksa bu satırı dedup'lanamayacağından skip et
+      const serialNo = row.serialNo as number | undefined;
+      if (typeof serialNo !== "number") continue;
+      infoList.push({
+        time: (row.time as string | undefined) ?? "",
+        cardNo: (row.cardNo as string | undefined) ?? "",
+        cardType: row.cardType as string | undefined,
+        name: row.name as string | undefined,
+        employeeNoString: row.employeeNoString as string | undefined,
+        major: (row.major as number | undefined) ?? 0,
+        minor: (row.minor as number | undefined) ?? 0,
+        doorNo: row.doorNo as number | undefined,
+        currentVerifyMode: row.currentVerifyMode as string | undefined,
+        serialNo,
+        pictureURL: row.pictureURL as string | undefined,
+        attendanceStatus: row.attendanceStatus as string | undefined,
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    events: infoList,
+    total: totalMatches,
+    numMatches: numOfMatches,
+    nextPosition: opts.position + numOfMatches,
+    hasMore,
+  };
+}
+
+/**
+ * Async apply operation'ın tamamlanmasını polling ile bekler.
+ * pollDeleteProgress'in genelleştirilmiş hâli — endpoint + status field parametrik.
+ *
+ * Örnek: FingerPrintProgress için
+ *   { statusField: "status", successValue: "success", failValue: "failed", wrapKey: "FingerPrintProgress" }
+ */
+export async function pollApplyProgress(
+  devIndex: string,
+  endpoint: string,
+  opts: {
+    wrapKey: string;
+    statusField: string;
+    successValue: string;
+    failValue: string;
+    timeoutMs?: number;
+    initialIntervalMs?: number;
+  },
+): Promise<{ ok: boolean; error?: string }> {
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_DELETE_TIMEOUT_MS;
+  let intervalMs = opts.initialIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const result = await gatewayApiCall(endpoint, "GET", null, devIndex);
+    if (result.status !== 200) {
+      return { ok: false, error: `HTTP ${result.status}: ${result.raw.slice(0, 200)}` };
+    }
+    const data = result.data as Record<string, unknown> | undefined;
+    const wrap = data?.[opts.wrapKey] as Record<string, unknown> | undefined;
+    const fieldValue = wrap?.[opts.statusField] as string | undefined;
+    if (fieldValue === opts.successValue) return { ok: true };
+    if (fieldValue === opts.failValue) {
+      return { ok: false, error: `Apply başarısız (cihaz: ${opts.failValue})` };
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+    intervalMs = Math.min(intervalMs * 2, DEFAULT_POLL_MAX_INTERVAL_MS);
+  }
+  return { ok: false, error: `Apply polling timeout (${timeoutMs}ms)` };
+}
+
+// ---------------------------------------------------------------------------
+// PR3: Reconcile + canlı okuma lib fonksiyonları
+// ---------------------------------------------------------------------------
+
+export interface SearchCardInfo {
+  cardNo: string;
+  employeeNo?: string;
+  cardType?: string;
+}
+
+export interface SearchCardsResult {
+  ok: boolean;
+  cards: SearchCardInfo[];
+  total: number;
+  numMatches: number;
+  nextPosition: number;
+  /** Devam eden sayfa var mı? responseStatusStrg==="MORE" veya tam-dolu sayfa. */
+  hasMore: boolean;
+  error?: string;
+}
+
+/**
+ * Cihazdaki kart listesini sayfalı olarak sorgular.
+ * POST /ISAPI/AccessControl/CardInfo/Search
+ *
+ * VERIFY: yanıt wrap-key CardInfo (üst) + CardInfo/InfoList (liste); ikisi de toleranslı okunur.
+ */
+export async function searchCardsOnDevice(
+  devIndex: string,
+  opts: {
+    searchID: string;
+    position: number;
+    maxResults?: number;
+    employeeNo?: string;
+  },
+): Promise<SearchCardsResult> {
+  const body = {
+    CardInfoSearchCond: {
+      searchID: opts.searchID,
+      searchResultPosition: opts.position,
+      maxResults: opts.maxResults ?? DEFAULT_SEARCH_PAGE_SIZE,
+      ...(opts.employeeNo
+        ? { EmployeeNoList: [{ employeeNo: opts.employeeNo }] }
+        : {}),
+    },
+  };
+  const result = await gatewayApiCall(
+    "/ISAPI/AccessControl/CardInfo/Search",
+    "POST",
+    body,
+    devIndex,
+  );
+  if (result.status !== 200) {
+    return {
+      ok: false,
+      cards: [],
+      total: 0,
+      numMatches: 0,
+      nextPosition: opts.position,
+      hasMore: false,
+      error: `HTTP ${result.status}: ${result.raw.slice(0, 200)}`,
+    };
+  }
+
+  const data = result.data as Record<string, unknown> | undefined;
+  // Wrap key: "CardInfo" (üst obje)
+  const wrap = data?.CardInfo as Record<string, unknown> | undefined;
+
+  const totalMatches = (wrap?.totalMatches as number | undefined) ?? 0;
+  const numOfMatches = (wrap?.numOfMatches as number | undefined) ?? 0;
+  const maxResults = opts.maxResults ?? DEFAULT_SEARCH_PAGE_SIZE;
+  const responseStatusStrg = wrap?.responseStatusStrg as string | undefined;
+  const hasMore = responseStatusStrg === "MORE" || numOfMatches >= maxResults;
+
+  // Liste ya "CardInfo" ya da "InfoList" key'inde olabilir
+  const rawList = wrap?.CardInfo ?? wrap?.InfoList;
+  const cards: SearchCardInfo[] = [];
+
+  if (Array.isArray(rawList)) {
+    for (const item of rawList) {
+      if (typeof item !== "object" || item === null) continue;
+      const row = item as Record<string, unknown>;
+      const cardNo = row.cardNo as string | undefined;
+      if (!cardNo) continue;
+      cards.push({
+        cardNo,
+        employeeNo: row.employeeNo as string | undefined,
+        cardType: row.cardType as string | undefined,
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    cards,
+    total: totalMatches,
+    numMatches: numOfMatches,
+    nextPosition: opts.position + numOfMatches,
+    hasMore,
+  };
+}
+
+export interface FaceRecord {
+  employeeNo?: string;
+  FPID?: string;
+  faceURL?: string;
+}
+
+export interface SearchFacesResult {
+  ok: boolean;
+  faces: FaceRecord[];
+  total: number;
+  numMatches: number;
+  nextPosition: number;
+  /** Devam eden sayfa var mı? responseStatusStrg==="MORE" veya tam-dolu sayfa. */
+  hasMore: boolean;
+  error?: string;
+}
+
+/**
+ * Cihazdaki yüz kaydı listesini sayfalı olarak sorgular.
+ * POST /ISAPI/Intelligent/FDLib/FDSearch
+ *
+ * VERIFY: FDSearchDescription body shape ve MatchList response shape canlı cihazda doğrula.
+ */
+export async function searchFacesOnDevice(
+  devIndex: string,
+  opts: {
+    searchID: string;
+    position: number;
+    maxResults?: number;
+    FDID?: string;
+  },
+): Promise<SearchFacesResult> {
+  const body = {
+    FDSearchDescription: {
+      searchID: opts.searchID,
+      FDID: opts.FDID ?? "1",
+      maxResults: opts.maxResults ?? DEFAULT_SEARCH_PAGE_SIZE,
+      searchResultPosition: opts.position,
+    },
+  };
+  const result = await gatewayApiCall(
+    "/ISAPI/Intelligent/FDLib/FDSearch",
+    "POST",
+    body,
+    devIndex,
+  );
+  if (result.status !== 200) {
+    return {
+      ok: false,
+      faces: [],
+      total: 0,
+      numMatches: 0,
+      nextPosition: opts.position,
+      hasMore: false,
+      error: `HTTP ${result.status}: ${result.raw.slice(0, 200)}`,
+    };
+  }
+
+  const data = result.data as Record<string, unknown> | undefined;
+
+  // VERIFY: totalMatches/numOfMatches üst seviyede mi yoksa wrap içinde mi?
+  const totalMatches = (data?.totalMatches as number | undefined) ?? 0;
+  const numOfMatches = (data?.numOfMatches as number | undefined) ?? 0;
+  const maxResults = opts.maxResults ?? DEFAULT_SEARCH_PAGE_SIZE;
+  const responseStatusStrg = data?.responseStatusStrg as string | undefined;
+  const hasMore = responseStatusStrg === "MORE" || numOfMatches >= maxResults;
+
+  // MatchList array'i
+  const rawList = data?.MatchList;
+  const faces: FaceRecord[] = [];
+
+  if (Array.isArray(rawList)) {
+    for (const item of rawList) {
+      if (typeof item !== "object" || item === null) continue;
+      const row = item as Record<string, unknown>;
+      faces.push({
+        FPID: row.FPID as string | undefined,
+        employeeNo: row.employeeNo as string | undefined,
+        faceURL: row.faceURL as string | undefined,
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    faces,
+    total: totalMatches,
+    numMatches: numOfMatches,
+    nextPosition: opts.position + numOfMatches,
+    hasMore,
+  };
+}
+
+export interface FingerprintRecord {
+  employeeNo: string;
+  fingerPrintID?: string;
+}
+
+export interface SearchFingerprintsResult {
+  ok: boolean;
+  fingerprints: FingerprintRecord[];
+  total: number;
+  numMatches: number;
+  nextPosition: number;
+  /** Devam eden sayfa var mı? responseStatusStrg==="MORE" veya tam-dolu sayfa. */
+  hasMore: boolean;
+  error?: string;
+}
+
+/**
+ * Cihazdaki parmak izi kayıtlarını sayfalı olarak sorgular.
+ * POST /ISAPI/AccessControl/FingerPrintUpload (isim yanıltıcı — bu ARAMA endpoint'idir)
+ *
+ * VERIFY: body shape ve response wrap key canlı cihazda doğrula.
+ */
+export async function searchFingerprintsOnDevice(
+  devIndex: string,
+  opts: {
+    searchID: string;
+    position: number;
+    maxResults?: number;
+    employeeNo?: string;
+  },
+): Promise<SearchFingerprintsResult> {
+  const body = {
+    FingerPrintCond: {
+      searchID: opts.searchID,
+      searchResultPosition: opts.position,
+      maxResults: opts.maxResults ?? DEFAULT_SEARCH_PAGE_SIZE,
+      ...(opts.employeeNo ? { EmployeeNoList: [{ employeeNo: opts.employeeNo }] } : {}),
+    },
+  };
+  const result = await gatewayApiCall(
+    "/ISAPI/AccessControl/FingerPrintUpload",
+    "POST",
+    body,
+    devIndex,
+  );
+  if (result.status !== 200) {
+    return {
+      ok: false,
+      fingerprints: [],
+      total: 0,
+      numMatches: 0,
+      nextPosition: opts.position,
+      hasMore: false,
+      error: `HTTP ${result.status}: ${result.raw.slice(0, 200)}`,
+    };
+  }
+
+  const data = result.data as Record<string, unknown> | undefined;
+  // VERIFY: wrap key (FingerPrintList? FingerPrint?)
+  const wrap = (data?.FingerPrintList ?? data?.FingerPrint ?? data) as
+    | Record<string, unknown>
+    | undefined;
+
+  const totalMatches = (wrap?.totalMatches as number | undefined) ?? 0;
+  const numOfMatches = (wrap?.numOfMatches as number | undefined) ?? 0;
+  const maxResults = opts.maxResults ?? DEFAULT_SEARCH_PAGE_SIZE;
+  const responseStatusStrg = wrap?.responseStatusStrg as string | undefined;
+  const hasMore = responseStatusStrg === "MORE" || numOfMatches >= maxResults;
+
+  const rawList = wrap?.FingerPrintInfo ?? wrap?.InfoList;
+  const fingerprints: FingerprintRecord[] = [];
+
+  if (Array.isArray(rawList)) {
+    for (const item of rawList) {
+      if (typeof item !== "object" || item === null) continue;
+      const row = item as Record<string, unknown>;
+      const employeeNo = row.employeeNo as string | undefined;
+      if (!employeeNo) continue;
+      fingerprints.push({
+        employeeNo,
+        fingerPrintID: row.fingerPrintID as string | undefined,
+      });
+    }
+  }
+
+  return {
+    ok: true,
+    fingerprints,
+    total: totalMatches,
+    numMatches: numOfMatches,
+    nextPosition: opts.position + numOfMatches,
+    hasMore,
+  };
+}
+
+/**
+ * Okuyucudan canlı kart okutma işlemi başlatır ve tamamlanana kadar polling yapar.
+ * GET /ISAPI/AccessControl/CaptureCardInfo
+ *
+ * captureFaceOnDevice poll desenini izler:
+ *   - Önce GET yap, ardından (devam ediyorsa) sleep — ilk poll'dan önce gereksiz bekleme yok.
+ *   - isCurRequestOver===true && cardNo var → ok.
+ *   - isCurRequestOver===true && cardNo yok → başarısız (kullanıcı kart okutmadı).
+ *   - timeout (~15s) → hata.
+ *
+ * VERIFY: response shape (cardNo, isCurRequestOver) canlı cihazda doğrula.
+ */
+export async function captureCardOnDevice(
+  devIndex: string,
+): Promise<{ ok: boolean; cardNo?: string; error?: string }> {
+  const timeoutMs = 15_000;
+  let intervalMs = DEFAULT_POLL_INTERVAL_MS;
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const result = await gatewayApiCall(
+      "/ISAPI/AccessControl/CaptureCardInfo",
+      "GET",
+      null,
+      devIndex,
+    );
+    if (result.status !== 200) {
+      return { ok: false, error: `HTTP ${result.status}: ${result.raw.slice(0, 200)}` };
+    }
+    const data = result.data as Record<string, unknown> | undefined;
+    // VERIFY: wrap key (CaptureCardInfo? CardInfo?)
+    const wrap = (data?.CaptureCardInfo ?? data) as Record<string, unknown> | undefined;
+
+    const cardNo = wrap?.cardNo as string | undefined;
+    const isDone = wrap?.isCurRequestOver === true;
+
+    if (isDone && cardNo) {
+      return { ok: true, cardNo };
+    }
+    if (isDone && !cardNo) {
+      return { ok: false, error: "Kart okunamadı (okuyucudan kart gösterilmedi)" };
+    }
+    // Henüz devam ediyor — sleep sonra tekrar poll
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await new Promise((r) => setTimeout(r, Math.min(intervalMs, remaining)));
+    intervalMs = Math.min(intervalMs * 2, DEFAULT_POLL_MAX_INTERVAL_MS);
+  }
+
+  return { ok: false, error: `CaptureCardInfo polling timeout (${timeoutMs}ms)` };
+}
+
+/**
+ * Okuyucudan canlı yüz verisi alır.
+ * 1) POST /ISAPI/AccessControl/CaptureFaceData başlatır.
+ * 2) captureProgress < 100 ise GET /ISAPI/AccessControl/CaptureFaceData/Progress polling.
+ * 3) isCurRequestOver===true && captureProgress===100 → ok.
+ *
+ * DİKKAT: pollApplyProgress string-status bekler; bu endpoint sayısal progress kullanır.
+ * Bu yüzden kendi poll döngüsünü içeriyor.
+ *
+ * VERIFY: response shape (captureProgress sayısı, isCurRequestOver bool, faceDataBase64/faceURL)
+ * canlı cihazda doğrula.
+ */
+export async function captureFaceOnDevice(
+  devIndex: string,
+  opts?: { employeeNo?: string },
+): Promise<{ ok: boolean; faceDataBase64?: string; faceURL?: string; error?: string }> {
+  const body = {
+    CaptureFaceData: {
+      ...(opts?.employeeNo ? { employeeNo: opts.employeeNo } : {}),
+    },
+  };
+  const startResult = await gatewayApiCall(
+    "/ISAPI/AccessControl/CaptureFaceData",
+    "POST",
+    body,
+    devIndex,
+  );
+  if (startResult.status !== 200) {
+    return {
+      ok: false,
+      error: `CaptureFaceData başlatılamadı: HTTP ${startResult.status}: ${startResult.raw.slice(0, 200)}`,
+    };
+  }
+
+  // Yanıtta yüz verisi hemen geldiyse kullan
+  const startData = startResult.data as Record<string, unknown> | undefined;
+  const startWrap = (startData?.CaptureFaceData ?? startData) as
+    | Record<string, unknown>
+    | undefined;
+  const startProgress = startWrap?.captureProgress as number | undefined;
+  const startDone = startWrap?.isCurRequestOver === true;
+
+  if (startDone && startProgress === 100) {
+    return {
+      ok: true,
+      faceDataBase64: startWrap?.faceDataBase64 as string | undefined,
+      faceURL: startWrap?.faceURL as string | undefined,
+    };
+  }
+  // Tamamlandı ama progress 100 değil → başarısız başladı (cihaz yüz görmedi)
+  if (startDone && startProgress !== undefined && startProgress < 100) {
+    return { ok: false, error: `Yüz alınamadı (cihaz captureProgress=${startProgress})` };
+  }
+
+  // Henüz devam ediyor — Progress endpoint'i polling
+  // Fix 5: önce GET yap, sonra sleep (ilk poll'dan önce gereksiz bekleme yok);
+  // son interval clamp edilir ki t≈deadline'da biten capture timeout raporlanmasın.
+  const timeoutMs = 15_000;
+  let intervalMs = DEFAULT_POLL_INTERVAL_MS;
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const poll = await gatewayApiCall(
+      "/ISAPI/AccessControl/CaptureFaceData/Progress",
+      "GET",
+      null,
+      devIndex,
+    );
+    if (poll.status !== 200) {
+      return {
+        ok: false,
+        error: `CaptureFaceData/Progress: HTTP ${poll.status}: ${poll.raw.slice(0, 200)}`,
+      };
+    }
+    const pd = poll.data as Record<string, unknown> | undefined;
+    // VERIFY: wrap key
+    const pw = (pd?.CaptureFaceDataProgress ?? pd?.CaptureFaceData ?? pd) as
+      | Record<string, unknown>
+      | undefined;
+
+    const progress = pw?.captureProgress as number | undefined;
+    const isDone = pw?.isCurRequestOver === true;
+
+    if (isDone && progress === 100) {
+      return {
+        ok: true,
+        faceDataBase64: pw?.faceDataBase64 as string | undefined,
+        faceURL: pw?.faceURL as string | undefined,
+      };
+    }
+    if (isDone && progress !== undefined && progress < 100) {
+      return { ok: false, error: `Yüz alınamadı (captureProgress=${progress})` };
+    }
+    // isDone===false → polling devam; sleep + backoff (clamp'li kalan süre)
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await new Promise((r) => setTimeout(r, Math.min(intervalMs, remaining)));
+    intervalMs = Math.min(intervalMs * 2, DEFAULT_POLL_MAX_INTERVAL_MS);
+  }
+
+  return { ok: false, error: `CaptureFaceData polling timeout (${timeoutMs}ms)` };
+}
+
+// ============================================================================
+// DOOR STATUS PLAN — mesai saatinde kapıyı otomatik açık/kapalı tutar.
+// Üç adım zinciri: WeekPlan → PlanTemplate → Door'a link.
+// ============================================================================
+
+/** DoorStatus segment: her gün için bir zaman aralığı + kapı modu. */
+export interface DoorStatusSegment {
+  week: Weekday;
+  id: number;        // 1-indexed segment sırası (her gün max 8)
+  enable: boolean;
+  doorStatus: "remainOpen" | "remainClosed" | "normal";
+  beginTime: string; // "HH:MM:SS"
+  endTime: string;   // "HH:MM:SS"
+}
+
+/**
+ * Cihaza DoorStatus haftalık planı yazar.
+ * setWeekPlanOnDevice deseni izlenerek her gün için 8 segment (boşlar disable) gönderilir.
+ * planNo: cihaz-tarafı plan slotu (1-based). Kapı başına ayrı planNo önerilir.
+ */
+export async function setDoorStatusWeekPlan(
+  devIndex: string,
+  planNo: number,
+  segments: DoorStatusSegment[],
+): Promise<{ ok: boolean; error?: string }> {
+  // Gün bazında groupby
+  const byDay = new Map<Weekday, DoorStatusSegment[]>();
+  for (const s of segments) {
+    const arr = byDay.get(s.week);
+    if (arr) arr.push(s);
+    else byDay.set(s.week, [s]);
+  }
+
+  const EMPTY_SEGMENT: DoorStatusSegment = {
+    week: "Monday",
+    id: 1,
+    enable: false,
+    doorStatus: "normal",
+    beginTime: "00:00:00",
+    endTime: "00:00:00",
+  };
+
+  const WeekPlanCfg: Array<{
+    week: Weekday;
+    id: number;
+    enable: boolean;
+    doorStatus: "remainOpen" | "remainClosed" | "normal";
+    TimeSegment: { beginTime: string; endTime: string };
+  }> = [];
+
+  for (const day of ALL_DAYS) {
+    const daySegs = byDay.get(day) ?? [];
+    for (let idx = 0; idx < MAX_SEGMENTS_PER_DAY; idx++) {
+      const s = daySegs[idx] ?? { ...EMPTY_SEGMENT, week: day, id: idx + 1 };
+      WeekPlanCfg.push({
+        week: day,
+        id: idx + 1,
+        enable: s.enable,
+        doorStatus: s.doorStatus,
+        TimeSegment: {
+          beginTime: s.beginTime,
+          endTime: s.enable ? normalizeEndTime(s.endTime) : "00:00:00",
+        },
+      });
+    }
+  }
+
+  return gatewayApiCallChecked(
+    `/ISAPI/AccessControl/DoorStatusWeekPlanCfg/${planNo}`,
+    "PUT",
+    { DoorStatusWeekPlanCfg: { enable: true, WeekPlanCfg } },
+    devIndex,
+  );
+}
+
+/**
+ * DoorStatus plan template'i yazar (week plan + opsiyonel holiday group bağlar).
+ * setPlanTemplate deseni izlendi.
+ */
+export async function setDoorStatusPlanTemplate(
+  devIndex: string,
+  templateNo: number,
+  opts: { weekPlanNo: number; holidayGroupNo?: number },
+): Promise<{ ok: boolean; error?: string }> {
+  return gatewayApiCallChecked(
+    `/ISAPI/AccessControl/DoorStatusPlanTemplate/${templateNo}`,
+    "PUT",
+    {
+      DoorStatusPlanTemplate: {
+        enable: true,
+        templateNo,
+        weekPlanNo: opts.weekPlanNo,
+        holidayGroupNo: opts.holidayGroupNo ? String(opts.holidayGroupNo) : "",
+      },
+    },
+    devIndex,
+  );
+}
+
+/**
+ * Kapıya DoorStatus plan template'ini bağlar (veya templateNo=0 ile iptal eder).
+ * doorNo: cihaz fiziksel kapı numarası (1-based; doors.hikDoorNo ?? 1).
+ */
+export async function linkDoorStatusPlan(
+  devIndex: string,
+  doorNo: number,
+  templateNo: number,
+): Promise<{ ok: boolean; error?: string }> {
+  return gatewayApiCallChecked(
+    `/ISAPI/AccessControl/DoorStatusPlan/${doorNo}`,
+    "PUT",
+    { DoorStatusPlan: { templateNo } },
+    devIndex,
+  );
+}
+
+// ============================================================================
+// VERIFY WEEK PLAN — saate göre doğrulama modunu değiştirir.
+// ============================================================================
+
+/** Verify segment: her gün için bir zaman aralığı + doğrulama modu. */
+export interface VerifySegment {
+  week: Weekday;
+  id: number;
+  enable: boolean;
+  verifyMode: string; // "cardOrFace", "card", "faceOrFingerprintOrCard" vb.
+  beginTime: string;
+  endTime: string;
+}
+
+/**
+ * Cihaza Verify haftalık planı yazar.
+ * setWeekPlanOnDevice ve setDoorStatusWeekPlan deseni izlendi.
+ */
+export async function setVerifyWeekPlan(
+  devIndex: string,
+  planNo: number,
+  segments: VerifySegment[],
+): Promise<{ ok: boolean; error?: string }> {
+  const byDay = new Map<Weekday, VerifySegment[]>();
+  for (const s of segments) {
+    const arr = byDay.get(s.week);
+    if (arr) arr.push(s);
+    else byDay.set(s.week, [s]);
+  }
+
+  const WeekPlanCfg: Array<{
+    week: Weekday;
+    id: number;
+    enable: boolean;
+    verifyMode: string;
+    TimeSegment: { beginTime: string; endTime: string };
+  }> = [];
+
+  for (const day of ALL_DAYS) {
+    const daySegs = byDay.get(day) ?? [];
+    for (let idx = 0; idx < MAX_SEGMENTS_PER_DAY; idx++) {
+      const s = daySegs[idx];
+      WeekPlanCfg.push({
+        week: day,
+        id: idx + 1,
+        enable: !!s,
+        verifyMode: s?.verifyMode ?? "card",
+        TimeSegment: {
+          beginTime: s?.beginTime ?? "00:00:00",
+          endTime: s?.enable ? normalizeEndTime(s.endTime) : "00:00:00",
+        },
+      });
+    }
+  }
+
+  return gatewayApiCallChecked(
+    `/ISAPI/AccessControl/VerifyWeekPlanCfg/${planNo}`,
+    "PUT",
+    { VerifyWeekPlanCfg: { enable: true, WeekPlanCfg } },
+    devIndex,
+  );
+}
+
+/**
+ * Verify plan template yazar.
+ */
+export async function setVerifyPlanTemplate(
+  devIndex: string,
+  templateNo: number,
+  opts: { weekPlanNo: number; holidayGroupNo?: number },
+): Promise<{ ok: boolean; error?: string }> {
+  return gatewayApiCallChecked(
+    `/ISAPI/AccessControl/VerifyPlanTemplate/${templateNo}`,
+    "PUT",
+    {
+      VerifyPlanTemplate: {
+        enable: true,
+        templateNo,
+        weekPlanNo: opts.weekPlanNo,
+        holidayGroupNo: opts.holidayGroupNo ? String(opts.holidayGroupNo) : "",
+      },
+    },
+    devIndex,
+  );
+}
+
+/**
+ * Kapıya Verify plan template'ini bağlar (templateNo=0 ile iptal).
+ *
+ * // VERIFY: Hik ISAPI dokümantasyonunda VerifyPlan'ın kapıya bağlanma path'i
+ * // netleştirilmedi. En makul alternatifler:
+ * //   A) /ISAPI/AccessControl/VerifyPlan/<doorNo>  (DoorStatusPlan ile simetrik)
+ * //   B) /ISAPI/AccessControl/VerifyWeekPlanCfg/template/<doorNo>
+ * //   C) Okuyucu bazlı: /ISAPI/AccessControl/CardReader/VerifyPlan/<readerNo>
+ * // Mevcut implementasyon (A) seçeneğini kullanıyor; canlı cihaz testiyle doğrulanmalı.
+ */
+export async function linkVerifyPlan(
+  devIndex: string,
+  doorNo: number,
+  templateNo: number,
+): Promise<{ ok: boolean; error?: string }> {
+  // VERIFY: path cihaz firmware'ına göre farklılık gösterebilir (bkz. yukarıdaki yorum).
+  return gatewayApiCallChecked(
+    `/ISAPI/AccessControl/VerifyPlan/${doorNo}`,
+    "PUT",
+    { VerifyPlan: { templateNo } },
+    devIndex,
+  );
 }

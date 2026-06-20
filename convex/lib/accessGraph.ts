@@ -2,6 +2,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
 import { orphanPanels } from "./reconcileMath";
+import { computeAuthorizedCards } from "./accessGraphPure";
 import { normalizeIdeCard } from "../ideSync";
 
 /**
@@ -110,6 +111,7 @@ export async function reconcileRemovedEmployeeIde(
 export async function resolvePanelAuthorizedCards(
   ctx: QueryCtx,
   deviceId: Id<"devices">,
+  normalizeCard: (card: unknown) => string | null = normalizeIdeCard,
 ): Promise<{
   deviceLegRuleIds: Id<"accessRules">[];
   doorLegRuleIds: Id<"accessRules">[];
@@ -138,28 +140,40 @@ export async function resolvePanelAuthorizedCards(
   );
 
   // Benzersiz kural başına üyeler BİR kez çekilir (iki bacakta da görünen kural,
-  // duplicate groupDevices satırı vb. yinelenen okuma üretmez).
+  // duplicate groupDevices satırı vb. yinelenen okuma üretmez). DB'den toplanan
+  // aktif kural/üye/kart verisi saf çekirdeğe (computeAuthorizedCards) verilir.
   const ruleIds = new Set<Id<"accessRules">>([...deviceLeg, ...doorLeg]);
-  const authorized = new Set<string>();
+  const activeRuleIds = new Set<Id<"accessRules">>();
+  const membersByRule = new Map<Id<"accessRules">, Id<"employees">[]>();
+  const cardByEmployee = new Map<Id<"employees">, unknown>();
   await Promise.all(
     Array.from(ruleIds).map(async (ruleId) => {
       const rule = await ctx.db.get(ruleId);
       if (!rule || rule.isActive === false) return;
+      activeRuleIds.add(ruleId);
       const members = await ctx.db
         .query("groupMembers")
         .withIndex("by_project_group", (q) =>
           q.eq("projectId", rule.projectId).eq("groupId", ruleId),
         )
         .collect();
+      membersByRule.set(ruleId, members.map((m) => m.employeeId));
       await Promise.all(
         members.map(async (m) => {
+          if (cardByEmployee.has(m.employeeId)) return;
           const emp = await ctx.db.get(m.employeeId);
-          const card = normalizeIdeCard(emp?.cardNumber);
-          if (card) authorized.add(card);
+          cardByEmployee.set(m.employeeId, emp?.cardNumber);
         }),
       );
     }),
   );
+  const authorized = computeAuthorizedCards({
+    ruleIds,
+    activeRuleIds,
+    membersByRule,
+    cardByEmployee,
+    normalizeCard,
+  });
   return {
     deviceLegRuleIds: Array.from(deviceLeg),
     doorLegRuleIds: Array.from(doorLeg),

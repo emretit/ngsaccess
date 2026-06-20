@@ -8,7 +8,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Device } from "@/types/device";
-import { Zone, Door } from "@/hooks/useZonesAndDoors";
+import { Zone } from "@/hooks/useZonesAndDoors";
 import { DeviceTableRow } from "@/components/devices/DeviceTableRow";
 import { Loader2, Smartphone } from "lucide-react";
 import { DeviceBulkActions } from "./DeviceBulkActions";
@@ -21,7 +21,6 @@ interface DeviceListProps {
   filteredDevices: Device[];
   isLoading: boolean;
   zones: Zone[];
-  doors: Door[];
   onDeleteDevice: (deviceId: string) => void;
   onAssignLocation?: (device: Device) => void;
   onEditDevice: (device: Device) => void;
@@ -29,7 +28,7 @@ interface DeviceListProps {
   onReleaseDevice?: (device: Device) => void;
   /** Admin görünümü: cihazın bağlı olduğu proje kolonunu göster. */
   showProject?: boolean;
-  /** Admin görünümü: bölge/kapı/erişim yönü kolonlarını ve "Konum Ata" aksiyonunu gizler. */
+  /** Admin görünümü: bölge kolonunu ve "Konum Ata" aksiyonunu gizler. */
   hideLocation?: boolean;
   getProjectName?: (device: Device) => string | undefined;
 }
@@ -39,7 +38,6 @@ export function DeviceList({
   filteredDevices,
   isLoading,
   zones,
-  doors,
   onDeleteDevice,
   onAssignLocation,
   onEditDevice,
@@ -66,16 +64,8 @@ export function DeviceList({
     return zone?.name;
   }
 
-  function getDoorName(device: Device & { door?: { name?: string } | null }) {
-    const doorId = device.doorId;
-    if (device.door?.name) return device.door.name;
-    if (!doorId) return undefined;
-    const door = doors.find(d => String(d._id) === String(doorId));
-    return door?.name;
-  }
-
   // Sabit kolonlar: seçim + # + Cihaz Adı + Seri No + Cihaz Modeli + Durum + İşlemler = 7.
-  const colCount = 7 + (showProject ? 1 : 0) + (hideLocation ? 0 : 3);
+  const colCount = 7 + (showProject ? 1 : 0) + (hideLocation ? 0 : 1);
 
   return (
     <div className="space-y-4">
@@ -104,8 +94,6 @@ export function DeviceList({
               {!hideLocation && (
                 <>
                   <TableHead className="bg-muted/50 font-semibold">Bölge</TableHead>
-                  <TableHead className="bg-muted/50 font-semibold">Kapı</TableHead>
-                  <TableHead className="bg-muted/50 font-semibold">Erişim Yönü</TableHead>
                 </>
               )}
               <TableHead className="bg-muted/50 font-semibold">Durum</TableHead>
@@ -129,7 +117,6 @@ export function DeviceList({
                   device={device}
                   rowIndex={i + 1}
                   zoneName={getZoneName(device)}
-                  doorName={getDoorName(device)}
                   showProject={showProject}
                   hideLocation={hideLocation}
                   projectName={getProjectName?.(device)}
