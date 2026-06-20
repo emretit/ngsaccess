@@ -14,8 +14,6 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "api": "node server.js",
-    "dev:api": "nodemon server.js",
     "seed:hikvision-device": "npx convex run seedHikvisionLanDevice:run '{}'",
     "verify:hikvision": "bash scripts/verify-hikvision-convex.sh",
     "forward:card-reader": "node scripts/forward-card-reader-to-convex.mjs",
