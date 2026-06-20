@@ -101,3 +101,37 @@ describe("reconcileMath – staleGroupDoorIds", () => {
     ).toEqual(["gd1", "gd2"]);
   });
 });
+
+describe("reconcileMath – edge cases", () => {
+  it("diffIds: iki liste de boş → tüm sonuçlar boş", () => {
+    const r = diffIds<string>([], []);
+    expect(r).toEqual({ removed: [], added: [], kept: [] });
+  });
+
+  it("diffIds: büyük liste, yarısı korunur / yarısı değişir", () => {
+    const oldIds = Array.from({ length: 1000 }, (_, i) => `e${i}`);
+    const newIds = Array.from({ length: 1000 }, (_, i) => `e${i + 500}`);
+    const r = diffIds(oldIds, newIds);
+    expect(r.removed.length).toBe(500); // e0..e499
+    expect(r.added.length).toBe(500); // e1000..e1499
+    expect(r.kept.length).toBe(500); // e500..e999
+    expect(r.kept).toContain("e500");
+    expect(r.removed).toContain("e0");
+    expect(r.added).toContain("e1499");
+  });
+
+  it("orphanPanels: büyük adayların hiçbiri kalan listede yok → hepsi orphan (tekil)", () => {
+    const candidate = Array.from({ length: 500 }, (_, i) => `p${i % 250}`); // yinelenenli
+    expect(orphanPanels(candidate, []).length).toBe(250);
+  });
+
+  it("orphanPanels: iki liste de boş → boş", () => {
+    expect(orphanPanels<string>([], [])).toEqual([]);
+  });
+
+  it("staleGroupDoorIds: boş satır listesi → boş", () => {
+    expect(
+      staleGroupDoorIds([], new Map<string, string>(), new Set<string>(["devA"])),
+    ).toEqual([]);
+  });
+});
