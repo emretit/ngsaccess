@@ -10,6 +10,7 @@ import { authTables } from "@convex-dev/auth/server";
 export default defineSchema({
   ...authTables,
 
+  // ═══════ 1 · KİMLİK · PROJE · YETKİLENDİRME ═══════════════════════════
   // users tablosunu authTables'tan override ediyoruz, custom alanlar ekleniyor
   users: defineTable({
     // Convex Auth core fields
@@ -62,6 +63,7 @@ export default defineSchema({
     updatedAt: v.optional(v.string()),
   }),
 
+  // ═══════ 2 · ÇALIŞANLAR · KİMLİK DOĞRULAMA · ORGANİZASYON ══════════════
   employees: defineTable({
     projectId: v.optional(v.id("projects")),
     firstName: v.string(),
@@ -161,6 +163,7 @@ export default defineSchema({
     .index("by_project", ["projectId"])
     .index("by_parent", ["parentId"]),
 
+  // ═══════ 3 · ERİŞİM TOPOLOJİSİ · BÖLGE / KAPI / OKUYUCU / CİHAZ ═════════
   zones: defineTable({
     name: v.string(),
     projectId: v.optional(v.id("projects")),
@@ -359,6 +362,7 @@ export default defineSchema({
     .index("by_token", ["token"])
     .index("by_project", ["projectId"]),
 
+  // ═══════ 4 · ERİŞİM KURALLARI · GRUP BAĞLARI ══════════════════════════
   accessRules: defineTable({
     name: v.string(),
     projectId: v.optional(v.id("projects")),
@@ -415,6 +419,7 @@ export default defineSchema({
     .index("by_door", ["doorId"])
     .index("by_project_group", ["projectId", "groupId"]),
 
+  // ═══════ 5 · KART OKUMA · CİHAZ İŞ KUYRUKLARI ═════════════════════════
   cardReadings: defineTable({
     projectId: v.optional(v.id("projects")),
     deviceId: v.optional(v.id("devices")),
@@ -597,6 +602,7 @@ export default defineSchema({
     .index("by_uuid", ["ideUuid"])
     .index("by_uuid_card", ["ideUuid", "cardNumber"]),
 
+  // ═══════ 6 · BİYOMETRİ ════════════════════════════════════════════════
   // Çalışan başına yüz fotoğrafı (Convex storage). Tek kişi → tek yüz.
   // Cihaza yazılan kayıt için ayrı status field yok — hikPendingOperations queue tutar.
   employeeFaces: defineTable({
@@ -622,6 +628,7 @@ export default defineSchema({
     .index("by_employee_fingerprint", ["employeeId", "fingerPrintID"])
     .index("by_project", ["projectId"]),
 
+  // ═══════ 7 · PDKS · ŞİRKET / POZİSYON / VARDİYA ═══════════════════════
   pdksRecords: defineTable({
     projectId: v.optional(v.id("projects")),
     employeeId: v.id("employees"),
@@ -695,6 +702,7 @@ export default defineSchema({
     .index("by_project", ["projectId"])
     .index("by_dates", ["startDate", "endDate"]),
 
+  // ═══════ 8 · AYARLAR (GENEL / MAIL / BİLDİRİM) ════════════════════════
   generalSettings: defineTable({
     projectId: v.optional(v.id("projects")),
     companyName: v.string(),
@@ -741,6 +749,7 @@ export default defineSchema({
     updatedAt: v.optional(v.string()),
   }).index("by_project", ["projectId"]),
 
+  // ═══════ 9 · CİHAZ HAVUZU · IDE VARSAYILANLARI · CHAT ═════════════════
   // IDE Smart panelleri için sistem geneli ortak varsayılanlar (singleton — proje
   // index'i yok, `.first()` ile okunur). Admin "UUID ile ekle" yaparken bu kimlik
   // cihaz satırına KOPYALANIR (bridge op-zamanı device.ideUser/idePassword okur).
@@ -794,6 +803,7 @@ export default defineSchema({
     updatedAt: v.string(),
   }).index("by_project", ["projectId"]),
 
+  // ═══════ 10 · İZİN · MESAİ · ÇALIŞMA AYARLARI ═════════════════════════
   leaves: defineTable({
     employeeId: v.id("employees"),
     projectId: v.optional(v.id("projects")),
@@ -857,6 +867,7 @@ export default defineSchema({
     updatedAt: v.optional(v.string()),
   }).index("by_project", ["projectId"]),
 
+  // ═══════ 11 · KVKK ONAYLARI · KULLANICI TERCİHLERİ ════════════════════
   employeeConsents: defineTable({
     employeeId: v.id("employees"),
     consentType: v.union(
@@ -885,6 +896,7 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_key", ["userId", "key"]),
 
+  // ═══════ 12 · TATİL · MESAİ ORANLARI ══════════════════════════════════
   holidays: defineTable({
     projectId: v.optional(v.id("projects")),
     date: v.string(),
@@ -910,6 +922,7 @@ export default defineSchema({
     updatedAt: v.string(),
   }).index("by_project", ["projectId"]),
 
+  // ═══════ 13 · SİSTEM · AUDIT / RAPOR / DAVET ══════════════════════════
   auditLog: defineTable({
     userId: v.optional(v.id("users")),
     userName: v.optional(v.string()),
