@@ -3,58 +3,28 @@
  * çözümü. ctx-bağımlı (DB okur). devices.ts'in getHikDeviceFaceRoster /
  * getHikDeviceFingerprintRoster registered internalQuery wrapper'larından çağrılır.
  *
- * İki-bacak yetki çözümü (cihaz bağı + kapı bağı + isActive guard) burada tek yerde;
- * `resolvePanelAuthorizedCards` ile aynı mantık ama kart yerine employeeId toplar.
+ * İki-bacak yetki çözümü (cihaz bağı + kapı bağı + isActive guard) artık TEK kaynakta:
+ * `accessGraph.resolvePanelRuleMembers`. Bu modül onu çağırıp employeeId'leri toplar —
+ * IDE kart roster'ı (`resolvePanelAuthorizedCards`) ile birebir aynı kural setini paylaşır.
  */
 import type { QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
+import { resolvePanelRuleMembers } from "./accessGraph";
 
 /**
- * Bir cihaza yetkili çalışanların ID kümesi. İki bacak: doğrudan cihaz↔grup bağı
- * (groupDevices) + cihazın kapıları üzerinden grup bağı (groupDoors). Pasif kural
- * (isActive === false) elenir; üyeler proje+grup index'iyle toplanır.
+ * Bir cihaza yetkili çalışanların ID kümesi. Kanonik iki-bacak çözümünü
+ * (cihaz bağı + kapı bağı + isActive guard) `resolvePanelRuleMembers`'tan alır ve
+ * aktif kuralların üyelerini düzleştirir.
  */
 export async function resolveAuthorizedEmployeeIds(
   ctx: QueryCtx,
   deviceId: Id<"devices">,
 ): Promise<Set<Id<"employees">>> {
-  const [deviceLinks, panelDoors] = await Promise.all([
-    ctx.db
-      .query("groupDevices")
-      .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
-      .collect(),
-    ctx.db
-      .query("doors")
-      .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
-      .collect(),
-  ]);
-
-  const ruleIds = new Set<Id<"accessRules">>(deviceLinks.map((l) => l.groupId));
-  await Promise.all(
-    panelDoors.map(async (door) => {
-      const doorLinks = await ctx.db
-        .query("groupDoors")
-        .withIndex("by_door", (q) => q.eq("doorId", door._id))
-        .collect();
-      for (const dl of doorLinks) ruleIds.add(dl.groupId);
-    }),
-  );
-
+  const { membersByRule } = await resolvePanelRuleMembers(ctx, deviceId);
   const authorizedEmpIds = new Set<Id<"employees">>();
-  await Promise.all(
-    Array.from(ruleIds).map(async (ruleId) => {
-      const rule = await ctx.db.get(ruleId);
-      if (!rule || rule.isActive === false) return;
-      const members = await ctx.db
-        .query("groupMembers")
-        .withIndex("by_project_group", (q) =>
-          q.eq("projectId", rule.projectId).eq("groupId", ruleId),
-        )
-        .collect();
-      for (const m of members) authorizedEmpIds.add(m.employeeId);
-    }),
-  );
-
+  for (const members of membersByRule.values()) {
+    for (const employeeId of members) authorizedEmpIds.add(employeeId);
+  }
   return authorizedEmpIds;
 }
 

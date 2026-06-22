@@ -94,28 +94,34 @@ export async function reconcileRemovedEmployeeIde(
 }
 
 /**
- * Bir paneli hedefleyen kuralları İKİ bacaktan çözer ve aktif olanların üye kartlarını
- * (normalize) döndürür:
+ * KANONİK iki-bacak yetki çözümü — bir paneli hedefleyen AKTİF kuralları ve kural-başına
+ * üye employeeId'lerini çözer. Tek kaynak: hem IDE kart roster'ı
+ * (`resolvePanelAuthorizedCards`) hem Hik biyometri roster'ı
+ * (`deviceSync.resolveAuthorizedEmployeeIds`) bunu çağırır — iki-bacak semantiği
+ * (groupDevices ∪ doors→groupDoors + isActive guard + üye toplama) bir daha ayrı yerlerde
+ * yürümesin (eski en büyük divergence riski).
+ *
+ * İki bacak:
  *   A) cihaz bağı — groupDevices.deviceId = panel
  *   B) kapı bağı  — doors.deviceId = panel → groupDoors.doorId (CANLI doors.deviceId'den
  *      gidilir; groupDoors.deviceId insert-anı snapshot'ıdır, taşınmış kapı eski panelde
  *      yetki üretmesin — getRuleIoIdsForPanel'in canlı kontrolüyle tutarlı).
  *
- * Bilinçli asimetri: push hattı (syncEmployeeToIdePanels → getEmployeeWithDevices) yalnız
- * cihaz bağını yazar; kapı bacağı burada yalnız KORUR (muhafazakar silme) — kapı bağıyla
- * yetkili ama panelde olmayan kişiyi panele YAZMAZ.
+ * Bacaklar AYRI döner (kart yolu deviceLeg/doorLeg ayrımını rapor eder); yalnız birleşik
+ * kural/üye setine ihtiyaç duyan çağıran membersByRule'u düzleştirir. Benzersiz kural
+ * başına üyeler BİR kez çekilir (iki bacakta da görünen kural yinelenen okuma üretmez).
  *
  * QueryCtx alır ki read-only dry-run ikizi (debugIde.panelRosterDiff) birebir aynı
- * mantığı kullanabilsin — iki kopyanın sessizce ayrışması bu fonksiyonun en büyük riski.
+ * mantığı kullanabilsin.
  */
-export async function resolvePanelAuthorizedCards(
+export async function resolvePanelRuleMembers(
   ctx: QueryCtx,
   deviceId: Id<"devices">,
-  normalizeCard: (card: unknown) => string | null = normalizeIdeCard,
 ): Promise<{
   deviceLegRuleIds: Id<"accessRules">[];
   doorLegRuleIds: Id<"accessRules">[];
-  authorized: Set<string>;
+  activeRuleIds: Set<Id<"accessRules">>;
+  membersByRule: Map<Id<"accessRules">, Id<"employees">[]>;
 }> {
   const [deviceLinks, panelDoors] = await Promise.all([
     ctx.db
@@ -139,13 +145,9 @@ export async function resolvePanelAuthorizedCards(
     }),
   );
 
-  // Benzersiz kural başına üyeler BİR kez çekilir (iki bacakta da görünen kural,
-  // duplicate groupDevices satırı vb. yinelenen okuma üretmez). DB'den toplanan
-  // aktif kural/üye/kart verisi saf çekirdeğe (computeAuthorizedCards) verilir.
   const ruleIds = new Set<Id<"accessRules">>([...deviceLeg, ...doorLeg]);
   const activeRuleIds = new Set<Id<"accessRules">>();
   const membersByRule = new Map<Id<"accessRules">, Id<"employees">[]>();
-  const cardByEmployee = new Map<Id<"employees">, unknown>();
   await Promise.all(
     Array.from(ruleIds).map(async (ruleId) => {
       const rule = await ctx.db.get(ruleId);
@@ -158,27 +160,57 @@ export async function resolvePanelAuthorizedCards(
         )
         .collect();
       membersByRule.set(ruleId, members.map((m) => m.employeeId));
-      await Promise.all(
-        members.map(async (m) => {
-          if (cardByEmployee.has(m.employeeId)) return;
-          const emp = await ctx.db.get(m.employeeId);
-          cardByEmployee.set(m.employeeId, emp?.cardNumber);
-        }),
-      );
     }),
   );
+
+  return {
+    deviceLegRuleIds: Array.from(deviceLeg),
+    doorLegRuleIds: Array.from(doorLeg),
+    activeRuleIds,
+    membersByRule,
+  };
+}
+
+/**
+ * Bir paneli hedefleyen aktif kuralların üye kartlarını (normalize) döndürür. İki-bacak
+ * kural/üye çözümünü `resolvePanelRuleMembers`'tan (kanonik) alır; üstüne kart numarası
+ * çözüp saf çekirdeğe (computeAuthorizedCards) verir.
+ *
+ * Bilinçli asimetri: push hattı (syncEmployeeToIdePanels → getEmployeeWithDevices) yalnız
+ * cihaz bağını yazar; kapı bacağı burada yalnız KORUR (muhafazakar silme) — kapı bağıyla
+ * yetkili ama panelde olmayan kişiyi panele YAZMAZ.
+ */
+export async function resolvePanelAuthorizedCards(
+  ctx: QueryCtx,
+  deviceId: Id<"devices">,
+  normalizeCard: (card: unknown) => string | null = normalizeIdeCard,
+): Promise<{
+  deviceLegRuleIds: Id<"accessRules">[];
+  doorLegRuleIds: Id<"accessRules">[];
+  authorized: Set<string>;
+}> {
+  const { deviceLegRuleIds, doorLegRuleIds, activeRuleIds, membersByRule } =
+    await resolvePanelRuleMembers(ctx, deviceId);
+
+  // Aktif kuralların benzersiz üyeleri için kart numarası BİR kez çekilir.
+  const cardByEmployee = new Map<Id<"employees">, unknown>();
+  await Promise.all(
+    Array.from(membersByRule.values())
+      .flat()
+      .map(async (employeeId) => {
+        if (cardByEmployee.has(employeeId)) return;
+        const emp = await ctx.db.get(employeeId);
+        cardByEmployee.set(employeeId, emp?.cardNumber);
+      }),
+  );
   const authorized = computeAuthorizedCards({
-    ruleIds,
+    ruleIds: new Set<Id<"accessRules">>([...deviceLegRuleIds, ...doorLegRuleIds]),
     activeRuleIds,
     membersByRule,
     cardByEmployee,
     normalizeCard,
   });
-  return {
-    deviceLegRuleIds: Array.from(deviceLeg),
-    doorLegRuleIds: Array.from(doorLeg),
-    authorized,
-  };
+  return { deviceLegRuleIds, doorLegRuleIds, authorized };
 }
 
 /**
