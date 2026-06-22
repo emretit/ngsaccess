@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UseFormReturn } from "react-hook-form";
 import type { FormValues } from "../hooks/useDeviceFormSchema";
+import { DeviceHikModelField } from "./DeviceHikModelField";
 
 interface DeviceBasicSectionProps {
   form: UseFormReturn<FormValues>;
@@ -18,6 +19,10 @@ const DEVICE_TYPES = [
 ] as const;
 
 export function DeviceBasicSection({ form }: DeviceBasicSectionProps) {
+  // Hikvision'da model seçimi cihaz adından hemen sonra gelir — model kapı/okuyucu
+  // sayısını belirlediği için ilk seçilmesi gerekir (hem yeni hem düzenleme).
+  const brand = form.watch("brand");
+
   return (
     <div className="space-y-4">
       <FormField
@@ -33,6 +38,8 @@ export function DeviceBasicSection({ form }: DeviceBasicSectionProps) {
           </FormItem>
         )}
       />
+
+      {brand === "hikvision" && <DeviceHikModelField form={form} />}
 
       <FormField
         control={form.control}

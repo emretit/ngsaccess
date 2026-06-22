@@ -148,7 +148,14 @@ export const getById = authedQuery({
     }
     const zone = device.zoneId ? await ctx.db.get(device.zoneId) : null;
     const door = device.doorId ? await ctx.db.get(device.doorId) : null;
-    return { ...device, zone, door };
+    // Sır alanları yalnız yönetebilen role döner — list ile AYNI gate (drift yok).
+    // authedQuery her proje üyesine açık; public query'ler frontend çağırmasa da
+    // client'tan doğrudan çağrılabildiğinden role-gate olmadan sır sızardı.
+    const result = { ...device, zone, door };
+    if (!isManager(ctx.user)) {
+      for (const f of DEVICE_SECRET_FIELDS) result[f] = undefined;
+    }
+    return result;
   },
 });
 
@@ -1596,7 +1603,9 @@ export const getHikDeviceFaceRoster = internalQuery({
     );
 
     // ── Yüz kaydı olanları filtrele ─────────────────────────────────────────
-    const roster: string[] = [];
+    // cardNumber başına tek kayıt — aynı cardNumber'ı paylaşan iki employee yüz
+    // sayımını şişirmesin (fingerprint roster ile tutarlı dedup).
+    const seen = new Set<string>();
     for (const employeeId of authorizedEmpIds) {
       const face = await ctx.db
         .query("employeeFaces")
@@ -1605,9 +1614,9 @@ export const getHikDeviceFaceRoster = internalQuery({
       if (!face) continue;
       const emp = await ctx.db.get(employeeId);
       const cardNumber = emp?.cardNumber?.trim();
-      if (cardNumber) roster.push(cardNumber);
+      if (cardNumber) seen.add(cardNumber);
     }
-    return roster;
+    return Array.from(seen);
   },
 });
 

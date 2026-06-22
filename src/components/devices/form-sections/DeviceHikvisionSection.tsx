@@ -31,11 +31,6 @@ import type { UseFormReturn } from "react-hook-form";
 import type { FormValues } from "../hooks/useDeviceFormSchema";
 import type { ServerDevice } from "@/types/device";
 import { DeviceHikLocalBridgeSection } from "./DeviceHikLocalBridgeSection";
-import {
-  HIK_MODELS,
-  MANUAL_MODEL_ID,
-  getHikModelSpec,
-} from "../../../../convex/lib/hikModels";
 
 /** Gateway heartbeat eşiği — bu süre içinde sinyal gelmemişse offline say. */
 const HIK_ONLINE_WINDOW_MS = 5 * 60 * 1000;
@@ -96,11 +91,6 @@ export function DeviceHikvisionSection({
   const transport = form.watch("hik_transport");
   const isLocalBridge = transport === "localBridge";
   const isGateway = transport === "gateway";
-  // Cihaz modeli kapı/okuyucu sayısını belirler. Katalog modeli seçilince transport
-  // ipucu da uygulanır; "manuel" seçilince kapı sayısı elle girilir.
-  const selectedModel = form.watch("hik_model");
-  const modelSpec = getHikModelSpec(selectedModel);
-  const isManualModel = selectedModel === MANUAL_MODEL_ID;
 
   useEffect(() => {
     // Heartbeat tazeliği yalnız gateway online/offline rozeti için gerekli; localBridge'de
@@ -273,79 +263,6 @@ export function DeviceHikvisionSection({
         </h3>
         {renderStatusBadge()}
       </div>
-
-      {/* Cihaz Modeli — kapı/okuyucu sayısı buradan türetilir. Model seçilince transport
-          ipucu otomatik uygulanır; "Diğer (manuel)" kapı sayısı inputunu açar. */}
-      <FormField
-        control={form.control}
-        name="hik_model"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Cihaz Modeli</FormLabel>
-            <Select
-              value={field.value ?? ""}
-              onValueChange={(value) => {
-                field.onChange(value);
-                const spec = getHikModelSpec(value);
-                if (spec?.transportHint) {
-                  form.setValue("hik_transport", spec.transportHint);
-                }
-                // Katalog modelinde kapı sayısı modelden gelir → alanı modelin sayısına
-                // sabitle (boşaltma değil): düzenlemede kaydedince localBridge hikDoorCount'u
-                // varsayılana (4) düşürmesin; manuel modelde kullanıcının girdiği korunur.
-                if (spec) {
-                  form.setValue("hik_door_count", spec.doorCount);
-                }
-              }}
-            >
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Model seçin" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {HIK_MODELS.map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.label}
-                  </SelectItem>
-                ))}
-                <SelectItem value={MANUAL_MODEL_ID}>Diğer (manuel)</SelectItem>
-              </SelectContent>
-            </Select>
-            {modelSpec && (
-              <p className="text-xs text-muted-foreground">
-                {modelSpec.doorCount} kapı ·{" "}
-                {modelSpec.doorCount * modelSpec.defaultReadersPerDoor} okuyucu
-                {modelSpec.maxReadersPerDoor > 1
-                  ? " · kapı başına 2. okuyucu sonradan eklenebilir"
-                  : ""}
-              </p>
-            )}
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-
-      {isManualModel && (
-        <FormField
-          control={form.control}
-          name="hik_door_count"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Kapı Sayısı</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  placeholder="4"
-                  {...field}
-                  value={field.value ?? ""}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FormField
