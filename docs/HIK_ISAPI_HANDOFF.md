@@ -49,12 +49,12 @@ Deploy anında `npx convex run devices:listOnlineGatewayDevicesForBackfill` → 
 ### 3.2 Görsel UI testi — ⏸️ BLOCKED (aynı sebep)
 Yeni butonlar + kapı plan formu yalnız `brand==="hikvision" && hikTransport==="gateway" && hikDevIndex` cihazda render olur. Cihaz yokken görünmez.
 
-### 3.3 Commit — opsiyonel
-Henüz commit yok. Önerilen bölme: `feat: hik ISAPI ops (backfill/reconcile/mgmt/plans)` · `fix: code-review correctness` · reader/refactor işi ayrı (kullanıcının paralel işi).
+### 3.3 Commit — durum
+Ana refactor/R9/R10/R7/R6 commit'leri lokalde, push bekliyor. HIK ISAPI canlı shape verify hâlâ gateway cihazı bekliyor.
 
 ### 3.4 Follow-up (opsiyonel, code-review bulguları — push'u engellemez)
 - `doors.update` `hikDoorNo` değişince reader'ın `hikReaderNo`'sunu re-sync etmiyor (latent drift; `hikReaderNo` bugün panele push edilmiyor).
-- Cleanup/refactor: 3 roster query iki-bacak auth walk'unu tekrar ediyor (→ `resolvePanelAuthorizedEmployeeIds` core'u çıkar); 4 pagination drain loop (→ `collectAllPages` helper); reconcile 3 drain sequential (→ `Promise.all`); `_runBackfill` per-event runMutation (→ batch). *Faz 7'de bilinçli ertelendi (kullanıcı "correctness + dead-code" dedi, refactor yok).*
+- Cleanup/refactor: ✅ reconcile tarafındaki 3 pagination drain loop `collectAllPages` helper'ına taşındı ve kart/yüz/parmak drain'i `Promise.all` ile paralelleşti (`d2003df`). Kalan: 3 roster query iki-bacak auth walk'unu tekrar ediyor (→ `resolvePanelAuthorizedEmployeeIds` core'u çıkar); `_runBackfill` per-event runMutation (→ batch). *Kalanlar push'u engellemez; batch işi mutation sözleşmesi değiştirir.*
 
 ---
 

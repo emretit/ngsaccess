@@ -1,13 +1,13 @@
 # Session Devir Notu — KALAN İŞ (Faz 2 refactor sonrası)
 
 > Son güncelleme: 2026-06-22 (UTC+3). **Bu dosya tek giriş noktasıdır.** God-file
-> refactor roadmap'i (Faz 1+2+3) + R9 + R10 bitti; `cardReadings.ts` PDKS
-> ekstraksiyonu tamamlandı. Bu not **kalan işe** odaklıdır.
+> refactor roadmap'i (Faz 1+2+3) + R9 + R10 + R7/R6 güvenli cleanup bitti.
+> Bu not **kalan işe** odaklıdır.
 
 ## Ortam / Bağlam
 
 - **Convex deployment:** `notable-tern-4` — DEV ama **canlı sistem orada**. Deploy: `npx convex dev --once` (`npx convex deploy` DEĞİL). Veri oku: `npx convex data <table>`.
-- **Git:** branch `main`; **9 commit lokalde, henüz push EDİLMEDİ** (`origin/main` 9 gerisinde): `4b99cb6` R9 + `5b1f340` R9-doc + `288f128` sub-faz1 + `13e3599` sub-faz2 + `053c825` sub-faz3 + `c58f6bd` handoff + `1271122` R10-table + `b248ccc` R10-chart + son handoff güncellemesi. Kullanıcı isteyince push.
+- **Git:** branch `main`; **12 commit lokalde, henüz push EDİLMEDİ** (`origin/main` 12 gerisinde): R9 + cardReadings sub-fazları + R10 + `8b66621` R7 a11y + `d2003df` R6 reconcile cleanup + son handoff güncellemesi. Kullanıcı isteyince push.
 - **Working tree:** R10 commit'leri temiz; repo genelinde R10 dışı kirli dosyalar var (`bridge/windows/NgAccess.HikvisionBridge/*` + `src/components/devices/*`). Bunlara dokunulmadı.
 - **Lint/test/build gate'leri (her değişiklikte):**
   ```
@@ -36,14 +36,16 @@ God-file refactor: 5 god-file → `convex/lib/*` modülleri + saf birim test ağ
 - **R10 cardReadings kalan PDKS handler'ları** (`1271122`+`b248ccc`): `getPdksTableData` + `getPdksChartData` saf çekirdekleri lib'e indi; god-file **2065→1611** sat, +11 golden test (163→174). Yeni lib:
   - `lib/pdksTable.ts` — tablo single-day summary + matrix day cell hesabı; **ham dakika + dailyOvertimeForShift** R8 tablo varyantı pinli.
   - `lib/pdksChart.ts` — daily attendance, departman devamsızlık, late bucket, hourly trend; mevcut N+1 dept lookup wrapper'da korundu, saat format farkı testle pinli.
+- **R7 a11y** (`8b66621`): `SheetContent` açıklama gerektirmeyen sheet'ler için `aria-describedby={undefined}` geçiriyor; çağıran kendi açıklama id'sini hâlâ override edebilir.
+- **R6 güvenli cleanup** (`d2003df`): Hik reconcile kart/yüz/parmak pagination drain loop'ları `collectAllPages` helper'ına indi ve 3 roster drain `Promise.all` ile paralelleşti. Hata davranışı korundu.
 
-2b/2c/R9 + cardReadings sub-faz 1-3 + R10: security + eşdeğerlik review **sıfır sapma**; `api.*` yüzeyleri + güvenlik-hassas sır-gate/cross-tenant pin korundu; her sub-faz `api.d.ts` salt-additive.
+2b/2c/R9 + cardReadings sub-faz 1-3 + R10 + R7/R6: security + eşdeğerlik review **sıfır sapma**; `api.*` yüzeyleri + güvenlik-hassas sır-gate/cross-tenant pin korundu; her sub-faz `api.d.ts` salt-additive.
 
 ---
 
 ## KALAN İŞ — öncelik sırası
 
-> ✅ **R9 + cardReadings sub-faz 1-3 + R10 BİTTİ** (9 commit, push bekliyor). Kalanlar artık ürün kararı / trivial cleanup / hardware-login blokajları.
+> ✅ **R9 + cardReadings sub-faz 1-3 + R10 + R7 + R6 güvenli kısmı BİTTİ** (12 commit, push bekliyor). Kalanlar artık ürün kararı / hardware-login-cihaz blokajları + opsiyonel riskli cleanup.
 
 ### 🟡 R8 · PDKS 3-ekran saat/mesai sapması (latent bug, ürün kararı)
 **Ne:** Aynı kişi-gün için 3 ekran **farklı saat/mesai** hesaplıyor:
@@ -56,11 +58,8 @@ God-file refactor: 5 god-file → `convex/lib/*` modülleri + saf birim test ağ
 **Karar gerekli (ürün):** Hangisi "doğru"? Üçü tek kanonik hesaba birleştirilecekse bu bir **davranış değişikliği** (refactor değil) — ayrı analiz + kullanıcı onayı + büyük olasılıkla migration/yeniden-hesap.
 **Bloke:** ürün kararı.
 
-### 🟢 R7 · A11y — SheetContent `aria-describedby` (trivial)
-Radix Sheet uyarısı; `aria-describedby` eklenmeli. Küçük frontend dokunuşu.
-
-### 🟢 R6 · Opsiyonel cleanup (düşük öncelik)
-`collectAllPages` helper, reconcile `Promise.all`, `_runBackfill` batch. Detay: `docs/HIK_ISAPI_HANDOFF.md §3.4`.
+### 🟢 R6 kalan opsiyonel cleanup (düşük öncelik)
+`collectAllPages` helper + reconcile `Promise.all` bitti. Kalan: `doors.update` `hikDoorNo` değişince reader `hikReaderNo` drift'i, 3 roster query için `resolvePanelAuthorizedEmployeeIds` core'u, `_runBackfill` per-event runMutation → batch. Bunlar push'u engellemez; özellikle batch işi mutation sözleşmesi değiştirir.
 
 ### ⏸️ R2 · Model/okuyucu provizyon — manuel UI verify (BLOKE: user login)
 7 adımlık doğrulama senaryosu: `docs/HANDOFF_KAPI_OKUYUCU.md §6`. Kullanıcının panele login olup model seçimi→kapı/okuyucu provizyonunu UI'da doğrulaması gerekiyor.
