@@ -43,6 +43,11 @@ import {
   formatIstanbulTime,
   formatHoursLabel,
 } from "./lib/pdksCalc";
+import {
+  enrichReadingsForList,
+  enrichWithDeviceName,
+  enrichWithDeviceInfo,
+} from "./lib/cardReadingAudit";
 
 /**
  * Ziyaretçi kayıt ekranı için: seçilen okuyucuda (device) okutulan en son BİLİNMEYEN
@@ -156,58 +161,7 @@ export const list = authedQuery({
     const from = (page - 1) * pageSize;
     const paginated = readings.slice(from, from + pageSize);
 
-    // IDE Smart okumaların kapı/okuyucu eşlemesi: ideIoId (panel actuator) →
-    // doors.ioId. Sayfadaki paneller için doors'u bir kez topla (N+1 önler).
-    const ideDeviceIds = [
-      ...new Set(
-        paginated
-          .filter((r) => r.ideIoId !== undefined && r.deviceId)
-          .map((r) => r.deviceId as Id<"devices">),
-      ),
-    ];
-    const doorsByDevice = new Map<Id<"devices">, Doc<"doors">[]>();
-    await Promise.all(
-      ideDeviceIds.map(async (did) => {
-        const doors = await ctx.db
-          .query("doors")
-          .withIndex("by_device", (q) => q.eq("deviceId", did))
-          .collect();
-        doorsByDevice.set(did, doors);
-      }),
-    );
-
-    const enriched = await Promise.all(
-      paginated.map(async (r) => {
-        const device = r.deviceId ? await ctx.db.get(r.deviceId) as Doc<"devices"> | null : null;
-        const employee = r.employeeId ? await ctx.db.get(r.employeeId) as Doc<"employees"> | null : null;
-        let department: Doc<"departments"> | null = null;
-        if (employee?.departmentId) {
-          department = await ctx.db.get(employee.departmentId) as Doc<"departments"> | null;
-        }
-        const door =
-          r.ideIoId !== undefined && r.deviceId
-            ? doorsByDevice.get(r.deviceId)?.find((d) => d.ioId === r.ideIoId)
-            : undefined;
-        return {
-          ...r,
-          devices: device
-            ? { name: device.name, deviceSerial: device.deviceSerial }
-            : null,
-          door: door
-            ? {
-                name: door.name,
-                readerName: door.readerName,
-                readerDirection: door.readerDirection,
-              }
-            : null,
-          employees: employee
-            ? {
-                departments: department ? { name: department.name } : null,
-              }
-            : null,
-        };
-      })
-    );
+    const enriched = await enrichReadingsForList(ctx, paginated);
 
     return { readings: enriched, totalCount };
   },
@@ -247,16 +201,7 @@ export const getRecentByProjects = query({
       return [];
     }
 
-    return await Promise.all(
-      readings.map(async (r) => {
-        const device = r.deviceId ? await ctx.db.get(r.deviceId) as Doc<"devices"> | null : null;
-        return {
-          ...r,
-          access_granted: r.accessStatus === "izin_verildi",
-          device_name: device?.name ?? "Bilinmeyen Cihaz",
-        };
-      })
-    );
+    return await enrichWithDeviceName(ctx, readings);
   },
 });
 
@@ -1948,24 +1893,7 @@ export const listForEmployee = employeeAuthedQuery({
       .order("desc")
       .take(limit);
 
-    return await Promise.all(
-      readings.map(async (r) => {
-        const device = r.deviceId
-          ? ((await ctx.db.get(r.deviceId)) as Doc<"devices"> | null)
-          : null;
-        return {
-          ...r,
-          device: device
-            ? {
-                _id: device._id,
-                name: device.name,
-                description: device.description ?? null,
-                deviceSerial: device.deviceSerial ?? null,
-              }
-            : null,
-        };
-      })
-    );
+    return await enrichWithDeviceInfo(ctx, readings);
   },
 });
 

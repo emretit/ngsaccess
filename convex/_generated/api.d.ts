@@ -54,6 +54,7 @@ import type * as lib_audit from "../lib/audit.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_breakDeduction from "../lib/breakDeduction.js";
 import type * as lib_cardReaderParse from "../lib/cardReaderParse.js";
+import type * as lib_cardReadingAudit from "../lib/cardReadingAudit.js";
 import type * as lib_customFunctions from "../lib/customFunctions.js";
 import type * as lib_digestAuth from "../lib/digestAuth.js";
 import type * as lib_emailVerification from "../lib/emailVerification.js";
@@ -156,6 +157,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auth": typeof lib_auth;
   "lib/breakDeduction": typeof lib_breakDeduction;
   "lib/cardReaderParse": typeof lib_cardReaderParse;
+  "lib/cardReadingAudit": typeof lib_cardReadingAudit;
   "lib/customFunctions": typeof lib_customFunctions;
   "lib/digestAuth": typeof lib_digestAuth;
   "lib/emailVerification": typeof lib_emailVerification;
