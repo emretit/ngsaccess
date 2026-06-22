@@ -29,9 +29,52 @@ import {
   setHttpHostForwarding,
   setVerifyPlanTemplate,
   setVerifyWeekPlan,
+  type FaceRecord,
+  type FingerprintRecord,
+  type SearchCardInfo,
   type Weekday,
 } from "../lib/hikGateway";
 import { diffIds } from "../lib/reconcileMath";
+
+type DrainPage = {
+  ok: boolean;
+  numMatches: number;
+  nextPosition: number;
+  hasMore: boolean;
+  error?: string;
+};
+
+async function collectAllPages<TItem, TPage extends DrainPage>(opts: {
+  label: string;
+  deviceId: Id<"devices">;
+  maxPages: number;
+  loadPage: (position: number) => Promise<TPage>;
+  itemsFromPage: (page: TPage) => TItem[];
+}): Promise<{ ok: true; items: TItem[] } | { ok: false; items: TItem[]; error?: string }> {
+  const items: TItem[] = [];
+  let position = 0;
+  let pageCount = 0;
+
+  while (pageCount < opts.maxPages) {
+    const page = await opts.loadPage(position);
+    if (!page.ok) {
+      return { ok: false, items, error: page.error };
+    }
+
+    items.push(...opts.itemsFromPage(page));
+    pageCount++;
+    if (page.numMatches === 0 || !page.hasMore) break;
+    position = page.nextPosition;
+  }
+
+  if (pageCount >= opts.maxPages) {
+    console.warn(
+      `[hik-reconcile] ${opts.label} maxPages=${opts.maxPages} aşıldı, device=${opts.deviceId}`,
+    );
+  }
+
+  return { ok: true, items };
+}
 
 /**
  * Cihazı Hik Device Gateway'e kaydeder (EHOME / ISUP 5.0).
@@ -675,90 +718,93 @@ export const reconcileDevice = authedAction({
       ctx.runQuery(internal.devices.getHikDeviceFingerprintRoster, { deviceId: args.deviceId }) as Promise<string[]>,
     ]);
 
-    // ── Cihaz kart roster (tüm sayfalar) ────────────────────────────────────
-    const cardSearchID = `reconcile-card-${args.deviceId}-${Date.now()}`;
     const MAX_RECONCILE_PAGES = 100;
-    const onDeviceCards: string[] = [];
-    let cardPos = 0;
-    let cardPageCount = 0;
+    const now = Date.now();
+    const [cardDrain, faceDrain, fingerprintDrain] = await Promise.all([
+      collectAllPages<string, {
+        ok: boolean;
+        cards: SearchCardInfo[];
+        numMatches: number;
+        nextPosition: number;
+        hasMore: boolean;
+        error?: string;
+      }>({
+        label: "kart",
+        deviceId: args.deviceId,
+        maxPages: MAX_RECONCILE_PAGES,
+        loadPage: (position) =>
+          searchCardsOnDevice(devIndex, {
+            searchID: `reconcile-card-${args.deviceId}-${now}`,
+            position,
+            maxResults: 50,
+          }),
+        itemsFromPage: (page) => page.cards.map((card) => card.cardNo),
+      }),
+      collectAllPages<string, {
+        ok: boolean;
+        faces: FaceRecord[];
+        numMatches: number;
+        nextPosition: number;
+        hasMore: boolean;
+        error?: string;
+      }>({
+        label: "yüz",
+        deviceId: args.deviceId,
+        maxPages: MAX_RECONCILE_PAGES,
+        loadPage: (position) =>
+          searchFacesOnDevice(devIndex, {
+            searchID: `reconcile-face-${args.deviceId}-${now}`,
+            position,
+            maxResults: 50,
+          }),
+        itemsFromPage: (page) =>
+          page.faces.flatMap((face) => {
+            // VERIFY: cihazdaki yüz kaydında employeeNo mu yoksa FPID mi kullanılan tanımlayıcı?
+            // hikvisionSync.ts addFaceToDevice'de FPID: employeeNo set ediliyor → employeeNo öncelikli.
+            const id = face.employeeNo ?? face.FPID;
+            return id ? [id] : [];
+          }),
+      }),
+      collectAllPages<string, {
+        ok: boolean;
+        fingerprints: FingerprintRecord[];
+        numMatches: number;
+        nextPosition: number;
+        hasMore: boolean;
+        error?: string;
+      }>({
+        label: "parmak izi",
+        deviceId: args.deviceId,
+        maxPages: MAX_RECONCILE_PAGES,
+        loadPage: (position) =>
+          searchFingerprintsOnDevice(devIndex, {
+            searchID: `reconcile-fp-${args.deviceId}-${now}`,
+            position,
+            maxResults: 50,
+          }),
+        itemsFromPage: (page) => page.fingerprints.map((fp) => fp.employeeNo),
+      }),
+    ]);
 
-    while (cardPageCount < MAX_RECONCILE_PAGES) {
-      const page = await searchCardsOnDevice(devIndex, {
-        searchID: cardSearchID,
-        position: cardPos,
-        maxResults: 50,
-      });
-      if (!page.ok) {
-        return {
-          ok: false,
-          ...emptyDiff(),
-          expectedCount: expectedCards.length,
-          error: `Cihaz kart listesi alınamadı: ${page.error ?? "bilinmeyen hata"}`,
-        };
-      }
-      for (const card of page.cards) onDeviceCards.push(card.cardNo);
-      cardPageCount++;
-      if (page.numMatches === 0 || !page.hasMore) break;
-      cardPos = page.nextPosition;
+    if (!cardDrain.ok) {
+      return {
+        ok: false,
+        ...emptyDiff(),
+        expectedCount: expectedCards.length,
+        error: `Cihaz kart listesi alınamadı: ${cardDrain.error ?? "bilinmeyen hata"}`,
+      };
     }
-    if (cardPageCount >= MAX_RECONCILE_PAGES) {
-      console.warn(`[hik-reconcile] kart maxPages=${MAX_RECONCILE_PAGES} aşıldı, device=${args.deviceId}`);
+    if (!faceDrain.ok) {
+      // Yüz desteği olmayan cihazlar HTTP 4xx dönebilir — uyarı logla, kart sonucunu yine de dön.
+      console.warn(`[hik-reconcile] yüz listesi alınamadı, device=${args.deviceId}: ${faceDrain.error ?? "?"}`);
+    }
+    if (!fingerprintDrain.ok) {
+      console.warn(`[hik-reconcile] parmak izi listesi alınamadı, device=${args.deviceId}: ${fingerprintDrain.error ?? "?"}`);
     }
 
-    // ── Cihaz yüz roster (tüm sayfalar) ─────────────────────────────────────
-    // VERIFY: FDSearch response shape (FPID/employeeNo/MatchList) canlı cihazda doğrula.
-    // Eşleme: cihaz yüz kaydı → FaceRecord.employeeNo = ngsaccess employee.cardNumber
-    const faceSearchID = `reconcile-face-${args.deviceId}-${Date.now()}`;
-    const onDeviceFaces: string[] = [];
-    let facePos = 0;
-    let facePageCount = 0;
-
-    while (facePageCount < MAX_RECONCILE_PAGES) {
-      const page = await searchFacesOnDevice(devIndex, {
-        searchID: faceSearchID,
-        position: facePos,
-        maxResults: 50,
-      });
-      if (!page.ok) {
-        // Yüz desteği olmayan cihazlar HTTP 4xx dönebilir — uyarı logla, kart sonucunu yine de dön.
-        console.warn(`[hik-reconcile] yüz listesi alınamadı, device=${args.deviceId}: ${page.error ?? "?"}`);
-        break;
-      }
-      for (const face of page.faces) {
-        // VERIFY: cihazdaki yüz kaydında employeeNo mu yoksa FPID mi kullanılan tanımlayıcı?
-        // hikvisionSync.ts addFaceToDevice'de FPID: employeeNo set ediliyor → employeeNo öncelikli.
-        const id = face.employeeNo ?? face.FPID;
-        if (id) onDeviceFaces.push(id);
-      }
-      facePageCount++;
-      if (page.numMatches === 0 || !page.hasMore) break;
-      facePos = page.nextPosition;
-    }
-
-    // ── Cihaz parmak izi roster (tüm sayfalar) ──────────────────────────────
-    // VERIFY: FingerPrintUpload response shape (FingerPrintList/FingerPrintInfo/employeeNo) canlı cihazda doğrula.
-    const fpSearchID = `reconcile-fp-${args.deviceId}-${Date.now()}`;
-    const onDeviceFingerprints: string[] = [];
-    let fpPos = 0;
-    let fpPageCount = 0;
-
-    while (fpPageCount < MAX_RECONCILE_PAGES) {
-      const page = await searchFingerprintsOnDevice(devIndex, {
-        searchID: fpSearchID,
-        position: fpPos,
-        maxResults: 50,
-      });
-      if (!page.ok) {
-        console.warn(`[hik-reconcile] parmak izi listesi alınamadı, device=${args.deviceId}: ${page.error ?? "?"}`);
-        break;
-      }
-      for (const fp of page.fingerprints) {
-        onDeviceFingerprints.push(fp.employeeNo);
-      }
-      fpPageCount++;
-      if (page.numMatches === 0 || !page.hasMore) break;
-      fpPos = page.nextPosition;
-    }
+    const onDeviceCards = cardDrain.items;
+    const onDeviceFaces = faceDrain.items;
+    const onDeviceFingerprints = fingerprintDrain.items;
 
     // ── Farkları hesapla ────────────────────────────────────────────────────
     // diffIds(oldIds=expected, newIds=onDevice)
