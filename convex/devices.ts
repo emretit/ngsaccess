@@ -18,6 +18,10 @@ import {
   provisionHikDoorsAndReaders,
 } from "./lib/deviceHelpers";
 import { claimAdminDeviceCore } from "./lib/devicePool";
+import {
+  resolveAuthorizedEmployeeIds,
+  rosterCardNumbersWithBiometric,
+} from "./lib/deviceSync";
 
 /**
  * Cihazın hassas alanları. list okuma-gate'i (non-manager'a gizle) ile update yazma-gate'i
@@ -1236,61 +1240,12 @@ export const getHikAuthorizedCardNumbers = internalQuery({
 export const getHikDeviceFaceRoster = internalQuery({
   args: { deviceId: v.id("devices") },
   handler: async (ctx, args): Promise<string[]> => {
-    // ── Yetkili employee ID seti ─────────────────────────────────────────────
-    // resolvePanelAuthorizedCards'ın iki-bacak kural çözümünü burada da uyguluyoruz;
-    // fark: kart normalizer yerine employeeId'leri topluyoruz.
-    const [deviceLinks, panelDoors] = await Promise.all([
-      ctx.db
-        .query("groupDevices")
-        .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
-        .collect(),
-      ctx.db
-        .query("doors")
-        .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
-        .collect(),
-    ]);
-
-    const ruleIds = new Set<Id<"accessRules">>(deviceLinks.map((l) => l.groupId));
-    await Promise.all(
-      panelDoors.map(async (door) => {
-        const doorLinks = await ctx.db
-          .query("groupDoors")
-          .withIndex("by_door", (q) => q.eq("doorId", door._id))
-          .collect();
-        for (const dl of doorLinks) ruleIds.add(dl.groupId);
-      }),
+    const authorizedEmpIds = await resolveAuthorizedEmployeeIds(ctx, args.deviceId);
+    return await rosterCardNumbersWithBiometric(
+      ctx,
+      authorizedEmpIds,
+      "employeeFaces",
     );
-
-    const authorizedEmpIds = new Set<Id<"employees">>();
-    await Promise.all(
-      Array.from(ruleIds).map(async (ruleId) => {
-        const rule = await ctx.db.get(ruleId);
-        if (!rule || rule.isActive === false) return;
-        const members = await ctx.db
-          .query("groupMembers")
-          .withIndex("by_project_group", (q) =>
-            q.eq("projectId", rule.projectId).eq("groupId", ruleId),
-          )
-          .collect();
-        for (const m of members) authorizedEmpIds.add(m.employeeId);
-      }),
-    );
-
-    // ── Yüz kaydı olanları filtrele ─────────────────────────────────────────
-    // cardNumber başına tek kayıt — aynı cardNumber'ı paylaşan iki employee yüz
-    // sayımını şişirmesin (fingerprint roster ile tutarlı dedup).
-    const seen = new Set<string>();
-    for (const employeeId of authorizedEmpIds) {
-      const face = await ctx.db
-        .query("employeeFaces")
-        .withIndex("by_employee", (q) => q.eq("employeeId", employeeId))
-        .first();
-      if (!face) continue;
-      const emp = await ctx.db.get(employeeId);
-      const cardNumber = emp?.cardNumber?.trim();
-      if (cardNumber) seen.add(cardNumber);
-    }
-    return Array.from(seen);
   },
 });
 
@@ -1305,58 +1260,12 @@ export const getHikDeviceFaceRoster = internalQuery({
 export const getHikDeviceFingerprintRoster = internalQuery({
   args: { deviceId: v.id("devices") },
   handler: async (ctx, args): Promise<string[]> => {
-    // ── Yetkili employee ID seti (getHikDeviceFaceRoster ile aynı yetki çözümü) ──
-    const [deviceLinks, panelDoors] = await Promise.all([
-      ctx.db
-        .query("groupDevices")
-        .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
-        .collect(),
-      ctx.db
-        .query("doors")
-        .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
-        .collect(),
-    ]);
-
-    const ruleIds = new Set<Id<"accessRules">>(deviceLinks.map((l) => l.groupId));
-    await Promise.all(
-      panelDoors.map(async (door) => {
-        const doorLinks = await ctx.db
-          .query("groupDoors")
-          .withIndex("by_door", (q) => q.eq("doorId", door._id))
-          .collect();
-        for (const dl of doorLinks) ruleIds.add(dl.groupId);
-      }),
+    const authorizedEmpIds = await resolveAuthorizedEmployeeIds(ctx, args.deviceId);
+    return await rosterCardNumbersWithBiometric(
+      ctx,
+      authorizedEmpIds,
+      "employeeFingerprints",
     );
-
-    const authorizedEmpIds = new Set<Id<"employees">>();
-    await Promise.all(
-      Array.from(ruleIds).map(async (ruleId) => {
-        const rule = await ctx.db.get(ruleId);
-        if (!rule || rule.isActive === false) return;
-        const members = await ctx.db
-          .query("groupMembers")
-          .withIndex("by_project_group", (q) =>
-            q.eq("projectId", rule.projectId).eq("groupId", ruleId),
-          )
-          .collect();
-        for (const m of members) authorizedEmpIds.add(m.employeeId);
-      }),
-    );
-
-    // ── Parmak izi kaydı olanları filtrele ──────────────────────────────────
-    // cardNumber başına tek kayıt — aynı employee'nin birden fazla parmağı olsa da tek entry.
-    const seen = new Set<string>();
-    for (const employeeId of authorizedEmpIds) {
-      const fp = await ctx.db
-        .query("employeeFingerprints")
-        .withIndex("by_employee", (q) => q.eq("employeeId", employeeId))
-        .first();
-      if (!fp) continue;
-      const emp = await ctx.db.get(employeeId);
-      const cardNumber = emp?.cardNumber?.trim();
-      if (cardNumber) seen.add(cardNumber);
-    }
-    return Array.from(seen);
   },
 });
 
