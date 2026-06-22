@@ -1,71 +1,81 @@
-# Session Devir Notu — Handoff Konsolidasyonu + Faz 2a (hikGateway split)
+# Session Devir Notu — KALAN İŞ (Faz 2 refactor sonrası)
 
-> Son güncelleme: 2026-06-22 (UTC+3). Bu dosya en güncel devir notudur. Bir önceki
-> oturum 4 dağınık handoff bırakmıştı; bu oturumda hepsi tek duruma indirgendi + Faz 2a yapıldı.
+> Son güncelleme: 2026-06-22 (UTC+3). **Bu dosya tek giriş noktasıdır.** God-file
+> refactor roadmap'i (Faz 1+2+3) bitti ve `origin/main`'e push edildi; bu not artık
+> **kalan işe** odaklıdır.
 
 ## Ortam / Bağlam
 
 - **Convex deployment:** `notable-tern-4` — DEV ama **canlı sistem orada**. Deploy: `npx convex dev --once` (`npx convex deploy` DEĞİL). Veri oku: `npx convex data <table>`.
-- **Git:** branch `main`, origin'in **23 commit önünde, PUSH YOK** (kullanıcı isteyince push). Working tree temiz (yalnız bu handoff `M`). **Faz 2 (god-file refactor) TAMAMEN BİTTİ:** 2a (hikGateway) + 2b (cardReadings, `1d021fd`+`217c8a5`+`1e775d5`+`8519d8a`) + 2c (devices, `9a794f6`+`8708edd`+`47c9301`) + 2d (schema, `8b256ae`). 2b/2c security+eşdeğerlik review sıfır sapma.
-- **Lint/test:** `node_modules/.bin/tsc --noEmit -p tsconfig.app.json` + `-p convex/tsconfig.json` (0 hata) · `node_modules/.bin/eslint src convex` (no-explicit-any 0) · `npm test` (100 yeşil) · `npm run build`.
+- **Git:** branch `main`, **`origin/main` ile SENKRON** (working tree temiz). Kullanıcı isteyince push.
+- **Lint/test/build gate'leri (her değişiklikte):**
+  ```
+  npm test                                                # 136 yeşil
+  node_modules/.bin/tsc --noEmit -p tsconfig.app.json     # 0
+  node_modules/.bin/tsc --noEmit -p convex/tsconfig.json  # 0
+  node_modules/.bin/eslint src convex                     # no-explicit-any 0
+  npm run build
+  npx convex dev --once                                   # fonksiyon register (CANLI)
+  ```
 - **Free-plan limiti yaklaşıyor** (Convex dashboard uyarısı) — kota-yiyen işlemlere dikkat.
 
-## Bu oturumda ne yapıldı (2 commit)
+## Tamamlanan (özet — detay git log + memory `refactor_roadmap_status`)
 
-| Commit | İş |
-|---|---|
-| `a959793` | `fix(security): getById sır gate` (HIGH — birkaç oturumdur uncommitted bekliyordu) + getHikDeviceFaceRoster dedup + Hik model alanını `DeviceHikModelField`'a taşıma + 4 handoff konsolidasyonu. **Tek commit** (kullanıcı kararı). |
-| `4b7711b` | `refactor: hikGateway.ts → lib/gateway/* (Faz 2a)`. |
+God-file refactor: 5 god-file → `convex/lib/*` modülleri + saf birim test ağı.
+- **Faz 1** test ağı (`4bd64e1`), **Faz 3** cleanup (`04fc40b`).
+- **Faz 2a** hikGateway→`lib/gateway/*` (`4b7711b`).
+- **Faz 2b** cardReadings→`lib/pdksCalc`+`lib/cardReadingAudit` (`1d021fd`+`217c8a5`+`1e775d5`+`8519d8a`); −217 sat, +34 test.
+- **Faz 2c** devices→`lib/deviceHelpers`+`lib/devicePool`+`lib/deviceSync` (`9a794f6`+`8708edd`+`47c9301`); 1736→1318 sat.
+- **Faz 2d** schema 13 bölüm başlığı + `docs/SCHEMA.md` (`8b256ae`).
 
-### Önemli: 4 handoff'un çelişkisi çözüldü
-Önceki oturumun 4 handoff'u (`HIK_ISAPI_HANDOFF`, `SESSION_HANDOFF`, `SESSION_HANDOFF_2026-06-20`, `HANDOFF_KAPI_OKUYUCU`) **farklı anlarda yazıldığı için çelişiyordu**. Git ile doğrulandı: handoff'ların "uncommitted" dediği işlerin **çoğu zaten `12ce665`'te commit'liydi** (ISAPI ops, kapı↔okuyucu, model provizyon, form `values` fix — 44+ dosya tek commit). Gerçekten bekleyen tek kritik şey **getById güvenlik fix'iydi** → artık `a959793`'te indi.
-
-> Eski 4 handoff dosyası (`docs/HANDOFF_KAPI_OKUYUCU.md`, `docs/HIK_ISAPI_HANDOFF.md`, `docs/SESSION_HANDOFF_2026-06-20.md`) hâlâ duruyor — ISAPI runbook'u (R3) ve kapı↔okuyucu detayları için **referans olarak değerli**, silinmedi. Bu dosya (`SESSION_HANDOFF.md`) giriş noktasıdır.
-
-### Faz 2a detayı (sıradaki adımların desenini belirler)
-`convex/lib/hikGateway.ts` (2215 sat god-file) → `convex/lib/gateway/` altında 9 domain modülü:
-`core` (config + HTTP + status parse + count + poll), `devices`, `persons`, `cards`, `scheduling`, `biometrics`, `events`, `capture`, `plans`. `lib/hikGateway.ts` artık **13 satırlık barrel** (`export * from "./gateway/*"`) → 4 importer (`hikGatewayDevice`, `hikQueueWorker`, `hikDebug`, `hikvisionSync`) **dokunulmadı**.
-- **SAF taşıma**, sıfır mantık değişikliği. Tek içerik değişikliği: cross-module için 3 helper'a `export` (`getCountFromEndpoint`, `MAX_SEGMENTS_PER_DAY`, `normalizeEndTime`).
-- **Kanıt:** 81 orijinal export'un 0'ı kayıp (sadece 3 eklendi). tsc app+convex 0 · eslint 0 · 100/100 test · build · `convex dev --once` register OK (api.d.ts yalnız 9 yeni modülü additive tanıdı).
-- **Neden cihaz-verify beklemeden yapılabildi:** hikGateway lib (api değil), 4 importer; saf-taşma davranışı kanıtlanır şekilde değiştirmez → ISAPI canlı-shape verify'ı (R3) bağımsız kalır.
-
-## Review durumu
-- `a959793` içeriği (getById + form): önceki oturumlarda **security-review (getById = bulunan HIGH) + code-review (0 bulgu)** geçmişti.
-- `4b7711b` (Faz 2a): saf mekanik taşıma — yeni input/auth/endpoint/saldırı yüzeyi yok. Stop-hook security/code-review fan-out'u kullanıcı isteğiyle atlandı; yeni session'da istenirse `/security-review` + `/code-review` çalıştırılabilir (düşük beklenti).
+2b/2c: security + eşdeğerlik review **sıfır sapma**; `api.*` yüzeyleri + güvenlik-hassas sır-gate/cross-tenant pin korundu.
 
 ---
 
-## ROADMAP — kalan iş (öncelik sırası)
+## KALAN İŞ — öncelik sırası
 
-| # | İş | Durum / bloke | Not |
-|---|---|---|---|
-| ~~**2b**~~ | `cardReadings.ts` refactor | ✓ **BİTTİ** (`1d021fd`+`217c8a5`+`1e775d5`) | `lib/pdksCalc.ts` (saf gün-hesabı + 34 golden test) & `lib/cardReadingAudit.ts` (enrich) çıkarıldı; wrapper'lar yerinde, `api.cardReadings.*` korundu (api.d.ts additive); cardReadings.ts −217 satır. |
-| ~~**2c**~~ | `devices.ts` refactor | ✓ **BİTTİ** (`9a794f6`+`8708edd`+`47c9301`) | cascade/provizyon → `lib/deviceHelpers.ts`, havuz claim → `lib/devicePool.ts`, Hik roster → `lib/deviceSync.ts`. Sır-gate/cross-tenant pin yerinde; `api.devices.*` korundu. devices.ts 1736→1318 (−418). |
-| ~~**2d**~~ | `schema.ts` (962 sat) | ✓ **BİTTİ** (`8b256ae`) | 44 tabloya 13 domain bölüm başlığı (yeniden sıralama yok) + `docs/SCHEMA.md` haritası. Yalnız yorum — sıfır şema değişikliği (convex register `_generated` diff yok). |
-| **R2** | Model/okuyucu provizyon **manuel UI verify** | kullanıcı login'i lazım | 7 adımlık senaryo: `docs/HANDOFF_KAPI_OKUYUCU.md` §6. |
-| **R3/R4** | ISAPI **canlı shape verify** + görsel test | **gateway Hik cihazı** bekliyor | Runbook: `docs/HIK_ISAPI_HANDOFF.md` §4. Şu an canlıda gateway-transport Hik yok (DS-K2804 localBridge var). |
-| R6 | Opsiyonel cleanup | düşük öncelik | collectAllPages helper, reconcile Promise.all, _runBackfill batch (`docs/HIK_ISAPI_HANDOFF.md` §3.4). |
-| R7 | A11y: SheetContent `aria-describedby` | trivial | — |
-| **R8** | **PDKS saat sapması** (latent bug, 2b'de keşfedildi) | **ürün kararı** | 3 ekran aynı kişi-gün için farklı saat/mesai hesaplıyor: **tablo** = ham dk (mola yok) + `dailyOvertimeForShift`; **bordro** = `netWorkMinutes`(mola+entry/exit) + haftalık `bucketWeeklyOvertime`; **detay** = `netWorkMinutes`(yalnız mola) + **sabit `max(0,net−8h)`**. Manuel ISO eki de tutarsız (`+03:00` vs yok). Davranış 2b'de KORUNDU (refactor) + `pdksCalc.test.ts` ile donduruldu. Hangisi "doğru" → birleştirme ayrı iş. |
-| **R9** | **İki-bacak kural çözümü dup** (2c-3'te kalan borç) | orta öncelik | `lib/deviceSync.ts:resolveAuthorizedEmployeeIds` (Hik biyometri roster) ile `lib/accessGraph.ts:resolvePanelAuthorizedCards` (IDE kart roster) aynı cihaz↔grup + kapı↔grup + isActive çözümünü AYRI yürütüyor → sessiz divergence riski (biri değişirse Hik yüz/parmak roster'ı IDE kart roster'ından farklı kişi seti yetkiler). Fix: accessGraph'a paylaşılan `resolveDevicePanelRuleIds`/employeeId primitifi koy, iki tüketici de çağırsın. Güvenlik-kritik kart yolunu touch ettiğinden ayrı iş + review. |
+### 🔴 R9 · İki-bacak kural çözümü dup (kod borcu, güvenlik-adjacent)
+**Ne:** `convex/lib/deviceSync.ts:resolveAuthorizedEmployeeIds` (Hik biyometri roster) ile `convex/lib/accessGraph.ts:resolvePanelAuthorizedCards` (IDE kart roster) **aynı iki-bacak yetki çözümünü** (cihaz↔grup `groupDevices` + kapı↔grup `groupDoors` + `isActive` guard → `groupMembers`) AYRI yürütüyor.
+**Neden risk:** Biri değişirse (ör. door-leg snapshot semantiği veya isActive nüansı) diğeri sapar → Hik yüz/parmak roster'ı, IDE kart roster'ından **farklı kişi setini** yetkiler (ör. pasifleştirilen kuralın üyeleri Hik'te hâlâ yüz erişimi alır). accessGraph.ts kendi içinde bu divergence'ı "en büyük risk" diye not düşmüş.
+**Yaklaşım:** `accessGraph`'a paylaşılan primitif koy — `resolveDevicePanelRuleIds(ctx, deviceId)` (iki bacak → ruleId seti) ya da `resolveAuthorizedEmployeeIds`'i oraya taşı; hem `resolvePanelAuthorizedCards` hem `deviceSync` bunu çağırsın. **Güvenlik-kritik canlı kart yolunu touch ettiğinden** ayrı commit + security/eşdeğerlik review şart (roster çıktısı byte-eşdeğer kalmalı).
+**Bloke:** yok — yapılabilir.
 
-### ⚠️ KRİTİK Convex kısıtı (2b/2c'yi belirler)
-Convex fonksiyonları **dosya-yolu** ile adreslenir. `devices.ts`/`cardReadings.ts` **registered-fn dosyaları** → alt-dizine bölmek `api.devices.update` → `api.devices.crud.update` yapar ve **referansları kırar**. Bu yüzden: **ağır mantık `lib/`'e taşınır, registered query/mutation wrapper'lar dosyada kalır** (içleri incelir). 2a'nın aksine bu **saf-mekanik değil** — wrapper'lar yeniden yazılır, dikkatli olunmalı. Faz 1 test ağı (accessDecision/accessGraphPure/reconcileMath, 100 test) bu refactor'lar için güvenlik ağıdır.
+### 🟡 R8 · PDKS 3-ekran saat/mesai sapması (latent bug, ürün kararı)
+**Ne:** Aynı kişi-gün için 3 ekran **farklı saat/mesai** hesaplıyor:
+- **Tablo** (`getPdksTableData`) = ham dakika (mola yok) + `dailyOvertimeForShift`.
+- **Bordro** (`getMonthlyPayrollSheet`) = `netWorkMinutes`(mola+entry/exit) + haftalık `bucketWeeklyOvertime`.
+- **Detay** (`getEmployeeAttendanceDetail`) = `netWorkMinutes`(yalnız mola) + **sabit `max(0, net−8h)`**.
+- Manuel kayıt ISO eki de tutarsız (`+03:00` vs yok).
 
-### Her refactor adımının doğrulaması
-```
-npm test                                              # 100 yeşil
-node_modules/.bin/tsc --noEmit -p tsconfig.app.json   # 0
-node_modules/.bin/tsc --noEmit -p convex/tsconfig.json # 0
-node_modules/.bin/eslint src convex                   # no-explicit-any 0
-npm run build
-npx convex dev --once                                 # fonksiyon register (notable-tern-4 CANLI)
-```
-Her sub-faz **kendi commit'i** (bisect-edilebilir). Saf taşımada `git diff --stat` mantık satırı içermemeli.
+**Durum:** Faz 2b refactor'unda davranış **bilerek korundu** + `convex/lib/pdksCalc.test.ts` golden testleriyle donduruldu (kazara değişmesin).
+**Karar gerekli (ürün):** Hangisi "doğru"? Üçü tek kanonik hesaba birleştirilecekse bu bir **davranış değişikliği** (refactor değil) — ayrı analiz + kullanıcı onayı + büyük olasılıkla migration/yeniden-hesap.
+**Bloke:** ürün kararı.
+
+### 🟢 R7 · A11y — SheetContent `aria-describedby` (trivial)
+Radix Sheet uyarısı; `aria-describedby` eklenmeli. Küçük frontend dokunuşu.
+
+### 🟢 R6 · Opsiyonel cleanup (düşük öncelik)
+`collectAllPages` helper, reconcile `Promise.all`, `_runBackfill` batch. Detay: `docs/HIK_ISAPI_HANDOFF.md §3.4`.
+
+### ⏸️ R2 · Model/okuyucu provizyon — manuel UI verify (BLOKE: user login)
+7 adımlık doğrulama senaryosu: `docs/HANDOFF_KAPI_OKUYUCU.md §6`. Kullanıcının panele login olup model seçimi→kapı/okuyucu provizyonunu UI'da doğrulaması gerekiyor.
+
+### ⏸️ R3/R4 · ISAPI canlı shape verify + görsel test (BLOKE: gateway Hik cihazı)
+~25 yeni ISAPI op'unun canlı cihazla shape doğrulaması. Runbook: `docs/HIK_ISAPI_HANDOFF.md §4`. Şu an canlıda **gateway-transport Hik yok** (yalnız DS-K2804 localBridge var). Gateway cihazı dönünce yapılır.
+
+---
+
+## Çalışma deseni (2b/2c'de kanıtlandı — sıradaki refactor/extraction için)
+
+Convex **registered-fn dosyaları** (`devices.ts`, `cardReadings.ts` …) file-path = `api.*` yolu → **bölünemez**. Desen:
+1. **Saf mantık** (ctx yok, async yok, plain-type in/out) → `convex/lib/*.ts` + **vitest golden test** (`accessDecision.test.ts` stili: `<T extends string>` generic, Readonly koleksiyon, Doc<> import etme).
+2. **ctx-bağımlı helper** → `ctx` alan lib fonksiyonu (`buildShiftResolver(ctx,…)` deseni).
+3. **Registered query/mutation wrapper'lar dosyada kalır** → `api.*` korunur; içleri helper'lara delege eder.
+4. **Güvenlik-hassas kod** (sır-gate, cross-tenant pin, auth) çıkarma kapsamı **dışı** — yerinde bırak.
+5. Her sub-faz **kendi commit'i** (bisect); saf taşımada `git diff` mantık satırı içermemeli; her commit'te 6 gate yeşil + `api.d.ts` additive (imza değişmedi kanıtı).
 
 ## Referanslar
-- **Roadmap planı (bu oturum):** `~/.claude/plans/devir-odakl-bir-handoff-buzzing-hippo.md`
-- **Faz 2 detaylı plan:** `~/.claude/plans/detayl-bir-plan-yap-dazzling-creek.md`
-- **Memory:** `refactor_roadmap_status.md` (Faz 1+3+2a bitti), `hik_isapi_ops_expansion.md`, `convex_deployment_topology.md`, `door_reader_separation.md`
-- **Konu handoff'ları:** `docs/HIK_ISAPI_HANDOFF.md` (ISAPI + R3 runbook), `docs/HANDOFF_KAPI_OKUYUCU.md` (kapı↔okuyucu + R2 senaryosu)
-- **Kod giriş:** `convex/lib/gateway/*` (yeni modüler gateway), `convex/lib/hikGateway.ts` (barrel)
+- **Memory:** `refactor_roadmap_status.md` (tüm faz durumu), `hik_isapi_ops_expansion.md`, `convex_deployment_topology.md`, `door_reader_separation.md`.
+- **Şema haritası:** `docs/SCHEMA.md` (13 domain bölümü, 44 tablo).
+- **Konu handoff'ları:** `docs/HIK_ISAPI_HANDOFF.md` (ISAPI + R3/R4/R6 runbook), `docs/HANDOFF_KAPI_OKUYUCU.md` (kapı↔okuyucu + R2 senaryosu).
+- **Kod giriş:** `convex/lib/{gateway/*,pdksCalc,cardReadingAudit,deviceHelpers,devicePool,deviceSync}`.
