@@ -1,16 +1,16 @@
 # Session Devir Notu — KALAN İŞ (Faz 2 refactor sonrası)
 
 > Son güncelleme: 2026-06-22 (UTC+3). **Bu dosya tek giriş noktasıdır.** God-file
-> refactor roadmap'i (Faz 1+2+3) bitti ve `origin/main`'e push edildi; bu not artık
-> **kalan işe** odaklıdır.
+> refactor roadmap'i (Faz 1+2+3) + R9 bitti; ardından `cardReadings.ts` ekstraksiyonu
+> sub-faz 1-3 yapıldı. Bu not **kalan işe** odaklıdır.
 
 ## Ortam / Bağlam
 
 - **Convex deployment:** `notable-tern-4` — DEV ama **canlı sistem orada**. Deploy: `npx convex dev --once` (`npx convex deploy` DEĞİL). Veri oku: `npx convex data <table>`.
-- **Git:** branch `main`; R9 commit `4b99cb6` **lokalde, henüz push EDİLMEDİ** (`origin/main` 1 commit gerisinde). Working tree temiz. Kullanıcı isteyince push.
+- **Git:** branch `main`; **5 commit lokalde, henüz push EDİLMEDİ** (`origin/main` 5 gerisinde): `4b99cb6` R9 + `5b1f340` R9-doc + `288f128` sub-faz1 + `13e3599` sub-faz2 + `053c825` sub-faz3. Working tree temiz. Kullanıcı isteyince push.
 - **Lint/test/build gate'leri (her değişiklikte):**
   ```
-  npm test                                                # 136 yeşil
+  npm test                                                # 163 yeşil
   node_modules/.bin/tsc --noEmit -p tsconfig.app.json     # 0
   node_modules/.bin/tsc --noEmit -p convex/tsconfig.json  # 0
   node_modules/.bin/eslint src convex                     # no-explicit-any 0
@@ -28,14 +28,28 @@ God-file refactor: 5 god-file → `convex/lib/*` modülleri + saf birim test ağ
 - **Faz 2c** devices→`lib/deviceHelpers`+`lib/devicePool`+`lib/deviceSync` (`9a794f6`+`8708edd`+`47c9301`); 1736→1318 sat.
 - **Faz 2d** schema 13 bölüm başlığı + `docs/SCHEMA.md` (`8b256ae`).
 - **R9** iki-bacak kural çözümü tek kaynağa indi (`4b99cb6`): `accessGraph.resolvePanelRuleMembers` kanonik primitif; Hik biyometri + IDE kart roster'ı artık onu paylaşıyor. Davranış byte-eşdeğer, `api.d.ts` diff boş.
+- **cardReadings sub-faz 1-3** (`288f128`+`13e3599`+`053c825`): god-file 2289→**2065** sat, +27 golden test (136→163). Yeni lib:
+  - `lib/cardReadingProcess.ts` — `ideTimeToISO`/`startOfTurkeyDayISO` (saf) + `resolveDirection`/`resolveActiveMatchingRuleIds` (ctx); processCardReading/selfCheckIn delege.
+  - `lib/pdksDetail.ts` — `computeAttendanceDetailDay`+`summarizeAttendanceDays` (getEmployeeAttendanceDetail çekirdeği, **sabit-8h** R8 varyantı).
+  - `lib/pdksPayroll.ts` — `computePayrollCell` (getMonthlyPayrollSheet hücresi, **shift-duyarlı** R8 varyantı).
 
-2b/2c/R9: security + eşdeğerlik review **sıfır sapma**; `api.*` yüzeyleri + güvenlik-hassas sır-gate/cross-tenant pin korundu.
+2b/2c/R9 + cardReadings sub-faz 1-3: security + eşdeğerlik review **sıfır sapma**; `api.*` yüzeyleri + güvenlik-hassas sır-gate/cross-tenant pin korundu; her sub-faz `api.d.ts` salt-additive.
 
 ---
 
 ## KALAN İŞ — öncelik sırası
 
-> ✅ **R9 BİTTİ** (`4b99cb6`, push bekliyor) — iki-bacak kural çözümü `accessGraph.resolvePanelRuleMembers` kanonik primitifinde birleşti; Hik biyometri + IDE kart roster'ı paylaşıyor. Byte-eşdeğer. Kalan tek **yapılabilir kod borcu** kalmadı; aşağıdakiler ürün kararı / hardware / trivial.
+> ✅ **R9 + cardReadings sub-faz 1-3 BİTTİ** (5 commit, push bekliyor). Tek **yapılabilir kod borcu** = aşağıdaki R10 (cardReadings'in kalan 2 PDKS handler'ı). R8 ürün kararı, R2/R3 hardware, R6/R7 trivial.
+
+### 🔵 R10 · cardReadings kalan 2 PDKS handler ekstraksiyonu (kod borcu, yapılabilir)
+**Ne:** cardReadings.ts (şu an 2065 sat) içinde 2 büyük query handler hâlâ inline:
+- **`getPdksTableData`** (~517 sat, en büyük) — data-load + per-employee summary + matrix per-day. En çok kazanç, en karmaşık.
+- **`getPdksChartData`** (~224 sat) — daily attendance + late bucketing (saf) + ⚠️ **N+1 dept lookup** (`await ctx.db.get(r.employeeId)` döngüde).
+
+**Yaklaşım:** Sub-faz 1-3'teki **kanıtlanmış reçete** (aşağıdaki çalışma deseni). Her handler'ın saf per-gün/per-employee compute'unu **birebir** `lib/pdksTable.ts` / `lib/pdksChart.ts`'e çıkar + golden test; data-load + auth guard handler'da kalır. **R8 farkı (tablo = ham dakika + dailyOvertimeForShift) KORUNMALI** — byte-eşdeğer. Her handler kendi commit'i.
+**Önemli:** Mapper'ın önerdiği "iyileştirmeler" (N+1→batch, 3 handler'ı tek loader'da birleştir) **davranış değiştirir → YAPMA**; sadece çıkar.
+**Uyarı:** Bu 4 PDKS handler'ının **çıktı-seviyesi testi yok** (yalnız primitifler test edildi) → saf compute çıkarırken golden test ekleyerek ağı ör.
+**Bloke:** yok.
 
 ### 🟡 R8 · PDKS 3-ekran saat/mesai sapması (latent bug, ürün kararı)
 **Ne:** Aynı kişi-gün için 3 ekran **farklı saat/mesai** hesaplıyor:
@@ -44,7 +58,7 @@ God-file refactor: 5 god-file → `convex/lib/*` modülleri + saf birim test ağ
 - **Detay** (`getEmployeeAttendanceDetail`) = `netWorkMinutes`(yalnız mola) + **sabit `max(0, net−8h)`**.
 - Manuel kayıt ISO eki de tutarsız (`+03:00` vs yok).
 
-**Durum:** Faz 2b refactor'unda davranış **bilerek korundu** + `convex/lib/pdksCalc.test.ts` golden testleriyle donduruldu (kazara değişmesin).
+**Durum:** Davranış **bilerek korundu** + golden testlerle donduruldu (kazara değişmesin): `pdksCalc.test.ts` (primitifler) + `pdksDetail.test.ts` (detay sabit-8h) + `pdksPayroll.test.ts` (bordro shift-duyarlı). Detay+bordro çekirdeği artık `lib/pdksDetail` + `lib/pdksPayroll`'de izole.
 **Karar gerekli (ürün):** Hangisi "doğru"? Üçü tek kanonik hesaba birleştirilecekse bu bir **davranış değişikliği** (refactor değil) — ayrı analiz + kullanıcı onayı + büyük olasılıkla migration/yeniden-hesap.
 **Bloke:** ürün kararı.
 
@@ -62,7 +76,7 @@ Radix Sheet uyarısı; `aria-describedby` eklenmeli. Küçük frontend dokunuşu
 
 ---
 
-## Çalışma deseni (2b/2c'de kanıtlandı — sıradaki refactor/extraction için)
+## Çalışma deseni (2b/2c + cardReadings sub-faz 1-3'te kanıtlandı — R10 için aynısı)
 
 Convex **registered-fn dosyaları** (`devices.ts`, `cardReadings.ts` …) file-path = `api.*` yolu → **bölünemez**. Desen:
 1. **Saf mantık** (ctx yok, async yok, plain-type in/out) → `convex/lib/*.ts` + **vitest golden test** (`accessDecision.test.ts` stili: `<T extends string>` generic, Readonly koleksiyon, Doc<> import etme).
@@ -75,4 +89,4 @@ Convex **registered-fn dosyaları** (`devices.ts`, `cardReadings.ts` …) file-p
 - **Memory:** `refactor_roadmap_status.md` (tüm faz durumu), `hik_isapi_ops_expansion.md`, `convex_deployment_topology.md`, `door_reader_separation.md`.
 - **Şema haritası:** `docs/SCHEMA.md` (13 domain bölümü, 44 tablo).
 - **Konu handoff'ları:** `docs/HIK_ISAPI_HANDOFF.md` (ISAPI + R3/R4/R6 runbook), `docs/HANDOFF_KAPI_OKUYUCU.md` (kapı↔okuyucu + R2 senaryosu).
-- **Kod giriş:** `convex/lib/{gateway/*,pdksCalc,cardReadingAudit,deviceHelpers,devicePool,deviceSync}`.
+- **Kod giriş:** `convex/lib/{gateway/*,pdksCalc,pdksDetail,pdksPayroll,cardReadingProcess,cardReadingAudit,deviceHelpers,devicePool,deviceSync}`. R10 hedefi: `convex/cardReadings.ts` → `getPdksTableData` / `getPdksChartData`.
