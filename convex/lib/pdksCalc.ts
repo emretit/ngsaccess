@@ -79,22 +79,35 @@ export function computeLateMinutes(
   return Math.max(0, (istanbulMins % (24 * 60)) - startMins - tolerance);
 }
 
-/**
- * Bir günün durumu.
- *
- * - `mode: "summary"` → getPdksTableData tek-gün mantığı (506-513): hafta sonu/
- *   tatil ayrımı YOK; izin yalnız devamsızken geçerli.
- * - `mode: "calendar"` → matrix (712-719) + detail (2249-2253) mantığı: tatil/
- *   hafta sonu sınıfı taban; devam → present/late, devam yoksa izin → leave
- *   (önceliğ: devam > izin > hafta sonu/tatil > devamsız).
- */
-export function resolveDayStatus(opts: {
-  mode: "summary" | "calendar";
+/** summary modu yalnız bu 4 değeri üretir (hafta sonu/tatil yok). */
+export type SummaryDayStatus = "present" | "late" | "absent" | "leave";
+
+interface DayStatusInput {
   classification: "workday" | "weekend" | "holiday" | "halfDayHoliday";
   hasAttendance: boolean;
   hasLeave: boolean;
   isLate: boolean;
-}): DayStatus {
+}
+
+/**
+ * Bir günün durumu.
+ *
+ * - `mode: "summary"` → getPdksTableData tek-gün mantığı (506-513): hafta sonu/
+ *   tatil ayrımı YOK; izin yalnız devamsızken geçerli. Dönüş dar `SummaryDayStatus`
+ *   — frontend `EmployeeRecord.status` (4'lü union) ile birebir.
+ * - `mode: "calendar"` → matrix (712-719) + detail (2249-2253) mantığı: tatil/
+ *   hafta sonu sınıfı taban; devam → present/late, devam yoksa izin → leave
+ *   (öncelik: devam > izin > hafta sonu/tatil > devamsız).
+ */
+export function resolveDayStatus(
+  opts: { mode: "summary" } & DayStatusInput,
+): SummaryDayStatus;
+export function resolveDayStatus(
+  opts: { mode: "calendar" } & DayStatusInput,
+): DayStatus;
+export function resolveDayStatus(
+  opts: { mode: "summary" | "calendar" } & DayStatusInput,
+): DayStatus {
   const { mode, classification, hasAttendance, hasLeave, isLate } = opts;
 
   if (mode === "summary") {

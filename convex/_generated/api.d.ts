@@ -74,6 +74,7 @@ import type * as lib_hikGateway from "../lib/hikGateway.js";
 import type * as lib_hikModels from "../lib/hikModels.js";
 import type * as lib_hikSync from "../lib/hikSync.js";
 import type * as lib_overtimeCalc from "../lib/overtimeCalc.js";
+import type * as lib_pdksCalc from "../lib/pdksCalc.js";
 import type * as lib_pdksHelpers from "../lib/pdksHelpers.js";
 import type * as lib_rateLimit from "../lib/rateLimit.js";
 import type * as lib_reconcileMath from "../lib/reconcileMath.js";
@@ -175,6 +176,7 @@ declare const fullApi: ApiFromModules<{
   "lib/hikModels": typeof lib_hikModels;
   "lib/hikSync": typeof lib_hikSync;
   "lib/overtimeCalc": typeof lib_overtimeCalc;
+  "lib/pdksCalc": typeof lib_pdksCalc;
   "lib/pdksHelpers": typeof lib_pdksHelpers;
   "lib/rateLimit": typeof lib_rateLimit;
   "lib/reconcileMath": typeof lib_reconcileMath;

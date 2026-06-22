@@ -33,6 +33,16 @@ import { bucketWeeklyOvertime, type DayEntry } from "./lib/overtimeCalc";
 import { inferAccessStatus, inferDenialReason } from "./lib/hikEventCodes";
 import { ideResultGranted } from "./lib/cardReaderParse";
 import { canEmployeeAccessDevice } from "./lib/accessDecision";
+import {
+  buildPeriodDateKeys,
+  manualOverrideMinutes,
+  minutesBetweenISO,
+  computeLateMinutes,
+  resolveDayStatus,
+  matchEmployeeKey,
+  formatIstanbulTime,
+  formatHoursLabel,
+} from "./lib/pdksCalc";
 
 /**
  * Ziyaretçi kayıt ekranı için: seçilen okuyucuda (device) okutulan en son BİLİNMEYEN
@@ -356,11 +366,12 @@ export const getPdksTableData = authedQuery({
     );
 
     const empById = new Map<string, Doc<"employees">>();
-    const empByCard = new Map<string, Doc<"employees">>();
+    const empIdByCard = new Map<string, string>();
     for (const emp of employees) {
       empById.set(String(emp._id), emp);
-      if (emp.cardNumber) empByCard.set(emp.cardNumber, emp);
+      if (emp.cardNumber) empIdByCard.set(emp.cardNumber, String(emp._id));
     }
+    const validEmpIds = new Set(empById.keys());
 
     const employeeMap = new Map<string, typeof readings>();
     for (const emp of employees) {
@@ -368,12 +379,11 @@ export const getPdksTableData = authedQuery({
     }
 
     for (const r of readings) {
-      let empKey: string | null = null;
-      if (r.employeeId && empById.has(String(r.employeeId))) {
-        empKey = String(r.employeeId);
-      } else if (r.cardNo && empByCard.has(r.cardNo)) {
-        empKey = String(empByCard.get(r.cardNo)!._id);
-      }
+      const empKey = matchEmployeeKey(
+        { employeeId: r.employeeId, cardNo: r.cardNo },
+        validEmpIds,
+        empIdByCard,
+      );
       if (!empKey) continue;
       employeeMap.get(empKey)!.push(r);
     }
@@ -439,14 +449,7 @@ export const getPdksTableData = authedQuery({
       compensatory: "Telafi",
     };
 
-    const periodDateKeys: string[] = [];
-    for (
-      let d = new Date(`${startDate}T00:00:00.000Z`);
-      d <= new Date(`${endDate}T00:00:00.000Z`);
-      d.setUTCDate(d.getUTCDate() + 1)
-    ) {
-      periodDateKeys.push(d.toISOString().split("T")[0]);
-    }
+    const periodDateKeys = buildPeriodDateKeys(startDate, endDate);
 
     const tableDepartments = await ctx.db.query("departments").collect();
     const tableDeptById = new Map(tableDepartments.map((d) => [String(d._id), d]));
@@ -503,14 +506,13 @@ export const getPdksTableData = authedQuery({
           refSettings,
         );
 
-        let status: "present" | "late" | "absent" | "leave" = "present";
-        if (hasLeave && !firstEntryISO) {
-          status = "leave";
-        } else if (firstEntryISO) {
-          if (isLate) status = "late";
-        } else {
-          status = "absent";
-        }
+        const status = resolveDayStatus({
+          mode: "summary",
+          classification: "workday",
+          hasAttendance: !!firstEntryISO,
+          hasLeave,
+          isLate,
+        });
 
         const dayReadingsMap = new Map<string, typeof granted>();
         for (const r of granted) {
@@ -528,21 +530,22 @@ export const getPdksTableData = authedQuery({
           const firstOfDay = dayReadings[0];
           const lastOfDay = dayReadings[dayReadings.length - 1];
           if (firstOfDay._id !== lastOfDay._id) {
-            const diff =
-              new Date(lastOfDay.accessTime).getTime() -
-              new Date(firstOfDay.accessTime).getTime();
-            totalMinutes += Math.floor(diff / 60000);
+            totalMinutes += minutesBetweenISO(
+              firstOfDay.accessTime,
+              lastOfDay.accessTime,
+            );
           }
         }
 
         // Manuel override total minutes hesabı (tek gün)
         if (isSingleDay && manualToday?.entryTime && manualToday?.exitTime) {
-          const entryMin = parseHHMM(manualToday.entryTime);
-          const exitMin = parseHHMM(manualToday.exitTime);
-          totalMinutes = Math.max(0, exitMin - entryMin);
+          totalMinutes = manualOverrideMinutes(
+            manualToday.entryTime,
+            manualToday.exitTime,
+          );
         }
 
-        const totalHours = `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
+        const totalHours = formatHoursLabel(totalMinutes);
 
         // Mesai hesabı: gün gün "vardiya bitişinden sonra geçen süre" (hafta sonu/tatil tüm gün)
         let overtimeMinutes = 0;
@@ -660,18 +663,12 @@ export const getPdksTableData = authedQuery({
 
             let dayMinutes = 0;
             if (manualDay?.entryTime && manualDay?.exitTime) {
-              dayMinutes = Math.max(
-                0,
-                parseHHMM(manualDay.exitTime) - parseHHMM(manualDay.entryTime)
+              dayMinutes = manualOverrideMinutes(
+                manualDay.entryTime,
+                manualDay.exitTime,
               );
             } else if (firstISO && lastISO) {
-              dayMinutes = Math.max(
-                0,
-                Math.floor(
-                  (new Date(lastISO).getTime() - new Date(firstISO).getTime()) /
-                    60000
-                )
-              );
+              dayMinutes = Math.max(0, minutesBetweenISO(firstISO, lastISO));
             }
 
             const cls = classifyDay(dk, workingDays, holidayMap.get(dk));
@@ -696,27 +693,15 @@ export const getPdksTableData = authedQuery({
               daySettings,
             );
             // late minutes
-            let lateMinutes = 0;
-            if (dayLate && firstISO) {
-              const t = new Date(firstISO);
-              const istanbulMins =
-                t.getUTCHours() * 60 + t.getUTCMinutes() + 3 * 60;
-              const startMins = parseHHMM(daySettings.workStartTime);
-              const tolerance = daySettings.maxLateMinutes ?? 0;
-              lateMinutes = Math.max(
-                0,
-                (istanbulMins % (24 * 60)) - startMins - tolerance
-              );
-            }
+            const lateMinutes = computeLateMinutes(firstISO, dayLate, daySettings);
 
-            let dayStatus: DayCell["status"] = "absent";
-            if (cls === "holiday") dayStatus = "holiday";
-            else if (cls === "weekend") dayStatus = "weekend";
-            if (firstISO) {
-              dayStatus = dayLate ? "late" : "present";
-            } else if (dayHasLeave) {
-              dayStatus = "leave";
-            }
+            const dayStatus = resolveDayStatus({
+              mode: "calendar",
+              classification: cls,
+              hasAttendance: !!firstISO,
+              hasLeave: dayHasLeave,
+              isLate: dayLate,
+            });
 
             const dayLastExitMin = lastISO ? isoTimeToTRMinutes(lastISO) : undefined;
             const dayOvertime = dailyOvertimeForShift({
@@ -729,20 +714,8 @@ export const getPdksTableData = authedQuery({
 
             days.push({
               date: dk,
-              firstEntry: firstISO
-                ? new Date(firstISO).toLocaleTimeString("tr-TR", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    timeZone: "Europe/Istanbul",
-                  })
-                : null,
-              lastExit: lastISO
-                ? new Date(lastISO).toLocaleTimeString("tr-TR", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    timeZone: "Europe/Istanbul",
-                  })
-                : null,
+              firstEntry: firstISO ? formatIstanbulTime(firstISO) : null,
+              lastExit: lastISO ? formatIstanbulTime(lastISO) : null,
               totalMinutes: dayMinutes,
               status: dayStatus,
               isLate: dayLate,
@@ -762,20 +735,10 @@ export const getPdksTableData = authedQuery({
           payrollCode,
           payrollEmployeeCode: employee?.payrollCode ?? "",
           department: department?.name ?? "-",
-          firstEntry: firstEntryISO
-            ? new Date(firstEntryISO).toLocaleTimeString("tr-TR", {
-                hour: "2-digit",
-                minute: "2-digit",
-                timeZone: "Europe/Istanbul",
-              })
-            : "-",
+          firstEntry: firstEntryISO ? formatIstanbulTime(firstEntryISO) : "-",
           lastExit:
             lastExitISO && lastExitISO !== firstEntryISO
-              ? new Date(lastExitISO).toLocaleTimeString("tr-TR", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  timeZone: "Europe/Istanbul",
-                })
+              ? formatIstanbulTime(lastExitISO)
               : "-",
           totalHours,
           overtime,
@@ -793,11 +756,7 @@ export const getPdksTableData = authedQuery({
           manualEditedBy:
             editor?.fullName ?? editor?.name ?? editor?.email ?? null,
           detailedLogs: empReadings.map((r) => ({
-            time: new Date(r.accessTime).toLocaleTimeString("tr-TR", {
-              hour: "2-digit",
-              minute: "2-digit",
-              timeZone: "Europe/Istanbul",
-            }),
+            time: formatIstanbulTime(r.accessTime),
             action: r.accessStatus === "izin_verildi" ? "Giriş" : "Reddedildi",
             location: "Bilinmiyor",
           })),
@@ -1166,19 +1125,18 @@ export const getMonthlyPayrollSheet = authedQuery({
     }
 
     // readings'i çalışan × gün'e grupla
-    const empByCard = new Map<string, Doc<"employees">>();
+    const empIdByCard = new Map<string, string>();
     for (const e of employees) {
-      if (e.cardNumber) empByCard.set(e.cardNumber, e);
+      if (e.cardNumber) empIdByCard.set(e.cardNumber, String(e._id));
     }
 
     const empDayReadings = new Map<string, Doc<"cardReadings">[]>();
     for (const r of readings) {
-      let empId: string | null = null;
-      if (r.employeeId && empIds.some((id) => id === r.employeeId)) {
-        empId = String(r.employeeId);
-      } else if (r.cardNo && empByCard.has(r.cardNo)) {
-        empId = String(empByCard.get(r.cardNo)!._id);
-      }
+      const empId = matchEmployeeKey(
+        { employeeId: r.employeeId, cardNo: r.cardNo },
+        empIdSet,
+        empIdByCard,
+      );
       if (!empId) continue;
       const dateKey = r.accessTime.split("T")[0];
       const key = `${empId}__${dateKey}`;
@@ -1237,11 +1195,7 @@ export const getMonthlyPayrollSheet = authedQuery({
           } else if (dayReadings.length >= 2) {
             const first = dayReadings[0];
             const last = dayReadings[dayReadings.length - 1];
-            rawTotalMin = Math.floor(
-              (new Date(last.accessTime).getTime() -
-                new Date(first.accessTime).getTime()) /
-                60000
-            );
+            rawTotalMin = minutesBetweenISO(first.accessTime, last.accessTime);
             entryMin = isoTimeToTRMinutes(first.accessTime);
             exitMin = isoTimeToTRMinutes(last.accessTime);
           }
@@ -2181,14 +2135,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
       if (m.manualEntry) manualByDate.set(m.date, m);
     }
 
-    const periodDateKeys: string[] = [];
-    for (
-      let d = new Date(`${args.startDate}T00:00:00.000Z`);
-      d <= new Date(`${args.endDate}T00:00:00.000Z`);
-      d.setUTCDate(d.getUTCDate() + 1)
-    ) {
-      periodDateKeys.push(d.toISOString().split("T")[0]);
-    }
+    const periodDateKeys = buildPeriodDateKeys(args.startDate, args.endDate);
 
     const readingsByDate = new Map<string, typeof readings>();
     for (const r of readings) {
@@ -2213,17 +2160,12 @@ export const getEmployeeAttendanceDetail = authedQuery({
 
         let totalMinutes = 0;
         if (manualDay?.entryTime && manualDay?.exitTime) {
-          totalMinutes = Math.max(
-            0,
-            parseHHMM(manualDay.exitTime) - parseHHMM(manualDay.entryTime)
+          totalMinutes = manualOverrideMinutes(
+            manualDay.entryTime,
+            manualDay.exitTime,
           );
         } else if (firstISO && lastISO) {
-          totalMinutes = Math.max(
-            0,
-            Math.floor(
-              (new Date(lastISO).getTime() - new Date(firstISO).getTime()) / 60000
-            )
-          );
+          totalMinutes = Math.max(0, minutesBetweenISO(firstISO, lastISO));
         }
 
         const cls = classifyDay(dk, workingDays, holidayMap.get(dk));
@@ -2246,11 +2188,13 @@ export const getEmployeeAttendanceDetail = authedQuery({
           daySettingsForLate
         );
 
-        let status: "present" | "late" | "absent" | "leave" | "weekend" | "holiday" = "absent";
-        if (cls === "holiday") status = "holiday";
-        else if (cls === "weekend") status = "weekend";
-        if (firstISO) status = isLate ? "late" : "present";
-        else if (hasLeave) status = "leave";
+        const status = resolveDayStatus({
+          mode: "calendar",
+          classification: cls,
+          hasAttendance: !!firstISO,
+          hasLeave,
+          isLate,
+        });
 
         const netMinutes = netWorkMinutes(totalMinutes, dayShift);
         const overtimeMinutes = Math.max(0, netMinutes - 8 * 60);
@@ -2258,22 +2202,10 @@ export const getEmployeeAttendanceDetail = authedQuery({
 
         return {
           date: dk,
-          firstEntry: firstISO
-            ? new Date(firstISO).toLocaleTimeString("tr-TR", {
-                hour: "2-digit",
-                minute: "2-digit",
-                timeZone: "Europe/Istanbul",
-              })
-            : null,
-          lastExit: lastISO
-            ? new Date(lastISO).toLocaleTimeString("tr-TR", {
-                hour: "2-digit",
-                minute: "2-digit",
-                timeZone: "Europe/Istanbul",
-              })
-            : null,
+          firstEntry: firstISO ? formatIstanbulTime(firstISO) : null,
+          lastExit: lastISO ? formatIstanbulTime(lastISO) : null,
           totalMinutes,
-          totalHours: `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`,
+          totalHours: formatHoursLabel(totalMinutes),
           status,
           isLate,
           isEarlyExit,
@@ -2284,12 +2216,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
           leaveType: leaveOnDay?.leaveType ?? null,
           rawReadings: dayReadings.map((r) => ({
             id: String(r._id),
-            time: new Date(r.accessTime).toLocaleTimeString("tr-TR", {
-              hour: "2-digit",
-              minute: "2-digit",
-              second: "2-digit",
-              timeZone: "Europe/Istanbul",
-            }),
+            time: formatIstanbulTime(r.accessTime, true),
             accessStatus: r.accessStatus,
             direction: r.direction,
             deviceId: r.deviceId ? String(r.deviceId) : null,
@@ -2326,7 +2253,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
       },
       summary: {
         totalMinutes: summary.totalMinutes,
-        totalHours: `${Math.floor(summary.totalMinutes / 60)}h ${summary.totalMinutes % 60}m`,
+        totalHours: formatHoursLabel(summary.totalMinutes),
         workedDays: summary.workedDays,
         lateDays: summary.lateDays,
         absentDays: summary.absentDays,
