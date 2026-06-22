@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { superAdminQuery, superAdminMutation, adminQuery } from "./lib/customFunctions";
-import { purgeDeviceCascade } from "./devices";
+import { purgeDeviceCascade } from "./lib/deviceHelpers";
 
 /**
  * Fiziksel cihaz envanteri (super_admin yönetir).
