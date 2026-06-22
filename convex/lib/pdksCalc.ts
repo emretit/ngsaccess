@@ -11,7 +11,11 @@
  * `netWorkMinutes`, `parseHHMM` …) zaten pdksHelpers/breakDeduction/overtimeCalc'te;
  * burada YENİDEN YAZILMAZ.
  */
-import { parseHHMM, type EffectiveWorkSettings } from "./pdksHelpers";
+import {
+  parseHHMM,
+  isoTimeToTRMinutes,
+  type EffectiveWorkSettings,
+} from "./pdksHelpers";
 
 export type DayStatus =
   | "present"
@@ -72,11 +76,10 @@ export function computeLateMinutes(
   settings: EffectiveWorkSettings,
 ): number {
   if (!isLate || !firstISO) return 0;
-  const t = new Date(firstISO);
-  const istanbulMins = t.getUTCHours() * 60 + t.getUTCMinutes() + 3 * 60;
+  const istanbulMins = isoTimeToTRMinutes(firstISO);
   const startMins = parseHHMM(settings.workStartTime);
   const tolerance = settings.maxLateMinutes;
-  return Math.max(0, (istanbulMins % (24 * 60)) - startMins - tolerance);
+  return Math.max(0, istanbulMins - startMins - tolerance);
 }
 
 /** summary modu yalnız bu 4 değeri üretir (hafta sonu/tatil yok). */
