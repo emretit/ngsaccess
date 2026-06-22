@@ -7,7 +7,7 @@
 ## Ortam / Bağlam
 
 - **Convex deployment:** `notable-tern-4` — DEV ama **canlı sistem orada**. Deploy: `npx convex dev --once` (`npx convex deploy` DEĞİL). Veri oku: `npx convex data <table>`.
-- **Git:** branch `main`, **`origin/main` ile SENKRON** (working tree temiz). Kullanıcı isteyince push.
+- **Git:** branch `main`; R9 commit `4b99cb6` **lokalde, henüz push EDİLMEDİ** (`origin/main` 1 commit gerisinde). Working tree temiz. Kullanıcı isteyince push.
 - **Lint/test/build gate'leri (her değişiklikte):**
   ```
   npm test                                                # 136 yeşil
@@ -27,18 +27,15 @@ God-file refactor: 5 god-file → `convex/lib/*` modülleri + saf birim test ağ
 - **Faz 2b** cardReadings→`lib/pdksCalc`+`lib/cardReadingAudit` (`1d021fd`+`217c8a5`+`1e775d5`+`8519d8a`); −217 sat, +34 test.
 - **Faz 2c** devices→`lib/deviceHelpers`+`lib/devicePool`+`lib/deviceSync` (`9a794f6`+`8708edd`+`47c9301`); 1736→1318 sat.
 - **Faz 2d** schema 13 bölüm başlığı + `docs/SCHEMA.md` (`8b256ae`).
+- **R9** iki-bacak kural çözümü tek kaynağa indi (`4b99cb6`): `accessGraph.resolvePanelRuleMembers` kanonik primitif; Hik biyometri + IDE kart roster'ı artık onu paylaşıyor. Davranış byte-eşdeğer, `api.d.ts` diff boş.
 
-2b/2c: security + eşdeğerlik review **sıfır sapma**; `api.*` yüzeyleri + güvenlik-hassas sır-gate/cross-tenant pin korundu.
+2b/2c/R9: security + eşdeğerlik review **sıfır sapma**; `api.*` yüzeyleri + güvenlik-hassas sır-gate/cross-tenant pin korundu.
 
 ---
 
 ## KALAN İŞ — öncelik sırası
 
-### 🔴 R9 · İki-bacak kural çözümü dup (kod borcu, güvenlik-adjacent)
-**Ne:** `convex/lib/deviceSync.ts:resolveAuthorizedEmployeeIds` (Hik biyometri roster) ile `convex/lib/accessGraph.ts:resolvePanelAuthorizedCards` (IDE kart roster) **aynı iki-bacak yetki çözümünü** (cihaz↔grup `groupDevices` + kapı↔grup `groupDoors` + `isActive` guard → `groupMembers`) AYRI yürütüyor.
-**Neden risk:** Biri değişirse (ör. door-leg snapshot semantiği veya isActive nüansı) diğeri sapar → Hik yüz/parmak roster'ı, IDE kart roster'ından **farklı kişi setini** yetkiler (ör. pasifleştirilen kuralın üyeleri Hik'te hâlâ yüz erişimi alır). accessGraph.ts kendi içinde bu divergence'ı "en büyük risk" diye not düşmüş.
-**Yaklaşım:** `accessGraph`'a paylaşılan primitif koy — `resolveDevicePanelRuleIds(ctx, deviceId)` (iki bacak → ruleId seti) ya da `resolveAuthorizedEmployeeIds`'i oraya taşı; hem `resolvePanelAuthorizedCards` hem `deviceSync` bunu çağırsın. **Güvenlik-kritik canlı kart yolunu touch ettiğinden** ayrı commit + security/eşdeğerlik review şart (roster çıktısı byte-eşdeğer kalmalı).
-**Bloke:** yok — yapılabilir.
+> ✅ **R9 BİTTİ** (`4b99cb6`, push bekliyor) — iki-bacak kural çözümü `accessGraph.resolvePanelRuleMembers` kanonik primitifinde birleşti; Hik biyometri + IDE kart roster'ı paylaşıyor. Byte-eşdeğer. Kalan tek **yapılabilir kod borcu** kalmadı; aşağıdakiler ürün kararı / hardware / trivial.
 
 ### 🟡 R8 · PDKS 3-ekran saat/mesai sapması (latent bug, ürün kararı)
 **Ne:** Aynı kişi-gün için 3 ekran **farklı saat/mesai** hesaplıyor:
