@@ -27,7 +27,6 @@ import {
   settingsForShift,
   thresholdsForShift,
 } from "./lib/shiftResolver";
-import { netWorkMinutes } from "./lib/breakDeduction";
 import { bucketWeeklyOvertime, type DayEntry } from "./lib/overtimeCalc";
 import { inferAccessStatus, inferDenialReason } from "./lib/hikEventCodes";
 import { ideResultGranted } from "./lib/cardReaderParse";
@@ -56,6 +55,7 @@ import {
   computeAttendanceDetailDay,
   summarizeAttendanceDays,
 } from "./lib/pdksDetail";
+import { computePayrollCell } from "./lib/pdksPayroll";
 
 /**
  * Ziyaretçi kayıt ekranı için: seçilen okuyucuda (device) okutulan en son BİLİNMEYEN
@@ -1112,96 +1112,25 @@ export const getMonthlyPayrollSheet = authedQuery({
           monthlyHoursBase: workSettings.monthlyHoursBase,
         });
 
-        const cells = days.map((d) => {
-          const manual = manualByEmpDate.get(`${emp._id}__${d}`);
-          const dayReadings = (empDayReadings.get(`${emp._id}__${d}`) ?? [])
-            .filter((r) => r.accessStatus === "izin_verildi")
-            .sort(
-              (a, b) =>
-                new Date(a.accessTime).getTime() -
-                new Date(b.accessTime).getTime()
-            );
-
-          const hasLeave = approvedLeaves.some(
-            (l) =>
-              l.employeeId === emp._id &&
-              d >= l.startDate &&
-              d <= l.endDate
-          );
-          const cls = classifyDay(d, workingDays, holidayMap.get(d));
-          const hasAttendance =
-            (manual?.entryTime != null && manual?.exitTime != null) ||
-            dayReadings.length >= 2;
-          const code = payrollCodeForDay({
-            classification: cls,
-            hasLeave,
-            hasAttendance,
-          });
-
-          let rawTotalMin = 0;
-          let entryMin: number | undefined;
-          let exitMin: number | undefined;
-          if (manual?.entryTime && manual?.exitTime) {
-            entryMin = parseHHMM(manual.entryTime);
-            exitMin = parseHHMM(manual.exitTime);
-            rawTotalMin = Math.max(0, exitMin - entryMin);
-          } else if (dayReadings.length >= 2) {
-            const first = dayReadings[0];
-            const last = dayReadings[dayReadings.length - 1];
-            rawTotalMin = minutesBetweenISO(first.accessTime, last.accessTime);
-            entryMin = isoTimeToTRMinutes(first.accessTime);
-            exitMin = isoTimeToTRMinutes(last.accessTime);
-          }
-
-          const entryISO = manual?.entryTime
-            ? `${d}T${manual.entryTime}:00.000`
-            : dayReadings[0]?.accessTime;
-          const exitISO = manual?.exitTime
-            ? `${d}T${manual.exitTime}:00.000`
-            : dayReadings[dayReadings.length - 1]?.accessTime;
-          const dayShift = payrollShiftResolver.resolve(emp._id, d);
-          const daySettings = settingsForShift(dayShift, workSettings);
-          const { isLate, isEarlyExit } = evaluateLateEarly(
-            entryISO,
-            exitISO !== entryISO ? exitISO : undefined,
-            daySettings
-          );
-
-          const totalMin = netWorkMinutes(rawTotalMin, dayShift, {
-            entryMinutes: entryMin,
-            exitMinutes: exitMin,
-          });
-
-          const overtimeMin = dailyOvertimeForShift({
-            classification: cls,
-            netMinutes: totalMin,
-            lastExitMinutes: exitMin,
-            shift: dayShift,
-            workSettings,
-          });
-          const multiplier =
-            overtimeMin > 0
-              ? multiplierForClassification(cls, overtimeRates)
-              : 0;
-          const overtimePayAmount = overtimePayTRY({
-            overtimeMinutes: overtimeMin,
-            multiplier,
-            hourlyRate: empHourlyRate,
-          });
-
-          return {
+        const cells = days.map((d) =>
+          computePayrollCell({
             date: d,
-            payrollCode: code,
-            totalMinutes: totalMin,
-            overtimeMinutes: overtimeMin,
-            multiplier,
-            overtimePayTRY: overtimePayAmount,
-            isLate,
-            isEarlyExit,
-            isManual: !!manual,
-            classification: cls,
-          };
-        });
+            manual: manualByEmpDate.get(`${emp._id}__${d}`),
+            dayReadings: empDayReadings.get(`${emp._id}__${d}`) ?? [],
+            hasLeave: approvedLeaves.some(
+              (l) =>
+                l.employeeId === emp._id &&
+                d >= l.startDate &&
+                d <= l.endDate
+            ),
+            holiday: holidayMap.get(d),
+            workingDays,
+            dayShift: payrollShiftResolver.resolve(emp._id, d),
+            workSettings,
+            overtimeRates,
+            empHourlyRate,
+          })
+        );
 
         const dayEntries: DayEntry[] = cells.map((c) => ({
           date: c.date,

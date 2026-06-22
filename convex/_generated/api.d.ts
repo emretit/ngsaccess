@@ -82,6 +82,7 @@ import type * as lib_overtimeCalc from "../lib/overtimeCalc.js";
 import type * as lib_pdksCalc from "../lib/pdksCalc.js";
 import type * as lib_pdksDetail from "../lib/pdksDetail.js";
 import type * as lib_pdksHelpers from "../lib/pdksHelpers.js";
+import type * as lib_pdksPayroll from "../lib/pdksPayroll.js";
 import type * as lib_rateLimit from "../lib/rateLimit.js";
 import type * as lib_reconcileMath from "../lib/reconcileMath.js";
 import type * as lib_sgkCodes from "../lib/sgkCodes.js";
@@ -190,6 +191,7 @@ declare const fullApi: ApiFromModules<{
   "lib/pdksCalc": typeof lib_pdksCalc;
   "lib/pdksDetail": typeof lib_pdksDetail;
   "lib/pdksHelpers": typeof lib_pdksHelpers;
+  "lib/pdksPayroll": typeof lib_pdksPayroll;
   "lib/rateLimit": typeof lib_rateLimit;
   "lib/reconcileMath": typeof lib_reconcileMath;
   "lib/sgkCodes": typeof lib_sgkCodes;
