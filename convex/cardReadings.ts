@@ -52,6 +52,10 @@ import {
   resolveDirection,
   resolveActiveMatchingRuleIds,
 } from "./lib/cardReadingProcess";
+import {
+  computeAttendanceDetailDay,
+  summarizeAttendanceDays,
+} from "./lib/pdksDetail";
 
 /**
  * Ziyaretçi kayıt ekranı için: seçilen okuyucuda (device) okutulan en son BİLİNMEYEN
@@ -1994,99 +1998,20 @@ export const getEmployeeAttendanceDetail = authedQuery({
       readingsByDate.get(dk)!.push(r);
     }
 
-    const days = await Promise.all(
-      periodDateKeys.map(async (dk) => {
-        const dayReadings = readingsByDate.get(dk) ?? [];
-        const granted = dayReadings.filter(
-          (r) => r.accessStatus === "izin_verildi"
-        );
-        const manualDay = manualByDate.get(dk);
-        const firstISO = manualDay?.entryTime
-          ? `${dk}T${manualDay.entryTime}:00.000+03:00`
-          : granted[0]?.accessTime ?? null;
-        const lastISO = manualDay?.exitTime
-          ? `${dk}T${manualDay.exitTime}:00.000+03:00`
-          : granted.length > 1 ? granted[granted.length - 1].accessTime : null;
-
-        let totalMinutes = 0;
-        if (manualDay?.entryTime && manualDay?.exitTime) {
-          totalMinutes = manualOverrideMinutes(
-            manualDay.entryTime,
-            manualDay.exitTime,
-          );
-        } else if (firstISO && lastISO) {
-          totalMinutes = Math.max(0, minutesBetweenISO(firstISO, lastISO));
-        }
-
-        const cls = classifyDay(dk, workingDays, holidayMap.get(dk));
-        const hasLeave = leaves.some(
-          (l) => dk >= l.startDate && dk <= l.endDate
-        );
-        const leaveOnDay = leaves.find(
-          (l) => dk >= l.startDate && dk <= l.endDate
-        );
-        const code = payrollCodeForDay({
-          classification: cls,
-          hasLeave,
-          hasAttendance: !!firstISO,
-        });
-        const dayShift = detailShiftResolver.resolve(employee._id, dk);
-        const daySettingsForLate = settingsForShift(dayShift, workSettings);
-        const { isLate, isEarlyExit } = evaluateLateEarly(
-          firstISO ?? undefined,
-          lastISO ?? undefined,
-          daySettingsForLate
-        );
-
-        const status = resolveDayStatus({
-          mode: "calendar",
-          classification: cls,
-          hasAttendance: !!firstISO,
-          hasLeave,
-          isLate,
-        });
-
-        const netMinutes = netWorkMinutes(totalMinutes, dayShift);
-        const overtimeMinutes = Math.max(0, netMinutes - 8 * 60);
-        totalMinutes = netMinutes;
-
-        return {
-          date: dk,
-          firstEntry: firstISO ? formatIstanbulTime(firstISO) : null,
-          lastExit: lastISO ? formatIstanbulTime(lastISO) : null,
-          totalMinutes,
-          totalHours: formatHoursLabel(totalMinutes),
-          status,
-          isLate,
-          isEarlyExit,
-          payrollCode: code,
-          overtimeMinutes,
-          isManual: !!manualDay,
-          manualNote: manualDay?.manualNote ?? null,
-          leaveType: leaveOnDay?.leaveType ?? null,
-          rawReadings: dayReadings.map((r) => ({
-            id: String(r._id),
-            time: formatIstanbulTime(r.accessTime, true),
-            accessStatus: r.accessStatus,
-            direction: r.direction,
-            deviceId: r.deviceId ? String(r.deviceId) : null,
-          })),
-        };
+    const days = periodDateKeys.map((dk) =>
+      computeAttendanceDetailDay({
+        date: dk,
+        dayReadings: readingsByDate.get(dk) ?? [],
+        manualDay: manualByDate.get(dk),
+        leaves,
+        holiday: holidayMap.get(dk),
+        dayShift: detailShiftResolver.resolve(employee._id, dk),
+        workSettings,
+        workingDays,
       })
     );
 
-    const summary = days.reduce(
-      (acc, d) => {
-        acc.totalMinutes += d.totalMinutes;
-        if (d.status === "present" || d.status === "late") acc.workedDays += 1;
-        if (d.status === "late") acc.lateDays += 1;
-        if (d.status === "absent") acc.absentDays += 1;
-        if (d.status === "leave") acc.leaveDays += 1;
-        acc.overtimeMinutes += d.overtimeMinutes;
-        return acc;
-      },
-      { totalMinutes: 0, workedDays: 0, lateDays: 0, absentDays: 0, leaveDays: 0, overtimeMinutes: 0 }
-    );
+    const summary = summarizeAttendanceDays(days);
 
     return {
       employee: {
