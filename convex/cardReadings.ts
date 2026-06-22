@@ -13,18 +13,11 @@ import {
   getEffectiveOvertimeRates,
   getHolidaysMap,
   parseHHMM,
-  classifyDay,
-  multiplierForClassification,
-  payrollCodeForDay,
-  evaluateLateEarly,
-  dailyOvertimeForShift,
   isoTimeToTRMinutes,
   resolveHourlyRate,
-  overtimePayTRY,
 } from "./lib/pdksHelpers";
 import {
   buildShiftResolver,
-  settingsForShift,
   thresholdsForShift,
 } from "./lib/shiftResolver";
 import { bucketWeeklyOvertime, type DayEntry } from "./lib/overtimeCalc";
@@ -33,12 +26,7 @@ import { ideResultGranted } from "./lib/cardReaderParse";
 import { canEmployeeAccessDevice } from "./lib/accessDecision";
 import {
   buildPeriodDateKeys,
-  manualOverrideMinutes,
-  minutesBetweenISO,
-  computeLateMinutes,
-  resolveDayStatus,
   matchEmployeeKey,
-  formatIstanbulTime,
   formatHoursLabel,
 } from "./lib/pdksCalc";
 import {
@@ -56,6 +44,11 @@ import {
   summarizeAttendanceDays,
 } from "./lib/pdksDetail";
 import { computePayrollCell } from "./lib/pdksPayroll";
+import {
+  buildPdksEmployeeReadingMap,
+  computePdksTableRow,
+  filterPdksTableRows,
+} from "./lib/pdksTable";
 
 /**
  * Ziyaretçi kayıt ekranı için: seçilen okuyucuda (device) okutulan en son BİLİNMEYEN
@@ -319,27 +312,10 @@ export const getPdksTableData = authedQuery({
     );
 
     const empById = new Map<string, Doc<"employees">>();
-    const empIdByCard = new Map<string, string>();
     for (const emp of employees) {
       empById.set(String(emp._id), emp);
-      if (emp.cardNumber) empIdByCard.set(emp.cardNumber, String(emp._id));
     }
-    const validEmpIds = new Set(empById.keys());
-
-    const employeeMap = new Map<string, typeof readings>();
-    for (const emp of employees) {
-      employeeMap.set(String(emp._id), []);
-    }
-
-    for (const r of readings) {
-      const empKey = matchEmployeeKey(
-        { employeeId: r.employeeId, cardNo: r.cardNo },
-        validEmpIds,
-        empIdByCard,
-      );
-      if (!empKey) continue;
-      employeeMap.get(empKey)!.push(r);
-    }
+    const employeeMap = buildPdksEmployeeReadingMap({ employees, readings });
 
     // Settings & holidays per project (super_admin için global = undefined)
     const referenceProjectId =
@@ -389,19 +365,6 @@ export const getPdksTableData = authedQuery({
       .filter((q) => q.eq(q.field("status"), "approved"))
       .collect();
 
-    const leaveTypeLabels: Record<string, string> = {
-      annual: "Yıllık",
-      sick: "Hastalık",
-      excuse: "Mazeret",
-      unpaid: "Ücretsiz",
-      parental: "Doğum/Ebeveyn",
-      marriage: "Evlilik",
-      bereavement: "Vefat",
-      paternity: "Babalık",
-      lactation: "Süt izni",
-      compensatory: "Telafi",
-    };
-
     const periodDateKeys = buildPeriodDateKeys(startDate, endDate);
 
     const tableDepartments = await ctx.db.query("departments").collect();
@@ -413,319 +376,39 @@ export const getPdksTableData = authedQuery({
         const department = employee?.departmentId
           ? tableDeptById.get(String(employee.departmentId)) ?? null
           : null;
-
         const empId = employee?._id;
-        const hasLeave = empId
-          ? allLeaves.some((l) => {
-              if (l.employeeId !== empId) return false;
-              return periodDateKeys.some((dk) => dk >= l.startDate && dk <= l.endDate);
-            })
-          : false;
-        const leaveRecord = empId
-          ? allLeaves.find((l) => {
-              if (l.employeeId !== empId) return false;
-              return periodDateKeys.some((dk) => dk >= l.startDate && dk <= l.endDate);
-            })
-          : null;
-        const leaveType = leaveRecord
-          ? leaveTypeLabels[leaveRecord.leaveType] ?? leaveRecord.leaveType
-          : "-";
-
-        const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
-
-        // Tek gün modunda manuel override öncelikli
         const manualToday =
           isSingleDay && empId
             ? manualPdksByEmpDate.get(`${empKey}__${startDate}`)
             : undefined;
-
-        const firstEntryISO = manualToday?.entryTime
-          ? `${startDate}T${manualToday.entryTime}:00.000+03:00`
-          : granted[0]?.accessTime;
-        const lastExitISO = manualToday?.exitTime
-          ? `${startDate}T${manualToday.exitTime}:00.000+03:00`
-          : granted[granted.length - 1]?.accessTime;
-
-        const refDateISO = isSingleDay
-          ? startDate
-          : (firstEntryISO?.split("T")[0] ?? startDate);
-        const refShift = employee
-          ? shiftResolver.resolve(employee._id, refDateISO)
-          : null;
-        const refSettings = settingsForShift(refShift, workSettings);
-        const { isLate, isEarlyExit } = evaluateLateEarly(
-          firstEntryISO,
-          lastExitISO !== firstEntryISO ? lastExitISO : undefined,
-          refSettings,
-        );
-
-        const status = resolveDayStatus({
-          mode: "summary",
-          classification: "workday",
-          hasAttendance: !!firstEntryISO,
-          hasLeave,
-          isLate,
-        });
-
-        const dayReadingsMap = new Map<string, typeof granted>();
-        for (const r of granted) {
-          const dateKey = r.accessTime.split("T")[0];
-          if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
-          dayReadingsMap.get(dateKey)!.push(r);
-        }
-
-        let totalMinutes = 0;
-        for (const dayReadings of dayReadingsMap.values()) {
-          dayReadings.sort(
-            (a, b) =>
-              new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
-          );
-          const firstOfDay = dayReadings[0];
-          const lastOfDay = dayReadings[dayReadings.length - 1];
-          if (firstOfDay._id !== lastOfDay._id) {
-            totalMinutes += minutesBetweenISO(
-              firstOfDay.accessTime,
-              lastOfDay.accessTime,
-            );
-          }
-        }
-
-        // Manuel override total minutes hesabı (tek gün)
-        if (isSingleDay && manualToday?.entryTime && manualToday?.exitTime) {
-          totalMinutes = manualOverrideMinutes(
-            manualToday.entryTime,
-            manualToday.exitTime,
-          );
-        }
-
-        const totalHours = formatHoursLabel(totalMinutes);
-
-        // Mesai hesabı: gün gün "vardiya bitişinden sonra geçen süre" (hafta sonu/tatil tüm gün)
-        let overtimeMinutes = 0;
-        let overtimePayMultiplier = 0;
-
-        if (isSingleDay) {
-          const cls = classifyDay(startDate, workingDays, holidayMap.get(startDate));
-          let lastExitMin: number | undefined;
-          if (manualToday?.exitTime) {
-            lastExitMin = parseHHMM(manualToday.exitTime);
-          } else if (granted.length > 1) {
-            const sortedGranted = [...granted].sort(
-              (a, b) =>
-                new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
-            );
-            lastExitMin = isoTimeToTRMinutes(
-              sortedGranted[sortedGranted.length - 1].accessTime
-            );
-          }
-          overtimeMinutes = dailyOvertimeForShift({
-            classification: cls,
-            netMinutes: totalMinutes,
-            lastExitMinutes: lastExitMin,
-            shift: refShift,
-            workSettings,
-          });
-          if (overtimeMinutes > 0) {
-            overtimePayMultiplier = multiplierForClassification(cls, overtimeRates);
-          }
-        } else {
-          for (const [dk, dayReadings] of dayReadingsMap.entries()) {
-            if (dayReadings.length < 2) continue;
-            const dayFirstISO = dayReadings[0].accessTime;
-            const dayLastISO = dayReadings[dayReadings.length - 1].accessTime;
-            const dayNetMin = Math.floor(
-              (new Date(dayLastISO).getTime() - new Date(dayFirstISO).getTime()) / 60000
-            );
-            const dayCls = classifyDay(dk, workingDays, holidayMap.get(dk));
-            const dayShift = employee ? shiftResolver.resolve(employee._id, dk) : null;
-            overtimeMinutes += dailyOvertimeForShift({
-              classification: dayCls,
-              netMinutes: dayNetMin,
-              lastExitMinutes: isoTimeToTRMinutes(dayLastISO),
-              shift: dayShift,
-              workSettings,
-            });
-          }
-          if (overtimeMinutes > 0) {
-            overtimePayMultiplier = workSettings.overtimeMultiplier;
-          }
-        }
-        const overtime = overtimeMinutes > 0 ? `${overtimeMinutes}m` : "0m";
-        const overtimeHours = overtimeMinutes / 60;
-
-        const hourlyRate = resolveHourlyRate({
-          hourlyRate: employee?.hourlyRate,
-          monthlySalary: employee?.monthlySalary,
-          monthlyHoursBase: workSettings.monthlyHoursBase,
-        });
-        const overtimePayAmountTRY = overtimePayTRY({
-          overtimeMinutes,
-          multiplier: overtimePayMultiplier,
-          hourlyRate,
-        });
-
-        // payrollCode (tek gün için anlamlı; periodda günleri karıştırır)
-        const payrollCode = isSingleDay
-          ? payrollCodeForDay({
-              classification: classifyDay(
-                startDate,
-                workingDays,
-                holidayMap.get(startDate)
-              ),
-              hasLeave,
-              hasAttendance: !!firstEntryISO,
-            })
-          : "—";
-
         const editor = manualToday?.editedBy
           ? await ctx.db.get(manualToday.editedBy)
           : null;
 
-        // Matrix mode: gün gün özet
-        type DayCell = {
-          date: string;
-          firstEntry: string | null;
-          lastExit: string | null;
-          totalMinutes: number;
-          status: "present" | "late" | "absent" | "leave" | "weekend" | "holiday";
-          isLate: boolean;
-          lateMinutes: number;
-          payrollCode: string;
-          overtimeMinutes: number;
-        };
-        const days: DayCell[] = [];
-        if (viewMode === "matrix") {
-          for (const dk of periodDateKeys) {
-            const dayReadings = (dayReadingsMap.get(dk) ?? []).slice().sort(
-              (a, b) =>
-                new Date(a.accessTime).getTime() -
-                new Date(b.accessTime).getTime()
-            );
-            const manualDay =
-              empId
-                ? manualPdksByEmpDate.get(`${empKey}__${dk}`)
-                : undefined;
-            const firstISO = manualDay?.entryTime
-              ? `${dk}T${manualDay.entryTime}:00.000+03:00`
-              : dayReadings[0]?.accessTime ?? null;
-            const lastISO = manualDay?.exitTime
-              ? `${dk}T${manualDay.exitTime}:00.000+03:00`
-              : dayReadings.length > 1
-                ? dayReadings[dayReadings.length - 1].accessTime
-                : null;
-
-            let dayMinutes = 0;
-            if (manualDay?.entryTime && manualDay?.exitTime) {
-              dayMinutes = manualOverrideMinutes(
-                manualDay.entryTime,
-                manualDay.exitTime,
-              );
-            } else if (firstISO && lastISO) {
-              dayMinutes = Math.max(0, minutesBetweenISO(firstISO, lastISO));
-            }
-
-            const cls = classifyDay(dk, workingDays, holidayMap.get(dk));
-            const dayHasLeave = empId
-              ? allLeaves.some(
-                  (l) =>
-                    l.employeeId === empId && dk >= l.startDate && dk <= l.endDate
-                )
-              : false;
-            const dayCode = payrollCodeForDay({
-              classification: cls,
-              hasLeave: dayHasLeave,
-              hasAttendance: !!firstISO,
-            });
-            const dayShift = employee
-              ? shiftResolver.resolve(employee._id, dk)
-              : null;
-            const daySettings = settingsForShift(dayShift, workSettings);
-            const { isLate: dayLate } = evaluateLateEarly(
-              firstISO ?? undefined,
-              lastISO ?? undefined,
-              daySettings,
-            );
-            // late minutes
-            const lateMinutes = computeLateMinutes(firstISO, dayLate, daySettings);
-
-            const dayStatus = resolveDayStatus({
-              mode: "calendar",
-              classification: cls,
-              hasAttendance: !!firstISO,
-              hasLeave: dayHasLeave,
-              isLate: dayLate,
-            });
-
-            const dayLastExitMin = lastISO ? isoTimeToTRMinutes(lastISO) : undefined;
-            const dayOvertime = dailyOvertimeForShift({
-              classification: cls,
-              netMinutes: dayMinutes,
-              lastExitMinutes: dayLastExitMin,
-              shift: dayShift,
-              workSettings,
-            });
-
-            days.push({
-              date: dk,
-              firstEntry: firstISO ? formatIstanbulTime(firstISO) : null,
-              lastExit: lastISO ? formatIstanbulTime(lastISO) : null,
-              totalMinutes: dayMinutes,
-              status: dayStatus,
-              isLate: dayLate,
-              lateMinutes,
-              payrollCode: dayCode,
-              overtimeMinutes: dayOvertime,
-            });
-          }
-        }
-
-        return {
-          id: empKey,
-          name: employee
-            ? `${employee.firstName} ${employee.lastName}`.trim()
-            : "Bilinmiyor",
-          employeeId: employee?.cardNumber ?? empKey,
-          payrollCode,
-          payrollEmployeeCode: employee?.payrollCode ?? "",
-          department: department?.name ?? "-",
-          firstEntry: firstEntryISO ? formatIstanbulTime(firstEntryISO) : "-",
-          lastExit:
-            lastExitISO && lastExitISO !== firstEntryISO
-              ? formatIstanbulTime(lastExitISO)
-              : "-",
-          totalHours,
-          overtime,
-          overtimeHours,
-          overtimeMultiplier: overtimePayMultiplier,
-          overtimePayTRY: overtimePayAmountTRY,
-          hourlyRate,
-          yearlyOvertimeLimit: workSettings.annualOvertimeLimitHours,
-          leaveType,
-          status,
-          isLate,
-          isEarlyExit,
-          isManual: !!manualToday,
-          manualNote: manualToday?.manualNote ?? null,
-          manualEditedBy:
-            editor?.fullName ?? editor?.name ?? editor?.email ?? null,
-          detailedLogs: empReadings.map((r) => ({
-            time: formatIstanbulTime(r.accessTime),
-            action: r.accessStatus === "izin_verildi" ? "Giriş" : "Reddedildi",
-            location: "Bilinmiyor",
-          })),
-          days,
-        };
+        return computePdksTableRow({
+          empKey,
+          empReadings,
+          employee,
+          departmentName: department?.name ?? "-",
+          periodDateKeys,
+          startDate,
+          isSingleDay,
+          viewMode,
+          manualPdksByEmpDate,
+          allLeaves,
+          holidayMap,
+          workingDays,
+          workSettings,
+          overtimeRates,
+          resolveShift: (employeeId, dateISO) =>
+            shiftResolver.resolve(employeeId, dateISO),
+          manualEditedBy: editor?.fullName ?? editor?.name ?? editor?.email ?? null,
+        });
       })
     );
 
     // Status filtresi (frontend'den önce sunucu tarafında uygula)
-    const filtered =
-      args.statusFilter && args.statusFilter !== "all"
-        ? tableData.filter((row) => {
-            if (args.statusFilter === "overtime") return row.overtimeHours > 0;
-            return row.status === args.statusFilter;
-          })
-        : tableData;
+    const filtered = filterPdksTableRows(tableData, args.statusFilter);
 
     return filtered.sort((a, b) => a.name.localeCompare(b.name, "tr"));
   },
