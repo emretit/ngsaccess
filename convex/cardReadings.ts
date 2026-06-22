@@ -12,8 +12,6 @@ import {
   getEffectiveWorkSettings,
   getEffectiveOvertimeRates,
   getHolidaysMap,
-  parseHHMM,
-  isoTimeToTRMinutes,
   resolveHourlyRate,
 } from "./lib/pdksHelpers";
 import {
@@ -49,6 +47,7 @@ import {
   computePdksTableRow,
   filterPdksTableRows,
 } from "./lib/pdksTable";
+import { computePdksChartData, emptyPdksChartData } from "./lib/pdksChart";
 
 /**
  * Ziyaretçi kayıt ekranı için: seçilen okuyucuda (device) okutulan en son BİLİNMEYEN
@@ -453,13 +452,7 @@ export const getPdksChartData = authedQuery({
       );
       readings = results.flat();
     } else {
-      return {
-        dailyAttendance: [],
-        departmentAbsence: [],
-        lateDistribution: [],
-        hourlyTrend: [],
-        lateMinutesSamples: [],
-      };
+      return emptyPdksChartData();
     }
 
     readings.sort(
@@ -471,8 +464,6 @@ export const getPdksChartData = authedQuery({
         ? undefined
         : allowedProjectIds[0] ?? undefined;
     const chartSettings = await getEffectiveWorkSettings(ctx, chartProjectId);
-    const fallbackLateThresholdMin =
-      parseHHMM(chartSettings.workStartTime) + chartSettings.maxLateMinutes;
 
     const chartEmployees =
       ctx.user.role === "super_admin"
@@ -489,156 +480,28 @@ export const getPdksChartData = authedQuery({
           ).flat();
     const chartShiftResolver = await buildShiftResolver(ctx, chartEmployees);
 
-    const dayNames = ["Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"];
-
-    const dailyMap = new Map<
-      string,
-      { present: Set<string>; late: Set<string>; absent: Set<string>; total: Set<string> }
-    >();
-    const departmentAbsenceMap = new Map<string, number>();
-    const lateByHourMap = new Map<number, number>();
-    const hourlyCheckinMap = new Map<string, number>();
-
-    const allEmployeeIds = new Set<string>();
-    for (const r of readings) {
-      const empKey = r.employeeId ?? r.cardNo;
-      allEmployeeIds.add(empKey);
-    }
-
-    const start = new Date(args.startDate);
-    const end = new Date(args.endDate);
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const dateKey = d.toISOString().split("T")[0];
-      dailyMap.set(dateKey, {
-        present: new Set(),
-        late: new Set(),
-        absent: new Set(),
-        total: new Set(allEmployeeIds),
-      });
-    }
-
-    const employeeDayMap = new Map<string, Map<string, { firstEntry?: string; hasLate: boolean; lateMinutes: number }>>();
-    const lateMinutesSamples: number[] = [];
-
-    for (const r of readings) {
-      const empKey = r.employeeId ?? r.cardNo;
-      const dateKey = r.accessTime.split("T")[0];
-      const dayData = dailyMap.get(dateKey);
-      if (!dayData) continue;
-
-      if (r.accessStatus === "izin_verildi") {
-        if (!employeeDayMap.has(empKey)) employeeDayMap.set(empKey, new Map());
-        const empDay = employeeDayMap.get(empKey)!;
-        if (!empDay.has(dateKey)) {
-          empDay.set(dateKey, { hasLate: false, lateMinutes: 0 });
-        }
-        const rec = empDay.get(dateKey)!;
-        if (!rec.firstEntry) {
-          rec.firstEntry = r.accessTime;
-          const arrivalMin = isoTimeToTRMinutes(r.accessTime);
-          const shift = r.employeeId
-            ? chartShiftResolver.resolve(r.employeeId, dateKey)
-            : null;
-          const lateThresholdMin = shift
-            ? thresholdsForShift(shift, chartSettings).lateThresholdMin
-            : fallbackLateThresholdMin;
-          rec.hasLate = arrivalMin > lateThresholdMin;
-          rec.lateMinutes = Math.max(0, arrivalMin - lateThresholdMin);
-        }
-      }
-    }
-
-    for (const [empKey, days] of employeeDayMap) {
-      for (const [dateKey, rec] of days) {
-        const dayData = dailyMap.get(dateKey);
-        if (!dayData) continue;
-        dayData.present.add(empKey);
-        if (rec.hasLate) {
-          dayData.late.add(empKey);
-          if (rec.lateMinutes > 0) lateMinutesSamples.push(rec.lateMinutes);
-          const firstReading = readings.find((r) => (r.employeeId ?? r.cardNo) === empKey);
-          if (firstReading?.employeeId && rec.firstEntry) {
-            const h = new Date(rec.firstEntry).getHours();
-            lateByHourMap.set(h, (lateByHourMap.get(h) ?? 0) + 1);
-          }
-        }
-      }
-    }
-
-    for (const dayData of dailyMap.values()) {
-      for (const empKey of allEmployeeIds) {
-        if (!dayData.present.has(empKey)) {
-          dayData.absent.add(empKey);
-        }
-      }
-    }
-
     const empToDept = new Map<string, string>();
     for (const r of readings) {
       const empKey = r.employeeId ?? r.cardNo;
       if (empToDept.has(empKey)) continue;
-      const emp = r.employeeId ? await ctx.db.get(r.employeeId) as Doc<"employees"> | null : null;
+      const emp = r.employeeId ? await ctx.db.get(r.employeeId) : null;
       if (emp?.departmentId) {
-        const dept = await ctx.db.get(emp.departmentId) as Doc<"departments"> | null;
+        const dept = await ctx.db.get(emp.departmentId);
         empToDept.set(empKey, dept?.name ?? "Bilinmiyor");
       } else {
         empToDept.set(empKey, "Bilinmiyor");
       }
     }
 
-    for (const [, dayData] of dailyMap) {
-      for (const empKey of dayData.absent) {
-        const deptName = empToDept.get(empKey) ?? "Bilinmiyor";
-        departmentAbsenceMap.set(deptName, (departmentAbsenceMap.get(deptName) ?? 0) + 1);
-      }
-    }
-
-    const dailyAttendance = Array.from(dailyMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([dateKey, data]) => {
-        const d = new Date(dateKey);
-        return {
-          name: dayNames[d.getDay()],
-          date: dateKey,
-          present: data.present.size,
-          late: data.late.size,
-          absent: data.absent.size,
-          rate: data.total.size > 0 ? Math.round((data.present.size / data.total.size) * 100) : 0,
-        };
-      });
-
-    const departmentAbsence = Array.from(departmentAbsenceMap.entries()).map(([name, value]) => ({
-      name,
-      absences: value,
-    }));
-
-    const lateDistribution = Array.from(lateByHourMap.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([hour, count]) => ({
-        hour: `${hour}:00`,
-        count,
-      }));
-
-    for (const r of readings) {
-      if (r.accessStatus !== "izin_verildi") continue;
-      const hourKey = r.accessTime.slice(11, 13);
-      hourlyCheckinMap.set(hourKey, (hourlyCheckinMap.get(hourKey) ?? 0) + 1);
-    }
-
-    const hourlyTrend = Array.from(hourlyCheckinMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([hour, checkins]) => ({
-        hour: `${hour}:00`,
-        checkins,
-      }));
-
-    return {
-      dailyAttendance,
-      departmentAbsence,
-      lateDistribution,
-      hourlyTrend,
-      lateMinutesSamples,
-    };
+    return computePdksChartData({
+      readings,
+      startDate: args.startDate,
+      endDate: args.endDate,
+      chartSettings,
+      employeeDepartmentByKey: empToDept,
+      resolveShift: (employeeId, dateISO) =>
+        chartShiftResolver.resolve(employeeId, dateISO),
+    });
   },
 });
 
