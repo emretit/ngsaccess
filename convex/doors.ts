@@ -7,6 +7,7 @@ import type { MutationCtx } from "./_generated/server";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { deleteReadersForDoor } from "./readers";
+import { deriveHikReaderNoFromDoorNo } from "./lib/hikReaderNumbers";
 
 type ReaderDirection = "entry" | "exit" | "both";
 
@@ -159,12 +160,7 @@ export const create = authedMutation({
       zoneId: args.zoneId,
       name: args.name,
       direction: readerDirection,
-      hikReaderNo:
-        args.hikDoorNo != null
-          ? readerDirection === "exit"
-            ? args.hikDoorNo * 2
-            : args.hikDoorNo * 2 - 1
-          : undefined,
+      hikReaderNo: deriveHikReaderNoFromDoorNo(args.hikDoorNo, readerDirection),
       ioId: args.ioId,
       status: "active",
       createdAt: now,
@@ -230,7 +226,22 @@ export const update = authedMutation({
       }
     }
     const { doorId, ...updates } = args;
-    await ctx.db.patch(doorId, { ...updates, updatedAt: new Date().toISOString() });
+    const now = new Date().toISOString();
+    await ctx.db.patch(doorId, { ...updates, updatedAt: now });
+    if (args.hikDoorNo !== undefined) {
+      const readers = await ctx.db
+        .query("readers")
+        .withIndex("by_door", (q) => q.eq("doorId", doorId))
+        .collect();
+      await Promise.all(
+        readers.map((reader) =>
+          ctx.db.patch(reader._id, {
+            hikReaderNo: deriveHikReaderNoFromDoorNo(args.hikDoorNo, reader.direction),
+            updatedAt: now,
+          }),
+        ),
+      );
+    }
     // Sensör ayarı değiştiyse panele yaz (ioId güncellenmiş olabilir → yeni değer öncelikli).
     if (args.requireSensor !== undefined) {
       await scheduleSensorSync(
@@ -340,8 +351,8 @@ export const readerStatus = authedQuery({
       iso ? now - new Date(iso).getTime() < ONLINE_WINDOW_MS : false;
 
     // 3) Her kapı için son okuma + çevrimiçi bayrağını BİR KEZ hesapla, okuyuculara paylaştır.
-    //    Okuyucu satırı varsa kapı başına N satır döner (giriş/çıkış); yoksa legacy alanlardan
-    //    tek sentetik satır (readerId: null) — migrasyon öncesi kapılar bugünküyle aynı görünür.
+    //    Yalnız gerçek readers satırları döner. Okuyucu taşınınca kaynak kapıda okuyucu
+    //    görünmemesi için artık legacy/sentetik satır üretmiyoruz.
     //    Hik event'i hangi okuyucudan geldiğini bildirmediğinden bir kapının okuyucuları aynı
     //    son-okumayı paylaşır (izin kapı bazlı).
     const perDoor = await Promise.all(
@@ -390,21 +401,15 @@ export const readerStatus = authedQuery({
           .withIndex("by_door", (q) => q.eq("doorId", door._id))
           .collect();
 
-        if (doorReaders.length === 0) {
-          // Legacy fallback: kapıda okuyucu satırı yok → kapı alanlarından tek satır.
-          return [
-            {
-              readerId: null as Id<"readers"> | null,
-              readerName: door.readerName ?? door.name,
-              readerDirection: door.readerDirection ?? directionFromIo(door.ioId),
-              ...base,
-            },
-          ];
-        }
         return doorReaders.map((r) => ({
           readerId: r._id as Id<"readers"> | null,
           readerName: r.name,
           readerDirection: r.direction,
+          hikReaderNo: r.hikReaderNo ?? null,
+          hikLastCfgAt: r.hikLastCfgAt ?? null,
+          hikCardReaderName: r.hikCardReaderName ?? null,
+          hikCardReaderPlanTemplateNo: r.hikCardReaderPlanTemplateNo ?? null,
+          hikCardReaderAntiSneakEnabled: r.hikCardReaderAntiSneakEnabled ?? null,
           ...base,
         }));
       })

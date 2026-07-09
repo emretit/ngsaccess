@@ -9,6 +9,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { DeviceForm } from "@/components/devices/DeviceForm";
 import { BrandPickerStep } from "@/components/devices/BrandPickerStep";
 import { DeviceApiTokenCard } from "@/components/devices/DeviceApiTokenCard";
+import { DeviceCommandCenter } from "@/components/devices/DeviceCommandCenter";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ServerDevice } from "@/types/device";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -79,25 +81,44 @@ export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess }:
             <div className="p-6 space-y-6">
               {step === "picker" && !selectedDevice ? (
                 <BrandPickerStep onSelect={handleBrandSelect} onCancel={onClose} />
-              ) : (
-                <>
-                  <DeviceForm
-                    key={selectedDevice?._id ?? "new"}
-                    open={open}
-                    device={selectedDevice}
-                    projects={projects}
-                    defaultBrand={brandForForm}
-                    onBack={selectedDevice ? undefined : () => setStep("picker")}
-                    onSuccess={onSuccess}
-                    onClose={onClose}
-                  />
-                  {selectedDevice && (
+              ) : selectedDevice ? (
+                <Tabs defaultValue="info" className="space-y-4">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="info">Bilgiler</TabsTrigger>
+                    <TabsTrigger value="command-center">Cihaz Merkezi</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="info" className="space-y-6">
+                    <DeviceForm
+                      key={selectedDevice._id}
+                      open={open}
+                      device={selectedDevice}
+                      projects={projects}
+                      defaultBrand={brandForForm}
+                      onSuccess={onSuccess}
+                      onClose={onClose}
+                    />
                     <DeviceApiTokenCard
                       deviceId={selectedDevice._id}
                       currentToken={selectedDevice.apiToken}
                       currentTokenCreatedAt={selectedDevice.apiTokenCreatedAt}
                     />
-                  )}
+                  </TabsContent>
+                  <TabsContent value="command-center">
+                    <DeviceCommandCenter device={selectedDevice} onUpdated={onSuccess} />
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <>
+                  <DeviceForm
+                    key="new"
+                    open={open}
+                    device={null}
+                    projects={projects}
+                    defaultBrand={brandForForm}
+                    onBack={() => setStep("picker")}
+                    onSuccess={onSuccess}
+                    onClose={onClose}
+                  />
                 </>
               )}
             </div>

@@ -94,11 +94,6 @@ export function DeviceHikLocalBridgeSection({
         />
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        Panel bilgileri buluttan bridge'e otomatik iletilir. Bridge'e elle panel girilmez —
-        yalnız bir kez <strong>Bridge Token</strong> girilir (Ayarlar → Bridge).
-      </p>
-
       {device && (
         <div className="flex flex-wrap items-start gap-2 pt-2 border-t">
           <Button

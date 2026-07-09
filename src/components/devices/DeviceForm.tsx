@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ServerDevice, Project } from "@/types/device";
 import { useDeviceFormLogic } from "./hooks/useDeviceFormLogic";
-import { DeviceBasicSection } from "./form-sections/DeviceBasicSection";
+import { DeviceBasicSection, DeviceTypeField } from "./form-sections/DeviceBasicSection";
 import { DeviceLocationSection } from "./form-sections/DeviceLocationSection";
 import { DeviceNetworkSection } from "./form-sections/DeviceNetworkSection";
 import { DeviceStatusSection } from "./form-sections/DeviceStatusSection";
@@ -115,8 +115,10 @@ export function DeviceForm({
                 locationLoading={locationLoading}
                 selectedZoneId={selectedZoneId}
                 filteredDoors={filteredDoorsForForm}
+                allowCreate={!device}
               />
               <DeviceStatusSection form={form} />
+              <DeviceTypeField form={form} />
             </div>
           </div>
         )}

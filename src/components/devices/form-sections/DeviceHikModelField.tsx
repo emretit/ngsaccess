@@ -33,7 +33,6 @@ interface DeviceHikModelFieldProps {
  */
 export function DeviceHikModelField({ form }: DeviceHikModelFieldProps) {
   const selectedModel = form.watch("hik_model");
-  const modelSpec = getHikModelSpec(selectedModel);
   const isManualModel = selectedModel === MANUAL_MODEL_ID;
 
   return (
@@ -74,15 +73,6 @@ export function DeviceHikModelField({ form }: DeviceHikModelFieldProps) {
                 <SelectItem value={MANUAL_MODEL_ID}>Diğer (manuel)</SelectItem>
               </SelectContent>
             </Select>
-            {modelSpec && (
-              <p className="text-xs text-muted-foreground">
-                {modelSpec.doorCount} kapı ·{" "}
-                {modelSpec.doorCount * modelSpec.defaultReadersPerDoor} okuyucu
-                {modelSpec.maxReadersPerDoor > 1
-                  ? " · kapı başına 2. okuyucu sonradan eklenebilir"
-                  : ""}
-              </p>
-            )}
             <FormMessage />
           </FormItem>
         )}

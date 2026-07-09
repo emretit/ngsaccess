@@ -1,10 +1,11 @@
 import { v } from "convex/values";
-import { internalMutation } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { getHikModelSpec } from "./lib/hikModels";
+import { deriveHikReaderNoFromDoorNo } from "./lib/hikReaderNumbers";
 
 type ReaderDirection = "entry" | "exit" | "both";
 
@@ -27,13 +28,33 @@ async function maxReadersForDoor(
   return 2;
 }
 
-/** Hikvision fiziksel okuyucu index'i: kapı N için entry=2N-1, exit=2N (both → giriş tarafı). */
-function deriveHikReaderNo(
-  door: Doc<"doors">,
-  direction: ReaderDirection,
-): number | undefined {
-  if (door.hikDoorNo == null) return undefined;
-  return direction === "exit" ? door.hikDoorNo * 2 : door.hikDoorNo * 2 - 1;
+async function maxReadersForDevice(
+  ctx: QueryCtx | MutationCtx,
+  deviceId: Id<"devices"> | undefined,
+): Promise<number | null> {
+  if (!deviceId) return null;
+  const device = await ctx.db.get(deviceId);
+  if (!device) return null;
+  if (device.brand === "hikvision") {
+    const spec = getHikModelSpec(device.hikModel);
+    if (spec) return spec.doorCount * spec.defaultReadersPerDoor;
+    return device.hikDoorCount ?? device.doorCount ?? null;
+  }
+  if (device.brand === "ide_smart") {
+    return device.ideDoorCount ?? device.doorCount ?? null;
+  }
+  return null;
+}
+
+async function countReadersForDevice(
+  ctx: QueryCtx | MutationCtx,
+  deviceId: Id<"devices">,
+): Promise<number> {
+  const rows = await ctx.db
+    .query("readers")
+    .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
+    .collect();
+  return rows.length;
 }
 
 export const list = authedQuery({
@@ -115,6 +136,17 @@ export const create = authedMutation({
     if (existing.length >= max) {
       throw new Error(`Bu kapı en çok ${max} okuyucu taşıyabilir`);
     }
+    if (door.deviceId) {
+      const deviceMax = await maxReadersForDevice(ctx, door.deviceId);
+      if (deviceMax !== null) {
+        const deviceReaders = await countReadersForDevice(ctx, door.deviceId);
+        if (deviceReaders >= deviceMax) {
+          throw new Error(
+            `Bu panelin fiziksel okuyucu kapasitesi dolu (${deviceMax}). Yeni okuyucu eklemek yerine mevcut okuyucuyu taşıyın.`,
+          );
+        }
+      }
+    }
     const now = new Date().toISOString();
     return await ctx.db.insert("readers", {
       doorId: args.doorId,
@@ -123,11 +155,60 @@ export const create = authedMutation({
       zoneId: door.zoneId,
       name: args.name.trim() || door.name,
       direction: args.direction,
-      hikReaderNo: args.hikReaderNo ?? deriveHikReaderNo(door, args.direction),
+      hikReaderNo:
+        args.hikReaderNo ??
+        deriveHikReaderNoFromDoorNo(door.hikDoorNo ?? undefined, args.direction),
       ioId: door.ioId,
       status: args.status ?? "active",
       createdAt: now,
       updatedAt: now,
+    });
+  },
+});
+
+export const move = authedMutation({
+  args: {
+    readerId: v.id("readers"),
+    targetDoorId: v.id("doors"),
+    direction: v.union(v.literal("entry"), v.literal("exit"), v.literal("both")),
+  },
+  handler: async (ctx, args): Promise<void> => {
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const reader = await ctx.db.get(args.readerId);
+    if (!reader) throw new Error("Okuyucu bulunamadı");
+    if (!isProjectAllowed(allowedProjectIds, reader.projectId)) {
+      throw new Error("Bu okuyucuya erişim yetkiniz yok");
+    }
+
+    const sourceDoor = await ctx.db.get(reader.doorId);
+    const targetDoor = await ctx.db.get(args.targetDoorId);
+    if (!sourceDoor || !targetDoor) throw new Error("Kapı bulunamadı");
+    if (!isProjectAllowed(allowedProjectIds, targetDoor.projectId)) {
+      throw new Error("Hedef kapıya erişim yetkiniz yok");
+    }
+    if (reader.deviceId !== targetDoor.deviceId) {
+      throw new Error("Okuyucu yalnızca aynı panelin kapıları arasında taşınabilir");
+    }
+
+    if (reader.doorId !== args.targetDoorId) {
+      const targetReaders = await ctx.db
+        .query("readers")
+        .withIndex("by_door", (q) => q.eq("doorId", args.targetDoorId))
+        .collect();
+      const max = await maxReadersForDoor(ctx, targetDoor);
+      if (targetReaders.length >= max) {
+        throw new Error(`Hedef kapı en çok ${max} okuyucu taşıyabilir`);
+      }
+    }
+
+    await ctx.db.patch(args.readerId, {
+      doorId: args.targetDoorId,
+      deviceId: targetDoor.deviceId,
+      projectId: targetDoor.projectId,
+      zoneId: targetDoor.zoneId,
+      direction: args.direction,
+      ioId: targetDoor.ioId,
+      updatedAt: new Date().toISOString(),
     });
   },
 });
@@ -157,6 +238,36 @@ export const update = authedMutation({
   },
 });
 
+export const getByIdInternal = internalQuery({
+  args: { readerId: v.id("readers") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.readerId);
+  },
+});
+
+export const setHikReaderSnapshot = internalMutation({
+  args: {
+    readerId: v.id("readers"),
+    snapshot: v.string(),
+    updatedAt: v.number(),
+    hikVerifyMode: v.optional(v.string()),
+    hikCardReaderName: v.optional(v.string()),
+    hikCardReaderPlanTemplateNo: v.optional(v.number()),
+    hikCardReaderAntiSneakEnabled: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.readerId, {
+      hikLastCfgSnapshot: args.snapshot,
+      hikLastCfgAt: args.updatedAt,
+      hikVerifyMode: args.hikVerifyMode,
+      hikCardReaderName: args.hikCardReaderName,
+      hikCardReaderPlanTemplateNo: args.hikCardReaderPlanTemplateNo,
+      hikCardReaderAntiSneakEnabled: args.hikCardReaderAntiSneakEnabled,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
 export const remove = authedMutation({
   args: { readerId: v.id("readers") },
   handler: async (ctx, args) => {
@@ -165,14 +276,6 @@ export const remove = authedMutation({
     if (!reader) throw new Error("Okuyucu bulunamadı");
     if (!isProjectAllowed(allowedProjectIds, reader.projectId)) {
       throw new Error("Bu okuyucuya erişim yetkiniz yok");
-    }
-    // Kapı en az bir okuyucu tutmalı — son okuyucu silinemez (kapıyı silin).
-    const siblings = await ctx.db
-      .query("readers")
-      .withIndex("by_door", (q) => q.eq("doorId", reader.doorId))
-      .collect();
-    if (siblings.length <= 1) {
-      throw new Error("Kapının son okuyucusu silinemez");
     }
     await ctx.db.delete(args.readerId);
   },
@@ -225,7 +328,7 @@ export const backfillReadersFromDoors = internalMutation({
         zoneId: door.zoneId,
         name: door.readerName ?? door.name,
         direction,
-        hikReaderNo: deriveHikReaderNo(door, direction),
+        hikReaderNo: deriveHikReaderNoFromDoorNo(door.hikDoorNo ?? undefined, direction),
         ioId: door.ioId,
         status: "active",
         createdAt: now,

@@ -100,8 +100,13 @@ export async function resolveOrCreateZone(
     }
     return opts.zoneId;
   }
+  const zoneName = opts.newZoneName?.trim();
+  const fallbackName = opts.fallbackName.trim();
+  if (zoneName && zoneName.toLocaleLowerCase("tr-TR") === fallbackName.toLocaleLowerCase("tr-TR")) {
+    throw new Error("Bölge adı cihaz adıyla aynı olamaz");
+  }
   return await ctx.db.insert("zones", {
-    name: opts.newZoneName?.trim() || opts.fallbackName,
+    name: zoneName || opts.fallbackName,
     projectId: opts.projectId,
     description: opts.description,
     createdAt: opts.now,
@@ -256,7 +261,7 @@ export async function provisionHikDoorsAndReaders(
         zoneId,
         name: `${doorName}${suffix}`,
         direction,
-        hikReaderNo: direction === "exit" ? n * 2 : n * 2 - 1,
+        hikReaderNo: readerCount === 1 ? n : direction === "exit" ? n * 2 : n * 2 - 1,
         now: opts.now,
       });
       readerIds.push(readerId);

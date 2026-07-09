@@ -1,5 +1,3 @@
-import ExcelJS from "exceljs";
-import { jsPDF } from "jspdf";
 import { toLocalDateString } from "@/lib/date";
 
 export interface PDKSExportRecord {
@@ -91,6 +89,7 @@ export async function exportToExcel(
     STATUS_LABELS[r.status] ?? r.status,
   ]);
 
+  const { default: ExcelJS } = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("PDKS Kayıtları", {
     views: [{ state: "frozen", ySplit: 1 }],
@@ -183,12 +182,13 @@ export function exportToCsv(
 /**
  * PDKS tablo verisini PDF formatında dışa aktarır
  */
-export function exportToPdf(
+export async function exportToPdf(
   records: PDKSExportRecord[],
   options: { title?: string; dateRange?: string } = {}
-): void {
+): Promise<void> {
   const { title = "PDKS Raporu", dateRange = "" } = options;
 
+  const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 15;
@@ -291,6 +291,7 @@ const MONTH_NAMES_TR = [
 export async function exportMonthlyPayrollSheet(
   data: MonthlyPayrollSheet
 ): Promise<void> {
+  const { default: ExcelJS } = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet(
     `${MONTH_NAMES_TR[data.month - 1]} ${data.year}`,

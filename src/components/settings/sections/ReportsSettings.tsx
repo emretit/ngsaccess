@@ -108,9 +108,9 @@ export function ReportsSettings() {
     }
   };
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
     if (reportType === "sgk" && reportData && "rows" in reportData && reportData.rows.length > 0) {
-      exportSgkToPdf(reportData as SgkReportData);
+      await exportSgkToPdf(reportData as SgkReportData);
     } else {
       toast.info("PDF export sadece SGK raporu için destekleniyor.");
     }

@@ -31,6 +31,20 @@ const HIK_BRIDGE_PENDING_SCAN = 200;
 // IP girilmemiş panelin bekleyen op'larına yazılan teşhis notu (neden pending görünür olsun).
 const HIK_BRIDGE_IP_MISSING_NOTE = "Panel IP'si girilmemiş; IP girilince uygulanacak";
 
+function isPermanentBridgeError(message: string | undefined): boolean {
+  if (!message) return false;
+  return (
+    message.includes("NET_DVR_SendRemoteConfig failed: 17") ||
+    message.includes("NET_DVR_PARAMETER_ERROR") ||
+    message.includes("cardNumber missing") ||
+    message.includes("planTemplateNo missing") ||
+    message.includes("weekPlanNo missing") ||
+    message.includes("Invalid doorNo") ||
+    message.includes("Unknown operation") ||
+    message.includes("is deferred for DS-K2804 bridge v1")
+  );
+}
+
 type RosterDevice = {
   deviceId: Id<"devices">;
   name: string;
@@ -252,7 +266,7 @@ export const ackBridgeOperation = internalMutation({
         claimedBy: undefined,
         lastError: undefined,
       });
-    } else if (op.attemptCount < HIK_BRIDGE_MAX_ATTEMPTS) {
+    } else if (!isPermanentBridgeError(args.message) && op.attemptCount < HIK_BRIDGE_MAX_ATTEMPTS) {
       // Geçici hata olabilir (panel offline / worker yok / token yarışı): backoff ile
       // pending'e geri çek. localBridge'in retry worker'ı yok; tek self-heal yolu budur.
       await ctx.db.patch(args.opId, {

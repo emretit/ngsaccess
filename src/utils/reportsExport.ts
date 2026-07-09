@@ -1,4 +1,4 @@
-import ExcelJS from "exceljs";
+import type ExcelJS from "exceljs";
 
 async function downloadExcel(workbook: ExcelJS.Workbook, fileName: string): Promise<void> {
   const buffer = await workbook.xlsx.writeBuffer();
@@ -22,6 +22,7 @@ export const exportReportsToExcel = {
   }) => {
     const headers = ["Çalışan", "Departman", "Fazla Mesai (Saat)"];
     const rows = data.rows.map((r) => [r.name, r.department, r.overtimeHours]);
+    const { default: ExcelJS } = await import("exceljs");
     const workbook = new ExcelJS.Workbook();
     const ws = workbook.addWorksheet("Fazla Mesai");
     ws.addRow(["Fazla Mesai Özet Raporu", "", ""]);
@@ -50,6 +51,7 @@ export const exportReportsToExcel = {
       r.absentDays,
       r.devamOrani,
     ]);
+    const { default: ExcelJS } = await import("exceljs");
     const workbook = new ExcelJS.Workbook();
     const ws = workbook.addWorksheet("Devam");
     ws.addRow(["Devam ve Devamsızlık Özet Raporu", "", "", "", "", ""]);
@@ -69,6 +71,7 @@ export const exportReportsToExcel = {
   }) => {
     const headers = ["Departman", "Fazla Mesai (Saat)", "Çalışan Sayısı", "Tahmini Maliyet (₺)"];
     const rows = data.rows.map((r) => [r.department, r.overtimeHours, r.employeeCount, r.cost]);
+    const { default: ExcelJS } = await import("exceljs");
     const workbook = new ExcelJS.Workbook();
     const ws = workbook.addWorksheet("Maliyet");
     ws.addRow(["Departman Maliyet Analizi Raporu", "", "", ""]);
@@ -102,6 +105,7 @@ export const exportReportsToExcel = {
       "Günler",
       "Durum",
     ];
+    const { default: ExcelJS } = await import("exceljs");
     const workbook = new ExcelJS.Workbook();
     const ws = workbook.addWorksheet("Vardiya Atamaları");
     ws.addRow(["Vardiya Atamaları", "", "", "", "", "", "", ""]);

@@ -56,8 +56,8 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
     try {
       const res = await backfillRules({ projectId: currentProjectId });
       toast({
-        title: "Cihazlara push tamam",
-        description: `${res.rulesProcessed} kural · ${res.synced} başarılı · ${res.failed} hata`,
+        title: "Senkronizasyon kuyruğa alındı",
+        description: `${res.rulesProcessed} kural işlendi · ${res.synced} cihaz işlemi başlatıldı · ${res.failed} başlangıç hatası`,
       });
     } catch (e) {
       toast({

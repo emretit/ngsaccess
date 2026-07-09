@@ -20,7 +20,7 @@
 ; ============================================================================
 
 #define AppName       "NGS Access Hikvision Bridge"
-#define AppVersion    "1.0.0"
+#define AppVersion    "1.0.3"
 #define ExeName       "ngsaccess-hikvision-bridge.exe"
 #define ServiceName   "NgAccessHikvisionBridge"
 
@@ -51,6 +51,9 @@ Name: "{group}\NGS Access (arayüz)"; Filename: "http://127.0.0.1:8787/"
 Name: "{group}\Bridge Ayarları (/__bridge)"; Filename: "http://127.0.0.1:8787/__bridge"
 Name: "{group}\Console Modda Çalıştır"; Filename: "{app}\{#ExeName}"; Parameters: "--console"
 Name: "{group}\Kaldır {#AppName}"; Filename: "{uninstallexe}"
+Name: "{commondesktop}\NGS Access"; Filename: "http://127.0.0.1:8787/"
+Name: "{commondesktop}\Bridge Ayarları"; Filename: "http://127.0.0.1:8787/__bridge"
+Name: "{commonstartup}\NGS Access"; Filename: "http://127.0.0.1:8787/"
 
 [Run]
 ; Servisi kur (binPath= ve start= sonrasındaki BOŞLUK sc.exe sözdizimi gereği zorunlu).

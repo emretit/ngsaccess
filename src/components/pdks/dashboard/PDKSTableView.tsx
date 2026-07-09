@@ -90,8 +90,8 @@ export function PDKSTableView({ records, loading = false, selectedDate, onShowDe
     toast({ title: "CSV indirildi", description: `${filteredRecords.length} kayıt dışa aktarıldı.` });
   };
 
-  const handleExportPdf = () => {
-    exportToPdf(filteredRecords, { dateRange: selectedDate ? toLocalDateString(selectedDate) : "" });
+  const handleExportPdf = async () => {
+    await exportToPdf(filteredRecords, { dateRange: selectedDate ? toLocalDateString(selectedDate) : "" });
     toast({ title: "PDF indirildi", description: `${filteredRecords.length} kayıt dışa aktarıldı.` });
   };
 

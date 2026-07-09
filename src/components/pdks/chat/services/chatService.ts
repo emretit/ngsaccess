@@ -6,46 +6,35 @@ import {
   type FetchDatabaseContextFn,
 } from './database/cardReadingsService';
 import { processWithOpenAI } from './openai/openaiService';
+import type { ProcessOpenAIFn } from './openai/openaiService';
 import { NaturalLanguageService } from './naturalLanguageService';
 
 export type ChatDataFetchers = {
   fetchCardReadings: FetchCardReadingsFn;
   fetchDatabaseContext: FetchDatabaseContextFn;
+  processOpenAI?: ProcessOpenAIFn;
 };
 
 export async function sendChatMessage(
   input: string,
   fetchers?: ChatDataFetchers
 ) {
-  console.log("Processing chat message:", input);
-  
   try {
     // Önce doğal dil servisimizle deneyelim
-    console.log("Doğal dil servisi ile işleniyor...");
-    
     const nlResult = await NaturalLanguageService.processQuery(input, fetchers);
     
     // Eğer doğal dil servisi başarıyla sonuç döndürdüyse onu kullan
     if (nlResult.source !== 'error' && (nlResult.data?.length || 0) > 0) {
-      console.log("Doğal dil servisi başarılı sonuç döndürdü");
       return nlResult;
     }
     
     // Eğer doğal dil servisi sonuç bulamadıysa eski sistemi dene
-    console.log("Doğal dil servisi sonuç bulamadı, eski parser'a geçiliyor...");
-    
     // Check if this is a query that can be handled by the natural language parser
     const queryParams = parseQuery(input);
-    
-    if (queryParams.department) {
-      console.log("Tespit edilen departman:", queryParams.department);
-    }
     
     const isReportQuery = (queryParams.department || queryParams.date);
     
     if (isReportQuery) {
-      console.log("Handling as report query", queryParams);
-      
       try {
         // Fetch the data based on the parsed query
         const cardReadings = await fetchCardReadings(queryParams, fetchers?.fetchCardReadings);
@@ -83,7 +72,7 @@ export async function sendChatMessage(
       const dbContext = await fetchDatabaseContext(fetchers?.fetchDatabaseContext);
       
       // Process with OpenAI
-      return await processWithOpenAI(input, dbContext);
+      return await processWithOpenAI(input, dbContext, fetchers?.processOpenAI);
     } catch (error) {
       console.error("Chat service error:", error);
       
@@ -95,10 +84,6 @@ export async function sendChatMessage(
       } else if (error instanceof Error) {
         errorMessage = error.message;
         
-        // If API key is invalid, suggest resetting it
-        if (errorMessage.includes("Invalid OpenAI API key")) {
-          errorMessage += " You can refresh the page to add a new API key.";
-        }
       }
       
       return {

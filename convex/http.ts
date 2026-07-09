@@ -4,10 +4,26 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { auth } from "./auth";
 import { parseCardReaderBody } from "./lib/cardReaderParse";
+import { shouldCreateCardReadingForHikEvent } from "./lib/hikEventCatalog";
 
 const http = httpRouter();
 
 auth.addHttpRoutes(http);
+
+const hasHikDeviceEventPayload = (args: {
+  major: number | null | undefined;
+  minor: number | null | undefined;
+  serialNo: number | null | undefined;
+  frontSerialNo: number | null | undefined;
+  eventState: string | null | undefined;
+  dateTime: string | null | undefined;
+}): boolean =>
+  (args.major !== null && args.major !== undefined) ||
+  (args.minor !== null && args.minor !== undefined) ||
+  (args.serialNo !== null && args.serialNo !== undefined) ||
+  (args.frontSerialNo !== null && args.frontSerialNo !== undefined) ||
+  (args.eventState !== null && args.eventState !== undefined) ||
+  (args.dateTime !== null && args.dateTime !== undefined);
 
 /** Tarayıcı/curl ile: deployment ve HTTP route’un açık olduğunu doğrular (Hikvision POST kullanmaz). */
 http.route({
@@ -129,8 +145,45 @@ http.route({
         });
       }
 
-      if (!user_id) {
-        // Heartbeat — sessizce atla, log basma
+      const rawData = raw.length > 10000 ? raw.slice(0, 10000) : raw;
+      const hasHikEvent = hasHikDeviceEventPayload({
+        major: hikMajorEventType,
+        minor: hikSubEventType,
+        serialNo: hikSerialNo,
+        frontSerialNo: hikFrontSerialNo,
+        eventState: hikEventState,
+        dateTime: hikDateTime,
+      });
+      const shouldCreateCardReading =
+        user_id !== null &&
+        shouldCreateCardReadingForHikEvent(
+          hikMajorEventType ?? undefined,
+          hikSubEventType ?? undefined,
+          true,
+        );
+
+      if (!user_id || !shouldCreateCardReading) {
+        if (hasHikEvent) {
+          await ctx.runMutation(internal.deviceEvents.recordHikDeviceEvent, {
+            projectId: authedDevice?.projectId,
+            deviceId: authedDevice?._id,
+            eventTime: hikDateTime ?? new Date().toISOString(),
+            major: hikMajorEventType ?? undefined,
+            minor: hikSubEventType ?? undefined,
+            cardNo: user_id ?? undefined,
+            rawData,
+            deviceSerial: serial ?? undefined,
+            deviceIp: deviceIp ?? undefined,
+            hikDevIndex: hikDevIndex ?? undefined,
+            hikEhomeID: hikEhomeID ?? undefined,
+            hikSerialNo: hikSerialNo ?? undefined,
+            hikFrontSerialNo: hikFrontSerialNo ?? undefined,
+            hikEventState: hikEventState ?? undefined,
+            ideUuid: ideUuid ?? undefined,
+          });
+        }
+
+        // Heartbeat veya access dışı olay: PDKS satırı yazma.
         return new Response(JSON.stringify({ cevap: "ok" }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -155,7 +208,7 @@ http.route({
           deviceIp: deviceIp ?? undefined,
           // Token sahibi cihaza sabitle — body serial/IP cross-tenant forge için kullanılamaz.
           authedDeviceId: authedDevice?._id,
-          rawBody: raw.length > 10000 ? raw.slice(0, 10000) : raw,
+          rawBody: rawData,
           hikDevIndex: hikDevIndex ?? undefined,
           hikEhomeID: hikEhomeID ?? undefined,
           hikMajorEventType: hikMajorEventType ?? undefined,

@@ -1,6 +1,3 @@
-import ExcelJS from "exceljs";
-import { jsPDF } from "jspdf";
-
 export interface SgkReportRow {
   tcNo: string;
   adSoyad: string;
@@ -46,6 +43,7 @@ export async function exportSgkToExcel(data: SgkReportData): Promise<void> {
     r.izinGunu,
   ]);
 
+  const { default: ExcelJS } = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
   const sheetName = `SGK_${data.year}_${String(data.month).padStart(2, "0")}`;
   const worksheet = workbook.addWorksheet(sheetName);
@@ -80,7 +78,8 @@ export async function exportSgkToExcel(data: SgkReportData): Promise<void> {
 /**
  * SGK aylık döküm raporunu PDF formatında dışa aktarır (SGK standartlarına uygun)
  */
-export function exportSgkToPdf(data: SgkReportData): void {
+export async function exportSgkToPdf(data: SgkReportData): Promise<void> {
+  const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 15;

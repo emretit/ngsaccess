@@ -10,6 +10,7 @@ export function useMessageHandler() {
   const { input, setInput, isLoading, setIsLoading } = useInput();
   const getCardReadings = useAction(api.actions.getChatData.getCardReadings);
   const getDatabaseContext = useAction(api.actions.getChatData.getDatabaseContext);
+  const processOpenAI = useAction(api.actions.openaiChat.processMessage);
 
   const fetchers = {
     fetchCardReadings: async (params: { department?: string | null; date?: string | null; startDate?: string | null; endDate?: string | null }) =>
@@ -20,6 +21,7 @@ export function useMessageHandler() {
         endDate: params.endDate ?? undefined,
       }),
     fetchDatabaseContext: () => getDatabaseContext({}),
+    processOpenAI: (params: { input: string; dbContext: string }) => processOpenAI(params),
   };
 
   const handleSendMessage = async (content: string) => {

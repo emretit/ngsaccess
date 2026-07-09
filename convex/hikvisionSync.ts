@@ -6,6 +6,7 @@ import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 
 const HIK_BRIDGE_PROCESSING_TIMEOUT_MS = 2 * 60 * 1000;
 const HIK_BRIDGE_MAX_POLL = 25;
+const HIK_BRIDGE_DEDUPE_SCAN = 100;
 
 const hikOperationValidator = v.union(
   v.literal("addPerson"),
@@ -408,6 +409,35 @@ export const enqueueLocalBridgeOperation = internalMutation({
     if (device.hikTransport !== "localBridge") {
       throw new Error("Cihaz localBridge transport kullanmıyor");
     }
+    const now = Date.now();
+    const newKey = localBridgeOperationKey(args.deviceId, args.operation, args.payload);
+    for (const status of ["pending", "processing", "failed"] as const) {
+      const existingRows = await ctx.db
+        .query("hikPendingOperations")
+        .withIndex("by_device_status", (q) =>
+          q.eq("deviceId", args.deviceId).eq("status", status),
+        )
+        .take(HIK_BRIDGE_DEDUPE_SCAN);
+      const existing = existingRows.find(
+        (op) =>
+          op.operation === args.operation &&
+          localBridgeOperationKey(op.deviceId, op.operation, op.payload) === newKey,
+      );
+      if (existing) {
+        await ctx.db.patch(existing._id, {
+          projectId: args.projectId,
+          payload: args.payload,
+          status: "pending",
+          attemptCount: 0,
+          nextRetryAt: now,
+          processingStartedAt: undefined,
+          completedAt: undefined,
+          claimedBy: undefined,
+          lastError: undefined,
+        });
+        return existing._id;
+      }
+    }
     return await ctx.db.insert("hikPendingOperations", {
       deviceId: args.deviceId,
       projectId: args.projectId,
@@ -415,14 +445,52 @@ export const enqueueLocalBridgeOperation = internalMutation({
       payload: args.payload,
       status: "pending",
       attemptCount: 0,
-      nextRetryAt: Date.now(),
-      createdAt: Date.now(),
+      nextRetryAt: now,
+      createdAt: now,
     });
   },
 });
 
 function isLocalBridgeDevice(device: Doc<"devices"> | null): device is Doc<"devices"> {
   return device !== null && device.brand === "hikvision" && device.hikTransport === "localBridge";
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function asKeyPart(value: unknown): string | null {
+  if (typeof value === "string" && value.trim().length > 0) return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return null;
+}
+
+function stablePayloadKey(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "payload";
+  }
+}
+
+function localBridgeOperationKey(
+  deviceId: Id<"devices">,
+  operation: Doc<"hikPendingOperations">["operation"],
+  payload: unknown,
+): string {
+  const p = asRecord(payload);
+  const primary =
+    asKeyPart(p.accessRuleId) ??
+    asKeyPart(p.employeeId) ??
+    asKeyPart(p.cardNumber) ??
+    asKeyPart(p.employeeNo) ??
+    asKeyPart(p.doorNo) ??
+    asKeyPart(p.faceStorageId) ??
+    asKeyPart(p.fingerPrintID) ??
+    stablePayloadKey(payload);
+  return `${deviceId}:${operation}:${primary}`;
 }
 
 export const claimLocalBridgeOperations = internalMutation({

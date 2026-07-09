@@ -1,39 +1,21 @@
 
 import { useState, useCallback, useEffect } from 'react';
+import { useAction } from 'convex/react';
+import { api } from '../../../../convex/_generated/api';
 
 export function useModelStatus() {
   const [isOpenAIConnected, setIsOpenAIConnected] = useState<boolean>(false);
+  const getOpenAIStatus = useAction(api.actions.openaiChat.status);
 
   const checkOpenAIStatus = useCallback(async () => {
-    const apiKey = localStorage.getItem('OPENAI_API_KEY');
-    
-    if (!apiKey) {
-      setIsOpenAIConnected(false);
-      return;
-    }
-
     try {
-      // Make a simple call to OpenAI API to check if the key works
-      const response = await fetch("https://api.openai.com/v1/models", {
-        headers: {
-          "Authorization": `Bearer ${apiKey}`
-        }
-      });
-
-      setIsOpenAIConnected(response.ok);
-      
-      if (!response.ok) {
-        // If the key is invalid, remove it
-        if (response.status === 401) {
-          localStorage.removeItem('OPENAI_API_KEY');
-        }
-        console.error("OpenAI API key validation failed:", response.status, response.statusText);
-      }
+      const response = await getOpenAIStatus({});
+      setIsOpenAIConnected(response.configured);
     } catch (error) {
       console.error("OpenAI API check failed:", error);
       setIsOpenAIConnected(false);
     }
-  }, []);
+  }, [getOpenAIStatus]);
 
   // Check on initial load
   useEffect(() => {

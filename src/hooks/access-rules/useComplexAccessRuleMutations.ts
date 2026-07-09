@@ -65,7 +65,7 @@ export const useComplexAccessRuleMutations = () => {
           toast({
             variant: "success",
             title: "Cihaz Senkronizasyonu",
-            description: `${syncResult.synced} cihaza zaman planı gönderildi, ${syncResult.employeesSynced} kişi senkronize edildi`,
+            description: `${syncResult.synced} cihaz için plan işi başlatıldı, ${syncResult.employeesSynced} kişi kuyruğa alındı`,
           });
         }
         if (syncResult.failed > 0) {

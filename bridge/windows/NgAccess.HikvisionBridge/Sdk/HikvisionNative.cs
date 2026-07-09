@@ -6,7 +6,7 @@ internal static unsafe class HikvisionNative
 {
   public const int AcsCardNoLen = 32;
   public const int MaxDoorNum256 = 256;
-  public const int MaxCardRightPlanNum = 4;
+  public const int MaxCardRightPlanNum = 8;
   public const int MaxGroupNum128 = 128;
   public const int CardPasswordLen = 8;
   public const int NameLen = 32;
@@ -16,18 +16,19 @@ internal static unsafe class HikvisionNative
   public const int NetDvrSetCardCfgV50 = 2179;
   public const int EnumAcsSendData = 3;
   public const int CommAlarmAcs = 0x5002;
+  public const uint CallbackTypeStatus = 0;
   public const uint CallbackStatusSuccess = 1000;
-  public const uint CallbackStatusFailed = 1002;
+  public const uint CallbackStatusFinish = 1002;
+  public const uint CallbackStatusFailed = 1003;
 
-  // dwModifyParamType bit maskesi (NET_DVR_CARD_CFG_V50). Taban maske bridge'in yazdığı alanları
-  // seçer: CARD_VALID|VALID|CARD_TYPE|DOOR_RIGHT|LEADER|GROUP|RIGHT_PLAN|NAME. EMPLOYEE_NO (0x400)
-  // yalnız geçerli (>0) bir employeeNo parse edildiğinde eklenir; aksi halde alanı 0 ile ezmeyiz.
-  public const uint CardModifyMaskBase = 0x0000095F;
-  public const uint CardModifyEmployeeNo = 0x00000400;
+  // dwModifyParamType bit maskesi (NET_DVR_CARD_CFG_V50). Hikvision ACS SDK örneği kart
+  // apply için 0x000003FF kullanır; DS-K2804 parametre validasyonu bu maskeye hassas.
+  // EMPLOYEE_NO (0x400) DS-K2804 localBridge yazımında özellikle eklenmez.
+  public const uint CardModifyMaskBase = 0x000003FF;
   public const uint CardModifyCardValid = 0x00000001;
 
   [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-  public delegate void MsgCallback(
+  public delegate bool MsgCallback(
     int command,
     IntPtr alarmer,
     IntPtr alarmInfo,

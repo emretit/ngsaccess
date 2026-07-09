@@ -3,6 +3,9 @@ import { api } from "../../convex/_generated/api";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import type { Device } from "@/types/device";
 import { computeDeviceStatus } from "@/lib/deviceStatus";
+import type { FunctionReturnType } from "convex/server";
+
+type DeviceRow = FunctionReturnType<typeof api.devices.list>[number];
 
 export const useProjectFilteredDevices = () => {
   const { projectIds, isSuperAdmin, projectId, loading: projectLoading } = useActiveProject();
@@ -15,7 +18,7 @@ export const useProjectFilteredDevices = () => {
 
   // eslint-disable-next-line react-hooks/purity
   const nowMs = Date.now();
-  const devices: Device[] = ((devicesRaw ?? []) as Device[]).map((dev) => ({
+  const devices: Device[] = (devicesRaw ?? []).map((dev: DeviceRow) => ({
     ...dev,
     status: computeDeviceStatus(dev.lastSeen, nowMs),
   }));

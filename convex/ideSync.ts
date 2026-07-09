@@ -220,6 +220,11 @@ export const enqueueIdeOp = internalMutation({
     maxAttempts: v.optional(v.number()),
   },
   handler: async (ctx, args): Promise<Id<"idePendingOperations">> => {
+    const device = await ctx.db.get(args.deviceId);
+    if (!device || device.brand !== "ide_smart") {
+      throw new Error("IDE sync kuyruğuna sadece IDE Smart panel işleri yazılabilir");
+    }
+
     const payload = (args.payload ?? {}) as Record<string, unknown>;
     const idempotencyKey = `${args.deviceId}:${args.opType}:${targetKey(args.opType, payload)}`;
     const now = Date.now();

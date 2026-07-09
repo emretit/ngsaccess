@@ -1,4 +1,4 @@
-import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { UseFormReturn } from "react-hook-form";
@@ -53,7 +53,6 @@ export function DeviceZoneSection({ form, zones, allowCreate = true }: DeviceZon
                 )}
               </SelectContent>
             </Select>
-            <FormDescription>Panelin bulunduğu mantıksal alan (panel adından bağımsız).</FormDescription>
             <FormMessage />
           </FormItem>
         )}

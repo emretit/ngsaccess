@@ -461,3 +461,27 @@ export const openIdeDoor = authedAction({
     return { ok: true, queued: true };
   },
 });
+
+export const triggerPanelSync = authedAction({
+  args: { deviceId: v.id("devices") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ ok: boolean; queued?: boolean; error?: string }> => {
+    const loaded = await loadIdePanel(ctx, args.deviceId);
+    if ("error" in loaded) return { ok: false, error: loaded.error };
+    const { device } = loaded;
+    if (!device.ideUuid) {
+      return { ok: false, error: "Panel UUID tanımsız" };
+    }
+
+    await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
+      deviceId: device._id,
+      projectId: device.projectId,
+      opType: "triggerSync",
+      payload: { reset: false },
+    });
+
+    return { ok: true, queued: true };
+  },
+});

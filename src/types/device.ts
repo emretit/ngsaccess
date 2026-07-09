@@ -32,6 +32,8 @@ export interface Device {
   hikTransport?: "gateway" | "localBridge";
   hikDoorCount?: number;
   hikPort?: number;
+  hikCapabilitiesSnapshot?: string;
+  hikCapabilitiesUpdatedAt?: number;
   // IDE Smart panel
   ideUuid?: string;
   ideUser?: string;
@@ -81,6 +83,8 @@ export interface ServerDevice {
   hikTransport?: "gateway" | "localBridge";
   hikDoorCount?: number;
   hikPort?: number;
+  hikCapabilitiesSnapshot?: string;
+  hikCapabilitiesUpdatedAt?: number;
   // IDE Smart panel
   ideUuid?: string;
   ideUser?: string;

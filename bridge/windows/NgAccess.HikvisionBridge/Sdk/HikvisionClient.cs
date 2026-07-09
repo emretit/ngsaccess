@@ -12,7 +12,7 @@ namespace NgAccess.HikvisionBridge.Sdk;
 /// </summary>
 public sealed class HikvisionClient : IAsyncDisposable
 {
-  private static readonly string[] Weekdays =
+  private static readonly string[] WeekdayNames =
     ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
   private readonly PanelConfig _panel;
@@ -199,16 +199,16 @@ public sealed class HikvisionClient : IAsyncDisposable
       .ToDictionary(g => g.Key, g => g.Take(8).ToList(), StringComparer.OrdinalIgnoreCase);
 
     var result = new List<object>(56);
-    foreach (var day in Weekdays)
+    for (var dayIndex = 0; dayIndex < WeekdayNames.Length; dayIndex++)
     {
-      byDay.TryGetValue(day, out var daySegments);
+      byDay.TryGetValue(WeekdayNames[dayIndex], out var daySegments);
       daySegments ??= [];
       for (var i = 0; i < 8; i++)
       {
         var segment = i < daySegments.Count ? daySegments[i] : null;
         result.Add(new
         {
-          week = day,
+          week = dayIndex + 1,
           id = i + 1,
           enable = segment is not null,
           TimeSegment = new
@@ -299,11 +299,9 @@ public sealed class HikvisionClient : IAsyncDisposable
     };
     WriteFixed(card.byCardNo, AcsCardNoLen, cardNo);
     WriteFixed(card.byName, NameLen, payload.Name ?? cardNo);
-    if (uint.TryParse(payload.EmployeeNo ?? cardNo, out var employeeNo) && employeeNo != 0)
-    {
-      card.dwEmployeeNo = employeeNo;
-      card.dwModifyParamType |= CardModifyEmployeeNo; // doc: employeeNo 0 olamaz, yoksa alanı yazma
-    }
+    // DS-K2804 rejects NET_DVR_CARD_CFG_V50 on some firmware when EMPLOYEE_NO is
+    // included in dwModifyParamType. Card number is the stable key we need, so keep
+    // dwEmployeeNo out of the write mask for localBridge card apply.
 
     var rights = payload.DoorRights is { Count: > 0 }
       ? payload.DoorRights
@@ -315,7 +313,11 @@ public sealed class HikvisionClient : IAsyncDisposable
     }
     card.byBelongGroup[0] = 1;
 
-    return SendRemoteCardConfig(NetDvrSetCardCfgV50, cond, card);
+    return SendRemoteCardConfig(NetDvrSetCardCfgV50, cond, card, new CardDebugInfo(
+      cardNo,
+      planTemplateNo.Value,
+      [.. rights],
+      card.dwModifyParamType));
   }
 
   private unsafe SdkResult DeleteCard(OperationPayload payload)
@@ -332,7 +334,11 @@ public sealed class HikvisionClient : IAsyncDisposable
       byCardValid = 0,
     };
     WriteFixed(card.byCardNo, AcsCardNoLen, cardNo);
-    return SendRemoteCardConfig(NetDvrSetCardCfgV50, cond, card);
+    return SendRemoteCardConfig(NetDvrSetCardCfgV50, cond, card, new CardDebugInfo(
+      cardNo,
+      null,
+      [],
+      card.dwModifyParamType));
   }
 
   private static NET_DVR_CARD_CFG_COND SingleCardCond() => new()
@@ -342,12 +348,26 @@ public sealed class HikvisionClient : IAsyncDisposable
     byCheckCardNo = 1,
   };
 
-  private SdkResult SendRemoteCardConfig(int command, NET_DVR_CARD_CFG_COND cond, NET_DVR_CARD_CFG_V50 card)
+  private sealed record CardDebugInfo(
+    string CardNo,
+    int? PlanTemplateNo,
+    IReadOnlyList<int> DoorRights,
+    uint ModifyMask);
+
+  private SdkResult SendRemoteCardConfig(
+    int command,
+    NET_DVR_CARD_CFG_COND cond,
+    NET_DVR_CARD_CFG_V50 card,
+    CardDebugInfo debug)
   {
-    return WithRemoteConfig(command, ref cond, ref card);
+    return WithRemoteConfig(command, ref cond, ref card, debug);
   }
 
-  private SdkResult WithRemoteConfig<TCond, TData>(int command, ref TCond cond, ref TData data)
+  private SdkResult WithRemoteConfig<TCond, TData>(
+    int command,
+    ref TCond cond,
+    ref TData data,
+    CardDebugInfo? debug = null)
     where TCond : struct
     where TData : struct
   {
@@ -356,10 +376,24 @@ public sealed class HikvisionClient : IAsyncDisposable
     var condPtr = Marshal.AllocHGlobal(condSize);
     var dataPtr = Marshal.AllocHGlobal(dataSize);
     var tcs = new TaskCompletionSource<SdkResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-    RemoteConfigCallback callback = (type, _, _, _) =>
+    RemoteConfigCallback callback = (type, buffer, bufferLength, _) =>
     {
-      if (type == CallbackStatusSuccess) tcs.TrySetResult(SdkResult.Success());
-      if (type == CallbackStatusFailed) tcs.TrySetResult(SdkResult.Failure($"remote config failed: {NET_DVR_GetLastError()}"));
+      var status = type;
+      if (type == CallbackTypeStatus && buffer != IntPtr.Zero && bufferLength >= sizeof(uint))
+      {
+        status = unchecked((uint)Marshal.ReadInt32(buffer));
+      }
+      if (status is CallbackStatusSuccess or CallbackStatusFinish)
+      {
+        tcs.TrySetResult(SdkResult.Success());
+      }
+      else if (status == CallbackStatusFailed)
+      {
+        var err = buffer != IntPtr.Zero && bufferLength >= sizeof(uint) * 2
+          ? Marshal.ReadInt32(buffer, sizeof(uint))
+          : NET_DVR_GetLastError();
+        tcs.TrySetResult(SdkResult.Failure($"remote config failed: {err}{FormatDebug(debug, condSize, dataSize)}"));
+      }
     };
     _activeRemoteConfigCallback = callback;
     try
@@ -375,7 +409,8 @@ public sealed class HikvisionClient : IAsyncDisposable
       {
         if (!NET_DVR_SendRemoteConfig(handle, EnumAcsSendData, dataPtr, (uint)dataSize))
         {
-          return SdkResult.Failure($"NET_DVR_SendRemoteConfig failed: {NET_DVR_GetLastError()}");
+          return SdkResult.Failure(
+            $"NET_DVR_SendRemoteConfig failed: {NET_DVR_GetLastError()}{FormatDebug(debug, condSize, dataSize)}");
         }
         var completed = tcs.Task.Wait(TimeSpan.FromSeconds(8));
         return completed ? tcs.Task.Result : SdkResult.Failure("remote config callback timeout");
@@ -391,6 +426,15 @@ public sealed class HikvisionClient : IAsyncDisposable
       Marshal.FreeHGlobal(condPtr);
       Marshal.FreeHGlobal(dataPtr);
     }
+  }
+
+  private static string FormatDebug(CardDebugInfo? debug, int condSize, int dataSize)
+  {
+    if (debug is null) return $" (condSize={condSize}, dataSize={dataSize})";
+    var doors = debug.DoorRights.Count > 0 ? string.Join(",", debug.DoorRights) : "-";
+    var plan = debug.PlanTemplateNo?.ToString() ?? "-";
+    return
+      $" (card={debug.CardNo}, plan={plan}, doors={doors}, mask=0x{debug.ModifyMask:X}, condSize={condSize}, dataSize={dataSize})";
   }
 
   private static NET_DVR_VALID_PERIOD_CFG ValidPeriod()

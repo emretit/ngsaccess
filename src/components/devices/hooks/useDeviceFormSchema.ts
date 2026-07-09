@@ -76,6 +76,23 @@ export function makeFormSchema(adminMode: boolean, isEdit = false) {
   ),
   ide_door_count: doorCountField,
 }).superRefine((data, ctx) => {
+  if (data.zone_id === "__new__" && !data.new_zone_name?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["new_zone_name"],
+      message: "Yeni bölge adı zorunlu",
+    });
+  } else if (
+    data.zone_id === "__new__" &&
+    data.new_zone_name?.trim().toLocaleLowerCase("tr-TR") ===
+      data.name.trim().toLocaleLowerCase("tr-TR")
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["new_zone_name"],
+      message: "Bölge adı cihaz adıyla aynı olamaz",
+    });
+  }
   // localBridge transport ehome/gateway kimliği kullanmaz (LAN bridge token ile auth olur);
   // ehome alanları yalnız gateway transport'ta zorunludur.
   if (data.brand === "hikvision" && !data.hik_transport) {
@@ -121,15 +138,6 @@ export function makeFormSchema(adminMode: boolean, isEdit = false) {
     }
   }
   if (data.brand === "ide_smart") {
-    // "+ Yeni bölge oluştur" seçildiyse ad zorunlu — boş bırakılırsa backend panel
-    // adına düşer (bu refactor'ün önlemek istediği "panel adı = bölge adı" durumu).
-    if (data.zone_id === "__new__" && !data.new_zone_name?.trim()) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["new_zone_name"],
-        message: "Yeni bölge adı zorunlu",
-      });
-    }
     // IDE Smart paneller yalnızca MQTT kullanır. Zorunlu: UUID (tek tanımlayıcı) +
     // kullanıcı/şifre (panel MQTT login token'ı bu kimlikle alınır). IP/port opsiyonel.
     if (!data.ide_uuid?.trim()) {

@@ -5,12 +5,15 @@ import { v } from "convex/values";
 import { internalAction, type ActionCtx } from "../_generated/server";
 import { authedAction } from "../lib/customFunctions";
 import { isProjectAllowed } from "../lib/auth";
+import { deriveHikReaderNoFromDoorNo } from "../lib/hikReaderNumbers";
 import type { Id } from "../_generated/dataModel";
 import {
   addDeviceToGateway,
   captureCardOnDevice,
   captureFaceOnDevice,
   deleteDeviceFromGateway,
+  fetchHikCapabilitySnapshot,
+  fetchCardReaderSnapshot,
   getDoorCapabilities,
   getAcsWorkStatus,
   listGatewayDevices,
@@ -31,6 +34,8 @@ import {
   setVerifyWeekPlan,
   type FaceRecord,
   type FingerprintRecord,
+  type HikCapabilitySnapshot,
+  type HikCardReaderSnapshot,
   type SearchCardInfo,
   type Weekday,
 } from "../lib/hikGateway";
@@ -303,6 +308,47 @@ export const pingHikGateway = authedAction({
     } catch (e) {
       return { ok: false, error: (e as Error).message };
     }
+  },
+});
+
+/**
+ * Cihaz capability snapshot'ını gateway passthrough üzerinden toplar ve devices'a yazar.
+ * Diger Hikvision fazlari bu snapshot'a bakarak UI/aksiyonlari model bazli kisitlayacak.
+ */
+export const fetchDeviceCapabilities = authedAction({
+  args: { deviceId: v.id("devices") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ ok: boolean; snapshot?: HikCapabilitySnapshot; error?: string }> => {
+    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
+      internal.users.listProjectIdsForCurrentUser,
+      {},
+    );
+    const device = await ctx.runQuery(internal.devices.getByIdInternal, {
+      id: args.deviceId,
+    });
+    if (!device) return { ok: false, error: "Cihaz bulunamadı" };
+    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
+      return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
+    }
+    if (device.hikTransport !== "gateway") {
+      return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
+    }
+    if (!device.hikDevIndex) {
+      return {
+        ok: false,
+        error: "Cihaz gateway'e kayıtlı değil (önce 'Gateway'e Kaydet' tıkla)",
+      };
+    }
+
+    const snapshot = await fetchHikCapabilitySnapshot(device.hikDevIndex);
+    await ctx.runMutation(internal.devices.setHikCapabilitiesSnapshot, {
+      deviceId: args.deviceId,
+      snapshot: JSON.stringify(snapshot),
+      updatedAt: snapshot.updatedAt,
+    });
+    return { ok: true, snapshot };
   },
 });
 
@@ -1006,6 +1052,63 @@ export const applyDoorStatusPlan = authedAction({
     if (!r2.ok) return r2;
 
     return await linkDoorStatusPlan(devIndex, doorNo, templateNo);
+  },
+});
+
+export const fetchReaderCfg = authedAction({
+  args: { readerId: v.id("readers") },
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ ok: boolean; snapshot?: HikCardReaderSnapshot; error?: string }> => {
+    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
+      internal.users.listProjectIdsForCurrentUser,
+      {},
+    );
+    const reader = await ctx.runQuery(internal.readers.getByIdInternal, {
+      readerId: args.readerId,
+    });
+    if (!reader) return { ok: false, error: "Okuyucu bulunamadı" };
+    if (!isProjectAllowed(allowedProjectIds, reader.projectId)) {
+      return { ok: false, error: "Bu okuyucuya erişim yetkiniz yok" };
+    }
+
+    const door = await ctx.runQuery(internal.doors.getByIdInternal, { id: reader.doorId });
+    if (!door) return { ok: false, error: "Kapı bulunamadı" };
+    const deviceId = reader.deviceId ?? door.deviceId;
+    if (!deviceId) return { ok: false, error: "Okuyucuya bağlı cihaz yok" };
+
+    const device = await ctx.runQuery(internal.devices.getByIdInternal, { id: deviceId });
+    if (!device) return { ok: false, error: "Cihaz bulunamadı" };
+    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
+      return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
+    }
+    if (device.brand !== "hikvision" || device.hikTransport !== "gateway") {
+      return { ok: false, error: "Bu işlem yalnızca Hikvision gateway cihazlarında desteklenir" };
+    }
+    if (!device.hikDevIndex) {
+      return { ok: false, error: "Cihaz gateway'e kayıtlı değil" };
+    }
+
+    const readerNo =
+      reader.hikReaderNo ??
+      deriveHikReaderNoFromDoorNo(door.hikDoorNo, reader.direction);
+    if (readerNo === undefined) {
+      return { ok: false, error: "Okuyucu numarası tanımsız" };
+    }
+
+    const snapshot = await fetchCardReaderSnapshot(device.hikDevIndex, readerNo);
+    await ctx.runMutation(internal.readers.setHikReaderSnapshot, {
+      readerId: args.readerId,
+      snapshot: JSON.stringify(snapshot),
+      updatedAt: snapshot.updatedAt,
+      hikVerifyMode: undefined,
+      hikCardReaderName: snapshot.summary.cardReaderName,
+      hikCardReaderPlanTemplateNo: snapshot.summary.templateNo,
+      hikCardReaderAntiSneakEnabled: snapshot.summary.antiSneakEnabled,
+    });
+
+    return { ok: true, snapshot };
   },
 });
 

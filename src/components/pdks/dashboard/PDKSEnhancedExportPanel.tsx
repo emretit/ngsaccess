@@ -95,7 +95,7 @@ export function PDKSEnhancedExportPanel({
       } else if (exportType === "CSV") {
         exportToCsv(records, { dateRange: rangeLabel });
       } else if (exportType === "PDF") {
-        exportToPdf(records, { dateRange: rangeLabel });
+        await exportToPdf(records, { dateRange: rangeLabel });
       }
 
       toast({

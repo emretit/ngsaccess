@@ -23,7 +23,7 @@ export function AiModelStatus({ isConnected }: AiModelStatusProps) {
       <TooltipContent>
         {isConnected 
           ? 'OpenAI API bağlantısı aktif' 
-          : 'OpenAI API anahtarınızı ayarlamanız gerekiyor'}
+          : 'OPENAI_API_KEY sunucuda tanımlanmalı'}
       </TooltipContent>
     </Tooltip>
   );

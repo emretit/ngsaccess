@@ -55,19 +55,19 @@ public sealed class HikvisionSdkRuntime : IDisposable
 
   public void UnregisterHandler(int userId) => _handlers.TryRemove(userId, out _);
 
-  private unsafe void OnSdkMessage(int command, IntPtr alarmer, IntPtr alarmInfo, uint bufferLength, IntPtr user)
+  private unsafe bool OnSdkMessage(int command, IntPtr alarmer, IntPtr alarmInfo, uint bufferLength, IntPtr user)
   {
-    if (command != CommAlarmAcs || alarmInfo == IntPtr.Zero || bufferLength == 0) return;
+    if (command != CommAlarmAcs || alarmInfo == IntPtr.Zero || bufferLength == 0) return true;
     try
     {
       // NET_DVR_ALARMER: ilk 8 byte valid-flag, ardından LONG lUserID (offset 8). Tüm struct'ı
       // tanımlamak yerine sadece userId'yi oku (sürüm farkı olan reserved alanlardan etkilenmez).
       var userId = alarmer != IntPtr.Zero ? Marshal.ReadInt32(alarmer, 8) : -1;
-      if (userId < 0 || !_handlers.TryGetValue(userId, out var handler)) return;
+      if (userId < 0 || !_handlers.TryGetValue(userId, out var handler)) return true;
 
       var alarm = Marshal.PtrToStructure<NET_DVR_ACS_ALARM_INFO>(alarmInfo);
       var cardNo = ReadFixed(alarm.struAcsEventInfo.byCardNo, AcsCardNoLen);
-      if (string.IsNullOrWhiteSpace(cardNo)) return;
+      if (string.IsNullOrWhiteSpace(cardNo)) return true;
 
       handler(new AcsEvent
       {
@@ -84,6 +84,7 @@ public sealed class HikvisionSdkRuntime : IDisposable
     {
       _logger.LogWarning(ex, "Failed to parse ACS alarm");
     }
+    return true;
   }
 
   private static unsafe string ReadFixed(byte* source, int length)

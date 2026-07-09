@@ -11,3 +11,5 @@ export * from "./gateway/biometrics";
 export * from "./gateway/events";
 export * from "./gateway/capture";
 export * from "./gateway/plans";
+export * from "./gateway/capabilities";
+export * from "./gateway/readers";

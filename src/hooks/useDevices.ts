@@ -4,8 +4,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Device } from "@/types/device";
+import type { FunctionReturnType } from "convex/server";
 
 export type { Device };
+type DeviceRow = FunctionReturnType<typeof api.devices.list>[number];
 
 export function useDevices() {
   const { toast } = useToast();
@@ -25,8 +27,7 @@ export function useDevices() {
   // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const fiveMinutesAgo = now - 5 * 60 * 1000;
-  const devices: Device[] = (devicesRaw ?? []).map((d: unknown) => {
-    const dev = d as Device & { lastSeen?: string };
+  const devices: Device[] = (devicesRaw ?? []).map((dev: DeviceRow) => {
     let computedStatus: Device["status"] = "offline";
     if (dev.lastSeen) {
       computedStatus = new Date(dev.lastSeen).getTime() > fiveMinutesAgo ? "online" : "offline";

@@ -5,15 +5,15 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { getHikModelSpec } from "../../../convex/lib/hikModels";
 
-import { ChevronRight, Building2, Cpu, HardDrive, Plus, Trash2, DoorClosed, DoorOpen, Loader2, ScanLine, Pencil, Settings2 } from "lucide-react";
+import { ArrowRightLeft, ChevronRight, Building2, Cpu, HardDrive, Plus, Trash2, DoorClosed, DoorOpen, Loader2, ScanLine, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { deviceDisplayName } from "@/lib/deviceDisplay";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AddDoorDialog } from "./AddDoorDialog";
 import { EditDoorDialog, type DoorForEdit } from "./EditDoorDialog";
-import { EditReaderDialog } from "./EditReaderDialog";
 import { AddReaderDialog } from "./AddReaderDialog";
+import { MoveReaderDialog } from "./MoveReaderDialog";
 import { toast } from "@/hooks/use-toast";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
@@ -75,6 +75,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
   const removeDoor = useMutation(api.doors.remove);
   const removeReader = useMutation(api.readers.remove);
   const openIdeDoor = useAction(api.actions.ideGatewayDevice.openIdeDoor);
+  const fetchHikReaderCfg = useAction(api.actions.hikGatewayDevice.fetchReaderCfg);
 
   // Kapı başına izin verilen en çok okuyucu — cihaz markası/modeline göre (UI tarafı; sunucu da doğrular).
   const maxReadersForDevice = (device: DeviceNode | null | undefined): number => {
@@ -84,6 +85,25 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
     return 2;
   };
 
+  const readerCapacityForDevice = (device: DeviceNode | null | undefined, deviceDoors: DoorNode[]): number | null => {
+    if (!device) return null;
+    if (device.brand === "hikvision") {
+      const spec = getHikModelSpec(device.hikModel);
+      if (spec) return spec.doorCount * spec.defaultReadersPerDoor;
+      return deviceDoors.length;
+    }
+    if (device.brand === "ide_smart") return deviceDoors.length;
+    return null;
+  };
+
+  const countReadersForDevice = (deviceId: Id<"devices"> | undefined): number => {
+    if (!deviceId) return 0;
+    return (readerStatusData ?? []).filter((reader) => {
+      const door = doors.find((item) => item._id === reader.doorId);
+      return door?.deviceId === deviceId;
+    }).length;
+  };
+
   const [selectedZone, setSelectedZone] = useState<Id<"zones"> | null>(null);
   const [selectedDoor, setSelectedDoor] = useState<Id<"doors"> | null>(null);
   const [expandedZones, setExpandedZones] = useState<Id<"zones">[]>([]);
@@ -91,13 +111,18 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
   const [showAddDoorDialog, setShowAddDoorDialog] = useState(false);
   const [selectedZoneForDoor, setSelectedZoneForDoor] = useState<{ id: Id<"zones">; name: string } | null>(null);
   const [openingDoorId, setOpeningDoorId] = useState<Id<"doors"> | null>(null);
-  const [editReader, setEditReader] = useState<{
-    readerId: Id<"readers"> | null;
-    doorId: Id<"doors">;
+  const [fetchingReaderCfgId, setFetchingReaderCfgId] = useState<Id<"readers"> | null>(null);
+  const [moveReader, setMoveReader] = useState<{
+    readerId: Id<"readers">;
     readerName: string;
-    readerDirection: "entry" | "exit" | "both";
-    requireSensor?: boolean;
-    isIdeDoor: boolean;
+    currentDoorId: Id<"doors">;
+    currentDirection: "entry" | "exit" | "both";
+    targetDoors: {
+      id: Id<"doors">;
+      name: string;
+      readerCount: number;
+      maxReaders: number;
+    }[];
   } | null>(null);
   const [addReader, setAddReader] = useState<{
     doorId: Id<"doors">;
@@ -130,6 +155,28 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
       });
     } finally {
       setOpeningDoorId(null);
+    }
+  };
+
+  const handleFetchHikReaderCfg = async (readerId: Id<"readers">) => {
+    setFetchingReaderCfgId(readerId);
+    try {
+      const result = await fetchHikReaderCfg({ readerId });
+      if (result.ok && result.snapshot) {
+        const summary = result.snapshot.summary;
+        toast({
+          title: "Okuyucu ayarları alındı",
+          description: `Hik #${summary.readerNo}${summary.templateNo !== undefined ? ` · Plan ${summary.templateNo}` : ""}`,
+        });
+      } else {
+        toast({
+          title: "Okuyucu ayarları alınamadı",
+          description: result.error ?? "Bilinmeyen hata",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setFetchingReaderCfgId(null);
     }
   };
 
@@ -183,12 +230,23 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
   const toggleDevice = (id: Id<"devices">) =>
     setExpandedDevices((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]));
 
-  // Tek okuyucu alt-satırı (kapının altında). total = kapıdaki okuyucu sayısı (son okuyucu silinemez).
+  const targetDoorsForMove = (door: DoorNode, device: DeviceNode | null) => {
+    const scopeDoors = door.deviceId
+      ? doors.filter((candidate) => candidate.deviceId === door.deviceId)
+      : doors.filter((candidate) => !candidate.deviceId && candidate.zoneId === door.zoneId);
+    return scopeDoors.map((candidate) => ({
+      id: candidate._id,
+      name: candidate.name,
+      readerCount: readersByDoor.get(String(candidate._id))?.length ?? 0,
+      maxReaders: maxReadersForDevice(device),
+    }));
+  };
+
+  // Tek okuyucu alt-satırı (kapının altında).
   const renderReaderRow = (
     door: DoorNode,
     reader: ReaderRow,
-    total: number,
-    isIdeDoor: boolean,
+    panelDevice: DeviceNode | null,
   ) => {
     const dirLabel =
       reader.readerDirection === "exit"
@@ -203,49 +261,93 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
           timeZone: "Europe/Istanbul",
         })
       : "—";
+    const canFetchHikCfg =
+      !!reader.readerId &&
+      panelDevice?.brand === "hikvision" &&
+      panelDevice.hikTransport === "gateway";
+    const fetchingCfg = !!reader.readerId && fetchingReaderCfgId === reader.readerId;
+    const technicalDetails = [
+      reader.hikReaderNo !== null ? `Hik okuyucu #${reader.hikReaderNo}` : null,
+      reader.hikCardReaderPlanTemplateNo !== null
+        ? `Plan ${reader.hikCardReaderPlanTemplateNo}`
+        : null,
+      reader.hikCardReaderAntiSneakEnabled !== null
+        ? `APB ${reader.hikCardReaderAntiSneakEnabled ? "açık" : "kapalı"}`
+        : null,
+      reader.hikLastCfgAt
+        ? `Cfg ${new Date(reader.hikLastCfgAt).toLocaleString("tr-TR", {
+            timeZone: "Europe/Istanbul",
+          })}`
+        : null,
+    ].filter((item): item is string => item !== null);
+    const readerLabel = reader.readerName !== door.name ? reader.readerName : "Okuyucu";
     return (
       <div
         key={reader.readerId ?? `legacy-${door._id}`}
-        className="group/reader flex items-center gap-2 rounded-md px-2 py-1 ml-12 text-xs text-muted-foreground hover:bg-accent/50"
+        className="group/reader ml-10 flex min-h-7 items-center gap-2 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent/50"
+        title={technicalDetails.length > 0 ? technicalDetails.join(" · ") : undefined}
       >
         <ScanLine className="h-3.5 w-3.5 shrink-0" />
-        {/* Okuyucu adı kapı adıyla aynıysa (readerName boş→door.name türetimi) tekrarı gizle. */}
-        {reader.readerName !== door.name && (
-          <span className="truncate">{reader.readerName}</span>
+        <span className="min-w-0 flex-1 truncate">
+          {readerLabel}
+          <span className="text-muted-foreground/70"> · {dirLabel}</span>
+        </span>
+        {reader.hikCardReaderAntiSneakEnabled === true && (
+          <span className="rounded-sm bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+            APB
+          </span>
         )}
-        <Badge variant="secondary" className="h-4 px-1 text-[10px] font-normal">
-          {dirLabel}
-        </Badge>
-        <span className="ml-auto tabular-nums" title={reader.lastReadAt ? "Son okuma" : "Henüz okuma yok"}>
-          {lastLabel}
+        <span className="tabular-nums text-[11px]" title={reader.lastReadAt ? "Son okuma" : "Henüz okuma yok"}>
+          {reader.lastReadAt ? lastLabel : ""}
         </span>
         <span
           className={cn(
-            "h-2 w-2 rounded-full shrink-0",
+            "h-2 w-2 shrink-0 rounded-full",
             reader.online ? "bg-emerald-500" : "bg-muted-foreground/40"
           )}
           title={reader.online ? "Çevrimiçi" : "Çevrimdışı"}
         />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-5 w-5 opacity-0 transition-opacity group-hover/reader:opacity-100"
-          title="Okuyucuyu Düzenle"
-          aria-label="Okuyucuyu Düzenle"
-          onClick={() => {
-            setEditReader({
-              readerId: reader.readerId,
-              doorId: door._id,
-              readerName: reader.readerName,
-              readerDirection: reader.readerDirection,
-              requireSensor: door.requireSensor,
-              isIdeDoor,
-            });
-          }}
-        >
-          <Pencil className="h-3 w-3" />
-        </Button>
-        {reader.readerId && total > 1 && (
+        {reader.readerId && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 opacity-0 transition-opacity group-hover/reader:opacity-100"
+            title="Okuyucuyu Taşı"
+            aria-label="Okuyucuyu Taşı"
+            onClick={() => {
+              setMoveReader({
+                readerId: reader.readerId as Id<"readers">,
+                readerName: reader.readerName,
+                currentDoorId: door._id,
+                currentDirection: reader.readerDirection,
+                targetDoors: targetDoorsForMove(door, panelDevice),
+              });
+            }}
+          >
+            <ArrowRightLeft className="h-3 w-3" />
+          </Button>
+        )}
+        {canFetchHikCfg && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 opacity-0 transition-opacity group-hover/reader:opacity-100 hover:bg-accent/80"
+            title="Hikvision Okuyucu Ayarlarını Oku"
+            aria-label="Hikvision Okuyucu Ayarlarını Oku"
+            disabled={fetchingCfg}
+            onClick={(event) => {
+              event.stopPropagation();
+              void handleFetchHikReaderCfg(reader.readerId as Id<"readers">);
+            }}
+          >
+            {fetchingCfg ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <Settings2 className="h-3 w-3" />
+            )}
+          </Button>
+        )}
+        {reader.readerId && (
           <Button
             variant="ghost"
             size="icon"
@@ -265,15 +367,21 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
   const renderReaders = (door: DoorNode, device: DeviceNode | null) => {
     const readers = readersByDoor.get(String(door._id)) ?? [];
     const max = maxReadersForDevice(device);
-    const isIdeDoor = door.ioId != null;
     const hasEntry = readers.some((r) => r.readerDirection === "entry");
+    const deviceDoors = device
+      ? doors.filter((candidate) => candidate.deviceId === device._id)
+      : [];
+    const deviceCapacity = readerCapacityForDevice(device, deviceDoors);
+    const canCreateReader =
+      readers.length < max &&
+      (deviceCapacity === null || !device?._id || countReadersForDevice(device._id) < deviceCapacity);
     return (
       <>
-        {readers.map((reader) => renderReaderRow(door, reader, readers.length, isIdeDoor))}
-        {readers.length < max && (
+        {readers.map((reader) => renderReaderRow(door, reader, device))}
+        {canCreateReader && (
           <button
             type="button"
-            className="ml-12 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent/50"
+            className="ml-10 flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent/50"
             onClick={() =>
               setAddReader({
                 doorId: door._id,
@@ -283,7 +391,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
             }
           >
             <Plus className="h-3 w-3" />
-            Okuyucu ekle
+            Okuyucu
           </button>
         )}
       </>
@@ -294,7 +402,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
   // Outer div = layout + hover/selected styling. Inner <button> = klavye/fare seçim hedefi.
   // Action butonlar sibling — iç içe interactive element ARIA ihlali yok.
   const renderDoor = (door: DoorNode, panelDeviceId: Id<"devices"> | null, panelDevice: DeviceNode | null) => (
-    <li key={door._id}>
+    <li key={door._id} className="group/door">
       <div
         className={cn(
           "group flex items-center rounded-md transition-all ml-6",
@@ -506,19 +614,6 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
         />
       )}
 
-      {editReader && (
-        <EditReaderDialog
-          open={!!editReader}
-          onOpenChange={(open) => { if (!open) setEditReader(null); }}
-          readerId={editReader.readerId}
-          doorId={editReader.doorId}
-          readerName={editReader.readerName}
-          readerDirection={editReader.readerDirection}
-          requireSensor={editReader.requireSensor}
-          isIdeDoor={editReader.isIdeDoor}
-        />
-      )}
-
       {addReader && (
         <AddReaderDialog
           open={!!addReader}
@@ -526,6 +621,18 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
           doorId={addReader.doorId}
           doorName={addReader.doorName}
           defaultDirection={addReader.defaultDirection}
+        />
+      )}
+
+      {moveReader && (
+        <MoveReaderDialog
+          open={!!moveReader}
+          onOpenChange={(open) => { if (!open) setMoveReader(null); }}
+          readerId={moveReader.readerId}
+          readerName={moveReader.readerName}
+          currentDoorId={moveReader.currentDoorId}
+          currentDirection={moveReader.currentDirection}
+          targetDoors={moveReader.targetDoors}
         />
       )}
 

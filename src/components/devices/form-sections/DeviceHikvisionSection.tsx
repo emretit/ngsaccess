@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useAction } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,8 @@ import {
   ListChecks,
   History,
   CreditCard,
+  Settings2,
+  BellRing,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { UseFormReturn } from "react-hook-form";
@@ -35,11 +37,115 @@ import { DeviceHikLocalBridgeSection } from "./DeviceHikLocalBridgeSection";
 /** Gateway heartbeat eşiği — bu süre içinde sinyal gelmemişse offline say. */
 const HIK_ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
+type CapabilityProbeResult = {
+  key: string;
+  label: string;
+  endpoint: string;
+  ok: boolean;
+  supported: boolean | null;
+  matchedField?: string;
+  error?: string;
+};
+
+type CapabilitySnapshot = {
+  version: 1;
+  updatedAt: number;
+  probes: CapabilityProbeResult[];
+};
+
+type DeviceEventCategory =
+  | "access"
+  | "alarm"
+  | "exception"
+  | "operation"
+  | "status"
+  | "unknown";
+type DeviceEventSeverity = "info" | "warning" | "critical";
+type BadgeVariant = "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info";
+
 interface DeviceHikvisionSectionProps {
   form: UseFormReturn<FormValues>;
   /** Edit mode'da set edilir; status badge + lifecycle aksiyonları görünür. */
   device?: ServerDevice | null;
   onUpdated?: () => void;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseCapabilitySnapshot(raw: string | undefined): CapabilitySnapshot | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) return null;
+    if (parsed.version !== 1 || typeof parsed.updatedAt !== "number") return null;
+    if (!Array.isArray(parsed.probes)) return null;
+    const probes: CapabilityProbeResult[] = [];
+    for (const item of parsed.probes) {
+      if (!isRecord(item)) continue;
+      if (
+        typeof item.key !== "string" ||
+        typeof item.label !== "string" ||
+        typeof item.endpoint !== "string" ||
+        typeof item.ok !== "boolean"
+      ) {
+        continue;
+      }
+      const supported =
+        typeof item.supported === "boolean" || item.supported === null
+          ? item.supported
+          : null;
+      probes.push({
+        key: item.key,
+        label: item.label,
+        endpoint: item.endpoint,
+        ok: item.ok,
+        supported,
+        matchedField: typeof item.matchedField === "string" ? item.matchedField : undefined,
+        error: typeof item.error === "string" ? item.error : undefined,
+      });
+    }
+    return { version: 1, updatedAt: parsed.updatedAt, probes };
+  } catch {
+    return null;
+  }
+}
+
+function deviceEventCategoryLabel(category: DeviceEventCategory): string {
+  switch (category) {
+    case "access":
+      return "Geçiş";
+    case "alarm":
+      return "Alarm";
+    case "exception":
+      return "İstisna";
+    case "operation":
+      return "Operasyon";
+    case "status":
+      return "Durum";
+    case "unknown":
+      return "Bilinmiyor";
+  }
+}
+
+function deviceEventBadgeVariant(
+  category: DeviceEventCategory,
+  severity: DeviceEventSeverity,
+): BadgeVariant {
+  if (severity === "critical") return "destructive";
+  if (category === "alarm" || category === "exception" || severity === "warning") {
+    return "warning";
+  }
+  if (category === "operation") return "info";
+  if (category === "status" || category === "unknown") return "outline";
+  return "secondary";
+}
+
+function formatEventTime(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString("tr-TR");
 }
 
 export function DeviceHikvisionSection({
@@ -55,8 +161,12 @@ export function DeviceHikvisionSection({
   const reconcile = useAction(api.actions.hikGatewayDevice.reconcileDevice);
   const backfill = useAction(api.actions.hikGatewayDevice.backfillDeviceEvents);
   const captureCard = useAction(api.actions.hikGatewayDevice.captureCardFromDevice);
+  const fetchCapabilities = useAction(api.actions.hikGatewayDevice.fetchDeviceCapabilities);
 
   const [busy, setBusy] = useState<string | null>(null);
+  const [capabilitySnapshot, setCapabilitySnapshot] = useState<CapabilitySnapshot | null>(() =>
+    parseCapabilitySnapshot(device?.hikCapabilitiesSnapshot)
+  );
 
   // Gelişmiş aksiyon sonuç state'leri
   const [workStatus, setWorkStatus] = useState<{
@@ -91,6 +201,14 @@ export function DeviceHikvisionSection({
   const transport = form.watch("hik_transport");
   const isLocalBridge = transport === "localBridge";
   const isGateway = transport === "gateway";
+  const recentDeviceEvents = useQuery(
+    api.deviceEvents.listForDevice,
+    device?._id && isGateway ? { deviceId: device._id, limit: 8 } : "skip",
+  );
+
+  useEffect(() => {
+    setCapabilitySnapshot(parseCapabilitySnapshot(device?.hikCapabilitiesSnapshot));
+  }, [device?.hikCapabilitiesSnapshot]);
 
   useEffect(() => {
     // Heartbeat tazeliği yalnız gateway online/offline rozeti için gerekli; localBridge'de
@@ -237,6 +355,25 @@ export function DeviceHikvisionSection({
     }
   };
 
+  const handleFetchCapabilities = async () => {
+    if (!device) return;
+    setBusy("capabilities");
+    try {
+      const result = await fetchCapabilities({ deviceId: device._id });
+      if (result.ok && result.snapshot) {
+        setCapabilitySnapshot(result.snapshot);
+        const supported = result.snapshot.probes.filter((p) => p.supported === true).length;
+        const failed = result.snapshot.probes.filter((p) => !p.ok).length;
+        toast.success(`Özellikler tarandı: ${supported} destekli, ${failed} hata`);
+        onUpdated?.();
+      } else {
+        toast.error(`Özellik taraması başarısız: ${result.error ?? "?"}`);
+      }
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const renderStatusBadge = () => {
     if (!device) return null;
     if (isLocalBridge) return <Badge variant="outline">Yerel Bridge</Badge>;
@@ -254,6 +391,15 @@ export function DeviceHikvisionSection({
       </Badge>
     );
   };
+
+  const capabilityCounts = capabilitySnapshot
+    ? {
+        supported: capabilitySnapshot.probes.filter((p) => p.supported === true).length,
+        unsupported: capabilitySnapshot.probes.filter((p) => p.supported === false).length,
+        unknown: capabilitySnapshot.probes.filter((p) => p.ok && p.supported === null).length,
+        failed: capabilitySnapshot.probes.filter((p) => !p.ok).length,
+      }
+    : null;
 
   return (
     <div className="space-y-3 border-t pt-4">
@@ -490,7 +636,83 @@ export function DeviceHikvisionSection({
                   )}
                   Kart Oku
                 </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleFetchCapabilities}
+                  disabled={busy !== null}
+                >
+                  {busy === "capabilities" ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Settings2 className="w-4 h-4 mr-2" />
+                  )}
+                  Özellikleri Tara
+                </Button>
               </div>
+
+              {capabilitySnapshot && capabilityCounts && (
+                <div className="rounded-md border bg-muted/40 p-3 space-y-3 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-medium text-muted-foreground">Hikvision Özellikleri</p>
+                    <span className="text-muted-foreground">
+                      {new Date(capabilitySnapshot.updatedAt).toLocaleString("tr-TR")}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div>
+                      <p className="text-muted-foreground">Destekli</p>
+                      <p className="font-mono text-sm">{capabilityCounts.supported}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Desteksiz</p>
+                      <p className="font-mono text-sm">{capabilityCounts.unsupported}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Belirsiz</p>
+                      <p className="font-mono text-sm">{capabilityCounts.unknown}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Hata</p>
+                      <p className="font-mono text-sm">{capabilityCounts.failed}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {capabilitySnapshot.probes.slice(0, 12).map((probe) => (
+                      <div
+                        key={probe.key}
+                        className="flex items-center justify-between gap-2 rounded border bg-background/60 px-2 py-1"
+                        title={probe.error ?? probe.endpoint}
+                      >
+                        <span className="truncate">{probe.label}</span>
+                        <Badge
+                          variant={
+                            probe.supported === true
+                              ? "default"
+                              : probe.supported === false || !probe.ok
+                                ? "destructive"
+                                : "outline"
+                          }
+                          className="shrink-0"
+                        >
+                          {probe.supported === true
+                            ? "Var"
+                            : probe.supported === false || !probe.ok
+                              ? "Yok"
+                              : "Belirsiz"}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                  {capabilitySnapshot.probes.length > 12 && (
+                    <p className="text-muted-foreground">
+                      +{capabilitySnapshot.probes.length - 12} özellik daha snapshot içinde saklandı.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Çalışma Durumu Paneli */}
               {workStatus && (
@@ -525,6 +747,66 @@ export function DeviceHikvisionSection({
                   </div>
                 </div>
               )}
+
+              {/* Son Cihaz Olayları */}
+              <div className="rounded-md border bg-muted/40 p-3 space-y-2 text-xs">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                    <BellRing className="h-3.5 w-3.5" />
+                    Son Cihaz Olayları
+                  </p>
+                  {recentDeviceEvents && (
+                    <Badge variant="secondary" className="shrink-0">
+                      {recentDeviceEvents.length}
+                    </Badge>
+                  )}
+                </div>
+
+                {recentDeviceEvents === undefined ? (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Yükleniyor
+                  </div>
+                ) : recentDeviceEvents.length === 0 ? (
+                  <p className="text-muted-foreground">Henüz cihaz olayı yok.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {recentDeviceEvents.map((event) => (
+                      <div
+                        key={event._id}
+                        className="rounded border bg-background/70 px-2.5 py-2"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <Badge
+                              variant={deviceEventBadgeVariant(
+                                event.category,
+                                event.severity,
+                              )}
+                              className="shrink-0"
+                            >
+                              {deviceEventCategoryLabel(event.category)}
+                            </Badge>
+                            <span className="truncate font-medium">{event.label}</span>
+                          </div>
+                          <span className="shrink-0 text-muted-foreground">
+                            {formatEventTime(event.eventTime)}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] text-muted-foreground">
+                          {event.major !== undefined && <span>major:{event.major}</span>}
+                          {event.minor !== undefined && <span>minor:{event.minor}</span>}
+                          {event.hikSerialNo !== undefined && (
+                            <span>serial:{event.hikSerialNo}</span>
+                          )}
+                          {event.hikEventState && <span>state:{event.hikEventState}</span>}
+                          {event.cardNo && <span>card:{event.cardNo}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Eşitlik Kontrolü Paneli */}
               {reconcileResult && (

@@ -16,6 +16,7 @@ import {
   purgeDeviceCascade,
   provisionPanelZoneAndDoors,
   provisionHikDoorsAndReaders,
+  resolveOrCreateZone,
 } from "./lib/deviceHelpers";
 import { claimAdminDeviceCore } from "./lib/devicePool";
 import {
@@ -172,6 +173,7 @@ export const create = authedMutation({
     name: v.string(),
     projectId: v.optional(v.id("projects")),
     zoneId: v.optional(v.id("zones")),
+    newZoneName: v.optional(v.string()),
     doorId: v.optional(v.id("doors")),
     doorCount: v.optional(v.number()),
     deviceType: v.optional(v.string()),
@@ -206,8 +208,22 @@ export const create = authedMutation({
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
     const now = new Date().toISOString();
+    const { newZoneName, ...deviceArgs } = args;
+    const zoneId =
+      args.zoneId || newZoneName?.trim()
+        ? await resolveOrCreateZone(ctx, {
+            projectId: args.projectId,
+            allowedProjectIds,
+            zoneId: args.zoneId,
+            newZoneName,
+            fallbackName: args.name,
+            description: args.description,
+            now,
+          })
+        : undefined;
     const deviceId = await ctx.db.insert("devices", {
-      ...args,
+      ...deviceArgs,
+      zoneId,
       isActive: args.isActive ?? true,
       status: args.status ?? "active",
       createdAt: now,
@@ -1154,6 +1170,21 @@ export const setHikWorkStatus = internalMutation({
   handler: async (ctx, args) => {
     await ctx.db.patch(args.deviceId, {
       hikWorkStatus: args.workStatus,
+      updatedAt: new Date().toISOString(),
+    });
+  },
+});
+
+export const setHikCapabilitiesSnapshot = internalMutation({
+  args: {
+    deviceId: v.id("devices"),
+    snapshot: v.string(),
+    updatedAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.deviceId, {
+      hikCapabilitiesSnapshot: args.snapshot,
+      hikCapabilitiesUpdatedAt: args.updatedAt,
       updatedAt: new Date().toISOString(),
     });
   },

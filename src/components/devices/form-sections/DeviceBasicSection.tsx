@@ -18,6 +18,42 @@ const DEVICE_TYPES = [
   "QR Kod Okuyucu"
 ] as const;
 
+export function DeviceTypeField({ form }: DeviceBasicSectionProps) {
+  return (
+    <FormField
+      control={form.control}
+      name="device_type"
+      render={({ field }) => {
+        // Kayıtlı tip standart listede yoksa (eski "Kapı Kontrolörü" vb.) onu da
+        // seçeneklere ekle — aksi halde düzenlemede Select boşalır ve değer kaybolur.
+        const options = field.value && !DEVICE_TYPES.includes(field.value as (typeof DEVICE_TYPES)[number])
+          ? [field.value, ...DEVICE_TYPES]
+          : DEVICE_TYPES;
+        return (
+        <FormItem>
+          <FormLabel>Cihaz Tipi</FormLabel>
+          <Select onValueChange={field.onChange} value={field.value}>
+            <FormControl>
+              <SelectTrigger>
+                <SelectValue placeholder="Cihaz tipini seçiniz" />
+              </SelectTrigger>
+            </FormControl>
+            <SelectContent>
+              {options.map(type => (
+                <SelectItem key={type} value={type}>
+                  {type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FormMessage />
+        </FormItem>
+        );
+      }}
+    />
+  );
+}
+
 export function DeviceBasicSection({ form }: DeviceBasicSectionProps) {
   // Hikvision'da model seçimi cihaz adından hemen sonra gelir — model kapı/okuyucu
   // sayısını belirlediği için ilk seçilmesi gerekir (hem yeni hem düzenleme).
@@ -53,38 +89,6 @@ export function DeviceBasicSection({ form }: DeviceBasicSectionProps) {
             <FormMessage />
           </FormItem>
         )}
-      />
-
-      <FormField
-        control={form.control}
-        name="device_type"
-        render={({ field }) => {
-          // Kayıtlı tip standart listede yoksa (eski "Kapı Kontrolörü" vb.) onu da
-          // seçeneklere ekle — aksi halde düzenlemede Select boşalır ve değer kaybolur.
-          const options = field.value && !DEVICE_TYPES.includes(field.value as (typeof DEVICE_TYPES)[number])
-            ? [field.value, ...DEVICE_TYPES]
-            : DEVICE_TYPES;
-          return (
-          <FormItem>
-            <FormLabel>Cihaz Tipi</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value}>
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Cihaz tipini seçiniz" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {options.map(type => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-          );
-        }}
       />
     </div>
   );

@@ -30,7 +30,7 @@ export function AiChatInput({
         onChange={(e) => onInputChange(e.target.value)}
         placeholder={isModelConnected 
           ? "PDKS hakkında sorunuzu yazın..." 
-          : "OpenAI API anahtarı gerekli..."}
+          : "OpenAI sunucu yapılandırması gerekli..."}
         disabled={isLoading}
         className="flex-1"
       />
@@ -48,7 +48,7 @@ export function AiChatInput({
         <TooltipContent side="top">
           {isModelConnected 
             ? "OpenAI modeline sorunuzu gönderin" 
-            : "API anahtarınızı ayarlamadan soru gönderemezsiniz"}
+            : "OPENAI_API_KEY sunucuda tanımlanmadan soru gönderemezsiniz"}
         </TooltipContent>
       </Tooltip>
       

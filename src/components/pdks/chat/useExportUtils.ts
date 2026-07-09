@@ -1,5 +1,3 @@
-import ExcelJS from "exceljs";
-import jsPDF from "jspdf";
 import { useToast } from "@/hooks/use-toast";
 import { MessageData } from './types';
 import { toLocalDateString } from "@/lib/date";
@@ -34,6 +32,7 @@ export function useExportUtils() {
     }
 
     try {
+      const { default: ExcelJS } = await import("exceljs");
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("PDKS Raporu");
       worksheet.addRow([...COL_HEADERS]);
@@ -74,7 +73,7 @@ export function useExportUtils() {
     }
   };
 
-  const handleExportPDF = (messageData: MessageData[]) => {
+  const handleExportPDF = async (messageData: MessageData[]) => {
     if (!messageData || !Array.isArray(messageData) || messageData.length === 0) {
       toast({
         title: "Dışa aktarılamadı",
@@ -85,6 +84,7 @@ export function useExportUtils() {
     }
 
     try {
+      const { default: jsPDF } = await import("jspdf");
       const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
 
       // Title

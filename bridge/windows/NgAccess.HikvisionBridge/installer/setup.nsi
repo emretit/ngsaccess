@@ -7,7 +7,7 @@ SetCompressor /SOLID lzma
 !define EXENAME  "ngsaccess-hikvision-bridge.exe"
 !define SVCNAME  "NgAccessHikvisionBridge"
 !define COMPANY  "NGS Access"
-!define VERSION  "1.0.0"
+!define VERSION  "1.0.3"
 !define UNINST   "Software\Microsoft\Windows\CurrentVersion\Uninstall\${SVCNAME}"
 
 Name "${APPNAME}"
@@ -62,6 +62,13 @@ Section "Install"
   WriteUninstaller "$INSTDIR\uninstall.exe"
   CreateShortcut "$SMPROGRAMS\${APPNAME}\Kaldir.lnk" "$INSTDIR\uninstall.exe"
 
+  ; Masaustu kisayollari
+  WriteINIStr "$DESKTOP\NGS Access.url" "InternetShortcut" "URL" "http://127.0.0.1:8787/"
+  WriteINIStr "$DESKTOP\Bridge Ayarlari.url" "InternetShortcut" "URL" "http://127.0.0.1:8787/__bridge"
+
+  ; Windows oturum acilinca arayuzu otomatik ac
+  WriteINIStr "$SMSTARTUP\NGS Access.url" "InternetShortcut" "URL" "http://127.0.0.1:8787/"
+
   ; Programlar ve Ozellikler (Apps & Features) kaydi
   WriteRegStr   HKLM "${UNINST}" "DisplayName"     "${APPNAME}"
   WriteRegStr   HKLM "${UNINST}" "DisplayVersion"  "${VERSION}"
@@ -79,5 +86,8 @@ Section "Uninstall"
   RMDir /r "$INSTDIR"
   Delete "$SMPROGRAMS\${APPNAME}\*.*"
   RMDir  "$SMPROGRAMS\${APPNAME}"
+  Delete "$DESKTOP\NGS Access.url"
+  Delete "$DESKTOP\Bridge Ayarlari.url"
+  Delete "$SMSTARTUP\NGS Access.url"
   DeleteRegKey HKLM "${UNINST}"
 SectionEnd

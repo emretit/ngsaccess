@@ -1,4 +1,4 @@
-import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { UseFormReturn } from "react-hook-form";
 import type { FormValues } from "../hooks/useDeviceFormSchema";
@@ -19,7 +19,6 @@ export function DeviceNameSection({ form }: DeviceNameSectionProps) {
           <FormControl>
             <Input placeholder="Örn. Ana Giriş Paneli" {...field} />
           </FormControl>
-          <FormDescription>Cihazın (panelin) adı. Bölge ayrı seçilir.</FormDescription>
           <FormMessage />
         </FormItem>
       )}

@@ -1,4 +1,4 @@
-import { query, mutation, internalMutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import {
@@ -7,7 +7,8 @@ import {
   employeeAuthedMutation,
 } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
-import { Doc } from "./_generated/dataModel";
+import type { Doc } from "./_generated/dataModel";
+import type { QueryCtx } from "./_generated/server";
 import {
   getEffectiveWorkSettings,
   getEffectiveOvertimeRates,
@@ -20,6 +21,10 @@ import {
 } from "./lib/shiftResolver";
 import { bucketWeeklyOvertime, type DayEntry } from "./lib/overtimeCalc";
 import { inferAccessStatus, inferDenialReason } from "./lib/hikEventCodes";
+import {
+  classifyHikEvent,
+  shouldCreateCardReadingForHikEvent,
+} from "./lib/hikEventCatalog";
 import { ideResultGranted } from "./lib/cardReaderParse";
 import { canEmployeeAccessDevice } from "./lib/accessDecision";
 import {
@@ -48,6 +53,83 @@ import {
   filterPdksTableRows,
 } from "./lib/pdksTable";
 import { computePdksChartData, emptyPdksChartData } from "./lib/pdksChart";
+
+type AuthedReadCtx = QueryCtx & { user: Doc<"users"> };
+
+const CARD_READING_LIST_SCAN_LIMIT = 5000;
+const CARD_READING_PAGE_SIZE_MAX = 200;
+
+function normalizePage(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) return 1;
+  return Math.max(1, Math.floor(value));
+}
+
+function normalizePageSize(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) return 100;
+  return Math.min(CARD_READING_PAGE_SIZE_MAX, Math.max(1, Math.floor(value)));
+}
+
+function dayBounds(date: string | undefined) {
+  if (!date) return null;
+  return {
+    startISO: `${date}T00:00:00.000`,
+    endISO: `${date}T23:59:59.999`,
+  };
+}
+
+async function loadScopedCardReadings(
+  ctx: AuthedReadCtx,
+  opts: {
+    limit: number;
+    startISO?: string;
+    endISO?: string;
+  },
+): Promise<Doc<"cardReadings">[]> {
+  const limit = Math.min(Math.max(1, opts.limit), CARD_READING_LIST_SCAN_LIMIT);
+  const range =
+    opts.startISO && opts.endISO
+      ? { startISO: opts.startISO, endISO: opts.endISO }
+      : null;
+  const allowedProjectIds = await getProjectIdsForUser(ctx);
+
+  if (ctx.user.role === "super_admin") {
+    const query =
+      range
+        ? ctx.db
+            .query("cardReadings")
+            .withIndex("by_access_time", (q) =>
+              q.gte("accessTime", range.startISO).lte("accessTime", range.endISO),
+            )
+        : ctx.db.query("cardReadings").withIndex("by_access_time");
+    return await query.order("desc").take(limit);
+  }
+
+  if (allowedProjectIds.length === 0) return [];
+  const perProjectLimit = Math.max(limit, Math.ceil(limit / allowedProjectIds.length));
+  const results = await Promise.all(
+    allowedProjectIds.map((pid) => {
+      const query =
+        range
+          ? ctx.db
+              .query("cardReadings")
+              .withIndex("by_project_access_time", (q) =>
+                q
+                  .eq("projectId", pid)
+                  .gte("accessTime", range.startISO)
+                  .lte("accessTime", range.endISO),
+              )
+          : ctx.db
+              .query("cardReadings")
+              .withIndex("by_project_access_time", (q) => q.eq("projectId", pid));
+      return query.order("desc").take(perProjectLimit);
+    }),
+  );
+
+  return results
+    .flat()
+    .sort((a, b) => new Date(b.accessTime).getTime() - new Date(a.accessTime).getTime())
+    .slice(0, limit);
+}
 
 /**
  * Ziyaretçi kayıt ekranı için: seçilen okuyucuda (device) okutulan en son BİLİNMEYEN
@@ -102,34 +184,18 @@ export const list = authedQuery({
     ),
   },
   handler: async (ctx, args) => {
-    const pageSize = args.pageSize ?? 100;
-    const page = args.page ?? 1;
-
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-
-    let readings;
-    if (args.isSuperAdmin && ctx.user.role === "super_admin") {
-      readings = await ctx.db
-        .query("cardReadings")
-        .withIndex("by_access_time")
-        .order("desc")
-        .collect();
-    } else if (allowedProjectIds.length > 0) {
-      const results = await Promise.all(
-        allowedProjectIds.map((pid) =>
-          ctx.db
-            .query("cardReadings")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .order("desc")
-            .collect()
-        )
-      );
-      readings = results.flat().sort(
-        (a, b) => new Date(b.accessTime).getTime() - new Date(a.accessTime).getTime()
-      );
-    } else {
-      return { readings: [], totalCount: 0 };
-    }
+    const pageSize = normalizePageSize(args.pageSize);
+    const page = normalizePage(args.page);
+    const bounds = dayBounds(args.dateFilter);
+    const scanLimit = Math.min(
+      CARD_READING_LIST_SCAN_LIMIT,
+      Math.max(page * pageSize * 3, pageSize),
+    );
+    let readings = await loadScopedCardReadings(ctx, {
+      limit: scanLimit,
+      startISO: bounds?.startISO,
+      endISO: bounds?.endISO,
+    });
 
     // Filters
     if (args.searchTerm) {
@@ -139,17 +205,6 @@ export const list = authedQuery({
           r.employeeName?.toLowerCase().includes(term) ||
           r.cardNo.toLowerCase().includes(term)
       );
-    }
-
-    if (args.dateFilter) {
-      const start = new Date(args.dateFilter);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(args.dateFilter);
-      end.setHours(23, 59, 59, 999);
-      readings = readings.filter((r) => {
-        const t = new Date(r.accessTime).getTime();
-        return t >= start.getTime() && t <= end.getTime();
-      });
     }
 
     if (args.accessFilter && args.accessFilter !== "all") {
@@ -167,40 +222,15 @@ export const list = authedQuery({
   },
 });
 
-export const getRecentByProjects = query({
+export const getRecentByProjects = authedQuery({
   args: {
     projectIds: v.optional(v.array(v.id("projects"))),
     isSuperAdmin: v.optional(v.boolean()),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 10;
-    let readings;
-
-    if (args.isSuperAdmin) {
-      readings = await ctx.db
-        .query("cardReadings")
-        .withIndex("by_access_time")
-        .order("desc")
-        .take(limit);
-    } else if (args.projectIds && args.projectIds.length > 0) {
-      const results = await Promise.all(
-        args.projectIds.map((pid) =>
-          ctx.db
-            .query("cardReadings")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .order("desc")
-            .take(limit)
-        )
-      );
-      readings = results
-        .flat()
-        .sort((a, b) => new Date(b.accessTime).getTime() - new Date(a.accessTime).getTime())
-        .slice(0, limit);
-    } else {
-      return [];
-    }
-
+    const limit = Math.min(Math.max(1, args.limit ?? 10), 100);
+    const readings = await loadScopedCardReadings(ctx, { limit });
     return await enrichWithDeviceName(ctx, readings);
   },
 });
@@ -732,29 +762,6 @@ export const getMonthlyPayrollSheet = authedQuery({
       year: args.year,
       month: args.month,
     };
-  },
-});
-
-export const insert = mutation({
-  args: {
-    projectId: v.optional(v.id("projects")),
-    deviceId: v.optional(v.id("devices")),
-    employeeId: v.optional(v.id("employees")),
-    cardNo: v.string(),
-    employeeName: v.optional(v.string()),
-    accessTime: v.string(),
-    accessStatus: v.optional(
-      v.union(v.literal("izin_verildi"), v.literal("reddedildi"))
-    ),
-    rawData: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const now = new Date().toISOString();
-    return await ctx.db.insert("cardReadings", {
-      ...args,
-      createdAt: now,
-      updatedAt: now,
-    });
   },
 });
 
@@ -1548,6 +1555,52 @@ export const backfillHikEventRow = internalMutation({
     ctx,
     args,
   ): Promise<{ inserted: boolean; reason?: string }> => {
+    // Device'ı al (projectId için).
+    const device = await ctx.db.get(args.deviceId);
+    if (!device) {
+      return { inserted: false, reason: "device-not-found" };
+    }
+
+    const cardNo = args.event.cardNo.trim();
+    const shouldCreateCardReading = shouldCreateCardReadingForHikEvent(
+      args.event.major,
+      args.event.minor,
+      cardNo.length > 0,
+    );
+
+    if (!shouldCreateCardReading) {
+      const existingEvent = await ctx.db
+        .query("deviceEvents")
+        .withIndex("by_device_and_hik_serial", (q) =>
+          q.eq("deviceId", args.deviceId).eq("hikSerialNo", args.event.serialNo),
+        )
+        .first();
+      if (existingEvent) {
+        return { inserted: false, reason: "duplicate" };
+      }
+
+      const event = classifyHikEvent(args.event.major, args.event.minor);
+      const rawData = JSON.stringify(args.event);
+      await ctx.db.insert("deviceEvents", {
+        projectId: device.projectId,
+        deviceId: args.deviceId,
+        source: "hikvision",
+        eventTime: args.event.time,
+        category: event.category,
+        severity: event.severity,
+        label: event.label,
+        major: args.event.major,
+        minor: args.event.minor,
+        cardNo: cardNo || undefined,
+        rawData: rawData.length > 10000 ? rawData.slice(0, 10000) : rawData,
+        hikDevIndex: device.hikDevIndex,
+        hikSerialNo: args.event.serialNo,
+        createdAt: args.event.time,
+        updatedAt: args.event.time,
+      });
+      return { inserted: true, reason: "device-event" };
+    }
+
     // Dedup: (deviceId, serialNo) çifti zaten kayıtlıysa atla.
     const existing = await ctx.db
       .query("cardReadings")
@@ -1557,12 +1610,6 @@ export const backfillHikEventRow = internalMutation({
       .first();
     if (existing) {
       return { inserted: false, reason: "duplicate" };
-    }
-
-    // Device'ı al (projectId için).
-    const device = await ctx.db.get(args.deviceId);
-    if (!device) {
-      return { inserted: false, reason: "device-not-found" };
     }
 
     const accessStatus: "izin_verildi" | "reddedildi" =
@@ -1575,7 +1622,7 @@ export const backfillHikEventRow = internalMutation({
     // cardNo'dan çalışan ara (by_card index — canlı branch ile aynı yol)
     const employee = await ctx.db
       .query("employees")
-      .withIndex("by_card", (q) => q.eq("cardNumber", args.event.cardNo))
+      .withIndex("by_card", (q) => q.eq("cardNumber", cardNo))
       .first();
 
     // projectId: employee'nin projesi > cihazın projesi
@@ -1589,7 +1636,7 @@ export const backfillHikEventRow = internalMutation({
       projectId,
       deviceId: args.deviceId,
       employeeId: employee?._id,
-      cardNo: args.event.cardNo,
+      cardNo,
       employeeName,
       // accessTime = event'in cihaz zamanı (Date.now() DEĞİL — backfill)
       accessTime: args.event.time,

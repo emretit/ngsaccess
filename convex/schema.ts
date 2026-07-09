@@ -250,6 +250,12 @@ export default defineSchema({
     // Hikvision fiziksel okuyucu index'i — kapı N için entry=2N-1, exit=2N.
     // Şu an sadece görsel/ileriye dönük; izin kapı bazlı olduğundan panele yazılmaz.
     hikReaderNo: v.optional(v.number()),
+    hikVerifyMode: v.optional(v.string()),
+    hikCardReaderName: v.optional(v.string()),
+    hikCardReaderPlanTemplateNo: v.optional(v.number()),
+    hikCardReaderAntiSneakEnabled: v.optional(v.boolean()),
+    hikLastCfgSnapshot: v.optional(v.string()),
+    hikLastCfgAt: v.optional(v.number()),
     // IDE Smart aktüatör index'i (door.ioId ile eşlenir) — son okuma çözümünde kullanılır.
     ioId: v.optional(v.number()),
     status: v.optional(v.string()), // "active" | "inactive"
@@ -329,6 +335,10 @@ export default defineSchema({
         raw: v.optional(v.string()),
       })
     ),
+    // Hikvision capability snapshot. Dynamic firmware/model response'lari string JSON
+    // olarak saklanir; parsed summary action/UI tarafinda type guard ile okunur.
+    hikCapabilitiesSnapshot: v.optional(v.string()),
+    hikCapabilitiesUpdatedAt: v.optional(v.number()),
     apiToken: v.optional(v.string()),
     apiTokenCreatedAt: v.optional(v.string()),
     // adminDevices geri bağlantısı — claim ile oluşturulur, release ile temizlenir.
@@ -459,9 +469,58 @@ export default defineSchema({
     .index("by_device", ["deviceId"])
     .index("by_employee", ["employeeId"])
     .index("by_access_time", ["accessTime"])
+    .index("by_project_access_time", ["projectId", "accessTime"])
+    .index("by_project_status_time", ["projectId", "accessStatus", "accessTime"])
+    .index("by_status_time", ["accessStatus", "accessTime"])
     .index("by_employee_device_time", ["employeeId", "deviceId", "accessTime"])
     .index("by_device_io_time", ["deviceId", "ideIoId", "accessTime"])
     .index("by_device_hik_serial", ["deviceId", "hikSerialNo"]),
+
+  // Hikvision access dışı olaylar: alarm, exception, operation, status.
+  // PDKS hesaplarını şişirmemek için cardReadings'ten ayrı tutulur.
+  deviceEvents: defineTable({
+    projectId: v.optional(v.id("projects")),
+    deviceId: v.optional(v.id("devices")),
+    source: v.union(
+      v.literal("hikvision"),
+      v.literal("ide_smart"),
+      v.literal("system"),
+    ),
+    eventTime: v.string(),
+    category: v.union(
+      v.literal("access"),
+      v.literal("alarm"),
+      v.literal("exception"),
+      v.literal("operation"),
+      v.literal("status"),
+      v.literal("unknown"),
+    ),
+    severity: v.union(
+      v.literal("info"),
+      v.literal("warning"),
+      v.literal("critical"),
+    ),
+    label: v.string(),
+    major: v.optional(v.number()),
+    minor: v.optional(v.number()),
+    cardNo: v.optional(v.string()),
+    rawData: v.optional(v.string()),
+    deviceSerial: v.optional(v.string()),
+    deviceIp: v.optional(v.string()),
+    hikDevIndex: v.optional(v.string()),
+    hikEhomeID: v.optional(v.string()),
+    hikSerialNo: v.optional(v.number()),
+    hikFrontSerialNo: v.optional(v.number()),
+    hikEventState: v.optional(v.string()),
+    ideUuid: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_device", ["deviceId"])
+    .index("by_project_and_event_time", ["projectId", "eventTime"])
+    .index("by_device_and_event_time", ["deviceId", "eventTime"])
+    .index("by_device_and_hik_serial", ["deviceId", "hikSerialNo"]),
 
   // Cihaz offline iken biriken Convex -> cihaz komutları kuyruğu.
   // Gateway cihazlarda worker failed kayıtları retry eder; localBridge cihazlarda

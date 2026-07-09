@@ -8,6 +8,9 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <AssemblyName>ngsaccess-hikvision-bridge</AssemblyName>
     <RootNamespace>NgAccess.HikvisionBridge</RootNamespace>
+    <Version>1.0.3</Version>
+    <AssemblyVersion>1.0.3.0</AssemblyVersion>
+    <FileVersion>1.0.3.0</FileVersion>
     <!-- Content öğeleri aşağıda açıkça listeleniyor; SDK'nın varsayılan appsettings.json
          include'ı ile çakışmasın (NETSDK1022). -->
     <EnableDefaultContentItems>false</EnableDefaultContentItems>

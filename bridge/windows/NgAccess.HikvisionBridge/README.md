@@ -55,7 +55,7 @@ reference ports (open.hikvision.com + JNA/C# implementations). Confirmed correct
 login (`NET_DVR_USER_LOGIN_INFO`), door-open (`NET_DVR_ControlGateway`, door 1..4 /
 cmd 1), alarm-channel setup, `NET_DVR_CARD_CFG_COND`, `NET_DVR_VALID_PERIOD_CFG`,
 `NET_DVR_ACS_EVENT_INFO`, all 7 function signatures, and the card-write semantics
-(`dwModifyParamType` mask `0x95F`, `byDoorRight`/`wCardRightPlan`/`byBelongGroup`).
+(`dwModifyParamType` mask `0x3FF`, `byDoorRight`/`wCardRightPlan`/`byBelongGroup`).
 
 **`NET_DVR_IPADDR` — RESOLVED.** Earlier notes (and the PDF §4.1.56 table) claimed
 `szIPv6` is 256 bytes. That is **misleading**: the real type is a *sequential struct*
@@ -140,3 +140,24 @@ Uninstall:
 ```powershell
 .\Scripts\uninstall-service.ps1
 ```
+
+Installer builds (`NgAccessHikvisionBridge-Setup.exe`) install the bridge as a Windows
+service with `StartupType=Automatic`, so after a PC restart there is nothing to run
+manually. The service starts in the background and keeps polling Convex.
+
+Windows services cannot open a browser window on the user's desktop. To make the UI
+visible after a reboot, the installer also creates a Startup shortcut: when a Windows
+user signs in, `http://127.0.0.1:8787/` opens in the default browser.
+
+The installer creates these shortcuts:
+
+```text
+Desktop\NGS Access              → http://127.0.0.1:8787/
+Desktop\Bridge Ayarları         → http://127.0.0.1:8787/__bridge
+Startup\NGS Access              → http://127.0.0.1:8787/
+Start Menu\NGS Access Hikvision Bridge\...
+```
+
+If you deploy the raw `publish\` folder instead of the installer, run
+`Scripts\install-service.ps1` once as Administrator; raw copy mode does not create
+desktop shortcuts by itself.

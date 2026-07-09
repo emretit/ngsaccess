@@ -31,7 +31,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const PUBLIC_PATHS = [
   '/', '/login', '/register', '/verify-email', '/demo-request',
-  '/user-setup', '/admin-setup', '/employee-setup', '/system-admin',
+  '/check-in', '/user-setup', '/admin-setup', '/employee-setup', '/system-admin',
 ];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {

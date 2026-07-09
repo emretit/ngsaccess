@@ -90,10 +90,15 @@ export function useDeviceFormSubmission({
           values.zone_id && values.zone_id !== NEW_ZONE_VALUE
             ? (values.zone_id as Id<"zones">)
             : undefined;
+        const newZoneName =
+          values.zone_id === NEW_ZONE_VALUE
+            ? values.new_zone_name?.trim() || undefined
+            : undefined;
         const { deviceId: newId } = await createHikDevice({
           name: values.name,
           projectId: currentProjectId ?? undefined,
           zoneId: pickedZone,
+          newZoneName,
           deviceType: values.device_type,
           hikTransport: values.hik_transport,
           // "Diğer (manuel)" gerçek bir model değil → hikModel boş bırakılır.
@@ -225,7 +230,14 @@ export function useDeviceFormSubmission({
                 deviceSerial: values.device_serial || undefined,
                 deviceType: values.device_type,
                 projectId: currentProjectId ?? undefined,
-                zoneId: (values.zone_id || undefined) as Id<"zones"> | undefined,
+                zoneId:
+                  values.zone_id && values.zone_id !== NEW_ZONE_VALUE
+                    ? (values.zone_id as Id<"zones">)
+                    : undefined,
+                newZoneName:
+                  values.zone_id === NEW_ZONE_VALUE
+                    ? values.new_zone_name?.trim() || undefined
+                    : undefined,
                 doorId: (values.door_id || undefined) as Id<"doors"> | undefined,
                 doorCount: values.door_count || undefined,
                 accessDirection: values.access_direction as "entry" | "exit" | "both",
