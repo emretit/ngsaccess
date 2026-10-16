@@ -12,18 +12,22 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Trash2 } from "lucide-react";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { notify } from "@/lib/notify";
 import { AdminDeviceDialog } from "@/components/admin/AdminDeviceDialog";
 import { computeDeviceStatus } from "@/lib/deviceStatus";
-import { toast } from "@/hooks/use-toast";
+import { useNow } from "@/hooks/useNow";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { AdminDataBoundary } from "./components/AdminDataBoundary";
 
 type AdminDevice = FunctionReturnType<typeof api.adminDevices.list>[number];
 
-const nowMs = Date.now();
-
-export function AdminDevicesPanel() {
+function AdminDevicesContent() {
+  const nowMs = useNow();
   // Hedef kapanış animasyonu boyunca korunur; diyalog yalnız deleteOpen ile kapanır.
   const [deleteDevice, setDeleteDevice] = useState<AdminDevice | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -33,19 +37,18 @@ export function AdminDevicesPanel() {
   const removeDevice = useMutation(api.adminDevices.remove);
   const backfill = useMutation(api.adminDevices.backfillExisting);
 
-  const handleBackfill = async () => {
-    try {
+  const { run: handleBackfill, pending: backfilling } = useAsyncAction(
+    async () => {
       const count = await backfill({});
-      if (count === 0) {
-        toast({ title: "Senkronize", description: "Tüm cihazlar zaten kayıtlı" });
-      } else {
-        toast({ title: "Başarılı", description: `${count} cihaz senkronize edildi` });
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Senkronizasyon başarısız";
-      toast({ title: "Hata", description: message, variant: "destructive" });
-    }
-  };
+      notify.success(
+        "Senkronize",
+        count === 0
+          ? "Tüm cihazlar zaten kayıtlı"
+          : `${count} cihaz senkronize edildi`,
+      );
+    },
+    { error: "Senkronizasyon başarısız" },
+  );
 
   const isLoading = adminDevices === undefined;
 
@@ -54,10 +57,16 @@ export function AdminDevicesPanel() {
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           Tüm kayıtlı fiziksel cihazlar. Projeye atamak için{" "}
-          <span className="font-medium">Cihazlar → Havuzdan Ekle</span>'yi kullanın.
+          <span className="font-medium">Cihazlar → Havuzdan Ekle</span>'yi
+          kullanın.
         </p>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={handleBackfill}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void handleBackfill()}
+            disabled={backfilling}
+          >
             <RefreshCw className="h-4 w-4 mr-2" />
             Senkronize Et
           </Button>
@@ -69,13 +78,12 @@ export function AdminDevicesPanel() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-        </div>
+        <SectionSkeleton label="Cihazlar yükleniyor" rows={5} />
       ) : adminDevices.length === 0 ? (
-        <div className="rounded-lg border border-dashed py-12 text-center text-muted-foreground text-sm">
-          Envanterde kayıtlı cihaz yok. "Cihaz Ekle" ile UUID girin.
-        </div>
+        <EmptyState
+          title="Envanterde kayıtlı cihaz yok"
+          description="Cihaz Ekle ile panel UUID'sini kaydedin."
+        />
       ) : (
         <div className="rounded-md border">
           <Table>
@@ -92,7 +100,8 @@ export function AdminDevicesPanel() {
             </TableHeader>
             <TableBody>
               {adminDevices.map((device: AdminDevice) => {
-                const online = computeDeviceStatus(device.lastSeen, nowMs) === "online";
+                const online =
+                  computeDeviceStatus(device.lastSeen, nowMs) === "online";
                 const isAssigned = !!device.assignedDeviceId;
                 return (
                   <TableRow
@@ -113,12 +122,15 @@ export function AdminDevicesPanel() {
                       {device.ideDoorCount ?? 4}
                     </TableCell>
                     <TableCell>
-                      <span className="flex items-center gap-1.5 text-xs">
-                        <span
-                          className={`h-2 w-2 rounded-full ${online ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
-                        />
-                        {online ? "Online" : "Offline"}
-                      </span>
+                      <StatusBadge tone={online ? "success" : "neutral"}>
+                        {online ? "Çevrimiçi" : "Çevrimdışı"}
+                      </StatusBadge>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {device.lastSeen &&
+                        Number.isFinite(Date.parse(device.lastSeen))
+                          ? `Son görülme ${Math.max(0, Math.floor((nowMs - Date.parse(device.lastSeen)) / 60_000))} dk önce`
+                          : "Henüz görülmedi"}
+                      </p>
                     </TableCell>
                     <TableCell>
                       {isAssigned ? (
@@ -135,7 +147,11 @@ export function AdminDevicesPanel() {
                         variant="ghost"
                         className="h-7 w-7 text-destructive hover:text-destructive"
                         aria-label={`${device.name} cihazını envanterden kaldır`}
-                        title={isAssigned ? "Projeden çıkar ve envanterden kaldır" : "Envanterden kaldır"}
+                        title={
+                          isAssigned
+                            ? "Projeden çıkar ve envanterden kaldır"
+                            : "Envanterden kaldır"
+                        }
                         onClick={(e) => {
                           e.stopPropagation();
                           setDeleteDevice(device);
@@ -158,9 +174,15 @@ export function AdminDevicesPanel() {
         onOpenChange={setDeleteOpen}
         title="Cihaz envanterden kaldırılsın mı?"
         objectName={deleteDevice?.name ?? "Cihaz"}
-        effects={deleteDevice?.assignedDeviceId
-          ? [`Cihaz ${deleteDevice.assignedProjectName ?? "atanmış olduğu proje"} kapsamından çıkarılır.`, "Kapıları silinir; kart okuma geçmişi korunur.", "Cihaz envanter kaydı kaldırılır."]
-          : ["Cihaz envanter kaydı kaldırılır."]}
+        effects={
+          deleteDevice?.assignedDeviceId
+            ? [
+                `Cihaz ${deleteDevice.assignedProjectName ?? "atanmış olduğu proje"} kapsamından çıkarılır.`,
+                "Kapıları silinir; kart okuma geçmişi korunur.",
+                "Cihaz envanter kaydı kaldırılır.",
+              ]
+            : ["Cihaz envanter kaydı kaldırılır."]
+        }
         confirmLabel="Envanterden kaldır"
         onConfirm={async () => {
           if (!deleteDevice) throw new Error("Kaldırılacak cihaz seçilmedi");
@@ -181,5 +203,13 @@ export function AdminDevicesPanel() {
         onSuccess={() => setEditDevice(null)}
       />
     </div>
+  );
+}
+
+export function AdminDevicesPanel() {
+  return (
+    <AdminDataBoundary label="Cihazlar">
+      <AdminDevicesContent />
+    </AdminDataBoundary>
   );
 }

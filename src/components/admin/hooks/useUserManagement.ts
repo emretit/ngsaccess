@@ -40,6 +40,6 @@ export const useUserManagement = () => {
     handleSaveUser, saving, editReady,
     handleDeleteUser: async (user: User) => { await deleteUser({ userId: user._id }); },
     resetForm: () => { setCurrentUser(null); setFormData({ email: "", role: "project_user", projectId, projectIds: [] }); },
-    loading: usersRaw === undefined, refetchUsers: () => {},
+    loading: permissions.admin && (usersRaw === undefined || projectsRaw === undefined),
   };
 };

@@ -10,6 +10,8 @@ import { DeleteUserDialog } from './components/DeleteUserDialog';
 import { useUserManagement } from './hooks/useUserManagement';
 import { Button } from '@/components/ui/button';
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { AdminDataBoundary } from "./components/AdminDataBoundary";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { api } from '../../../convex/_generated/api';
 import type { User } from './types/user-types';
@@ -91,11 +93,11 @@ const AdminUsersContent = () => {
           onCreateUser={handleCreateUser}
         />
 
-        <UserTable
+        {filteredUsers.length === 0 ? <EmptyState title={searchQuery ? "Aramaya uygun kullanıcı yok" : "Henüz kullanıcı yok"} description={searchQuery ? "E-posta aramasını değiştirin veya temizleyin." : "Kullanıcı ekleyerek bir davet gönderin."} /> : <UserTable
           users={filteredUsers}
           onEditUser={handleEditClick}
           onDeleteUser={handleDeleteClick}
-        />
+        />}
 
         <UserFormDialog
           isOpen={isDialogOpen}
@@ -147,5 +149,5 @@ const AdminUsersContent = () => {
 };
 
 export default function AdminUsersPanel() {
-  return <ProjectFilter requiredRole="admin"><AdminUsersContent /></ProjectFilter>;
+  return <ProjectFilter requiredRole="admin"><AdminDataBoundary label="Kullanıcılar"><AdminUsersContent /></AdminDataBoundary></ProjectFilter>;
 }

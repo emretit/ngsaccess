@@ -1,3 +1,4 @@
+import { deviceIdentityError } from "./lib/deviceIdentity";
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { superAdminQuery, superAdminMutation, adminQuery } from "./lib/customFunctions";
@@ -72,7 +73,8 @@ export const register = superAdminMutation({
   returns: v.id("adminDevices"),
   handler: async (ctx, args) => {
     const ideUuid = args.ideUuid.trim();
-    if (!ideUuid) throw new Error("UUID gerekli");
+    const identityError = deviceIdentityError(ideUuid, args.brand);
+    if (identityError) throw new Error(identityError);
 
     const existing = await ctx.db
       .query("adminDevices")

@@ -1,0 +1,80 @@
+import { trDayRangeISO } from "./trDate";
+
+export const AUDIT_TARGET_LABELS: Record<string, string> = {
+  pdksRecords: "PDKS Kaydı",
+  holidays: "Tatil",
+  overtimeRates: "Mesai Oranı",
+  employees: "Çalışan",
+  employeeConsents: "Çalışan İzni / Ziyaretçi Onayı",
+};
+
+export function auditDateRange(startDate?: string, endDate?: string) {
+  for (const date of [startDate, endDate]) {
+    if (!date) continue;
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+      Number.isNaN(Date.parse(`${date}T00:00:00Z`)) ||
+      new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) !== date
+    ) {
+      throw new Error("Geçerli bir tarih girin");
+    }
+  }
+  if (startDate && endDate && startDate > endDate)
+    throw new Error("Başlangıç tarihi bitiş tarihinden sonra olamaz");
+  const range = trDayRangeISO(
+    startDate || "0001-01-01",
+    endDate || "9999-12-31",
+  );
+  return {
+    startTimestamp: Date.parse(range.startISO),
+    endTimestamp: Date.parse(range.endISO),
+  };
+}
+
+export function auditIndex(
+  projectId?: string,
+  targetTable?: string,
+  userId?: string,
+) {
+  if (projectId)
+    return targetTable
+      ? "by_project_table_timestamp"
+      : userId
+        ? "by_project_user_timestamp"
+        : "by_project_timestamp";
+  return targetTable
+    ? "by_table_timestamp"
+    : userId
+      ? "by_user_timestamp"
+      : "by_timestamp";
+}
+
+export function auditPageMatches(
+  row: {
+    userId?: string;
+    action: string;
+    targetTable: string;
+    targetId: string;
+    userName?: string;
+    note?: string;
+    oldValue?: unknown;
+    newValue?: unknown;
+  },
+  filters: { userId?: string; action?: string; search?: string },
+) {
+  if (filters.userId && row.userId !== filters.userId) return false;
+  if (filters.action && row.action !== filters.action) return false;
+  const search = filters.search?.trim().toLocaleLowerCase("tr-TR");
+  return (
+    !search ||
+    [
+      row.targetId,
+      row.targetTable,
+      AUDIT_TARGET_LABELS[row.targetTable],
+      row.userName,
+      row.note,
+      JSON.stringify(row.oldValue),
+      JSON.stringify(row.newValue),
+    ].some((value) => value?.toLocaleLowerCase("tr-TR").includes(search))
+  );
+}

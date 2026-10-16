@@ -1,3 +1,5 @@
+import { AdminDataBoundary } from '@/components/admin/components/AdminDataBoundary';
+import { SectionSkeleton } from '@/components/shared/SectionSkeleton';
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { Card, CardContent } from '@/components/ui/card';
@@ -6,7 +8,7 @@ import AdminProjectsPanel from '@/components/admin/AdminProjectsPanel';
 import { AdminDevicesPanel } from '@/components/admin/AdminDevicesPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-export function AdminDashboard() {
+function AdminDashboardContent() {
   const allProjects = useQuery(api.projects.list);
   const allUsers = useQuery(api.users.list);
 
@@ -24,7 +26,7 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-3">
+      {allProjects === undefined || allUsers === undefined ? <SectionSkeleton label="Yönetim özeti yükleniyor" rows={3} /> : <div className="grid gap-3 sm:grid-cols-3">
         {stats.map(({ label, value, sub, icon: Icon }) => (
           <Card key={label}>
             <CardContent className="flex items-center justify-between p-4">
@@ -37,7 +39,7 @@ export function AdminDashboard() {
             </CardContent>
           </Card>
         ))}
-      </div>
+      </div>}
 
       <Tabs defaultValue="projects" className="w-full">
         <TabsList>
@@ -53,4 +55,8 @@ export function AdminDashboard() {
       </Tabs>
     </div>
   );
+}
+
+export function AdminDashboard() {
+  return <AdminDataBoundary label="Yönetim özeti"><AdminDashboardContent /></AdminDataBoundary>;
 }

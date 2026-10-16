@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { adminQuery } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
+import { paginationOptsValidator } from "convex/server";
+import { resolveProjectScope } from "./lib/projectScope";
+import { AUDIT_TARGET_LABELS, auditDateRange, auditPageMatches, auditIndex } from "./lib/auditLogQuery";
 
 interface PdksAuditPayload {
   date?: string;
@@ -72,64 +74,60 @@ export const getPdksAuditForEmployee = adminQuery({
 export const list = adminQuery({
   args: {
     projectId: v.optional(v.id("projects")),
+    allProjects: v.optional(v.boolean()),
     targetTable: v.optional(v.string()),
     userId: v.optional(v.id("users")),
-    startTimestamp: v.optional(v.number()),
-    endTimestamp: v.optional(v.number()),
-    limit: v.optional(v.number()),
+    action: v.optional(v.union(v.literal("create"), v.literal("update"), v.literal("delete"))),
+    search: v.optional(v.string()),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+    paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 200;
-    const isSuperAdmin = ctx.user.role === "super_admin";
-
-    if (args.projectId !== undefined) {
-      if (!isSuperAdmin) {
-        const allowedProjectIds = await getProjectIdsForUser(ctx);
-        if (!allowedProjectIds.some((id) => id === args.projectId)) {
-          throw new Error("Bu projeye erişim yetkiniz yok");
-        }
-      }
-    } else if (!isSuperAdmin) {
-      throw new Error("Tüm projeler görünümü süper admin gerektirir");
-    }
-
-    let rows;
-    if (args.userId) {
-      rows = await ctx.db
-        .query("auditLog")
-        .withIndex("by_user_timestamp", (q) => q.eq("userId", args.userId))
-        .order("desc")
-        .take(limit);
-    } else if (args.projectId !== undefined) {
-      rows = await ctx.db
-        .query("auditLog")
-        .withIndex("by_project_timestamp", (q) =>
-          q.eq("projectId", args.projectId)
-        )
-        .order("desc")
-        .take(limit);
-    } else {
-      rows = await ctx.db.query("auditLog").order("desc").take(limit);
-    }
-
-    if (args.targetTable) {
-      rows = rows.filter((r) => r.targetTable === args.targetTable);
-    }
-    if (args.startTimestamp !== undefined) {
-      rows = rows.filter((r) => r.timestamp >= args.startTimestamp!);
-    }
-    if (args.endTimestamp !== undefined) {
-      rows = rows.filter((r) => r.timestamp <= args.endTimestamp!);
-    }
-
-    return rows;
+    if (args.allProjects && ctx.user.role !== "super_admin") throw new Error("Tüm projeler görünümü süper admin gerektirir; bir proje seçin");
+    if (!args.allProjects && !args.projectId) throw new Error("Denetim kaydı için bir proje seçin");
+    const scope = await resolveProjectScope(ctx, args.allProjects ? undefined : args.projectId);
+    const projectId = args.allProjects ? undefined : scope[0];
+    const { startTimestamp: start, endTimestamp: end } = auditDateRange(args.startDate, args.endDate);
+    const { targetTable, userId } = args;
+    const index = auditIndex(projectId, targetTable, userId);
+    const query = ctx.db.query("auditLog");
+    const indexed = projectId
+      ? index === "by_project_table_timestamp" && targetTable
+        ? query.withIndex("by_project_table_timestamp", q => q.eq("projectId", projectId).eq("targetTable", targetTable).gte("timestamp", start).lte("timestamp", end))
+        : index === "by_project_user_timestamp" && userId
+          ? query.withIndex("by_project_user_timestamp", q => q.eq("projectId", projectId).eq("userId", userId).gte("timestamp", start).lte("timestamp", end))
+          : query.withIndex("by_project_timestamp", q => q.eq("projectId", projectId).gte("timestamp", start).lte("timestamp", end))
+      : index === "by_table_timestamp" && targetTable
+        ? query.withIndex("by_table_timestamp", q => q.eq("targetTable", targetTable).gte("timestamp", start).lte("timestamp", end))
+        : index === "by_user_timestamp" && userId
+          ? query.withIndex("by_user_timestamp", q => q.eq("userId", userId).gte("timestamp", start).lte("timestamp", end))
+          : query.withIndex("by_timestamp", q => q.gte("timestamp", start).lte("timestamp", end));
+    const result = await indexed.order("desc").paginate(args.paginationOpts);
+    const userIds = [...new Set(result.page.map(row => row.userId).filter((id): id is NonNullable<typeof id> => id !== undefined))];
+    const users = await Promise.all(userIds.map(async id => [id, await ctx.db.get(id)] as const));
+    const names = new Map(users.map(([id, user]) => [id, user?.name ?? user?.email ?? "Bilinmeyen"]));
+    return { ...result, page: result.page.map(row => ({ ...row, userName: row.userId ? names.get(row.userId) : "Sistem" })).filter(row => auditPageMatches(row, args)) };
   },
 });
 
 export const distinctTargetTables = adminQuery({
   args: {},
-  handler: async (ctx) => {
-    const rows = await ctx.db.query("auditLog").take(500);
-    return Array.from(new Set(rows.map((r) => r.targetTable))).sort();
+  handler: async () => Object.keys(AUDIT_TARGET_LABELS),
+});
+
+export const filterUsers = adminQuery({
+  args: { projectId: v.optional(v.id("projects")), allProjects: v.optional(v.boolean()) },
+  handler: async (ctx, args) => {
+    if (args.allProjects && ctx.user.role === "super_admin") {
+      const users = await ctx.db.query("users").collect();
+      return users.map(user => ({ _id: user._id, name: user.name ?? user.email ?? "Bilinmeyen" }));
+    }
+    const projectId = args.projectId;
+    if (!projectId) return [];
+    await resolveProjectScope(ctx, projectId);
+    const members = await ctx.db.query("userProjects").withIndex("by_project", q => q.eq("projectId", projectId)).collect();
+    const users = await Promise.all([...new Set([...members.map(member => member.userId), ctx.user._id])].map(id => ctx.db.get(id)));
+    return users.filter((user): user is NonNullable<typeof user> => user !== null).map(user => ({ _id: user._id, name: user.name ?? user.email ?? "Bilinmeyen" }));
   },
 });

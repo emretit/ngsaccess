@@ -1,15 +1,29 @@
-import { capabilities } from "@/lib/capabilities";
-import { AccessDenied } from "@/components/shared/AccessDenied";
-import { Fragment, useMemo, useState } from "react";
-import { useQuery } from "convex/react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { Fragment, useState, useEffect, useRef } from "react";
+import { usePaginatedQuery, useQuery } from "convex/react";
+import type { FunctionArgs } from "convex/server";
+import { useSearchParams } from "react-router-dom";
 import { api } from "../../convex/_generated/api";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import type { Id } from "../../convex/_generated/dataModel";
+import {
+  AUDIT_TARGET_LABELS,
+  auditDateRange,
+} from "../../convex/lib/auditLogQuery";
+import { capabilities } from "@/lib/capabilities";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { DatePicker } from "@/components/ui/date-picker";
-import { parseDateString, formatDateString } from "@/lib/date";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
+import { AccessDenied } from "@/components/shared/AccessDenied";
+import { AdminDataBoundary } from "@/components/admin/components/AdminDataBoundary";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { DatePicker } from "@/components/ui/date-picker";
+import { parseDateString, formatDateString } from "@/lib/date";
 import {
   Table,
   TableBody,
@@ -25,236 +39,433 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
-import { ChevronDown, ChevronRight, FileText } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
-const ACTION_LABELS: Record<string, { label: string; cls: string }> = {
-  create: { label: "Oluştur", cls: "bg-green-100 text-green-800" },
-  update: { label: "Güncelle", cls: "bg-blue-100 text-blue-800" },
-  delete: { label: "Sil", cls: "bg-red-100 text-red-800" },
-};
+type AuditArgs = Omit<FunctionArgs<typeof api.auditLog.list>, "paginationOpts">;
+const actions = { create: "Oluştur", update: "Güncelle", delete: "Sil" };
+const timestampFormat = new Intl.DateTimeFormat("tr-TR", {
+  timeZone: "Europe/Istanbul",
+  dateStyle: "medium",
+  timeStyle: "medium",
+});
 
-const TABLE_LABELS: Record<string, string> = {
-  pdksRecords: "PDKS Kaydı",
-  holidays: "Tatil",
-  overtimeRates: "Mesai Oranı",
-  employees: "Çalışan",
-  workSettings: "Çalışma Ayarı",
-};
-
-function formatJson(value: unknown): string {
-  if (value === undefined || value === null) return "—";
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
-  }
-}
-
-export default function AuditLog() {
-  const { profile } = useAuth();
-  const { projectId, loading } = useActiveProject();
-  const isSuperAdmin = profile?.role === "super_admin";
-  const isAuthorized = capabilities(profile?.role).auditLog;
-
-  const [targetTable, setTargetTable] = useState<string>("all");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
-  const [showAllProjects, setShowAllProjects] = useState(false);
-
-  const startTimestamp = startDate
-    ? new Date(`${startDate}T00:00:00.000`).getTime()
-    : undefined;
-  const endTimestamp = endDate
-    ? new Date(`${endDate}T23:59:59.999`).getTime()
-    : undefined;
-
-  const effectiveProjectId = isSuperAdmin && showAllProjects ? undefined : projectId;
-
-  const rows = useQuery(
+function AuditRows({ args }: { args: AuditArgs }) {
+  const { results, status, loadMore } = usePaginatedQuery(
     api.auditLog.list,
-    loading || !isAuthorized
-      ? "skip"
-      : {
-          projectId: effectiveProjectId,
-          targetTable: targetTable === "all" ? undefined : targetTable,
-          startTimestamp,
-          endTimestamp,
-        }
+    args,
+    { initialNumItems: 50 },
   );
-  const tables = useQuery(api.auditLog.distinctTargetTables, isAuthorized ? {} : "skip");
-
-  const visibleRows = useMemo(() => rows ?? [], [rows]);
-
-  if (!isAuthorized) {
-    return <AccessDenied message="Denetim kaydını görüntüleme yetkiniz yok." />;
-  }
-
+  const autoLoads = useRef(0);
+  const lastAutoLoad = useRef<typeof loadMore | null>(null);
+  useEffect(() => {
+    if (results.length > 0) {
+      autoLoads.current = 0;
+      return;
+    }
+    if (status !== "CanLoadMore" || autoLoads.current >= 5 || lastAutoLoad.current === loadMore) return;
+    lastAutoLoad.current = loadMore;
+    autoLoads.current += 1;
+    loadMore(50);
+  }, [results.length, status, loadMore]);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const secondary = Boolean(
+    args.action || args.search || (args.targetTable && args.userId),
+  );
+  const filtered = Boolean(
+    args.targetTable ||
+    args.userId ||
+    args.action ||
+    args.search ||
+    args.startDate ||
+    args.endDate,
+  );
+  if (status === "LoadingFirstPage")
+    return <SectionSkeleton label="Denetim kayıtları yükleniyor" rows={5} />;
   return (
     <div className="space-y-3">
-      <div className="rounded-xl border bg-card shadow-xs p-4 md:p-6">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 mr-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <FileText className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold leading-tight">Denetim Kaydı</h2>
-              <p className="text-xs text-muted-foreground">
-                {visibleRows.length} kayıt gösteriliyor
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 ml-auto flex-wrap">
-            {isSuperAdmin && (
-              <label className="flex items-center gap-2 text-xs">
-                <Switch
-                  checked={showAllProjects}
-                  onCheckedChange={setShowAllProjects}
-                />
-                <span className="text-muted-foreground">Tüm projeler</span>
-              </label>
-            )}
-            <Select value={targetTable} onValueChange={setTargetTable}>
-              <SelectTrigger id="target" className="w-[160px] h-8 text-xs">
-                <SelectValue placeholder="Hedef Tablo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-xs">Tüm Tablolar</SelectItem>
-                {(tables ?? []).map((t) => (
-                  <SelectItem key={t} value={t} className="text-xs">
-                    {TABLE_LABELS[t] ?? t}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <DatePicker
-              date={parseDateString(startDate)}
-              onSelect={(d) => setStartDate(formatDateString(d))}
-              placeholder="Başlangıç"
-              className="w-[160px]"
-            />
-            <DatePicker
-              date={parseDateString(endDate)}
-              onSelect={(d) => setEndDate(formatDateString(d))}
-              placeholder="Bitiş"
-              className="w-[160px]"
-              minDate={parseDateString(startDate)}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setTargetTable("all");
-                setStartDate("");
-                setEndDate("");
-              }}
-              className="h-8 gap-1.5 text-xs"
-            >
-              Temizle
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-xl border bg-card shadow-xs overflow-hidden">
-        <Table>
+      <p className="text-xs text-muted-foreground">
+        Yüklenen {results.length} eşleşen kayıt ·{" "}
+        {status === "Exhausted"
+          ? "Kapsamın sonuna ulaşıldı"
+          : "Daha fazla kayıt var"}
+        {secondary &&
+          " · İşlem/metin ve birleşik kullanıcı filtresi yüklenen kayıtlarda uygulanır."}
+      </p>
+      {results.length === 0 ? (
+        <EmptyState
+          title={
+            status !== "Exhausted"
+              ? "Yüklenen kayıtlarda eşleşme yok — daha fazla yükle"
+              : filtered
+                ? "Filtrelere uygun kayıt yok"
+                : "Henüz denetim kaydı yok"
+          }
+          description={
+            status !== "Exhausted"
+              ? "Eski kayıtları aramak için daha fazla yükleyin."
+              : "Seçili proje kapsamındaki sonuçlar gösteriliyor."
+          }
+        />
+      ) : (
+        <div className="rounded-xl border bg-card overflow-x-auto">
+          <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10"></TableHead>
-                <TableHead>Zaman</TableHead>
+                <TableHead className="w-10" />
+                <TableHead>Zaman (TR saati)</TableHead>
                 <TableHead>Kullanıcı</TableHead>
-                <TableHead>Aksiyon</TableHead>
+                <TableHead>İşlem</TableHead>
                 <TableHead>Hedef</TableHead>
                 <TableHead>ID</TableHead>
                 <TableHead>Not</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {visibleRows.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="text-center text-muted-foreground py-8"
-                  >
-                    Kayıt bulunamadı
-                  </TableCell>
-                </TableRow>
-              ) : (
-                visibleRows.map((r) => {
-                  const expanded = expandedRow === r._id;
-                  const actionInfo = ACTION_LABELS[r.action] ?? {
-                    label: r.action,
-                    cls: "bg-gray-100",
-                  };
-                  return (
-                    <Fragment key={r._id}>
-                      <TableRow
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => setExpandedRow(expanded ? null : r._id)}
-                      >
-                        <TableCell>
+              {results.map((row) => {
+                const expanded = expandedRow === row._id;
+                return (
+                  <Fragment key={row._id}>
+                    <TableRow>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Kayıt detayını aç/kapat"
+                          aria-expanded={expanded}
+                          onClick={() =>
+                            setExpandedRow(expanded ? null : row._id)
+                          }
+                        >
                           {expanded ? (
                             <ChevronDown className="h-4 w-4" />
                           ) : (
                             <ChevronRight className="h-4 w-4" />
                           )}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">
-                          {format(new Date(r.timestamp), "dd MMM yyyy HH:mm:ss", {
-                            locale: tr,
-                          })}
-                        </TableCell>
-                        <TableCell>{r.userName ?? "—"}</TableCell>
-                        <TableCell>
-                          <Badge className={actionInfo.cls}>
-                            {actionInfo.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {TABLE_LABELS[r.targetTable] ?? r.targetTable}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground">
-                          {r.targetId.slice(0, 12)}…
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate">
-                          {r.note ?? ""}
+                        </Button>
+                      </TableCell>
+                      <TableCell className="text-xs whitespace-nowrap">
+                        {timestampFormat.format(row.timestamp)}
+                      </TableCell>
+                      <TableCell>{row.userName ?? "Bilinmeyen"}</TableCell>
+                      <TableCell>
+                        <StatusBadge
+                          tone={
+                            row.action === "delete"
+                              ? "danger"
+                              : row.action === "create"
+                                ? "success"
+                                : "info"
+                          }
+                        >
+                          {actions[row.action]}
+                        </StatusBadge>
+                      </TableCell>
+                      <TableCell>
+                        {AUDIT_TARGET_LABELS[row.targetTable] ??
+                          row.targetTable}
+                      </TableCell>
+                      <TableCell
+                        className="font-mono text-xs"
+                        title={row.targetId}
+                      >
+                        {row.targetId}
+                      </TableCell>
+                      <TableCell>{row.note ?? "—"}</TableCell>
+                    </TableRow>
+                    {expanded && (
+                      <TableRow>
+                        <TableCell colSpan={7}>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3">
+                            {[
+                              ["Eski değer", row.oldValue],
+                              ["Yeni değer", row.newValue],
+                            ].map(([label, value], index) => (
+                              <div key={index}>
+                                <h4 className="text-sm font-semibold mb-2">
+                                  {String(label)}
+                                </h4>
+                                <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-60">
+                                  {value == null
+                                    ? "—"
+                                    : JSON.stringify(value, null, 2)}
+                                </pre>
+                              </div>
+                            ))}
+                          </div>
                         </TableCell>
                       </TableRow>
-                      {expanded && (
-                        <TableRow>
-                          <TableCell colSpan={7} className="bg-muted/30">
-                            <div className="grid grid-cols-2 gap-4 p-4">
-                              <div>
-                                <h4 className="font-semibold mb-2 text-sm">
-                                  Eski Değer
-                                </h4>
-                                <pre className="text-xs bg-card p-3 rounded border overflow-auto max-h-60">
-                                  {formatJson(r.oldValue)}
-                                </pre>
-                              </div>
-                              <div>
-                                <h4 className="font-semibold mb-2 text-sm">
-                                  Yeni Değer
-                                </h4>
-                                <pre className="text-xs bg-card p-3 rounded border overflow-auto max-h-60">
-                                  {formatJson(r.newValue)}
-                                </pre>
-                              </div>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </Fragment>
-                  );
-                })
-              )}
+                    )}
+                  </Fragment>
+                );
+              })}
             </TableBody>
           </Table>
+        </div>
+      )}
+      {status !== "Exhausted" && (
+        <Button
+          variant="outline"
+          disabled={status === "LoadingMore"}
+          onClick={() => loadMore(50)}
+        >
+          {status === "LoadingMore" ? "Yükleniyor…" : "Daha fazla yükle"}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function UserFilter({
+  args,
+  value,
+  onChange,
+}: {
+  args: AuditArgs;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const users = useQuery(api.auditLog.filterUsers, {
+    projectId: args.projectId,
+    allProjects: args.allProjects,
+  });
+  return (
+    <Select value={value || "all"} onValueChange={onChange}>
+      <SelectTrigger className="w-48" aria-label="Kullanıcı">
+        <SelectValue placeholder="Kullanıcı" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">Tüm kullanıcılar</SelectItem>
+        {value && !users?.some((user) => user._id === value) && (
+          <SelectItem value={value}>Bilinmeyen kullanıcı</SelectItem>
+        )}
+        {users?.map((user) => (
+          <SelectItem key={user._id} value={user._id}>
+            {user.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+export default function AuditLog() {
+  const { profile } = useAuth();
+  const { projectId, activeProject, loading } = useActiveProjectScope();
+  const [params, setParams] = useSearchParams();
+  const authorized = capabilities(profile?.role).auditLog;
+  const allProjects =
+    profile?.role === "super_admin" && params.get("allProjects") === "true";
+  const searchUrl = params.get("q") ?? "";
+  const [searchText, setSearchText] = useState(searchUrl);
+  const debouncedSearch = useDebouncedValue(searchText, 300);
+  const lastSearchUrl = useRef(searchUrl);
+  useEffect(() => {
+    if (lastSearchUrl.current !== searchUrl) {
+      lastSearchUrl.current = searchUrl;
+      setSearchText(searchUrl);
+      return;
+    }
+    if (searchText !== debouncedSearch || searchUrl === debouncedSearch) return;
+    lastSearchUrl.current = debouncedSearch;
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      if (debouncedSearch) next.set("q", debouncedSearch);
+      else next.delete("q");
+      return next;
+    }, { replace: true });
+  }, [searchUrl, searchText, debouncedSearch, setParams]);
+  const previousScope = useRef<string | null>(null);
+  useEffect(() => {
+    if (loading) return;
+    const scope = `${projectId ?? "none"}:${allProjects}`;
+    if (previousScope.current !== null && previousScope.current !== scope) {
+      setParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete("user");
+        return next;
+      }, { replace: true });
+    }
+    previousScope.current = scope;
+  }, [projectId, allProjects, loading, setParams]);
+  const startDate = params.get("start") || "";
+  const endDate = params.get("end") || "";
+  const actionValue = params.get("action");
+  const action =
+    actionValue === "create" ||
+    actionValue === "update" ||
+    actionValue === "delete"
+      ? actionValue
+      : undefined;
+  const args: AuditArgs = {
+    projectId: allProjects ? undefined : projectId,
+    allProjects,
+    targetTable: params.get("target") || undefined,
+    userId: (params.get("user") || undefined) as Id<"users"> | undefined,
+    action,
+    search: params.get("q") || undefined,
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
+  };
+  let rangeError: string | undefined;
+  try {
+    auditDateRange(args.startDate, args.endDate);
+  } catch (error) {
+    rangeError =
+      error instanceof Error ? error.message : "Tarih aralığı geçersiz";
+  }
+  const update = (key: string, value: string) =>
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (!value || value === "all") next.delete(key);
+        else next.set(key, value);
+        return next;
+      },
+      { replace: true },
+    );
+  if (!authorized)
+    return <AccessDenied message="Denetim kaydını görüntüleme yetkiniz yok." />;
+  const scopeReady = !loading && (allProjects || Boolean(projectId));
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border bg-card p-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="font-semibold">Denetim Kaydı</h2>
+          <Badge variant="secondary">
+            {allProjects
+              ? "Tüm projeler"
+              : (activeProject?.name ?? "Proje seçilmedi")}
+          </Badge>
+          <span className="text-xs text-muted-foreground">TR saati</span>
+          {profile?.role === "super_admin" && (
+            <label className="flex items-center gap-2 text-sm">
+              <Switch
+                checked={allProjects}
+                onCheckedChange={(checked) =>
+                  update("allProjects", checked ? "true" : "")
+                }
+              />
+              Tüm projeler
+            </label>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Select
+            value={args.targetTable || "all"}
+            onValueChange={(value) => update("target", value)}
+          >
+            <SelectTrigger className="w-48" aria-label="Hedef tablo">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tüm hedefler</SelectItem>
+              {Object.entries(AUDIT_TARGET_LABELS).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {scopeReady && (
+            <AdminDataBoundary
+              key={`users-${projectId}-${allProjects}`}
+              label="Kullanıcı seçenekleri"
+            >
+              <UserFilter
+                args={args}
+                value={args.userId ?? ""}
+                onChange={(value) => update("user", value)}
+              />
+            </AdminDataBoundary>
+          )}
+          <Select
+            value={action ?? "all"}
+            onValueChange={(value) => update("action", value)}
+          >
+            <SelectTrigger className="w-40" aria-label="İşlem türü">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tüm işlemler</SelectItem>
+              {Object.entries(actions).map(([value, label]) => (
+                <SelectItem key={value} value={value}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            className="w-60"
+            aria-label="Denetim kayıtlarında ara"
+            placeholder="Hedef, kullanıcı veya metin ara"
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+          />
+          <div aria-label="Başlangıç tarihi">
+            <DatePicker
+              date={parseDateString(startDate)}
+              onSelect={(date) => update("start", formatDateString(date))}
+              placeholder="Başlangıç"
+              className="w-40"
+            />
+          </div>
+          <div aria-label="Bitiş tarihi">
+            <DatePicker
+              date={parseDateString(endDate)}
+              onSelect={(date) => update("end", formatDateString(date))}
+              placeholder="Bitiş"
+              className="w-40"
+            />
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSearchText("");
+              setParams((current) => {
+                const next = new URLSearchParams(current);
+                for (const key of [
+                  "target",
+                  "user",
+                  "action",
+                  "q",
+                  "start",
+                  "end",
+                  "allProjects",
+                ])
+                  next.delete(key);
+                return next;
+              });
+            }}
+          >
+            Tüm filtreleri temizle
+          </Button>
+        </div>
+        {profile?.role !== "super_admin" && (
+          <p className="text-xs text-muted-foreground">
+            Denetim kaydı için üst menüden bir proje seçin. Birden fazla proje
+            tek cursor altında birleştirilmez.
+          </p>
+        )}
+        {rangeError && (
+          <p role="alert" className="text-sm text-destructive">
+            {rangeError}
+          </p>
+        )}
       </div>
+      {loading ? (
+        <SectionSkeleton label="Proje yükleniyor" />
+      ) : !scopeReady ? (
+        <EmptyState
+          title="Proje seçin"
+          description="Denetim kayıtlarını görmek için aktif bir proje seçin."
+        />
+      ) : rangeError ? (
+        <ErrorState title="Tarih aralığı geçersiz" description={rangeError} />
+      ) : (
+        <AdminDataBoundary key={JSON.stringify(args)} label="Denetim kayıtları">
+          <AuditRows args={args} />
+        </AdminDataBoundary>
+      )}
     </div>
   );
 }
