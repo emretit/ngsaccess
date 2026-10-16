@@ -3,17 +3,17 @@
 ## Checklist
 ### Faz 0 — Tespit ve acil durdurma
 - [x] 0.0 Baz ölçüm (2026-10-16 17:05): hâlâ ~3,2 sn'de bir roster (11 dk'da 205 çağrı)
-- [ ] 0.1 Poll eden köprüyü bul — kod hazır (roster route'unda 1/50 örneklemeli IP/UA logu + `hikBridges.lastClientInfo`); Convex deploy sonrası `npx convex logs` ile oku
+- [x] 0.1 Poll eden köprü bulundu (2026-10-16 17:50 deploy sonrası log): çıkış IP'si `95.70.206.84` (TurkNet Gayrettepe) = bu Mac'in internet çıkışıyla AYNI → köprü aynı yerel ağdaki bir Windows makinede (Mac'te/VM'de değil). User-Agent yok → eski köprü sürümü. Kalan: hangi PC olduğunu kullanıcı belirler.
 - [ ] 0.2 O makinede appsettings 900/900 + servis restart (ya da 1.1.0 installer)
-### Faz 1 — Convex (uyandırma tetiği) — KOD TAMAM, commit/deploy YOK
+### Faz 1 — Convex (uyandırma tetiği) — CANLIDA (2026-10-16 17:47, commit 4b242c8 + 5cab086)
 - [x] 1.1 `actions/hikBridgeWake.ts` internalAction: relay'e HMAC imzalı POST, 3 sn timeout, en-iyi-çaba
 - [x] 1.2 `enqueueLocalBridgeOperation` + `retrySyncIssue` → `scheduleBridgeWakeForProject` (≤1 wake / 2 sn / köprü, `hikBridges.nextWakeAt`)
 - [x] 1.3 Roster: `lastSeenAt` 60 sn'de bir, yanıta `nextPollSeconds: 900`, `nextDueInSeconds` (retry ipucu), `wake {streamUrl,bridgeId,ticket}`
-### Faz 2 — Hetzner relay — KOD TAMAM, sunucuya kurulum YOK
+### Faz 2 — Hetzner relay — KOD commit'li (0a9cabc), sunucuya kurulum YOK
 - [x] 2.1 `infra/hik-relay/server.mjs` (bağımlılıksız Node, SSE + imzalı wake, 3 bağlantı/30 wake-dk sınırı) + 12 node testi
 - [x] 2.2 nginx (limit_req, query'siz log) + systemd + `RUNBOOK.md` hazır
-- [ ] 2.3 DNS A kaydı `relay.ngsplus.app → 157.90.114.86` (kullanıcı, Netlify DNS) → RUNBOOK ile kurulum + `npx convex env set HIK_RELAY_URL/HIK_RELAY_SECRET`
-### Faz 3 — Windows köprüsü 1.1.0 — KOD TAMAM, installer YOK
+- [ ] 2.3 DNS A kaydı `relay.ngsplus.app → 157.90.114.86` (ngsplus.app DNS'i şu an Netlify/NS1'de; kullanıcı Cloudflare istiyor → karar bekliyor) → RUNBOOK ile kurulum + `npx convex env set HIK_RELAY_URL/HIK_RELAY_SECRET`
+### Faz 3 — Windows köprüsü 1.1.0 — KOD commit'li (674fb6f), installer YOK
 - [x] 3.1 `WakeStreamClient` (SSE, 90 sn watchdog, backoff ≥60 sn yaşamadan sıfırlanmaz, ready-poll ≤1/5 dk, 401 bekleme, yalnız https)
 - [x] 3.2 Wake → 1 sn debounce → roster; iş varsa ≤20 tur boşaltma; saatte en fazla 240 roster (kota emniyeti); hata backoff 5→300 sn
 - [ ] 3.3 Installer build (Docker+NSIS) + sahada kurulum
