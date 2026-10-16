@@ -34,7 +34,7 @@ interface AccessRulesListProps {
 }
 
 const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => {
-  const { rules, isLoading, error, updateAccessRule, deleteAccessRule, isDeleting } = useAccessRules();
+  const { rules, isLoading, error, updateAccessRule, deleteAccessRule } = useAccessRules();
   const [expandedRules, setExpandedRules] = useState<Set<string>>(new Set());
   const [optimisticActive, setOptimisticActive] = useState<Map<string, boolean>>(new Map());
   const { getDeviceLocationDisplay } = useLocationUtils();
@@ -72,6 +72,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
 
   const handleToggleActive = async (rule: AccessRule, next: boolean) => {
     const ruleId = String(rule._id);
+    if (updateAccessRule.isPendingFor(rule._id)) return;
     setOptimisticActive((prev) => new Map(prev).set(ruleId, next));
     try {
       await updateAccessRule.mutateAsync({ id: rule._id, updates: { isActive: next } });
@@ -285,6 +286,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
 
                   <div className="flex items-center gap-2">
                     <Switch
+                      disabled={updateAccessRule.isPendingFor(rule._id)}
                       checked={optimisticActive.get(String(rule._id)) ?? rule.isActive ?? true}
                       onCheckedChange={(checked) => handleToggleActive(rule, checked)}
                     />
@@ -303,6 +305,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                         <Button
                           variant="ghost"
                           size="sm"
+                          disabled={deleteAccessRule.isPendingFor(rule._id)}
                           className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -319,10 +322,10 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                           <AlertDialogCancel>İptal</AlertDialogCancel>
                           <AlertDialogAction
                             onClick={() => handleDeleteRule(ruleId)}
-                            disabled={isDeleting}
+                            disabled={deleteAccessRule.isPendingFor(rule._id)}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                           >
-                            {isDeleting ? (
+                            {deleteAccessRule.isPendingFor(rule._id) ? (
                               <>
                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                 Siliniyor...

@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { useMutation, useAction } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
@@ -49,6 +50,19 @@ type IdeSyncResult = FunctionReturnType<
 
 export const useComplexAccessRuleMutations = () => {
   const { toast } = useToast();
+  const pendingRef = useRef(new Set<string>());
+  const [pending, setPending] = useState<Set<string>>(new Set());
+  const runPending = async <T,>(key: string, operation: () => Promise<T>): Promise<T> => {
+    if (pendingRef.current.has(key)) throw new Error("İşlem zaten devam ediyor.");
+    pendingRef.current.add(key);
+    setPending(new Set(pendingRef.current));
+    try {
+      return await operation();
+    } finally {
+      pendingRef.current.delete(key);
+      setPending(new Set(pendingRef.current));
+    }
+  };
 
   const createWithGroups = useMutation(api.accessRules.createWithGroups);
   const updateWithGroups = useMutation(api.accessRules.updateWithGroups);
@@ -132,7 +146,7 @@ export const useComplexAccessRuleMutations = () => {
   };
 
   const createAccessRuleWithMembers = {
-    mutateAsync: async (params: CreateRuleWithMembersParams) => {
+    mutateAsync: (params: CreateRuleWithMembersParams) => runPending("create", async () => {
       const result = await createWithGroups({
         ...params.rule,
         employeeIds: params.employeeIds,
@@ -142,12 +156,12 @@ export const useComplexAccessRuleMutations = () => {
       toast({ title: "Başarılı", description: "Erişim kuralı ve üyeleri oluşturuldu." });
       startBackgroundSync(result);
       return result;
-    },
-    isPending: false,
+    }),
+    isPending: pending.has("create"),
   };
 
   const updateAccessRuleWithAdditionalMembers = {
-    mutateAsync: async (params: UpdateRuleWithMembersParams) => {
+    mutateAsync: (params: UpdateRuleWithMembersParams) => runPending(params.id, async () => {
       const result = await updateWithGroups({
         ruleId: params.id,
         ...params.updates,
@@ -158,8 +172,8 @@ export const useComplexAccessRuleMutations = () => {
       toast({ title: "Başarılı", description: "Erişim kuralı güncellendi." });
       startBackgroundSync(params.id);
       return result;
-    },
-    isPending: false,
+    }),
+    isPending: [...pending].some((key) => key !== "create"),
   };
 
   return { createAccessRuleWithMembers, updateAccessRuleWithAdditionalMembers };

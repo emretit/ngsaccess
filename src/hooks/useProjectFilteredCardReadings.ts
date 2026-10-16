@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
+import { toLocalDateString } from "@/lib/date";
 import { useProjectAccess } from "./useProjectAccess";
 
 export const useProjectFilteredCardReadings = (pageSize: number = 100) => {
@@ -23,7 +24,7 @@ export const useProjectFilteredCardReadings = (pageSize: number = 100) => {
           page: currentPage,
           pageSize,
           searchTerm: searchTerm || undefined,
-          dateFilter: dateFilter ? dateFilter.toISOString().split("T")[0] : undefined,
+          dateFilter: dateFilter ? toLocalDateString(dateFilter) : undefined,
           accessFilter,
         }
       : "skip"
