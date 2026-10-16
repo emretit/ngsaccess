@@ -272,9 +272,8 @@ export const getPdksTableData = authedQuery({
       [readings, employees] = await Promise.all([
         ctx.db
           .query("cardReadings")
-          .withIndex("by_access_time")
-          .filter((q) =>
-            q.and(q.gte(q.field("accessTime"), startISO), q.lte(q.field("accessTime"), endISO))
+          .withIndex("by_access_time", (q) =>
+            q.gte("accessTime", startISO).lte("accessTime", endISO)
           )
           .collect(),
         ctx.db
@@ -288,12 +287,8 @@ export const getPdksTableData = authedQuery({
           allowedProjectIds.map((pid) =>
             ctx.db
               .query("cardReadings")
-              .withIndex("by_project", (q) => q.eq("projectId", pid))
-              .filter((q) =>
-                q.and(
-                  q.gte(q.field("accessTime"), startISO),
-                  q.lte(q.field("accessTime"), endISO)
-                )
+              .withIndex("by_project_access_time", (q) =>
+                q.eq("projectId", pid).gte("accessTime", startISO).lte("accessTime", endISO)
               )
               .collect()
           )
@@ -367,30 +362,34 @@ export const getPdksTableData = authedQuery({
 
     // pdksRecords manuel override haritası
     const manualPdksByEmpDate = new Map<string, Doc<"pdksRecords">>();
-    for (const empKey of employeeMap.keys()) {
-      const emp = empById.get(empKey);
-      if (!emp) continue;
-      const recs = await ctx.db
-        .query("pdksRecords")
-        .withIndex("by_employee_date", (q) => q.eq("employeeId", emp._id))
-        .filter((q) =>
-          q.and(
-            q.gte(q.field("date"), startDate),
-            q.lte(q.field("date"), endDate)
+    const periodEmployees = Array.from(employeeMap.keys())
+      .map((empKey) => empById.get(empKey))
+      .filter((emp): emp is NonNullable<typeof emp> => emp !== undefined);
+    const recsByEmployee = await Promise.all(
+      periodEmployees.map((emp) =>
+        ctx.db
+          .query("pdksRecords")
+          .withIndex("by_employee_date", (q) =>
+            q.eq("employeeId", emp._id).gte("date", startDate).lte("date", endDate)
           )
-        )
-        .collect();
+          .collect()
+      )
+    );
+    for (const recs of recsByEmployee) {
       for (const r of recs) {
         if (r.manualEntry) {
-          manualPdksByEmpDate.set(`${empKey}__${r.date}`, r);
+          manualPdksByEmpDate.set(`${String(r.employeeId)}__${r.date}`, r);
         }
       }
     }
 
-    const allLeaves = await ctx.db
-      .query("leaves")
-      .filter((q) => q.eq(q.field("status"), "approved"))
-      .collect();
+    // Yalnız dönemle kesişen onaylı izinler (gün eşleşmesi pdksTable'da).
+    const allLeaves = (
+      await ctx.db
+        .query("leaves")
+        .withIndex("by_status", (q) => q.eq("status", "approved"))
+        .collect()
+    ).filter((l) => l.startDate <= endDate && l.endDate >= startDate);
 
     const periodDateKeys = buildPeriodDateKeys(startDate, endDate);
 
