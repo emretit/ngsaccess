@@ -3,34 +3,6 @@ import { mutation } from "./_generated/server";
 import { employeeAuthedMutation } from "./lib/customFunctions";
 
 /**
- * Çalışan için QR check-in token oluşturur (5 dakika geçerli).
- * Web admin/portal tarafı kullanıyor — `employeeId` parametresiyle.
- */
-export const createCheckInToken = mutation({
-  args: {
-    employeeId: v.id("employees"),
-  },
-  handler: async (ctx, args) => {
-    const employee = await ctx.db.get(args.employeeId);
-    if (!employee) throw new Error("Çalışan bulunamadı");
-
-    const token = crypto.randomUUID();
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + 5 * 60 * 1000).toISOString();
-    const createdAt = now.toISOString();
-
-    await ctx.db.insert("checkInTokens", {
-      employeeId: args.employeeId,
-      token,
-      expiresAt,
-      createdAt,
-    });
-
-    return { token, expiresAt };
-  },
-});
-
-/**
  * Mobil çalışan oturumu için: kendi adına QR check-in token üretir.
  * `ctx.employee` `employeeAuthedMutation` tarafından enjekte edilir.
  */
