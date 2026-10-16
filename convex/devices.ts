@@ -1,4 +1,4 @@
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalMutation, internalQuery, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -27,7 +27,7 @@ import {
 /**
  * Cihazın hassas alanları. list okuma-gate'i (non-manager'a gizle) ile update yazma-gate'i
  * (non-manager yazamaz) AYNI listeyi kullanır — drift = wipe/leak regresyonu. apiToken update
- * arg'larında yok (yalnız regenerateApiToken yazar) → write loop'ta hiç görünmez; sette durması
+ * arg'larında yok (yalnız issueApiToken yazar) → write loop'ta hiç görünmez; sette durması
  * zararsız ve okuma-gate'iyle simetriyi korur.
  */
 const DEVICE_SECRET_FIELDS = ["devicePassword", "idePassword", "ehomeKey", "apiToken"] as const;
@@ -472,6 +472,21 @@ export const updateLastSeen = internalMutation({
 // API token — /card-reader HTTP endpoint per-device auth
 // ────────────────────────────────────────────────────────────
 
+/** Cihaza yeni /card-reader token'ı yazar (regenerate + ensure ortak yolu). */
+async function issueApiToken(
+  ctx: MutationCtx,
+  deviceId: Id<"devices">,
+): Promise<{ token: string; createdAt: string }> {
+  const token = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+  await ctx.db.patch(deviceId, {
+    apiToken: token,
+    apiTokenCreatedAt: createdAt,
+    updatedAt: createdAt,
+  });
+  return { token, createdAt };
+}
+
 export const regenerateApiToken = adminMutation({
   args: { deviceId: v.id("devices") },
   returns: v.object({ token: v.string(), createdAt: v.string() }),
@@ -487,14 +502,23 @@ export const regenerateApiToken = adminMutation({
         throw new Error("Bu cihaza erişim yetkiniz yok");
       }
     }
-    const token = crypto.randomUUID();
-    const createdAt = new Date().toISOString();
-    await ctx.db.patch(args.deviceId, {
-      apiToken: token,
-      apiTokenCreatedAt: createdAt,
-      updatedAt: createdAt,
-    });
-    return { token, createdAt };
+    return await issueApiToken(ctx, args.deviceId);
+  },
+});
+
+/**
+ * Cihazın /card-reader token'ı yoksa üretir, varsa aynısını döner (idempotent).
+ * Gateway httpHosts forwarding URL'ine `?token=` olarak gömülür — token'sız istek
+ * artık reddediliyor.
+ */
+export const ensureApiToken = internalMutation({
+  args: { deviceId: v.id("devices") },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, args) => {
+    const device = await ctx.db.get(args.deviceId);
+    if (!device) return null;
+    if (device.apiToken) return device.apiToken;
+    return (await issueApiToken(ctx, args.deviceId)).token;
   },
 });
 

@@ -56,6 +56,7 @@ import type * as lib_accessGraphPure from "../lib/accessGraphPure.js";
 import type * as lib_audit from "../lib/audit.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_breakDeduction from "../lib/breakDeduction.js";
+import type * as lib_cardReaderAuth from "../lib/cardReaderAuth.js";
 import type * as lib_cardReaderParse from "../lib/cardReaderParse.js";
 import type * as lib_cardReadingAudit from "../lib/cardReadingAudit.js";
 import type * as lib_cardReadingProcess from "../lib/cardReadingProcess.js";
@@ -175,6 +176,7 @@ declare const fullApi: ApiFromModules<{
   "lib/audit": typeof lib_audit;
   "lib/auth": typeof lib_auth;
   "lib/breakDeduction": typeof lib_breakDeduction;
+  "lib/cardReaderAuth": typeof lib_cardReaderAuth;
   "lib/cardReaderParse": typeof lib_cardReaderParse;
   "lib/cardReadingAudit": typeof lib_cardReadingAudit;
   "lib/cardReadingProcess": typeof lib_cardReadingProcess;

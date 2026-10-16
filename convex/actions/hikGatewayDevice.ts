@@ -6,6 +6,7 @@ import { internalAction, type ActionCtx } from "../_generated/server";
 import { authedAction } from "../lib/customFunctions";
 import { isProjectAllowed } from "../lib/auth";
 import { deriveHikReaderNoFromDoorNo } from "../lib/hikReaderNumbers";
+import { withDeviceToken } from "../lib/cardReaderAuth";
 import type { Id } from "../_generated/dataModel";
 import {
   addDeviceToGateway,
@@ -144,7 +145,15 @@ export const registerDeviceOnGateway = authedAction({
     // Başarısızsa register'ı geri almıyoruz; UI'da uyarı olarak görünür.
     const forwardingUrl = process.env.HIK_FORWARDING_URL;
     if (forwardingUrl) {
-      const fwd = await setHttpHostForwarding(result.devIndex, forwardingUrl);
+      // /card-reader token'sız isteği reddeder; httpHosts header ekleyemediği için
+      // cihaz token'ı URL'e gömülür (event cihaza sabitlenir, cross-tenant forge yok).
+      const token = await ctx.runMutation(internal.devices.ensureApiToken, {
+        deviceId: args.deviceId,
+      });
+      const fwd = await setHttpHostForwarding(
+        result.devIndex,
+        token ? withDeviceToken(forwardingUrl, token) : forwardingUrl,
+      );
       if (!fwd.ok) {
         await ctx.runMutation(internal.devices.setHikOfflineHint, {
           deviceId: args.deviceId,

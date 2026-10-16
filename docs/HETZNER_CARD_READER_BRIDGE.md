@@ -95,6 +95,23 @@ ssh -i ~/.ssh/id_ed25519_hetzner root@157.90.114.86 'bash -c "
 
 Çıkan yeni secret'ı cihazın Host alanına yaz, **Save → Reboot**.
 
+### Convex tarafı relay secret'ı (2026-10-16'dan itibaren ŞART)
+
+`/card-reader` artık token'sız isteği **401** ile reddeder (`convex/lib/cardReaderAuth.ts`).
+Bu köprü çok cihaz taşıdığı için cihaz token'ı yerine **relay secret** kullanır:
+
+```bash
+RELAY=$(openssl rand -hex 24)
+npx convex env set CARD_READER_RELAY_SECRET "$RELAY"     # notable-tern-4
+# nginx location bloğuna (proxy_pass'tan önce):
+#   proxy_set_header X-Relay-Secret "<RELAY>";
+# sonra: nginx -t && systemctl reload nginx
+```
+
+Diğer kabul yolları: tek cihaz → `Authorization: Bearer <token>` veya `/card-reader?token=<token>`
+(Hikvision httpHosts). Geçiş için geçici: `npx convex env set CARD_READER_ALLOW_UNAUTHENTICATED 1`
+(eski serial/IP lookup; işi bitince `npx convex env remove CARD_READER_ALLOW_UNAUTHENTICATED`).
+
 ## Sorun Giderme
 
 | Belirti | Anlamı | Yapılacak |

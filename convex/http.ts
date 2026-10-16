@@ -5,6 +5,7 @@ import type { Id } from "./_generated/dataModel";
 import { auth } from "./auth";
 import { parseCardReaderBody } from "./lib/cardReaderParse";
 import { shouldCreateCardReadingForHikEvent } from "./lib/hikEventCatalog";
+import { resolveCardReaderAuth } from "./lib/cardReaderAuth";
 
 const http = httpRouter();
 
@@ -24,6 +25,12 @@ const hasHikDeviceEventPayload = (args: {
   (args.frontSerialNo !== null && args.frontSerialNo !== undefined) ||
   (args.eventState !== null && args.eventState !== undefined) ||
   (args.dateTime !== null && args.dateTime !== undefined);
+
+const unauthorizedCardReader = (): Response =>
+  new Response(
+    JSON.stringify({ cevap: "error", checkResult: "failed", error: "unauthorized" }),
+    { status: 401, headers: { "Content-Type": "application/json" } },
+  );
 
 /** Tarayıcı/curl ile: deployment ve HTTP route’un açık olduğunu doğrular (Hikvision POST kullanmaz). */
 http.route({
@@ -76,22 +83,35 @@ http.route({
         ideTime,
       } = parsed;
 
-      const authHeader = request.headers.get("Authorization") ?? "";
-      const bearerToken = authHeader.startsWith("Bearer ")
-        ? authHeader.slice(7).trim()
-        : null;
-      const authedDevice = bearerToken
-        ? await ctx.runQuery(internal.devices.getByApiToken, { token: bearerToken })
-        : null;
-      if (bearerToken && !authedDevice) {
-        // Backwards-compat dönemi: warn log, eski serial/IP lookup'a düş
-        console.warn("[card-reader] geçersiz apiToken, serial/IP'ye düşülüyor", {
-          token: bearerToken.slice(0, 8) + "…",
+      const requestUrl = new URL(request.url);
+      const cardReaderAuth = resolveCardReaderAuth({
+        authorizationHeader: request.headers.get("Authorization"),
+        queryToken: requestUrl.searchParams.get("token"),
+        relayHeader: request.headers.get("X-Relay-Secret"),
+        queryRelay: requestUrl.searchParams.get("relay"),
+        relaySecret: process.env.CARD_READER_RELAY_SECRET,
+        allowUnauthenticated: process.env.CARD_READER_ALLOW_UNAUTHENTICATED,
+      });
+      if (cardReaderAuth.kind === "reject") {
+        console.warn("[card-reader] kimlik bilgisi yok — reddedildi", {
+          deviceIp: deviceIp ?? "(yok)",
+          serial: serial ?? "(yok)",
         });
+        return unauthorizedCardReader();
       }
-      if (!bearerToken) {
+      const authedDevice =
+        cardReaderAuth.kind === "token"
+          ? await ctx.runQuery(internal.devices.getByApiToken, { token: cardReaderAuth.token })
+          : null;
+      if (cardReaderAuth.kind === "token" && !authedDevice) {
+        console.warn("[card-reader] geçersiz apiToken — reddedildi", {
+          token: cardReaderAuth.token.slice(0, 8) + "…",
+        });
+        return unauthorizedCardReader();
+      }
+      if (cardReaderAuth.kind === "legacy") {
         console.warn(
-          "[card-reader] Authorization header yok — eski serial/IP lookup kullanılıyor (deprecated)",
+          "[card-reader] CARD_READER_ALLOW_UNAUTHENTICATED=1 — token'sız serial/IP lookup (geçiş modu)",
         );
       }
 

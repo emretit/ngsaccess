@@ -69,7 +69,7 @@ export function DeviceApiTokenCard({
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          Bridge cihaz POST'unda <code className="rounded bg-muted px-1 py-0.5">Authorization: Bearer &lt;token&gt;</code> header'ı yollar. Token sızarsa "Yenile" ile geri çevir; eski token geçersiz olur.
+          Token'sız kart olayı reddedilir. Bridge <code className="rounded bg-muted px-1 py-0.5">Authorization: Bearer &lt;token&gt;</code> header'ı yollar; header ekleyemeyen cihazda (Hikvision httpHosts) adresin sonuna <code className="rounded bg-muted px-1 py-0.5">/card-reader?token=&lt;token&gt;</code> yazın. Token sızarsa "Yenile" ile geri çevir; eski token geçersiz olur.
         </p>
 
         {revealedToken ? (
