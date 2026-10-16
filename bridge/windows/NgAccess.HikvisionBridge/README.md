@@ -89,8 +89,10 @@ canonical method — so no separate (header-only) delete command is required.
   "Bridge": {
     "SdkDllDirectory": "hikvision-sdk/win-x64",
     "ConvexSiteUrl": "https://notable-tern-4.convex.site",
-    "PollIntervalSeconds": 3,
-    "PollMaxOperations": 10,
+    "PollIntervalSeconds": 900,
+    "PollMaxIntervalSeconds": 900,
+    "WakeStreamEnabled": true,
+    "PollMaxOperations": 25,
     "BridgeToken": "",
     "ConfigFile": "bridge.json"
   },
@@ -161,3 +163,38 @@ Start Menu\NGS Access Hikvision Bridge\...
 If you deploy the raw `publish\` folder instead of the installer, run
 `Scripts\install-service.ps1` once as Administrator; raw copy mode does not create
 desktop shortcuts by itself.
+
+## Uyandırma kanalı (1.1.0)
+
+Roster `wake` bilgisi döndürürse köprü relay'e SSE bağlantısı açar; `ready` ve `wake`
+olayları bir saniyede birleştirilerek roster çekilir. `ready` en fazla beş dakikada
+bir poll başlatır; kısa bağlantı kopmalarında geri çekilme 1–60 saniyeye büyür,
+yalnız en az 60 saniye bağlı kalan akıştan sonra sıfırlanır. Bekleyen işler en fazla
+20 ardışık turda, turlar arasında en az bir saniye bırakılarak boşaltılır.
+Tüm roster çağrıları kayan 60 dakikada sabit 240 çağrı ile sınırlıdır; wake, hata,
+ayar değişikliği ve kuyruk boşaltma aynı bütçeyi kullanır. Kota dolduğunda bir kez
+uyarı yazılır ve pencere açılana kadar beklenir. Her tur varsayılan en fazla 25 iş alır. Relay yalnız
+uyandırma taşır; panel/personel/kart bilgileri yine Convex roster'ından alınır.
+
+Relay kapalı veya bağlantı kopuksa emniyet poll'u devam eder: sunucunun
+`nextPollSeconds` ipucu (30–3600 saniye), eski sunucuda yerel poll ayarlarının büyüğü
+(varsayılan 900 saniye) kullanılır. `nextDueInSeconds` varsa bekleme
+`min(tavan, max(5, nextDueInSeconds))` olur; geçici iş hataları 15 dakika beklemez.
+Roster hatalarında bekleme 5, 10, 20, 40, 80, 160, 300 saniyedir (tavan 300).
+Yerel ayar değişikliği başarı/hata beklemesini keser; relay wake hata beklemesini
+kısaltmaz. `/__bridge` sayfası kanal durumunu gösterir. SSE adresi HTTPS olmalıdır;
+yerel SelfTest için yalnız `http://localhost` ve `http://127.0.0.1` serbesttir.
+`Bridge.WakeStreamEnabled` değerini `false` yapıp servisi yeniden başlatarak kanalı
+kapatabilirsiniz. Bilet ve token loglanmaz; HTTP istemcileri sürüm ve makine adını
+User-Agent üzerinden bildirir.
+
+Yerel doğrulama (SDK DLL'lerini veya canlı servisi kullanmaz):
+
+```bash
+dotnet run --project bridge/windows/NgAccess.HikvisionBridge.SelfTest
+```
+
+Bu kontrol parser/debounce, yerel SSE bağlantısı, 401 ve bilet yenileme, poll sınırları
+ve 20 turluk kuyruk boşaltmayı doğrular. Sanal saat senaryoları ayrıca relay flapping,
+240/saat tavanı, hata geri çekilmesi, Configure ile uyanma ve nextDue beklemelerini
+kapsar; .NET 8 veya daha yeni runtime ile çalışır.

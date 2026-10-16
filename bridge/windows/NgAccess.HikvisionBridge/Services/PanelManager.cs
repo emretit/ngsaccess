@@ -24,19 +24,60 @@ public sealed class PanelManager : IAsyncDisposable
   private volatile string? _lastRosterError;
   // Configure() yalnız bunu kaldırır; worker teardown'ı poll thread yapar (tek-sahip, #11).
   private bool _needsWorkerReset;
+  private WakeInfo? _wake;
+  private int? _nextPollSeconds;
+  private int? _nextDueInSeconds;
+  private readonly RosterCallLimiter _rosterLimiter;
+  private TaskCompletionSource _configurationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+  public Task ConfigurationChanged { get { lock (_lock) return _configurationChanged.Task; } }
+  public int SuccessWaitSeconds
+  {
+    get { lock (_lock) return _nextDueInSeconds is int due ? Math.Min(NextPollSeconds, Math.Max(5, due)) : NextPollSeconds; }
+  }
+  private TaskCompletionSource _wakeChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+  public int NextPollSeconds
+  {
+    get
+    {
+      lock (_lock) return Math.Clamp(_nextPollSeconds ??
+        Math.Max(_options.PollIntervalSeconds, _options.PollMaxIntervalSeconds), 30, 3600);
+    }
+  }
+
+  public (WakeInfo? Info, Task Changed) GetWakeState()
+  {
+    lock (_lock) return (_wake, _wakeChanged.Task);
+  }
+
+  private void SetRosterHints(WakeInfo? wake, int? nextPollSeconds, int? nextDueInSeconds)
+  {
+    lock (_lock)
+    {
+      _nextPollSeconds = nextPollSeconds;
+      _nextDueInSeconds = nextDueInSeconds;
+      if (_wake == wake) return;
+      _wake = wake;
+      var previous = _wakeChanged;
+      _wakeChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+      previous.TrySetResult();
+    }
+  }
 
   public PanelManager(
     HikvisionSdkRuntime runtime,
     IHttpClientFactory httpFactory,
     IOptions<BridgeOptions> options,
     ILoggerFactory loggerFactory,
-    ILogger<PanelManager> logger)
+    ILogger<PanelManager> logger, TimeProvider? timeProvider = null)
   {
     _runtime = runtime;
     _httpFactory = httpFactory;
     _options = options.Value;
     _loggerFactory = loggerFactory;
     _logger = logger;
+    _rosterLimiter = new RosterCallLimiter(timeProvider ?? TimeProvider.System, logger);
   }
 
   public string? LastRosterError => _lastRosterError;
@@ -58,19 +99,22 @@ public sealed class PanelManager : IAsyncDisposable
       _bridgeToken = bridgeToken;
       var http = _httpFactory.CreateClient();
       _convex = new ConvexBridgeClient(
-        http, siteUrl, bridgeToken, _options.PollMaxOperations, _loggerFactory.CreateLogger("Convex:roster"));
+        http, siteUrl, bridgeToken, _options.PollMaxOperations, _loggerFactory.CreateLogger("Convex:roster"), _rosterLimiter);
 
       // Mevcut worker'lar eski Convex istemcisini tutar; burada (HTTP thread) durdurmak
       // PollRosterAsync ile yarışırdı. Bayrağı kaldır — bir sonraki poll eski worker'ları
       // durdurup yeni istemciyle yeniden kurar.
       _needsWorkerReset = true;
+      SetRosterHints(null, null, null);
+      var previous = _configurationChanged;
+      _configurationChanged = new(TaskCreationOptions.RunContinuationsAsynchronously);
+      previous.TrySetResult();
     }
   }
 
   /// <summary>Bir poll turu: roster çek → worker'ları uzlaştır → işleri uygula + ack.
-  /// Dönüş: bu turda "aktivite" oldu mu (op işlendi veya cihaz listesi değişti) — caller
-  /// adaptive backoff için kullanır (aktivite → hızlı moda dön, boş → yavaşla).</summary>
-  public async Task<bool> PollRosterAsync(CancellationToken ct)
+  /// Dönüş: başarı, iş sayısı ve cihaz değişikliği; caller kuyruk boşaltmayı sınırlar.</summary>
+  public async Task<RosterPollResult> PollRosterAsync(CancellationToken ct)
   {
     // Worker yaşam döngüsünün tek sahibi bu thread: Configure() reset istediyse eski
     // worker'ları burada (await ile) durdur — fire-and-forget cross-thread dispose yok.
@@ -91,14 +135,29 @@ public sealed class PanelManager : IAsyncDisposable
     if (convex is null || !convex.HasToken)
     {
       _lastRosterError = "bridge token girilmemiş";
-      return false;
+      return new(false);
     }
 
-    var roster = await convex.RosterAsync(ct);
-    if (!roster.Ok)
+    RosterResponse roster;
+    try { roster = await convex.RosterAsync(ct); }
+    catch (Exception) when (!ct.IsCancellationRequested)
     {
-      _lastRosterError = roster.Error;
-      return false;
+      lock (_lock)
+      {
+        if (!ReferenceEquals(convex, _convex)) return new(false, ConfigurationChanged: true);
+      }
+      throw;
+    }
+    lock (_lock)
+    {
+      // Ayarlar HTTP çağrısı sürerken değiştiyse eski bilet yeniden kurulmasın.
+      if (!ReferenceEquals(convex, _convex)) return new(false, ConfigurationChanged: true);
+      if (!roster.Ok)
+      {
+        _lastRosterError = roster.Error;
+        return new(false);
+      }
+      SetRosterHints(roster.Wake, roster.NextPollSeconds, roster.NextDueInSeconds);
     }
     _lastRosterError = null;
 
@@ -128,8 +187,7 @@ public sealed class PanelManager : IAsyncDisposable
       await convex.AckAsync(op.OpId, result.Ok, result.Error, ct);
     }
 
-    // Op işlendiyse veya cihaz listesi değiştiyse "aktivite" → backoff tabana döner.
-    return roster.Operations.Count > 0 || devicesChanged;
+    return new(true, roster.Operations.Count, devicesChanged);
   }
 
   /// <summary>Roster cihaz listesine göre worker'ları uzlaştır. Durdurulacak worker listesini

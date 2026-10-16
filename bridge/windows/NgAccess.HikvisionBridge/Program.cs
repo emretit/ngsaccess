@@ -17,6 +17,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<HikvisionSdkRuntime>();
 builder.Services.AddSingleton<PanelConfigStore>();
 builder.Services.AddSingleton<PanelManager>();
+builder.Services.AddSingleton<WakeStreamClient>();
 builder.Services.AddSingleton<LocalConfigServer>();
 builder.Services.AddHostedService<BridgeWorker>();
 

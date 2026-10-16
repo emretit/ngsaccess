@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -12,6 +13,9 @@ namespace NgAccess.HikvisionBridge.Services;
 /// </summary>
 public sealed class ConvexBridgeClient
 {
+  public static string UserAgent { get; } =
+    $"NgAccessHikBridge/{typeof(ConvexBridgeClient).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "1.1.0"} ({Environment.MachineName})";
+
   // message=null gönderilmesin: Convex v.optional(v.string()) açık null'ı reddeder.
   private static readonly JsonSerializerOptions NullSkipping =
     new() { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
@@ -20,13 +24,16 @@ public sealed class ConvexBridgeClient
   private readonly string _bridgeToken;
   private readonly int _pollMax;
   private readonly ILogger _logger;
+  private readonly RosterCallLimiter _rosterLimiter;
 
-  public ConvexBridgeClient(HttpClient http, string siteUrl, string bridgeToken, int pollMax, ILogger logger)
+  public ConvexBridgeClient(HttpClient http, string siteUrl, string bridgeToken, int pollMax, ILogger logger, RosterCallLimiter rosterLimiter)
   {
     _http = http;
+    _http.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
     _bridgeToken = bridgeToken;
     _pollMax = pollMax;
     _logger = logger;
+    _rosterLimiter = rosterLimiter;
     if (!string.IsNullOrWhiteSpace(siteUrl))
     {
       _http.BaseAddress = new Uri(siteUrl.TrimEnd('/') + "/");
@@ -45,6 +52,7 @@ public sealed class ConvexBridgeClient
     request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _bridgeToken);
     request.Content = JsonContent.Create(new { max = Math.Clamp(_pollMax, 1, 25) });
 
+    await _rosterLimiter.WaitAsync(cancellationToken);
     using var response = await _http.SendAsync(request, cancellationToken);
     if (!response.IsSuccessStatusCode)
     {

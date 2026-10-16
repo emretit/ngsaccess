@@ -14,11 +14,35 @@ public sealed class RosterResponse
   [JsonPropertyName("error")]
   public string? Error { get; init; }
 
+  [JsonPropertyName("nextPollSeconds")]
+  public int? NextPollSeconds { get; init; }
+
+  [JsonPropertyName("nextDueInSeconds")]
+  public int? NextDueInSeconds { get; init; }
+
+  [JsonPropertyName("wake")]
+  public WakeInfo? Wake { get; init; }
+
   [JsonPropertyName("devices")]
   public List<RosterDevice> Devices { get; init; } = [];
 
   [JsonPropertyName("operations")]
   public List<BridgeOperation> Operations { get; init; } = [];
+}
+
+public sealed record WakeInfo
+{
+  [JsonPropertyName("streamUrl")] public string StreamUrl { get; init; } = "";
+  [JsonPropertyName("bridgeId")] public string BridgeId { get; init; } = "";
+  [JsonPropertyName("ticket")] public string Ticket { get; init; } = "";
+
+  // Biletin yanlışlıkla yapılandırılmış loglara girmesini önle.
+  public override string ToString() => "WakeInfo";
+}
+
+public sealed record RosterPollResult(bool Success, int OperationCount = 0, bool DevicesChanged = false, bool ConfigurationChanged = false)
+{
+  public bool Active => OperationCount > 0 || DevicesChanged;
 }
 
 /// <summary>Roster'dan gelen tek bir panelin bağlantı bilgileri (buluttan).</summary>

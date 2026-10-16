@@ -41,6 +41,7 @@ public sealed class LocalConfigServer
 
   private readonly PanelConfigStore _store;
   private readonly PanelManager _manager;
+  private readonly WakeStreamClient _wake;
   private readonly LocalApiOptions _options;
   private readonly ILogger<LocalConfigServer> _logger;
   private readonly string _webRoot;
@@ -49,11 +50,13 @@ public sealed class LocalConfigServer
   public LocalConfigServer(
     PanelConfigStore store,
     PanelManager manager,
+    WakeStreamClient wake,
     IOptions<LocalApiOptions> options,
     ILogger<LocalConfigServer> logger)
   {
     _store = store;
     _manager = manager;
+    _wake = wake;
     _options = options.Value;
     _logger = logger;
     _webRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
@@ -132,6 +135,9 @@ public sealed class LocalConfigServer
         convexSiteUrl = config.ConvexSiteUrl,
         hasToken = !string.IsNullOrWhiteSpace(config.BridgeToken),
         rosterError = _manager.LastRosterError,
+        wakeChannel = _wake.State,
+        lastWakeAt = _wake.LastWakeAt,
+        nextPollSeconds = _manager.NextPollSeconds,
         devices,
       });
       return;
@@ -279,6 +285,7 @@ public sealed class LocalConfigServer
  </div>
  <div class="card">
    <h3>Paneller <span class="muted">(ngsplus'tan yönetilir — buradan eklenmez)</span></h3>
+   <div id="wakeStatus" class="muted">Uyandırma kanalı: kapalı</div>
    <div id="rosterErr" class="muted"></div>
    <table><thead><tr><th>Ad</th><th>Adres</th><th>Kapı</th><th>Durum</th><th>Son event</th><th></th></tr></thead><tbody id="rows"></tbody></table>
  </div>
@@ -296,6 +303,7 @@ async function load(){
   g('url').value=c.convexSiteUrl||'';
   g('tokenState').textContent=c.hasToken?'Token girili.':'Token henüz girilmedi.';
   g('rosterErr').innerHTML=c.rosterError?('<span class="badge err">roster: '+esc(c.rosterError)+'</span>'):'';
+  g('wakeStatus').textContent='Uyandırma kanalı: '+(c.wakeChannel||'kapalı')+' · Son uyandırma: '+fmt(c.lastWakeAt)+' · Emniyet poll: '+(c.nextPollSeconds||900)+' sn';
   const rows=g('rows');rows.innerHTML='';
   (c.devices||[]).forEach(p=>{
     const tr=document.createElement('tr');
