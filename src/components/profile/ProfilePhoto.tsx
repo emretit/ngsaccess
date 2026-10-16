@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "@/hooks/use-toast";
+import { notify } from "@/lib/notify";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
@@ -19,70 +20,26 @@ export default function ProfilePhoto({
   userInitials,
   onPhotoUpdated,
 }: ProfilePhotoProps) {
-  const [isLoading, setIsLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
   const saveUserPhoto = useMutation(api.files.saveUserPhoto);
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target;
-    if (!input.files || !input.files[0]) return;
-
-    const file = input.files[0];
-    input.value = "";
-
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
-      toast({
-        title: "Geçersiz dosya türü",
-        description: "Sadece JPEG, PNG veya WebP fotoğraflar yüklenebilir.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (file.size > 2 * 1024 * 1024) {
-      toast({
-        title: "Dosya çok büyük",
-        description: "Profil fotoğrafı 2MB'dan küçük olmalıdır.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-
-      // 1. Upload URL al
-      const uploadUrl = await generateUploadUrl();
-
-      // 2. Dosyayı yükle
-      const result = await fetch(uploadUrl, {
-        method: "POST",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      if (!result.ok) throw new Error("Dosya yüklenemedi");
-      const { storageId } = (await result.json()) as { storageId: Id<"_storage"> };
-
-      // 3. Kullanıcı kaydını güncelle
-      const publicUrl = await saveUserPhoto({ storageId });
-
-      onPhotoUpdated(publicUrl);
-
-      toast({
-        title: "Fotoğraf güncellendi",
-        description: "Profil fotoğrafınız başarıyla güncellendi.",
-      });
-    } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Fotoğraf yüklenirken bir hata oluştu.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+  const { run: upload, pending: isLoading } = useAsyncAction(async (file: File) => {
+    const uploadUrl = await generateUploadUrl();
+    const result = await fetch(uploadUrl, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+    if (!result.ok) throw new Error("Dosya yüklenemedi");
+    const { storageId } = (await result.json()) as { storageId: Id<"_storage"> };
+    const publicUrl = await saveUserPhoto({ storageId });
+    onPhotoUpdated(publicUrl);
+  }, { success: "Fotoğraf güncellendi", error: "Fotoğraf yüklenemedi" });
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { notify.error("Sadece JPEG, PNG veya WebP yüklenebilir."); return; }
+    if (file.size > 2 * 1024 * 1024) { notify.error("Profil fotoğrafı 2 MB'dan küçük olmalıdır."); return; }
+    await upload(file);
   };
 
   return (
@@ -102,8 +59,12 @@ export default function ProfilePhoto({
             </AvatarFallback>
           </Avatar>
 
-          <label
-            htmlFor="photo-upload"
+          <button
+            type="button"
+            aria-label="Profil fotoğrafını değiştir"
+            aria-busy={isLoading}
+            disabled={isLoading}
+            onClick={() => inputRef.current?.click()}
             className="absolute bottom-0 right-0 p-1.5 rounded-full bg-primary text-white cursor-pointer hover:bg-primary/90 transition-colors"
           >
             {isLoading ? (
@@ -111,11 +72,12 @@ export default function ProfilePhoto({
             ) : (
               <Camera className="h-5 w-5" />
             )}
-          </label>
+          </button>
           <input
             type="file"
             id="photo-upload"
-            accept="image/*"
+            ref={inputRef}
+            accept="image/jpeg,image/png,image/webp"
             className="hidden"
             onChange={handlePhotoUpload}
             disabled={isLoading}

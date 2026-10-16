@@ -17,9 +17,9 @@ export default function SecurityCard() {
           <div className="flex items-center justify-between">
             <div>
               <h4 className="font-medium">Şifre Değiştir</h4>
-              <p className="text-sm text-gray-500">Hesap şifrenizi güncellemeyi düşünüyor musunuz?</p>
+              <p className="text-sm text-gray-500">Uygulama içinden parola değiştirme henüz kullanılamıyor.</p>
             </div>
-            <Button variant="outline">Şifre Değiştir</Button>
+            <Button variant="outline" disabled>Henüz yok</Button>
           </div>
           
           <Separator />

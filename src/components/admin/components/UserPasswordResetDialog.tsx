@@ -39,8 +39,7 @@ export function UserPasswordResetDialog({
             {user && (
               <>
                 <strong>{user.email}</strong> için şifre sıfırlama özelliği şu an
-                hazırlanıyor. Yakında bu sayfadan kullanıcılara şifre sıfırlama
-                maili gönderebileceksiniz.
+                kullanılamıyor. Henüz parola sıfırlama akışı bulunmuyor.
               </>
             )}
           </DialogDescription>

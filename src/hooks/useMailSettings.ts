@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useToast } from "@/hooks/use-toast";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 
 interface MailSettingsInput {
   smtpHost?: string;
@@ -15,43 +15,23 @@ interface MailSettingsInput {
 }
 
 export function useMailSettings() {
-  const { toast } = useToast();
-  const { projectId, loading: projectLoading } = useActiveProject();
+  const { projectId, loading: projectLoading, isAdmin } = useActiveProjectScope();
 
   const mailSettings = useQuery(
     api.settings.getMail,
-    !projectLoading && projectId ? { projectId } : "skip",
+    !projectLoading && isAdmin && projectId ? { projectId } : "skip",
   );
   const upsertMail = useMutation(api.settings.upsertMail);
 
-  const saveMailSettings = async (settings: MailSettingsInput) => {
-    if (!projectId) {
-      toast({
-        title: "Hata",
-        description: "Önce bir proje seçin.",
-        variant: "destructive",
-      });
-      return;
-    }
-    try {
-      await upsertMail({ ...settings, projectId });
-      toast({
-        title: "Mail ayarları kaydedildi",
-        description: "Mail yapılandırması başarıyla güncellendi",
-      });
-    } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Mail ayarları kaydedilirken hata oluştu",
-        variant: "destructive",
-      });
-    }
-  };
+  const { run: saveMailSettings, pending: isSaving } = useAsyncAction(async (settings: MailSettingsInput) => {
+    if (!isAdmin || !projectId || projectLoading || mailSettings === undefined) throw new Error("Ayarlar yüklenmeden kaydedilemez. Önce bir proje seçin.");
+    await upsertMail({ ...settings, projectId });
+  }, { success: "Ayarlar kaydedildi", error: "Ayarlar kaydedilemedi" });
 
   return {
     mailSettings: mailSettings ?? null,
     isLoading: projectLoading || (!!projectId && mailSettings === undefined),
     saveMailSettings,
-    isSaving: false,
+    isSaving,
   };
 }

@@ -1,3 +1,5 @@
+import { roleLabel } from "@/lib/roleLabels";
+import { Checkbox } from "@/components/ui/checkbox";
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
@@ -45,12 +47,12 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
   projects
 }) => {
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSaving) onClose(); }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{currentUser ? 'Kullanıcı Düzenle' : 'Yeni Kullanıcı'}</DialogTitle>
           <DialogDescription>
-            {currentUser ? 'Kullanıcı bilgilerini güncelleyin' : 'Sisteme yeni bir kullanıcı ekleyin. Kullanıcıya şifre belirleme emaili gönderilecektir.'}
+            {currentUser ? 'Rol tüm projelerde geçerlidir. İşaretli proje üyelikleri kaydedilecektir.' : 'Sisteme yeni bir kullanıcı ekleyin. Kullanıcıya şifre belirleme emaili gönderilecektir.'}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -61,13 +63,14 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
               type="email"
               value={formData.email}
               onChange={(e) => onFormDataChange({ ...formData, email: e.target.value })}
-              disabled={!!currentUser}
+              disabled={!!currentUser || isSaving}
             />
           </div>
           
           <div className="grid gap-2">
             <Label htmlFor="role">Rol</Label>
             <Select 
+              disabled={isSaving}
               value={formData.role} 
               onValueChange={(value: 'super_admin' | 'project_admin' | 'project_user') => 
                 onFormDataChange({ ...formData, role: value })}
@@ -78,19 +81,40 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
               <SelectContent>
                 <SelectGroup>
                   {currentUser && (
-                    <SelectItem value="super_admin">Süper Admin</SelectItem>
+                    <SelectItem value="super_admin">{roleLabel("super_admin")}</SelectItem>
                   )}
-                  <SelectItem value="project_admin">Proje Yöneticisi</SelectItem>
-                  <SelectItem value="project_user">Kullanıcı</SelectItem>
+                  <SelectItem value="project_admin">{roleLabel("project_admin")}</SelectItem>
+                  <SelectItem value="project_user">{roleLabel("project_user")}</SelectItem>
                 </SelectGroup>
               </SelectContent>
             </Select>
           </div>
 
-          {(formData.role === 'project_admin' || formData.role === 'project_user') && (
+          {currentUser ? (
+            <div className="space-y-2">
+              <Label>Proje üyelikleri</Label>
+              {projects.map(project => (
+                <label key={project._id} className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    disabled={isSaving}
+                    checked={formData.projectIds?.includes(project._id) ?? false}
+                    onCheckedChange={checked => onFormDataChange({
+                      ...formData,
+                      projectIds: checked
+                        ? [...(formData.projectIds ?? []), project._id]
+                        : (formData.projectIds ?? []).filter(id => id !== project._id),
+                    })}
+                  />
+                  {project.name}
+                </label>
+              ))}
+              <p className="text-xs text-muted-foreground">İşareti kaldırılan projeye erişim kaldırılır. Süper admin bütün projelere erişir.</p>
+            </div>
+          ) : (
             <div className="grid gap-2">
               <Label htmlFor="project">Proje*</Label>
-              <Select 
+              <Select
+                disabled={isSaving}
                 value={formData.projectId != null ? String(formData.projectId) : ""} 
                 onValueChange={(value) => 
                   onFormDataChange({ ...formData, projectId: value ? (value as Id<"projects">) : undefined })}
@@ -100,17 +124,7 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    {(projects ?? [])
-                      .filter((p) => (p as { _id?: string; id?: number })._id ?? (p as { id?: number }).id)
-                      .map((project) => {
-                        const projectId = (project as { _id?: string; id?: number })._id ?? (project as { id?: number }).id;
-                        const value = String(projectId);
-                        return (
-                          <SelectItem key={value} value={value}>
-                            {project.name}
-                          </SelectItem>
-                        );
-                      })}
+                    {projects.map(project => <SelectItem key={project._id} value={project._id}>{project.name}</SelectItem>)}
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -118,7 +132,7 @@ export const UserFormDialog: React.FC<UserFormDialogProps> = ({
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={onClose} disabled={isSaving}>
             İptal
           </Button>
           <Button onClick={onSave} disabled={isSaving}>

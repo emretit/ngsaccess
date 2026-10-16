@@ -1,3 +1,5 @@
+import { validateSettingsNumbers } from "./lib/settingsUx";
+import { resolveProjectScope } from "./lib/projectScope";
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { adminMutation, authedQuery } from "./lib/customFunctions";
@@ -192,6 +194,8 @@ export const upsertOvertimeRates = adminMutation({
     nightShiftEnd: v.string(),
   },
   handler: async (ctx, args) => {
+    await resolveProjectScope(ctx, args.projectId);
+    validateSettingsNumbers(args);
     const existing = await ctx.db
       .query("overtimeRates")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))

@@ -4,10 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Building2, Mail, Phone, CreditCard } from "lucide-react";
-import { CompanyInfo } from "../types/generalSettings";
+import type { FunctionReturnType } from "convex/server";
+import { api } from "../../../../../convex/_generated/api";
 
 interface CompanyInfoFormProps {
-  company: CompanyInfo | null;
+  company: FunctionReturnType<typeof api.settings.getGeneral>;
 }
 
 export const CompanyInfoForm = ({ company }: CompanyInfoFormProps) => {
@@ -27,7 +28,7 @@ export const CompanyInfoForm = ({ company }: CompanyInfoFormProps) => {
               id="companyName" 
               name="companyName" 
               placeholder="Şirket adını girin" 
-              defaultValue={company?.name || ''}
+              defaultValue={company?.companyName || ''}
               required 
               className="focus:ring-2 focus:ring-primary/20"
             />
@@ -38,7 +39,7 @@ export const CompanyInfoForm = ({ company }: CompanyInfoFormProps) => {
               id="taxNumber" 
               name="taxNumber" 
               placeholder="Vergi numarasını girin"
-              defaultValue={company?.tax_number || ''}
+              defaultValue={company?.taxNumber || ''}
               className="focus:ring-2 focus:ring-primary/20"
             />
           </div>

@@ -2,29 +2,12 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 
 export type UserRole = 'super_admin' | 'project_admin' | 'project_user';
 
-export interface User {
-  _id: Id<"users">;
-  email?: string;
-  role?: UserRole;
-  createdAt?: string;
-  updatedAt?: string;
-  fullName?: string;
-  name?: string;
-  photoUrl?: string;
-  setupToken?: string;
-  tokenExpiresAt?: string;
-}
-
-export interface Project {
-  _id: Id<"projects">;
-  name: string;
-  description?: string;
-  isActive?: boolean;
-}
+export type User = import("convex/server").FunctionReturnType<typeof import("../../../../convex/_generated/api").api.users.list>[number];
+export type Project = import("convex/server").FunctionReturnType<typeof import("../../../../convex/_generated/api").api.projects.list>[number];
 
 export interface UserFormData {
   email: string;
-  password?: string;
+  projectIds?: Id<"projects">[];
   role: UserRole;
   projectId?: Id<"projects">;
 }

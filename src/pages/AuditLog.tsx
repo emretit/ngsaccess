@@ -1,9 +1,10 @@
+import { capabilities } from "@/lib/capabilities";
+import { AccessDenied } from "@/components/shared/AccessDenied";
 import { Fragment, useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { Card, CardContent } from "@/components/ui/card";
 import { DatePicker } from "@/components/ui/date-picker";
 import { parseDateString, formatDateString } from "@/lib/date";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +56,7 @@ export default function AuditLog() {
   const { profile } = useAuth();
   const { projectId, loading } = useActiveProject();
   const isSuperAdmin = profile?.role === "super_admin";
+  const isAuthorized = capabilities(profile?.role).auditLog;
 
   const [targetTable, setTargetTable] = useState<string>("all");
   const [startDate, setStartDate] = useState("");
@@ -73,7 +75,7 @@ export default function AuditLog() {
 
   const rows = useQuery(
     api.auditLog.list,
-    loading
+    loading || !isAuthorized
       ? "skip"
       : {
           projectId: effectiveProjectId,
@@ -82,23 +84,12 @@ export default function AuditLog() {
           endTimestamp,
         }
   );
-  const tables = useQuery(api.auditLog.distinctTargetTables, {});
-
-  const isAuthorized =
-    profile?.role === "super_admin" || profile?.role === "project_admin";
+  const tables = useQuery(api.auditLog.distinctTargetTables, isAuthorized ? {} : "skip");
 
   const visibleRows = useMemo(() => rows ?? [], [rows]);
 
   if (!isAuthorized) {
-    return (
-      <div className="p-8">
-        <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            Bu sayfayı görüntüleme yetkiniz yok.
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <AccessDenied message="Denetim kaydını görüntüleme yetkiniz yok." />;
   }
 
   return (

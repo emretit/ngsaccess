@@ -1,27 +1,26 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
-import { useToast } from "@/hooks/use-toast";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 
 export const useGeneralSettings = () => {
-  const { toast } = useToast();
-  const { projectId, loading: projectLoading } = useActiveProject();
+  const { projectId, loading: projectLoading, isAdmin } = useActiveProjectScope();
 
   const settings = useQuery(
     api.settings.getGeneral,
-    !projectLoading && projectId ? { projectId } : "skip",
+    !projectLoading && isAdmin && projectId ? { projectId } : "skip",
   );
   const upsertGeneral = useMutation(api.settings.upsertGeneral);
 
-  const saveSettings = async (data: {
+  const { run: saveSettings, pending: saving } = useAsyncAction(async (data: {
     companyName?: string;
-    address?: string;
-    email?: string;
-    phone?: string;
-    website?: string;
-    taxNumber?: string;
-    currency?: string;
-    logoUrl?: string;
+    address?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    website?: string | null;
+    taxNumber?: string | null;
+    currency?: string | null;
+    logoUrl?: string | null;
     darkMode?: boolean;
     dateFormat?: string;
     timezone?: string;
@@ -31,36 +30,14 @@ export const useGeneralSettings = () => {
     workingHoursEnd?: string;
     notificationsEnabled?: boolean;
   }) => {
-    if (!projectId) {
-      toast({
-        title: "Hata",
-        description: "Önce bir proje seçin.",
-        variant: "destructive",
-      });
-      return false;
-    }
-    try {
-      await upsertGeneral({
-        projectId,
-        companyName: data.companyName ?? settings?.companyName ?? "NGS Access",
-        ...data,
-      });
-      toast({ title: "Başarılı", description: "Genel ayarlar kaydedildi." });
-      return true;
-    } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Ayarlar kaydedilirken hata oluştu.",
-        variant: "destructive",
-      });
-      return false;
-    }
-  };
+    if (!isAdmin || !projectId || projectLoading || settings === undefined) throw new Error("Ayarlar yüklenmeden kaydedilemez. Önce bir proje seçin.");
+    await upsertGeneral({ ...data, projectId, companyName: data.companyName ?? settings?.companyName ?? "NGS Access" });
+  }, { success: "Ayarlar kaydedildi", error: "Ayarlar kaydedilemedi" });
 
   return {
     settings: settings ?? null,
     loading: projectLoading || (!!projectId && settings === undefined),
-    saving: false,
+    saving,
     saveSettings,
   };
 };

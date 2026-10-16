@@ -1,3 +1,6 @@
+import { AccessDenied } from "@/components/shared/AccessDenied";
+import { capabilities } from "@/lib/capabilities";
+import { roleLabel } from "@/lib/roleLabels";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
@@ -16,9 +19,7 @@ export default function SystemAdmin() {
       return;
     }
     if (!profile) return;
-    if (!checkUserRole("super_admin")) {
-      navigate("/home");
-    }
+
   }, [checkUserRole, loading, navigate, profile, user]);
 
   if (loading || (user && !profile)) {
@@ -30,8 +31,8 @@ export default function SystemAdmin() {
     );
   }
 
-  if (!user || !checkUserRole("super_admin")) {
-    return null;
+  if (!user || !capabilities(profile?.role).systemAdmin) {
+    return <AccessDenied message="Bu sayfa için süper admin yetkisi gerekli." />;
   }
 
   return (
@@ -40,7 +41,7 @@ export default function SystemAdmin() {
         <p className="text-sm text-muted-foreground">
           Projeleri, kullanıcıları ve cihazları merkezi olarak yönetin
         </p>
-        <Badge variant="secondary">Super Admin</Badge>
+        <Badge variant="secondary">{roleLabel("super_admin")}</Badge>
       </div>
       <AdminDashboard />
     </div>

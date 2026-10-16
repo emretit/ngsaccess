@@ -1,3 +1,4 @@
+import { profileName } from "./lib/settingsUx";
 import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -57,6 +58,7 @@ export const isSuperAdmin = optionalAuthQuery({
 export const updateRole = superAdminMutation({
   args: {
     userId: v.id("users"),
+    projectIds: v.optional(v.array(v.id("projects"))),
     role: v.union(
       v.literal("super_admin"),
       v.literal("project_admin"),
@@ -76,6 +78,19 @@ export const updateRole = superAdminMutation({
       removesSuperAdmin, adminCount: admins.length, deleting: false,
     });
     if (protectionError) throw new ConvexError(protectionError);
+    if (args.projectIds !== undefined) {
+      const projectIds = [...new Set(args.projectIds)];
+      for (const projectId of projectIds) {
+        if (!(await ctx.db.get(projectId))) throw new ConvexError("Proje bulunamadı");
+      }
+      const memberships = await ctx.db.query("userProjects").withIndex("by_user", q => q.eq("userId", args.userId)).collect();
+      for (const row of memberships) {
+        if (!projectIds.includes(row.projectId)) await ctx.db.delete(row._id);
+      }
+      for (const projectId of projectIds) {
+        if (!memberships.some(row => row.projectId === projectId)) await ctx.db.insert("userProjects", { userId: args.userId, projectId, createdAt: new Date().toISOString() });
+      }
+    }
     await ctx.db.patch(args.userId, {
       role: args.role,
       updatedAt: new Date().toISOString(),
@@ -107,7 +122,7 @@ export const updateProfile = authedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-    if (args.fullName !== undefined) updates.fullName = args.fullName;
+    if (args.fullName !== undefined) updates.fullName = profileName(args.fullName);
     if (args.photoUrl !== undefined) updates.photoUrl = args.photoUrl;
     await ctx.db.patch(ctx.user._id, updates);
     return null;

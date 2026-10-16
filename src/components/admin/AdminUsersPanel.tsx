@@ -9,11 +9,12 @@ import { UserFormDialog } from './components/UserFormDialog';
 import { DeleteUserDialog } from './components/DeleteUserDialog';
 import { useUserManagement } from './hooks/useUserManagement';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/hooks/use-toast';
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { api } from '../../../convex/_generated/api';
 import type { User } from './types/user-types';
 
-const AdminUsersPanel = () => {
+const AdminUsersContent = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -24,16 +25,14 @@ const AdminUsersPanel = () => {
   const expiredInvites = useQuery(api.invites.listExpired, isSuperAdmin === true ? {} : "skip") ?? [];
   const sendInviteEmail = useAction(api.actions.sendEmail.sendUserInviteEmail);
 
-  const handleResendInvite = async (email: string, projectId: string, role: "project_admin" | "project_user") => {
+  const { run: resendInvite, pending: resending } = useAsyncAction(async (email: string, projectId: Parameters<typeof sendInviteEmail>[0]["projectId"], role: "project_admin" | "project_user") => {
+    const result = await sendInviteEmail({ email, projectId, role });
+    if (!result.success) throw new Error(result.error ?? "Davet gönderilemedi.");
+  }, { success: "Davet yeniden gönderildi" });
+  const handleResendInvite = async (email: string, projectId: Parameters<typeof sendInviteEmail>[0]["projectId"], role: "project_admin" | "project_user") => {
     setResendingId(email);
-    try {
-      await sendInviteEmail({ email, projectId: projectId as Parameters<typeof sendInviteEmail>[0]["projectId"], role });
-      toast({ title: "Davet yeniden gönderildi", description: `${email} adresine yeni davet maili gönderildi.` });
-    } catch (error: unknown) {
-      toast({ title: "Hata", description: (error as Error)?.message ?? "Davet gönderilemedi", variant: "destructive" });
-    } finally {
-      setResendingId(null);
-    }
+    await resendInvite(email, projectId, role);
+    setResendingId(null);
   };
 
   const {
@@ -45,7 +44,7 @@ const AdminUsersPanel = () => {
     handleEditUser,
     handleSaveUser,
     handleDeleteUser,
-    resetForm
+    resetForm, saving, editReady, loading
   } = useUserManagement();
 
   const filteredUsers = users.filter((user: User) =>
@@ -76,13 +75,13 @@ const AdminUsersPanel = () => {
 
   const handleDelete = async () => {
     if (userToDelete) {
-      const deleted = await handleDeleteUser(userToDelete);
-      if (!deleted) return;
+      await handleDeleteUser(userToDelete);
       setIsDeleteDialogOpen(false);
       setUserToDelete(null);
     }
   };
 
+  if (loading) return <SectionSkeleton label="Kullanıcılar yükleniyor" />;
   return (
     <ProjectFilter requiredRole="admin">
       <div className="space-y-8">
@@ -105,6 +104,7 @@ const AdminUsersPanel = () => {
           formData={formData}
           onFormDataChange={setFormData}
           onSave={handleSave}
+          isSaving={saving || !editReady}
           projects={projects}
         />
 
@@ -130,7 +130,7 @@ const AdminUsersPanel = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={resendingId === inv.email}
+                    disabled={resending}
                     onClick={() => void handleResendInvite(inv.email, inv.projectId, inv.role)}
                   >
                     <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${resendingId === inv.email ? "animate-spin" : ""}`} />
@@ -146,4 +146,6 @@ const AdminUsersPanel = () => {
   );
 };
 
-export default AdminUsersPanel;
+export default function AdminUsersPanel() {
+  return <ProjectFilter requiredRole="admin"><AdminUsersContent /></ProjectFilter>;
+}

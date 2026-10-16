@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useToast } from "@/hooks/use-toast";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 
 interface NotificationSettingsInput {
   emailNotifications?: boolean;
@@ -11,44 +11,24 @@ interface NotificationSettingsInput {
 }
 
 export function useNotificationSettings() {
-  const { toast } = useToast();
-  const { projectId, loading: projectLoading } = useActiveProject();
+  const { projectId, loading: projectLoading, isAdmin } = useActiveProjectScope();
 
   const notificationSettings = useQuery(
     api.settings.getNotification,
-    !projectLoading && projectId ? { projectId } : "skip",
+    !projectLoading && isAdmin && projectId ? { projectId } : "skip",
   );
   const upsertNotification = useMutation(api.settings.upsertNotification);
 
-  const saveNotificationSettings = async (settings: NotificationSettingsInput) => {
-    if (!projectId) {
-      toast({
-        title: "Hata",
-        description: "Önce bir proje seçin.",
-        variant: "destructive",
-      });
-      return;
-    }
-    try {
-      await upsertNotification({ ...settings, projectId });
-      toast({
-        title: "Bildirim ayarları kaydedildi",
-        description: "Bildirim tercihleri başarıyla güncellendi",
-      });
-    } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Bildirim ayarları kaydedilirken hata oluştu",
-        variant: "destructive",
-      });
-    }
-  };
+  const { run: saveNotificationSettings, pending: isSaving } = useAsyncAction(async (settings: NotificationSettingsInput) => {
+    if (!isAdmin || !projectId || projectLoading || notificationSettings === undefined) throw new Error("Ayarlar yüklenmeden kaydedilemez. Önce bir proje seçin.");
+    await upsertNotification({ ...settings, projectId });
+  }, { success: "Ayarlar kaydedildi", error: "Ayarlar kaydedilemedi" });
 
   return {
     notificationSettings: notificationSettings ?? null,
     isLoading:
       projectLoading || (!!projectId && notificationSettings === undefined),
     saveNotificationSettings,
-    isSaving: false,
+    isSaving,
   };
 }

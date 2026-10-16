@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { toast } from '@/hooks/use-toast';
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { roleLabel } from "@/lib/roleLabels";
 import { useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { Loader2 } from 'lucide-react';
@@ -21,36 +22,22 @@ interface ProfileFormProps {
 }
 
 export default function ProfileForm({ email, fullName, role, userId: _userId, onProfileUpdated, onSignOut }: ProfileFormProps) {
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [name, setName] = useState(fullName);
+  const [draft, setDraft] = useState<string | null>(null);
+  const name = draft ?? fullName;
+  const [nameError, setNameError] = useState("");
   const navigate = useNavigate();
   const updateProfile = useMutation(api.users.updateProfile);
 
+  const { run, pending: isUpdating } = useAsyncAction(async () => {
+    await updateProfile({ fullName: name.trim() });
+    setDraft(null);
+    await onProfileUpdated();
+  }, { success: "Profil güncellendi", error: "Profil güncellenemedi" });
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    try {
-      setIsUpdating(true);
-      
-      await updateProfile({ fullName: name });
-      
-      // Context'teki profil bilgisini güncelle
-      await onProfileUpdated();
-      
-      toast({
-        title: "Profil güncellendi",
-        description: "Profil bilgileriniz başarıyla güncellendi.",
-      });
-      
-    } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Profil güncellenirken bir hata oluştu.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUpdating(false);
-    }
+    if (!name.trim()) { setNameError("Ad soyad boş bırakılamaz."); return; }
+    setNameError("");
+    await run();
   };
 
   const handleSignOut = async () => {
@@ -70,51 +57,54 @@ export default function ProfileForm({ email, fullName, role, userId: _userId, on
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">E-posta</Label>
-            <Input 
-              id="email" 
-              type="email" 
-              name="email" 
-              value={email} 
-              disabled 
+            <Input
+              id="email"
+              type="email"
+              name="email"
+              value={email}
+              disabled
             />
             <p className="text-xs text-gray-500">
               E-posta adresi değiştirilemez
             </p>
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="fullName">Ad Soyad</Label>
-            <Input 
-              id="fullName" 
-              name="fullName" 
-              value={name} 
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ad Soyad" 
+            <Input
+              id="fullName"
+              name="fullName"
+              value={name}
+              onChange={(e) => setDraft(e.target.value)}
+              aria-invalid={!!nameError}
+              aria-describedby="profile-name-error"
+              placeholder="Ad Soyad"
               disabled={isUpdating}
             />
           </div>
-          
+
+          {nameError && <p id="profile-name-error" role="alert" className="text-sm text-destructive">{nameError}</p>}
           <Separator className="my-4" />
-          
+
           <div className="space-y-2">
             <Label htmlFor="role">Rol</Label>
-            <Input 
-              id="role" 
-              value={role || 'Kullanıcı'} 
-              disabled 
+            <Input
+              id="role"
+              value={roleLabel(role)}
+              disabled
             />
           </div>
         </CardContent>
         <CardFooter className="flex justify-between flex-col sm:flex-row gap-4">
-          <Button 
-            variant="destructive" 
+          <Button
+            variant="destructive"
             type="button"
             onClick={handleSignOut}
           >
             Çıkış Yap
           </Button>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             disabled={isUpdating}
           >
             {isUpdating ? (

@@ -1,3 +1,4 @@
+import { capabilities } from "@/lib/capabilities";
 import { Link, useLocation } from "react-router-dom";
 import {
   Users,
@@ -44,13 +45,12 @@ const navItems: NavItem[] = [
 export function AppSidebarNav() {
   const location = useLocation();
   const { profile } = useAuth();
-  const isSuperAdmin = profile?.role === "super_admin";
-  const isAdmin = isSuperAdmin || profile?.role === "project_admin";
+  const { systemAdmin: isSuperAdmin, admin: isAdmin } = capabilities(profile?.role);
 
   return (
     <SidebarMenu>
       {navItems
-        .filter((item) => (!item.adminOnly || isAdmin) && (!item.superAdminOnly || isSuperAdmin))
+        .filter((item) => (item.href !== "/settings" || isAdmin) && (!item.adminOnly || isAdmin) && (!item.superAdminOnly || isSuperAdmin))
         .map((item) => {
         const Icon = item.icon;
         const isActive = location.pathname === item.href;

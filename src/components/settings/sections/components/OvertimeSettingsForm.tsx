@@ -1,240 +1,81 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { z } from "zod";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
-import { useToast } from "@/hooks/use-toast";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
 
+const nonnegative = z.number({ error: "Geçerli bir sayı girin." }).min(0, "Negatif olamaz.");
+const multiplier = z.number({ error: "Geçerli bir sayı girin." }).min(1, "Çarpan en az 1 olmalıdır.");
+const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Geçerli bir saat girin.");
+const schema = z.object({
+  annualOvertimeLimitHours: nonnegative,
+  overtimeStartToleranceMinutes: nonnegative,
+  monthlyHoursBase: z.number({ error: "Geçerli bir sayı girin." }).positive("Saat tabanı sıfırdan büyük olmalıdır."),
+  weekdayMultiplier: multiplier, weekendMultiplier: multiplier, holidayMultiplier: multiplier, nightShiftMultiplier: multiplier,
+  nightShiftStart: time, nightShiftEnd: time,
+});
+type Values = z.infer<typeof schema>;
+const numbers = [
+  ["annualOvertimeLimitHours", "Yıllık sınır (saat)", 0], ["overtimeStartToleranceMinutes", "Başlangıç toleransı (dk)", 0],
+  ["monthlyHoursBase", "Aylık saat tabanı", 0.1], ["weekdayMultiplier", "Hafta içi çarpanı", 1],
+  ["weekendMultiplier", "Hafta tatili çarpanı", 1], ["holidayMultiplier", "Resmi tatil çarpanı", 1], ["nightShiftMultiplier", "Gece çarpanı", 1],
+] as const;
 export function OvertimeSettingsForm() {
-  const { projectId, loading: projectLoading } = useActiveProject();
-  const { toast } = useToast();
-
-  const workSettings = useQuery(
-    api.settings.getWork,
-    !projectLoading && projectId ? { projectId } : "skip",
-  );
-  const rates = useQuery(
-    api.holidays.getOvertimeRates,
-    !projectLoading && projectId ? { projectId } : "skip",
-  );
-  const upsertWork = useMutation(api.settings.upsertWork);
-  const upsertRates = useMutation(api.holidays.upsertOvertimeRates);
-
-  const [annualOvertimeLimitHours, setAnnualOvertimeLimitHours] = useState(270);
-  const [overtimeStartToleranceMinutes, setOvertimeStartToleranceMinutes] = useState(15);
-  const [monthlyHoursBase, setMonthlyHoursBase] = useState(225);
-
-  const [weekday, setWeekday] = useState(1.5);
-  const [weekend, setWeekend] = useState(2.0);
-  const [holiday, setHoliday] = useState(2.0);
-  const [night, setNight] = useState(1.5);
-  const [nightStart, setNightStart] = useState("22:00");
-  const [nightEnd, setNightEnd] = useState("06:00");
-
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!workSettings) return;
-    setAnnualOvertimeLimitHours(workSettings.annualOvertimeLimitHours ?? 270);
-    setOvertimeStartToleranceMinutes(workSettings.overtimeStartToleranceMinutes ?? 15);
-    setMonthlyHoursBase(workSettings.monthlyHoursBase ?? 225);
-  }, [workSettings]);
-
-  useEffect(() => {
-    if (!rates) return;
-    setWeekday(rates.weekdayMultiplier);
-    setWeekend(rates.weekendMultiplier);
-    setHoliday(rates.holidayMultiplier);
-    setNight(rates.nightShiftMultiplier);
-    setNightStart(rates.nightShiftStart);
-    setNightEnd(rates.nightShiftEnd);
-  }, [rates]);
-
-  const handleSave = async () => {
-    if (!projectId) {
-      toast({
-        title: "Hata",
-        description: "Önce bir proje seçin.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setSaving(true);
-    try {
-      await Promise.all([
-        upsertWork({
-          projectId,
-          annualOvertimeLimitHours,
-          overtimeStartToleranceMinutes,
-          monthlyHoursBase,
-        }),
-        upsertRates({
-          projectId,
-          weekdayMultiplier: weekday,
-          weekendMultiplier: weekend,
-          holidayMultiplier: holiday,
-          nightShiftMultiplier: night,
-          nightShiftStart: nightStart,
-          nightShiftEnd: nightEnd,
-        }),
-      ]);
-      toast({
-        title: "Kaydedildi",
-        description: "Mesai ayarları ve çarpanlar güncellendi.",
-      });
-    } catch (e) {
-      toast({
-        title: "Hata",
-        description: e instanceof Error ? e.message : "Kayıt başarısız",
-        variant: "destructive",
-      });
-    } finally {
-      setSaving(false);
-    }
+  const { projectId, loading, isAdmin } = useActiveProjectScope();
+  const work = useQuery(api.settings.getWork, !loading && projectId && isAdmin ? { projectId } : "skip");
+  const rates = useQuery(api.holidays.getOvertimeRates, !loading && projectId && isAdmin ? { projectId } : "skip");
+  const save = useMutation(api.settings.saveOvertime);
+  const [draft, setDraft] = useState<{ projectId: string; fields: Partial<Values> } | null>(null);
+  const [errors, setErrors] = useState<Partial<Record<keyof Values, string>>>({});
+  const values: Values = {
+    annualOvertimeLimitHours: work?.annualOvertimeLimitHours ?? 270,
+    overtimeStartToleranceMinutes: work?.overtimeStartToleranceMinutes ?? 15, monthlyHoursBase: work?.monthlyHoursBase ?? 225,
+    weekdayMultiplier: rates?.weekdayMultiplier ?? 1.5, weekendMultiplier: rates?.weekendMultiplier ?? 2,
+    holidayMultiplier: rates?.holidayMultiplier ?? 2, nightShiftMultiplier: rates?.nightShiftMultiplier ?? 1.5,
+    nightShiftStart: rates?.nightShiftStart ?? "22:00", nightShiftEnd: rates?.nightShiftEnd ?? "06:00",
+    ...(draft && draft.projectId === projectId ? draft.fields : {}),
   };
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Mesai Ayarları</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <section className="space-y-4">
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Limitler ve Bazlar
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="annualLimit">Yıllık Sınır (saat)</Label>
-              <Input
-                id="annualLimit"
-                type="number"
-                min={0}
-                value={annualOvertimeLimitHours}
-                onChange={(e) =>
-                  setAnnualOvertimeLimitHours(Number(e.target.value))
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                4857 sayılı İş Kanunu: yıllık 270 saat üst sınır.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="overtimeStartTolerance">
-                Başlangıç Toleransı (dk)
-              </Label>
-              <Input
-                id="overtimeStartTolerance"
-                type="number"
-                min={0}
-                value={overtimeStartToleranceMinutes}
-                onChange={(e) =>
-                  setOvertimeStartToleranceMinutes(Number(e.target.value))
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                Vardiyada boşsa global kullanılır.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="monthlyHoursBase">Aylık Saat Tabanı</Label>
-              <Input
-                id="monthlyHoursBase"
-                type="number"
-                min={1}
-                value={monthlyHoursBase}
-                onChange={(e) => setMonthlyHoursBase(Number(e.target.value))}
-              />
-              <p className="text-xs text-muted-foreground">
-                Aylık maaş → saatlik ücret (default 225).
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <div className="border-t" />
-
-        <section className="space-y-4">
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            Çarpanlar
-          </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="weekday">Hafta İçi</Label>
-              <Input
-                id="weekday"
-                type="number"
-                step="0.1"
-                min={1}
-                value={weekday}
-                onChange={(e) => setWeekday(Number(e.target.value))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="weekend">Hafta Tatili</Label>
-              <Input
-                id="weekend"
-                type="number"
-                step="0.1"
-                min={1}
-                value={weekend}
-                onChange={(e) => setWeekend(Number(e.target.value))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="holiday">Resmi Tatil</Label>
-              <Input
-                id="holiday"
-                type="number"
-                step="0.1"
-                min={1}
-                value={holiday}
-                onChange={(e) => setHoliday(Number(e.target.value))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="night">Gece Vardiyası</Label>
-              <Input
-                id="night"
-                type="number"
-                step="0.1"
-                min={1}
-                value={night}
-                onChange={(e) => setNight(Number(e.target.value))}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="nightStart">Gece Başlangıç</Label>
-              <Input
-                id="nightStart"
-                type="time"
-                value={nightStart}
-                onChange={(e) => setNightStart(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="nightEnd">Gece Bitiş</Label>
-              <Input
-                id="nightEnd"
-                type="time"
-                value={nightEnd}
-                onChange={(e) => setNightEnd(e.target.value)}
-              />
-            </div>
-          </div>
-        </section>
-
-        <Button onClick={handleSave} disabled={saving || !projectId}>
-          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Değişiklikleri Kaydet
-        </Button>
-      </CardContent>
-    </Card>
-  );
+  const change = (fields: Partial<Values>) => {
+    if (projectId) setDraft(previous => ({ projectId, fields: { ...(previous?.projectId === projectId ? previous.fields : {}), ...fields } }));
+  };
+  const { run, pending } = useAsyncAction(async (payload: Values) => {
+    if (!projectId || loading || !isAdmin || work === undefined || rates === undefined) throw new Error("Ayarlar yüklenmeden kaydedilemez.");
+    await save({ projectId, ...payload });
+    setDraft(null);
+  }, { success: "Mesai ayarları ve çarpanlar kaydedildi" });
+  if (loading || work === undefined || rates === undefined) return <SectionSkeleton label="Mesai ayarları yükleniyor" />;
+  return <Card><CardHeader><CardTitle>Mesai Ayarları</CardTitle></CardHeader><CardContent>
+    <form noValidate className="space-y-4" onSubmit={async event => {
+      event.preventDefault();
+      const result = schema.safeParse(values);
+      if (!result.success) {
+        const next: Partial<Record<keyof Values, string>> = {};
+        for (const issue of result.error.issues) {
+          const key = issue.path[0];
+          if (typeof key === "string" && key in values) next[key as keyof Values] = issue.message;
+        }
+        setErrors(next);
+        document.getElementById(String(result.error.issues[0]?.path[0]))?.focus();
+        return;
+      }
+      setErrors({});
+      await run(result.data);
+    }}>
+      <fieldset disabled={pending} className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {numbers.map(([key, label, min]) => <FormFieldWrapper key={key} htmlFor={key} label={label} error={errors[key]}>
+          <Input id={key} type="number" min={min} step="any" value={Number.isNaN(values[key]) ? "" : values[key]} onChange={event => change({ [key]: event.target.value === "" ? NaN : Number(event.target.value) })} />
+        </FormFieldWrapper>)}
+        {(["nightShiftStart", "nightShiftEnd"] as const).map(key => <FormFieldWrapper key={key} htmlFor={key} label={key === "nightShiftStart" ? "Gece başlangıcı" : "Gece bitişi"} error={errors[key]}>
+          <Input id={key} type="time" value={values[key]} onChange={event => change({ [key]: event.target.value })} />
+        </FormFieldWrapper>)}
+      </fieldset>
+      <Button type="submit" disabled={pending || !projectId}>{pending ? "Kaydediliyor…" : "Değişiklikleri Kaydet"}</Button>
+    </form>
+  </CardContent></Card>;
 }

@@ -1,6 +1,10 @@
+import { writeAudit } from "./lib/audit";
+import { validateSettingsNumbers } from "./lib/settingsUx";
+import { resolveProjectScope } from "./lib/projectScope";
+import { toPatch } from "./lib/nullablePatch";
 
 import { v } from "convex/values";
-import { authedQuery, authedMutation, optionalAuthQuery } from "./lib/customFunctions";
+import { authedQuery, adminQuery, adminMutation, optionalAuthQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import type { Id } from "./_generated/dataModel";
 
@@ -37,17 +41,17 @@ export const getGeneral = authedQuery({
   },
 });
 
-export const upsertGeneral = authedMutation({
+export const upsertGeneral = adminMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     companyName: v.string(),
-    address: v.optional(v.string()),
-    email: v.optional(v.string()),
-    phone: v.optional(v.string()),
-    website: v.optional(v.string()),
-    taxNumber: v.optional(v.string()),
-    currency: v.optional(v.string()),
-    logoUrl: v.optional(v.string()),
+    address: v.optional(v.union(v.null(), v.string())),
+    email: v.optional(v.union(v.null(), v.string())),
+    phone: v.optional(v.union(v.null(), v.string())),
+    website: v.optional(v.union(v.null(), v.string())),
+    taxNumber: v.optional(v.union(v.null(), v.string())),
+    currency: v.optional(v.union(v.null(), v.string())),
+    logoUrl: v.optional(v.union(v.null(), v.string())),
     darkMode: v.optional(v.boolean()),
     dateFormat: v.optional(v.string()),
     timezone: v.optional(v.string()),
@@ -58,7 +62,9 @@ export const upsertGeneral = authedMutation({
     notificationsEnabled: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (!args.companyName.trim()) throw new Error("Şirket adı boş bırakılamaz.");
+    args.companyName = args.companyName.trim();
+    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
     const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
     if (!projectId) throw new Error("Bu projeye erişim yetkiniz yok");
     const now = new Date().toISOString();
@@ -68,11 +74,12 @@ export const upsertGeneral = authedMutation({
       .first();
 
     if (existing) {
-      await ctx.db.patch(existing._id, { ...args, projectId, updatedAt: now });
+      await ctx.db.patch(existing._id, { ...toPatch(args), projectId, updatedAt: now });
       return existing._id;
     }
     return await ctx.db.insert("generalSettings", {
-      ...args,
+      ...toPatch(args),
+      companyName: args.companyName.trim(),
       projectId,
       createdAt: now,
       updatedAt: now,
@@ -81,7 +88,7 @@ export const upsertGeneral = authedMutation({
 });
 
 // === Mail Settings ===
-export const getMail = authedQuery({
+export const getMail = adminQuery({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -94,20 +101,21 @@ export const getMail = authedQuery({
   },
 });
 
-export const upsertMail = authedMutation({
+export const upsertMail = adminMutation({
   args: {
     projectId: v.optional(v.id("projects")),
-    smtpHost: v.optional(v.string()),
+    smtpHost: v.optional(v.union(v.null(), v.string())),
     smtpPort: v.optional(v.number()),
-    smtpUsername: v.optional(v.string()),
-    smtpPassword: v.optional(v.string()),
+    smtpUsername: v.optional(v.union(v.null(), v.string())),
+    smtpPassword: v.optional(v.union(v.null(), v.string())),
     smtpSecure: v.optional(v.boolean()),
-    fromEmail: v.optional(v.string()),
-    fromName: v.optional(v.string()),
+    fromEmail: v.optional(v.union(v.null(), v.string())),
+    fromName: v.optional(v.union(v.null(), v.string())),
     isActive: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    validateSettingsNumbers(args);
+    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
     const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
     if (!projectId) throw new Error("Bu projeye erişim yetkiniz yok");
     const now = new Date().toISOString();
@@ -117,11 +125,11 @@ export const upsertMail = authedMutation({
       .first();
 
     if (existing) {
-      await ctx.db.patch(existing._id, { ...args, projectId, updatedAt: now });
+      await ctx.db.patch(existing._id, { ...toPatch(args), projectId, updatedAt: now });
       return existing._id;
     }
     return await ctx.db.insert("mailSettings", {
-      ...args,
+      ...toPatch(args),
       projectId,
       createdAt: now,
       updatedAt: now,
@@ -143,7 +151,7 @@ export const getNotification = authedQuery({
   },
 });
 
-export const upsertNotification = authedMutation({
+export const upsertNotification = adminMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     emailNotifications: v.optional(v.boolean()),
@@ -152,7 +160,7 @@ export const upsertNotification = authedMutation({
     reportNotifications: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
     const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
     if (!projectId) throw new Error("Bu projeye erişim yetkiniz yok");
     const now = new Date().toISOString();
@@ -162,11 +170,11 @@ export const upsertNotification = authedMutation({
       .first();
 
     if (existing) {
-      await ctx.db.patch(existing._id, { ...args, projectId, updatedAt: now });
+      await ctx.db.patch(existing._id, { ...toPatch(args), projectId, updatedAt: now });
       return existing._id;
     }
     return await ctx.db.insert("notificationSettings", {
-      ...args,
+      ...toPatch(args),
       projectId,
       createdAt: now,
       updatedAt: now,
@@ -188,7 +196,7 @@ export const getWork = authedQuery({
   },
 });
 
-export const upsertWork = authedMutation({
+export const upsertWork = adminMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     workStartTime: v.optional(v.string()),
@@ -204,7 +212,8 @@ export const upsertWork = authedMutation({
     monthlyHoursBase: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    validateSettingsNumbers(args);
+    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
     const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
     if (!projectId) throw new Error("Bu projeye erişim yetkiniz yok");
     const now = new Date().toISOString();
@@ -214,10 +223,10 @@ export const upsertWork = authedMutation({
       .first();
 
     if (existing) {
-      await ctx.db.patch(existing._id, { ...args, projectId, updatedAt: now });
+      await ctx.db.patch(existing._id, { ...toPatch(args), projectId, updatedAt: now });
       return existing._id;
     }
-    return await ctx.db.insert("workSettings", { ...args, projectId, updatedAt: now });
+    return await ctx.db.insert("workSettings", { ...toPatch(args), projectId, updatedAt: now });
   },
 });
 
@@ -238,5 +247,30 @@ export const getDarkMode = optionalAuthQuery({
       .withIndex("by_project", (q) => q.eq("projectId", projectId))
       .first();
     return settings?.darkMode ?? false;
+  },
+});
+
+export const saveOvertime = adminMutation({
+  args: {
+    projectId: v.id("projects"), annualOvertimeLimitHours: v.number(), overtimeStartToleranceMinutes: v.number(), monthlyHoursBase: v.number(),
+    weekdayMultiplier: v.number(), weekendMultiplier: v.number(), holidayMultiplier: v.number(), nightShiftMultiplier: v.number(), nightShiftStart: v.string(), nightShiftEnd: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await resolveProjectScope(ctx, args.projectId);
+    validateSettingsNumbers(args);
+    const { projectId, annualOvertimeLimitHours, overtimeStartToleranceMinutes, monthlyHoursBase, ...rates } = args;
+    const updatedAt = new Date().toISOString();
+    const work = { projectId, annualOvertimeLimitHours, overtimeStartToleranceMinutes, monthlyHoursBase, updatedAt };
+    const rate = { ...rates, projectId, updatedAt };
+    const existingWork = await ctx.db.query("workSettings").withIndex("by_project", q => q.eq("projectId", projectId)).first();
+    const existingRates = await ctx.db.query("overtimeRates").withIndex("by_project", q => q.eq("projectId", projectId)).first();
+    if (existingWork) await ctx.db.patch(existingWork._id, work);
+    else await ctx.db.insert("workSettings", work);
+    const rateId = existingRates?._id ?? await ctx.db.insert("overtimeRates", rate);
+    if (existingRates) await ctx.db.patch(existingRates._id, rate);
+    await writeAudit(ctx, {
+      user: ctx.user, projectId, action: existingRates ? "update" : "create",
+      targetTable: "overtimeRates", targetId: rateId, oldValue: existingRates ?? undefined, newValue: rate,
+    });
   },
 });

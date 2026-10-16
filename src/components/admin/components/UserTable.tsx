@@ -1,6 +1,9 @@
+import { capabilities } from "@/lib/capabilities";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { roleLabel } from "@/lib/roleLabels";
 
-import React, { useState } from 'react';
-import { Edit, Trash2, UserPlus, Mail } from 'lucide-react';
+import React from 'react';
+import { Edit, Trash2, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -12,7 +15,7 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { User } from '../types/user-types';
-import { UserPasswordResetDialog } from './UserPasswordResetDialog';
+import { EmptyState } from "@/components/shared/EmptyState";
 
 interface UserTableProps {
   users: User[];
@@ -25,27 +28,9 @@ export const UserTable: React.FC<UserTableProps> = ({
   onEditUser,
   onDeleteUser
 }) => {
-  const [selectedUserForReset, setSelectedUserForReset] = useState<User | null>(null);
-  const [showPasswordResetDialog, setShowPasswordResetDialog] = useState(false);
-
-
-  const handlePasswordResetClick = (user: User) => {
-    setSelectedUserForReset(user);
-    setShowPasswordResetDialog(true);
-  };
-
-  const getRoleDisplay = (role: string | undefined) => {
-    switch (role) {
-      case 'super_admin':
-        return <Badge variant="destructive">Süper Admin</Badge>;
-      case 'project_admin':
-        return <Badge className="bg-primary text-primary-foreground">Proje Yöneticisi</Badge>;
-      case 'project_user':
-        return <Badge variant="secondary">Kullanıcı</Badge>;
-      default:
-        return <Badge variant="outline">Bilinmiyor</Badge>;
-    }
-  };
+  const { profile } = useAuth();
+  const canManage = capabilities(profile?.role).manageUsers;
+  const getRoleDisplay = (role: string | undefined) => <Badge variant="secondary">{roleLabel(role)}</Badge>;
 
 
   return (
@@ -63,12 +48,7 @@ export const UserTable: React.FC<UserTableProps> = ({
             {users.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={3} className="text-center py-8">
-                  <div className="flex flex-col items-center space-y-4">
-                    <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center">
-                      <UserPlus className="w-6 h-6 text-muted-foreground" />
-                    </div>
-                    <span className="text-muted-foreground">Kullanıcı bulunamadı</span>
-                  </div>
+                  <EmptyState title="Kullanıcı bulunamadı" description="Aramanızı değiştirin veya yeni bir kullanıcı davet edin." />
                 </TableCell>
               </TableRow>
             ) : (
@@ -79,11 +59,13 @@ export const UserTable: React.FC<UserTableProps> = ({
                   </TableCell>
                   <TableCell>{getRoleDisplay(user.role)}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end space-x-2">
+                    {canManage && <div className="flex justify-end space-x-2">
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        onClick={() => handlePasswordResetClick(user)}
+                        disabled
+                        aria-label="Parola sıfırlama henüz kullanılamıyor"
+                        title="Parola sıfırlama henüz kullanılamıyor"
                         className="h-8 w-8"
                       >
                         <Mail className="h-4 w-4" />
@@ -91,6 +73,7 @@ export const UserTable: React.FC<UserTableProps> = ({
                       <Button 
                         variant="ghost" 
                         size="icon" 
+                        aria-label="Kullanıcıyı düzenle"
                         onClick={() => onEditUser(user)}
                         className="h-8 w-8"
                       >
@@ -100,11 +83,12 @@ export const UserTable: React.FC<UserTableProps> = ({
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive"
+                        aria-label="Kullanıcıyı sil"
                         onClick={() => onDeleteUser(user)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    </div>
+                    </div>}
                   </TableCell>
                 </TableRow>
               ))
@@ -113,11 +97,6 @@ export const UserTable: React.FC<UserTableProps> = ({
         </Table>
       </div>
 
-      <UserPasswordResetDialog
-        isOpen={showPasswordResetDialog}
-        onOpenChange={setShowPasswordResetDialog}
-        user={selectedUserForReset}
-      />
     </>
   );
 }

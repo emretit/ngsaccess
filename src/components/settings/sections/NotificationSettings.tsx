@@ -1,3 +1,4 @@
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -30,11 +31,8 @@ export function NotificationSettings({ onComplete }: NotificationSettingsProps) 
     }
   }, [notificationSettings]);
 
-  const handleSave = () => {
-    saveNotificationSettings(formData);
-    if (onComplete) {
-      onComplete();
-    }
+  const handleSave = async () => {
+    if (await saveNotificationSettings(formData)) onComplete?.();
   };
 
   const handleSwitchChange = (field: string, checked: boolean) => {
@@ -45,7 +43,7 @@ export function NotificationSettings({ onComplete }: NotificationSettingsProps) 
   };
 
   if (isLoading) {
-    return <div>Yükleniyor...</div>;
+    return <SectionSkeleton label="Bildirim ayarları yükleniyor" />;
   }
 
   return (
@@ -54,6 +52,7 @@ export function NotificationSettings({ onComplete }: NotificationSettingsProps) 
         <CardTitle>Bildirim Ayarları</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        <fieldset disabled={isSaving} className="space-y-6">
         <div className="flex items-center justify-between space-y-2">
           <Label htmlFor="emailNotifications">E-posta Bildirimleri</Label>
           <Switch 
@@ -90,6 +89,7 @@ export function NotificationSettings({ onComplete }: NotificationSettingsProps) 
           />
         </div>
         
+        </fieldset>
         <Button onClick={handleSave} disabled={isSaving}>
           {isSaving ? 'Kaydediliyor...' : 'Değişiklikleri Kaydet'}
         </Button>

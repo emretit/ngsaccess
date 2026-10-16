@@ -7,8 +7,12 @@ import { NotificationSettings } from "@/components/settings/sections/Notificatio
 import { MailSettings } from "@/components/settings/sections/MailSettings";
 import { IntegrationsSettings } from "@/components/settings/sections/IntegrationsSettings";
 import AdminUsersPanel from "@/components/admin/AdminUsersPanel";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import { useGeneralSettings } from "@/components/settings/sections/hooks/useGeneralSettings";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { capabilities } from "@/lib/capabilities";
+import { AccessDenied } from "@/components/shared/AccessDenied";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import {
   Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList,
   BreadcrumbPage, BreadcrumbSeparator,
@@ -44,7 +48,9 @@ export default function Settings() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabFromUrl = searchParams.get("tab");
   const activeTab: Tab = isValidTab(tabFromUrl) ? tabFromUrl : "general";
-  const { loading } = useGeneralSettings();
+  const { profile, loading } = useAuth();
+  const scope = useActiveProjectScope();
+  const permissions = capabilities(profile?.role);
 
   const handleTabChange = (tab: string) => {
     const next = new URLSearchParams(searchParams);
@@ -57,8 +63,10 @@ export default function Settings() {
   };
 
   if (loading) {
-    return <LoadingSpinner text="Ayarlar yükleniyor..." />;
+    return <SectionSkeleton label="Ayarlar yükleniyor" />;
   }
+
+  if (!permissions.settingsTabs.includes(activeTab)) return <AccessDenied message="Bu ayar bölümünü görüntüleme yetkiniz yok." />;
 
   const renderActiveContent = () => {
     switch (activeTab) {
@@ -113,7 +121,7 @@ export default function Settings() {
         <SettingsSidebar selected={activeTab} onSelect={handleTabChange} />
 
         <div className="flex-1 min-w-0 overflow-auto">
-          {renderActiveContent()}
+          {scope.loading ? <SectionSkeleton label="Proje yükleniyor" /> : !scope.projectId ? <EmptyState title="Proje seçin" description="Ayarları görüntülemek için bir proje seçin." /> : <div key={scope.projectId}>{renderActiveContent()}</div>}
         </div>
       </div>
     </div>

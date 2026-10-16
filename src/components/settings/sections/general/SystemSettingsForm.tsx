@@ -4,10 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Clock, Globe, Calendar, Sun } from "lucide-react";
-import { GeneralSettings } from "../types/generalSettings";
+import type { FunctionReturnType } from "convex/server";
+import { api } from "../../../../../convex/_generated/api";
 
 interface SystemSettingsFormProps {
-  settings: GeneralSettings | null;
+  settings: FunctionReturnType<typeof api.settings.getGeneral>;
   isDarkMode: boolean;
   onDarkModeChange: (enabled: boolean) => void;
 }
@@ -25,7 +26,7 @@ export const SystemSettingsForm = ({ settings, isDarkMode, onDarkModeChange }: S
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <Label htmlFor="language">Sistem Dili</Label>
-            <Select name="language" defaultValue={settings?.system_language || "tr"}>
+            <Select name="language" defaultValue={settings?.systemLanguage || "tr"}>
               <SelectTrigger className="focus:ring-2 focus:ring-primary/20">
                 <SelectValue placeholder="Dil seçin" />
               </SelectTrigger>
@@ -57,7 +58,7 @@ export const SystemSettingsForm = ({ settings, isDarkMode, onDarkModeChange }: S
             <Label htmlFor="dateFormat">Tarih Formatı</Label>
             <div className="flex items-center space-x-2">
               <Calendar className="w-4 h-4 text-muted-foreground" />
-              <Select name="dateFormat" defaultValue={settings?.date_format || "DD.MM.YYYY"}>
+              <Select name="dateFormat" defaultValue={settings?.dateFormat || "DD.MM.YYYY"}>
                 <SelectTrigger className="focus:ring-2 focus:ring-primary/20">
                   <SelectValue placeholder="Tarih formatı seçin" />
                 </SelectTrigger>
@@ -77,7 +78,7 @@ export const SystemSettingsForm = ({ settings, isDarkMode, onDarkModeChange }: S
                 id="workingHoursStart"
                 name="workingHoursStart"
                 type="time"
-                defaultValue={settings?.working_hours_start || "09:00"}
+                defaultValue={settings?.workingHoursStart || "09:00"}
                 className="focus:ring-2 focus:ring-primary/20"
               />
               <span className="text-muted-foreground font-medium">-</span>
@@ -85,7 +86,7 @@ export const SystemSettingsForm = ({ settings, isDarkMode, onDarkModeChange }: S
                 id="workingHoursEnd"
                 name="workingHoursEnd"
                 type="time"
-                defaultValue={settings?.working_hours_end || "18:00"}
+                defaultValue={settings?.workingHoursEnd || "18:00"}
                 className="focus:ring-2 focus:ring-primary/20"
               />
             </div>
@@ -123,7 +124,7 @@ export const SystemSettingsForm = ({ settings, isDarkMode, onDarkModeChange }: S
             <Switch 
               id="notifications" 
               name="notifications" 
-              defaultChecked={settings?.notifications_enabled || true}
+              defaultChecked={settings?.notificationsEnabled ?? true}
             />
           </div>
         </div>

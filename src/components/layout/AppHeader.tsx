@@ -1,3 +1,6 @@
+import type { FunctionReturnType } from "convex/server";
+import { api } from "../../../convex/_generated/api";
+import { capabilities } from "@/lib/capabilities";
 import { Link } from "react-router-dom";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -19,10 +22,10 @@ interface AppHeaderProps {
   children?: React.ReactNode;
 }
 
-type UserProfile = { email?: string; photo_url?: string } | null;
+type UserProfile = FunctionReturnType<typeof api.users.currentUser>;
 
 function getUserDisplayName(profile: UserProfile) {
-  return profile?.email?.split("@")[0] || "Kullanıcı";
+  return profile?.fullName || profile?.name || profile?.email?.split("@")[0] || "Kullanıcı";
 }
 
 function getUserInitials(profile: UserProfile, user: UserProfile) {
@@ -35,8 +38,8 @@ function getUserInitials(profile: UserProfile, user: UserProfile) {
 
 export function AppHeader({ title, className, children }: AppHeaderProps) {
   const { user, profile, signOut } = useAuth();
-  const typedProfile = profile as UserProfile;
-  const typedUser = user as UserProfile;
+  const typedProfile = profile;
+  const typedUser = user;
 
   return (
     <header
@@ -58,9 +61,9 @@ export function AppHeader({ title, className, children }: AppHeaderProps) {
       <div className="ml-auto flex items-center gap-1">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 rounded-full p-0">
+            <Button variant="ghost" aria-label="Hesap menüsü" className="h-8 w-8 rounded-full p-0">
               <Avatar className="h-7 w-7">
-                <AvatarImage src={typedProfile?.photo_url || ""} alt={getUserDisplayName(typedProfile)} />
+                <AvatarImage src={typedProfile?.photoUrl || typedProfile?.image || ""} alt={getUserDisplayName(typedProfile)} />
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
                   {getUserInitials(typedProfile, typedUser)}
                 </AvatarFallback>
@@ -76,9 +79,9 @@ export function AppHeader({ title, className, children }: AppHeaderProps) {
             <DropdownMenuItem asChild>
               <Link to="/profile" className="cursor-pointer">Profil</Link>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
+            {capabilities(profile?.role).admin && <DropdownMenuItem asChild>
               <Link to="/settings" className="cursor-pointer">Ayarlar</Link>
-            </DropdownMenuItem>
+            </DropdownMenuItem>}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => signOut()}

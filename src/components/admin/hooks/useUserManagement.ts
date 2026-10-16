@@ -1,141 +1,45 @@
-import { useEffect, useState } from "react";
-import { ConvexError } from "convex/values";
-import { toast as notify } from "sonner";
+import { useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { useToast } from "@/hooks/use-toast";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
-import type { User, Project, UserFormData, UserRole } from "../types/user-types";
-
-export type { User, Project, UserFormData, UserRole };
-
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { capabilities } from "@/lib/capabilities";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import type { User, UserFormData } from "../types/user-types";
+export type { User, Project, UserFormData, UserRole } from "../types/user-types";
 export const useUserManagement = () => {
-  const { toast } = useToast();
-  const { projectId: activeProjectId } = useActiveProject();
+  const { projectId } = useActiveProjectScope();
+  const { profile } = useAuth();
+  const permissions = capabilities(profile?.role);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [formData, setFormData] = useState<UserFormData>({
-    email: "",
-    role: "project_user",
-    projectId: activeProjectId,
-  });
-
-  useEffect(() => {
-    setFormData((prev) =>
-      prev.projectId || !activeProjectId ? prev : { ...prev, projectId: activeProjectId },
-    );
-  }, [activeProjectId]);
-
-  const usersRaw = useQuery(api.users.list);
-  const projectsRaw = useQuery(api.projects.listActive);
-
-  const updateRoleMut = useMutation(api.users.updateRole);
-  const assignProjectMut = useMutation(api.userProjects.assign);
-  const _removeProjectMut = useMutation(api.userProjects.remove);
-  const deleteUserMut = useMutation(api.users.deleteUser);
-  const sendInviteEmail = useAction(api.actions.sendEmail.sendUserInviteEmail);
-
-  const users: User[] = (usersRaw ?? []) as User[];
-  const projects: Project[] = (projectsRaw ?? []) as Project[];
-
-  const handleEditUser = (user: User) => {
-    setCurrentUser(user);
-    setFormData({ email: user.email ?? "", role: user.role ?? "project_user", projectId: activeProjectId });
-  };
-
-  const handleSaveUser = async () => {
-    // Düzenleme akışı
+  const [formData, setFormData] = useState<UserFormData>({ email: "", role: "project_user", projectIds: [] });
+  const usersRaw = useQuery(api.users.list, permissions.admin ? {} : "skip");
+  const projectsRaw = useQuery(api.projects.list, permissions.admin ? {} : "skip");
+  const memberships = useQuery(api.userProjects.getProjectIdsByUser, permissions.manageUsers && currentUser ? { userId: currentUser._id } : "skip");
+  const updateRole = useMutation(api.users.updateRole);
+  const deleteUser = useMutation(api.users.deleteUser);
+  const sendInvite = useAction(api.actions.sendEmail.sendUserInviteEmail);
+  const editReady = projectsRaw !== undefined && (!currentUser || memberships !== undefined);
+  const effectiveFormData = currentUser && formData.projectIds === undefined ? { ...formData, projectIds: memberships } : formData;
+  const { run: handleSaveUser, pending: saving } = useAsyncAction(async () => {
+    if (!editReady) throw new Error("Proje üyelikleri yükleniyor.");
     if (currentUser) {
-      try {
-        await updateRoleMut({ userId: currentUser._id, role: formData.role });
-        if (formData.projectId) {
-          await assignProjectMut({ userId: currentUser._id, projectId: formData.projectId });
-        }
-        toast({ title: "Kullanıcı güncellendi" });
-        setCurrentUser(null);
-        return true;
-      } catch (error: unknown) {
-        notify.error(error instanceof ConvexError && typeof error.data === "string"
-          ? error.data : error instanceof Error ? error.message : "Kullanıcı güncellenemedi");
-        return false;
-      }
+      await updateRole({ userId: currentUser._id, role: formData.role, projectIds: effectiveFormData.projectIds });
+    } else {
+      const email = formData.email.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Geçerli bir e-posta adresi girin.");
+      if (formData.role === "super_admin") throw new Error("Süper admin davet edilemez.");
+      if (!formData.projectId) throw new Error("Proje seçimi zorunludur.");
+      const result = await sendInvite({ email, role: formData.role, projectId: formData.projectId });
+      if (!result.success) throw new Error(result.error ?? "Davet gönderilemedi.");
     }
-
-    // Yeni kullanıcı = davet maili gönder
-    const trimmedEmail = formData.email.trim().toLowerCase();
-    if (!trimmedEmail) {
-      toast({ title: "Hata", description: "E-posta adresi zorunludur", variant: "destructive" });
-      return false;
-    }
-    if (formData.role === "super_admin") {
-      toast({
-        title: "Hata",
-        description: "Süper admin davet edilemez. Mevcut kullanıcıyı düzenleyerek atayın.",
-        variant: "destructive",
-      });
-      return false;
-    }
-    if (!formData.projectId) {
-      toast({ title: "Hata", description: "Proje seçimi zorunludur", variant: "destructive" });
-      return false;
-    }
-
-    try {
-      const result = await sendInviteEmail({
-        email: trimmedEmail,
-        projectId: formData.projectId,
-        role: formData.role,
-      });
-      if (!result.success) {
-        toast({
-          title: "Mail gönderilemedi",
-          description: result.error ?? "Davet maili gönderilirken bir hata oluştu",
-          variant: "destructive",
-        });
-        return false;
-      }
-      toast({
-        title: "Davet gönderildi",
-        description: `${trimmedEmail} adresine davet maili gönderildi.`,
-      });
-      return true;
-    } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Davet oluşturulamadı",
-        variant: "destructive",
-      });
-      return false;
-    }
-  };
-
-  const handleDeleteUser = async (user: User) => {
-    try {
-      await deleteUserMut({ userId: user._id });
-      toast({ title: "Kullanıcı silindi", description: `${user.email ?? user._id} kaldırıldı.` });
-      return true;
-    } catch (error: unknown) {
-      notify.error(error instanceof ConvexError && typeof error.data === "string"
-        ? error.data : error instanceof Error ? error.message : "Kullanıcı silinemedi");
-      return false;
-    }
-  };
-
-  const resetForm = () => {
-    setCurrentUser(null);
-    setFormData({ email: "", role: "project_user", projectId: activeProjectId });
-  };
-
+  }, { success: currentUser ? "Kullanıcı güncellendi" : "Davet gönderildi" });
   return {
-    users,
-    projects,
-    currentUser,
-    formData,
-    setFormData,
-    handleEditUser,
-    handleSaveUser,
-    handleDeleteUser,
-    resetForm,
-    refetchUsers: () => {},
-    loading: usersRaw === undefined,
+    users: usersRaw ?? [], projects: projectsRaw ?? [], currentUser, formData: effectiveFormData, setFormData,
+    handleEditUser: (user: User) => { setCurrentUser(user); setFormData({ email: user.email ?? "", role: user.role ?? "project_user" }); },
+    handleSaveUser, saving, editReady,
+    handleDeleteUser: async (user: User) => { await deleteUser({ userId: user._id }); },
+    resetForm: () => { setCurrentUser(null); setFormData({ email: "", role: "project_user", projectId, projectIds: [] }); },
+    loading: usersRaw === undefined, refetchUsers: () => {},
   };
 };

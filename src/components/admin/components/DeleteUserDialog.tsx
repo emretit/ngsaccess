@@ -1,43 +1,7 @@
-import React from 'react';
-import { Button } from '@/components/ui/button';
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { User } from '../types/user-types';
-
-interface DeleteUserDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  user: User | null;
-  onDelete: () => void;
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
+import type { User } from "../types/user-types";
+export function DeleteUserDialog({ isOpen, onClose, user, onDelete }: {
+  isOpen: boolean; onClose: () => void; user: User | null; onDelete: () => Promise<unknown>;
+}) {
+  return <ConfirmDestructive open={isOpen} onOpenChange={open => { if (!open) onClose(); }} title="Kullanıcı silinsin mi?" objectName={user?.email ?? "Kullanıcı"} effects={["Hesap ve kimlik doğrulama oturumları silinir.", "Tüm proje üyelikleri kaldırılır."]} confirmLabel="Kullanıcıyı sil" onConfirm={onDelete} />;
 }
-
-export const DeleteUserDialog: React.FC<DeleteUserDialogProps> = ({
-  isOpen,
-  onClose,
-  user,
-  onDelete,
-}) => {
-  return (
-    <AlertDialog open={isOpen} onOpenChange={onClose}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Kullanıcı Silme</AlertDialogTitle>
-          <AlertDialogDescription>
-            Bu işlem geri alınamaz. "{user?.email}" kullanıcısını ve tüm proje atamalarını
-            silmek istediğinize emin misiniz?
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <Button variant="outline" onClick={onClose}>İptal</Button>
-          <Button variant="destructive" onClick={onDelete}>Sil</Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-};

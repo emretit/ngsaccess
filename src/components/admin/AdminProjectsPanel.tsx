@@ -1,3 +1,4 @@
+import { roleLabel } from "@/lib/roleLabels";
 import React, { useState } from "react";
 import { ConvexError } from "convex/values";
 import { toast as notify } from "sonner";
@@ -31,9 +32,9 @@ interface ProjectForm {
 }
 
 const ROLE_BADGE: Record<string, { label: string; variant: "destructive" | "info" | "success" }> = {
-  super_admin:   { label: "Süper Admin",       variant: "destructive" },
-  project_admin: { label: "Proje Yöneticisi",  variant: "info" },
-  project_user:  { label: "Kullanıcı",          variant: "success" },
+  super_admin:   { label: roleLabel("super_admin"),       variant: "destructive" },
+  project_admin: { label: roleLabel("project_admin"),  variant: "info" },
+  project_user:  { label: roleLabel("project_user"),          variant: "success" },
 };
 
 const AdminProjectsPanel = () => {

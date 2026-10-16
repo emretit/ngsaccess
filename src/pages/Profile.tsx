@@ -9,11 +9,8 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 export default function Profile() {
   const { user, profile, refreshProfile, signOut } = useAuth();
-  const { formData, getUserInitials, updateFormData } = useProfileUtils();
+  const { formData, getUserInitials } = useProfileUtils();
 
-  const handlePhotoUpdated = (newUrl: string) => {
-    updateFormData('photoUrl', newUrl);
-  };
 
   if (!user || !profile) {
     return <LoadingSpinner text="Profil bilgileri yükleniyor..." />;
@@ -29,7 +26,7 @@ export default function Profile() {
           photoUrl={formData.photoUrl} 
           userInitials={getUserInitials()} 
           userId={user._id}
-          onPhotoUpdated={handlePhotoUpdated}
+          onPhotoUpdated={() => void refreshProfile()}
         />
         
         {/* Sağ Kart: Profil Bilgileri */}

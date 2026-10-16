@@ -1,3 +1,5 @@
+import { useAuth } from "@/components/auth/AuthProvider";
+import { capabilities, type SettingsTab } from "@/lib/capabilities";
 import {
   Settings,
   Bell,
@@ -53,6 +55,8 @@ const sidebarItems = [
 ];
 
 export function SettingsSidebar({ selected, onSelect }: SettingsSidebarProps) {
+  const { profile } = useAuth();
+  const allowed = capabilities(profile?.role).settingsTabs;
   return (
     <div className="h-full w-full md:w-[220px] shrink-0 bg-card rounded-xl border shadow-xs">
       <div className="p-4 border-b border-border">
@@ -64,7 +68,7 @@ export function SettingsSidebar({ selected, onSelect }: SettingsSidebarProps) {
       </div>
       <nav className="p-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
         <ul className="space-y-0.5">
-          {sidebarItems.map((item) => {
+          {sidebarItems.filter(item => allowed.includes(item.key as SettingsTab)).map((item) => {
             const Icon = item.icon;
             const isSelected = selected === item.key;
             return (
