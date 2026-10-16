@@ -53,7 +53,7 @@ export const CardReadingsTable = ({
       return reading.devices.deviceSerial;
     }
     // Fallback to default
-    return "Bilinmeyen Cihaz";
+    return reading.deviceId && !reading.devices ? "Silinmiş cihaz" : "Bilinmeyen Cihaz";
   };
 
   // Okuyucu/kapı: IDE Smart okumalarda hangi WIEGAND/io okudu (ideIoId → doors).

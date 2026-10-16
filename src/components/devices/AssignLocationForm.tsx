@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors"; 
 import { ServerDevice } from '@/types/device';
 
@@ -29,7 +29,7 @@ export function AssignLocationForm({
   deviceName,
   device
 }: AssignLocationFormProps) {
-  const { toast } = useToast();
+  const submittingRef = useRef(false);
   const { zones, doors, loading } = useZonesAndDoors();
   const [selectedZoneId, setSelectedZoneId] = useState<string>("");
   const [selectedDoorId, setSelectedDoorId] = useState<string>("");
@@ -75,55 +75,47 @@ export function AssignLocationForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     
     if (!selectedZoneId || !selectedDoorId) {
-      toast({
-        title: "Validation Error",
-        description: "Please select both zone and door",
-        variant: "destructive",
-      });
+      toast.error("Lütfen bölge ve kapı seçin.");
       return;
     }
     
+    submittingRef.current = true;
     setIsSubmitting(true);
     
     try {
       await onSubmit(selectedZoneId, selectedDoorId);
-      toast({
-        title: "Location assigned",
-        description: `${deviceName} has been assigned to the selected location.`,
-      });
+      toast.success(`${deviceName} cihazının konumu güncellendi.`);
       onClose();
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to assign location",
-        variant: "destructive",
-      });
+      toast.error(error instanceof Error ? error.message : "Konum atanamadı");
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen && !submittingRef.current) onClose(); }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Assign Location to {deviceName}</DialogTitle>
+          <DialogTitle>{deviceName} — Konum Ata</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="zone" className="text-right">
-                Zone
+                Bölge
               </Label>
               <Select
                 value={selectedZoneId}
                 onValueChange={setSelectedZoneId}
-                disabled={loading}
+                disabled={loading || isSubmitting}
               >
                 <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select a zone" />
+                  <SelectValue placeholder="Bölge seçin" />
                 </SelectTrigger>
                 <SelectContent>
                   {zones.map((zone) => (
@@ -136,15 +128,15 @@ export function AssignLocationForm({
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="door" className="text-right">
-                Door
+                Kapı
               </Label>
               <Select
                 value={selectedDoorId}
                 onValueChange={setSelectedDoorId}
-                disabled={!selectedZoneId || loading}
+                disabled={!selectedZoneId || loading || isSubmitting}
               >
                 <SelectTrigger className="col-span-3">
-                  <SelectValue placeholder="Select a door" />
+                  <SelectValue placeholder="Kapı seçin" />
                 </SelectTrigger>
                 <SelectContent>
                   {filteredDoors.map((door) => (
@@ -157,11 +149,11 @@ export function AssignLocationForm({
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+              İptal
             </Button>
             <Button type="submit" disabled={isSubmitting || !selectedZoneId || !selectedDoorId}>
-              {isSubmitting ? "Assigning..." : "Assign Location"}
+              {isSubmitting ? "Atanıyor..." : "Konum Ata"}
             </Button>
           </DialogFooter>
         </form>

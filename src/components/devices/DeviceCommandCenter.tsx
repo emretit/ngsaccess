@@ -368,10 +368,14 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
     });
 
   const handleOpenDoor = (doorId: Id<"doors">, doorNo: number | undefined, doorName: string) => {
+    if (device.brand !== "ide_smart" && (doorNo === undefined || !Number.isInteger(doorNo) || doorNo < 1)) {
+      toast.error("Kapı numarası tanımlı veya geçerli değil. Kapı eşlemesini düzeltip tekrar deneyin.");
+      return;
+    }
     makeConfirmed({
       id: `openDoor:${doorId}`,
       title: "Kapı açılsın mı?",
-      description: `${doorName} için panele kapı açma komutu gönderilecek.`,
+      description: `${device.name ?? "Bu cihaz"} — ${doorName}${doorNo !== undefined ? ` (Kapı ${doorNo})` : ""} için kapı açma komutu gönderilecek.`,
       label: `Kapı aç (${doorName})`,
       run: async () => {
         if (device.brand === "ide_smart") {
@@ -380,7 +384,10 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
             ? { ok: true }
             : { ok: false, error: result.error ?? "Kapı açma kuyruğa alınamadı" };
         }
-        const result = await openHikDoor({ deviceId: device._id, doorNo: doorNo ?? 1 });
+        if (doorNo === undefined || !Number.isInteger(doorNo) || doorNo < 1) {
+          return { ok: false, error: "Kapı numarası geçerli değil. Kapı eşlemesini düzeltin." };
+        }
+        const result = await openHikDoor({ deviceId: device._id, doorNo });
         return result.ok ? { ok: true } : { ok: false, error: result.error ?? "Kapı açılamadı" };
       },
     });

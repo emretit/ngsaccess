@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAction, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,6 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  DoorOpen,
   RefreshCw,
   Trash2,
   RotateCw,
@@ -155,7 +155,6 @@ export function DeviceHikvisionSection({
 }: DeviceHikvisionSectionProps) {
   const remove = useAction(api.actions.hikGatewayDevice.removeDeviceFromGateway);
   const refresh = useAction(api.actions.hikGatewayDevice.refreshGatewayDeviceStatus);
-  const openDoor = useAction(api.actions.hikGatewayDevice.remoteOpenDoor);
   const reboot = useAction(api.actions.hikGatewayDevice.rebootDevice);
   const fetchWorkStatus = useAction(api.actions.hikGatewayDevice.fetchDeviceWorkStatus);
   const reconcile = useAction(api.actions.hikGatewayDevice.reconcileDevice);
@@ -163,6 +162,7 @@ export function DeviceHikvisionSection({
   const captureCard = useAction(api.actions.hikGatewayDevice.captureCardFromDevice);
   const fetchCapabilities = useAction(api.actions.hikGatewayDevice.fetchDeviceCapabilities);
 
+  const [rebootConfirmOpen, setRebootConfirmOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [capabilitySnapshot, setCapabilitySnapshot] = useState<CapabilitySnapshot | null>(() =>
     parseCapabilitySnapshot(device?.hikCapabilitiesSnapshot)
@@ -223,18 +223,6 @@ export function DeviceHikvisionSection({
     now - device.hikLastSeenAt < HIK_ONLINE_WINDOW_MS &&
     !device.hikOfflineHint;
 
-  const handleOpenDoor = async () => {
-    if (!device) return;
-    setBusy("door");
-    try {
-      const result = await openDoor({ deviceId: device._id, doorNo: 1 });
-      if (result.ok) toast.success("Kapı açma komutu gönderildi.");
-      else toast.error(`Kapı açma başarısız: ${result.error ?? "?"}`);
-    } finally {
-      setBusy(null);
-    }
-  };
-
   const handleRefresh = async () => {
     setBusy("refresh");
     try {
@@ -264,8 +252,6 @@ export function DeviceHikvisionSection({
 
   const handleReboot = async () => {
     if (!device) return;
-    const confirmed = window.confirm("Cihaz yeniden başlatılsın mı? ~30-60sn offline olur.");
-    if (!confirmed) return;
     setBusy("reboot");
     try {
       const result = await reboot({ deviceId: device._id });
@@ -452,8 +438,6 @@ export function DeviceHikvisionSection({
         <DeviceHikLocalBridgeSection
           form={form}
           device={device}
-          onOpenDoor={handleOpenDoor}
-          openingDoor={busy === "door"}
         />
       ) : isGateway ? (
         <>
@@ -504,20 +488,7 @@ export function DeviceHikvisionSection({
 
           {device?.hikDevIndex && (
             <div className="flex flex-wrap items-center gap-2 pt-3 border-t">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleOpenDoor}
-                disabled={busy !== null}
-              >
-                {busy === "door" ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <DoorOpen className="w-4 h-4 mr-2" />
-                )}
-                Kapıyı Aç
-              </Button>
+              <p className="w-full text-xs text-muted-foreground">Kapı açmak için Cihaz Merkezi sekmesinde hedef kapıyı seçip onaylayın.</p>
               <Button
                 type="button"
                 variant="outline"
@@ -562,7 +533,7 @@ export function DeviceHikvisionSection({
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={handleReboot}
+                  onClick={() => setRebootConfirmOpen(true)}
                   disabled={busy !== null}
                 >
                   {busy === "reboot" ? (
@@ -943,6 +914,18 @@ export function DeviceHikvisionSection({
           )}
         </>
       ) : null}
+      <AlertDialog open={rebootConfirmOpen} onOpenChange={setRebootConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cihazı Yeniden Başlat</AlertDialogTitle>
+            <AlertDialogDescription>{device?.name ?? "Bu cihaz"} yeniden başlatılacak ve yaklaşık 30–60 saniye çevrimdışı kalacak.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogAction disabled={busy !== null} onClick={() => void handleReboot()}>Yeniden Başlat</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

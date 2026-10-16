@@ -970,7 +970,7 @@ export const reassignDevice = adminMutation({
 
 /**
  * Cihazı projeden çıkarır ve adminDevices havuzuna geri koyar.
- * card readings, groupDevices ve panelin kapıları silinir; bölge KORUNUR.
+ * groupDevices ve panelin kapıları silinir; bölge ve kart okuma geçmişi korunur.
  * adminMutation: yıkıcı + claim ile simetrik (project_user değil).
  */
 export const releaseDevice = adminMutation({
@@ -982,12 +982,6 @@ export const releaseDevice = adminMutation({
     if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
       throw new Error("Bu cihaza erişim yetkiniz yok");
     }
-
-    const readings = await ctx.db
-      .query("cardReadings")
-      .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
-      .collect();
-    await Promise.all(readings.map((r) => ctx.db.delete(r._id)));
 
     const groupDevices = await ctx.db
       .query("groupDevices")

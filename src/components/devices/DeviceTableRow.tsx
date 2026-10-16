@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { DeviceDeleteDialog } from "./DeviceDeleteDialog";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,6 +53,7 @@ export function DeviceTableRow({
   selected,
   onSelect
 }: DeviceTableRowProps) {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const getStatusBadge = (status: 'online' | 'offline' | 'expired') => {
     switch (status) {
       case 'online':
@@ -150,7 +153,7 @@ export function DeviceTableRow({
                   <AlertDialogTitle>Havuza geri al</AlertDialogTitle>
                   <AlertDialogDescription>
                     {device.name ? `"${device.name}" cihazını` : "Bu cihazı"} projeden çıkarıp havuza
-                    geri almak istediğinize emin misiniz? Cihazın kapıları ve okuma geçmişi silinir;
+                    geri almak istediğinize emin misiniz? Cihazın kapıları silinir, okuma geçmişi korunur;
                     cihaz havuzda kalır ve başka projeye atanabilir.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
@@ -161,31 +164,22 @@ export function DeviceTableRow({
               </AlertDialogContent>
             </AlertDialog>
           )}
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => e.stopPropagation()}
-                className="h-8 w-8 text-destructive hover:text-destructive"
-                title="Sil"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Cihazı Sil</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {device.name ? `"${device.name}" cihazını` : "Bu cihazı"} silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>İptal</AlertDialogCancel>
-                <AlertDialogAction onClick={() => onDeleteDevice(deviceId)}>Sil</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(event) => { event.stopPropagation(); setDeleteDialogOpen(true); }}
+            className="h-8 w-8 text-destructive hover:text-destructive"
+            title="Sil"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          <DeviceDeleteDialog
+            isOpen={deleteDialogOpen}
+            onOpenChange={setDeleteDialogOpen}
+            selectedCount={1}
+            deviceName={device.name ?? device.deviceSerial ?? "Bu cihaz"}
+            onConfirm={() => onDeleteDevice(deviceId)}
+          />
         </div>
       </TableCell>
     </TableRow>

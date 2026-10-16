@@ -160,6 +160,7 @@ export function DeviceList({
         isOpen={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
         selectedCount={selectedDevices.length}
+        deviceNames={devices.filter((device) => selectedDevices.includes(device._id)).map((device) => device.name ?? device.deviceSerial ?? "Adsız cihaz")}
         onConfirm={handleBulkDelete}
       />
     </div>

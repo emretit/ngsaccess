@@ -12,7 +12,7 @@ import { isProjectAllowed } from "./auth";
 import { deleteReadersForDoor } from "../readers";
 
 /**
- * Bir cihazı ve doğrudan bağlı kayıtlarını (cardReadings, groupDevices, doors) siler.
+ * Bir cihazı ve doğrudan bağlı kayıtlarını (groupDevices, doors, readers) siler.
  * Bölge SİLİNMEZ — artık paylaşılan mantıksal alan; başka cihaz/kapı barındırabilir.
  * adminDevices kaydına DOKUNMAZ — assignment temizleme/silme mantığı çağırana aittir.
  */
@@ -21,12 +21,7 @@ export async function purgeDeviceCascade(
   deviceId: Id<"devices">,
   projectId: Id<"projects"> | undefined,
 ) {
-  const readings = await ctx.db
-    .query("cardReadings")
-    .withIndex("by_device", (q) => q.eq("deviceId", deviceId))
-    .collect();
-  await Promise.all(readings.map((r) => ctx.db.delete(r._id)));
-
+  // Kart okuma geçmişi ve deviceId referansı denetim için korunur.
   const groupDevices = await ctx.db
     .query("groupDevices")
     .withIndex("by_project_device", (q) =>

@@ -6,19 +6,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Loader2, DoorOpen } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import type { FormValues } from "../hooks/useDeviceFormSchema";
 import type { ServerDevice } from "@/types/device";
 
 interface DeviceHikLocalBridgeSectionProps {
   form: UseFormReturn<FormValues>;
-  /** Edit mode'da set edilir; "Kapıyı Aç" yalnız kayıtlı cihazda görünür. */
   device?: ServerDevice | null;
-  /** Kapı açma parent'ta (paylaşılan remoteOpenDoor action) yürütülür. */
-  onOpenDoor: () => void;
-  openingDoor: boolean;
 }
 
 /**
@@ -33,8 +27,6 @@ interface DeviceHikLocalBridgeSectionProps {
 export function DeviceHikLocalBridgeSection({
   form,
   device,
-  onOpenDoor,
-  openingDoor,
 }: DeviceHikLocalBridgeSectionProps) {
   return (
     <>
@@ -95,22 +87,9 @@ export function DeviceHikLocalBridgeSection({
       </div>
 
       {device && (
-        <div className="flex flex-wrap items-start gap-2 pt-2 border-t">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onOpenDoor}
-            disabled={openingDoor}
-          >
-            {openingDoor ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <DoorOpen className="w-4 h-4 mr-2" />
-            )}
-            Kapıyı Aç
-          </Button>
-        </div>
+        <p className="pt-2 border-t text-xs text-muted-foreground">
+          Kapı açmak için Cihaz Merkezi sekmesinde hedef kapıyı seçip onaylayın.
+        </p>
       )}
     </>
   );

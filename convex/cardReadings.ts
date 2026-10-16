@@ -7,7 +7,7 @@ import {
   employeeAuthedQuery,
   employeeAuthedMutation,
 } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
+import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import type { Doc } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import {
@@ -147,22 +147,23 @@ export const getLastUnknownByDevice = authedQuery({
   handler: async (ctx, args) => {
     const device = await ctx.db.get(args.deviceId);
     if (!device) return null;
-    if (device.projectId && ctx.user.role !== "super_admin") {
+    if (ctx.user.role !== "super_admin") {
+      // Havuzdaki cihazın (projectId yok) okumaları önceki projeye aittir; yalnız super_admin görür.
       const allowed = await getProjectIdsForUser(ctx);
-      if (!allowed.some((id) => id === device.projectId)) return null;
+      if (!isProjectAllowed(allowed, device.projectId)) return null;
     }
     const since = args.sinceTime;
+    // Cihaz geçmişi korunduğu için önceki projenin okumaları aynı deviceId'yi taşıyabilir.
     const reading = await ctx.db
       .query("cardReadings")
       .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
       .order("desc")
       .filter((q) =>
-        since
-          ? q.and(
-              q.eq(q.field("employeeId"), undefined),
-              q.gt(q.field("accessTime"), since),
-            )
-          : q.eq(q.field("employeeId"), undefined),
+        q.and(
+          q.eq(q.field("projectId"), device.projectId),
+          q.eq(q.field("employeeId"), undefined),
+          ...(since ? [q.gt(q.field("accessTime"), since)] : []),
+        ),
       )
       .first();
     if (!reading) return null;
