@@ -1,12 +1,12 @@
 import { useQuery, useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useAuth } from "@/components/auth/AuthProvider";
 
 export const useDashboard = () => {
   const { isAuthenticated } = useConvexAuth();
   const { profile } = useAuth();
-  const { projectId, activeProject, loading: projectLoading } = useActiveProject();
+  const { projectId, activeProject, loading: projectLoading } = useActiveProjectScope();
   const enabled = !projectLoading && isAuthenticated && !!projectId;
   const stats = useQuery(api.dashboard.getStats, enabled ? { projectId } : "skip");
   const recentReadings = useQuery(api.dashboard.getRecentReadings, enabled ? { projectId, limit: 10 } : "skip");

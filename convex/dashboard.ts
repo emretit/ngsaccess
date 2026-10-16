@@ -4,6 +4,7 @@ import type { QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id, Doc } from "./_generated/dataModel";
 import { authedQuery } from "./lib/customFunctions";
+import { resolveProjectScope } from "./lib/projectScope";
 import { getProjectIdsForUser } from "./lib/auth";
 import {
   buildShiftResolver,
@@ -27,20 +28,12 @@ import {
 
 type AuthedCtx = QueryCtx & { user: Doc<"users"> };
 
-async function dashboardProjectIds(ctx: AuthedCtx, projectId?: Id<"projects">) {
-  const allowed = await getProjectIdsForUser(ctx);
-  if (projectId && !allowed.includes(projectId)) {
-    throw new Error("Bu projeye erişim yetkiniz yok");
-  }
-  return projectId ? [projectId] : allowed;
-}
-
 export const getStats = authedQuery({
   args: {
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await dashboardProjectIds(ctx, args.projectId);
+    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
     const today = trTodayKey();
     const { startISO: todayISO, endISO: todayEndISO } = trDayRangeISO(today, today);
 
@@ -152,7 +145,7 @@ async function loadPdksDataset(
   shiftResolver: ShiftResolver;
   workSettings: EffectiveWorkSettings;
 }> {
-  const allowedProjectIds = await dashboardProjectIds(ctx, filters.projectId);
+  const allowedProjectIds = await resolveProjectScope(ctx, filters.projectId);
   let employees: Doc<"employees">[] = [];
   let readings: Doc<"cardReadings">[] = [];
 
@@ -761,7 +754,7 @@ export const getRecentReadings = authedQuery({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await dashboardProjectIds(ctx, args.projectId);
+    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
     const limit = args.limit ?? 10;
 
     let readings;

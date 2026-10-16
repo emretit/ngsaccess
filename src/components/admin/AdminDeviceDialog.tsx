@@ -23,6 +23,10 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { toast } from "@/hooks/use-toast";
 
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { notify } from "@/lib/notify";
+
 const NO_PROJECT = "__none__";
 
 type AdminDevice = FunctionReturnType<typeof api.adminDevices.list>[number];
@@ -51,6 +55,7 @@ export function AdminDeviceDialog({ open, onClose, onSuccess, device }: AdminDev
   const [ideUuid, setIdeUuid] = useState("");
   const [name, setName] = useState("");
   const [projectId, setProjectId] = useState<string>(NO_PROJECT);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -59,6 +64,7 @@ export function AdminDeviceDialog({ open, onClose, onSuccess, device }: AdminDev
       setName(device?.name ?? "");
       setProjectId(device?.assignedProjectId ?? NO_PROJECT);
       setSubmitting(false);
+      setConfirmOpen(false);
     }
   }, [open, device]);
 
@@ -95,38 +101,37 @@ export function AdminDeviceDialog({ open, onClose, onSuccess, device }: AdminDev
     }
   };
 
-  const handleEdit = async () => {
-    if (!device) return;
-    const targetProjectId = projectId === NO_PROJECT ? undefined : (projectId as Id<"projects">);
-    const projectChanged = (device.assignedProjectId ?? null) !== (targetProjectId ?? null);
-
-    // Proje değişimi atanmış cihazda yıkıcı: kapılar + okuma geçmişi silinir.
-    if (projectChanged && device.assignedDeviceId) {
-      const warn = targetProjectId
-        ? "Projeyi değiştirmek için cihaz mevcut projeden çıkarılacak (kapıları ve kart okuma geçmişi silinir), ardından yeni projeye atanacak. Devam edilsin mi?"
-        : "Cihaz mevcut projeden çıkarılacak: kapıları ve kart okuma geçmişi silinir. Devam edilsin mi?";
-      if (!confirm(warn)) return;
-    }
-
+  const saveEdit = async () => {
+    if (!device) throw new Error("Düzenlenecek cihaz seçilmedi");
     setSubmitting(true);
     try {
       await reassignDevice({
         adminDeviceId: device._id,
-        projectId: targetProjectId,
+        projectId: projectId === NO_PROJECT ? undefined : (projectId as Id<"projects">),
         name: name.trim() || undefined,
       });
-      toast({ title: "Başarılı", description: "Cihaz güncellendi" });
+      notify.success("Cihaz güncellendi");
       onSuccess();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Cihaz güncellenemedi";
-      toast({ title: "Hata", description: message, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }
   };
+  const { run: runEdit } = useAsyncAction(saveEdit, { error: "Cihaz güncellenemedi" });
+
+  const handleEdit = () => {
+    if (!device) return;
+    const targetProjectId = projectId === NO_PROJECT ? undefined : (projectId as Id<"projects">);
+    const projectChanged = (device.assignedProjectId ?? null) !== (targetProjectId ?? null);
+    if (projectChanged && device.assignedDeviceId) {
+      setConfirmOpen(true);
+    } else {
+      void runEdit();
+    }
+  };
 
   return (
-    <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+    <>
+    <Sheet open={open} onOpenChange={(isOpen) => !isOpen && !submitting && onClose()}>
       <SheetContent size="lg" className="p-0">
         <div className="p-6 border-b">
           <SheetHeader>
@@ -134,7 +139,7 @@ export function AdminDeviceDialog({ open, onClose, onSuccess, device }: AdminDev
           </SheetHeader>
           <p className="mt-1 text-sm text-muted-foreground">
             {isEdit
-              ? "İsmi ve proje atamasını değiştirin. Proje değişimi atanmış cihazda kapıları ve okuma geçmişini siler."
+              ? "İsmi ve proje atamasını değiştirin. Proje değişimi atanmış cihazda kapıları siler; okuma geçmişi korunur."
               : "Cihaz envantere eklendikten sonra Cihazlar sayfasından projeye atanabilir."}
           </p>
         </div>
@@ -202,5 +207,21 @@ export function AdminDeviceDialog({ open, onClose, onSuccess, device }: AdminDev
         </ScrollArea>
       </SheetContent>
     </Sheet>
+    <ConfirmDestructive
+      open={open && confirmOpen}
+      onOpenChange={setConfirmOpen}
+      title="Cihazın proje ataması değiştirilsin mi?"
+      objectName={device?.name ?? "Cihaz"}
+      effects={[
+        `Cihaz ${device?.assignedProjectName ?? "mevcut proje"} kapsamından çıkarılır.`,
+        "Mevcut kapıları silinir; kart okuma geçmişi korunur.",
+        projectId === NO_PROJECT
+          ? "Cihaz atanmamış olarak envanterde kalır."
+          : `Cihaz ${projects?.find((project) => project._id === projectId)?.name ?? "seçilen proje"} projesine atanır.`,
+      ]}
+      confirmLabel="Atamayı değiştir"
+      onConfirm={saveEdit}
+    />
+    </>
   );
 }

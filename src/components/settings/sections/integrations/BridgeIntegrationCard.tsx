@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
+import { notify } from "@/lib/notify";
 import { Badge } from "@/components/ui/badge";
 
 /**
@@ -31,6 +33,9 @@ export function BridgeIntegrationCard() {
   const createBridge = useMutation(api.hikBridge.createBridge);
   const revokeBridge = useMutation(api.hikBridge.revokeBridge);
 
+  // Hedef kapanış animasyonu boyunca korunur; diyalog yalnız revokeOpen ile kapanır.
+  const [revokeTarget, setRevokeTarget] = useState<{ id: Id<"hikBridges">; label: string } | null>(null);
+  const [revokeOpen, setRevokeOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [reveal, setReveal] = useState<Record<string, boolean>>({});
 
@@ -52,20 +57,6 @@ export function BridgeIntegrationCard() {
       });
     } finally {
       setCreating(false);
-    }
-  };
-
-  const handleRevoke = async (bridgeId: Id<"hikBridges">) => {
-    if (!window.confirm("Bu bridge token iptal edilsin mi? O bridge artık bağlanamaz.")) return;
-    try {
-      await revokeBridge({ bridgeId });
-      toast({ title: "İptal edildi", description: "Bridge token kaldırıldı." });
-    } catch (e) {
-      toast({
-        variant: "destructive",
-        title: "İptal edilemedi",
-        description: e instanceof Error ? e.message : "Bilinmeyen hata",
-      });
     }
   };
 
@@ -168,7 +159,10 @@ export function BridgeIntegrationCard() {
                 type="button"
                 variant="outline"
                 size="icon"
-                onClick={() => handleRevoke(b._id)}
+                onClick={() => {
+                  setRevokeTarget({ id: b._id, label: `Token ${mask(b.token)}` });
+                  setRevokeOpen(true);
+                }}
                 aria-label="Token'ı iptal et"
               >
                 <Trash2 className="h-4 w-4" />
@@ -181,6 +175,19 @@ export function BridgeIntegrationCard() {
           Token'ı bridge EXE'de <code className="font-mono">http://127.0.0.1:8787/__bridge</code> ekranına
           yapıştırın. Bir bridge, projedeki tüm localBridge panellerini tek token ile yönetir.
         </p>
+        <ConfirmDestructive
+          open={revokeOpen}
+          onOpenChange={setRevokeOpen}
+          title="Bridge token iptal edilsin mi?"
+          objectName={revokeTarget?.label ?? "Bridge token"}
+          effects={["Bu token ile çalışan bridge artık bağlanamaz.", "Bağlı panellerin bridge üzerinden iletişimi kesilir."]}
+          confirmLabel="Token'ı iptal et"
+          onConfirm={async () => {
+            if (!revokeTarget) throw new Error("İptal edilecek token seçilmedi");
+            await revokeBridge({ bridgeId: revokeTarget.id });
+            notify.success("Bridge token kaldırıldı");
+          }}
+        />
       </CardContent>
     </Card>
   );

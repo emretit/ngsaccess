@@ -13,6 +13,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
+import { notify } from "@/lib/notify";
 import { AdminDeviceDialog } from "@/components/admin/AdminDeviceDialog";
 import { computeDeviceStatus } from "@/lib/deviceStatus";
 import { toast } from "@/hooks/use-toast";
@@ -22,6 +24,9 @@ type AdminDevice = FunctionReturnType<typeof api.adminDevices.list>[number];
 const nowMs = Date.now();
 
 export function AdminDevicesPanel() {
+  // Hedef kapanış animasyonu boyunca korunur; diyalog yalnız deleteOpen ile kapanır.
+  const [deleteDevice, setDeleteDevice] = useState<AdminDevice | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDevice, setEditDevice] = useState<AdminDevice | null>(null);
   const adminDevices = useQuery(api.adminDevices.list);
@@ -38,21 +43,6 @@ export function AdminDevicesPanel() {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Senkronizasyon başarısız";
-      toast({ title: "Hata", description: message, variant: "destructive" });
-    }
-  };
-
-  const handleDelete = async (device: AdminDevice) => {
-    const assigned = !!device.assignedDeviceId;
-    const message = assigned
-      ? `"${device.name}" cihazı ${device.assignedProjectName ?? "bir projeye"} atanmış. Silerseniz projeden de çıkarılır; kapıları ve okuma geçmişi silinir. Devam edilsin mi?`
-      : `"${device.name}" cihazını envanterden kaldırmak istediğinize emin misiniz?`;
-    if (!confirm(message)) return;
-    try {
-      await removeDevice({ adminDeviceId: device._id });
-      toast({ title: "Başarılı", description: "Cihaz envanterden kaldırıldı" });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Cihaz silinemedi";
       toast({ title: "Hata", description: message, variant: "destructive" });
     }
   };
@@ -144,10 +134,12 @@ export function AdminDevicesPanel() {
                         size="icon"
                         variant="ghost"
                         className="h-7 w-7 text-destructive hover:text-destructive"
+                        aria-label={`${device.name} cihazını envanterden kaldır`}
                         title={isAssigned ? "Projeden çıkar ve envanterden kaldır" : "Envanterden kaldır"}
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDelete(device);
+                          setDeleteDevice(device);
+                          setDeleteOpen(true);
                         }}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -161,6 +153,21 @@ export function AdminDevicesPanel() {
         </div>
       )}
 
+      <ConfirmDestructive
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Cihaz envanterden kaldırılsın mı?"
+        objectName={deleteDevice?.name ?? "Cihaz"}
+        effects={deleteDevice?.assignedDeviceId
+          ? [`Cihaz ${deleteDevice.assignedProjectName ?? "atanmış olduğu proje"} kapsamından çıkarılır.`, "Kapıları silinir; kart okuma geçmişi korunur.", "Cihaz envanter kaydı kaldırılır."]
+          : ["Cihaz envanter kaydı kaldırılır."]}
+        confirmLabel="Envanterden kaldır"
+        onConfirm={async () => {
+          if (!deleteDevice) throw new Error("Kaldırılacak cihaz seçilmedi");
+          await removeDevice({ adminDeviceId: deleteDevice._id });
+          notify.success("Cihaz envanterden kaldırıldı");
+        }}
+      />
       <AdminDeviceDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}

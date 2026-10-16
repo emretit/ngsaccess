@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import type { FunctionReturnType } from 'convex/server';
 import { api } from '../../../convex/_generated/api';
 import { EmptyState } from '@/components/shared/EmptyState';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SectionSkeleton } from '@/components/shared/SectionSkeleton';
 import {
   Table,
   TableBody,
@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { StatusBadge } from '@/components/shared/StatusBadge';
 type RecentReadings = FunctionReturnType<typeof api.dashboard.getRecentReadings>;
 
 const trDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -36,9 +36,9 @@ const RecentReadingsTable: React.FC<RecentReadingsTableProps> = ({ readings, loa
     const hasAccess = reading.accessStatus === 'izin_verildi';
 
     return (
-      <Badge variant={hasAccess ? 'success' : 'destructive'}>
+      <StatusBadge tone={hasAccess ? 'success' : 'danger'}>
         {hasAccess ? 'İzin Verildi' : 'Reddedildi'}
-      </Badge>
+      </StatusBadge>
     );
   };
 
@@ -70,7 +70,7 @@ const RecentReadingsTable: React.FC<RecentReadingsTableProps> = ({ readings, loa
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-4">
-                    <Skeleton className="h-10 w-full" aria-label="Son okumalar yükleniyor" />
+                    <SectionSkeleton rows={3} label="Son okumalar yükleniyor" />
                   </TableCell>
                 </TableRow>
               ) : readings.length === 0 ? (
