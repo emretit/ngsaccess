@@ -15,3 +15,7 @@ panels.json
 
 # Gömülü ngsplus arayüzü — `npm run build` çıktısı; commit edilmez, build sırasında üretilir.
 wwwroot/
+
+# Installer build çıktıları (setup.iss/setup.nsi kaynak, takip edilir)
+installer/*.exe
+installer/ngsaccess-bridge/
