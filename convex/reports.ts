@@ -3,13 +3,13 @@ import { v } from "convex/values";
 import { internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
-import { Doc } from "./_generated/dataModel";
+import { requireAdmin } from "./lib/auth";
+import { resolveReportScope, readReportReadings, reportPeriod, resolveScheduleScope } from "./lib/reportScope";
+import { loadAttendanceReport } from "./lib/reportAttendance";
 import {
   getEffectiveWorkSettings,
   resolveHourlyRate,
   overtimePayTRY,
-  DEFAULT_WORK_SETTINGS,
 } from "./lib/pdksHelpers";
 
 const STANDARD_DAY_MINUTES = 8 * 60;
@@ -21,12 +21,12 @@ const STANDARD_WEEK_MINUTES = 45 * 60;
  */
 export const getSgkMonthlyReport = authedQuery({
   args: {
-    projectIds: v.optional(v.array(v.id("projects"))),
-    isSuperAdmin: v.optional(v.boolean()),
+    projectId: v.optional(v.id("projects")),
     year: v.number(),
     month: v.number(),
   },
   handler: async (ctx, args) => {
+    reportPeriod(args.year, args.month);
     const year = args.year;
     const month = args.month;
     const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
@@ -35,52 +35,8 @@ export const getSgkMonthlyReport = authedQuery({
 
     const { startISO, endISO } = trDayRangeISO(startDate, endDate);
 
-    let readings;
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-
-    if (args.isSuperAdmin) {
-      readings = await ctx.db
-        .query("cardReadings")
-        .withIndex("by_access_time")
-        .filter((q) =>
-          q.and(q.gte(q.field("accessTime"), startISO), q.lte(q.field("accessTime"), endISO))
-        )
-        .collect();
-    } else if (args.projectIds && args.projectIds.length > 0) {
-      const results = await Promise.all(
-        args.projectIds.map((pid) =>
-          ctx.db
-            .query("cardReadings")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .filter((q) =>
-              q.and(
-                q.gte(q.field("accessTime"), startISO),
-                q.lte(q.field("accessTime"), endISO)
-              )
-            )
-            .collect()
-        )
-      );
-      readings = results.flat();
-    } else if (allowedProjectIds.length > 0) {
-      const results = await Promise.all(
-        allowedProjectIds.map((pid) =>
-          ctx.db
-            .query("cardReadings")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .filter((q) =>
-              q.and(
-                q.gte(q.field("accessTime"), startISO),
-                q.lte(q.field("accessTime"), endISO)
-              )
-            )
-            .collect()
-        )
-      );
-      readings = results.flat();
-    } else {
-      return [];
-    }
+    const { projectIds, scopeLabel } = await resolveReportScope(ctx, args.projectId);
+    const readings = await readReportReadings(ctx, projectIds, startISO, endISO);
 
     readings.sort(
       (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
@@ -88,30 +44,29 @@ export const getSgkMonthlyReport = authedQuery({
 
     const employeeMap = new Map<string, typeof readings>();
     for (const r of readings) {
-      const key = r.employeeId ?? r.cardNo;
+      const key = `${r.projectId}:${r.employeeId ?? r.cardNo}`;
       if (!employeeMap.has(key)) employeeMap.set(key, []);
-      employeeMap.get(key)!.push(r);
+      employeeMap.get(key)?.push(r);
     }
 
-    const allLeaves = await ctx.db
-      .query("leaves")
-      .filter((q) => q.eq(q.field("status"), "approved"))
-      .collect();
+    const allLeaves = (await Promise.all(projectIds.map((projectId) => ctx.db.query("leaves").withIndex("by_project", (q) => q.eq("projectId", projectId)).collect()))).flat().filter((l) => l.status === "approved");
 
     const reportRows = await Promise.all(
       Array.from(employeeMap.entries()).map(async ([, empReadings]) => {
         const first = empReadings[0];
-        const employee = first.employeeId ? await ctx.db.get(first.employeeId) as Doc<"employees"> | null : null;
-        const department = employee?.departmentId
-          ? await ctx.db.get(employee.departmentId) as Doc<"departments"> | null
+        const foundEmployee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
+        const employee = foundEmployee?.projectId === first.projectId ? foundEmployee : null;
+        const foundDepartment = employee?.departmentId
+          ? await ctx.db.get(employee.departmentId)
           : null;
+        const department = foundDepartment?.projectId === first.projectId ? foundDepartment : null;
 
-        const empId = first.employeeId;
+        const empId = employee?._id;
 
         const leaveDaysInMonth = empId
           ? allLeaves
               .filter((l) => {
-                if (l.employeeId !== empId) return false;
+                if (l.employeeId !== empId || l.projectId !== first.projectId) return false;
                 const leaveStart = new Date(l.startDate);
                 const leaveEnd = new Date(l.endDate);
                 const monthStart = new Date(startDate);
@@ -133,7 +88,7 @@ export const getSgkMonthlyReport = authedQuery({
         for (const r of granted) {
           const dateKey = trDateKey(r.accessTime);
           if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
-          dayReadingsMap.get(dateKey)!.push(r);
+          dayReadingsMap.get(dateKey)?.push(r);
         }
 
         let totalMinutes = 0;
@@ -172,6 +127,8 @@ export const getSgkMonthlyReport = authedQuery({
     );
 
     return {
+      scopeLabel,
+      reliabilityNote: "Güvenilirlik sınırı: Bu rapor okuma kayıtlarından üretilir; sıfır okumalı personel ve PDKS vardiya/haftalık mesai hesabı bu eski özet hesabına dahil değildir. Bordro doğrulaması yerine kullanılmamalıdır.",
       year,
       month,
       startDate,
@@ -186,13 +143,13 @@ export const getSgkMonthlyReport = authedQuery({
  */
 export const getOvertimeSummaryReport = authedQuery({
   args: {
-    projectIds: v.optional(v.array(v.id("projects"))),
-    isSuperAdmin: v.optional(v.boolean()),
+    projectId: v.optional(v.id("projects")),
     year: v.number(),
     month: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const { projectIds, scopeLabel } = await resolveReportScope(ctx, args.projectId);
+    reportPeriod(args.year, args.month);
     const year = args.year;
     const month = args.month;
 
@@ -205,48 +162,15 @@ export const getOvertimeSummaryReport = authedQuery({
 
     const { startISO, endISO } = trDayRangeISO(startDate, endDate);
 
-    let readings;
-    if (args.isSuperAdmin) {
-      readings = await ctx.db
-        .query("cardReadings")
-        .withIndex("by_access_time")
-        .filter((q) =>
-          q.and(q.gte(q.field("accessTime"), startISO), q.lte(q.field("accessTime"), endISO))
-        )
-        .collect();
-    } else {
-      const pids = args.projectIds?.length ? args.projectIds : allowedProjectIds;
-      const results = await Promise.all(
-        pids.map((pid) =>
-          ctx.db
-            .query("cardReadings")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .filter((q) =>
-              q.and(
-                q.gte(q.field("accessTime"), startISO),
-                q.lte(q.field("accessTime"), endISO)
-              )
-            )
-            .collect()
-        )
-      );
-      readings = results.flat();
-    }
+    const readings = await readReportReadings(ctx, projectIds, startISO, endISO);
 
     const employeeMap = new Map<string, typeof readings>();
     for (const r of readings) {
-      const key = r.employeeId ?? r.cardNo;
+      const key = `${r.projectId}:${r.employeeId ?? r.cardNo}`;
       if (!employeeMap.has(key)) employeeMap.set(key, []);
-      employeeMap.get(key)!.push(r);
+      employeeMap.get(key)?.push(r);
     }
 
-    const referenceProjectId =
-      args.isSuperAdmin
-        ? undefined
-        : (args.projectIds?.[0] ?? allowedProjectIds[0] ?? undefined);
-    const workSettings = referenceProjectId
-      ? await getEffectiveWorkSettings(ctx, referenceProjectId)
-      : DEFAULT_WORK_SETTINGS;
 
     let totalOvertimeHours = 0;
     let totalOvertimePayTRY = 0;
@@ -260,17 +184,20 @@ export const getOvertimeSummaryReport = authedQuery({
 
     for (const [empKey, empReadings] of employeeMap) {
       const first = empReadings[0];
-      const employee = first.employeeId ? await ctx.db.get(first.employeeId) as Doc<"employees"> | null : null;
-      const department = employee?.departmentId
-        ? await ctx.db.get(employee.departmentId) as Doc<"departments"> | null
+      const foundEmployee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
+      const employee = foundEmployee?.projectId === first.projectId ? foundEmployee : null;
+      const foundDepartment = employee?.departmentId
+        ? await ctx.db.get(employee.departmentId)
         : null;
+      const department = foundDepartment?.projectId === first.projectId ? foundDepartment : null;
+      const workSettings = await getEffectiveWorkSettings(ctx, first.projectId);
 
       const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
       const dayReadingsMap = new Map<string, typeof granted>();
       for (const r of granted) {
         const dateKey = trDateKey(r.accessTime);
         if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
-        dayReadingsMap.get(dateKey)!.push(r);
+        dayReadingsMap.get(dateKey)?.push(r);
       }
 
       let totalMinutes = 0;
@@ -319,13 +246,15 @@ export const getOvertimeSummaryReport = authedQuery({
     }
 
     return {
+      scopeLabel,
+      reliabilityNote: "Güvenilirlik sınırı: Bu rapor okuma kayıtlarından üretilir; sıfır okumalı personel ve PDKS vardiya/haftalık mesai hesabı bu eski özet hesabına dahil değildir. Bordro doğrulaması yerine kullanılmamalıdır.",
       year,
       month,
       startDate,
       endDate,
       totalOvertimeHours: Math.round(totalOvertimeHours * 10) / 10,
       totalOvertimePayTRY: Math.round(totalOvertimePayTRY * 100) / 100,
-      overtimeMultiplier: workSettings.overtimeMultiplier,
+      overtimeMultiplier: null,
       rows: rows.filter((r) => r.overtimeHours > 0).sort((a, b) => b.overtimeHours - a.overtimeHours),
     };
   },
@@ -336,105 +265,13 @@ export const getOvertimeSummaryReport = authedQuery({
  */
 export const getAttendanceSummaryReport = authedQuery({
   args: {
-    projectIds: v.optional(v.array(v.id("projects"))),
-    isSuperAdmin: v.optional(v.boolean()),
+    projectId: v.optional(v.id("projects")),
     year: v.number(),
     month: v.number(),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const startDate = `${args.year}-${String(args.month).padStart(2, "0")}-01`;
-    const lastDay = new Date(args.year, args.month, 0).getDate();
-    const endDate = `${args.year}-${String(args.month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
-
-    let readings;
-    if (args.isSuperAdmin) {
-      readings = await ctx.db
-        .query("cardReadings")
-        .withIndex("by_access_time")
-        .filter((q) =>
-          q.and(q.gte(q.field("accessTime"), startISO), q.lte(q.field("accessTime"), endISO))
-        )
-        .collect();
-    } else {
-      const pids = args.projectIds?.length ? args.projectIds : allowedProjectIds;
-      const results = await Promise.all(
-        pids.map((pid) =>
-          ctx.db
-            .query("cardReadings")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .filter((q) =>
-              q.and(
-                q.gte(q.field("accessTime"), startISO),
-                q.lte(q.field("accessTime"), endISO)
-              )
-            )
-            .collect()
-        )
-      );
-      readings = results.flat();
-    }
-
-    const allLeaves = await ctx.db
-      .query("leaves")
-      .filter((q) => q.eq(q.field("status"), "approved"))
-      .collect();
-
-    const employeeMap = new Map<string, typeof readings>();
-    for (const r of readings) {
-      const key = r.employeeId ?? r.cardNo;
-      if (!employeeMap.has(key)) employeeMap.set(key, []);
-      employeeMap.get(key)!.push(r);
-    }
-
-    const workDaysInMonth = lastDay;
-    const rows = await Promise.all(
-      Array.from(employeeMap.entries()).map(async ([empKey, empReadings]) => {
-        const first = empReadings[0];
-        const employee = first.employeeId ? await ctx.db.get(first.employeeId) as Doc<"employees"> | null : null;
-        const department = employee?.departmentId
-          ? await ctx.db.get(employee.departmentId) as Doc<"departments"> | null
-          : null;
-
-        const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
-        const presentDays = new Set(granted.map((r) => trDateKey(r.accessTime))).size;
-
-        const leaveDays = first.employeeId
-          ? allLeaves
-              .filter((l) => {
-                if (l.employeeId !== first.employeeId) return false;
-                return l.startDate <= endDate && l.endDate >= startDate;
-              })
-              .reduce((sum, l) => {
-                const overlapStart = l.startDate < startDate ? startDate : l.startDate;
-                const overlapEnd = l.endDate > endDate ? endDate : l.endDate;
-                return sum + Math.ceil((new Date(overlapEnd).getTime() - new Date(overlapStart).getTime()) / 86400000) + 1;
-              }, 0)
-          : 0;
-
-        const absentDays = Math.max(0, workDaysInMonth - presentDays - leaveDays);
-
-        return {
-          employeeId: empKey,
-          name: first.employeeName ?? (employee ? `${employee.firstName} ${employee.lastName}` : "Bilinmiyor"),
-          department: department?.name ?? "Bilinmiyor",
-          presentDays,
-          leaveDays,
-          absentDays,
-          devamOrani: workDaysInMonth > 0 ? Math.round((presentDays / workDaysInMonth) * 100) : 0,
-        };
-      })
-    );
-
-    return {
-      year: args.year,
-      month: args.month,
-      startDate,
-      endDate,
-      workDaysInMonth,
-      rows: rows.sort((a, b) => a.name.localeCompare(b.name)),
-    };
+    const scope = await resolveReportScope(ctx, args.projectId);
+    return { ...await loadAttendanceReport(ctx, scope.projectIds, args.year, args.month), scopeLabel: scope.scopeLabel };
   },
 });
 
@@ -443,72 +280,42 @@ export const getAttendanceSummaryReport = authedQuery({
  */
 export const getDepartmentCostReport = authedQuery({
   args: {
-    projectIds: v.optional(v.array(v.id("projects"))),
-    isSuperAdmin: v.optional(v.boolean()),
+    projectId: v.optional(v.id("projects")),
     year: v.number(),
     month: v.number(),
     hourlyRate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const { projectIds, scopeLabel } = await resolveReportScope(ctx, args.projectId);
+    reportPeriod(args.year, args.month);
     const startDate = `${args.year}-${String(args.month).padStart(2, "0")}-01`;
     const endDate = `${args.year}-${String(args.month).padStart(2, "0")}-${String(new Date(args.year, args.month, 0).getDate()).padStart(2, "0")}`;
     const { startISO, endISO } = trDayRangeISO(startDate, endDate);
 
-    let readings;
-    if (args.isSuperAdmin) {
-      readings = await ctx.db
-        .query("cardReadings")
-        .withIndex("by_access_time")
-        .filter((q) =>
-          q.and(q.gte(q.field("accessTime"), startISO), q.lte(q.field("accessTime"), endISO))
-        )
-        .collect();
-    } else {
-      const pids = args.projectIds?.length ? args.projectIds : allowedProjectIds;
-      const results = await Promise.all(
-        pids.map((pid) =>
-          ctx.db
-            .query("cardReadings")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .filter((q) =>
-              q.and(
-                q.gte(q.field("accessTime"), startISO),
-                q.lte(q.field("accessTime"), endISO)
-              )
-            )
-            .collect()
-        )
-      );
-      readings = results.flat();
-    }
+    const readings = await readReportReadings(ctx, projectIds, startISO, endISO);
 
     const employeeMap = new Map<string, typeof readings>();
     for (const r of readings) {
-      const key = r.employeeId ?? r.cardNo;
+      const key = `${r.projectId}:${r.employeeId ?? r.cardNo}`;
       if (!employeeMap.has(key)) employeeMap.set(key, []);
-      employeeMap.get(key)!.push(r);
+      employeeMap.get(key)?.push(r);
     }
 
-    const referenceProjectId =
-      args.isSuperAdmin
-        ? undefined
-        : (args.projectIds?.[0] ?? allowedProjectIds[0] ?? undefined);
-    const workSettings = referenceProjectId
-      ? await getEffectiveWorkSettings(ctx, referenceProjectId)
-      : DEFAULT_WORK_SETTINGS;
     const fallbackRate = args.hourlyRate;
     const byDept = new Map<
       string,
       { overtimeHours: number; cost: number; employeeCount: number }
     >();
 
-    for (const [_, empReadings] of employeeMap) {
+    for (const empReadings of employeeMap.values()) {
       const first = empReadings[0];
-      const employee = first.employeeId ? await ctx.db.get(first.employeeId) as Doc<"employees"> | null : null;
-      const department = employee?.departmentId
-        ? await ctx.db.get(employee.departmentId) as Doc<"departments"> | null
+      const foundEmployee = first.employeeId ? await ctx.db.get(first.employeeId) : null;
+      const employee = foundEmployee?.projectId === first.projectId ? foundEmployee : null;
+      const foundDepartment = employee?.departmentId
+        ? await ctx.db.get(employee.departmentId)
         : null;
+      const department = foundDepartment?.projectId === first.projectId ? foundDepartment : null;
+      const workSettings = await getEffectiveWorkSettings(ctx, first.projectId);
       const deptName = department?.name ?? "Belirtilmemiş";
 
       const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
@@ -516,7 +323,7 @@ export const getDepartmentCostReport = authedQuery({
       for (const r of granted) {
         const dateKey = trDateKey(r.accessTime);
         if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
-        dayReadingsMap.get(dateKey)!.push(r);
+        dayReadingsMap.get(dateKey)?.push(r);
       }
 
       let totalMinutes = 0;
@@ -571,10 +378,12 @@ export const getDepartmentCostReport = authedQuery({
     }));
 
     return {
+      scopeLabel,
+      reliabilityNote: "Güvenilirlik sınırı: Bu rapor okuma kayıtlarından üretilir; sıfır okumalı personel ve PDKS vardiya/haftalık mesai hesabı bu eski özet hesabına dahil değildir. Bordro doğrulaması yerine kullanılmamalıdır.",
       year: args.year,
       month: args.month,
       hourlyRate: fallbackRate ?? null,
-      overtimeMultiplier: workSettings.overtimeMultiplier,
+      overtimeMultiplier: null,
       rows: rows.sort((a, b) => b.cost - a.cost),
     };
   },
@@ -584,101 +393,84 @@ export const getDepartmentCostReport = authedQuery({
  * Kullanıcının zamanlanmış rapor ayarını getirir
  */
 export const getReportSchedule = authedQuery({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db
-      .query("reportScheduleSettings")
-      .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
-      .first();
+  args: { projectId: v.optional(v.id("projects")) },
+  handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    await resolveReportScope(ctx, args.projectId);
+    return await ctx.db.query("reportScheduleSettings")
+      .withIndex("by_user_project", (q) => q.eq("userId", ctx.user._id).eq("projectId", args.projectId)).first();
   },
 });
 
-/**
- * Zamanlanmış rapor ayarlarını kaydeder
- */
 export const saveReportSchedule = authedMutation({
   args: {
-    reportType: v.string(),
+    projectId: v.optional(v.id("projects")),
+    reportType: v.union(v.literal("sgk"), v.literal("overtime"), v.literal("attendance"), v.literal("department")),
     email: v.string(),
     enabled: v.boolean(),
   },
   handler: async (ctx, args) => {
+    await requireAdmin(ctx);
+    const scope = await resolveReportScope(ctx, args.projectId);
+    if (!scope.projectIds.length) throw new Error("Erişilebilir proje bulunamadı");
+    const email = args.email.trim();
+    if (args.enabled && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Geçerli bir e-posta adresi girin");
     const now = new Date().toISOString();
-    const existing = await ctx.db
-      .query("reportScheduleSettings")
-      .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
-      .first();
-
-    if (existing) {
-      await ctx.db.patch(existing._id, {
-        reportType: args.reportType,
-        email: args.email,
-        enabled: args.enabled,
-        updatedAt: now,
-      });
-    } else {
-      await ctx.db.insert("reportScheduleSettings", {
-        userId: ctx.user._id,
-        reportType: args.reportType,
-        email: args.email,
-        enabled: args.enabled,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
+    const existing = await ctx.db.query("reportScheduleSettings")
+      .withIndex("by_user_project", (q) => q.eq("userId", ctx.user._id).eq("projectId", args.projectId)).first();
+    const values = { ...args, email, updatedAt: now };
+    if (existing) await ctx.db.patch(existing._id, values);
+    else await ctx.db.insert("reportScheduleSettings", { ...values, userId: ctx.user._id, createdAt: now });
   },
 });
 
-/** Internal: Aktif zamanlanmış rapor ayarları */
 export const getEnabledSchedules = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const all = await ctx.db.query("reportScheduleSettings").collect();
-    return all.filter((s) => s.enabled);
+    const schedules = [];
+    for await (const schedule of ctx.db.query("reportScheduleSettings")) {
+      if (schedule.enabled && await resolveScheduleScope(ctx, schedule)) schedules.push(schedule);
+    }
+    return schedules;
   },
 });
 
-/** Internal: E-posta için rapor özeti */
 export const getReportSummaryForEmail = internalQuery({
-  args: {
-    reportType: v.string(),
-    year: v.number(),
-    month: v.number(),
-    userId: v.id("users"),
-  },
-  handler: async (_ctx, args) => {
+  args: { scheduleId: v.id("reportScheduleSettings"), year: v.number(), month: v.number() },
+  handler: async (ctx, args) => {
+    reportPeriod(args.year, args.month);
+    const schedule = await ctx.db.get(args.scheduleId);
+    if (!schedule?.enabled) return null;
+    const scope = await resolveScheduleScope(ctx, schedule);
+    if (!scope) return null;
     const labels: Record<string, string> = {
-      sgk: "SGK Aylık Döküm Raporu",
-      overtime: "Fazla Mesai Özet Raporu",
-      attendance: "Devam ve Devamsızlık Özet Raporu",
-      department: "Departman Maliyet Analizi Raporu",
+      sgk: "SGK Aylık Döküm Raporu", overtime: "Fazla Mesai Özet Raporu",
+      attendance: "Devam ve Devamsızlık Özet Raporu", department: "Departman Maliyet Analizi Raporu",
     };
+    const attendance = schedule.reportType === "attendance"
+      ? await loadAttendanceReport(ctx, scope.projectIds, args.year, args.month) : null;
+    const detail = attendance
+      ? `${attendance.rows.length} aktif personel; ${attendance.rows.filter((row) => row.absentDays === null).length} personelin takvimi doğrulanamadı. ${attendance.reliabilityNote}`
+      : "Raporu seçilen kapsam ve dönemle Ayarlar → Raporlar bölümünden oluşturabilirsiniz; bu e-posta rapor dosyası içermez.";
     return {
-      title: labels[args.reportType] ?? "Aylık Rapor",
-      summary: `${args.year}/${String(args.month).padStart(2, "0")} dönemi raporu hazır. Ayarlar → Raporlar bölümünden indirebilirsiniz.`,
+      title: `${labels[schedule.reportType] ?? "Aylık Rapor"} — ${scope.scopeLabel}`,
+      summary: `${args.year}/${String(args.month).padStart(2, "0")} dönemi. Kapsam: ${scope.scopeLabel}. ${detail}`,
     };
   },
 });
 
-/** Internal: Rapor gönderildi olarak işaretle */
 export const markReportSent = internalMutation({
   args: { scheduleId: v.id("reportScheduleSettings") },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.scheduleId, {
-      lastSentAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+    const schedule = await ctx.db.get(args.scheduleId);
+    if (!schedule?.enabled || !await resolveScheduleScope(ctx, schedule)) return;
+    await ctx.db.patch(schedule._id, { lastSentAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
   },
 });
 
-/** Internal: Cron tarafından çağrılır, aylık rapor action'ını tetikler */
 export const triggerScheduledReports = internalMutation({
   args: {},
   handler: async (ctx) => {
-    await ctx.scheduler.runAfter(
-      0,
-      internal.actions.sendScheduledReports.sendMonthlyReports,
-      {}
-    );
+    await ctx.scheduler.runAfter(0, internal.actions.sendScheduledReports.sendMonthlyReports, {});
   },
 });
