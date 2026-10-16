@@ -98,6 +98,7 @@ import type * as lib_reconcileMath from "../lib/reconcileMath.js";
 import type * as lib_sgkCodes from "../lib/sgkCodes.js";
 import type * as lib_shiftResolver from "../lib/shiftResolver.js";
 import type * as lib_syncErrors from "../lib/syncErrors.js";
+import type * as lib_trDate from "../lib/trDate.js";
 import type * as lib_turkishHolidays from "../lib/turkishHolidays.js";
 import type * as maintenance from "../maintenance.js";
 import type * as migrations from "../migrations.js";
@@ -218,6 +219,7 @@ declare const fullApi: ApiFromModules<{
   "lib/sgkCodes": typeof lib_sgkCodes;
   "lib/shiftResolver": typeof lib_shiftResolver;
   "lib/syncErrors": typeof lib_syncErrors;
+  "lib/trDate": typeof lib_trDate;
   "lib/turkishHolidays": typeof lib_turkishHolidays;
   maintenance: typeof maintenance;
   migrations: typeof migrations;

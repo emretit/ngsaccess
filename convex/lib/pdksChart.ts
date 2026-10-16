@@ -1,3 +1,4 @@
+import { trDateKey } from "./trDate";
 import type { Doc, Id } from "../_generated/dataModel";
 import {
   isoTimeToTRMinutes,
@@ -117,7 +118,7 @@ export function computePdksChartData(params: {
 
   for (const r of readings) {
     const empKey = readingEmployeeKey(r);
-    const dateKey = r.accessTime.split("T")[0];
+    const dateKey = trDateKey(r.accessTime);
     const dayData = dailyMap.get(dateKey);
     if (!dayData) continue;
 

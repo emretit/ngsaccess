@@ -119,6 +119,29 @@ describe("pdksTable – buildPdksEmployeeReadingMap", () => {
 });
 
 describe("pdksTable – computePdksTableRow", () => {
+  it("UTC gece yarısını aşan aynı Türkiye günü tek hücrede kalır", () => {
+    const resolvedDates: string[] = [];
+    const row = computePdksTableRow(rowParams({
+      empReadings: [
+        reading("2026-06-21T21:00:00.000Z"),
+        reading(`${MONDAY}T00:00:00.000Z`),
+      ],
+      periodDateKeys: [MONDAY, TUESDAY],
+      isSingleDay: false,
+      viewMode: "matrix",
+      resolveShift: (_employeeId, date) => {
+        resolvedDates.push(date);
+        return null;
+      },
+    }));
+
+    expect(row.totalHours).toBe("3h 0m");
+    expect(row.days[0]).toMatchObject({ date: MONDAY, totalMinutes: 180 });
+    expect(row.days[1]).toMatchObject({ date: TUESDAY, totalMinutes: 0 });
+    expect(resolvedDates[0]).toBe(MONDAY);
+    expect(resolvedDates).not.toContain("2026-06-21");
+  });
+
   it("tek gün okuma/manuel/izin yok → absent / DV", () => {
     const row = computePdksTableRow(rowParams());
 

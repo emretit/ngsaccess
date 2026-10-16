@@ -1,3 +1,4 @@
+import { trCalendarDate } from "./trDate";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 
@@ -133,7 +134,7 @@ export function parseHHMM(hhmm: string): number {
  * Ör: "2026-05-18T16:30:00.000Z" → 19*60 + 30 = 1170.
  */
 export function isoTimeToTRMinutes(iso: string): number {
-  const tr = new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000);
+  const tr = trCalendarDate(iso);
   return tr.getUTCHours() * 60 + tr.getUTCMinutes();
 }
 

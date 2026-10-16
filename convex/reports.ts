@@ -1,3 +1,4 @@
+import { trDateKey, trDayRangeISO } from "./lib/trDate";
 import { v } from "convex/values";
 import { internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -32,8 +33,7 @@ export const getSgkMonthlyReport = authedQuery({
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-    const startISO = `${startDate}T00:00:00.000`;
-    const endISO = `${endDate}T23:59:59.999`;
+    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
 
     let readings;
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -131,7 +131,7 @@ export const getSgkMonthlyReport = authedQuery({
 
         const dayReadingsMap = new Map<string, typeof granted>();
         for (const r of granted) {
-          const dateKey = r.accessTime.split("T")[0];
+          const dateKey = trDateKey(r.accessTime);
           if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
           dayReadingsMap.get(dateKey)!.push(r);
         }
@@ -203,8 +203,7 @@ export const getOvertimeSummaryReport = authedQuery({
       ? `${year}-${String(month).padStart(2, "0")}-${String(new Date(year, month, 0).getDate()).padStart(2, "0")}`
       : `${year}-12-31`;
 
-    const startISO = `${startDate}T00:00:00.000`;
-    const endISO = `${endDate}T23:59:59.999`;
+    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
 
     let readings;
     if (args.isSuperAdmin) {
@@ -269,7 +268,7 @@ export const getOvertimeSummaryReport = authedQuery({
       const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
       const dayReadingsMap = new Map<string, typeof granted>();
       for (const r of granted) {
-        const dateKey = r.accessTime.split("T")[0];
+        const dateKey = trDateKey(r.accessTime);
         if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
         dayReadingsMap.get(dateKey)!.push(r);
       }
@@ -347,8 +346,7 @@ export const getAttendanceSummaryReport = authedQuery({
     const startDate = `${args.year}-${String(args.month).padStart(2, "0")}-01`;
     const lastDay = new Date(args.year, args.month, 0).getDate();
     const endDate = `${args.year}-${String(args.month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
-    const startISO = `${startDate}T00:00:00.000`;
-    const endISO = `${endDate}T23:59:59.999`;
+    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
 
     let readings;
     if (args.isSuperAdmin) {
@@ -400,7 +398,7 @@ export const getAttendanceSummaryReport = authedQuery({
           : null;
 
         const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
-        const presentDays = new Set(granted.map((r) => r.accessTime.split("T")[0])).size;
+        const presentDays = new Set(granted.map((r) => trDateKey(r.accessTime))).size;
 
         const leaveDays = first.employeeId
           ? allLeaves
@@ -455,8 +453,7 @@ export const getDepartmentCostReport = authedQuery({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const startDate = `${args.year}-${String(args.month).padStart(2, "0")}-01`;
     const endDate = `${args.year}-${String(args.month).padStart(2, "0")}-${String(new Date(args.year, args.month, 0).getDate()).padStart(2, "0")}`;
-    const startISO = `${startDate}T00:00:00.000`;
-    const endISO = `${endDate}T23:59:59.999`;
+    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
 
     let readings;
     if (args.isSuperAdmin) {
@@ -517,7 +514,7 @@ export const getDepartmentCostReport = authedQuery({
       const granted = empReadings.filter((r) => r.accessStatus === "izin_verildi");
       const dayReadingsMap = new Map<string, typeof granted>();
       for (const r of granted) {
-        const dateKey = r.accessTime.split("T")[0];
+        const dateKey = trDateKey(r.accessTime);
         if (!dayReadingsMap.has(dateKey)) dayReadingsMap.set(dateKey, []);
         dayReadingsMap.get(dateKey)!.push(r);
       }

@@ -57,6 +57,26 @@ describe("pdksChart – emptyPdksChartData", () => {
 });
 
 describe("pdksChart – computePdksChartData", () => {
+  it("UTC önceki günün 21:00 sonrası okumalarını Türkiye gününe atar", () => {
+    const resolvedDates: string[] = [];
+    const result = computePdksChartData(chartParams({
+      readings: [
+        reading("2026-06-21T21:00:00.000Z", EMP_A, "CARD-A"),
+        reading(`${MONDAY}T21:00:00.000Z`, EMP_B, "CARD-B"),
+      ],
+      resolveShift: (_employeeId, date) => {
+        resolvedDates.push(date);
+        return null;
+      },
+    }));
+
+    expect(result.dailyAttendance.map(({ date, present, late }) => ({ date, present, late }))).toEqual([
+      { date: MONDAY, present: 1, late: 0 },
+      { date: TUESDAY, present: 1, late: 0 },
+    ]);
+    expect(resolvedDates).toEqual([MONDAY, TUESDAY]);
+  });
+
   it("boş reading ama geçerli tarih aralığı → günler sıfır sayaçla döner", () => {
     const result = computePdksChartData(chartParams());
 

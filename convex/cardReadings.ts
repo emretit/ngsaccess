@@ -1,3 +1,4 @@
+import { trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
 import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
@@ -10,6 +11,7 @@ import { getProjectIdsForUser } from "./lib/auth";
 import type { Doc } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import {
+  isoTimeToTRMinutes,
   getEffectiveWorkSettings,
   getEffectiveOvertimeRates,
   getHolidaysMap,
@@ -71,10 +73,7 @@ function normalizePageSize(value: number | undefined): number {
 
 function dayBounds(date: string | undefined) {
   if (!date) return null;
-  return {
-    startISO: `${date}T00:00:00.000`,
-    endISO: `${date}T23:59:59.999`,
-  };
+  return trDayRangeISO(date, date);
 }
 
 async function loadScopedCardReadings(
@@ -260,11 +259,10 @@ export const getPdksTableData = authedQuery({
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
 
-    const today = args.date ?? new Date().toISOString().split("T")[0];
+    const today = args.date ?? trTodayKey();
     const startDate = args.startDate ?? today;
     const endDate = args.endDate ?? today;
-    const startISO = `${startDate}T00:00:00.000`;
-    const endISO = `${endDate}T23:59:59.999`;
+    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
     const isSingleDay = startDate === endDate;
     const viewMode = args.viewMode ?? "single";
 
@@ -453,8 +451,7 @@ export const getPdksChartData = authedQuery({
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const startISO = `${args.startDate}T00:00:00.000`;
-    const endISO = `${args.endDate}T23:59:59.999`;
+    const { startISO, endISO } = trDayRangeISO(args.startDate, args.endDate);
 
     let readings;
     if (ctx.user.role === "super_admin") {
@@ -552,8 +549,7 @@ export const getMonthlyPayrollSheet = authedQuery({
     const lastDay = new Date(args.year, args.month, 0).getUTCDate();
     const startDate = `${args.year}-${monthStr}-01`;
     const endDate = `${args.year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
-    const startISO = `${startDate}T00:00:00.000`;
-    const endISO = `${endDate}T23:59:59.999`;
+    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
 
     let readings;
     let employees: Doc<"employees">[];
@@ -667,7 +663,7 @@ export const getMonthlyPayrollSheet = authedQuery({
         empIdByCard,
       );
       if (!empId) continue;
-      const dateKey = r.accessTime.split("T")[0];
+      const dateKey = trDateKey(r.accessTime);
       const key = `${empId}__${dateKey}`;
       if (!empDayReadings.has(key)) empDayReadings.set(key, []);
       empDayReadings.get(key)!.push(r);
@@ -1247,12 +1243,9 @@ export const processCardReading = internalMutation({
     if (hasAccess) {
       const settings = await getEffectiveWorkSettings(ctx, employee.projectId);
       const dayShiftResolver = await buildShiftResolver(ctx, [employee]);
-      const dayShift = dayShiftResolver.resolve(employee._id, accessTime.split("T")[0]);
+      const dayShift = dayShiftResolver.resolve(employee._id, trDateKey(accessTime));
       const { lateThresholdMin } = thresholdsForShift(dayShift, settings);
-      const tr = new Date(new Date(accessTime).getTime() + 3 * 60 * 60 * 1000);
-      const h = tr.getUTCHours();
-      const m = tr.getUTCMinutes();
-      const isLate = h * 60 + m > lateThresholdMin;
+      const isLate = isoTimeToTRMinutes(accessTime) > lateThresholdMin;
       if (isLate && employee.projectId) {
         const notifSettings = await ctx.db
           .query("notificationSettings")
@@ -1408,8 +1401,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
       return null;
     }
 
-    const startISO = `${args.startDate}T00:00:00.000`;
-    const endISO = `${args.endDate}T23:59:59.999`;
+    const { startISO, endISO } = trDayRangeISO(args.startDate, args.endDate);
 
     const readings = await ctx.db
       .query("cardReadings")
@@ -1475,7 +1467,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
 
     const readingsByDate = new Map<string, typeof readings>();
     for (const r of readings) {
-      const dk = r.accessTime.split("T")[0];
+      const dk = trDateKey(r.accessTime);
       if (!readingsByDate.has(dk)) readingsByDate.set(dk, []);
       readingsByDate.get(dk)!.push(r);
     }

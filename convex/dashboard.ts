@@ -1,3 +1,4 @@
+import { trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
 import type { QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id, Doc } from "./_generated/dataModel";
@@ -32,10 +33,8 @@ export const getStats = authedQuery({
   },
   handler: async (ctx) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayISO = today.toISOString();
-    const tomorrowISO = new Date(today.getTime() + 86400000).toISOString();
+    const today = trTodayKey();
+    const { startISO: todayISO, endISO: todayEndISO } = trDayRangeISO(today, today);
 
     let employees: unknown[] = [];
     let devices: unknown[] = [];
@@ -52,7 +51,7 @@ export const getStats = authedQuery({
           .filter((q) =>
             q.and(
               q.gte(q.field("accessTime"), todayISO),
-              q.lt(q.field("accessTime"), tomorrowISO)
+              q.lte(q.field("accessTime"), todayEndISO)
             )
           )
           .collect(),
@@ -85,7 +84,7 @@ export const getStats = authedQuery({
               .filter((q) =>
                 q.and(
                   q.gte(q.field("accessTime"), todayISO),
-                  q.lt(q.field("accessTime"), tomorrowISO)
+                  q.lte(q.field("accessTime"), todayEndISO)
                 )
               )
               .collect()
@@ -233,8 +232,8 @@ function computePdksCoreInMemory(
   workSettings: EffectiveWorkSettings,
 ): { core: PdksStatsCore; lateByDept: Map<string, number> } {
   const allowedEmpIds = new Set(employees.map((e) => String(e._id)));
-  const startDate = range.start.split("T")[0];
-  const endDate = range.end.split("T")[0];
+  const startDate = trDateKey(range.start);
+  const endDate = trDateKey(range.end);
 
   const dayReadings = readings.filter(
     (r) =>
@@ -256,7 +255,7 @@ function computePdksCoreInMemory(
       empFirstEntry.set(key, r.accessTime);
       presentSet.add(key);
       const arrivalMin = isoTimeToTRMinutes(r.accessTime);
-      const dateISO = r.accessTime.split("T")[0];
+      const dateISO = trDateKey(r.accessTime);
       const shift = shiftResolver.resolve(r.employeeId as Id<"employees">, dateISO);
       const { lateThresholdMin } = thresholdsForShift(shift, workSettings);
       if (arrivalMin > lateThresholdMin) lateSet.add(key);
@@ -274,7 +273,7 @@ function computePdksCoreInMemory(
     if (first === last) continue;
     const diff = new Date(last.accessTime).getTime() - new Date(first.accessTime).getTime();
     const netMin = Math.floor(diff / 60000);
-    const dateISO = first.accessTime.split("T")[0];
+    const dateISO = trDateKey(first.accessTime);
     const cls = classifyDay(dateISO, defaultWorkingDays);
     const shift = shiftResolver.resolve(empId as Id<"employees">, dateISO);
     totalOvertimeMinutes += dailyOvertimeForShift({
@@ -330,7 +329,7 @@ export const getPdksStats = authedQuery({
     compareWithPrevious: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = trTodayKey();
     const baseDate = new Date(`${today}T00:00:00.000Z`);
 
     const filters = {
@@ -344,13 +343,15 @@ export const getPdksStats = authedQuery({
     if (args.compareWithPrevious) {
       earliestDate.setUTCDate(earliestDate.getUTCDate() - 7);
     }
-    const datasetStart = `${earliestDate.toISOString().split("T")[0]}T00:00:00.000`;
-    const datasetEnd = `${today}T23:59:59.999`;
+    const { startISO: datasetStart, endISO: datasetEnd } = trDayRangeISO(
+      earliestDate.toISOString().split("T")[0], today,
+    );
 
     const { employees, readings, leaves, deptNameById, shiftResolver, workSettings } =
       await loadPdksDataset(ctx, datasetStart, datasetEnd, filters);
 
-    const todayRange = { start: `${today}T00:00:00.000`, end: `${today}T23:59:59.999` };
+    const todayBounds = trDayRangeISO(today, today);
+    const todayRange = { start: todayBounds.startISO, end: todayBounds.endISO };
     const current = computePdksCoreInMemory(
       employees,
       readings,
@@ -377,11 +378,12 @@ export const getPdksStats = authedQuery({
         const day = new Date(baseDate);
         day.setUTCDate(day.getUTCDate() - offset);
         const dStr = day.toISOString().split("T")[0];
+        const bounds = trDayRangeISO(dStr, dStr);
         return computePdksCoreInMemory(
           employees,
           readings,
           leaves,
-          { start: `${dStr}T00:00:00.000`, end: `${dStr}T23:59:59.999` },
+          { start: bounds.startISO, end: bounds.endISO },
           deptNameById,
           shiftResolver,
           workSettings,
@@ -412,9 +414,8 @@ export const getAnnualOvertimeBalance = authedQuery({
     employeeId: v.optional(v.id("employees")),
   },
   handler: async (ctx, args) => {
-    const targetYear = args.year ?? new Date().getFullYear();
-    const startISO = `${targetYear}-01-01T00:00:00.000`;
-    const endISO = `${targetYear}-12-31T23:59:59.999`;
+    const targetYear = args.year ?? Number(trTodayKey().slice(0, 4));
+    const { startISO, endISO } = trDayRangeISO(`${targetYear}-01-01`, `${targetYear}-12-31`);
 
     const { employees, readings, shiftResolver } =
       await loadPdksDataset(ctx, startISO, endISO, {});
@@ -427,7 +428,7 @@ export const getAnnualOvertimeBalance = authedQuery({
     for (const r of readings) {
       if (r.accessStatus !== "izin_verildi" || !r.employeeId) continue;
       const empKey = String(r.employeeId);
-      const dateKey = r.accessTime.split("T")[0];
+      const dateKey = trDateKey(r.accessTime);
       if (!readingsByEmpDay.has(empKey)) readingsByEmpDay.set(empKey, new Map());
       const dayMap = readingsByEmpDay.get(empKey)!;
       if (!dayMap.has(dateKey)) dayMap.set(dateKey, []);
@@ -488,8 +489,7 @@ export const getRepeatLateOffenders = authedQuery({
     const end = new Date();
     const start = new Date(end);
     start.setUTCDate(start.getUTCDate() - daysBack);
-    const startISO = `${start.toISOString().split("T")[0]}T00:00:00.000`;
-    const endISO = `${end.toISOString().split("T")[0]}T23:59:59.999`;
+    const { startISO, endISO } = trDayRangeISO(trDateKey(start.toISOString()), trDateKey(end.toISOString()));
 
     const { employees, readings, shiftResolver, workSettings } =
       await loadPdksDataset(ctx, startISO, endISO, {});
@@ -498,7 +498,7 @@ export const getRepeatLateOffenders = authedQuery({
     const firstEntryByEmpDay = new Map<string, string>();
     for (const r of readings) {
       if (r.accessStatus !== "izin_verildi" || !r.employeeId) continue;
-      const key = `${String(r.employeeId)}__${r.accessTime.split("T")[0]}`;
+      const key = `${String(r.employeeId)}__${trDateKey(r.accessTime)}`;
       if (!firstEntryByEmpDay.has(key)) firstEntryByEmpDay.set(key, r.accessTime);
     }
 
@@ -538,9 +538,8 @@ export const getRepeatLateOffenders = authedQuery({
 export const getBreakViolations = authedQuery({
   args: { date: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const today = args.date ?? new Date().toISOString().split("T")[0];
-    const startISO = `${today}T00:00:00.000`;
-    const endISO = `${today}T23:59:59.999`;
+    const today = args.date ?? trTodayKey();
+    const { startISO, endISO } = trDayRangeISO(today, today);
 
     const { employees, readings, shiftResolver } =
       await loadPdksDataset(ctx, startISO, endISO, {});
@@ -614,7 +613,7 @@ export const getPdksDashboardWidgets = authedQuery({
         .collect()
         .then((assignments) =>
           assignments
-            .filter((a) => a.endDate >= new Date().toISOString().split("T")[0])
+            .filter((a) => a.endDate >= trTodayKey())
             .slice(0, 5)
         );
     } else if (allowedProjectIds.length > 0) {
@@ -639,7 +638,7 @@ export const getPdksDashboardWidgets = authedQuery({
       ]);
       pendingLeaves = leaveResults.flat();
       const allShifts = shiftResults.flat();
-      const today = new Date().toISOString().split("T")[0];
+      const today = trTodayKey();
       upcomingShifts = allShifts
         .filter((a) => a.endDate >= today)
         .sort((a, b) => a.startDate.localeCompare(b.startDate))
@@ -662,9 +661,8 @@ export const getCurrentlyInside = authedQuery({
   args: {},
   handler: async (ctx) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const today = new Date().toISOString().split("T")[0];
-    const startISO = `${today}T00:00:00.000`;
-    const endISO = `${today}T23:59:59.999`;
+    const today = trTodayKey();
+    const { startISO, endISO } = trDayRangeISO(today, today);
 
     let readings;
     if (ctx.user.role === "super_admin") {

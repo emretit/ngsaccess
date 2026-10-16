@@ -1,3 +1,4 @@
+import { trDateKey } from "./trDate";
 import type { Doc, Id } from "../_generated/dataModel";
 import {
   classifyDay,
@@ -197,7 +198,7 @@ export function computePdksTableRow(params: {
 
   const refDateISO = isSingleDay
     ? startDate
-    : (firstEntryISO?.split("T")[0] ?? startDate);
+    : (firstEntryISO ? trDateKey(firstEntryISO) : startDate);
   const refShift = employee ? resolveShift(employee._id, refDateISO) : null;
   const refSettings = settingsForShift(refShift, workSettings);
   const { isLate, isEarlyExit } = evaluateLateEarly(
@@ -216,7 +217,7 @@ export function computePdksTableRow(params: {
 
   const dayReadingsMap = new Map<string, Doc<"cardReadings">[]>();
   for (const r of granted) {
-    const dateKey = r.accessTime.split("T")[0];
+    const dateKey = trDateKey(r.accessTime);
     const dayReadings = dayReadingsMap.get(dateKey);
     if (dayReadings) {
       dayReadings.push(r);
