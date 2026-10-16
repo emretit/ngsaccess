@@ -1,3 +1,4 @@
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -56,7 +57,7 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
   const [idePassword, setIdePassword] = useState("");
   const [zoneChoice, setZoneChoice] = useState<string>(NEW_ZONE);
   const [newZoneName, setNewZoneName] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+
 
   const zones = useQuery(
     api.zones.list,
@@ -74,7 +75,6 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
       setIdePassword("");
       setZoneChoice(NEW_ZONE);
       setNewZoneName("");
-      setSubmitting(false);
     }
   }, [open, activeProjectId]);
 
@@ -91,7 +91,7 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
     setDoorCount(dev?.ideDoorCount ?? 4);
     setIdeUser(dev?.ideUser ?? "");
     setIdePassword(dev?.idePassword ?? "");
-    setNewZoneName(dev?.name ?? "");
+    setNewZoneName("");
   };
 
   const isIde = selected?.brand === "ide_smart";
@@ -106,12 +106,10 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
     !!targetProjectId &&
     // IDE Smart paneller MQTT login için kullanıcı+şifre ister; boşsa sync sonsuza pending kalır.
     (!isIde || (ideUser.trim().length > 0 && idePassword.trim().length > 0)) &&
-    (zoneChoice === NEW_ZONE ? newZoneName.trim().length > 0 : true);
+    (zoneChoice === NEW_ZONE ? newZoneName.trim().length > 0 && newZoneName.trim().toLocaleLowerCase("tr-TR") !== name.trim().toLocaleLowerCase("tr-TR") : true);
 
-  const handleSubmit = async () => {
-    if (!selectedId || !targetProjectId) return;
-    setSubmitting(true);
-    try {
+  const { run: handleSubmit, pending: submitting } = useAsyncAction(async () => {
+    if (!selectedId || !targetProjectId || !canSubmit) throw new Error("Cihaz, proje ve geçerli bölge seçin");
       await claimDevice({
         adminDeviceId: selectedId,
         projectId: targetProjectId,
@@ -126,19 +124,13 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
       });
       toast({ title: "Başarılı", description: "Cihaz projeye eklendi" });
       onSuccess();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Cihaz eklenemedi";
-      toast({ title: "Hata", description: message, variant: "destructive" });
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  }, { error: "Cihaz projeye eklenemedi" });
 
   const loading = claimable === undefined;
   const empty = !loading && (claimable ?? []).length === 0;
 
   return (
-    <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+    <Sheet open={open} onOpenChange={(isOpen) => !isOpen && !submitting && onClose()}>
       <SheetContent size="lg" className="p-0">
         <div className="p-6 border-b">
           <SheetHeader>
@@ -270,11 +262,18 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
                     </SelectContent>
                   </Select>
                   {zoneChoice === NEW_ZONE && (
+                    <div className="space-y-1">
+                    <Label htmlFor="claim-zone-name">Yeni bölge adı (zorunlu)</Label>
                     <Input
+                      id="claim-zone-name"
+                      aria-describedby="claim-zone-error"
+                      aria-invalid={newZoneName.trim().toLocaleLowerCase("tr-TR") === name.trim().toLocaleLowerCase("tr-TR")}
                       value={newZoneName}
                       onChange={(e) => setNewZoneName(e.target.value)}
-                      placeholder="Yeni bölge adı"
+                      placeholder="Örn. Giriş katı"
                     />
+                    {(!newZoneName.trim() || newZoneName.trim().toLocaleLowerCase("tr-TR") === name.trim().toLocaleLowerCase("tr-TR")) && <p id="claim-zone-error" className="text-xs text-destructive">{!newZoneName.trim() ? "Yeni bölge adı girin veya mevcut bir bölge seçin." : "Bölge adı cihaz adıyla aynı olamaz."}</p>}
+                    </div>
                   )}
                 </div>
 
@@ -292,7 +291,7 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
 
                 <div className="flex justify-end gap-2 pt-2">
                   <Button variant="outline" onClick={onClose} disabled={submitting}>İptal</Button>
-                  <Button onClick={handleSubmit} disabled={!canSubmit || submitting}>
+                  <Button onClick={() => void handleSubmit()} disabled={!canSubmit || submitting}>
                     {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     Projeye Ekle
                   </Button>

@@ -10,16 +10,16 @@ interface DeviceStatsProps {
 export function DeviceStats({ devices }: DeviceStatsProps) {
   const stats = useMemo(() => ({
     total:   devices.length,
-    online:  devices.filter((d) => d.status === "online").length,
-    offline: devices.filter((d) => d.status === "offline").length,
-    expired: devices.filter((d) => d.status === "expired").length,
+    online:  devices.filter((d) => d.connectionStatus === "online").length,
+    offline: devices.filter((d) => d.connectionStatus === "offline").length,
+    never: devices.filter((d) => d.connectionStatus === "never").length,
   }), [devices]);
 
   const cards: { label: string; value: number; Icon: typeof Smartphone; tone: StatTone }[] = [
     { label: "Toplam",          value: stats.total,   Icon: Smartphone,  tone: "info" },
-    { label: "Aktif",           value: stats.online,  Icon: CircleCheck, tone: "success" },
-    { label: "Pasif",           value: stats.offline, Icon: WifiOff,     tone: "default" },
-    { label: "Süresi Dolmuş",   value: stats.expired, Icon: AlertCircle, tone: "danger" },
+    { label: "Çevrimiçi",           value: stats.online,  Icon: CircleCheck, tone: "success" },
+    { label: "Çevrimdışı",           value: stats.offline, Icon: WifiOff,     tone: "default" },
+    { label: "Henüz bağlanmadı",   value: stats.never, Icon: AlertCircle, tone: "default" },
   ];
 
   return (

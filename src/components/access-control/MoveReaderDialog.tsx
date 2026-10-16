@@ -13,7 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/notify";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 type ReaderDirection = "entry" | "exit" | "both";
 
@@ -56,9 +57,13 @@ export function MoveReaderDialog({
   );
   const [targetDoorId, setTargetDoorId] = useState<Id<"doors"> | "">("");
   const [direction, setDirection] = useState<ReaderDirection>(currentDirection);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const moveReader = useMutation(api.readers.move);
-  const { toast } = useToast();
+  const { run: move, pending: isSubmitting } = useAsyncAction(async () => {
+    if (!targetDoorId) throw new Error("Hedef kapı seçin");
+    await moveReader({ readerId, targetDoorId, direction });
+    notify.success("Okuyucu taşındı");
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -75,28 +80,11 @@ export function MoveReaderDialog({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!targetDoorId) {
-      toast({ title: "Hedef kapı seçin", variant: "destructive" });
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      await moveReader({ readerId, targetDoorId, direction });
-      toast({ title: "Okuyucu taşındı", description: `${readerName} hedef kapıya bağlandı.` });
-      onOpenChange(false);
-    } catch (error: unknown) {
-      toast({
-        title: "Okuyucu taşınamadı",
-        description: error instanceof Error ? error.message : "Bilinmeyen hata",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    if (await move()) onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => { if (!isSubmitting) onOpenChange(next); }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -105,6 +93,7 @@ export function MoveReaderDialog({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <p className="text-sm text-muted-foreground">{readerName}, {targetDoors.find((door) => door.id === currentDoorId)?.name ?? "kaynak kapı"} üzerinden seçilen hedefe mantıksal olarak taşınacak. Kaynaktaki son okuyucuysa kapı okuyucusuz kalır. Fiziksel kablolama değişmez.</p>
           <div className="space-y-2">
             <Label>Okuyucu</Label>
             <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">{readerName}</div>
@@ -144,7 +133,7 @@ export function MoveReaderDialog({
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => onOpenChange(false)}>
               İptal
             </Button>
             <Button type="submit" disabled={isSubmitting || !targetDoorId}>

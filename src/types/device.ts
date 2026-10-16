@@ -13,6 +13,8 @@ export interface Device {
   deviceSerial?: string;
   accessDirection?: AccessDirection;
   status?: "online" | "offline" | "expired" | "active" | "inactive" | string;
+  connectionStatus?: "online" | "offline" | "never";
+  doorIds?: Id<"doors">[];
   isActive?: boolean;
   zoneId?: Id<"zones">;
   doorId?: Id<"doors">;
@@ -50,6 +52,8 @@ export interface Project {
   _id: Id<"projects">;
   name: string;
   description?: string;
+  connectionStatus?: "online" | "offline" | "never";
+  doorIds?: Id<"doors">[];
   isActive?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -64,6 +68,8 @@ export interface ServerDevice {
   deviceSerial?: string;
   accessDirection?: AccessDirection;
   status?: "online" | "offline" | "expired" | "active" | "inactive" | string;
+  connectionStatus?: "online" | "offline" | "never";
+  doorIds?: Id<"doors">[];
   isActive?: boolean;
   zoneId?: Id<"zones">;
   doorId?: Id<"doors">;

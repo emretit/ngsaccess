@@ -18,6 +18,7 @@ export interface DeviceData {
   devicePassword?: string;
   description?: string;
   status?: string;
+  isActive?: boolean;
   brand?: DeviceBrand;
   ehomeID?: string;
   ehomeKey?: string;
@@ -91,7 +92,7 @@ export function buildDeviceFormValues(
     description: device.description ?? "",
     status: (device.status === "active" || device.status === "inactive"
       ? device.status
-      : "active") as "active" | "inactive",
+      : device.isActive === false ? "inactive" : "active") as "active" | "inactive",
     ehome_id: device.ehomeID ?? "",
     ehome_key: device.ehomeKey ?? "",
     // Kayıtlı transport'u olduğu gibi yükle. Eski gateway cihazlarında (hikTransport alanı

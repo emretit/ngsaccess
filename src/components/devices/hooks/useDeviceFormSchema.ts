@@ -1,3 +1,4 @@
+import { isDeviceHost } from "../../../../convex/lib/deviceUx";
 import { z } from "zod";
 import { MANUAL_MODEL_ID } from "../../../../convex/lib/hikModels";
 
@@ -17,7 +18,7 @@ export const BRAND_LABELS: Record<DeviceBrand, string> = {
  */
 const doorCountField = z.preprocess(
   (v) => (v === "" || v === null ? undefined : v),
-  z.coerce.number().int().min(1).max(8).optional(),
+  z.coerce.number().int("Tam sayı girin").min(1, "En az 1 olmalı").max(8, "En fazla 8 olmalı").optional(),
 );
 
 /**
@@ -62,7 +63,7 @@ export function makeFormSchema(adminMode: boolean, isEdit = false) {
   // max 65535: bridge tarafı Port'u 16-bit okur; aralık dışı değer roster'ı düşürür.
   hik_port: z.preprocess(
     (v) => (v === "" || v === null ? undefined : v),
-    z.coerce.number().int().min(1).max(65535).optional(),
+    z.coerce.number().int("Tam sayı girin").min(1, "En az 1 olmalı").max(65535, "En fazla 65535 olmalı").optional(),
   ),
   // IDE Smart panel (brand === "ide_smart")
   ide_uuid: z.string().optional(),
@@ -72,7 +73,7 @@ export function makeFormSchema(adminMode: boolean, isEdit = false) {
   // takılmasın diye boş/null değerleri önce undefined'a indir (opsiyonel alan).
   ide_http_port: z.preprocess(
     (v) => (v === "" || v === null ? undefined : v),
-    z.coerce.number().int().positive().optional(),
+    z.coerce.number().int("Tam sayı girin").min(1, "En az 1 olmalı").max(65535, "En fazla 65535 olmalı").optional(),
   ),
   ide_door_count: doorCountField,
 }).superRefine((data, ctx) => {
@@ -119,6 +120,12 @@ export function makeFormSchema(adminMode: boolean, isEdit = false) {
         message: "Kapı sayısı gerekli",
       });
     }
+  }
+  if (data.brand === "hikvision" && data.hik_transport === "localBridge") {
+    for (const field of ["device_ip", "device_username", "device_password"] as const) {
+      if (!data[field]?.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [field], message: "Yerel bridge için bu alan zorunlu" });
+    }
+    if (data.device_ip?.trim() && !isDeviceHost(data.device_ip)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["device_ip"], message: "Geçerli IP adresi veya sunucu adı girin" });
   }
   // ehome yalnız gateway transport'ta zorunlu (localBridge LAN bridge token ile auth olur).
   if (data.brand === "hikvision" && data.hik_transport === "gateway") {

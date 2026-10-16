@@ -44,6 +44,7 @@ export function DeviceForm({
   const {
     form,
     isLoading,
+    connectionError,
     zones,
     doors,
     locationLoading,
@@ -68,11 +69,12 @@ export function DeviceForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit as never)} className="space-y-4">
+        <fieldset disabled={isLoading || !!connectionError} className="space-y-4">
         {adminMode ? (
           // Admin: yalnız bağlantı kimliği. İsim seri/UUID'den türetilir; bölge,
           // kapı, erişim yönü, tip, durum proje tarafında kararlaştırılır.
           brand === "ide_smart" ? (
-            <DeviceIdeSmartSection form={form} />
+            <DeviceIdeSmartSection form={form} isEdit={!!device} />
           ) : (
             <div className="space-y-5">
               <FormField
@@ -97,13 +99,13 @@ export function DeviceForm({
           <div className="space-y-5">
             <DeviceNameSection form={form} />
             <DeviceZoneSection form={form} zones={zonesForForm} allowCreate={!device} />
-            <DeviceIdeSmartSection form={form} />
+            <DeviceIdeSmartSection form={form} isEdit={!!device} />
             <DeviceStatusSection form={form} />
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
             <div className="space-y-4">
-              <DeviceBasicSection form={form} />
+              <DeviceBasicSection form={form} isEdit={!!device} />
               {brand !== "hikvision" && <DeviceNetworkSection form={form} />}
             </div>
 
@@ -127,7 +129,7 @@ export function DeviceForm({
           <DeviceHikvisionSection
             form={form}
             device={device}
-            onUpdated={onSuccess}
+            onUpdated={() => {}}
           />
         )}
 
@@ -151,6 +153,9 @@ export function DeviceForm({
           />
         )}
 
+        </fieldset>
+        {connectionError && <p role="alert" className="text-sm text-destructive">{connectionError}</p>}
+        {device && <p className="text-sm text-muted-foreground">Model ve kapı sayısı mevcut kapı/okuyucu yapısını değiştirmez. Topoloji düzenleme bu ekranda desteklenmiyor.</p>}
         <div className="flex justify-between gap-2 pt-4 border-t">
           {onBack && !device ? (
             <Button
@@ -174,7 +179,7 @@ export function DeviceForm({
               İptal
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Kaydediliyor..." : device ? "Güncelle" : "Kaydet"}
+              {isLoading ? "Kaydediliyor..." : connectionError ? "Bağlantıyı tekrar dene" : device ? "Güncelle" : "Kaydet"}
             </Button>
           </div>
         </div>

@@ -12,7 +12,7 @@ interface DevicesContentProps {
   zones: Zone[];
   selectedZoneId: string | null;
   selectedDoorId: string | null;
-  onDeleteDevice: (deviceId: string) => void;
+  onDeleteDevice: (deviceId: string) => Promise<void> | void;
   onAssignLocation: (device: Device) => void;
   onEditDevice: (device: Device) => void;
   /** Sıfırdan yeni cihaz oluşturma akışı. */
@@ -20,7 +20,7 @@ interface DevicesContentProps {
   /** Buluttan (havuzdan) cihaz ekleme akışı. */
   onAddFromCloud: () => void;
   onQRClick?: (device: Device) => void;
-  onReleaseDevice?: (device: Device) => void;
+  onReleaseDevice?: (device: Device) => Promise<void> | void;
   /** Yönetimsel aksiyonlar (cihaz ekle menüsü) yalnız admin'e gösterilir. */
   canManage?: boolean;
 }

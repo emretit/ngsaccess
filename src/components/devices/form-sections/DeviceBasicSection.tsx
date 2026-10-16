@@ -8,6 +8,7 @@ import { DeviceHikModelField } from "./DeviceHikModelField";
 
 interface DeviceBasicSectionProps {
   form: UseFormReturn<FormValues>;
+  isEdit?: boolean;
 }
 
 const DEVICE_TYPES = [
@@ -54,7 +55,7 @@ export function DeviceTypeField({ form }: DeviceBasicSectionProps) {
   );
 }
 
-export function DeviceBasicSection({ form }: DeviceBasicSectionProps) {
+export function DeviceBasicSection({ form, isEdit }: DeviceBasicSectionProps) {
   // Hikvision'da model seçimi cihaz adından hemen sonra gelir — model kapı/okuyucu
   // sayısını belirlediği için ilk seçilmesi gerekir (hem yeni hem düzenleme).
   const brand = form.watch("brand");
@@ -75,7 +76,7 @@ export function DeviceBasicSection({ form }: DeviceBasicSectionProps) {
         )}
       />
 
-      {brand === "hikvision" && <DeviceHikModelField form={form} />}
+      {brand === "hikvision" && <DeviceHikModelField form={form} isEdit={isEdit} />}
 
       <FormField
         control={form.control}

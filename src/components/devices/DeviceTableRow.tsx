@@ -1,19 +1,10 @@
 import { useState } from "react";
 import { DeviceDeleteDialog } from "./DeviceDeleteDialog";
 import { TableCell, TableRow } from "@/components/ui/table";
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Device } from "@/types/device";
 import { Edit2, Trash2, MapPin, QrCode, Undo2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,12 +19,12 @@ interface DeviceTableRowProps {
   projectName?: string;
   /** Admin görünümü: bölge kolonunu ve "Konum Ata" aksiyonunu gizler. */
   hideLocation?: boolean;
-  onDeleteDevice: (deviceId: string) => void;
+  onDeleteDevice: (deviceId: string) => Promise<void> | void;
   onAssignLocation?: (device: Device) => void;
   onEditDevice: (device: Device) => void;
   onQRClick?: (device: Device) => void;
   /** Verilirse "Havuza geri al" aksiyonu gösterilir (cihazı projeden çıkarır). */
-  onReleaseDevice?: (device: Device) => void;
+  onReleaseDevice?: (device: Device) => Promise<void> | void;
   selected: boolean;
   onSelect: (checked: boolean, deviceId: Id<"devices">) => void;
 }
@@ -54,18 +45,8 @@ export function DeviceTableRow({
   onSelect
 }: DeviceTableRowProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const getStatusBadge = (status: 'online' | 'offline' | 'expired') => {
-    switch (status) {
-      case 'online':
-        return <Badge variant="success">Çevrimiçi</Badge>;
-      case 'offline':
-        return <Badge variant="secondary">Çevrimdışı</Badge>;
-      case 'expired':
-        return <Badge variant="destructive">Süresi Dolmuş</Badge>;
-      default:
-        return <Badge variant="secondary">Bilinmiyor</Badge>;
-    }
-  };
+  const [releaseOpen, setReleaseOpen] = useState(false);
+  const getStatusBadge = () => <StatusBadge tone={device.connectionStatus === "online" ? "success" : "neutral"}>{device.connectionStatus === "online" ? "Çevrimiçi" : device.connectionStatus === "never" ? "Henüz bağlanmadı" : "Çevrimdışı"}</StatusBadge>;
 
   const deviceId = String(device._id ?? "");
 
@@ -79,6 +60,7 @@ export function DeviceTableRow({
     >
       <TableCell onClick={(e) => e.stopPropagation()}>
         <Checkbox
+          aria-label={`${device.name} cihazını seç`}
           checked={selected}
           onCheckedChange={(checked) => onSelect(checked as boolean, device._id)}
         />
@@ -101,7 +83,7 @@ export function DeviceTableRow({
           <TableCell>{zoneName || '-'}</TableCell>
         </>
       )}
-      <TableCell>{getStatusBadge(device.status as 'online' | 'offline' | 'expired')}</TableCell>
+      <TableCell>{getStatusBadge()}</TableCell>
       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-1">
           {onQRClick && (
@@ -110,7 +92,9 @@ export function DeviceTableRow({
               size="icon"
               onClick={() => onQRClick(device)}
               className="h-8 w-8"
-              title="QR Kod"
+              disabled={!(device.deviceSerial?.trim() || device.ideUuid?.trim())}
+              aria-label="Cihaz kimlik QR kodunu göster"
+              title="Cihaz kimlik etiketi — geçiş yetkisi sağlamaz"
             >
               <QrCode className="h-4 w-4" />
             </Button>
@@ -136,33 +120,12 @@ export function DeviceTableRow({
             <Edit2 className="h-4 w-4" />
           </Button>
           {onReleaseDevice && device.brand === "ide_smart" && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => e.stopPropagation()}
-                  className="h-8 w-8"
-                  title="Havuza geri al"
-                >
-                  <Undo2 className="h-4 w-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Havuza geri al</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {device.name ? `"${device.name}" cihazını` : "Bu cihazı"} projeden çıkarıp havuza
-                    geri almak istediğinize emin misiniz? Cihazın kapıları silinir, okuma geçmişi korunur;
-                    cihaz havuzda kalır ve başka projeye atanabilir.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>İptal</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => onReleaseDevice(device)}>Havuza al</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <>
+              <Button variant="ghost" size="icon" aria-label="Havuza geri al" onClick={() => setReleaseOpen(true)}><Undo2 className="h-4 w-4" /></Button>
+              <ConfirmDestructive open={releaseOpen} onOpenChange={setReleaseOpen} title="Havuza geri al" objectName={device.name}
+                effects={["Cihazın kapıları, okuyucuları ve erişim bağlantıları silinir.", "Kart okuma geçmişi korunur; cihaz başka projeye atanabilir."]}
+                confirmLabel="Havuza al" onConfirm={async () => { await onReleaseDevice(device); }} />
+            </>
           )}
           <Button
             variant="ghost"

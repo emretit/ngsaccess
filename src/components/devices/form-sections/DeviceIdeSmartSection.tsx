@@ -5,6 +5,7 @@ import type { FormValues } from "../hooks/useDeviceFormSchema";
 
 interface DeviceIdeSmartSectionProps {
   form: UseFormReturn<FormValues>;
+  isEdit?: boolean;
 }
 
 /**
@@ -15,7 +16,7 @@ interface DeviceIdeSmartSectionProps {
  * Zorunlu: Panel UUID (tek tanımlayıcı) + kullanıcı/şifre (panel MQTT login token'ı
  * bu kimlikle alınır). IP/port yalnızca opsiyonel LAN yedeği için saklanır.
  */
-export function DeviceIdeSmartSection({ form }: DeviceIdeSmartSectionProps) {
+export function DeviceIdeSmartSection({ form, isEdit }: DeviceIdeSmartSectionProps) {
   return (
     <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
       <h4 className="text-sm font-semibold">IDE Smart Panel</h4>
@@ -70,7 +71,7 @@ export function DeviceIdeSmartSection({ form }: DeviceIdeSmartSectionProps) {
           <FormItem>
             <FormLabel>Kapı Sayısı</FormLabel>
             <FormControl>
-              <Input type="number" placeholder="4" className="max-w-[10rem]" {...field} value={field.value ?? ""} />
+              <Input disabled={isEdit} type="number" placeholder="4" className="max-w-[10rem]" {...field} value={field.value ?? ""} />
             </FormControl>
             <FormMessage />
           </FormItem>

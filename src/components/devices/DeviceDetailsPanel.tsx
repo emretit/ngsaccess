@@ -99,12 +99,13 @@ export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess }:
                     />
                     <DeviceApiTokenCard
                       deviceId={selectedDevice._id}
+                      deviceName={selectedDevice.name}
                       currentToken={selectedDevice.apiToken}
                       currentTokenCreatedAt={selectedDevice.apiTokenCreatedAt}
                     />
                   </TabsContent>
                   <TabsContent value="command-center">
-                    <DeviceCommandCenter device={selectedDevice} onUpdated={onSuccess} />
+                    <DeviceCommandCenter device={selectedDevice} onUpdated={() => {}} />
                   </TabsContent>
                 </Tabs>
               ) : (

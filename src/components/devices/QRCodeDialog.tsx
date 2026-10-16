@@ -32,6 +32,7 @@ export function QRCodeDialog({
         </DialogHeader>
         {qrData && (
           <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">Cihaz kimlik etiketi. Bu QR kod geçiş yetkisi sağlamaz.</p>
             <QRCode
               id="qr-large"
               value={qrData.serial}
@@ -44,7 +45,7 @@ export function QRCodeDialog({
               onClick={onDownload}
             >
               <Download className="mr-2" />
-              QR Kodunu İndir
+              QR Kodunu İndir (SVG)
             </Button>
           </div>
         )}

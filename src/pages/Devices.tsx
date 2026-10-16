@@ -2,11 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import type { Id } from '../../convex/_generated/dataModel';
 import { DevicesContent } from '@/components/devices/DevicesContent';
 import { ZoneDoorTreePanel } from '@/components/access-control/ZoneDoorTreePanel';
 import { QRCodeDialog } from '@/components/devices/QRCodeDialog';
-import { DeviceDeleteDialog } from '@/components/devices/DeviceDeleteDialog';
 import { AssignLocationForm } from '@/components/devices/AssignLocationForm';
 import { DeviceDetailsPanel } from '@/components/devices/DeviceDetailsPanel';
 import { ClaimDeviceDialog } from '@/components/devices/ClaimDeviceDialog';
@@ -15,7 +13,8 @@ import { useZonesAndDoors } from '@/hooks/useZonesAndDoors';
 import { useQRCodeDialog } from '@/components/devices/useQRCodeDialog';
 import { useLocationForm } from '@/components/devices/useLocationForm';
 import { useDeviceActions } from '@/components/devices/useDeviceActions';
-import { useDeviceTable } from '@/hooks/useDeviceTable';
+import { useActiveProjectScope } from '@/hooks/useActiveProjectScope';
+import { notify } from '@/lib/notify';
 import { Device, ServerDevice } from '@/types/device';
 import { useProjectAccess } from '@/hooks/useProjectAccess';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -23,6 +22,7 @@ import { AccessDenied } from '@/components/shared/AccessDenied';
 import { useToast } from '@/hooks/use-toast';
 
 const Devices = () => {
+  const { projectId } = useActiveProjectScope();
   const { loading: projectLoading, isAdmin } = useProjectAccess();
   const { devices, isLoading, hasProjectAccess } = useProjectFilteredDevices();
   const { zones } = useZonesAndDoors();
@@ -51,7 +51,7 @@ const Devices = () => {
   const { handleDeleteDevice } = useDeviceActions();
   
   // Device table selection
-  const { showDeleteDialog, setShowDeleteDialog, handleBulkDelete } = useDeviceTable(devices);
+  useEffect(() => { setSelectedDoorId(null); setSelectedZoneId(null); }, [projectId]);
 
   // Clear selections when zone/door changes
   useEffect(() => {
@@ -78,13 +78,8 @@ const Devices = () => {
   // Cihazı projeden çıkarıp havuza geri al (door/okuma silinir, cihaz havuzda kalır).
   const releaseDeviceMut = useMutation(api.devices.releaseDevice);
   const handleReleaseDevice = async (device: Device) => {
-    try {
-      await releaseDeviceMut({ deviceId: device._id as Id<"devices"> });
-      toast({ title: "İşlem başarılı", description: "Cihaz havuza geri alındı" });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Cihaz havuza alınamadı";
-      toast({ title: "Hata", description: message, variant: "destructive" });
-    }
+    await releaseDeviceMut({ deviceId: device._id });
+    notify.success("Cihaz havuza geri alındı");
   };
 
   const handleEditDevice = (device: Device) => {
@@ -97,10 +92,7 @@ const Devices = () => {
 
   const handleDevicePanelSuccess = () => {
     setDevicePanel({ open: false, device: null });
-    toast({
-      title: "İşlem başarılı",
-      description: "Cihaz bilgileri kaydedildi",
-    });
+
   };
 
   // Loading durumunda (hem project hem devices loading) loading göster
@@ -159,14 +151,6 @@ const Devices = () => {
         onOpenChange={(open) => !open && closeQRDialog()}
         qrData={selectedQR}
         onDownload={handleDownloadQR}
-      />
-
-      {/* Delete Dialog */}
-      <DeviceDeleteDialog
-        isOpen={showDeleteDialog}
-        onOpenChange={setShowDeleteDialog}
-        selectedCount={0}
-        onConfirm={handleBulkDelete}
       />
 
       {/* Location Assignment Form */}

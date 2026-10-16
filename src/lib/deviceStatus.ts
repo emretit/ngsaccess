@@ -15,3 +15,15 @@ export function computeDeviceStatus(
     ? "online"
     : "offline";
 }
+
+export { deviceConnection } from "../../convex/lib/deviceConnection";
+
+export function commandResultMessage(result: { ok: boolean; queued?: boolean; error?: string }): string {
+  if (!result.ok) return result.error ?? "İşlem başarısız";
+  return result.queued ? "Sıraya alındı — cihaz onayı henüz alınmadı" : "İşlem sonucu alındı";
+}
+
+export function capabilityLabel(probe: { ok: boolean; supported: boolean | null }): string {
+  if (!probe.ok) return "Doğrulanamadı";
+  return probe.supported === true ? "Destekli" : probe.supported === false ? "Desteklenmiyor" : "Belirsiz";
+}

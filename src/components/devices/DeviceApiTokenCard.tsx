@@ -1,3 +1,4 @@
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { useState } from "react";
 import { useMutation } from "convex/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 
 interface DeviceApiTokenCardProps {
   deviceId: Id<"devices">;
+  deviceName?: string;
   currentToken?: string;
   currentTokenCreatedAt?: string;
 }
@@ -22,6 +24,7 @@ function maskToken(token?: string): string {
 
 export function DeviceApiTokenCard({
   deviceId,
+  deviceName,
   currentToken,
   currentTokenCreatedAt,
 }: DeviceApiTokenCardProps) {
@@ -29,6 +32,7 @@ export function DeviceApiTokenCard({
   const regenerate = useMutation(api.devices.regenerateApiToken);
   const [revealedToken, setRevealedToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const handleRegenerate = async () => {
     setBusy(true);
@@ -38,12 +42,6 @@ export function DeviceApiTokenCard({
       toast({
         title: "Yeni token oluşturuldu",
         description: "Token'ı kopyalayıp cihaz bridge config'ine yapıştırın. Bu pencereyi kapattıktan sonra bir daha gösterilmeyecek.",
-      });
-    } catch (error) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Token oluşturulamadı",
-        variant: "destructive",
       });
     } finally {
       setBusy(false);
@@ -61,6 +59,7 @@ export function DeviceApiTokenCard({
 
   return (
     <Card>
+      <ConfirmDestructive open={confirmOpen} onOpenChange={setConfirmOpen} title="Cihaz bağlantı anahtarını yenile" objectName={deviceName ?? deviceId} effects={["Eski anahtar hemen geçersiz olur.", "Yeni anahtarı kopyalayıp bridge yapılandırmasına uygulayana kadar bağlantı durabilir."]} confirmLabel="Anahtarı yenile" onConfirm={handleRegenerate} />
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <KeyRound className="h-4 w-4 text-primary" />
@@ -79,7 +78,7 @@ export function DeviceApiTokenCard({
             </div>
             <div className="flex gap-2">
               <Input value={revealedToken} readOnly className="font-mono text-xs" />
-              <Button variant="outline" size="sm" onClick={() => handleCopy(revealedToken)}>
+              <Button variant="outline" size="sm" aria-label="Yeni anahtarı kopyala" onClick={() => handleCopy(revealedToken)}>
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
@@ -96,7 +95,7 @@ export function DeviceApiTokenCard({
           </div>
         )}
 
-        <Button onClick={handleRegenerate} disabled={busy} size="sm" variant="outline">
+        <Button onClick={() => setConfirmOpen(true)} disabled={busy} size="sm" variant="outline">
           <RefreshCw className={`mr-2 h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} />
           {currentToken ? "Token'ı Yenile" : "Token Oluştur"}
         </Button>

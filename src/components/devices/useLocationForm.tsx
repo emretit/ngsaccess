@@ -26,7 +26,7 @@ export function useLocationForm() {
     await updateDevice({
       deviceId: showLocationForm.device._id,
       zoneId: zoneId as Id<"zones">,
-      doorId: doorId as Id<"doors">,
+      doorId: showLocationForm.device.brand === "ide_smart" || showLocationForm.device.brand === "hikvision" ? undefined : doorId as Id<"doors">,
     });
   };
 

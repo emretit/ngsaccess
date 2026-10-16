@@ -1,5 +1,6 @@
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -29,12 +30,12 @@ export function AssignLocationForm({
   deviceName,
   device
 }: AssignLocationFormProps) {
-  const submittingRef = useRef(false);
+  const isPanel = device?.brand === "ide_smart" || device?.brand === "hikvision";
   const { zones, doors, loading } = useZonesAndDoors();
   const [selectedZoneId, setSelectedZoneId] = useState<string>("");
   const [selectedDoorId, setSelectedDoorId] = useState<string>("");
   const [filteredDoors, setFilteredDoors] = useState<typeof doors>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
 
   useEffect(() => {
     if (open && device) {
@@ -57,7 +58,7 @@ export function AssignLocationForm({
 
   useEffect(() => {
     if (selectedZoneId && doors.length > 0) {
-      const filtered = doors.filter(door => door.zoneId === selectedZoneId);
+      const filtered = doors.filter(door => door.zoneId === selectedZoneId && (!door.deviceId || door.deviceId === device?._id));
       setFilteredDoors(filtered);
 
       if (selectedDoorId && !filtered.some(door => door._id === selectedDoorId)) {
@@ -73,32 +74,18 @@ export function AssignLocationForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedZoneId, doors]);
 
+  const { run: assign, pending: isSubmitting } = useAsyncAction(async () => {
+    if (!selectedZoneId || (!isPanel && !selectedDoorId)) throw new Error("Lütfen bölge ve kapı seçin");
+    await onSubmit(selectedZoneId, selectedDoorId);
+    toast.success(`${deviceName} cihazının konumu güncellendi.`);
+  }, { error: "Konum atanamadı" });
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (submittingRef.current) return;
-    
-    if (!selectedZoneId || !selectedDoorId) {
-      toast.error("Lütfen bölge ve kapı seçin.");
-      return;
-    }
-    
-    submittingRef.current = true;
-    setIsSubmitting(true);
-    
-    try {
-      await onSubmit(selectedZoneId, selectedDoorId);
-      toast.success(`${deviceName} cihazının konumu güncellendi.`);
-      onClose();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Konum atanamadı");
-    } finally {
-      submittingRef.current = false;
-      setIsSubmitting(false);
-    }
+    if (await assign()) onClose();
   };
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen && !submittingRef.current) onClose(); }}>
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen && !isSubmitting) onClose(); }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{deviceName} — Konum Ata</DialogTitle>
@@ -126,7 +113,7 @@ export function AssignLocationForm({
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
+            {isPanel ? <p className="text-sm text-muted-foreground">Panelin tüm kapıları ve okuyucuları seçilen bölgeye taşınır. Kapı eşlemesi değiştirilmez.</p> : <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="door" className="text-right">
                 Kapı
               </Label>
@@ -146,13 +133,13 @@ export function AssignLocationForm({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </div>}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
               İptal
             </Button>
-            <Button type="submit" disabled={isSubmitting || !selectedZoneId || !selectedDoorId}>
+            <Button type="submit" disabled={isSubmitting || !selectedZoneId || (!isPanel && !selectedDoorId)}>
               {isSubmitting ? "Atanıyor..." : "Konum Ata"}
             </Button>
           </DialogFooter>

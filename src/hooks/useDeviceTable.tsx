@@ -1,53 +1,44 @@
 import { useState } from "react";
 import { Device } from "@/types/device";
-import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/notify";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 
+export function visibleSelection<T extends string>(selected: T[], visible: T[]): T[] {
+  const ids = new Set(visible);
+  return selected.filter((id) => ids.has(id));
+}
+
+export async function deleteDeviceSelection<T extends string>(targets: T[], remove: (id: T) => Promise<unknown>) {
+  const results = await Promise.allSettled(targets.map(remove));
+  const failed = targets.filter((_, index) => results[index].status === "rejected");
+  return { failed, deleted: targets.length - failed.length };
+}
+
 export function useDeviceTable(devices: Device[]) {
-  const [selectedDevices, setSelectedDevices] = useState<Id<"devices">[]>([]);
+  const [selection, setSelection] = useState<Id<"devices">[]>([]);
+  const [previousIds, setPreviousIds] = useState("");
+  const idsKey = devices.map((device) => `${device.projectId}:${device._id}`).sort().join(",");
+  if (previousIds !== idsKey) {
+    setPreviousIds(idsKey);
+    setSelection(visibleSelection(selection, devices.map((device) => device._id)));
+  }
+  const selectedDevices = visibleSelection(selection, devices.map((device) => device._id));
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const { toast } = useToast();
   const removeDevice = useMutation(api.devices.remove);
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedDevices(devices.map((d) => d._id));
-    } else {
-      setSelectedDevices([]);
-    }
-  };
-
+  const handleSelectAll = (checked: boolean) => setSelection(checked ? devices.map((d) => d._id) : []);
   const handleSelectDevice = (checked: boolean, deviceId: Id<"devices">) => {
-    if (checked) {
-      setSelectedDevices([...selectedDevices, deviceId]);
-    } else {
-      setSelectedDevices(selectedDevices.filter((id) => id !== deviceId));
-    }
+    setSelection((current) => checked ? Array.from(new Set([...current, deviceId])) : current.filter((id) => id !== deviceId));
   };
-
   const handleBulkDelete = async () => {
-    try {
-      await Promise.all(selectedDevices.map((id) => removeDevice({ deviceId: id })));
-      toast({ title: "Başarılı", description: `${selectedDevices.length} cihaz başarıyla silindi` });
-      setSelectedDevices([]);
-      setShowDeleteDialog(false);
-    } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Cihazlar silinirken bir hata oluştu",
-        variant: "destructive",
-      });
-    }
+    const targets = visibleSelection(selectedDevices, devices.map((device) => device._id));
+    const { failed, deleted } = await deleteDeviceSelection(targets, (deviceId) => removeDevice({ deviceId }));
+    setSelection(failed);
+    if (deleted) notify.success(`${deleted} cihaz silindi`);
+    if (failed.length) throw new Error(`${failed.length} cihaz silinemedi. Yalnız bu cihazlar seçili kaldı; tekrar deneyebilirsiniz.`);
+    setShowDeleteDialog(false);
   };
-
-  return {
-    selectedDevices,
-    showDeleteDialog,
-    setShowDeleteDialog,
-    handleSelectAll,
-    handleSelectDevice,
-    handleBulkDelete,
-  };
+  return { selectedDevices, showDeleteDialog, setShowDeleteDialog, handleSelectAll, handleSelectDevice, handleBulkDelete };
 }

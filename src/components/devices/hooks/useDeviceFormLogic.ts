@@ -52,7 +52,7 @@ export function useDeviceFormLogic({ device, defaultBrand, onSuccess, projectIdO
   const filteredDoors = doors.filter((door) => String(door.zoneId) === String(selectedZoneId));
 
   // Handle form submission
-  const { onSubmit, isLoading } = useDeviceFormSubmission({
+  const { onSubmit, isLoading, connectionError } = useDeviceFormSubmission({
     device,
     currentProjectId,
     onSuccess,
@@ -63,6 +63,7 @@ export function useDeviceFormLogic({ device, defaultBrand, onSuccess, projectIdO
     form,
     onSubmit,
     isLoading,
+    connectionError,
     user,
     currentProjectId,
     zones,

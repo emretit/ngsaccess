@@ -18,6 +18,9 @@ import {
   provisionHikDoorsAndReaders,
   resolveOrCreateZone,
 } from "./lib/deviceHelpers";
+import { resolveProjectScope } from "./lib/projectScope";
+import { toPatch } from "./lib/nullablePatch";
+import { validateDeviceDoor, deviceActive } from "./lib/deviceUx";
 import { claimAdminDeviceCore } from "./lib/devicePool";
 import {
   resolveAuthorizedEmployeeIds,
@@ -36,7 +39,7 @@ const DEVICE_SECRET_FIELD_SET: ReadonlySet<string> = new Set(DEVICE_SECRET_FIELD
 export const list = authedQuery({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
 
     let devices;
     if (args.projectId) {
@@ -71,7 +74,8 @@ export const list = authedQuery({
       devices.map(async (device) => {
         const zone = device.zoneId ? await ctx.db.get(device.zoneId) : null;
         const door = device.doorId ? await ctx.db.get(device.doorId) : null;
-        const result = { ...device, zone, door };
+        const ownedDoors = await ctx.db.query("doors").withIndex("by_device", (q) => q.eq("deviceId", device._id)).collect();
+        const result = { ...device, zone, door, doorIds: ownedDoors.map((row) => row._id) };
         if (!manager) {
           for (const f of DEVICE_SECRET_FIELDS) result[f] = undefined;
         }
@@ -224,8 +228,8 @@ export const create = authedMutation({
     const deviceId = await ctx.db.insert("devices", {
       ...deviceArgs,
       zoneId,
-      isActive: args.isActive ?? true,
-      status: args.status ?? "active",
+      isActive: deviceActive(args.status, args.isActive),
+      status: deviceActive(args.status, args.isActive) ? "active" : "inactive",
       createdAt: now,
       updatedAt: now,
     });
@@ -257,14 +261,14 @@ export const update = authedMutation({
     doorId: v.optional(v.id("doors")),
     doorCount: v.optional(v.number()),
     deviceType: v.optional(v.string()),
-    deviceIp: v.optional(v.string()),
+    deviceIp: v.optional(v.union(v.null(), v.string())),
     deviceSerial: v.optional(v.string()),
     accessDirection: v.optional(
       v.union(v.literal("entry"), v.literal("exit"), v.literal("both"))
     ),
     status: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
-    description: v.optional(v.string()),
+    description: v.optional(v.union(v.null(), v.string())),
     lastSeen: v.optional(v.string()),
     deviceUsername: v.optional(v.string()),
     devicePassword: v.optional(v.string()),
@@ -273,7 +277,7 @@ export const update = authedMutation({
     ),
     ehomeID: v.optional(v.string()),
     ehomeKey: v.optional(v.string()),
-    hikModel: v.optional(v.string()),
+    hikModel: v.optional(v.union(v.null(), v.string())),
     hikTransport: v.optional(v.union(v.literal("gateway"), v.literal("localBridge"))),
     hikDoorCount: v.optional(v.number()),
     hikPort: v.optional(v.number()),
@@ -313,6 +317,7 @@ export const update = authedMutation({
       if (!isProjectAllowed(allowedProjectIds, targetDoor.projectId)) {
         throw new Error("Bu kapıya erişim yetkiniz yok");
       }
+      validateDeviceDoor(device, targetDoor.deviceId === device._id && args.zoneId ? { ...targetDoor, zoneId: args.zoneId } : targetDoor, args.zoneId ?? device.zoneId);
       if (targetDoor.projectId !== device.projectId) {
         throw new Error("Seçilen kapı bu cihazın projesinde değil");
       }
@@ -331,7 +336,12 @@ export const update = authedMutation({
       if (!manager && DEVICE_SECRET_FIELD_SET.has(k)) continue;
       clean[k] = v;
     }
-    await ctx.db.patch(deviceId, clean);
+    if (args.status !== undefined || args.isActive !== undefined) {
+      const active = deviceActive(args.status, args.isActive ?? device.isActive);
+      clean.isActive = active;
+      clean.status = active ? "active" : "inactive";
+    }
+    await ctx.db.patch(deviceId, toPatch(clean));
 
     // Panel başka bölgeye taşınırsa (zoneId değişti), o panele bağlı tüm kapıların
     // door.zoneId'sini eşitle (Variant 1 değişmezi: panelin tüm kapıları tek bölgede).
@@ -592,6 +602,7 @@ export const getPanelDoorByIo = internalQuery({
 export const createIdePanel = authedMutation({
   args: {
     name: v.string(),
+    status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
     projectId: v.optional(v.id("projects")),
     // Bölge: mevcut bölge id'si VEYA yeni bölge adı. İkisi de boşsa panel adından türetilir.
     zoneId: v.optional(v.id("zones")),
@@ -643,8 +654,8 @@ export const createIdePanel = authedMutation({
       idePassword: args.idePassword ?? "admin12345",
       ideHttpPort: args.ideHttpPort ?? 80,
       ideDoorCount: doorCount,
-      isActive: true,
-      status: "active",
+      isActive: deviceActive(args.status),
+      status: deviceActive(args.status) ? "active" : "inactive",
       description: args.description,
       createdAt: now,
       updatedAt: now,
@@ -749,8 +760,8 @@ export const createHikDevice = authedMutation({
       hikDoorCount: doorCount,
       hikPort: args.hikPort,
       accessDirection: args.accessDirection,
-      isActive: true,
-      status: args.status ?? "active",
+      isActive: deviceActive(args.status),
+      status: deviceActive(args.status) ? "active" : "inactive",
       description: args.description,
       createdAt: now,
       updatedAt: now,

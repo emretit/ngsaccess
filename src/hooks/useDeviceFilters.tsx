@@ -24,7 +24,7 @@ export function useDeviceFilters(
       // Filter by zone/door
       const locationMatch = () => {
         if (selectedDoorId != null) {
-          return device.doorId === selectedDoorId;
+          return device.doorId === selectedDoorId || device.doorIds?.some((id) => id === selectedDoorId);
         }
         if (selectedZoneId != null) {
           return device.zoneId === selectedZoneId;
@@ -46,7 +46,7 @@ export function useDeviceFilters(
       // Filter by status
       const statusMatch = () => {
         if (statusFilter === 'all') return true;
-        return device.status === statusFilter;
+        return device.connectionStatus === statusFilter;
       };
 
       // Filter by type

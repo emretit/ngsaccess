@@ -72,8 +72,9 @@ export function DeviceFilters({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all" className="text-xs">Tümü</SelectItem>
-              <SelectItem value="online" className="text-xs">Aktif</SelectItem>
-              <SelectItem value="offline" className="text-xs">Pasif</SelectItem>
+              <SelectItem value="online" className="text-xs">Çevrimiçi</SelectItem>
+              <SelectItem value="offline" className="text-xs">Çevrimdışı</SelectItem>
+              <SelectItem value="never">Henüz bağlanmadı</SelectItem>
             </SelectContent>
           </Select>
 

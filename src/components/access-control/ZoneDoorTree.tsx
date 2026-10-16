@@ -1,3 +1,4 @@
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -212,17 +213,10 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
     setShowAddDoorDialog(true);
   };
 
+  const [deleteReader, setDeleteReader] = useState<{ id: Id<"readers">; name: string } | null>(null);
   const handleDeleteReader = async (readerId: Id<"readers">) => {
-    try {
-      await removeReader({ readerId });
-      toast({ title: "Başarılı", description: "Okuyucu silindi" });
-    } catch (e) {
-      toast({
-        title: "Hata",
-        description: e instanceof Error ? e.message : "Okuyucu silinirken hata oluştu",
-        variant: "destructive",
-      });
-    }
+    await removeReader({ readerId });
+    toast({ title: "Okuyucu silindi" });
   };
 
   const toggleZone = (id: Id<"zones">) =>
@@ -354,7 +348,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
             className="h-5 w-5 opacity-0 transition-opacity group-hover/reader:opacity-100 hover:bg-accent/80"
             title="Okuyucuyu Sil"
             aria-label="Okuyucuyu Sil"
-            onClick={() => handleDeleteReader(reader.readerId as Id<"readers">)}
+            onClick={() => setDeleteReader({ id: reader.readerId as Id<"readers">, name: `${door.name} / ${reader.readerName ?? "Okuyucu"}` })}
           >
             <Trash2 className="h-3 w-3" />
           </Button>
@@ -377,6 +371,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
       (deviceCapacity === null || !device?._id || countReadersForDevice(device._id) < deviceCapacity);
     return (
       <>
+        {readers.length === 0 && <p className="text-xs text-muted-foreground py-1">Okuyucu atanmamış</p>}
         {readers.map((reader) => renderReaderRow(door, reader, device))}
         {canCreateReader && (
           <button
@@ -481,6 +476,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
 
   return (
     <>
+      <ConfirmDestructive open={deleteReader !== null} onOpenChange={(open) => { if (!open) setDeleteReader(null); }} title="Okuyucuyu sil" objectName={deleteReader?.name ?? "Okuyucu"} effects={["Okuyucunun kapı eşlemesi kaldırılır.", "Son okuyucuysa kaynak kapı okuyucusuz kalır; kart okuma geçmişi korunur."]} confirmLabel="Okuyucuyu sil" onConfirm={async () => { if (deleteReader) await handleDeleteReader(deleteReader.id); }} />
       <ul role="tree" className="space-y-0.5">
         {zones.map((zone) => {
           const isExpanded = expandedZones.includes(zone._id);

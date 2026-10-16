@@ -1,3 +1,4 @@
+import { deviceConnection, DEVICE_ONLINE_WINDOW_MS } from "./lib/deviceConnection";
 import { v } from "convex/values";
 import { authedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
@@ -62,8 +63,8 @@ function parseHikCapabilitySummary(raw: string | undefined): HikCapabilitySummar
 
     return {
       updatedAt: parsed.updatedAt,
-      supported: probes.filter((p) => p.supported === true).length,
-      unsupported: probes.filter((p) => p.supported === false).length,
+      supported: probes.filter((p) => p.ok && p.supported === true).length,
+      unsupported: probes.filter((p) => p.ok && p.supported === false).length,
       unknown: probes.filter((p) => p.ok && p.supported === null).length,
       failed: probes.filter((p) => !p.ok).length,
       probes,
@@ -71,16 +72,6 @@ function parseHikCapabilitySummary(raw: string | undefined): HikCapabilitySummar
   } catch {
     return null;
   }
-}
-
-function isRecentIso(value: string | undefined, windowMs: number, now: number): boolean {
-  if (!value) return false;
-  const parsed = new Date(value).getTime();
-  return Number.isFinite(parsed) && now - parsed <= windowMs;
-}
-
-function isRecentEpoch(value: number | undefined, windowMs: number, now: number): boolean {
-  return typeof value === "number" && Number.isFinite(value) && now - value <= windowMs;
 }
 
 export const getOverview = authedQuery({
@@ -189,12 +180,7 @@ export const getOverview = authedQuery({
     };
 
     const now = Date.now();
-    const onlineWindowMs = 5 * 60 * 1000;
-    const isHikOnline =
-      device.hikTransport === "localBridge"
-        ? isRecentIso(device.lastSeen, onlineWindowMs, now)
-        : isRecentEpoch(device.hikLastSeenAt, onlineWindowMs, now);
-    const isIdeOnline = isRecentIso(device.lastSeen, onlineWindowMs, now);
+    const onlineWindowMs = DEVICE_ONLINE_WINDOW_MS;
 
     return {
       device: {
@@ -222,12 +208,7 @@ export const getOverview = authedQuery({
         ideHttpPort: device.ideHttpPort,
       },
       online: {
-        isOnline:
-          device.brand === "hikvision"
-            ? isHikOnline
-            : device.brand === "ide_smart"
-              ? isIdeOnline
-              : isRecentIso(device.lastSeen, onlineWindowMs, now),
+        isOnline: deviceConnection(device, now) === "online",
         checkedAt: now,
         windowMs: onlineWindowMs,
       },

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import {
@@ -17,10 +18,11 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
+import { deviceConnection, commandResultMessage, capabilityLabel } from "@/lib/deviceStatus";
 import { toast } from "sonner";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import type { BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +31,7 @@ import type { ServerDevice } from "@/types/device";
 type OperationResult = {
   ok: boolean;
   error?: string;
+  queued?: boolean;
 };
 
 type ConfirmedAction = {
@@ -117,14 +120,10 @@ function stringifyUnknown(value: unknown): string | undefined {
   }
 }
 
-function resultMessage(result: OperationResult): string {
-  return result.ok ? "İşlem tamamlandı" : result.error ?? "İşlem başarısız";
-}
-
 function getAdapter(device: ServerDevice, hasIdeDoor: boolean): BrandAdapter {
   const brand = device.brand ?? "other";
   if (brand === "hikvision") {
-    const isGateway = device.hikTransport === "gateway";
+    const isGateway = device.hikTransport !== "localBridge";
     const hasGatewayDevice = Boolean(device.hikDevIndex);
     const canGatewayCommand = isGateway && hasGatewayDevice;
     return {
@@ -185,6 +184,8 @@ function getAdapter(device: ServerDevice, hasIdeDoor: boolean): BrandAdapter {
 }
 
 export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterProps) {
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 15000); return () => window.clearInterval(timer); }, []);
   const overview = useQuery(api.deviceCenter.getOverview, { deviceId: device._id });
   const recordOperation = useMutation(api.deviceEvents.recordSystemOperation);
   const fetchCapabilities = useAction(api.actions.hikGatewayDevice.fetchDeviceCapabilities);
@@ -202,6 +203,28 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
   const [pendingAction, setPendingAction] = useState<ConfirmedAction | null>(null);
   const [reconcileSummary, setReconcileSummary] = useState<string | null>(null);
   const [capturedCard, setCapturedCard] = useState<string | null>(null);
+
+  const { run: execute, pending } = useAsyncAction(async (
+    id: string, label: string, run: () => Promise<OperationResult>,
+    onSuccess?: (result: OperationResult) => void,
+  ) => {
+    setBusy(id);
+    try {
+      const result = await run();
+      try {
+        await recordOperation({ deviceId: device._id, label: `${label}: ${result.queued ? "sıraya alındı" : result.ok ? "sonuç alındı" : "başarısız"}`, ok: result.ok, rawData: stringifyUnknown(result) });
+      } catch (error: unknown) { console.warn("Operation audit kaydı yazılamadı", error); }
+      if (!result.ok) throw new Error(result.error ?? "İşlem başarısız");
+      toast.success(commandResultMessage(result));
+      onSuccess?.(result);
+      onUpdated?.();
+    } finally { setBusy(null); }
+  });
+  const runImmediate = (id: string, label: string, run: () => Promise<OperationResult>, onSuccess?: (result: OperationResult) => void) => execute(id, label, run, onSuccess);
+  const runConfirmed = async () => {
+    if (!pendingAction) return;
+    if (await execute(pendingAction.id, pendingAction.label, pendingAction.run)) setPendingAction(null);
+  };
 
   if (overview === undefined) {
     return (
@@ -222,8 +245,9 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
     );
   }
 
+  const connected = deviceConnection(overview.device, clock) === "online";
   const hasIdeDoor = overview.doors.some((door) => typeof door.ioId === "number");
-  const adapter = getAdapter(device, hasIdeDoor);
+  const adapter = getAdapter(overview.device, hasIdeDoor);
   const queueRows: { label: string; value: number }[] =
     device.brand === "ide_smart"
       ? [
@@ -238,68 +262,6 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
           { label: "Tamamlandı", value: overview.queues.hikvision.done.count },
           { label: "Hatalı", value: overview.queues.hikvision.failed.count },
         ];
-
-  const audit = async (label: string, result: OperationResult, raw?: unknown) => {
-    try {
-      await recordOperation({
-        deviceId: device._id,
-        label: `${label}: ${result.ok ? "başarılı" : "başarısız"}`,
-        ok: result.ok,
-        rawData: stringifyUnknown(raw ?? result),
-      });
-    } catch (error) {
-      console.warn("Operation audit kaydı yazılamadı", error);
-    }
-  };
-
-  const runImmediate = async (
-    id: string,
-    label: string,
-    run: () => Promise<OperationResult>,
-    onSuccess?: (result: OperationResult) => void,
-  ) => {
-    setBusy(id);
-    try {
-      const result = await run();
-      await audit(label, result);
-      if (result.ok) {
-        toast.success(resultMessage(result));
-        onSuccess?.(result);
-        onUpdated?.();
-      } else {
-        toast.error(resultMessage(result));
-      }
-    } catch (error) {
-      const result = { ok: false, error: error instanceof Error ? error.message : "Bilinmeyen hata" };
-      await audit(label, result);
-      toast.error(result.error);
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const runConfirmed = async () => {
-    const action = pendingAction;
-    if (!action) return;
-    setPendingAction(null);
-    setBusy(action.id);
-    try {
-      const result = await action.run();
-      await audit(action.label, result);
-      if (result.ok) {
-        toast.success(resultMessage(result));
-        onUpdated?.();
-      } else {
-        toast.error(resultMessage(result));
-      }
-    } catch (error) {
-      const result = { ok: false, error: error instanceof Error ? error.message : "Bilinmeyen hata" };
-      await audit(action.label, result);
-      toast.error(result.error);
-    } finally {
-      setBusy(null);
-    }
-  };
 
   const makeConfirmed = (action: ConfirmedAction) => {
     setPendingAction(action);
@@ -381,14 +343,14 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
         if (device.brand === "ide_smart") {
           const result = await openIdeDoor({ deviceId: device._id, doorId, keep: 1 });
           return result.ok
-            ? { ok: true }
+            ? { ok: true, queued: true }
             : { ok: false, error: result.error ?? "Kapı açma kuyruğa alınamadı" };
         }
         if (doorNo === undefined || !Number.isInteger(doorNo) || doorNo < 1) {
           return { ok: false, error: "Kapı numarası geçerli değil. Kapı eşlemesini düzeltin." };
         }
         const result = await openHikDoor({ deviceId: device._id, doorNo });
-        return result.ok ? { ok: true } : { ok: false, error: result.error ?? "Kapı açılamadı" };
+        return result.ok ? { ok: true, queued: device.hikTransport === "localBridge" } : { ok: false, error: result.error ?? "Kapı açılamadı" };
       },
     });
   };
@@ -417,7 +379,7 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
       run: async () => {
         const result = await triggerIdeSync({ deviceId: device._id });
         return result.ok
-          ? { ok: true }
+          ? { ok: true, queued: true }
           : { ok: false, error: result.error ?? "Sync kuyruğa alınamadı" };
       },
     });
@@ -437,9 +399,9 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
               {overview.device.deviceIp ?? overview.device.deviceSerial ?? overview.device.ideUuid ?? "Temel cihaz kaydı"}
             </p>
           </div>
-          <Badge variant={overview.online.isOnline ? "success" : "outline"} className="gap-1">
-            {overview.online.isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-            {overview.online.isOnline ? "Online" : "Offline / belirsiz"}
+          <Badge variant={connected ? "success" : "outline"} className="gap-1">
+            {connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+            {connected ? "Online" : "Offline / belirsiz"}
           </Badge>
         </div>
 
@@ -477,6 +439,7 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
                 </div>
                 <div className="text-xs text-muted-foreground">
                   Son tarama: {formatDateTime(overview.capabilities.updatedAt)}
+                  <details className="mt-2"><summary>Tüm özellikler ve sorgu sonuçları</summary><ul className="space-y-1">{overview.capabilities.probes.map((probe) => <li key={probe.key}>{probe.label}: {capabilityLabel(probe)}{!probe.ok && probe.error ? ` — ${probe.error}` : ""}</li>)}</ul></details>
                 </div>
               </div>
             ) : (
@@ -602,10 +565,10 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
           <ActionButton busy={busy === "reconcile"} disabled={!adapter.supported.reconcile || busy !== null} icon={<ListChecks className="h-4 w-4" />} onClick={handleReconcile}>
             Eşitlik Kontrolü
           </ActionButton>
-          <ActionButton busy={busy === "backfillEvents"} disabled={device.brand !== "hikvision" || busy !== null} icon={<RefreshCw className="h-4 w-4" />} onClick={handleBackfill}>
+          <ActionButton busy={busy === "backfillEvents"} disabled={!adapter.supported.capabilities || busy !== null} icon={<RefreshCw className="h-4 w-4" />} onClick={handleBackfill}>
             Olayları Tara
           </ActionButton>
-          <ActionButton busy={busy === "captureCard"} disabled={device.brand !== "hikvision" || busy !== null} icon={<ScanLine className="h-4 w-4" />} onClick={handleCaptureCard}>
+          <ActionButton busy={busy === "captureCard"} disabled={!adapter.supported.capabilities || busy !== null} icon={<ScanLine className="h-4 w-4" />} onClick={handleCaptureCard}>
             Kart Okut
           </ActionButton>
           <ActionButton busy={busy === "triggerIdeSync"} disabled={!adapter.supported.triggerSync || busy !== null} icon={<RefreshCw className="h-4 w-4" />} onClick={handleTriggerIdeSync}>
@@ -657,15 +620,15 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
         </p>
       </section>
 
-      <AlertDialog open={pendingAction !== null} onOpenChange={(open) => !open && setPendingAction(null)}>
+      <AlertDialog open={pendingAction !== null} onOpenChange={(open) => { if (!open && !pending) setPendingAction(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{pendingAction?.title ?? "İşlem onayı"}</AlertDialogTitle>
             <AlertDialogDescription>{pendingAction?.description ?? ""}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Vazgeç</AlertDialogCancel>
-            <AlertDialogAction onClick={runConfirmed}>Onayla</AlertDialogAction>
+            <AlertDialogCancel disabled={pending}>Vazgeç</AlertDialogCancel>
+            <Button disabled={pending} onClick={runConfirmed}>{pending ? "İşlem sürüyor…" : "Onayla"}</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

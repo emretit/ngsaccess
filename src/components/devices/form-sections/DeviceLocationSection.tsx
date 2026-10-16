@@ -1,3 +1,4 @@
+import { toast as sonnerToast } from "sonner";
 import { useRef, useState } from "react";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -5,10 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { UseFormReturn } from "react-hook-form";
-import { useMutation } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
-import { useToast } from "@/hooks/use-toast";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import type { FormValues } from "../hooks/useDeviceFormSchema";
 import { NEW_ZONE_VALUE } from "./DeviceZoneSection";
 interface ZoneForForm {
@@ -42,15 +39,14 @@ export function DeviceLocationSection({
   const userChangedZone = useRef(false);
   const [zoneDialogOpen, setZoneDialogOpen] = useState(false);
   const [newZoneName, setNewZoneName] = useState("");
-  const [isCreatingZone, setIsCreatingZone] = useState(false);
-  const createZone = useMutation(api.zones.create);
-  const { toast } = useToast();
-  const { projectId } = useActiveProject();
+  const isCreatingZone = false;
+
   // Hikvision'da kapı sayısı modelden türetilir (DeviceHikvisionSection) → generic
   // "Kapı Sayısı" select'ini gizle. Diğer markalarda eski davranış korunur.
   const brand = form.watch("brand");
   const showDoorCount = brand !== "hikvision";
 
+  const toast = ({ description }: { title: string; description: string; variant?: string }) => sonnerToast.error(description);
   const handleCreateZone = async () => {
     const trimmedName = newZoneName.trim();
     const deviceName = form.getValues("name").trim();
@@ -67,27 +63,11 @@ export function DeviceLocationSection({
       return;
     }
 
-    setIsCreatingZone(true);
-    try {
-      const zoneId = await createZone({
-        name: trimmedName,
-        projectId: projectId ?? undefined,
-      });
-      form.setValue("zone_id", zoneId, { shouldDirty: true, shouldValidate: true });
-      form.setValue("new_zone_name", "");
-      form.setValue("door_id", undefined);
-      setNewZoneName("");
-      setZoneDialogOpen(false);
-      toast({ title: "Başarılı", description: "Bölge eklendi." });
-    } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: error instanceof Error ? error.message : "Bölge eklenirken hata oluştu.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCreatingZone(false);
-    }
+    form.setValue("zone_id", NEW_ZONE_VALUE, { shouldDirty: true });
+    form.setValue("new_zone_name", trimmedName, { shouldDirty: true, shouldValidate: true });
+    form.setValue("door_id", undefined);
+    setZoneDialogOpen(false);
+
   };
 
   return (
@@ -137,12 +117,13 @@ export function DeviceLocationSection({
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
+                {form.watch("zone_id") === NEW_ZONE_VALUE && <SelectItem value={NEW_ZONE_VALUE}>{form.watch("new_zone_name")} (taslak)</SelectItem>}
                 {zones.map((zone) => (
                   <SelectItem key={zone.id} value={String(zone.id)}>
                     {zone.name}
                   </SelectItem>
                 ))}
-                {allowCreate && (
+                {allowCreate && form.watch("zone_id") !== NEW_ZONE_VALUE && (
                   <SelectItem value={NEW_ZONE_VALUE}>+ Yeni Bölge Ekle</SelectItem>
                 )}
               </SelectContent>
@@ -163,7 +144,7 @@ export function DeviceLocationSection({
           <DialogHeader>
             <DialogTitle>Yeni Bölge Ekle</DialogTitle>
             <DialogDescription>
-              Cihazdan bağımsız bir bölge adı girin.
+              Bölge cihaz kaydedildiğinde oluşturulur.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -208,6 +189,7 @@ export function DeviceLocationSection({
             <FormItem>
               <FormLabel>Kapı Sayısı</FormLabel>
               <Select
+                disabled={!allowCreate}
                 value={field.value ? String(field.value) : ""}
                 onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
               >

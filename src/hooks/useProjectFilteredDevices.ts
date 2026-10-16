@@ -1,14 +1,15 @@
+import { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import type { Device } from "@/types/device";
-import { computeDeviceStatus } from "@/lib/deviceStatus";
+import { deviceConnection } from "@/lib/deviceStatus";
 import type { FunctionReturnType } from "convex/server";
 
 type DeviceRow = FunctionReturnType<typeof api.devices.list>[number];
 
 export const useProjectFilteredDevices = () => {
-  const { projectIds, isSuperAdmin, projectId, loading: projectLoading } = useActiveProject();
+  const { projectIds, isSuperAdmin, projectId, loading: projectLoading } = useActiveProjectScope();
 
   // Aktif projeye göre filtrele — super_admin dahil yalnızca seçili projenin cihazları.
   const devicesRaw = useQuery(
@@ -16,11 +17,14 @@ export const useProjectFilteredDevices = () => {
     !projectLoading && projectId ? { projectId } : "skip",
   );
 
-  // eslint-disable-next-line react-hooks/purity
-  const nowMs = Date.now();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 15000);
+    return () => window.clearInterval(timer);
+  }, []);
   const devices: Device[] = (devicesRaw ?? []).map((dev: DeviceRow) => ({
     ...dev,
-    status: computeDeviceStatus(dev.lastSeen, nowMs),
+    connectionStatus: deviceConnection(dev, nowMs),
   }));
 
   // Super admin veya en az bir projesi olan kullanıcı erişebilir

@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { useToast } from "@/hooks/use-toast";
+import { useRef, useState } from "react";
+import { notify } from "@/lib/notify";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useMutation, useAction } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Id } from "../../../../convex/_generated/dataModel";
@@ -31,8 +32,8 @@ export function useDeviceFormSubmission({
   onSuccess,
   adminMode,
 }: UseDeviceFormSubmissionProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
+  const savedId = useRef<Id<"devices"> | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   const createDevice = useMutation(api.devices.create);
   const updateDevice = useMutation(api.devices.update);
@@ -40,9 +41,15 @@ export function useDeviceFormSubmission({
   const createIdePanel = useMutation(api.devices.createIdePanel);
   const createHikDevice = useMutation(api.devices.createHikDevice);
 
-  const onSubmit = async (values: FormValues) => {
-    setIsLoading(true);
-    try {
+  const save = async (values: FormValues) => {
+      if (savedId.current) {
+        const reg = await registerOnGateway({ deviceId: savedId.current });
+        if (!reg.ok) throw new Error(reg.error ?? "Bağlantı kurulamadı");
+        setConnectionError(null);
+        notify.success("Kayıtlı cihazın gateway bağlantısı hazırlandı");
+        onSuccess();
+        return;
+      }
       // IDE Smart paneli: cihaz + kapıları tek mutation'da üret, bölgeye yerleştir, sonra bağlan.
       if (values.brand === "ide_smart" && !device?._id) {
         // Admin modu: bölge seçilmez (gizli) → backend placeholder bölge üretir; isim UUID/IP'den türetilir.
@@ -61,6 +68,7 @@ export function useDeviceFormSubmission({
           ? values.ide_uuid?.trim() || values.device_ip?.trim() || "Panel"
           : values.name;
         await createIdePanel({
+          status: values.status,
           name: panelName,
           projectId: currentProjectId ?? undefined,
           zoneId: pickedZone,
@@ -73,7 +81,7 @@ export function useDeviceFormSubmission({
           ideUuid: values.ide_uuid?.trim() || undefined,
           description: values.description || undefined,
         });
-        toast({ title: "Başarılı", description: "Panel ve kapıları oluşturuldu" });
+        notify.success("Panel ve kapıları oluşturuldu");
 
         // Panel broker'a kendi bağlanır, UUID ile eklenir; panel ilk trigger'da
         // (heartbeat/kart) otomatik canlanır. HTTP-login adımı kullanılmaz.
@@ -120,24 +128,14 @@ export function useDeviceFormSubmission({
           status: values.status,
           description: values.description || undefined,
         });
-        toast({ title: "Başarılı", description: "Cihaz, kapılar ve okuyucular oluşturuldu" });
+        savedId.current = newId;
 
         // Gateway transport + ehome dolu → otomatik gateway registration.
         if (!isLocalBridge && values.ehome_id?.trim()) {
           const reg = await registerOnGateway({ deviceId: newId });
-          if (reg.ok) {
-            toast({
-              title: "Gateway",
-              description: `Gateway'e kaydedildi: ${reg.devIndex?.slice(0, 8)}…`,
-            });
-          } else {
-            toast({
-              title: "Gateway kaydı başarısız",
-              description: reg.error ?? "Bilinmeyen hata",
-              variant: "destructive",
-            });
-          }
+          if (!reg.ok) throw new Error(reg.error ?? "Gateway bağlantısı kurulamadı");
         }
+        notify.success("Cihaz, kapılar ve okuyucular kaydedildi");
         onSuccess();
         return;
       }
@@ -155,10 +153,10 @@ export function useDeviceFormSubmission({
               hikModel:
                 values.hik_model && values.hik_model !== MANUAL_MODEL_ID
                   ? values.hik_model
-                  : undefined,
+                  : device?._id ? null : undefined,
               ehomeID: isHikLocalBridge ? undefined : values.ehome_id?.trim() || undefined,
               ehomeKey: isHikLocalBridge ? undefined : values.ehome_key?.trim() || undefined,
-              hikDoorCount: isHikLocalBridge
+              hikDoorCount: isHikLocalBridge && !device?._id
                 ? values.hik_door_count || HIK_DEFAULT_DOOR_COUNT
                 : undefined,
               hikPort: isHikLocalBridge ? values.hik_port || HIK_DEFAULT_PORT : undefined,
@@ -170,7 +168,7 @@ export function useDeviceFormSubmission({
               ideUser: values.ide_user?.trim() || undefined,
               idePassword: values.ide_password?.trim() || undefined,
               ideHttpPort: values.ide_http_port || undefined,
-              ideDoorCount: values.ide_door_count || undefined,
+              ideDoorCount: device?._id ? undefined : values.ide_door_count || undefined,
               ideUuid: values.ide_uuid?.trim() || undefined,
             }
           : {};
@@ -178,7 +176,7 @@ export function useDeviceFormSubmission({
       // proje tarafının kararıdır → bu alanlar gönderilmez (update'te de korunur).
       const connectionFields = {
         deviceSerial: values.device_serial || undefined,
-        deviceIp: values.device_ip || undefined,
+        deviceIp: values.device_ip || (device?._id ? null : undefined),
         // localBridge'de boş string'i koru: update handler undefined alanları skip eder,
         // bu yüzden "" göndermezsek panel kullanıcı/şifresi temizlenemezdi. Bu alanlar
         // yalnız localBridge bölümünde render edilir → diğer markalarda eski davranış.
@@ -203,15 +201,14 @@ export function useDeviceFormSubmission({
                 deviceType: values.device_type,
                 zoneId: (values.zone_id || undefined) as Id<"zones"> | undefined,
                 doorId: (values.door_id || undefined) as Id<"doors"> | undefined,
-                doorCount: values.door_count || undefined,
+                doorCount: device?._id ? undefined : values.door_count || undefined,
                 accessDirection: values.access_direction as "entry" | "exit" | "both",
-                description: values.description || undefined,
+                description: values.description || null,
                 status: values.status,
                 ...connectionFields,
               }
         );
         deviceId = device._id;
-        toast({ title: "Başarılı", description: "Cihaz bilgileri güncellendi" });
       } else {
         deviceId = await createDevice(
           adminMode
@@ -224,6 +221,7 @@ export function useDeviceFormSubmission({
                 devicePassword: values.device_password || undefined,
                 brand: values.brand,
                 ...hikFields,
+                hikModel: hikFields.hikModel ?? undefined,
               }
             : {
                 name: values.name,
@@ -248,9 +246,10 @@ export function useDeviceFormSubmission({
                 status: values.status,
                 brand: values.brand,
                 ...hikFields,
+                hikModel: hikFields.hikModel ?? undefined,
               }
         );
-        toast({ title: "Başarılı", description: "Cihaz başarıyla eklendi" });
+        savedId.current = deviceId;
       }
 
       // Hikvision cihazlar için otomatik gateway registration (zaten kayıtlıysa skip).
@@ -263,30 +262,18 @@ export function useDeviceFormSubmission({
         !alreadyRegistered
       ) {
         const reg = await registerOnGateway({ deviceId });
-        if (reg.ok) {
-          toast({
-            title: "Gateway",
-            description: `Gateway'e kaydedildi: ${reg.devIndex?.slice(0, 8)}…`,
-          });
-        } else {
-          toast({
-            title: "Gateway kaydı başarısız",
-            description: reg.error ?? "Bilinmeyen hata",
-            variant: "destructive",
-          });
-        }
+        if (!reg.ok) throw new Error(reg.error ?? "Gateway bağlantısı kurulamadı");
       }
+      notify.success("Cihaz bilgileri kaydedildi");
       onSuccess();
-    } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Cihaz kaydedilirken hata oluştu",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
   };
-
-  return { isLoading, onSubmit };
+  const { run, pending: isLoading } = useAsyncAction(async (values: FormValues) => {
+    try { await save(values); }
+    catch (error: unknown) {
+      if (savedId.current) setConnectionError(`Cihaz kaydedildi (${savedId.current}). Bağlantı kurulamadı; tekrar deneme aynı cihazı kullanır.`);
+      throw error;
+    }
+  }, { error: "Cihaz kaydı veya bağlantı işlemi tamamlanamadı" });
+  const onSubmit = async (values: FormValues) => { await run(values); };
+  return { isLoading, onSubmit, connectionError };
 }

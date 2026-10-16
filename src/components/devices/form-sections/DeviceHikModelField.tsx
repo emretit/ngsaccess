@@ -23,6 +23,7 @@ import {
 
 interface DeviceHikModelFieldProps {
   form: UseFormReturn<FormValues>;
+  isEdit?: boolean;
 }
 
 /**
@@ -31,12 +32,13 @@ interface DeviceHikModelFieldProps {
  * ilk seçilmesi gerekir. Model seçilince transport ipucu uygulanır ve kapı sayısı modele
  * sabitlenir; "Diğer (manuel)" kapı sayısı inputunu açar.
  */
-export function DeviceHikModelField({ form }: DeviceHikModelFieldProps) {
+export function DeviceHikModelField({ form, isEdit }: DeviceHikModelFieldProps) {
   const selectedModel = form.watch("hik_model");
   const isManualModel = selectedModel === MANUAL_MODEL_ID;
 
   return (
     <>
+      <p className="text-sm text-muted-foreground">{isEdit ? "Model etiketi değiştirilebilir; mevcut kapı/okuyucular ve iletişim yöntemi korunur." : selectedModel ? `${getHikModelSpec(selectedModel)?.doorCount ?? form.watch("hik_door_count") ?? 4} kapı · her kapı için okuyucu oluşturulacak.` : "Model seçince oluşturulacak kapı sayısı gösterilir."}</p>
       <FormField
         control={form.control}
         name="hik_model"
@@ -48,13 +50,13 @@ export function DeviceHikModelField({ form }: DeviceHikModelFieldProps) {
               onValueChange={(value) => {
                 field.onChange(value);
                 const spec = getHikModelSpec(value);
-                if (spec?.transportHint) {
+                if (!isEdit && spec?.transportHint) {
                   form.setValue("hik_transport", spec.transportHint);
                 }
                 // Katalog modelinde kapı sayısı modelden gelir → alanı modelin sayısına
                 // sabitle (boşaltma değil): düzenlemede kaydedince localBridge hikDoorCount'u
                 // varsayılana (4) düşürmesin; manuel modelde kullanıcının girdiği korunur.
-                if (spec) {
+                if (!isEdit && spec) {
                   form.setValue("hik_door_count", spec.doorCount);
                 }
               }}
@@ -87,6 +89,7 @@ export function DeviceHikModelField({ form }: DeviceHikModelFieldProps) {
               <FormLabel>Kapı Sayısı</FormLabel>
               <FormControl>
                 <Input
+                  disabled={isEdit}
                   type="number"
                   placeholder="4"
                   {...field}

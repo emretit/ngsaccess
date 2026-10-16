@@ -21,7 +21,7 @@ interface DeviceListProps {
   filteredDevices: Device[];
   isLoading: boolean;
   zones: Zone[];
-  onDeleteDevice: (deviceId: string) => void;
+  onDeleteDevice: (deviceId: string) => Promise<void> | void;
   onAssignLocation?: (device: Device) => void;
   onEditDevice: (device: Device) => void;
   onQRClick?: (device: Device) => void;
@@ -82,7 +82,8 @@ export function DeviceList({
             <TableRow>
               <TableHead className="w-[50px] bg-muted/50 font-semibold">
                 <Checkbox
-                  checked={filteredDevices.length > 0 && selectedDevices.length === filteredDevices.length}
+                  aria-label="Görünen tüm cihazları seç"
+                  checked={filteredDevices.length > 0 && filteredDevices.every((device) => selectedDevices.includes(device._id))}
                   onCheckedChange={handleSelectAll}
                 />
               </TableHead>
