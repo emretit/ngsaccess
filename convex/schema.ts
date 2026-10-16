@@ -44,7 +44,8 @@ export default defineSchema({
   })
     .index("email", ["email"])
     .index("by_setup_token", ["setupToken"])
-    .index("by_role", ["role"]),
+    .index("by_role", ["role"])
+    .index("by_photo_url", ["photoUrl"]),
 
   userProjects: defineTable({
     userId: v.id("users"),
@@ -114,6 +115,9 @@ export default defineSchema({
     .index("by_card", ["cardNumber"])
     .index("by_tc", ["tcNo"])
     .index("by_visitor", ["isVisitor"])
+    .index("by_department", ["departmentId"])
+    .index("by_photo_storage", ["photoStorageId"])
+    .index("by_project_visitor", ["projectId", "isVisitor"])
     // Expiry cron: isVisitor=true ∧ isActive=true ∧ accessExpiresAt<=now (ISO-UTC sıralanabilir).
     .index("by_visitor_active_expiry", ["isVisitor", "isActive", "accessExpiresAt"]),
 
@@ -474,7 +478,11 @@ export default defineSchema({
     .index("by_status_time", ["accessStatus", "accessTime"])
     .index("by_employee_device_time", ["employeeId", "deviceId", "accessTime"])
     .index("by_device_io_time", ["deviceId", "ideIoId", "accessTime"])
-    .index("by_device_hik_serial", ["deviceId", "hikSerialNo"]),
+    .index("by_device_hik_serial", ["deviceId", "hikSerialNo"])
+    .index("by_project_device_time", ["projectId", "deviceId", "accessTime"])
+    .index("by_project_device_status_time", ["projectId", "deviceId", "accessStatus", "accessTime"])
+    .index("by_project_device_employee_time", ["projectId", "deviceId", "employeeId", "accessTime"])
+    .index("by_employee_status_time", ["employeeId", "accessStatus", "accessTime"]),
 
   // Hikvision access dışı olaylar: alarm, exception, operation, status.
   // PDKS hesaplarını şişirmemek için cardReadings'ten ayrı tutulur.
@@ -580,10 +588,15 @@ export default defineSchema({
      * Stale-requeue bunu temizler; yeni claim yeniden damgalar.
      */
     claimedBy: v.optional(v.id("hikBridges")),
+    /** Kullanıcı uyarıyı kapattı; operasyon sonucu (status) DEĞİŞMEZ. */
+    dismissedAt: v.optional(v.number()),
+    dismissedBy: v.optional(v.id("users")),
   })
     .index("by_device_status", ["deviceId", "status"])
     .index("by_status_created", ["status", "createdAt"])
-    .index("by_status_nextRetry", ["status", "nextRetryAt"]),
+    .index("by_status_nextRetry", ["status", "nextRetryAt"])
+    .index("by_project_status_created", ["projectId", "status", "createdAt"])
+    .index("by_project_status_dismissed_created", ["projectId", "status", "dismissedAt", "createdAt"]),
 
   /**
    * IDE Smart bulut→panel komut kuyruğu. Convex serverless MQTT tutamaz; Hetzner'daki
@@ -635,11 +648,16 @@ export default defineSchema({
     responseMessage: v.optional(v.string()),
     createdAt: v.number(),
     ackedAt: v.optional(v.number()),
+    /** Kullanıcı uyarıyı kapattı; operasyon sonucu (status) DEĞİŞMEZ. */
+    dismissedAt: v.optional(v.number()),
+    dismissedBy: v.optional(v.id("users")),
   })
     .index("by_device_status", ["deviceId", "status"])
     .index("by_status_nextRetry", ["status", "nextRetryAt"])
     .index("by_msx", ["deviceId", "msxId"])
-    .index("by_idempotency", ["idempotencyKey"]),
+    .index("by_idempotency", ["idempotencyKey"])
+    .index("by_project_status_created", ["projectId", "status", "createdAt"])
+    .index("by_project_status_dismissed_created", ["projectId", "status", "dismissedAt", "createdAt"]),
 
   /**
    * IDE Smart panelinde GERÇEKTE bulunan kullanıcıların (kart) takibi.
@@ -1001,7 +1019,24 @@ export default defineSchema({
   })
     .index("by_project_timestamp", ["projectId", "timestamp"])
     .index("by_target", ["targetTable", "targetId"])
-    .index("by_user_timestamp", ["userId", "timestamp"]),
+    .index("by_user_timestamp", ["userId", "timestamp"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_table_timestamp", ["targetTable", "timestamp"])
+    .index("by_project_table_timestamp", ["projectId", "targetTable", "timestamp"])
+    .index("by_project_user_timestamp", ["projectId", "userId", "timestamp"]),
+
+  /**
+   * Yüklenen ama henüz bir kayda bağlanmamış dosyaların sahipliği. Yükleme sonrası
+   * istemci storageId'yi ilk talep eden olarak kaydeder; bağlanmamış dosyaya erişim
+   * yalnız yükleyene açıktır. Bağlanınca (ör. personel fotoğrafı) kayıt silinir.
+   */
+  pendingUploads: defineTable({
+    storageId: v.id("_storage"),
+    userId: v.id("users"),
+    createdAt: v.number(),
+  })
+    .index("by_storage", ["storageId"])
+    .index("by_created", ["createdAt"]),
 
   reportScheduleSettings: defineTable({
     userId: v.id("users"),
@@ -1014,7 +1049,8 @@ export default defineSchema({
     updatedAt: v.string(),
   })
     .index("by_user", ["userId"])
-    .index("by_project", ["projectId"]),
+    .index("by_project", ["projectId"])
+    .index("by_user_project", ["userId", "projectId"]),
 
   // Kullanıcı davet sistemi - yetkili kullanıcılar projeye davet eder veya
   // mevcut kullanıcıya şifre sıfırlama maili gönderir (type === "reset")
