@@ -20,3 +20,12 @@ export function formatDateString(d: Date | undefined): string {
   if (!d) return "";
   return toLocalDateString(d);
 }
+
+export function todayInTurkey(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}

@@ -1,20 +1,20 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { Id } from "../../../convex/_generated/dataModel";
 
 export const useAccessRulesQuery = (projectId?: Id<"projects">) => {
-  const { projectId: activeProjectId } = useActiveProject();
+  const { projectId: activeProjectId, loading } = useActiveProjectScope();
   const effectiveProjectId = projectId ?? activeProjectId;
 
   const data = useQuery(
     api.accessRules.list,
-    effectiveProjectId !== undefined ? { projectId: effectiveProjectId } : {}
+    !loading && effectiveProjectId ? { projectId: effectiveProjectId } : "skip"
   );
 
   return {
     data,
-    isLoading: data === undefined,
+    isLoading: loading || (!!effectiveProjectId && data === undefined),
     error: null,
     refetch: () => {},
   };

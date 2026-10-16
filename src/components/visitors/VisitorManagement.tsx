@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
 import { Visitor, isVisitorInside } from "@/types/visitor";
 import { useVisitors } from "@/hooks/useVisitors";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { VisitorFilters, type VisitorStatusFilter } from "./VisitorFilters";
 import { VisitorStats } from "./VisitorStats";
 import VisitorTable from "./VisitorTable";
@@ -9,6 +11,13 @@ import VisitorSlideOverPanel from "./VisitorSlideOverPanel";
 import VisitorZoneDialog from "./VisitorZoneDialog";
 
 export default function VisitorManagement() {
+  const { projectId, loading } = useActiveProjectScope();
+  if (loading) return <SectionSkeleton rows={6} label="Ziyaretçiler yükleniyor" />;
+  if (!projectId) return <EmptyState title="Proje seçin" description="Ziyaretçileri görmek için aktif bir proje seçin." />;
+  return <ProjectVisitors key={projectId} />;
+}
+
+function ProjectVisitors() {
   const { visitors, isLoading } = useVisitors();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<VisitorStatusFilter>("all");
@@ -57,7 +66,7 @@ export default function VisitorManagement() {
   };
 
   if (isLoading) {
-    return <LoadingSpinner text="Ziyaretçiler yükleniyor..." />;
+    return <SectionSkeleton rows={6} label="Ziyaretçiler yükleniyor" />;
   }
 
   return (

@@ -1,4 +1,6 @@
-import { CardReading } from "@/types/access-control";
+import type { FunctionReturnType } from "convex/server";
+import type { api } from "../../../convex/_generated/api";
+type CardReading = FunctionReturnType<typeof api.cardReadings.list>["page"][number];
 import {
   Table,
   TableBody,
@@ -7,9 +9,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { EmptyState } from "@/components/shared/EmptyState";
+
+const trTime = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
 import { Button } from "@/components/ui/button";
 
 interface CardReadingsTableProps {
@@ -25,22 +28,14 @@ export const CardReadingsTable = ({
   showClearFilters = false,
   onClearFilters,
 }: CardReadingsTableProps) => {
-  // Helper function to get status badge - using accessStatus
-  const getStatusBadge = (reading: CardReading) => {
-    if (reading.accessStatus === "izin_verildi") {
-      return <Badge variant="success">İzin Verildi</Badge>;
-    } else {
-      return <Badge variant="destructive">Reddedildi</Badge>;
-    }
-  };
-
-  // Yön badge'i: alan yoksa default "Giriş" göster (eski kayıtlar için).
-  const getDirectionBadge = (reading: CardReading) => {
-    if (reading.direction === "exit") {
-      return <Badge variant="destructive">Çıkış</Badge>;
-    }
-    return <Badge variant="success">Giriş</Badge>;
-  };
+  const getStatusBadge = (reading: CardReading) => (
+    <StatusBadge tone={reading.accessStatus === "izin_verildi" ? "success" : reading.accessStatus === "reddedildi" ? "danger" : "neutral"}>
+      {reading.accessStatus === "izin_verildi" ? "İzin Verildi" : reading.accessStatus === "reddedildi" ? "Reddedildi" : "Bilinmiyor"}
+    </StatusBadge>
+  );
+  const getDirectionBadge = (reading: CardReading) => (
+    <StatusBadge tone="neutral">{reading.direction === "entry" ? "Giriş" : reading.direction === "exit" ? "Çıkış" : "Bilinmiyor"}</StatusBadge>
+  );
 
   // Helper function to get device display name
   const getDeviceDisplay = (reading: CardReading) => {
@@ -78,7 +73,7 @@ export const CardReadingsTable = ({
           <TableRow>
             <TableHead>Çalışan</TableHead>
             <TableHead>Kart No</TableHead>
-            <TableHead>Zaman</TableHead>
+            <TableHead>Zaman (TR saati)</TableHead>
             <TableHead>Departman</TableHead>
             <TableHead>Cihaz</TableHead>
             <TableHead>Okuyucu / Kapı</TableHead>
@@ -91,7 +86,7 @@ export const CardReadingsTable = ({
             <TableRow>
               <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                 <div className="flex flex-col items-center gap-2">
-                  <p>{emptyMessage}</p>
+                  <EmptyState title={emptyMessage} />
                   {showClearFilters && onClearFilters && (
                     <Button variant="ghost" size="sm" onClick={onClearFilters}>
                       Filtreleri Temizle
@@ -106,7 +101,7 @@ export const CardReadingsTable = ({
                 <TableCell>{reading.employeeName || "Bilinmeyen"}</TableCell>
                 <TableCell>{reading.cardNo}</TableCell>
                 <TableCell>
-                  {format(new Date(reading.accessTime), "dd.MM.yyyy HH:mm:ss", { locale: tr })}
+                  {Number.isFinite(Date.parse(reading.accessTime)) ? trTime.format(new Date(reading.accessTime)) : "Bilinmiyor"}
                 </TableCell>
                 <TableCell>{reading.employees?.departments?.name || "-"}</TableCell>
                 <TableCell>{getDeviceDisplay(reading)}</TableCell>

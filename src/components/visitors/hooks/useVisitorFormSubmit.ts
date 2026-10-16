@@ -27,7 +27,7 @@ export const useVisitorFormSubmit = (
     let id: Id<"employees">;
     if (visitor) {
       id = await updateVisitor({
-        visitorId: visitor._id, ...shared,
+        visitorId: visitor._id, projectId: formData.projectId, ...shared,
         cardNumber: parsed.cardNumber || undefined,
         visitorPhone: formData.visitorPhone.trim() || null,
         visitorCompany: formData.visitorCompany.trim() || null,

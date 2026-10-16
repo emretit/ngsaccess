@@ -4,6 +4,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useDevices } from "@/hooks/useDevices";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,7 @@ interface VisitorCardCaptureProps {
 // query ile anında yakalanıp forma düşürülür (getLastUnknownByDevice → bilinmeyen kart).
 export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCardCaptureProps) {
   const { devices } = useDevices();
+  const { projectId } = useActiveProjectScope();
 
   const [readerId, setReaderIdState] = useState<Id<"devices"> | null>(() => {
     try {
@@ -44,9 +46,17 @@ export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCa
   const session = useRef(createCardCaptureSession());
   const [replacement, setReplacement] = useState<string | null>(null);
 
+  useEffect(() => {
+    session.current.rearm();
+    setSinceTime(null);
+    setCaptured(null);
+    setReplacement(null);
+  }, [projectId]);
+
+  const validReaderId = devices.some(device => device._id === readerId) ? readerId : null;
   const reading = useQuery(
     api.cardReadings.getLastUnknownByDevice,
-    readerId && sinceTime && !captured ? { deviceId: readerId, sinceTime } : "skip",
+    projectId && validReaderId && sinceTime && !captured ? { projectId, deviceId: validReaderId, sinceTime } : "skip",
   );
 
   useEffect(() => {
@@ -77,7 +87,7 @@ export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCa
     setCaptured(null);
   };
 
-  const listening = !!readerId && !!sinceTime && !captured;
+  const listening = !!validReaderId && !!sinceTime && !captured;
 
   return (
     <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
@@ -87,7 +97,7 @@ export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCa
       </div>
 
       <Select
-        value={readerId ?? ""}
+        value={validReaderId ?? ""}
         onValueChange={(value) => setReaderId((value || null) as Id<"devices"> | null)}
       >
         <SelectTrigger className="h-8 text-sm">
@@ -102,7 +112,7 @@ export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCa
         </SelectContent>
       </Select>
 
-      {readerId && (
+      {validReaderId && (
         <div className="flex items-center justify-between gap-2 text-sm">
           {captured ? (
             <StatusBadge tone="success">

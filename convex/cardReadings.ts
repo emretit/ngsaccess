@@ -1,3 +1,6 @@
+import { paginationOptsValidator, type PaginationResult } from "convex/server";
+import { resolveProjectScope } from "./lib/projectScope";
+import { scopedCardReadingQuery } from "./lib/cardReadingList";
 import { toUtcISO, trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
 import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
@@ -7,8 +10,8 @@ import {
   employeeAuthedQuery,
   employeeAuthedMutation,
 } from "./lib/customFunctions";
-import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
-import type { Doc } from "./_generated/dataModel";
+import { getProjectIdsForUser } from "./lib/auth";
+import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import {
   isoTimeToTRMinutes,
@@ -56,181 +59,70 @@ import {
 } from "./lib/pdksTable";
 import { computePdksChartData, emptyPdksChartData } from "./lib/pdksChart";
 
+export type CardReadingListPage = PaginationResult<Awaited<ReturnType<typeof enrichReadingsForList>>[number]>;
+
 type AuthedReadCtx = QueryCtx & { user: Doc<"users"> };
-
-const CARD_READING_LIST_SCAN_LIMIT = 5000;
-const CARD_READING_PAGE_SIZE_MAX = 200;
-
-function normalizePage(value: number | undefined): number {
-  if (value === undefined || !Number.isFinite(value)) return 1;
-  return Math.max(1, Math.floor(value));
-}
-
-function normalizePageSize(value: number | undefined): number {
-  if (value === undefined || !Number.isFinite(value)) return 100;
-  return Math.min(CARD_READING_PAGE_SIZE_MAX, Math.max(1, Math.floor(value)));
-}
-
-function dayBounds(date: string | undefined) {
-  if (!date) return null;
-  return trDayRangeISO(date, date);
-}
 
 async function loadScopedCardReadings(
   ctx: AuthedReadCtx,
-  opts: {
-    limit: number;
-    startISO?: string;
-    endISO?: string;
-  },
+  opts: { limit: number; projectId?: Id<"projects">; projectIds?: Id<"projects">[] },
 ): Promise<Doc<"cardReadings">[]> {
-  const limit = Math.min(Math.max(1, opts.limit), CARD_READING_LIST_SCAN_LIMIT);
-  const range =
-    opts.startISO && opts.endISO
-      ? { startISO: opts.startISO, endISO: opts.endISO }
-      : null;
-  const allowedProjectIds = await getProjectIdsForUser(ctx);
-
-  if (ctx.user.role === "super_admin") {
-    const query =
-      range
-        ? ctx.db
-            .query("cardReadings")
-            .withIndex("by_access_time", (q) =>
-              q.gte("accessTime", range.startISO).lte("accessTime", range.endISO),
-            )
-        : ctx.db.query("cardReadings").withIndex("by_access_time");
-    return await query.order("desc").take(limit);
-  }
-
-  if (allowedProjectIds.length === 0) return [];
-  const perProjectLimit = Math.max(limit, Math.ceil(limit / allowedProjectIds.length));
-  const results = await Promise.all(
-    allowedProjectIds.map((pid) => {
-      const query =
-        range
-          ? ctx.db
-              .query("cardReadings")
-              .withIndex("by_project_access_time", (q) =>
-                q
-                  .eq("projectId", pid)
-                  .gte("accessTime", range.startISO)
-                  .lte("accessTime", range.endISO),
-              )
-          : ctx.db
-              .query("cardReadings")
-              .withIndex("by_project_access_time", (q) => q.eq("projectId", pid));
-      return query.order("desc").take(perProjectLimit);
-    }),
-  );
-
-  return results
-    .flat()
-    .sort((a, b) => new Date(b.accessTime).getTime() - new Date(a.accessTime).getTime())
-    .slice(0, limit);
+  const allowed = await resolveProjectScope(ctx, opts.projectId);
+  const projects = opts.projectIds ? allowed.filter(id => opts.projectIds?.includes(id)) : allowed;
+  const results = await Promise.all(projects.map(projectId =>
+    ctx.db.query("cardReadings")
+      .withIndex("by_project_access_time", q => q.eq("projectId", projectId))
+      .order("desc").take(opts.limit),
+  ));
+  return results.flat().sort((a, b) => b.accessTime.localeCompare(a.accessTime)).slice(0, opts.limit);
 }
 
-/**
- * Ziyaretçi kayıt ekranı için: seçilen okuyucuda (device) okutulan en son BİLİNMEYEN
- * (atanmamış = `employeeId` yok) kartı döner. Reaktif — kart bastırılınca `useQuery`
- * anında günceller. `sinceTime` (kayıt ekranının açıldığı an) eski okumaları eler.
- */
+/** Kayıt okuyucusunun seçili projedeki son atanmamış kartı. */
 export const getLastUnknownByDevice = authedQuery({
   args: {
+    projectId: v.optional(v.id("projects")),
     deviceId: v.id("devices"),
     sinceTime: v.optional(v.string()),
   },
-  returns: v.union(
-    v.object({ cardNo: v.string(), accessTime: v.string() }),
-    v.null(),
-  ),
+  returns: v.union(v.object({ cardNo: v.string(), accessTime: v.string() }), v.null()),
   handler: async (ctx, args) => {
+    const allowed = await resolveProjectScope(ctx, args.projectId);
     const device = await ctx.db.get(args.deviceId);
-    if (!device) return null;
-    if (ctx.user.role !== "super_admin") {
-      // Havuzdaki cihazın (projectId yok) okumaları önceki projeye aittir; yalnız super_admin görür.
-      const allowed = await getProjectIdsForUser(ctx);
-      if (!isProjectAllowed(allowed, device.projectId)) return null;
-    }
-    const since = args.sinceTime;
-    // Cihaz geçmişi korunduğu için önceki projenin okumaları aynı deviceId'yi taşıyabilir.
-    const reading = await ctx.db
-      .query("cardReadings")
-      .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
-      .order("desc")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("projectId"), device.projectId),
-          q.eq(q.field("employeeId"), undefined),
-          ...(since ? [q.gt(q.field("accessTime"), since)] : []),
-        ),
-      )
-      .first();
-    if (!reading) return null;
-    return { cardNo: reading.cardNo, accessTime: reading.accessTime };
+    if (!device?.projectId || !allowed.includes(device.projectId)) return null;
+    const reading = await ctx.db.query("cardReadings")
+      .withIndex("by_project_device_employee_time", q => {
+        const prefix = q.eq("projectId", device.projectId).eq("deviceId", args.deviceId).eq("employeeId", undefined);
+        return args.sinceTime ? prefix.gt("accessTime", args.sinceTime) : prefix;
+      }).order("desc").first();
+    return reading ? { cardNo: reading.cardNo, accessTime: reading.accessTime } : null;
   },
 });
 
 export const list = authedQuery({
   args: {
-    projectIds: v.optional(v.array(v.id("projects"))),
-    isSuperAdmin: v.optional(v.boolean()),
-    page: v.optional(v.number()),
-    pageSize: v.optional(v.number()),
-    searchTerm: v.optional(v.string()),
-    dateFilter: v.optional(v.string()),
-    accessFilter: v.optional(
-      v.union(v.literal("all"), v.literal("granted"), v.literal("denied"))
-    ),
+    projectId: v.id("projects"),
+    deviceId: v.optional(v.id("devices")),
+    paginationOpts: paginationOptsValidator,
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+    accessFilter: v.optional(v.union(v.literal("all"), v.literal("granted"), v.literal("denied"))),
   },
   handler: async (ctx, args) => {
-    const pageSize = normalizePageSize(args.pageSize);
-    const page = normalizePage(args.page);
-    const bounds = dayBounds(args.dateFilter);
-    const scanLimit = Math.min(
-      CARD_READING_LIST_SCAN_LIMIT,
-      Math.max(page * pageSize * 3, pageSize),
-    );
-    let readings = await loadScopedCardReadings(ctx, {
-      limit: scanLimit,
-      startISO: bounds?.startISO,
-      endISO: bounds?.endISO,
-    });
-
-    // Filters
-    if (args.searchTerm) {
-      const term = args.searchTerm.toLowerCase();
-      readings = readings.filter(
-        (r) =>
-          r.employeeName?.toLowerCase().includes(term) ||
-          r.cardNo.toLowerCase().includes(term)
-      );
-    }
-
-    if (args.accessFilter && args.accessFilter !== "all") {
-      const status = args.accessFilter === "granted" ? "izin_verildi" : "reddedildi";
-      readings = readings.filter((r) => r.accessStatus === status);
-    }
-
-    const totalCount = readings.length;
-    const from = (page - 1) * pageSize;
-    const paginated = readings.slice(from, from + pageSize);
-
-    const enriched = await enrichReadingsForList(ctx, paginated);
-
-    return { readings: enriched, totalCount };
+    await resolveProjectScope(ctx, args.projectId);
+    const result = await scopedCardReadingQuery(ctx, args).order("desc").paginate(args.paginationOpts);
+    return { ...result, page: await enrichReadingsForList(ctx, result.page) };
   },
 });
 
 export const getRecentByProjects = authedQuery({
   args: {
+    projectId: v.optional(v.id("projects")),
     projectIds: v.optional(v.array(v.id("projects"))),
-    isSuperAdmin: v.optional(v.boolean()),
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const limit = Math.min(Math.max(1, args.limit ?? 10), 100);
-    const readings = await loadScopedCardReadings(ctx, { limit });
+    const readings = await loadScopedCardReadings(ctx, { limit, projectId: args.projectId, projectIds: args.projectIds });
     return await enrichWithDeviceName(ctx, readings);
   },
 });

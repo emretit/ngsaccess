@@ -1,3 +1,6 @@
+import { resolveProjectScope } from "./lib/projectScope";
+import { assertAccessProjectUnchanged } from "./lib/accessScope";
+import { validateAccessRelations, validateRuleAccessRelations } from "./lib/accessScopeRelations";
 import { toPatch } from "./lib/nullablePatch";
 import { assertAccessSchedule, assertAccessScheduleUpdate } from "./lib/accessRuleUx";
 
@@ -43,29 +46,10 @@ export const list = authedQuery({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-
-    let rules;
-    if (args.projectId && allowedProjectIds.some((id) => id === args.projectId)) {
-      rules = await ctx.db
-        .query("accessRules")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-        .collect();
-    } else if (ctx.user.role === "super_admin") {
-      rules = await ctx.db.query("accessRules").collect();
-    } else if (allowedProjectIds.length > 0) {
-      const results = await Promise.all(
-        allowedProjectIds.map((pid) =>
-          ctx.db
-            .query("accessRules")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .collect()
-        )
-      );
-      rules = results.flat();
-    } else {
-      return [];
-    }
+    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
+    const rules = (await Promise.all(allowedProjectIds.map(projectId =>
+      ctx.db.query("accessRules").withIndex("by_project", q => q.eq("projectId", projectId)).collect(),
+    ))).flat();
 
     return await Promise.all(
       rules.map(async (rule) => {
@@ -155,10 +139,8 @@ export const create = authedMutation({
     templateName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      throw new Error("Bu projeye erişim yetkiniz yok");
-    }
+    await resolveProjectScope(ctx, args.projectId);
+    if (!args.projectId) throw new Error("Önce bir proje seçin");
     assertAccessSchedule(args);
     if (!args.name.trim()) throw new Error("Kural adı zorunludur");
     const now = new Date().toISOString();
@@ -190,9 +172,12 @@ export const update = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const rule = await ctx.db.get(args.ruleId);
     if (!rule) throw new Error("Kural bulunamadı");
+    await resolveProjectScope(ctx, rule.projectId);
+    if (!rule.projectId) throw new Error("Önce kuralı bir projeye atayın");
     if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
       throw new Error("Bu kurala erişim yetkiniz yok");
     }
+    await validateRuleAccessRelations(ctx, rule);
     const { ruleId, ...updates } = args;
     const clean = { ...toPatch(updates), updatedAt: new Date().toISOString() };
     assertAccessScheduleUpdate(rule, updates);
@@ -329,10 +314,9 @@ export const createWithGroups = authedMutation({
     doorIds: v.optional(v.array(v.id("doors"))),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      throw new Error("Bu projeye erişim yetkiniz yok");
-    }
+    await resolveProjectScope(ctx, args.projectId);
+    if (!args.projectId) throw new Error("Önce bir proje seçin");
+    await validateAccessRelations(ctx, args.projectId, args);
     const { employeeIds, deviceIds, doorIds, ...ruleData } = args;
     assertAccessSchedule(args);
     if (!args.name.trim()) throw new Error("Kural adı zorunludur");
@@ -431,12 +415,16 @@ export const updateWithGroups = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const rule = await ctx.db.get(args.ruleId);
     if (!rule) throw new Error("Kural bulunamadı");
+    await resolveProjectScope(ctx, rule.projectId);
+    if (!rule.projectId) throw new Error("Önce kuralı bir projeye atayın");
     if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
       throw new Error("Bu kurala erişim yetkiniz yok");
     }
     if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
+    assertAccessProjectUnchanged(rule.projectId, args.projectId);
+    await validateRuleAccessRelations(ctx, rule, args);
     const { ruleId, employeeIds, deviceIds, doorIds, projectId: _ignoredProjectId, ...updates } = args;
     const now = new Date().toISOString();
     const clean = { ...toPatch(updates), updatedAt: new Date().toISOString() };
@@ -635,9 +623,13 @@ export const addGroupMember = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const rule = await ctx.db.get(args.groupId);
     if (!rule) throw new Error("Kural bulunamadı");
+    await resolveProjectScope(ctx, rule.projectId);
+    if (!rule.projectId) throw new Error("Önce kuralı bir projeye atayın");
     if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
       throw new Error("Bu gruba erişim yetkiniz yok");
     }
+    assertAccessProjectUnchanged(rule.projectId, args.projectId);
+    await validateAccessRelations(ctx, rule.projectId, { employeeIds: [args.employeeId] });
     // projectId istemciden değil kuraldan: farklı düşerse üye, reconcile'ın
     // by_project_group sorgusuna görünmez ve kartı hayalet sanılıp süpürülürdü.
     const id = await ctx.db.insert("groupMembers", {
@@ -693,9 +685,13 @@ export const addGroupDevice = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const rule = await ctx.db.get(args.groupId);
     if (!rule) throw new Error("Kural bulunamadı");
+    await resolveProjectScope(ctx, rule.projectId);
+    if (!rule.projectId) throw new Error("Önce kuralı bir projeye atayın");
     if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
       throw new Error("Bu gruba erişim yetkiniz yok");
     }
+    assertAccessProjectUnchanged(rule.projectId, args.projectId);
+    await validateAccessRelations(ctx, rule.projectId, { deviceIds: [args.deviceId] });
     // projectId istemciden değil kuraldan (addGroupMember'daki gerekçeyle aynı).
     const id = await ctx.db.insert("groupDevices", {
       ...args,

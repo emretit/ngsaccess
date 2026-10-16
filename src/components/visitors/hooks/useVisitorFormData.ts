@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Visitor } from "@/types/visitor";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { isoToLocalInput, defaultExpiryLocalInput } from "../visitorTime";
 
@@ -16,7 +15,7 @@ export interface VisitorFormData {
   hostEmployeeId: Id<"employees"> | null;
   cardNumber: string;
   presetRuleId: Id<"accessRules"> | null;
-  accessExpiresAt: string; // datetime-local (tarayıcı yerel saati)
+  accessExpiresAt: string; // datetime-local (TR saati)
   isActive: boolean;
   notes: string;
   kvkkConsent: boolean;
@@ -40,15 +39,14 @@ const emptyForm = (projectId?: Id<"projects">): VisitorFormData => ({
 });
 
 export const useVisitorFormData = (visitor?: Visitor | null) => {
-  const { projectId: defaultProjectId } = useActiveProject();
-  const { projectIds, isSuperAdmin, loading } = useProjectAccess();
+  const { projectId: defaultProjectId, loading } = useActiveProjectScope();
 
   const [formData, setFormData] = useState<VisitorFormData>(() => emptyForm(defaultProjectId));
 
-  const presetRulesData = useQuery(api.visitors.presetRules, {});
+  const presetRulesData = useQuery(api.visitors.presetRules, !loading && defaultProjectId ? { projectId: defaultProjectId } : "skip");
   const employeesData = useQuery(
     api.employees.list,
-    !loading ? { projectIds, isSuperAdmin } : "skip",
+    !loading && defaultProjectId ? { projectId: defaultProjectId } : "skip",
   );
 
   const optionsLoading = presetRulesData === undefined || employeesData === undefined;
@@ -56,7 +54,7 @@ export const useVisitorFormData = (visitor?: Visitor | null) => {
   const presetRules = (presetRulesData ?? [])
     .filter((r) => r.isActive)
     .map((r) => ({ id: r._id, name: r.name }));
-  const hostEmployees = (employeesData ?? []).map((e) => ({
+  const hostEmployees = (employeesData ?? []).filter(e => !e.isVisitor).map((e) => ({
     id: e._id,
     name: `${e.firstName} ${e.lastName}`,
   }));

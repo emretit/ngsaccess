@@ -1,5 +1,8 @@
+import { resolveProjectScope } from "./lib/projectScope";
+import { assertAccessProjectUnchanged } from "./lib/accessScope";
+import { validateVisitorAccessRelations } from "./lib/accessScopeRelations";
 import { toPatch } from "./lib/nullablePatch";
-import { VISITOR_PRESENCE_READING_LIMIT, visitorPresence, visitorDetailsError, visitorExpiryError } from "./lib/visitorPresence";
+import { visitorPresence, visitorDetailsError, visitorExpiryError } from "./lib/visitorPresence";
 import { internalMutation } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
@@ -63,29 +66,10 @@ async function grantKvkkConsent(
 export const presetRules = authedQuery({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
-    const allowed = await getProjectIdsForUser(ctx);
-
-    let rules: Doc<"accessRules">[];
-    if (args.projectId && allowed.some((id) => id === args.projectId)) {
-      rules = await ctx.db
-        .query("accessRules")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-        .collect();
-    } else if (ctx.user.role === "super_admin") {
-      rules = await ctx.db.query("accessRules").collect();
-    } else if (allowed.length > 0) {
-      const results = await Promise.all(
-        allowed.map((pid) =>
-          ctx.db
-            .query("accessRules")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .collect(),
-        ),
-      );
-      rules = results.flat();
-    } else {
-      return [];
-    }
+    const allowed = await resolveProjectScope(ctx, args.projectId);
+    const rules = (await Promise.all(allowed.map(projectId =>
+      ctx.db.query("accessRules").withIndex("by_project", q => q.eq("projectId", projectId)).collect(),
+    ))).flat();
 
     return rules
       .filter((r) => r.targetType === "visitor")
@@ -104,33 +88,26 @@ export const presetRules = authedQuery({
 /** Ziyaretçi listesi: yalnızca isVisitor===true; host adı, bölge adı ve son okumayla zenginleştirilir. */
 export const list = authedQuery({
   args: {
-    projectIds: v.optional(v.array(v.id("projects"))),
-    isSuperAdmin: v.optional(v.boolean()),
+    projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
-    const allowed = await getProjectIdsForUser(ctx);
-    const isSuper = args.isSuperAdmin === true && ctx.user.role === "super_admin";
-
-    const all = await ctx.db
-      .query("employees")
-      .withIndex("by_visitor", (q) => q.eq("isVisitor", true))
-      .order("desc")
-      .collect();
-
-    const visitors = isSuper
-      ? all
-      : all.filter((e) => e.projectId && allowed.some((id) => id === e.projectId));
+    const allowed = await resolveProjectScope(ctx, args.projectId);
+    const visitors = (await Promise.all(allowed.map(projectId =>
+      ctx.db.query("employees").withIndex("by_project_visitor", q => q.eq("projectId", projectId).eq("isVisitor", true)).order("desc").collect(),
+    ))).flat();
 
     return await Promise.all(
       visitors.map(async (vz) => {
         const host = vz.hostEmployeeId ? await ctx.db.get(vz.hostEmployeeId) : null;
         const rule = vz.accessRuleId ? await ctx.db.get(vz.accessRuleId) : null;
-        // Olay zamanına göre son başarılı yönlü okuma; retler konumu değiştirmez.
-        const readings = await ctx.db
-          .query("cardReadings")
-          .withIndex("by_employee", (q) => q.eq("employeeId", vz._id))
-          .order("desc")
-          .take(VISITOR_PRESENCE_READING_LIMIT);
+        // Son kabul edilen olay; retler konumu değiştirmez, eksik yön bilinmiyor kalır.
+        const latest = await ctx.db.query("cardReadings")
+          .withIndex("by_employee_status_time", q => q.eq("employeeId", vz._id).eq("accessStatus", "izin_verildi"))
+          .order("desc").first();
+        // Aynı andaki çelişkili yönler bilinmiyor olarak kalır.
+        const readings = latest?.projectId === vz.projectId && latest ? await ctx.db.query("cardReadings")
+          .withIndex("by_employee_status_time", q => q.eq("employeeId", vz._id).eq("accessStatus", "izin_verildi").eq("accessTime", latest.accessTime))
+          .collect() : [];
         // KVKK rıza durumu.
         const consents = await ctx.db
           .query("employeeConsents")
@@ -141,11 +118,11 @@ export const list = authedQuery({
         const activeConsent = consents.find((c) => !c.revokedAt) ?? null;
         return {
           ...vz,
-          host: host
+          host: host?.projectId === vz.projectId && host
             ? { _id: host._id, firstName: host.firstName, lastName: host.lastName }
             : null,
-          presetRule: rule ? { _id: rule._id, name: rule.name } : null,
-          ...visitorPresence(readings),
+          presetRule: rule?.projectId === vz.projectId && rule ? { _id: rule._id, name: rule.name } : null,
+          ...visitorPresence(readings.filter(reading => reading.projectId === vz.projectId)),
           hasKvkkConsent: !!activeConsent,
           kvkkConsentAt: activeConsent?.grantedAt ?? null,
         };
@@ -174,23 +151,9 @@ export const create = adminMutation({
     kvkkConsent: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const allowed = await getProjectIdsForUser(ctx);
-    const isSuper = ctx.user.role === "super_admin";
-    // Tenant izolasyonu: super hariç, referans verilen kayıt yetkili bir projede olmalı.
-    const inAllowed = (pid: Id<"projects"> | undefined) =>
-      isSuper || (!!pid && allowed.some((id) => id === pid));
-
-    if (args.projectId && !inAllowed(args.projectId)) {
-      throw new Error("Bu projeye erişim yetkiniz yok");
-    }
-
-    const rule = await ctx.db.get(args.presetRuleId);
-    if (!rule || rule.targetType !== "visitor") {
-      throw new Error("Geçerli bir ziyaretçi bölgesi seçin");
-    }
-    if (!inAllowed(rule.projectId)) {
-      throw new Error("Bu ziyaretçi bölgesine erişim yetkiniz yok");
-    }
+    await resolveProjectScope(ctx, args.projectId);
+    await validateVisitorAccessRelations(ctx, args.projectId, args.presetRuleId, args.hostEmployeeId);
+    const inAllowed = (projectId: Id<"projects"> | undefined) => projectId === args.projectId;
 
     const validationError = visitorDetailsError(args);
     if (validationError) throw new Error(validationError);
@@ -272,6 +235,7 @@ export const create = adminMutation({
 export const update = adminMutation({
   args: {
     visitorId: v.id("employees"),
+    projectId: v.optional(v.id("projects")),
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     cardNumber: v.optional(v.string()),
@@ -287,10 +251,10 @@ export const update = adminMutation({
   handler: async (ctx, args) => {
     const visitor = await ctx.db.get(args.visitorId);
     if (!visitor || visitor.isVisitor !== true) throw new Error("Ziyaretçi bulunamadı");
-    const allowed = await getProjectIdsForUser(ctx);
-    if (visitor.projectId && !allowed.some((id) => id === visitor.projectId)) {
-      throw new Error("Bu ziyaretçiye erişim yetkiniz yok");
-    }
+    assertAccessProjectUnchanged(visitor.projectId, args.projectId);
+    await resolveProjectScope(ctx, visitor.projectId);
+    await validateVisitorAccessRelations(ctx, visitor.projectId, visitor.accessRuleId,
+      args.hostEmployeeId === undefined ? visitor.hostEmployeeId : args.hostEmployeeId ?? undefined);
 
     const effective = { ...visitor, ...toPatch(args) };
     // İade edilmiş pasif kayıt kişisel bilgi düzenlemesine açık kalır.

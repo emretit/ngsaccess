@@ -1,94 +1,68 @@
 "use node";
 
 import { v } from "convex/values";
+import type { CardReadingListPage as ReadingPage } from "../cardReadings";
 import { api } from "../_generated/api";
 import { authedAction } from "../lib/customFunctions";
 
-type EnrichedReading = {
-  employeeName?: string;
-  accessTime: string;
-  accessStatus?: string;
-  device_name?: string;
-  employees?: { departments?: { name?: string } };
-};
 
-/**
- * AI chat için kart okuma verilerini getirir.
- * Auth + project scope ile güvenli.
- */
+/** AI sohbeti için seçili projeden sınırlı, cursor ile ilerleyen örneklem. */
 export const getCardReadings = authedAction({
   args: {
+    projectId: v.id("projects"),
     department: v.optional(v.string()),
     date: v.optional(v.string()),
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
-    const result = await ctx.runQuery(api.cardReadings.list, {
-      dateFilter: args.date,
-      pageSize: args.startDate ? 500 : 100,
-      page: 1,
-    });
-
-    let readings = result.readings as EnrichedReading[];
-
-    if (args.startDate) {
-      const start = new Date(args.startDate);
-      const end = new Date(args.endDate ?? args.startDate);
-      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-        const shown =
-          args.endDate && args.endDate !== args.startDate
-            ? `${args.startDate} - ${args.endDate}`
-            : args.startDate;
-        throw new Error(
-          `Tarih anlaşılamadı: "${shown}". Lütfen tarihi GG.AA.YYYY biçiminde belirtin.`
-        );
-      }
-      start.setHours(0, 0, 0, 0);
-      end.setHours(23, 59, 59, 999);
-      readings = readings.filter((r) => {
-        const t = new Date(r.accessTime).getTime();
-        return t >= start.getTime() && t <= end.getTime();
+  handler: async (ctx, args): Promise<{
+    hasMore: boolean;
+    scopeNote: string;
+    readings: { name: string; check_in: string; check_out: string | null; department: string; device: string; location: string }[];
+  }> => {
+    const loaded: ReadingPage["page"] = [];
+    let cursor: string | null = null;
+    let isDone = false;
+    for (let page = 0; page < 5 && !isDone && loaded.length < 500; page++) {
+      const result: ReadingPage = await ctx.runQuery(api.cardReadings.list, {
+        projectId: args.projectId,
+        startDate: args.startDate ?? args.date,
+        endDate: args.endDate ?? args.startDate ?? args.date,
+        paginationOpts: { cursor, numItems: Math.min(100, 500 - loaded.length) },
       });
+      loaded.push(...result.page);
+      cursor = result.continueCursor;
+      isDone = result.isDone;
     }
-
-    if (args.department) {
-      const deptLower = args.department.toLowerCase();
-      readings = readings.filter(
-        (r) =>
-          r.employees?.departments?.name?.toLowerCase().includes(deptLower)
-      );
-    }
-
-    return readings.map((r) => ({
-      name: r.employeeName ?? "Bilinmiyor",
-      check_in: new Date(r.accessTime).toLocaleString("tr-TR"),
-      check_out: null as string | null,
-      department: r.employees?.departments?.name ?? "Belirtilmemiş",
-      device: r.device_name ?? "-",
-      location: r.device_name ?? "-",
-    }));
+    const department = args.department?.toLocaleLowerCase("tr-TR");
+    const readings = department ? loaded.filter(r => r.employees?.departments?.name.toLocaleLowerCase("tr-TR").includes(department)) : loaded;
+    const scopeNote = isDone
+      ? `Seçili proje ve tarih kapsamında ${loaded.length} kayıt yüklendi.`
+      : `Seçili proje ve tarih kapsamında ilk ${loaded.length} kayıt incelendi, devamı var; toplam bilinmiyor. Departman eşleşmesi yalnız yüklenen kayıtlarda arandı.`;
+    return {
+      hasMore: !isDone,
+      scopeNote,
+      readings: readings.map(r => ({
+        name: r.employeeName ?? "Bilinmiyor",
+        check_in: new Date(r.accessTime).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" }),
+        check_out: null as string | null,
+        department: r.employees?.departments?.name ?? "Belirtilmemiş",
+        device: r.devices?.name ?? "-",
+        location: r.devices?.name ?? "-",
+      })),
+    };
   },
 });
 
-/**
- * AI chat için veritabanı özet bağlamı döner.
- * Auth ile güvenli.
- */
+/** Toplam sayım değildir: seçili projenin son kayıtlarından bağlam. */
 export const getDatabaseContext = authedAction({
-  args: {},
-  handler: async (ctx): Promise<string> => {
-    const result = await ctx.runQuery(api.cardReadings.list, {
-      pageSize: 20,
-      page: 1,
-    }) as { readings: EnrichedReading[]; totalCount: number };
-
-    const sample = result.readings.slice(0, 5).map((r: EnrichedReading) => ({
-      employee: r.employeeName,
-      time: r.accessTime,
-      status: r.accessStatus,
-    }));
-
-    return `Convex veritabanı: ${result.totalCount} toplam kart okuma kaydı. Son kayıtlar: ${JSON.stringify(sample)}. Sorgular için department ve date filtreleri kullanılabilir.`;
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args): Promise<string> => {
+    const result: ReadingPage = await ctx.runQuery(api.cardReadings.list, {
+      projectId: args.projectId,
+      paginationOpts: { numItems: 20, cursor: null },
+    });
+    const sample = result.page.slice(0, 5).map(r => ({ employee: r.employeeName, time: r.accessTime, status: r.accessStatus }));
+    return `Convex veritabanı, seçili proje: son ${result.page.length} kayıt (toplam bilinmiyor)${result.isDone ? "" : ", devamı var"}. Son kayıt örnekleri: ${JSON.stringify(sample)}. Sorgular için department ve date filtreleri kullanılabilir. Zamanları TR saatiyle (Europe/Istanbul) göster.`;
   },
 });
