@@ -705,16 +705,20 @@ export const backfillAllRulesToDevices = authedAction({
 // FACE — sync/delete (Phase 3)
 // ============================================================================
 
-export const syncEmployeeFaceToDevices = authedAction({
-  args: { employeeId: v.id("employees") },
+// Yüz/parmak izi action'ları yalnız scheduler tetikli (employeeFaces/employeeFingerprints
+// mutation'ları yetkiyi zaten denetledi). Scheduler auth identity taşımadığı için
+// authedAction burada "Giriş yapmanız gerekiyor" fırlatırdı → internalAction.
+
+export const syncEmployeeFaceToDevicesInternal = internalAction({
+  args: {
+    employeeId: v.id("employees"),
+    allowedProjectIds: v.optional(v.array(v.id("projects"))),
+  },
   handler: async (
     ctx,
     args,
   ): Promise<{ synced: number; failed: number; errors: string[] }> => {
-    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
-      internal.users.listProjectIdsForCurrentUser,
-      {},
-    );
+    const inScope = makeProjectGuard(args.allowedProjectIds);
     const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, {
       employeeId: args.employeeId,
     });
@@ -735,7 +739,7 @@ export const syncEmployeeFaceToDevices = authedAction({
     const targets: { device: typeof data.deviceRules[number]["device"] }[] = [];
     const hikRules = data.deviceRules.filter((dr) => dr.device.brand === "hikvision");
     for (const { device } of hikRules) {
-      if (!isProjectAllowed(allowedProjectIds, device.projectId)) continue;
+      if (!inScope(device.projectId)) continue;
       if (!device.hikDevIndex || seen.has(device.hikDevIndex)) continue;
       seen.add(device.hikDevIndex);
       targets.push({ device });
@@ -778,16 +782,16 @@ export const syncEmployeeFaceToDevices = authedAction({
   },
 });
 
-export const deleteEmployeeFaceFromDevices = authedAction({
-  args: { employeeId: v.id("employees") },
+export const deleteEmployeeFaceFromDevicesInternal = internalAction({
+  args: {
+    employeeId: v.id("employees"),
+    allowedProjectIds: v.optional(v.array(v.id("projects"))),
+  },
   handler: async (
     ctx,
     args,
   ): Promise<{ removed: number; failed: number; errors: string[] }> => {
-    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
-      internal.users.listProjectIdsForCurrentUser,
-      {},
-    );
+    const inScope = makeProjectGuard(args.allowedProjectIds);
     const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, {
       employeeId: args.employeeId,
     });
@@ -797,7 +801,7 @@ export const deleteEmployeeFaceFromDevices = authedAction({
     const targets: { device: typeof data.deviceRules[number]["device"] }[] = [];
     const hikRules = data.deviceRules.filter((dr) => dr.device.brand === "hikvision");
     for (const { device } of hikRules) {
-      if (!isProjectAllowed(allowedProjectIds, device.projectId)) continue;
+      if (!inScope(device.projectId)) continue;
       if (!device.hikDevIndex || seen.has(device.hikDevIndex)) continue;
       seen.add(device.hikDevIndex);
       targets.push({ device });
@@ -842,19 +846,17 @@ export const deleteEmployeeFaceFromDevices = authedAction({
 // FINGERPRINT — sync/delete (Phase 3)
 // ============================================================================
 
-export const syncEmployeeFingerprintToDevices = authedAction({
+export const syncEmployeeFingerprintToDevicesInternal = internalAction({
   args: {
     employeeId: v.id("employees"),
     fingerPrintID: v.number(),
+    allowedProjectIds: v.optional(v.array(v.id("projects"))),
   },
   handler: async (
     ctx,
     args,
   ): Promise<{ synced: number; failed: number; errors: string[] }> => {
-    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
-      internal.users.listProjectIdsForCurrentUser,
-      {},
-    );
+    const inScope = makeProjectGuard(args.allowedProjectIds);
     const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, {
       employeeId: args.employeeId,
     });
@@ -872,7 +874,7 @@ export const syncEmployeeFingerprintToDevices = authedAction({
     const targets: { device: typeof data.deviceRules[number]["device"] }[] = [];
     const hikRules = data.deviceRules.filter((dr) => dr.device.brand === "hikvision");
     for (const { device } of hikRules) {
-      if (!isProjectAllowed(allowedProjectIds, device.projectId)) continue;
+      if (!inScope(device.projectId)) continue;
       if (!device.hikDevIndex || seen.has(device.hikDevIndex)) continue;
       seen.add(device.hikDevIndex);
       targets.push({ device });
@@ -918,19 +920,17 @@ export const syncEmployeeFingerprintToDevices = authedAction({
   },
 });
 
-export const deleteEmployeeFingerprintFromDevices = authedAction({
+export const deleteEmployeeFingerprintFromDevicesInternal = internalAction({
   args: {
     employeeId: v.id("employees"),
     fingerPrintID: v.number(),
+    allowedProjectIds: v.optional(v.array(v.id("projects"))),
   },
   handler: async (
     ctx,
     args,
   ): Promise<{ removed: number; failed: number; errors: string[] }> => {
-    const allowedProjectIds: Id<"projects">[] = await ctx.runQuery(
-      internal.users.listProjectIdsForCurrentUser,
-      {},
-    );
+    const inScope = makeProjectGuard(args.allowedProjectIds);
     const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, {
       employeeId: args.employeeId,
     });
@@ -940,7 +940,7 @@ export const deleteEmployeeFingerprintFromDevices = authedAction({
     const targets: { device: typeof data.deviceRules[number]["device"] }[] = [];
     const hikRules = data.deviceRules.filter((dr) => dr.device.brand === "hikvision");
     for (const { device } of hikRules) {
-      if (!isProjectAllowed(allowedProjectIds, device.projectId)) continue;
+      if (!inScope(device.projectId)) continue;
       if (!device.hikDevIndex || seen.has(device.hikDevIndex)) continue;
       seen.add(device.hikDevIndex);
       targets.push({ device });

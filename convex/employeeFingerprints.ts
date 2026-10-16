@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { internalQuery } from "./_generated/server";
@@ -99,7 +99,7 @@ export const addFingerprint = authedMutation({
       });
     }
 
-    await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeFingerprintToDevices, {
+    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeFingerprintToDevicesInternal, {
       employeeId: args.employeeId,
       fingerPrintID: args.fingerPrintID,
     });
@@ -148,7 +148,7 @@ export const removeFingerprint = authedMutation({
       .first();
     if (!row) return;
     await ctx.db.delete(row._id);
-    await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.deleteEmployeeFingerprintFromDevices, {
+    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.deleteEmployeeFingerprintFromDevicesInternal, {
       employeeId: args.employeeId,
       fingerPrintID: args.fingerPrintID,
     });

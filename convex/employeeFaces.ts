@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { internalQuery } from "./_generated/server";
@@ -95,7 +95,7 @@ export const addFace = authedMutation({
     });
 
     // Hikvision cihazlara push
-    await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.syncEmployeeFaceToDevices, {
+    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeFaceToDevicesInternal, {
       employeeId: args.employeeId,
     });
 
@@ -123,7 +123,7 @@ export const removeFace = authedMutation({
     if (!face) return;
     await ctx.storage.delete(face.pictureStorageId);
     await ctx.db.delete(face._id);
-    await ctx.scheduler.runAfter(0, api.actions.hikvisionSync.deleteEmployeeFaceFromDevices, {
+    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.deleteEmployeeFaceFromDevicesInternal, {
       employeeId: args.employeeId,
     });
   },
