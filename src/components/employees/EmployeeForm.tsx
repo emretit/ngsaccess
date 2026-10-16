@@ -1,3 +1,4 @@
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useState } from 'react';
@@ -18,7 +19,8 @@ interface EmployeeFormProps {
 }
 
 export default function EmployeeForm({ employee, onClose, onSave }: EmployeeFormProps) {
-  const rules = useQuery(api.accessRules.list, {});
+  const { projectId } = useActiveProjectScope();
+  const rules = useQuery(api.accessRules.list, projectId ? { projectId } : "skip");
   const memberships = rules?.filter(rule => rule.groupMembers.some(member => member.employeeId === employee?._id));
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({});
 
@@ -41,7 +43,7 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
   const onPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleFileChange(
       e,
-      (url) => setFormData(current => ({ ...current, photoUrl: url })),
+      (url, storageId) => setFormData(current => ({ ...current, photoUrl: url, photoStorageId: storageId })),
       (preview) => setPhotoPreview(preview || formData.photoUrl)
     );
   };

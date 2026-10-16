@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { Employee } from "@/types/employee";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { Id } from "../../../../convex/_generated/dataModel";
 
 export interface EmployeeFormData {
@@ -19,6 +19,7 @@ export interface EmployeeFormData {
   shift: string | null;
   shiftId: Id<"shifts"> | null;
   photoUrl: string | null;
+  photoStorageId?: Id<"_storage">;
   notes: string;
   isActive: boolean;
   hourlyRate: number | null;
@@ -27,7 +28,7 @@ export interface EmployeeFormData {
 }
 
 export const useEmployeeFormData = (employee?: Employee | null) => {
-  const { projectId: defaultProjectId } = useActiveProject();
+  const { projectId: defaultProjectId } = useActiveProjectScope();
 
   const [formData, setFormData] = useState<EmployeeFormData>({
     firstName: "",
@@ -51,9 +52,9 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
 
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
-  const departmentsData = useQuery(api.departments.list);
-  const companiesData = useQuery(api.companies.list);
-  const accessRulesData = useQuery(api.accessRules.list, {});
+  const departmentsData = useQuery(api.departments.list, defaultProjectId ? { projectId: defaultProjectId } : "skip");
+  const companiesData = useQuery(api.companies.list, defaultProjectId ? { projectId: defaultProjectId } : "skip");
+  const accessRulesData = useQuery(api.accessRules.list, defaultProjectId ? { projectId: defaultProjectId } : "skip");
   const positionsData = useQuery(api.positions.list);
 
   const optionsLoading =
@@ -65,10 +66,10 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
   const departments = (departmentsData ?? []).map((d: { _id: string; name: string }) => ({ id: d._id, name: d.name }));
   const companies = (companiesData ?? []).map((c: { _id: string; name: string }) => ({ id: c._id, name: c.name }));
   const accessRules = (accessRulesData ?? []).filter((r: { isActive?: boolean }) => r.isActive !== false).map((r: { _id: string; name: string }) => ({ id: r._id, name: r.name }));
-  const positions = (positionsData ?? []).map((p: { _id: string; name: string }) => ({ id: p._id, name: p.name }));
+  const positions = (positionsData ?? []).filter(p => p.projectId === defaultProjectId).map((p: { _id: string; name: string }) => ({ id: p._id, name: p.name }));
 
   useEffect(() => {
-    if (employee) {
+    if (employee && employee.projectId === defaultProjectId) {
       setFormData({
         firstName: employee.firstName || "",
         lastName: employee.lastName || "",
@@ -83,6 +84,7 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
         shift: employee.shift ?? null,
         shiftId: employee.shiftId ?? null,
         photoUrl: employee.photoUrl ?? null,
+        photoStorageId: employee.photoStorageId,
         notes: employee.notes || "",
         isActive: employee.isActive ?? true,
         hourlyRate: employee.hourlyRate ?? null,

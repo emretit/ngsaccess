@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { FunctionReturnType } from "convex/server";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,7 +41,7 @@ const LEAVE_TYPES = [
 type LeaveTypeValue = (typeof LEAVE_TYPES)[number]["value"];
 
 export default function Leaves() {
-  const { loading: projectLoading } = useProjectAccess();
+  const { projectId, loading: projectLoading } = useActiveProjectScope();
   const { profile } = useAuth();
   const isAdmin = profile?.role === "super_admin" || profile?.role === "project_admin";
   const createLeave = useMutation(api.leaves.create);
@@ -48,9 +49,9 @@ export default function Leaves() {
   const rejectLeave = useMutation(api.leaves.reject);
   const leaves: FunctionReturnType<typeof api.leaves.list> | undefined = useQuery(
     api.leaves.list,
-    !projectLoading ? {} : "skip"
+    !projectLoading && projectId ? { projectId } : "skip"
   );
-  const employees = useQuery(api.employees.list, !projectLoading ? {} : "skip");
+  const employees = useQuery(api.employees.list, !projectLoading && projectId ? { projectId } : "skip");
   const { toast } = useToast();
 
   const [showForm, setShowForm] = useState(false);
@@ -63,6 +64,14 @@ export default function Leaves() {
     endDate: "",
     notes: "",
   });
+
+  useEffect(() => {
+    setShowForm(false);
+    setDecidingLeaveId(null);
+    setFormData({ employeeId: "", leaveType: "annual", startDate: "", endDate: "", notes: "" });
+  }, [projectId]);
+
+  if (!projectLoading && !projectId) return <EmptyState title="Proje seçin" description="Kayıtları görmek için aktif bir proje seçin." />;
 
   if (projectLoading || leaves === undefined || employees === undefined) {
     return <LoadingSpinner text="İzin verileri yükleniyor..." />;

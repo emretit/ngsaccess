@@ -1,22 +1,16 @@
+import { resolveProjectScope } from "./lib/projectScope";
 
 import { v } from "convex/values";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 
 export const list = authedQuery({
-  args: {},
-  handler: async (ctx) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (ctx.user.role === "super_admin") return await ctx.db.query("companies").collect();
-    if (allowedProjectIds.length === 0) return [];
-    const results = await Promise.all(
-      allowedProjectIds.map((pid) =>
-        ctx.db
-          .query("companies")
-          .withIndex("by_project", (q) => q.eq("projectId", pid))
-          .collect()
-      )
-    );
+  args: { projectId: v.optional(v.id("projects")) },
+  handler: async (ctx, args) => {
+    const projectIds = await resolveProjectScope(ctx, args.projectId);
+    const results = await Promise.all(projectIds.map(projectId =>
+      ctx.db.query("companies").withIndex("by_project", q => q.eq("projectId", projectId)).collect(),
+    ));
     return results.flat();
   },
 });

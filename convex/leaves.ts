@@ -1,3 +1,5 @@
+import { resolveProjectScope } from "./lib/projectScope";
+import { assertPeopleProject } from "./lib/peopleScope";
 import { v } from "convex/values";
 import { authedQuery, adminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
@@ -5,42 +7,19 @@ import { approvedLeaveFields, leaveDecisionPatch } from "./lib/leaveRules";
 
 export const list = authedQuery({
   args: {
+    projectId: v.optional(v.id("projects")),
     employeeId: v.optional(v.id("employees")),
     status: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.employeeId) {
-      const emp = await ctx.db.get(args.employeeId);
-      if (!emp || (emp.projectId && !allowedProjectIds.some((id) => id === emp.projectId))) {
-        return [];
-      }
-      const leaves = await ctx.db
-        .query("leaves")
-        .withIndex("by_employee", (q) => q.eq("employeeId", args.employeeId!))
-        .collect();
-      if (args.status) return leaves.filter((l) => l.status === args.status);
-      return leaves;
-    }
-    if (ctx.user.role === "super_admin") {
-      const leaves = await ctx.db.query("leaves").collect();
-      if (args.status) return leaves.filter((l) => l.status === args.status);
-      return leaves;
-    }
-    if (allowedProjectIds.length > 0) {
-      const results = await Promise.all(
-        allowedProjectIds.map((pid) =>
-          ctx.db
-            .query("leaves")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .collect()
-        )
-      );
-      const leaves = results.flat();
-      if (args.status) return leaves.filter((l) => l.status === args.status);
-      return leaves;
-    }
-    return [];
+    const projectIds = await resolveProjectScope(ctx, args.projectId);
+    const results = await Promise.all(projectIds.map(projectId =>
+      ctx.db.query("leaves").withIndex("by_project", q => q.eq("projectId", projectId)).collect(),
+    ));
+    return results.flat().filter(leave =>
+      (!args.employeeId || leave.employeeId === args.employeeId) &&
+      (!args.status || leave.status === args.status),
+    );
   },
 });
 
@@ -73,9 +52,11 @@ export const create = adminMutation({
     if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
+    assertPeopleProject(args.projectId ?? emp.projectId, emp.projectId, "İzin ve çalışan");
     const now = new Date().toISOString();
     return await ctx.db.insert("leaves", {
       ...args,
+      projectId: emp.projectId,
       ...approvedLeaveFields(ctx.user),
       createdAt: now,
       updatedAt: now,
@@ -120,34 +101,13 @@ export const reject = adminMutation({
 });
 
 export const listForRange = authedQuery({
-  args: {
-    startDate: v.string(),
-    endDate: v.string(),
-  },
+  args: { startDate: v.string(), endDate: v.string(), projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    let leaves;
-    if (ctx.user.role === "super_admin") {
-      leaves = await ctx.db.query("leaves").collect();
-    } else if (allowedProjectIds.length > 0) {
-      const results = await Promise.all(
-        allowedProjectIds.map((pid) =>
-          ctx.db
-            .query("leaves")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .collect()
-        )
-      );
-      leaves = results.flat();
-    } else {
-      return [];
-    }
-    return leaves.filter(
-      (l) =>
-        l.status === "approved" &&
-        l.startDate <= args.endDate &&
-        l.endDate >= args.startDate,
-    );
+    const projectIds = await resolveProjectScope(ctx, args.projectId);
+    const results = await Promise.all(projectIds.map(projectId =>
+      ctx.db.query("leaves").withIndex("by_project", q => q.eq("projectId", projectId)).collect(),
+    ));
+    return results.flat().filter(l => l.status === "approved" && l.startDate <= args.endDate && l.endDate >= args.startDate);
   },
 });
 

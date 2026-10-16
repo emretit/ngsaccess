@@ -1,3 +1,4 @@
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { schedulesOverlap, validDay } from "../../../convex/lib/shiftUx";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useEffect, useMemo, useState } from "react";
@@ -88,11 +89,12 @@ export function AssignShiftDialog({
   holidays: _holidays = [],
   initial,
 }: AssignShiftDialogProps) {
+  const { projectId } = useActiveProjectScope();
   const { toast } = useToast();
   const assignShift = useMutation(api.shifts.assignShift);
   const [form, setForm] = useState<AssignmentFormValues>(EMPTY);
   const rangeValid = validDay(form.startDate) && validDay(form.endDate) && form.startDate <= form.endDate;
-  const rangeLeaves = useQuery(api.leaves.listForRange, open && rangeValid ? { startDate: form.startDate, endDate: form.endDate } : "skip");
+  const rangeLeaves = useQuery(api.leaves.listForRange, open && rangeValid && projectId ? { startDate: form.startDate, endDate: form.endDate, projectId } : "skip");
   const rangeHolidays = useQuery(api.holidays.listForRange, open && rangeValid ? { startDate: form.startDate, endDate: form.endDate } : "skip");
   const employeeProject = employees.find(e => e._id === form.employeeId)?.projectId;
   const leaves = (rangeLeaves ?? []).filter(l => l.employeeId === form.employeeId);

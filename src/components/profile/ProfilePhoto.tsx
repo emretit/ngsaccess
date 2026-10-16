@@ -23,6 +23,7 @@ export default function ProfilePhoto({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const claimUpload = useMutation(api.files.claimUpload);
   const saveUserPhoto = useMutation(api.files.saveUserPhoto);
 
   const { run: upload, pending: isLoading } = useAsyncAction(async (file: File) => {
@@ -30,6 +31,7 @@ export default function ProfilePhoto({
     const result = await fetch(uploadUrl, { method: "POST", headers: { "Content-Type": file.type }, body: file });
     if (!result.ok) throw new Error("Dosya yüklenemedi");
     const { storageId } = (await result.json()) as { storageId: Id<"_storage"> };
+    await claimUpload({ storageId });
     const publicUrl = await saveUserPhoto({ storageId });
     onPhotoUpdated(publicUrl);
   }, { success: "Fotoğraf güncellendi", error: "Fotoğraf yüklenemedi" });

@@ -76,4 +76,11 @@ crons.daily(
   internal.emailVerification.cleanupExpiredTokens,
 );
 
+crons.cron(
+  "cleanup-pending-uploads",
+  "0 4 * * *",
+  internal.files.cleanupPendingUploads,
+  {},
+);
+
 export default crons;

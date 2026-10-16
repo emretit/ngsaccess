@@ -1,3 +1,4 @@
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 
@@ -5,8 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export function EngineeringDepartmentView() {
-  const allDepartmentsData = useQuery(api.departments.list, {});
-  const allEmployeesData = useQuery(api.employees.list, {});
+  const { projectId, loading: projectLoading } = useActiveProjectScope();
+  const scope = !projectLoading && projectId ? { projectId } : "skip";
+  const allDepartmentsData = useQuery(api.departments.list, scope);
+  const allEmployeesData = useQuery(api.employees.list, scope);
   const loading = allDepartmentsData === undefined || allEmployeesData === undefined;
   const allDepartments = allDepartmentsData ?? [];
   const allEmployees = allEmployeesData ?? [];

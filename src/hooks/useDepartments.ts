@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useToast } from "@/hooks/use-toast";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
+
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { Id } from "../../convex/_generated/dataModel";
 
 export interface Department {
@@ -15,37 +15,26 @@ export interface Department {
 }
 
 export function useDepartments() {
-  const { projectId, loading: projectLoading } = useActiveProject();
-  const { toast } = useToast();
+  const { projectId, loading: projectLoading } = useActiveProjectScope();
+
 
   const departments = useQuery(
     api.departments.list,
-    !projectLoading ? {} : "skip"
+    !projectLoading && projectId ? { projectId } : "skip"
   );
 
   const createDept = useMutation(api.departments.create);
   const removeDept = useMutation(api.departments.remove);
 
   const addDepartment = async (name: string, parentId: Id<"departments"> | null = null) => {
-    if (!name.trim()) return false;
-    const parentDept = parentId ? (departments ?? []).find((d: Department) => d._id === parentId) : null;
-    try {
-      await createDept({
-        name: name.trim(),
-        projectId,
-        parentId: parentId ?? undefined,
-        level: parentDept ? (parentDept.level ?? 0) + 1 : 0,
-      });
-      toast({ title: "Başarılı", description: "Departman başarıyla eklendi" });
-      return true;
-    } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Departman eklenirken hata oluştu",
-        variant: "destructive",
-      });
-      return false;
-    }
+    if (!name.trim()) throw new Error("Departman adı zorunludur");
+    if (!projectId) throw new Error("Departman eklemek için proje seçin");
+    const parentDept = parentId ? (departments ?? []).find(d => d._id === parentId) : null;
+    await createDept({
+      name: name.trim(), projectId, parentId: parentId ?? undefined,
+      level: parentDept ? (parentDept.level ?? 0) + 1 : 0,
+    });
+    return true;
   };
 
   const deleteDepartment = async (id: Id<"departments">) => {
@@ -55,7 +44,7 @@ export function useDepartments() {
 
   return {
     departments: (departments ?? []) as Department[],
-    isLoading: projectLoading || departments === undefined,
+    isLoading: projectLoading || Boolean(projectId && departments === undefined),
     error: null,
     addDepartment,
     deleteDepartment,

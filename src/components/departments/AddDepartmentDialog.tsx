@@ -1,55 +1,54 @@
-
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useId, useState } from "react";
 
 interface AddDepartmentDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onAdd: (name: string) => Promise<void>;
+  onAdd: (name: string) => Promise<boolean | void>;
   title?: string;
   description?: string;
 }
 
-export function AddDepartmentDialog({
-  isOpen,
-  onOpenChange,
-  onAdd,
-  title = "Yeni Departman Ekle",
-  description = "Departmanın adını girin"
+export function AddDepartmentDialog({ isOpen, onOpenChange, onAdd,
+  title = "Yeni Departman Ekle", description = "Departmanın adını girin",
 }: AddDepartmentDialogProps) {
   const [departmentName, setDepartmentName] = useState("");
-
-  const handleAdd = async () => {
-    await onAdd(departmentName);
-    setDepartmentName("");
+  const [nameError, setNameError] = useState<string>();
+  const inputId = useId();
+  const { run, pending } = useAsyncAction(async (name: string) => {
+    if (await onAdd(name) === false) throw new Error("Departman eklenemedi");
+  }, { success: "Departman eklendi", error: "Departman eklenemedi" });
+  const close = (open: boolean) => {
+    if (pending) return;
+    if (!open) { setDepartmentName(""); setNameError(undefined); }
+    onOpenChange(open);
   };
-
   return (
-    <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="sm:max-w-[425px]">
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>{description}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <Input
-          value={departmentName}
-          onChange={(e) => setDepartmentName(e.target.value)}
-          placeholder="Departman adı"
-          className="my-4"
-        />
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => {
+    <Dialog open={isOpen} onOpenChange={close}>
+      <DialogContent className="sm:max-w-[425px]" onInteractOutside={event => { if (pending) event.preventDefault(); }}>
+        <DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader>
+        <form onSubmit={async event => {
+          event.preventDefault();
+          if (!departmentName.trim()) { setNameError("Departman adı zorunludur"); return; }
+          setNameError(undefined);
+          if (await run(departmentName.trim())) {
             setDepartmentName("");
             onOpenChange(false);
-          }}>
-            İptal
-          </AlertDialogCancel>
-          <AlertDialogAction onClick={handleAdd}>
-            Ekle
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          }
+        }} className="space-y-4">
+          <FormFieldWrapper htmlFor={inputId} label="Departman adı" error={nameError}>
+            <Input id={inputId} value={departmentName} disabled={pending} onChange={event => setDepartmentName(event.target.value)} />
+          </FormFieldWrapper>
+          <DialogFooter>
+            <Button type="button" variant="outline" disabled={pending} onClick={() => close(false)}>İptal</Button>
+            <Button type="submit" disabled={pending}>{pending ? "Ekleniyor..." : "Ekle"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

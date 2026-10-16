@@ -119,7 +119,7 @@ export function PDKSInlineQuery({
   onOpenChat,
 }: PDKSInlineQueryProps) {
   const [input, setInput] = useState("");
-  const departments = useQuery(api.departments.list);
+  const departments = useQuery(api.departments.list, {});
   const suggestion = useMemo(
     () => computeSuggestion(input, departments),
     [input, departments],

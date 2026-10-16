@@ -65,7 +65,7 @@ const QUICK_CHIPS: Array<{
 ];
 
 export function PDKSFilterBar({ values, onChange }: PDKSFilterBarProps) {
-  const departments = useQuery(api.departments.list);
+  const departments = useQuery(api.departments.list, {});
   const companies = useQuery(api.companies.list, {});
   const positions = useQuery(api.positions.list, {});
   const shifts = useQuery(api.shifts.list, {});

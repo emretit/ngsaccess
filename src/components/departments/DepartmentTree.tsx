@@ -1,5 +1,5 @@
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -25,6 +25,16 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
   const [showAddTopLevelDialog, setShowAddTopLevelDialog] = useState(false);
   const [addingToParentId, setAddingToParentId] = useState<Id<"departments"> | null>(null);
 
+  useEffect(() => {
+    setSelectedDepartment(null);
+    onSelectDepartment(null);
+    setDeleteTarget(null);
+    setShowAddDialog(false);
+    setShowAddTopLevelDialog(false);
+    setAddingToParentId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
   const generalSettings = useQuery(
     api.settings.getGeneral,
     !projectLoading && projectId ? { projectId } : "skip",
@@ -49,6 +59,7 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
       setShowAddDialog(false);
       setAddingToParentId(null);
     }
+    return success;
   };
 
   const handleAddTopLevelDepartment = async (name: string) => {
@@ -56,6 +67,7 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
     if (success) {
       setShowAddTopLevelDialog(false);
     }
+    return success;
   };
 
   const renderDepartmentTree = (parentId: Id<"departments"> | null = null) => {
@@ -114,7 +126,7 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
           await deleteDepartment(deleteTarget._id);
           if (selectedDepartment === deleteTarget._id) handleProjectHeaderClick();
         }} />
-      <AddDepartmentDialog
+      <AddDepartmentDialog key={`${projectId}-${addingToParentId ?? "top"}`}
         isOpen={showAddDialog}
         onOpenChange={setShowAddDialog}
         onAdd={handleAddDepartment}
@@ -122,7 +134,7 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
         description={addingToParentId ? "Alt departmanın adını girin" : "Yeni departmanın adını girin"}
       />
 
-      <AddDepartmentDialog
+      <AddDepartmentDialog key={projectId}
         isOpen={showAddTopLevelDialog}
         onOpenChange={setShowAddTopLevelDialog}
         onAdd={handleAddTopLevelDepartment}

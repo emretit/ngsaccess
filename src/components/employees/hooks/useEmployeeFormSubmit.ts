@@ -77,6 +77,7 @@ export const useEmployeeFormSubmit = (
         shiftId: formData.shiftId ?? undefined,
         shift: formData.shift ?? undefined,
         photoUrl: formData.photoUrl ?? undefined,
+        photoStorageId: formData.photoStorageId,
         notes: formData.notes?.trim() ?? undefined,
         isActive: formData.isActive ?? true,
         hourlyRate: formData.hourlyRate ?? undefined,

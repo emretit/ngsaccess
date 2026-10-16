@@ -16,7 +16,7 @@ import { AccessDenied } from "@/components/shared/AccessDenied";
 import { DeviceSyncStatusBanner } from "@/components/sync/DeviceSyncStatusBanner";
 
 export default function Employees() {
-  const { isAdmin } = useActiveProjectScope();
+  const { isAdmin, projectId } = useActiveProjectScope();
   const { loading: projectLoading } = useProjectAccess();
   const { employees, isLoading, error, refetch, hasProjectAccess } = useEmployees();
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,6 +26,15 @@ export default function Employees() {
   const [selectedDepartment, setSelectedDepartment] = useState<Id<"departments"> | null>(null);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [viewMode, setViewMode] = useState(false);
+
+  useEffect(() => {
+    setEditingEmployee(null);
+    setIsPanelOpen(false);
+    setViewMode(false);
+    setSearchQuery("");
+    setSelectedDepartment(null);
+    setCurrentPage(1);
+  }, [projectId]);
 
   // Filtreleme işlemini useMemo ile optimize et
   const filteredEmployees = useMemo(() => {

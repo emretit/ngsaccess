@@ -1,3 +1,5 @@
+import { assertPeopleProject } from "./lib/peopleScope";
+import { resolveProjectScope } from "./lib/projectScope";
 import { toPatch } from "./lib/nullablePatch";
 import { validateRange, validateShift, schedulesOverlap, appliesOn, type ScheduleRange } from "./lib/shiftUx";
 import type { MutationCtx } from "./_generated/server";
@@ -9,7 +11,7 @@ import { getProjectIdsForUser } from "./lib/auth";
 
 async function validateAssignment(ctx: MutationCtx, employee: Doc<"employees">, shift: Doc<"shifts">, range: ScheduleRange, force = false, excludeId?: string, calendarConfirmed = false) {
   validateRange(range.startDate, range.endDate);
-  if (employee.projectId !== shift.projectId) throw new Error("Çalışan ve vardiya aynı projede olmalıdır");
+  assertPeopleProject(employee.projectId, shift.projectId, "Çalışan ve vardiya");
   if (shift.isActive === false) throw new Error("Pasif vardiya atanamaz");
   if (range.weekPattern?.some(code => !["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].includes(code))) throw new Error("Geçersiz tekrar günü");
   const leaves = await ctx.db.query("leaves").withIndex("by_employee", q => q.eq("employeeId", employee._id)).collect();
@@ -32,46 +34,19 @@ async function validateAssignment(ctx: MutationCtx, employee: Doc<"employees">, 
 
 export const listAssignments = authedQuery({
   args: {
+    projectId: v.optional(v.id("projects")),
     employeeId: v.optional(v.id("employees")),
     shiftId: v.optional(v.id("shifts")),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.employeeId) {
-      const emp = await ctx.db.get(args.employeeId);
-      if (!emp || (emp.projectId && !allowedProjectIds.some((id) => id === emp.projectId))) {
-        return [];
-      }
-      return await ctx.db
-        .query("shiftAssignments")
-        .withIndex("by_employee", (q) => q.eq("employeeId", emp._id))
-        .collect();
-    }
-    if (args.shiftId) {
-      const shift = await ctx.db.get(args.shiftId);
-      if (!shift || (shift.projectId && !allowedProjectIds.some((id) => id === shift.projectId))) {
-        return [];
-      }
-      return await ctx.db
-        .query("shiftAssignments")
-        .withIndex("by_shift", (q) => q.eq("shiftId", shift._id))
-        .collect();
-    }
-    if (ctx.user.role === "super_admin") {
-      return await ctx.db.query("shiftAssignments").collect();
-    }
-    if (allowedProjectIds.length > 0) {
-      const results = await Promise.all(
-        allowedProjectIds.map((pid) =>
-          ctx.db
-            .query("shiftAssignments")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .collect()
-        )
-      );
-      return results.flat();
-    }
-    return [];
+    const projectIds = await resolveProjectScope(ctx, args.projectId);
+    const results = await Promise.all(projectIds.map(projectId =>
+      ctx.db.query("shiftAssignments").withIndex("by_project", q => q.eq("projectId", projectId)).collect(),
+    ));
+    return results.flat().filter(item =>
+      (!args.employeeId || item.employeeId === args.employeeId) &&
+      (!args.shiftId || item.shiftId === args.shiftId),
+    );
   },
 });
 
@@ -99,11 +74,13 @@ export const assignShift = authedMutation({
     if (!shift || (shift.projectId && !allowedProjectIds.some((id) => id === shift.projectId))) {
       throw new Error("Bu vardiyaya erişim yetkiniz yok");
     }
+    if (args.projectId) assertPeopleProject(args.projectId, emp.projectId, "Atama ve çalışan");
     await validateAssignment(ctx, emp, shift, args, args.forceConfirm, undefined, args.calendarConfirmed);
     const now = new Date().toISOString();
     const { forceConfirm: _force, calendarConfirmed: _calendar, ...rest } = args;
     return await ctx.db.insert("shiftAssignments", {
       ...rest,
+      projectId: emp.projectId,
       createdAt: now,
       updatedAt: now,
     });
@@ -132,6 +109,7 @@ export const updateAssignment = authedMutation({
     const employee = await ctx.db.get(assignment.employeeId);
     const nextShift = await ctx.db.get(args.shiftId ?? assignment.shiftId);
     if (!employee || !nextShift) throw new Error("Çalışan veya vardiya bulunamadı");
+    assertPeopleProject(assignment.projectId, employee.projectId, "Atama ve çalışan");
     await validateAssignment(ctx, employee, nextShift, { startDate: nextStart, endDate: nextEnd, weekPattern: args.weekPattern ?? assignment.weekPattern }, args.forceConfirm, assignment._id, args.calendarConfirmed);
     const { assignmentId, forceConfirm: _force, calendarConfirmed: _calendar, ...updates } = args;
     const clean: Record<string, unknown> = { updatedAt: new Date().toISOString() };
@@ -243,19 +221,12 @@ export const bulkRemoveAssignment = authedMutation({
 });
 
 export const list = authedQuery({
-  args: {},
-  handler: async (ctx) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (ctx.user.role === "super_admin") return await ctx.db.query("shifts").collect();
-    if (allowedProjectIds.length === 0) return [];
-    const results = await Promise.all(
-      allowedProjectIds.map((pid) =>
-        ctx.db
-          .query("shifts")
-          .withIndex("by_project", (q) => q.eq("projectId", pid))
-          .collect()
-      )
-    );
+  args: { projectId: v.optional(v.id("projects")) },
+  handler: async (ctx, args) => {
+    const projectIds = await resolveProjectScope(ctx, args.projectId);
+    const results = await Promise.all(projectIds.map(projectId =>
+      ctx.db.query("shifts").withIndex("by_project", q => q.eq("projectId", projectId)).collect(),
+    ));
     return results.flat();
   },
 });

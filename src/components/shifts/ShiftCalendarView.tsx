@@ -1,3 +1,4 @@
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useQuery } from "convex/react";
 import { toLocalDateString } from "@/lib/date";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
@@ -34,12 +35,13 @@ export function ShiftCalendarView({
   assignments,
   onNavigateToDefinitions,
 }: ShiftCalendarViewProps) {
+  const { projectId } = useActiveProjectScope();
   const hasNoShifts = shifts.length === 0;
   const [weekStart, setWeekStart] = useState<Date>(() =>
     getWeekStart(new Date()),
   );
   const range = { startDate: toLocalDateString(weekStart), endDate: toLocalDateString(addDays(weekStart, 6)) };
-  const weekLeaves = useQuery(api.leaves.listForRange, range);
+  const weekLeaves = useQuery(api.leaves.listForRange, projectId ? { ...range, projectId } : "skip");
   const weekHolidays = useQuery(api.holidays.listForRange, range);
   const leaves = weekLeaves ?? [];
   const holidays = weekHolidays ?? [];

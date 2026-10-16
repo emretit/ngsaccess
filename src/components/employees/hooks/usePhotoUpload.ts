@@ -6,11 +6,12 @@ import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 export function usePhotoUpload() {
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+  const claimUpload = useMutation(api.files.claimUpload);
   const getUploadUrl = useMutation(api.files.getUploadUrl);
   const preview = useRef<string | null>(null);
   const upload = useAsyncAction(async (
     file: File,
-    onPhotoChange: (url: string) => void,
+    onPhotoChange: (url: string, storageId: Id<"_storage">) => void,
     onPreviewChange: (url: string) => void,
   ) => {
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) throw new Error("Sadece JPEG, PNG veya WebP fotoğraflar yüklenebilir");
@@ -24,8 +25,9 @@ export function usePhotoUpload() {
       if (!result.ok) throw new Error("Dosya sunucuya yüklenemedi");
       const payload: unknown = await result.json();
       if (typeof payload !== "object" || payload === null || !("storageId" in payload) || typeof payload.storageId !== "string") throw new Error("Dosya sunucusu geçersiz yanıt verdi");
+      await claimUpload({ storageId: payload.storageId as Id<"_storage"> });
       const url = await getUploadUrl({ storageId: payload.storageId as Id<"_storage"> });
-      onPhotoChange(url);
+      onPhotoChange(url, payload.storageId as Id<"_storage">);
       onPreviewChange(url);
     } catch (error: unknown) {
       onPreviewChange("");
@@ -38,7 +40,7 @@ export function usePhotoUpload() {
 
   const handleFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>,
-    onPhotoChange: (url: string) => void,
+    onPhotoChange: (url: string, storageId: Id<"_storage">) => void,
     onPreviewChange: (url: string) => void,
     _employeeId?: Id<"employees">,
   ) => {

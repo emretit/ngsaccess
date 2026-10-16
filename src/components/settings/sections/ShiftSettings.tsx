@@ -6,7 +6,7 @@ import { notify } from "@/lib/notify";
 import { Clock, Loader2, Plus } from "lucide-react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { ShiftTable, type ShiftRow } from "./components/ShiftTable";
 import {
   AddShiftDialog,
@@ -20,12 +20,12 @@ interface ShiftSettingsProps {
 }
 
 export function ShiftSettings({ onComplete, embedded = false }: ShiftSettingsProps) {
-  const { projectId, isSuperAdmin, loading: projectLoading } = useActiveProject();
+  const { projectId, loading: projectLoading } = useActiveProjectScope();
 
-  const shifts = useQuery(api.shifts.list, projectLoading ? "skip" : {});
+  const shifts = useQuery(api.shifts.list, !projectLoading && projectId ? { projectId } : "skip");
   const assignments = useQuery(
     api.shifts.listAssignments,
-    projectLoading ? "skip" : {},
+    !projectLoading && projectId ? { projectId } : "skip",
   );
   const createShift = useMutation(api.shifts.create);
   const updateShift = useMutation(api.shifts.update);
@@ -92,8 +92,8 @@ export function ShiftSettings({ onComplete, embedded = false }: ShiftSettingsPro
     setEditingShift(null);
   };
 
-  const isLoading = projectLoading || shifts === undefined;
-  const hasNoProjectAccess = !projectLoading && !projectId && !isSuperAdmin;
+  const isLoading = projectLoading || Boolean(projectId && shifts === undefined);
+  const hasNoProjectAccess = !projectLoading && !projectId;
 
   const tableShifts: ShiftRow[] = (shifts ?? []).map((s) => ({
     _id: s._id,

@@ -347,6 +347,17 @@ function resolveSuccesses(
 export const deleteEmployeeFromDevicesInternal = internalAction({
   args: {
     employeeId: v.id("employees"),
+    snapshot: v.optional(v.object({
+      cardNumber: v.string(),
+      projectId: v.optional(v.id("projects")),
+      devices: v.array(v.object({
+        _id: v.id("devices"), name: v.string(),
+        brand: v.optional(v.union(v.literal("hikvision"), v.literal("other"), v.literal("ide_smart"))),
+        projectId: v.optional(v.id("projects")), hikDevIndex: v.optional(v.string()),
+        hikTransport: v.optional(v.union(v.literal("gateway"), v.literal("localBridge"))),
+        hikDoorCount: v.optional(v.number()),
+      })),
+    })),
     allowedProjectIds: v.optional(v.array(v.id("projects"))),
   },
   handler: async (
@@ -354,7 +365,10 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
     args,
   ): Promise<{ removed: number; failed: number; errors: string[] }> => {
     const isAllowed = makeProjectGuard(args.allowedProjectIds);
-    const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, {
+    const data = args.snapshot ? {
+      employee: args.snapshot,
+      deviceRules: args.snapshot.devices.map(device => ({ device })),
+    } : await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, {
       employeeId: args.employeeId,
     });
     if (!data?.employee.cardNumber || data.deviceRules.length === 0) {
@@ -414,7 +428,7 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
           projectId: s.device.projectId,
           operation: "deletePerson",
           lastError: s.reason,
-          payload: { employeeId: args.employeeId },
+          payload: { employeeId: args.employeeId, cardNumber: data.employee.cardNumber },
         }),
       );
     }
@@ -434,7 +448,7 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
           projectId: r.target.device.projectId,
           operation: "deletePerson",
           lastError: errMsg,
-          payload: { employeeId: args.employeeId },
+          payload: { employeeId: args.employeeId, cardNumber: data.employee.cardNumber },
         }),
       );
     }

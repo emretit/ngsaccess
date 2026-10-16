@@ -1,3 +1,6 @@
+import { claimEmployeePhoto } from "./lib/peoplePhoto";
+import { snapshotEmployeeHikDevices } from "./lib/peopleHikSnapshot";
+import { employeeRelationsToValidate, validateEmployeeRelations } from "./lib/peopleRelations";
 import { resolveProjectScope } from "./lib/projectScope";
 import { toPatch } from "./lib/nullablePatch";
 import { assertSameProject, validatePay, employeeDependentTables, assertEmployeeBulkDeleteLimit } from "./lib/employeeUx";
@@ -69,31 +72,15 @@ export async function upsertGroupMembership(
 
 export const list = authedQuery({
   args: {
-    projectIds: v.optional(v.array(v.id("projects"))),
-    isSuperAdmin: v.optional(v.boolean()),
+    projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-
-    let employees;
-    if (args.isSuperAdmin && ctx.user.role === "super_admin") {
-      employees = await ctx.db.query("employees").order("desc").collect();
-    } else if (allowedProjectIds.length > 0) {
-      const results = await Promise.all(
-        allowedProjectIds.map((pid) =>
-          ctx.db
-            .query("employees")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .collect()
-        )
-      );
-      employees = results.flat();
-    } else {
-      return [];
-    }
-
+    const projectIds = await resolveProjectScope(ctx, args.projectId);
+    const results = await Promise.all(projectIds.map(projectId =>
+      ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", projectId)).collect(),
+    ));
     // Ziyaretçiler (isVisitor) Kişiler listesinde görünmez — Ziyaretçiler sekmesinde yönetilir.
-    employees = employees.filter((e) => e.isVisitor !== true);
+    const employees = results.flat().filter((e) => e.isVisitor !== true);
 
     return await Promise.all(
       employees.map(async (emp) => {
@@ -199,6 +186,7 @@ export const create = adminMutation({
     shiftId: v.optional(v.id("shifts")),
     accessRuleId: v.optional(v.id("accessRules")),
     photoUrl: v.optional(v.string()),
+    photoStorageId: v.optional(v.id("_storage")),
     isActive: v.optional(v.boolean()),
     notes: v.optional(v.string()),
     shift: v.optional(v.string()),
@@ -220,10 +208,14 @@ export const create = adminMutation({
       if (dup) throw new Error(DUPLICATE_MESSAGES[field]);
     }
 
+    if (args.photoUrl && !args.photoStorageId) throw new Error("Fotoğrafı yeniden yükleyin");
+    const photo = args.photoStorageId ? await claimEmployeePhoto(ctx, args.photoStorageId, ctx.user._id) : {};
+    await validateEmployeeRelations(ctx, args);
     validatePay(args.hourlyRate, args.monthlySalary);
     const now = new Date().toISOString();
     const id = await ctx.db.insert("employees", {
       ...args,
+      ...photo,
       isActive: args.isActive ?? true,
       createdAt: now,
       updatedAt: now,
@@ -259,6 +251,7 @@ export const update = adminMutation({
     shiftId: v.optional(v.union(v.null(), v.id("shifts"))),
     accessRuleId: v.optional(v.id("accessRules")),
     photoUrl: v.optional(v.union(v.null(), v.string())),
+    photoStorageId: v.optional(v.union(v.null(), v.id("_storage"))),
     isActive: v.optional(v.boolean()),
     notes: v.optional(v.union(v.null(), v.string())),
     shift: v.optional(v.union(v.null(), v.string())),
@@ -293,8 +286,15 @@ export const update = adminMutation({
       }
     }
 
+    if (updates.photoUrl && updates.photoUrl !== emp.photoUrl && !updates.photoStorageId) throw new Error("Fotoğrafı yeniden yükleyin");
+    const photo = updates.photoStorageId
+      ? await claimEmployeePhoto(ctx, updates.photoStorageId, ctx.user._id, employeeId)
+      : updates.photoUrl === null || updates.photoStorageId === null
+        ? { photoUrl: undefined, photoStorageId: undefined }
+        : {};
+    await validateEmployeeRelations(ctx, employeeRelationsToValidate(emp, toPatch(updates)));
     validatePay(updates.hourlyRate, updates.monthlySalary);
-    await ctx.db.patch(employeeId, { ...toPatch(updates), updatedAt: new Date().toISOString() });
+    await ctx.db.patch(employeeId, { ...toPatch(updates), ...photo, updatedAt: new Date().toISOString() });
 
     const groupMemberAdded = await upsertGroupMembership(
       ctx,
@@ -336,11 +336,11 @@ export const update = adminMutation({
 });
 
 async function removeEmployeeWithDependencies(ctx: MutationCtx & { user: Doc<"users"> }, emp: Doc<"employees">) {
-    // Önce cihazlardan sil (employeeId bilgisi gerektiği için DB silinmeden çağrılır).
+    const snapshot = await snapshotEmployeeHikDevices(ctx, emp);
     await ctx.scheduler.runAfter(
       0,
       internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal,
-      { employeeId: emp._id },
+      { employeeId: emp._id, snapshot },
     );
     // IDE: kayıt + groupMembers birazdan silinecek → getEmployeeWithDevices null döner.
     // Panelleri ŞİMDİ (commit öncesi) çöz, kart no'yu açıkça geçir.

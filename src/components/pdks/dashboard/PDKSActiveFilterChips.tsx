@@ -18,7 +18,7 @@ export function PDKSActiveFilterChips({
   onChange,
 }: PDKSActiveFilterChipsProps) {
   const companies = useQuery(api.companies.list, {});
-  const departments = useQuery(api.departments.list);
+  const departments = useQuery(api.departments.list, {});
   const positions = useQuery(api.positions.list, {});
   const shifts = useQuery(api.shifts.list, {});
 

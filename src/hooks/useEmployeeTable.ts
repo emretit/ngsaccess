@@ -1,3 +1,4 @@
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useEffect, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -8,6 +9,7 @@ import { Id } from "../../convex/_generated/dataModel";
 import type { Employee } from "@/types/employee";
 
 export function useEmployeeTable(employees: Employee[]) {
+  const { projectId } = useActiveProjectScope();
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Employee;
     direction: "asc" | "desc";
@@ -16,6 +18,8 @@ export function useEmployeeTable(employees: Employee[]) {
   const [selectedEmployees, setSelectedEmployees] = useState<Id<"employees">[]>([]);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  useEffect(() => { setSelectedEmployees([]); setSelectedDepartment(""); setShowDeleteDialog(false); }, [projectId]);
+
 
   const bulkDelete = useMutation(api.employees.bulkDelete);
   const updateDepartment = useMutation(api.employees.bulkUpdateDepartment);
