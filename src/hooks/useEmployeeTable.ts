@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { toast } from "@/hooks/use-toast";
+import { notify } from "@/lib/notify";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { Id } from "../../convex/_generated/dataModel";
 
 import type { Employee } from "@/types/employee";
@@ -17,7 +18,16 @@ export function useEmployeeTable(employees: Employee[]) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const bulkDelete = useMutation(api.employees.bulkDelete);
-  const _bulkUpdateStatus = useMutation(api.employees.bulkUpdateStatus);
+  const updateDepartment = useMutation(api.employees.bulkUpdateDepartment);
+  const visibleIds = employees.map(emp => emp._id).join(",");
+  useEffect(() => { setSelectedEmployees([]); setSelectedDepartment(""); }, [visibleIds]);
+  const departmentAction = useAsyncAction(async () => {
+    if (!selectedDepartment || selectedEmployees.length === 0) return;
+    const result = await updateDepartment({ employeeIds: selectedEmployees, departmentId: selectedDepartment as Id<"departments"> });
+    notify.success(`${result.updatedCount} personelin departmanı güncellendi`);
+    setSelectedEmployees([]);
+    setSelectedDepartment("");
+  });
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -36,39 +46,13 @@ export function useEmployeeTable(employees: Employee[]) {
   };
 
   const handleBulkDelete = async () => {
-    try {
-      await bulkDelete({ employeeIds: selectedEmployees });
-      toast({ title: "Başarılı", description: "Seçili personeller silindi" });
-      setSelectedEmployees([]);
-      setShowDeleteDialog(false);
-    } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Personeller silinirken hata oluştu",
-        variant: "destructive",
-      });
-    }
+    await bulkDelete({ employeeIds: selectedEmployees });
+    notify.success("Personel kayıtları silindi", "Cihaz temizliği kuyruğa alındı; cihaz teslimi henüz doğrulanmadı.");
+    setSelectedEmployees([]);
+    setShowDeleteDialog(false);
   };
 
-  const handleBulkDepartmentUpdate = async () => {
-    if (!selectedDepartment || selectedEmployees.length === 0) return;
-    try {
-      await Promise.all(
-        selectedEmployees.map((id) =>
-          fetch(`/api/employees/${id}`, { method: "PATCH", body: JSON.stringify({ departmentId: selectedDepartment }) })
-        )
-      );
-      toast({ title: "Başarılı", description: "Departman güncellendi" });
-      setSelectedEmployees([]);
-      setSelectedDepartment("");
-    } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Departman güncellenirken hata oluştu",
-        variant: "destructive",
-      });
-    }
-  };
+  const handleBulkDepartmentUpdate = departmentAction.run;
 
   const requestSort = (key: keyof Employee) => {
     let direction: "asc" | "desc" = "asc";
@@ -101,5 +85,6 @@ export function useEmployeeTable(employees: Employee[]) {
     handleBulkDelete,
     handleBulkDepartmentUpdate,
     requestSort,
+    departmentPending: departmentAction.pending,
   };
 }

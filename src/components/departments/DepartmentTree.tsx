@@ -1,6 +1,8 @@
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { useState } from "react";
 import { useQuery } from "convex/react";
-import { Loader2 } from "lucide-react";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -18,6 +20,7 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
   const { departments, isLoading, addDepartment, deleteDepartment } = useDepartments();
   const { activeProject, isSuperAdmin, projectId, loading: projectLoading } = useActiveProject();
   const [selectedDepartment, setSelectedDepartment] = useState<Id<"departments"> | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<(typeof departments)[number] | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAddTopLevelDialog, setShowAddTopLevelDialog] = useState(false);
   const [addingToParentId, setAddingToParentId] = useState<Id<"departments"> | null>(null);
@@ -74,7 +77,7 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
             setAddingToParentId(parentId);
             setShowAddDialog(true);
           }}
-          onDelete={deleteDepartment}
+          onDelete={() => setDeleteTarget(department)}
           hasChildren={hasChildren}
         >
           {renderDepartmentTree(department._id)}
@@ -93,14 +96,9 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
 
       <div className="p-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
         {isLoading ? (
-          <div className="flex items-center justify-center py-6 text-xs text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            Yükleniyor...
-          </div>
+          <SectionSkeleton label="Departmanlar yükleniyor" />
         ) : departments.length === 0 ? (
-          <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-            Departman yok
-          </p>
+          <EmptyState title="Departman yok" />
         ) : (
           <ul role="tree" className="space-y-0.5">
             {renderDepartmentTree()}
@@ -108,6 +106,14 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
         )}
       </div>
 
+      <ConfirmDestructive open={deleteTarget !== null} onOpenChange={open => { if (!open) setDeleteTarget(null); }}
+        confirmLabel="Departmanı sil" title="Departman silinsin mi?" objectName={deleteTarget?.name ?? ""}
+        effects={["Departman kalıcı silinir.", "Çalışanı veya alt departmanı varsa işlem engellenir; önce bağlı kayıtları taşıyın."]}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          await deleteDepartment(deleteTarget._id);
+          if (selectedDepartment === deleteTarget._id) handleProjectHeaderClick();
+        }} />
       <AddDepartmentDialog
         isOpen={showAddDialog}
         onOpenChange={setShowAddDialog}

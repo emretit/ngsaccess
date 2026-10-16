@@ -1,3 +1,4 @@
+import { assertDepartmentEmpty } from "./lib/employeeUx";
 
 import { v } from "convex/values";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
@@ -74,6 +75,9 @@ export const remove = authedMutation({
     if (dept.projectId && !allowedProjectIds.some((id) => id === dept.projectId)) {
       throw new Error("Bu departmana erişim yetkiniz yok");
     }
+    const employees = await ctx.db.query("employees").filter(q => q.eq(q.field("departmentId"), args.departmentId)).collect();
+    const children = await ctx.db.query("departments").filter(q => q.eq(q.field("parentId"), args.departmentId)).collect();
+    assertDepartmentEmpty(employees.length, children.length);
     await ctx.db.delete(args.departmentId);
   },
 });

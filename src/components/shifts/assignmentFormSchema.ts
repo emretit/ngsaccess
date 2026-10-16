@@ -1,3 +1,4 @@
+import { validDay } from "../../../convex/lib/shiftUx";
 import { z } from "zod";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -7,8 +8,8 @@ export const assignmentFormSchema = z
   .object({
     employeeId: z.string().min(1, "Çalışan seçin"),
     shiftId: z.string().min(1, "Vardiya seçin"),
-    startDate: z.string().regex(ISO_DATE, "Başlangıç tarihi seçin"),
-    endDate: z.string().regex(ISO_DATE, "Bitiş tarihi seçin"),
+    startDate: z.string().regex(ISO_DATE, "Başlangıç tarihi seçin").refine(validDay, "Geçerli takvim günü seçin"),
+    endDate: z.string().regex(ISO_DATE, "Bitiş tarihi seçin").refine(validDay, "Geçerli takvim günü seçin"),
   })
   .refine((v) => v.startDate <= v.endDate, {
     path: ["endDate"],

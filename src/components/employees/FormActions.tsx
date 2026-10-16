@@ -10,7 +10,7 @@ interface FormActionsProps {
 export default function FormActions({ isLoading, onClose }: FormActionsProps) {
   return (
     <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-      <Button variant="outline" onClick={onClose} type="button">
+      <Button variant="outline" disabled={isLoading} onClick={onClose} type="button">
         İptal
       </Button>
       <Button type="submit" disabled={isLoading}>

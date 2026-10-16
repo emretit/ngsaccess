@@ -1,21 +1,12 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
+import { notify } from "@/lib/notify";
 import { Clock, Loader2, Plus } from "lucide-react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
-import { useToast } from "@/hooks/use-toast";
 import { ShiftTable, type ShiftRow } from "./components/ShiftTable";
 import {
   AddShiftDialog,
@@ -30,7 +21,6 @@ interface ShiftSettingsProps {
 
 export function ShiftSettings({ onComplete, embedded = false }: ShiftSettingsProps) {
   const { projectId, isSuperAdmin, loading: projectLoading } = useActiveProject();
-  const { toast } = useToast();
 
   const shifts = useQuery(api.shifts.list, projectLoading ? "skip" : {});
   const assignments = useQuery(
@@ -57,38 +47,15 @@ export function ShiftSettings({ onComplete, embedded = false }: ShiftSettingsPro
   }, [assignments]);
 
   const handleAdd = async (payload: ShiftFormPayload) => {
-    if (!projectId) {
-      toast({
-        title: "Proje bulunamadı",
-        description: "Vardiya eklemek için en az bir projeye atanmış olmalısınız.",
-        variant: "destructive",
-      });
-      return;
-    }
-    try {
-      await createShift({ projectId, ...payload });
-      toast({ title: "Vardiya oluşturuldu", description: `"${payload.name}" eklendi.` });
-      if (shifts && shifts.length === 0 && onComplete) onComplete();
-    } catch (e) {
-      toast({
-        title: "Vardiya eklenemedi",
-        description: e instanceof Error ? e.message : "Bilinmeyen hata",
-        variant: "destructive",
-      });
-    }
+    if (!projectId) throw new Error("Vardiya eklemek için proje seçin");
+    await createShift({ projectId, ...payload });
+    notify.success("Vardiya oluşturuldu", `${payload.name} eklendi`);
+    if (shifts && shifts.length === 0 && onComplete) onComplete();
   };
 
   const handleUpdate = async (id: Id<"shifts">, payload: ShiftFormPayload) => {
-    try {
-      await updateShift({ shiftId: id, ...payload });
-      toast({ title: "Vardiya güncellendi", description: `"${payload.name}" kaydedildi.` });
-    } catch (e) {
-      toast({
-        title: "Vardiya güncellenemedi",
-        description: e instanceof Error ? e.message : "Bilinmeyen hata",
-        variant: "destructive",
-      });
-    }
+    await updateShift({ shiftId: id, ...payload });
+    notify.success("Vardiya güncellendi", `${payload.name} kaydedildi`);
   };
 
   const handleEdit = (shift: ShiftRow) => {
@@ -116,24 +83,8 @@ export function ShiftSettings({ onComplete, embedded = false }: ShiftSettingsPro
 
   const handleDeleteConfirm = async () => {
     if (!deleteTarget) return;
-    try {
-      const result = await removeShift({ shiftId: deleteTarget.id });
-      const removed = result?.removedAssignments ?? 0;
-      toast({
-        title: "Vardiya silindi",
-        description:
-          removed > 0
-            ? `"${deleteTarget.name}" ve ${removed} bağlı atama kaldırıldı.`
-            : `"${deleteTarget.name}" kaldırıldı.`,
-      });
-      setDeleteTarget(null);
-    } catch (e) {
-      toast({
-        title: "Vardiya silinemedi",
-        description: e instanceof Error ? e.message : "Bilinmeyen hata",
-        variant: "destructive",
-      });
-    }
+    const result = await removeShift({ shiftId: deleteTarget.id });
+    notify.success("Vardiya silindi", `${result.removedAssignments} bağlı atama kaldırıldı`);
   };
 
   const handleCloseDialog = () => {
@@ -244,41 +195,10 @@ export function ShiftSettings({ onComplete, embedded = false }: ShiftSettingsPro
         onClose={handleCloseDialog}
       />
 
-      <AlertDialog
-        open={deleteTarget !== null}
-        onOpenChange={(o) => !o && setDeleteTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Vardiyayı sil</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteTarget && (
-                <>
-                  <span className="font-medium">"{deleteTarget.name}"</span>{" "}
-                  vardiyasını silmek istediğinizden emin misiniz?
-                  {(() => {
-                    const count = assignmentCountByShift.get(deleteTarget.id) ?? 0;
-                    if (count === 0) return " İşlem geri alınamaz.";
-                    return ` Bu vardiyaya bağlı ${count} atama da silinecek. İşlem geri alınamaz.`;
-                  })()}
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Vazgeç</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                void handleDeleteConfirm();
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Sil
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDestructive open={deleteTarget !== null} onOpenChange={open => { if (!open) setDeleteTarget(null); }}
+        title="Vardiya silinsin mi?" objectName={deleteTarget?.name ?? ""} confirmLabel="Vardiyayı sil"
+        effects={[`Bu vardiya ve ${deleteTarget ? assignmentCountByShift.get(deleteTarget.id) ?? 0 : 0} bağlı atama kalıcı silinir.`]}
+        onConfirm={handleDeleteConfirm} />
     </div>
   );
 }

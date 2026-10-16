@@ -9,6 +9,8 @@ export const employeeFormSchema = z
     email: z.string().email("Geçerli bir e-posta adresi girin"),
     tcNo: z.string().optional(),
     cardNumber: z.string().min(1, "Kart numarası zorunludur"),
+    hourlyRate: z.number().finite().min(0, "Ücret negatif olamaz").nullable().optional(),
+    monthlySalary: z.number().finite().min(0, "Ücret negatif olamaz").nullable().optional(),
     payrollCode: z.string().optional(),
   })
   .superRefine((data, ctx) => {

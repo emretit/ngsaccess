@@ -1,3 +1,5 @@
+import { minute } from "../../../../../convex/lib/shiftUx";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useEffect, useState } from "react";
 import {
   Dialog,
@@ -20,11 +22,11 @@ export interface ShiftFormPayload {
   name: string;
   startTime: string;
   endTime: string;
-  breakStart?: string;
-  breakEnd?: string;
-  lateToleranceMinutes?: number;
-  earlyExitToleranceMinutes?: number;
-  overtimeStartToleranceMinutes?: number;
+  breakStart?: string | null;
+  breakEnd?: string | null;
+  lateToleranceMinutes?: number | null;
+  earlyExitToleranceMinutes?: number | null;
+  overtimeStartToleranceMinutes?: number | null;
   overtimeEnabled: boolean;
   isActive: boolean;
 }
@@ -76,7 +78,11 @@ export function AddShiftDialog({
 }: AddShiftDialogProps) {
   const { toast } = useToast();
   const [formData, setFormData] = useState<ShiftFormValues>(EMPTY_FORM);
-  const [submitting, setSubmitting] = useState(false);
+  const saveAction = useAsyncAction(async (payload: ShiftFormPayload) => {
+    if (editingShift) await onUpdate(editingShift._id, payload);
+    else await onAdd(payload);
+  }, { error: "Vardiya kaydedilemedi" });
+  const submitting = saveAction.pending;
   const [breakEnabled, setBreakEnabled] = useState(false);
 
   useEffect(() => {
@@ -87,9 +93,9 @@ export function AddShiftDialog({
         endTime: editingShift.endTime,
         breakStart: editingShift.breakStart ?? "",
         breakEnd: editingShift.breakEnd ?? "",
-        lateToleranceMinutes: editingShift.lateToleranceMinutes,
-        earlyExitToleranceMinutes: editingShift.earlyExitToleranceMinutes,
-        overtimeStartToleranceMinutes: editingShift.overtimeStartToleranceMinutes,
+        lateToleranceMinutes: editingShift.lateToleranceMinutes ?? undefined,
+        earlyExitToleranceMinutes: editingShift.earlyExitToleranceMinutes ?? undefined,
+        overtimeStartToleranceMinutes: editingShift.overtimeStartToleranceMinutes ?? undefined,
         overtimeEnabled: editingShift.overtimeEnabled ?? true,
         isActive: editingShift.isActive,
       });
@@ -101,6 +107,14 @@ export function AddShiftDialog({
   }, [editingShift, open]);
 
   const duration = computeDuration(formData.startTime, formData.endTime);
+  const netDuration = (() => {
+    try {
+      const gross = (minute(formData.endTime) - minute(formData.startTime) + 1440) % 1440;
+      const pause = breakEnabled && formData.breakStart && formData.breakEnd
+        ? (minute(formData.breakEnd) - minute(formData.breakStart) + 1440) % 1440 : 0;
+      return `${Math.floor((gross - pause) / 60)} sa ${(gross - pause) % 60} dk`;
+    } catch { return null; }
+  })();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,36 +137,27 @@ export function AddShiftDialog({
       name: result.data.name,
       startTime: result.data.startTime,
       endTime: result.data.endTime,
-      breakStart: result.data.breakStart || undefined,
-      breakEnd: result.data.breakEnd || undefined,
-      lateToleranceMinutes: result.data.lateToleranceMinutes,
-      earlyExitToleranceMinutes: result.data.earlyExitToleranceMinutes,
-      overtimeStartToleranceMinutes: result.data.overtimeStartToleranceMinutes,
+      breakStart: result.data.breakStart || null,
+      breakEnd: result.data.breakEnd || null,
+      lateToleranceMinutes: result.data.lateToleranceMinutes ?? null,
+      earlyExitToleranceMinutes: result.data.earlyExitToleranceMinutes ?? null,
+      overtimeStartToleranceMinutes: result.data.overtimeStartToleranceMinutes ?? null,
       overtimeEnabled: result.data.overtimeEnabled,
       isActive: result.data.isActive,
     };
 
-    setSubmitting(true);
-    try {
-      if (editingShift) {
-        await onUpdate(editingShift._id, payload);
-      } else {
-        await onAdd(payload);
-      }
-      handleClose();
-    } finally {
-      setSubmitting(false);
-    }
+    if (await saveAction.run(payload)) handleClose();
   };
 
   const handleClose = () => {
+    if (submitting) return;
     setFormData(EMPTY_FORM);
     setBreakEnabled(false);
     onClose();
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={value => { if (!submitting) onOpenChange(value); }}>
       <DialogContent className="max-w-lg max-h-[85vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-5 pb-3 border-b">
           <DialogTitle>
@@ -298,7 +303,7 @@ export function AddShiftDialog({
 
             {duration && (
               <p className="text-xs text-muted-foreground">
-                Toplam süre: <span className="font-medium">{duration}</span>
+                Brüt süre: <span className="font-medium">{duration}</span>{netDuration && <> · Net süre: <span className="font-medium">{netDuration}</span></>}
               </p>
             )}
 

@@ -1,3 +1,6 @@
+import { resolveProjectScope } from "./lib/projectScope";
+import { toPatch } from "./lib/nullablePatch";
+import { assertSameProject, validatePay, employeeDependentTables, assertEmployeeBulkDeleteLimit } from "./lib/employeeUx";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
@@ -217,6 +220,7 @@ export const create = adminMutation({
       if (dup) throw new Error(DUPLICATE_MESSAGES[field]);
     }
 
+    validatePay(args.hourlyRate, args.monthlySalary);
     const now = new Date().toISOString();
     const id = await ctx.db.insert("employees", {
       ...args,
@@ -246,20 +250,20 @@ export const update = adminMutation({
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     email: v.optional(v.string()),
-    tcNo: v.optional(v.string()),
+    tcNo: v.optional(v.union(v.null(), v.string())),
     cardNumber: v.optional(v.string()),
-    payrollCode: v.optional(v.string()),
-    departmentId: v.optional(v.id("departments")),
-    companyId: v.optional(v.id("companies")),
-    positionId: v.optional(v.id("positions")),
-    shiftId: v.optional(v.id("shifts")),
+    payrollCode: v.optional(v.union(v.null(), v.string())),
+    departmentId: v.optional(v.union(v.null(), v.id("departments"))),
+    companyId: v.optional(v.union(v.null(), v.id("companies"))),
+    positionId: v.optional(v.union(v.null(), v.id("positions"))),
+    shiftId: v.optional(v.union(v.null(), v.id("shifts"))),
     accessRuleId: v.optional(v.id("accessRules")),
-    photoUrl: v.optional(v.string()),
+    photoUrl: v.optional(v.union(v.null(), v.string())),
     isActive: v.optional(v.boolean()),
-    notes: v.optional(v.string()),
-    shift: v.optional(v.string()),
-    hourlyRate: v.optional(v.number()),
-    monthlySalary: v.optional(v.number()),
+    notes: v.optional(v.union(v.null(), v.string())),
+    shift: v.optional(v.union(v.null(), v.string())),
+    hourlyRate: v.optional(v.union(v.null(), v.number())),
+    monthlySalary: v.optional(v.union(v.null(), v.number())),
   },
   handler: async (ctx, args) => {
     const { employeeId, ...updates } = args;
@@ -283,17 +287,14 @@ export const update = adminMutation({
     // başka alanları güncellenirken (örn. pozisyon) bozulmadan saklanır.
     for (const field of ["cardNumber", "email", "tcNo"] as const) {
       const newValue = updates[field];
-      if (newValue !== undefined && newValue !== emp[field]) {
+      if (newValue != null && newValue !== emp[field]) {
         const dup = await findDuplicateEmployee(ctx, field, newValue, employeeId);
         if (dup) throw new Error(DUPLICATE_MESSAGES[field]);
       }
     }
 
-    const clean: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-    for (const [k, val] of Object.entries(updates)) {
-      if (val !== undefined) clean[k] = val;
-    }
-    await ctx.db.patch(employeeId, clean);
+    validatePay(updates.hourlyRate, updates.monthlySalary);
+    await ctx.db.patch(employeeId, { ...toPatch(updates), updatedAt: new Date().toISOString() });
 
     const groupMemberAdded = await upsertGroupMembership(
       ctx,
@@ -334,29 +335,18 @@ export const update = adminMutation({
   returns: v.id("employees"),
 });
 
-export const remove = adminMutation({
-  args: { employeeId: v.id("employees") },
-  handler: async (ctx, args) => {
-    const emp = await ctx.db.get(args.employeeId);
-    if (!emp) throw new Error("Çalışan bulunamadı");
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (
-      emp.projectId &&
-      !allowedProjectIds.some((id) => id === emp.projectId)
-    ) {
-      throw new Error("Bu çalışana erişim yetkiniz yok");
-    }
+async function removeEmployeeWithDependencies(ctx: MutationCtx & { user: Doc<"users"> }, emp: Doc<"employees">) {
     // Önce cihazlardan sil (employeeId bilgisi gerektiği için DB silinmeden çağrılır).
     await ctx.scheduler.runAfter(
       0,
       internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal,
-      { employeeId: args.employeeId },
+      { employeeId: emp._id },
     );
     // IDE: kayıt + groupMembers birazdan silinecek → getEmployeeWithDevices null döner.
     // Panelleri ŞİMDİ (commit öncesi) çöz, kart no'yu açıkça geçir.
     const ideDeviceIds = await resolveEmployeeIdeDeviceIds(
       ctx,
-      args.employeeId,
+      emp._id,
       emp.projectId,
     );
     if (ideDeviceIds.length > 0) {
@@ -370,33 +360,35 @@ export const remove = adminMutation({
     const groupMembers = await ctx.db
       .query("groupMembers")
       .withIndex("by_project_employee", (q) =>
-        q.eq("projectId", emp.projectId).eq("employeeId", args.employeeId),
+        q.eq("projectId", emp.projectId).eq("employeeId", emp._id),
       )
       .collect();
     await Promise.all(groupMembers.map((gm) => ctx.db.delete(gm._id)));
 
-    const employeeAuth = await ctx.db
-      .query("employeeAuth")
-      .withIndex("by_employee", (q) => q.eq("employeeId", args.employeeId))
-      .collect();
-    await Promise.all(employeeAuth.map((ea) => ctx.db.delete(ea._id)));
-
-    const employeeSessions = await ctx.db
-      .query("employeeSessions")
-      .withIndex("by_employee", (q) => q.eq("employeeId", args.employeeId))
-      .collect();
-    await Promise.all(employeeSessions.map((s) => ctx.db.delete(s._id)));
-
-    const shiftAssignments = await ctx.db
-      .query("shiftAssignments")
-      .withIndex("by_employee", (q) => q.eq("employeeId", args.employeeId))
-      .collect();
-    await Promise.all(shiftAssignments.map((a) => ctx.db.delete(a._id)));
+    for (const table of employeeDependentTables) {
+      const records = await ctx.db.query(table).withIndex("by_employee", q => q.eq("employeeId", emp._id)).collect();
+      for (const record of records) await ctx.db.delete(record._id);
+    }
 
     // KVKK cascade: biyometrik veri sil, rıza iptal, cardReadings PII anonimleştir
-    await cascadeRemoveEmployeePII(ctx, args.employeeId);
+    await cascadeRemoveEmployeePII(ctx, emp._id);
 
-    await ctx.db.delete(args.employeeId);
+    await ctx.db.delete(emp._id);
+}
+
+export const remove = adminMutation({
+  args: { employeeId: v.id("employees") },
+  handler: async (ctx, args) => {
+    const emp = await ctx.db.get(args.employeeId);
+    if (!emp) throw new Error("Çalışan bulunamadı");
+    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    if (
+      (!emp.projectId && ctx.user.role !== "super_admin") ||
+      (emp.projectId && !allowedProjectIds.some((id) => id === emp.projectId))
+    ) {
+      throw new Error("Bu çalışana erişim yetkiniz yok");
+    }
+    await removeEmployeeWithDependencies(ctx, emp);
   },
   returns: v.null(),
 });
@@ -404,36 +396,40 @@ export const remove = adminMutation({
 export const bulkDelete = adminMutation({
   args: { employeeIds: v.array(v.id("employees")) },
   handler: async (ctx, args) => {
+    assertEmployeeBulkDeleteLimit(args.employeeIds.length);
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const employees = await Promise.all(
-      args.employeeIds.map((id) => ctx.db.get(id)),
+      [...new Set(args.employeeIds)].map((id) => ctx.db.get(id)),
     );
     for (const emp of employees) {
-      if (emp && emp.projectId && !allowedProjectIds.some((pid) => pid === emp.projectId)) {
+      if (emp && ((!emp.projectId && ctx.user.role !== "super_admin") || (emp.projectId && !allowedProjectIds.some((pid) => pid === emp.projectId)))) {
         throw new Error(`Çalışan ${emp.firstName} ${emp.lastName} için erişim yetkiniz yok`);
       }
     }
-    await Promise.all(
-      employees.map(async (emp, idx) => {
-        const id = args.employeeIds[idx];
-        const groupMembers = await ctx.db
-          .query("groupMembers")
-          .withIndex("by_project_employee", (q) =>
-            q.eq("projectId", emp?.projectId).eq("employeeId", id),
-          )
-          .collect();
-        await Promise.all(groupMembers.map((gm) => ctx.db.delete(gm._id)));
-        const shiftAssignments = await ctx.db
-          .query("shiftAssignments")
-          .withIndex("by_employee", (q) => q.eq("employeeId", id))
-          .collect();
-        await Promise.all(shiftAssignments.map((a) => ctx.db.delete(a._id)));
-        await cascadeRemoveEmployeePII(ctx, id);
-        await ctx.db.delete(id);
-      })
-    );
+    for (const emp of employees.filter((p): p is NonNullable<typeof p> => p !== null)) {
+      await removeEmployeeWithDependencies(ctx, emp);
+    }
   },
   returns: v.null(),
+});
+
+export const bulkUpdateDepartment = adminMutation({
+  args: { employeeIds: v.array(v.id("employees")), departmentId: v.id("departments") },
+  handler: async (ctx, args) => {
+    const dept = await ctx.db.get(args.departmentId);
+    if (!dept) throw new Error("Departman bulunamadı");
+    const allowed = await resolveProjectScope(ctx, dept.projectId);
+    const employees = await Promise.all([...new Set(args.employeeIds)].map(id => ctx.db.get(id)));
+    for (const emp of employees) {
+      if (!emp) throw new Error("Çalışan bulunamadı; hiçbir kayıt değiştirilmedi");
+      if (!emp.projectId || !allowed.includes(emp.projectId)) throw new Error("Bu çalışana erişim yetkiniz yok");
+      assertSameProject(emp.projectId, dept.projectId);
+    }
+    for (const emp of employees) {
+      if (emp) await ctx.db.patch(emp._id, { departmentId: dept._id, updatedAt: new Date().toISOString() });
+    }
+    return { updatedCount: employees.length };
+  },
 });
 
 export const bulkUpdateStatus = adminMutation({

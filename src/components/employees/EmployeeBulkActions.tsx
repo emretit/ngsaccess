@@ -1,3 +1,4 @@
+import { EMPLOYEE_BULK_DELETE_LIMIT } from "../../../convex/lib/employeeUx";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +20,7 @@ interface EmployeeBulkActionsProps {
   onDelete: () => void;
   onSyncToDevices?: () => void;
   isSyncing?: boolean;
+  pending?: boolean;
 }
 
 export function EmployeeBulkActions({
@@ -30,6 +32,7 @@ export function EmployeeBulkActions({
   onDelete,
   onSyncToDevices,
   isSyncing,
+  pending,
 }: EmployeeBulkActionsProps) {
   return (
     <div className="flex items-center gap-4 p-4 bg-muted rounded-lg flex-wrap">
@@ -47,7 +50,7 @@ export function EmployeeBulkActions({
       <Button
         variant="secondary"
         onClick={onUpdateDepartment}
-        disabled={!selectedDepartment}
+        disabled={!selectedDepartment || pending}
       >
         Departmanı Güncelle
       </Button>
@@ -64,9 +67,16 @@ export function EmployeeBulkActions({
       <Button
         variant="destructive"
         onClick={onDelete}
+        disabled={pending || selectedCount > EMPLOYEE_BULK_DELETE_LIMIT}
+        aria-describedby={selectedCount > EMPLOYEE_BULK_DELETE_LIMIT ? "bulk-delete-limit" : undefined}
       >
         Seçilenleri Sil
       </Button>
+      {selectedCount > EMPLOYEE_BULK_DELETE_LIMIT && (
+        <span id="bulk-delete-limit" className="text-sm text-muted-foreground">
+          Bir seferde en fazla {EMPLOYEE_BULK_DELETE_LIMIT} personel silebilirsiniz. Seçimi azaltın.
+        </span>
+      )}
     </div>
   );
 }

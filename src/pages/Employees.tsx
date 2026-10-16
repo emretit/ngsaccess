@@ -1,3 +1,4 @@
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useState, useMemo, useEffect } from "react";
 import type { Id } from "../../convex/_generated/dataModel";
 import DepartmentTree from "@/components/departments/DepartmentTree";
@@ -9,11 +10,13 @@ import { EmployeeFilters } from "@/components/employees/EmployeeFilters";
 import { EmployeePagination } from "@/components/employees/EmployeePagination";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { AccessDenied } from "@/components/shared/AccessDenied";
 import { DeviceSyncStatusBanner } from "@/components/sync/DeviceSyncStatusBanner";
 
 export default function Employees() {
+  const { isAdmin } = useActiveProjectScope();
   const { loading: projectLoading } = useProjectAccess();
   const { employees, isLoading, error, refetch, hasProjectAccess } = useEmployees();
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,7 +96,7 @@ export default function Employees() {
 
   // Loading durumunda (hem project hem employees loading) loading göster
   if (projectLoading || isLoading) {
-    return <LoadingSpinner text="Personel bilgileri yükleniyor..." />;
+    return <SectionSkeleton label="Personel bilgileri yükleniyor..." />;
   }
 
   // Proje erişimi yoksa ve loading de tamamlandıysa mesaj göster
@@ -102,11 +105,7 @@ export default function Employees() {
   }
 
   if (error) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-red-500">{String(error)}</div>
-      </div>
-    );
+    return <ErrorState description={String(error)} onRetry={refetch} />;
   }
 
   return (
@@ -114,6 +113,7 @@ export default function Employees() {
       <DepartmentTree onSelectDepartment={setSelectedDepartment} />
 
       <div className="flex-1 min-w-0 space-y-3">
+        {!isAdmin && <p className="text-sm text-muted-foreground">Salt okunur erişim: personel yazma işlemleri yöneticilere açıktır.</p>}
         <DeviceSyncStatusBanner />
         <EmployeeFilters
           searchQuery={searchQuery}
@@ -124,6 +124,7 @@ export default function Employees() {
             setCurrentPage(1);
           }}
           onNewEmployee={handleNewEmployee}
+          canWrite={isAdmin}
         />
 
         <EmployeeStats employees={employees} />

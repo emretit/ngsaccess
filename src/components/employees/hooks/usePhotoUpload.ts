@@ -1,90 +1,50 @@
-import { useState } from "react";
+import { useRef } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
-import { Id } from "../../../../convex/_generated/dataModel";
-import { toast } from "@/hooks/use-toast";
+import type { Id } from "../../../../convex/_generated/dataModel";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 export function usePhotoUpload() {
-  const [isLoading, setIsLoading] = useState(false);
-
   const generateUploadUrl = useMutation(api.files.generateUploadUrl);
-  const saveEmployeePhoto = useMutation(api.files.saveEmployeePhoto);
+  const getUploadUrl = useMutation(api.files.getUploadUrl);
+  const preview = useRef<string | null>(null);
+  const upload = useAsyncAction(async (
+    file: File,
+    onPhotoChange: (url: string) => void,
+    onPreviewChange: (url: string) => void,
+  ) => {
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) throw new Error("Sadece JPEG, PNG veya WebP fotoğraflar yüklenebilir");
+    if (file.size > 5 * 1024 * 1024) throw new Error("Dosya boyutu 5 MB'dan küçük olmalıdır");
+    if (preview.current) URL.revokeObjectURL(preview.current);
+    preview.current = URL.createObjectURL(file);
+    onPreviewChange(preview.current);
+    try {
+      const uploadUrl = await generateUploadUrl();
+      const result = await fetch(uploadUrl, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+      if (!result.ok) throw new Error("Dosya sunucuya yüklenemedi");
+      const payload: unknown = await result.json();
+      if (typeof payload !== "object" || payload === null || !("storageId" in payload) || typeof payload.storageId !== "string") throw new Error("Dosya sunucusu geçersiz yanıt verdi");
+      const url = await getUploadUrl({ storageId: payload.storageId as Id<"_storage"> });
+      onPhotoChange(url);
+      onPreviewChange(url);
+    } catch (error: unknown) {
+      onPreviewChange("");
+      throw error;
+    } finally {
+      if (preview.current) URL.revokeObjectURL(preview.current);
+      preview.current = null;
+    }
+  }, { error: "Fotoğraf yüklenemedi" });
 
   const handleFileChange = async (
-    e: React.ChangeEvent<HTMLInputElement>,
+    event: React.ChangeEvent<HTMLInputElement>,
     onPhotoChange: (url: string) => void,
-    onPreviewChange: (preview: string) => void,
-    employeeId?: Id<"employees">
+    onPreviewChange: (url: string) => void,
+    _employeeId?: Id<"employees">,
   ) => {
-    const input = e.target;
-    const file = input.files?.[0];
-    input.value = "";
-    if (!file) return;
-
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
-      toast({
-        title: "Hata",
-        description: "Sadece JPEG, PNG veya WebP fotoğraflar yüklenebilir",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "Hata",
-        description: "Dosya boyutu 5 MB'dan küçük olmalıdır",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const reader = new FileReader();
-    const previewUrl = await new Promise<string>((resolve, reject) => {
-      reader.onload = (event) => resolve(event.target?.result as string);
-      reader.onerror = () => reject(new Error("Önizleme oluşturulamadı"));
-      reader.readAsDataURL(file);
-    });
-    onPreviewChange(previewUrl);
-
-    try {
-      setIsLoading(true);
-
-      const uploadUrl = await generateUploadUrl();
-
-      const result = await fetch(uploadUrl, {
-        method: "POST",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      if (!result.ok) throw new Error("Dosya sunucuya yüklenemedi");
-      const { storageId } = (await result.json()) as { storageId: Id<"_storage"> };
-
-      if (employeeId) {
-        const url = await saveEmployeePhoto({ employeeId, storageId });
-        onPhotoChange(url);
-        return;
-      }
-
-      const urlResponse = await fetch(`/api/convex/files/${storageId}`);
-      if (!urlResponse.ok) {
-        throw new Error("Fotoğraf URL'i alınamadı");
-      }
-      const { url } = (await urlResponse.json()) as { url: string };
-      onPhotoChange(url);
-    } catch (error) {
-      onPreviewChange("");
-      const message = error instanceof Error ? error.message : "Fotoğraf yüklenemedi";
-      toast({
-        title: "Fotoğraf Yükleme Hatası",
-        description: message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (file) await upload.run(file, onPhotoChange, onPreviewChange);
   };
-
-  return { isLoading, handleFileChange };
+  return { isLoading: upload.pending, handleFileChange };
 }

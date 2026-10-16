@@ -1,3 +1,6 @@
+import { useQuery } from "convex/react";
+import { toLocalDateString } from "@/lib/date";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { useMemo, useState } from "react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
@@ -29,14 +32,18 @@ export function ShiftCalendarView({
   employees,
   shifts,
   assignments,
-  leaves = [],
-  holidays = [],
   onNavigateToDefinitions,
 }: ShiftCalendarViewProps) {
   const hasNoShifts = shifts.length === 0;
   const [weekStart, setWeekStart] = useState<Date>(() =>
     getWeekStart(new Date()),
   );
+  const range = { startDate: toLocalDateString(weekStart), endDate: toLocalDateString(addDays(weekStart, 6)) };
+  const weekLeaves = useQuery(api.leaves.listForRange, range);
+  const weekHolidays = useQuery(api.holidays.listForRange, range);
+  const leaves = weekLeaves ?? [];
+  const holidays = weekHolidays ?? [];
+  const overlaysLoading = weekLeaves === undefined || weekHolidays === undefined;
   const [search, setSearch] = useState("");
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [assignInitial, setAssignInitial] = useState<{
@@ -130,7 +137,7 @@ export function ShiftCalendarView({
                 setAssignInitial({});
                 setAssignDialogOpen(true);
               }}
-              disabled={hasNoShifts && !onNavigateToDefinitions}
+              disabled={overlaysLoading || (hasNoShifts && !onNavigateToDefinitions)}
               title={hasNoShifts ? "Önce vardiya tanımlayın" : undefined}
             >
               <Plus className="h-3.5 w-3.5" />
@@ -140,7 +147,7 @@ export function ShiftCalendarView({
         </div>
       </div>
 
-      <ShiftCalendarGrid
+      {overlaysLoading ? <SectionSkeleton label="İzin ve tatiller kontrol ediliyor" /> : <ShiftCalendarGrid
         weekStart={weekStart}
         employees={filteredEmployees}
         shifts={shifts}
@@ -149,7 +156,7 @@ export function ShiftCalendarView({
         holidays={holidays}
         onEmptyCellClick={handleEmptyCellClick}
         onAssignmentClick={(a) => setEditAssignment(a)}
-      />
+      />}
 
       <AssignShiftDialog
         open={assignDialogOpen}

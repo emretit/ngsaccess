@@ -1,3 +1,4 @@
+import { toLocalDateString } from "@/lib/date";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "../../../../convex/_generated/api";
 
@@ -63,7 +64,7 @@ export function findRangeConflicts(
     d.getTime() <= end.getTime();
     d.setUTCDate(d.getUTCDate() + 1)
   ) {
-    const iso = d.toISOString().split("T")[0];
+    const iso = toLocalDateString(d);
     if (weekPattern && weekPattern.length > 0 && !weekPattern.includes(weekdayCodeForDate(iso))) {
       continue;
     }

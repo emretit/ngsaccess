@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { notify } from "@/lib/notify";
 import { useMutation, useAction } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { toast } from "@/hooks/use-toast";
@@ -7,9 +8,6 @@ import { EmployeeFormData } from "./useEmployeeFormData";
 import { employeeFormSchema } from "./useEmployeeFormSchema";
 
 export type { EmployeeFormData };
-
-const errorMessage = (err: unknown, fallback = "Bir hata oluştu"): string =>
-  err instanceof Error ? err.message : typeof err === "string" ? err : fallback;
 
 const reportSyncResult = (
   synced: number,
@@ -25,7 +23,7 @@ const reportSyncResult = (
   }
   if (failed > 0) {
     const detail = errors.length > 0
-      ? errors.slice(0, 3).join(" • ") + (errors.length > 3 ? ` (+${errors.length - 3})` : "")
+      ? errors.join(" • ")
       : `${failed} cihaza gönderilemedi`;
     toast({
       title: `${failed} cihaza gönderilemedi`,
@@ -40,7 +38,7 @@ export const useEmployeeFormSubmit = (
   onClose: () => void,
   onSave: (payload?: unknown) => void
 ) => {
-  const [isLoading, setIsLoading] = useState(false);
+
 
   const createEmployee = useMutation(api.employees.create);
   const updateEmployee = useMutation(api.employees.update);
@@ -51,19 +49,8 @@ export const useEmployeeFormSubmit = (
   // parent state temizlenirse closure'daki employee null olabilir.
   const editingId = employee?._id;
 
-  const handleSubmit = async (formData: EmployeeFormData) => {
-    if (isLoading) return;
-    setIsLoading(true);
-
-    try {
-      const parsed = employeeFormSchema.safeParse({
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        tcNo: formData.tcNo,
-        cardNumber: formData.cardNumber,
-        payrollCode: formData.payrollCode,
-      });
+  const { run: handleSubmit, pending: isLoading } = useAsyncAction(async (formData: EmployeeFormData) => {
+      const parsed = employeeFormSchema.safeParse(formData);
       if (!parsed.success) {
         const firstError = parsed.error.issues[0];
         toast({
@@ -102,14 +89,25 @@ export const useEmployeeFormSubmit = (
           employeeId: editingId,
           projectId: formData.projectId,
           ...sharedPayload,
+          tcNo: trimmedTcNo || null,
+          payrollCode: parsed.data.payrollCode?.trim() || null,
+          companyId: formData.companyId,
+          departmentId: formData.departmentId,
+          positionId: formData.positionId,
+          shiftId: formData.shiftId,
+          shift: formData.shift || null,
+          photoUrl: formData.photoUrl,
+          notes: formData.notes.trim() || null,
+          hourlyRate: parsed.data.hourlyRate ?? null,
+          monthlySalary: parsed.data.monthlySalary ?? null,
         });
         toast({ title: "Başarılı", description: "Personel güncellendi" });
 
         try {
           const syncResult = await syncToDevices({ employeeId: editingId });
           reportSyncResult(syncResult.synced, syncResult.failed, syncResult.errors);
-        } catch {
-          // Sync hatası kaydı engellemez
+        } catch (error: unknown) {
+          notify.error("Personel kaydedildi; cihaz senkronizasyonu tamamlanamadı", error);
         }
 
         onSave({ _id: editingId, ...formData });
@@ -123,13 +121,14 @@ export const useEmployeeFormSubmit = (
         toast({ title: "Başarılı", description: "Personel eklendi" });
 
         try {
-          await sendSetupEmail({
+          const emailResult = await sendSetupEmail({
             employeeId: newId,
             email: sharedPayload.email,
             firstName: sharedPayload.firstName,
             lastName: sharedPayload.lastName,
             projectId: formData.projectId,
           });
+          if (!emailResult.success) throw new Error("Kurulum e-postası gönderilemedi");
           toast({ title: "Kurulum E-postası", description: "Personele kurulum bağlantısı gönderildi" });
         } catch {
           toast({
@@ -142,23 +141,14 @@ export const useEmployeeFormSubmit = (
         try {
           const syncResult = await syncToDevices({ employeeId: newId });
           reportSyncResult(syncResult.synced, syncResult.failed, syncResult.errors);
-        } catch {
-          // Sync hatası kaydı engellemez
+        } catch (error: unknown) {
+          notify.error("Personel kaydedildi; cihaz senkronizasyonu tamamlanamadı", error);
         }
 
         onSave({ _id: newId, ...formData });
         onClose();
       }
-    } catch (error) {
-      toast({
-        title: "Hata",
-        description: errorMessage(error),
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, { error: "Personel kaydedilemedi" });
 
   return { isLoading, handleSubmit };
 };

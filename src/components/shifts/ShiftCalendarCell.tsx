@@ -1,3 +1,4 @@
+import { overlapOnDay } from "../../../convex/lib/shiftUx";
 import { Plus, AlertTriangle, Sun, Plane } from "lucide-react";
 import {
   Tooltip,
@@ -18,6 +19,7 @@ type Leave = FunctionReturnType<typeof api.leaves.listForRange>[number];
 
 interface ShiftCalendarCellProps {
   isToday: boolean;
+  date: string;
   cellAssignments: Assignment[];
   shiftMap: Map<string, Shift>;
   holiday?: Holiday | null;
@@ -28,6 +30,7 @@ interface ShiftCalendarCellProps {
 
 export function ShiftCalendarCell({
   isToday,
+  date,
   cellAssignments,
   shiftMap,
   holiday,
@@ -35,11 +38,14 @@ export function ShiftCalendarCell({
   onEmptyClick,
   onAssignmentClick,
 }: ShiftCalendarCellProps) {
-  const hasConflict = cellAssignments.length > 1;
+  const hasConflict = cellAssignments.some((a, index) => cellAssignments.slice(index + 1).some(b => {
+    const sa = shiftMap.get(a.shiftId); const sb = shiftMap.get(b.shiftId);
+    return sa && sb && overlapOnDay(a, sa, b, sb, date);
+  }));
   const bgClass = holiday
-    ? "bg-red-50 dark:bg-red-950/30"
+    ? "bg-destructive/10"
     : leave
-      ? "bg-amber-50 dark:bg-amber-950/30"
+      ? "status-warning-badge"
       : "";
 
   if (cellAssignments.length === 0) {

@@ -1,3 +1,4 @@
+import { validateShift } from "../../../../../convex/lib/shiftUx";
 import { z } from "zod";
 
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -37,6 +38,10 @@ export const shiftFormSchema = z
       .optional(),
     overtimeEnabled: z.boolean(),
     isActive: z.boolean(),
+  })
+  .superRefine((data, ctx) => {
+    try { validateShift({ ...data, breakStart: data.breakStart || undefined, breakEnd: data.breakEnd || undefined }); }
+    catch (error: unknown) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: error instanceof Error ? error.message : "Geçersiz vardiya", path: ["breakEnd"] }); }
   })
   .refine(
     (d) => (d.breakStart ? !!d.breakEnd : !d.breakEnd),

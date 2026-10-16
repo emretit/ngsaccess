@@ -1,3 +1,4 @@
+import { assignmentTouchesDay } from "../../../convex/lib/shiftUx";
 import { useMemo } from "react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
@@ -116,16 +117,16 @@ export function ShiftCalendarGrid({
               </div>
               {days.map((d) => {
                 const iso = toISODate(d);
-                const cellAssignments = empAssignments.filter(
-                  (a) =>
-                    isDateInRange(iso, a.startDate, a.endDate) &&
-                    assignmentAppliesOnDate(a, iso),
-                );
-                const holiday = holidayOn(iso, holidays);
+                const cellAssignments = empAssignments.filter(a => {
+                  const shift = shiftMap.get(a.shiftId);
+                  return shift ? assignmentTouchesDay(a, shift, iso) : isDateInRange(iso, a.startDate, a.endDate) && assignmentAppliesOnDate(a, iso);
+                });
+                const holiday = holidayOn(iso, holidays.filter(h => !h.projectId || h.projectId === emp.projectId));
                 const leave = leaveForEmployeeOn(iso, String(emp._id), leaves);
                 return (
                   <div key={iso} className="p-1">
                     <ShiftCalendarCell
+                      date={iso}
                       isToday={isSameDay(d, today)}
                       cellAssignments={cellAssignments}
                       shiftMap={shiftMap}

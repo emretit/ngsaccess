@@ -1,3 +1,6 @@
+import { assignmentFormSchema } from "./assignmentFormSchema";
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useEffect, useState } from "react";
 import { useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -59,7 +62,15 @@ export function AssignmentEditDialog({
   const [shiftId, setShiftId] = useState<string>("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [confirmSeries, setConfirmSeries] = useState(false);
+  const [calendarApproved, setCalendarApproved] = useState(false);
+  const [calendarConflict, setCalendarConflict] = useState<string | null>(null);
+  const deleteAction = useAsyncAction(async () => {
+    if (!assignment) return;
+    await removeAssignment({ assignmentId: assignment._id });
+    onOpenChange(false);
+  }, { success: "Atama silindi" });
+  const [overlapDetails, setOverlapDetails] = useState("");
   const [overlapCount, setOverlapCount] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -69,21 +80,21 @@ export function AssignmentEditDialog({
       setStartDate(assignment.startDate);
       setEndDate(assignment.endDate);
       setOverlapCount(null);
+      setCalendarConflict(null);
+      setConfirmSeries(false);
+      setConfirmDelete(false);
     }
   }, [assignment, open]);
 
-  if (!assignment) return null;
+  useEffect(() => { setCalendarApproved(false); }, [startDate, endDate, shiftId]);
 
-  const saveImpl = async (forceConfirm: boolean) => {
-    if (startDate > endDate) {
-      toast({
-        title: "Hatalı tarih",
-        description: "Bitiş tarihi başlangıçtan önce olamaz",
-        variant: "destructive",
-      });
+  const saveAction = useAsyncAction(async (forceConfirm: boolean, confirmCalendar: boolean = false) => {
+    if (!assignment) throw new Error("Atama bulunamadı");
+    const parsed = assignmentFormSchema.safeParse({ employeeId: assignment.employeeId, shiftId, startDate, endDate });
+    if (!parsed.success) {
+      toast({ title: "Hatalı form", description: parsed.error.issues[0]?.message, variant: "destructive" });
       return;
     }
-    setBusy(true);
     try {
       await updateAssignment({
         assignmentId: assignment._id,
@@ -91,6 +102,7 @@ export function AssignmentEditDialog({
         startDate,
         endDate,
         forceConfirm,
+        calendarConfirmed: confirmCalendar || calendarApproved,
       });
       toast({ title: "Atama güncellendi" });
       setOverlapCount(null);
@@ -100,43 +112,26 @@ export function AssignmentEditDialog({
       const overlapMatch = /OVERLAP:(\d+)/.exec(msg);
       if (overlapMatch) {
         setOverlapCount(Number(overlapMatch[1]));
+        setOverlapDetails(msg.replace(/.*OVERLAP:\d+/, ""));
+      } else if (msg.includes("CALENDAR:")) {
+        setCalendarConflict(msg.replace("CALENDAR:", ""));
       } else {
-        toast({
-          title: "Atama güncellenemedi",
-          description: msg,
-          variant: "destructive",
-        });
+        throw e;
       }
-    } finally {
-      setBusy(false);
     }
-  };
+  }, { error: "Atama güncellenemedi" });
+  const saveImpl = saveAction.run;
+  const busy = saveAction.pending || deleteAction.pending;
+  if (!assignment) return null;
 
-  const handleSave = () => saveImpl(false);
-
-  const handleDelete = async () => {
-    setBusy(true);
-    try {
-      await removeAssignment({ assignmentId: assignment._id });
-      toast({ title: "Atama silindi" });
-      setConfirmDelete(false);
-      onOpenChange(false);
-    } catch (e) {
-      toast({
-        title: "Atama silinemedi",
-        description: e instanceof Error ? e.message : "Bilinmeyen hata",
-        variant: "destructive",
-      });
-    } finally {
-      setBusy(false);
-    }
-  };
+  const handleSave = () => setConfirmSeries(true);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={value => { if (!busy) onOpenChange(value); }}>
       <DialogContent className="sm:max-w-[440px]">
         <DialogHeader>
-          <DialogTitle>Atamayı Düzenle</DialogTitle>
+          <DialogTitle>Tüm Atama Serisini Düzenle</DialogTitle>
+          <p className="text-sm text-muted-foreground">{employeeName} · {assignment.startDate}–{assignment.endDate}. Değişiklikler ve silme tüm tarih aralığına uygulanır.</p>
         </DialogHeader>
         <div className="grid gap-3 py-2">
           <div className="grid grid-cols-2 gap-3 text-sm">
@@ -222,7 +217,7 @@ export function AssignmentEditDialog({
             <AlertDialogTitle>Çakışan atama var</AlertDialogTitle>
             <AlertDialogDescription>
               Yeni tarih aralığı çalışanın {overlapCount} mevcut atamasıyla
-              çakışıyor. Yine de kaydetmek istiyor musunuz?
+              çakışıyor. {overlapDetails} Mevcut atamalar korunarak ek çakışmaya izin verilir. Yine de kaydetmek istiyor musunuz?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -240,28 +235,15 @@ export function AssignmentEditDialog({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Atamayı sil</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bu atamayı silmek istediğinizden emin misiniz? İşlem geri
-              alınamaz.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Vazgeç</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                void handleDelete();
-              }}
-              disabled={busy}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Sil
-            </AlertDialogAction>
-          </AlertDialogFooter>
+      <ConfirmDestructive open={confirmDelete} onOpenChange={setConfirmDelete} title="Tüm seri silinsin mi?"
+        objectName={`${employeeName} · ${shiftName} · ${assignment.startDate}–${assignment.endDate}`}
+        effects={["Bu atamanın tüm tarih aralığı kalıcı silinir."]} confirmLabel="Tüm seriyi sil" onConfirm={async () => { if (!await deleteAction.run()) throw new Error("Atama silinemedi"); }} />
+      <ConfirmDestructive open={confirmSeries} onOpenChange={setConfirmSeries} title="Tüm seri güncellensin mi?"
+        objectName={`${employeeName} · ${assignment.startDate}–${assignment.endDate}`}
+        effects={[`Tüm seri ${startDate}–${endDate} tarihleri ve seçili vardiyayla güncellenir.`]} confirmLabel="Tüm seriyi güncelle" onConfirm={async () => { if (!await saveImpl(false)) throw new Error("Atama güncellenemedi; form korundu"); }} />
+      <AlertDialog open={calendarConflict !== null} onOpenChange={open => { if (!open) setCalendarConflict(null); }}>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>İzin veya tatil çakışması</AlertDialogTitle><AlertDialogDescription>{calendarConflict}</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel disabled={busy}>Vazgeç</AlertDialogCancel><AlertDialogAction disabled={busy} onClick={e => { e.preventDefault(); setCalendarApproved(true); setCalendarConflict(null); void saveImpl(false, true); }}>Yine de tüm seriye ata</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </Dialog>

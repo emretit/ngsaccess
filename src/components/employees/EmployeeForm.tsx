@@ -1,3 +1,5 @@
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { useState } from 'react';
 import { Employee } from '@/types/employee';
 import PhotoUpload from './PhotoUpload';
@@ -7,7 +9,7 @@ import { useEmployeeFormData } from './hooks/useEmployeeFormData';
 import { useEmployeeFormSubmit } from './hooks/useEmployeeFormSubmit';
 import { usePhotoUpload } from './hooks/usePhotoUpload';
 import { employeeFormSchema } from './hooks/useEmployeeFormSchema';
-import { Loader2 } from 'lucide-react';
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 
 interface EmployeeFormProps {
   employee?: Employee | null;
@@ -16,6 +18,8 @@ interface EmployeeFormProps {
 }
 
 export default function EmployeeForm({ employee, onClose, onSave }: EmployeeFormProps) {
+  const rules = useQuery(api.accessRules.list, {});
+  const memberships = rules?.filter(rule => rule.groupMembers.some(member => member.employeeId === employee?._id));
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({});
 
   const {
@@ -32,18 +36,19 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
 
   const { isLoading, handleSubmit } = useEmployeeFormSubmit(employee, onClose, onSave);
 
-  const { handleFileChange } = usePhotoUpload();
+  const { handleFileChange, isLoading: uploading } = usePhotoUpload();
 
   const onPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleFileChange(
       e,
-      (url) => setFormData({ ...formData, photoUrl: url }),
-      setPhotoPreview
+      (url) => setFormData(current => ({ ...current, photoUrl: url })),
+      (preview) => setPhotoPreview(preview || formData.photoUrl)
     );
   };
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (uploading) return;
     const result = employeeFormSchema.safeParse(formData);
     if (!result.success) {
       const errors: Record<string, string> = {};
@@ -61,13 +66,12 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
   return (
     <form onSubmit={onSubmit} className="space-y-5" noValidate>
       <div className="space-y-4">
+        <p className="text-xs text-muted-foreground">JPEG, PNG veya WebP · en çok 5 MB. {uploading ? "Fotoğraf yükleniyor…" : ""}</p>
+        {employee && <p className="text-xs text-muted-foreground">Mevcut erişim üyelikleri: {memberships === undefined ? "Yükleniyor…" : memberships.map(rule => rule.name).join(", ") || "Yok"}</p>}
         <PhotoUpload photoPreview={photoPreview} onPhotoChange={onPhotoChange} />
 
         {optionsLoading ? (
-          <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            Form bilgileri yükleniyor...
-          </div>
+          <SectionSkeleton label="Form bilgileri yükleniyor" />
         ) : (
           <EmployeeFormFields
             formData={formData}
@@ -81,7 +85,7 @@ export default function EmployeeForm({ employee, onClose, onSave }: EmployeeForm
         )}
       </div>
 
-      <FormActions isLoading={isLoading || optionsLoading} onClose={onClose} />
+      <FormActions isLoading={isLoading || optionsLoading || uploading} onClose={onClose} />
     </form>
   );
 }

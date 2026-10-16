@@ -49,18 +49,8 @@ export function useDepartments() {
   };
 
   const deleteDepartment = async (id: Id<"departments">) => {
-    try {
-      await removeDept({ departmentId: id });
-      toast({ title: "Başarılı", description: "Departman başarıyla silindi" });
-      return true;
-    } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Departman silinirken hata oluştu",
-        variant: "destructive",
-      });
-      return false;
-    }
+    await removeDept({ departmentId: id });
+    return true;
   };
 
   return {

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { useToast } from "@/hooks/use-toast";
 import { ShiftCalendarView } from "@/components/shifts/ShiftCalendarView";
 import { ShiftListSidebar } from "@/components/shifts/ShiftListSidebar";
@@ -25,55 +25,16 @@ export default function Shifts() {
     projectLoading ? "skip" : {},
   );
 
-  const overlayRange = (() => {
-    const today = new Date();
-    const start = new Date(today);
-    start.setDate(start.getDate() - 60);
-    const end = new Date(today);
-    end.setDate(end.getDate() + 180);
-    return {
-      startDate: start.toISOString().slice(0, 10),
-      endDate: end.toISOString().slice(0, 10),
-    };
-  })();
-  const leaves = useQuery(
-    api.leaves.listForRange,
-    projectLoading ? "skip" : overlayRange,
-  );
-  const holidays = useQuery(
-    api.holidays.listForRange,
-    projectLoading ? "skip" : overlayRange,
-  );
-
   if (projectLoading || shifts === undefined) {
-    return <LoadingSpinner text="Vardiya verileri yükleniyor..." />;
+    return <SectionSkeleton label="Vardiya verileri yükleniyor..." />;
   }
 
   const isLoading = employees === undefined || assignments === undefined;
 
   const handleCreateFirstShift = async (payload: ShiftFormPayload) => {
-    if (!projectId) {
-      toast({
-        title: "Proje bulunamadı",
-        description: "Vardiya eklemek için en az bir projeye atanmış olmalısınız.",
-        variant: "destructive",
-      });
-      return;
-    }
-    try {
-      await createShift({ projectId, ...payload });
-      toast({
-        title: "Vardiya oluşturuldu",
-        description: `"${payload.name}" eklendi. Artık atama yapabilirsiniz.`,
-      });
-      setFirstShiftOpen(false);
-    } catch (e) {
-      toast({
-        title: "Vardiya eklenemedi",
-        description: e instanceof Error ? e.message : "Bilinmeyen hata",
-        variant: "destructive",
-      });
-    }
+    if (!projectId) throw new Error("Vardiya eklemek için proje seçin");
+    await createShift({ projectId, ...payload });
+    toast({ title: "Vardiya oluşturuldu" });
   };
 
   return (
@@ -87,14 +48,12 @@ export default function Shifts() {
 
         <div className="flex-1 min-w-0">
           {isLoading ? (
-            <LoadingSpinner text="Yükleniyor..." />
+            <SectionSkeleton label="Yükleniyor..." />
           ) : (
             <ShiftCalendarView
               employees={employees ?? []}
               shifts={shifts}
               assignments={assignments ?? []}
-              leaves={leaves ?? []}
-              holidays={holidays ?? []}
               onNavigateToDefinitions={() => setFirstShiftOpen(true)}
             />
           )}

@@ -1,44 +1,13 @@
-
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 interface EmployeeDeleteDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   selectedCount: number;
-  onConfirm: () => void;
+  names?: string;
+  onConfirm: () => Promise<unknown>;
 }
-
-export function EmployeeDeleteDialog({
-  isOpen,
-  onOpenChange,
-  selectedCount,
-  onConfirm
-}: EmployeeDeleteDialogProps) {
-  return (
-    <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Seçili personelleri silmek istediğinize emin misiniz?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Bu işlem geri alınamaz. Seçili {selectedCount} personel kalıcı olarak silinecektir.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>İptal</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-            Sil
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
+export function EmployeeDeleteDialog({ isOpen, onOpenChange, selectedCount, names, onConfirm }: EmployeeDeleteDialogProps) {
+  return <ConfirmDestructive open={isOpen} onOpenChange={onOpenChange} title="Personeller silinsin mi?"
+    objectName={names || `${selectedCount} personel`} confirmLabel="Personelleri sil" onConfirm={onConfirm}
+    effects={[`${selectedCount} personel ve vardiya atamaları kalıcı silinir.`, "Erişim üyelikleri, mobil giriş ve oturumlar kaldırılır; kişisel veriler temizlenir.", "Cihazlardan kaldırma kuyruğa alınır; cihaz teslimi bu işlemde doğrulanmaz."]} />;
 }

@@ -79,7 +79,7 @@ export const useEmployeeFormData = (employee?: Employee | null) => {
         companyId: employee.companyId ?? null,
         departmentId: employee.departmentId ?? null,
         positionId: employee.positionId ?? null,
-        accessRuleId: employee.accessRuleId ?? null,
+        accessRuleId: null,
         shift: employee.shift ?? null,
         shiftId: employee.shiftId ?? null,
         photoUrl: employee.photoUrl ?? null,

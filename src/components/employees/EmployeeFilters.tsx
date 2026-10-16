@@ -10,6 +10,7 @@ interface EmployeeFiltersProps {
   itemsPerPage: number;
   onItemsPerPageChange: (value: number) => void;
   onNewEmployee: () => void;
+  canWrite?: boolean;
 }
 
 export function EmployeeFilters({
@@ -17,7 +18,8 @@ export function EmployeeFilters({
   onSearchChange,
   itemsPerPage,
   onItemsPerPageChange,
-  onNewEmployee
+  onNewEmployee,
+  canWrite = false
 }: EmployeeFiltersProps) {
   const PAGE_SIZE_OPTIONS = [10, 50, 100];
 
@@ -65,7 +67,7 @@ export function EmployeeFilters({
             </SelectContent>
           </Select>
 
-          <Button onClick={onNewEmployee} size="sm" className="h-8 gap-1.5 text-xs">
+          <Button disabled={!canWrite} title={!canWrite ? "Personel yazma işlemleri yalnız yöneticilere açıktır" : undefined} onClick={onNewEmployee} size="sm" className="h-8 gap-1.5 text-xs">
             <UserPlus className="h-3.5 w-3.5" />
             Yeni Personel
           </Button>

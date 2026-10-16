@@ -1,7 +1,34 @@
+import { toPatch } from "./lib/nullablePatch";
+import { validateRange, validateShift, schedulesOverlap, appliesOn, type ScheduleRange } from "./lib/shiftUx";
+import type { MutationCtx } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 
 import { v } from "convex/values";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
+
+async function validateAssignment(ctx: MutationCtx, employee: Doc<"employees">, shift: Doc<"shifts">, range: ScheduleRange, force = false, excludeId?: string, calendarConfirmed = false) {
+  validateRange(range.startDate, range.endDate);
+  if (employee.projectId !== shift.projectId) throw new Error("Çalışan ve vardiya aynı projede olmalıdır");
+  if (shift.isActive === false) throw new Error("Pasif vardiya atanamaz");
+  if (range.weekPattern?.some(code => !["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"].includes(code))) throw new Error("Geçersiz tekrar günü");
+  const leaves = await ctx.db.query("leaves").withIndex("by_employee", q => q.eq("employeeId", employee._id)).collect();
+  const holidays = await ctx.db.query("holidays").withIndex("by_project", q => q.eq("projectId", employee.projectId)).collect();
+  const globalHolidays = employee.projectId ? await ctx.db.query("holidays").withIndex("by_project", q => q.eq("projectId", undefined)).collect() : [];
+  const conflicts = [
+    ...leaves.filter(l => l.status === "approved" && l.startDate <= range.endDate && l.endDate >= range.startDate).map(l => `İzin: ${l.startDate}–${l.endDate}`),
+    ...[...holidays, ...globalHolidays].filter(h => appliesOn(range, h.date)).map(h => `${h.date}: ${h.name}`),
+  ];
+  if (conflicts.length && !calendarConfirmed) throw new Error(`CALENDAR: ${conflicts.join("; ")}. İzin/tatil günlerinde atama için açık onay verin.`);
+  const existing = await ctx.db.query("shiftAssignments").withIndex("by_employee", q => q.eq("employeeId", employee._id)).collect();
+  const overlaps: string[] = [];
+  for (const item of existing) {
+    if (item._id === excludeId) continue;
+    const other = await ctx.db.get(item.shiftId);
+    if (other && schedulesOverlap(range, shift, item, other)) overlaps.push(`${other.name} ${other.startTime}–${other.endTime} (${item.startDate}–${item.endDate})`);
+  }
+  if (!force && overlaps.length) throw new Error(`OVERLAP:${overlaps.length} ${overlaps.join("; ")}`);
+}
 
 export const listAssignments = authedQuery({
   args: {
@@ -17,7 +44,7 @@ export const listAssignments = authedQuery({
       }
       return await ctx.db
         .query("shiftAssignments")
-        .withIndex("by_employee", (q) => q.eq("employeeId", args.employeeId!))
+        .withIndex("by_employee", (q) => q.eq("employeeId", emp._id))
         .collect();
     }
     if (args.shiftId) {
@@ -27,7 +54,7 @@ export const listAssignments = authedQuery({
       }
       return await ctx.db
         .query("shiftAssignments")
-        .withIndex("by_shift", (q) => q.eq("shiftId", args.shiftId!))
+        .withIndex("by_shift", (q) => q.eq("shiftId", shift._id))
         .collect();
     }
     if (ctx.user.role === "super_admin") {
@@ -57,6 +84,7 @@ export const assignShift = authedMutation({
     endDate: v.string(),
     weekPattern: v.optional(v.array(v.string())),
     forceConfirm: v.optional(v.boolean()),
+    calendarConfirmed: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -71,23 +99,9 @@ export const assignShift = authedMutation({
     if (!shift || (shift.projectId && !allowedProjectIds.some((id) => id === shift.projectId))) {
       throw new Error("Bu vardiyaya erişim yetkiniz yok");
     }
-    if (args.startDate > args.endDate) {
-      throw new Error("Bitiş tarihi başlangıçtan önce olamaz");
-    }
-    if (!args.forceConfirm) {
-      const existing = await ctx.db
-        .query("shiftAssignments")
-        .withIndex("by_employee", (q) => q.eq("employeeId", args.employeeId))
-        .collect();
-      const overlapCount = existing.filter(
-        (a) => a.startDate <= args.endDate && a.endDate >= args.startDate,
-      ).length;
-      if (overlapCount > 0) {
-        throw new Error(`OVERLAP:${overlapCount}`);
-      }
-    }
+    await validateAssignment(ctx, emp, shift, args, args.forceConfirm, undefined, args.calendarConfirmed);
     const now = new Date().toISOString();
-    const { forceConfirm: _force, ...rest } = args;
+    const { forceConfirm: _force, calendarConfirmed: _calendar, ...rest } = args;
     return await ctx.db.insert("shiftAssignments", {
       ...rest,
       createdAt: now,
@@ -104,6 +118,7 @@ export const updateAssignment = authedMutation({
     shiftId: v.optional(v.id("shifts")),
     weekPattern: v.optional(v.array(v.string())),
     forceConfirm: v.optional(v.boolean()),
+    calendarConfirmed: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -114,25 +129,11 @@ export const updateAssignment = authedMutation({
     }
     const nextStart = args.startDate ?? assignment.startDate;
     const nextEnd = args.endDate ?? assignment.endDate;
-    if (nextStart > nextEnd) {
-      throw new Error("Bitiş tarihi başlangıçtan önce olamaz");
-    }
-    if (!args.forceConfirm && (args.startDate !== undefined || args.endDate !== undefined)) {
-      const existing = await ctx.db
-        .query("shiftAssignments")
-        .withIndex("by_employee", (q) => q.eq("employeeId", assignment.employeeId))
-        .collect();
-      const overlapCount = existing.filter(
-        (a) =>
-          a._id !== assignment._id &&
-          a.startDate <= nextEnd &&
-          a.endDate >= nextStart,
-      ).length;
-      if (overlapCount > 0) {
-        throw new Error(`OVERLAP:${overlapCount}`);
-      }
-    }
-    const { assignmentId, forceConfirm: _force, ...updates } = args;
+    const employee = await ctx.db.get(assignment.employeeId);
+    const nextShift = await ctx.db.get(args.shiftId ?? assignment.shiftId);
+    if (!employee || !nextShift) throw new Error("Çalışan veya vardiya bulunamadı");
+    await validateAssignment(ctx, employee, nextShift, { startDate: nextStart, endDate: nextEnd, weekPattern: args.weekPattern ?? assignment.weekPattern }, args.forceConfirm, assignment._id, args.calendarConfirmed);
+    const { assignmentId, forceConfirm: _force, calendarConfirmed: _calendar, ...updates } = args;
     const clean: Record<string, unknown> = { updatedAt: new Date().toISOString() };
     for (const [k, val] of Object.entries(updates)) {
       if (val !== undefined) clean[k] = val;
@@ -149,11 +150,10 @@ export const bulkAssignShift = authedMutation({
     endDate: v.string(),
     weekPattern: v.optional(v.array(v.string())),
     forceConfirm: v.optional(v.boolean()),
+    calendarConfirmed: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    if (args.startDate > args.endDate) {
-      throw new Error("Bitiş tarihi başlangıçtan önce olamaz");
-    }
+    validateRange(args.startDate, args.endDate);
     if (args.employeeIds.length === 0) {
       throw new Error("En az bir çalışan seçin");
     }
@@ -179,19 +179,13 @@ export const bulkAssignShift = authedMutation({
         skipped.push({ employeeId, reason: "Erişim yok" });
         continue;
       }
-      if (!args.forceConfirm) {
-        const existing = await ctx.db
-          .query("shiftAssignments")
-          .withIndex("by_employee", (q) => q.eq("employeeId", employeeId))
-          .collect();
-        const hasOverlap = existing.some(
-          (a) => a.startDate <= args.endDate && a.endDate >= args.startDate,
-        );
-        if (hasOverlap) {
-          overlapCount += 1;
-          skipped.push({ employeeId, reason: "Çakışma" });
-          continue;
-        }
+      try {
+        await validateAssignment(ctx, emp, shift, args, args.forceConfirm, undefined, args.calendarConfirmed);
+      } catch (error: unknown) {
+        const reason = error instanceof Error ? error.message : "Atama doğrulanamadı";
+        if (reason.includes("OVERLAP:")) overlapCount++;
+        skipped.push({ employeeId, reason });
+        continue;
       }
       const id = await ctx.db.insert("shiftAssignments", {
         employeeId,
@@ -272,11 +266,11 @@ export const create = authedMutation({
     projectId: v.optional(v.id("projects")),
     startTime: v.string(),
     endTime: v.string(),
-    breakStart: v.optional(v.string()),
-    breakEnd: v.optional(v.string()),
-    lateToleranceMinutes: v.optional(v.number()),
-    earlyExitToleranceMinutes: v.optional(v.number()),
-    overtimeStartToleranceMinutes: v.optional(v.number()),
+    breakStart: v.optional(v.union(v.null(), v.string())),
+    breakEnd: v.optional(v.union(v.null(), v.string())),
+    lateToleranceMinutes: v.optional(v.union(v.null(), v.number())),
+    earlyExitToleranceMinutes: v.optional(v.union(v.null(), v.number())),
+    overtimeStartToleranceMinutes: v.optional(v.union(v.null(), v.number())),
     overtimeEnabled: v.optional(v.boolean()),
     isActive: v.optional(v.boolean()),
   },
@@ -286,8 +280,10 @@ export const create = authedMutation({
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
     const now = new Date().toISOString();
+    const fields = { ...toPatch(args), name: args.name, startTime: args.startTime, endTime: args.endTime };
+    validateShift(fields);
     return await ctx.db.insert("shifts", {
-      ...args,
+      ...fields,
       isActive: args.isActive ?? true,
       overtimeEnabled: args.overtimeEnabled ?? true,
       createdAt: now,
@@ -302,11 +298,11 @@ export const update = authedMutation({
     name: v.optional(v.string()),
     startTime: v.optional(v.string()),
     endTime: v.optional(v.string()),
-    breakStart: v.optional(v.string()),
-    breakEnd: v.optional(v.string()),
-    lateToleranceMinutes: v.optional(v.number()),
-    earlyExitToleranceMinutes: v.optional(v.number()),
-    overtimeStartToleranceMinutes: v.optional(v.number()),
+    breakStart: v.optional(v.union(v.null(), v.string())),
+    breakEnd: v.optional(v.union(v.null(), v.string())),
+    lateToleranceMinutes: v.optional(v.union(v.null(), v.number())),
+    earlyExitToleranceMinutes: v.optional(v.union(v.null(), v.number())),
+    overtimeStartToleranceMinutes: v.optional(v.union(v.null(), v.number())),
     overtimeEnabled: v.optional(v.boolean()),
     isActive: v.optional(v.boolean()),
   },
@@ -318,11 +314,9 @@ export const update = authedMutation({
       throw new Error("Bu vardiyaya erişim yetkiniz yok");
     }
     const { shiftId, ...updates } = args;
-    const clean: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-    for (const [k, v] of Object.entries(updates)) {
-      if (v !== undefined) clean[k] = v;
-    }
-    await ctx.db.patch(shiftId, clean);
+    const patch = toPatch(updates);
+    validateShift({ ...shift, ...patch });
+    await ctx.db.patch(shiftId, { ...patch, updatedAt: new Date().toISOString() });
   },
 });
 

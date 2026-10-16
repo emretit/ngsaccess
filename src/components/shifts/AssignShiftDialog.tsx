@@ -1,5 +1,7 @@
+import { schedulesOverlap, validDay } from "../../../convex/lib/shiftUx";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useEffect, useMemo, useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -82,20 +84,29 @@ export function AssignShiftDialog({
   employees,
   shifts,
   assignments,
-  leaves = [],
-  holidays = [],
+  leaves: _leaves = [],
+  holidays: _holidays = [],
   initial,
 }: AssignShiftDialogProps) {
   const { toast } = useToast();
   const assignShift = useMutation(api.shifts.assignShift);
   const [form, setForm] = useState<AssignmentFormValues>(EMPTY);
-  const [submitting, setSubmitting] = useState(false);
+  const rangeValid = validDay(form.startDate) && validDay(form.endDate) && form.startDate <= form.endDate;
+  const rangeLeaves = useQuery(api.leaves.listForRange, open && rangeValid ? { startDate: form.startDate, endDate: form.endDate } : "skip");
+  const rangeHolidays = useQuery(api.holidays.listForRange, open && rangeValid ? { startDate: form.startDate, endDate: form.endDate } : "skip");
+  const employeeProject = employees.find(e => e._id === form.employeeId)?.projectId;
+  const leaves = (rangeLeaves ?? []).filter(l => l.employeeId === form.employeeId);
+  const holidays = (rangeHolidays ?? []).filter(h => !h.projectId || h.projectId === employeeProject);
+  const calendarLoading = rangeValid && (rangeLeaves === undefined || rangeHolidays === undefined);
   const [employeeOpen, setEmployeeOpen] = useState(false);
   const [overlapCount, setOverlapCount] = useState<number | null>(null);
+  const [calendarApproved, setCalendarApproved] = useState(false);
   const [calendarConflict, setCalendarConflict] = useState<{
     leaveDays: number;
     holidayDays: number;
   } | null>(null);
+
+  useEffect(() => { setCalendarApproved(false); }, [form.employeeId, form.startDate, form.endDate]);
 
   useEffect(() => {
     if (open) {
@@ -112,17 +123,18 @@ export function AssignShiftDialog({
 
   const localConflicts = useMemo(() => {
     if (!form.employeeId || !form.startDate || !form.endDate) return 0;
-    return assignments.filter(
-      (a) =>
-        a.employeeId === form.employeeId &&
-        a.startDate <= form.endDate &&
-        a.endDate >= form.startDate,
-    ).length;
-  }, [assignments, form.employeeId, form.startDate, form.endDate]);
+    const shift = shifts.find(s => s._id === form.shiftId);
+    if (!shift) return 0;
+    return assignments.filter(a => {
+      const other = shifts.find(s => s._id === a.shiftId);
+      return a.employeeId === form.employeeId && other && schedulesOverlap(form, shift, a, other);
+    }).length;
+  }, [assignments, shifts, form]);
 
   const selectedEmployee = employees.find((e) => e._id === form.employeeId);
 
-  const submit = async (forceConfirm: boolean, skipCalendarCheck = false) => {
+  const { run: submit, pending: submitting } = useAsyncAction(async (forceConfirm: boolean, skipCalendarCheck: boolean = false) => {
+    if (calendarLoading) throw new Error("İzin ve tatiller kontrol ediliyor");
     const result = assignmentFormSchema.safeParse(form);
     if (!result.success) {
       const first = result.error.issues[0];
@@ -134,7 +146,7 @@ export function AssignShiftDialog({
       return;
     }
 
-    if (!skipCalendarCheck && !forceConfirm) {
+    if (!skipCalendarCheck && !calendarApproved && !forceConfirm) {
       const conflicts = findRangeConflicts(
         result.data.employeeId,
         result.data.startDate,
@@ -151,7 +163,6 @@ export function AssignShiftDialog({
       }
     }
 
-    setSubmitting(true);
     try {
       const emp = employees.find((e) => e._id === result.data.employeeId);
       await assignShift({
@@ -161,6 +172,7 @@ export function AssignShiftDialog({
         startDate: result.data.startDate,
         endDate: result.data.endDate,
         forceConfirm,
+        calendarConfirmed: skipCalendarCheck || calendarApproved,
       });
       toast({ title: "Vardiya atandı" });
       setOverlapCount(null);
@@ -170,21 +182,17 @@ export function AssignShiftDialog({
       const overlapMatch = /OVERLAP:(\d+)/.exec(msg);
       if (overlapMatch) {
         setOverlapCount(Number(overlapMatch[1]));
+      } else if (msg.includes("CALENDAR:")) {
+        setCalendarConflict({ leaveDays: 0, holidayDays: 0 });
       } else {
-        toast({
-          title: "Atama yapılamadı",
-          description: msg,
-          variant: "destructive",
-        });
+        throw e;
       }
-    } finally {
-      setSubmitting(false);
     }
-  };
+  }, { error: "Atama yapılamadı" });
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={value => { if (!submitting) onOpenChange(value); }}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle>Vardiya Ata</DialogTitle>
@@ -301,11 +309,11 @@ export function AssignShiftDialog({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={submitting}
+                disabled={submitting || calendarLoading}
               >
                 İptal
               </Button>
-              <Button onClick={() => submit(false)} disabled={submitting}>
+              <Button onClick={() => submit(false)} disabled={submitting || calendarLoading}>
                 {submitting ? "Atanıyor..." : "Ata"}
               </Button>
             </div>
@@ -320,19 +328,20 @@ export function AssignShiftDialog({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Çakışan atama var</AlertDialogTitle>
+            <div className="text-sm">{assignments.filter(a => a.employeeId === form.employeeId && (() => { const shift = shifts.find(s => s._id === form.shiftId); const other = shifts.find(s => s._id === a.shiftId); return shift && other && schedulesOverlap(form, shift, a, other); })()).map(a => <p key={a._id}>{shifts.find(s => s._id === a.shiftId)?.name} · {a.startDate}–{a.endDate}</p>)}</div>
             <AlertDialogDescription>
               Bu çalışana seçilen aralıkta {overlapCount} mevcut atama
-              bulunuyor. Yine de eklemek istiyor musunuz?
+              bulunuyor. Mevcut atamalar korunur; çakışan ek atamaya izin vermek istiyor musunuz?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={submitting}>Vazgeç</AlertDialogCancel>
+            <AlertDialogCancel disabled={submitting || calendarLoading}>Vazgeç</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
-                void submit(true);
+                void submit(true, calendarApproved);
               }}
-              disabled={submitting}
+              disabled={submitting || calendarLoading}
             >
               Yine de Ata
             </AlertDialogAction>
@@ -366,14 +375,15 @@ export function AssignShiftDialog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={submitting}>Vazgeç</AlertDialogCancel>
+            <AlertDialogCancel disabled={submitting || calendarLoading}>Vazgeç</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
+                setCalendarApproved(true);
                 setCalendarConflict(null);
                 void submit(false, true);
               }}
-              disabled={submitting}
+              disabled={submitting || calendarLoading}
             >
               Yine de Ata
             </AlertDialogAction>
