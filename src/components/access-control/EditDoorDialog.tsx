@@ -19,11 +19,14 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { toast } from "@/hooks/use-toast";
+import { errorMessage, notify } from "@/lib/notify";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
+import { applySelectedDoorPlans, doorPlanTimeSchema, type PlanKey, type PlanResult } from "./doorPlanResult";
 import { useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import type { FunctionReturnType } from "convex/server";
 
 /** Cihaz listesinden sadece kullandığımız alanlar */
 type DeviceInfo = {
@@ -87,25 +90,21 @@ const VERIFY_MODES: { value: string; label: string }[] = [
 
 const DEFAULT_STATUS_PLAN: DoorStatusPlanState = {
   enabled: false,
-  beginTime: "08:00:00",
-  endTime: "18:00:00",
+  beginTime: "08:00",
+  endTime: "18:00",
   mode: "remainOpen",
 };
 
 const DEFAULT_VERIFY_PLAN: VerifyPlanState = {
   enabled: false,
-  beginTime: "08:00:00",
-  endTime: "18:00:00",
+  beginTime: "08:00",
+  endTime: "18:00",
   verifyMode: "card",
 };
 
 function isHikGateway(device: DeviceInfo | undefined): boolean {
   return device?.brand === "hikvision" && device?.hikTransport === "gateway";
 }
-
-type ApplyResult = FunctionReturnType<
-  typeof api.actions.hikGatewayDevice.applyDoorStatusPlan
->;
 
 export function EditDoorDialog({
   open,
@@ -116,7 +115,9 @@ export function EditDoorDialog({
 }: EditDoorDialogProps) {
   const [name, setName] = useState(door.name);
   const [doorCode, setDoorCode] = useState(door.doorCode ?? "");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [planResults, setPlanResults] = useState<PlanResult[]>([]);
+  const [timeErrors, setTimeErrors] = useState<Record<string, string>>({});
 
   // hikDoorNo — zorunlu sayı (1..N) yalnız gateway cihazda gösterilir
   const [hikDoorNo, setHikDoorNo] = useState<string>(
@@ -127,8 +128,8 @@ export function EditDoorDialog({
     door.hikDoorStatusPlan
       ? {
           enabled: door.hikDoorStatusPlan.enabled,
-          beginTime: door.hikDoorStatusPlan.beginTime,
-          endTime: door.hikDoorStatusPlan.endTime,
+          beginTime: door.hikDoorStatusPlan.beginTime.slice(0, 5),
+          endTime: door.hikDoorStatusPlan.endTime.slice(0, 5),
           mode: door.hikDoorStatusPlan.mode,
         }
       : DEFAULT_STATUS_PLAN
@@ -138,8 +139,8 @@ export function EditDoorDialog({
     door.hikVerifyPlan
       ? {
           enabled: door.hikVerifyPlan.enabled,
-          beginTime: door.hikVerifyPlan.beginTime,
-          endTime: door.hikVerifyPlan.endTime,
+          beginTime: door.hikVerifyPlan.beginTime.slice(0, 5),
+          endTime: door.hikVerifyPlan.endTime.slice(0, 5),
           verifyMode: door.hikVerifyPlan.verifyMode,
         }
       : DEFAULT_VERIFY_PLAN
@@ -155,96 +156,86 @@ export function EditDoorDialog({
 
   const showHikSection = isHikGateway(device);
 
+  const sendPlans = async (keys: PlanKey[]) => {
+    const results = await applySelectedDoorPlans(keys, {
+      status: () => applyDoorStatusPlan({ doorId: door._id }),
+      verify: () => applyVerifyPlan({ doorId: door._id }),
+    }, errorMessage);
+    setPlanResults((previous) => [
+      ...previous.filter((result) => !keys.includes(result.key)),
+      ...results,
+    ]);
+    return results.every((result) => result.ok);
+  };
+
+  const saveAction = useAsyncAction(async (parsedDoorNo: number | undefined) => {
+    await updateDoor({
+      doorId: door._id,
+      name: name.trim(),
+      doorCode: doorCode.trim() || undefined,
+      hikDoorNo: parsedDoorNo,
+      hikDoorStatusPlan: showHikSection ? {
+        ...statusPlan,
+        beginTime: `${statusPlan.beginTime}:00`,
+        endTime: `${statusPlan.endTime}:00`,
+      } : undefined,
+      hikVerifyPlan: showHikSection ? {
+        ...verifyPlan,
+        beginTime: `${verifyPlan.beginTime}:00`,
+        endTime: `${verifyPlan.endTime}:00`,
+      } : undefined,
+    });
+    setSaved(true);
+    if (showHikSection) {
+      if (!(await sendPlans(["status", "verify"]))) return;
+      notify.success("Kapı kaydedildi ve zaman planları cihaza uygulandı");
+    } else {
+      notify.success("Kapı kaydedildi");
+    }
+    onSuccess();
+    onOpenChange(false);
+  }, { error: "Kapı kaydedilemedi" });
+
+  const retryAction = useAsyncAction(async () => {
+    const failed = planResults.filter((result) => !result.ok).map((result) => result.key);
+    if (failed.length === 0) return;
+    if (await sendPlans(failed)) notify.success("Zaman planları cihaza uygulandı");
+  }, { error: "Planlar gönderilemedi" });
+  const isSubmitting = saveAction.pending || retryAction.pending;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    if (saved || isSubmitting) return;
     if (!name.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Hata",
-        description: "Kapı adı gereklidir.",
-      });
+      notify.error("Kapı adı gereklidir.");
       return;
     }
-
     const parsedDoorNo = hikDoorNo.trim() !== "" ? Number(hikDoorNo) : undefined;
-
+    if (showHikSection && (parsedDoorNo === undefined || !Number.isInteger(parsedDoorNo) || parsedDoorNo < 1)) {
+      notify.error("Hikvision kapı numarası 1 veya üzeri bir tam sayı olmalıdır.");
+      return;
+    }
+    const errors: Record<string, string> = {};
     if (showHikSection) {
-      if (parsedDoorNo === undefined || isNaN(parsedDoorNo) || parsedDoorNo < 1) {
-        toast({
-          variant: "destructive",
-          title: "Hata",
-          description: "Hikvision kapı numarası (1 veya üzeri) girilmelidir.",
+      for (const [key, plan] of [["status", statusPlan], ["verify", verifyPlan]] as const) {
+        const result = doorPlanTimeSchema.safeParse({
+          beginTime: plan.beginTime,
+          endTime: plan.endTime,
         });
-        return;
-      }
-    }
-
-    setIsSubmitting(true);
-    try {
-      await updateDoor({
-        doorId: door._id,
-        name: name.trim(),
-        doorCode: doorCode.trim() || undefined,
-        hikDoorNo: parsedDoorNo,
-        hikDoorStatusPlan: showHikSection ? statusPlan : undefined,
-        hikVerifyPlan: showHikSection ? verifyPlan : undefined,
-      });
-
-      // Gateway cihazsa planları cihaza uygula
-      if (showHikSection && parsedDoorNo !== undefined) {
-        const [statusResult, verifyResult] = await Promise.all([
-          applyDoorStatusPlan({ doorId: door._id }).catch(
-            (err: unknown): ApplyResult => ({
-              ok: false,
-              error: err instanceof Error ? err.message : "Bilinmeyen hata",
-            })
-          ),
-          applyVerifyPlan({ doorId: door._id }).catch(
-            (err: unknown): ApplyResult => ({
-              ok: false,
-              error: err instanceof Error ? err.message : "Bilinmeyen hata",
-            })
-          ),
-        ]);
-
-        if (!statusResult.ok || !verifyResult.ok) {
-          const errParts: string[] = [];
-          if (!statusResult.ok)
-            errParts.push(`Durum planı: ${statusResult.error ?? "hata"}`);
-          if (!verifyResult.ok)
-            errParts.push(`Doğrulama planı: ${verifyResult.error ?? "hata"}`);
-          toast({
-            variant: "destructive",
-            title: "Plan uygulanamadı",
-            description: errParts.join(" / "),
-          });
-        } else {
-          toast({
-            title: "Kaydedildi",
-            description: "Kapı ve Hikvision zaman planları güncellendi.",
-          });
+        if (!result.success) {
+          for (const issue of result.error.issues) {
+            errors[`${key}-${String(issue.path[0])}`] = issue.message;
+          }
         }
-      } else {
-        toast({ title: "Kaydedildi", description: "Kapı güncellendi." });
       }
-
-      onSuccess();
-      onOpenChange(false);
-    } catch (error: unknown) {
-      toast({
-        variant: "destructive",
-        title: "Hata",
-        description:
-          (error as Error)?.message ?? "Kapı güncellenirken hata oluştu.",
-      });
-    } finally {
-      setIsSubmitting(false);
     }
+    setTimeErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+    await saveAction.run(parsedDoorNo);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => { if (!isSubmitting) onOpenChange(next); }}>
       <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Kapıyı Düzenle</DialogTitle>
@@ -253,204 +244,237 @@ export function EditDoorDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            {/* Temel alanlar */}
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-door-name" className="text-right">
-                Ad *
-              </Label>
-              <Input
-                id="edit-door-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="col-span-3"
-                placeholder="Kapı adı"
-                required
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="edit-door-code" className="text-right">
-                Kapı Kodu
-              </Label>
-              <Input
-                id="edit-door-code"
-                value={doorCode}
-                onChange={(e) => setDoorCode(e.target.value)}
-                className="col-span-3"
-                placeholder="Kapı kodu (opsiyonel)"
-              />
-            </div>
+        <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
+          <fieldset disabled={isSubmitting || saved}>
+            <div className="grid gap-4 py-4">
+              {/* Temel alanlar */}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-door-name" className="text-right">
+                  Ad *
+                </Label>
+                <Input
+                  id="edit-door-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="col-span-3"
+                  placeholder="Kapı adı"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-door-code" className="text-right">
+                  Kapı Kodu
+                </Label>
+                <Input
+                  id="edit-door-code"
+                  value={doorCode}
+                  onChange={(e) => setDoorCode(e.target.value)}
+                  className="col-span-3"
+                  placeholder="Kapı kodu (opsiyonel)"
+                />
+              </div>
 
-            {/* Hikvision gateway bölümü */}
-            {showHikSection && (
-              <>
-                <Separator />
-                <p className="text-sm font-medium text-muted-foreground">
-                  Hikvision Zaman Planı
-                </p>
+              {/* Hikvision gateway bölümü */}
+              {showHikSection && (
+                <>
+                  <Separator />
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Hikvision Zaman Planı
+                  </p>
 
-                {/* hikDoorNo */}
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="hik-door-no" className="text-right">
-                    Kapı No *
-                  </Label>
-                  <div className="col-span-3">
-                    <Input
-                      id="hik-door-no"
-                      type="number"
-                      min={1}
-                      value={hikDoorNo}
-                      onChange={(e) => setHikDoorNo(e.target.value)}
-                      placeholder="Cihazdaki fiziksel kapı no (1, 2, ...)"
-                      required
-                    />
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Cihazda bu kapıya atanan fiziksel numara (1'den başlar).
-                    </p>
-                  </div>
-                </div>
-
-                {/* Kapı Durum Planı */}
-                <div className="rounded-md border p-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">Kapı Durum Planı</p>
-                    <Switch
-                      checked={statusPlan.enabled}
-                      onCheckedChange={(checked) =>
-                        setStatusPlan((p) => ({ ...p, enabled: checked }))
-                      }
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Başlangıç</Label>
+                  {/* hikDoorNo */}
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="hik-door-no" className="text-right">
+                      Kapı No *
+                    </Label>
+                    <div className="col-span-3">
                       <Input
-                        type="time"
-                        step={1}
-                        value={statusPlan.beginTime.slice(0, 5)}
-                        onChange={(e) =>
+                        id="hik-door-no"
+                        type="number"
+                        min={1}
+                        value={hikDoorNo}
+                        onChange={(e) => setHikDoorNo(e.target.value)}
+                        placeholder="Cihazdaki fiziksel kapı no (1, 2, ...)"
+                        required
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Cihazda bu kapıya atanan fiziksel numara (1'den başlar).
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Kapı Durum Planı */}
+                  <div className="rounded-md border p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="status-enabled" className="text-sm font-medium">Kapı Durum Planı</Label>
+                      <Switch
+                        disabled={isSubmitting || saved}
+                        id="status-enabled"
+                        checked={statusPlan.enabled}
+                        onCheckedChange={(checked) =>
+                          setStatusPlan((p) => ({ ...p, enabled: checked }))
+                        }
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormFieldWrapper htmlFor="status-beginTime" label="Başlangıç (TR saati)" error={timeErrors["status-beginTime"]}>
+                        <Input
+                          id="status-beginTime"
+                          type="time"
+                          step={60}
+                          value={statusPlan.beginTime.slice(0, 5)}
+                          onChange={(e) =>
+                            setStatusPlan((p) => ({
+                              ...p,
+                              beginTime: e.target.value,
+                            }))
+                          }
+                        />
+                      </FormFieldWrapper>
+                      <FormFieldWrapper htmlFor="status-endTime" label="Bitiş (TR saati)" error={timeErrors["status-endTime"]}>
+                        <Input
+                          id="status-endTime"
+                          type="time"
+                          step={60}
+                          value={statusPlan.endTime.slice(0, 5)}
+                          onChange={(e) =>
+                            setStatusPlan((p) => ({
+                              ...p,
+                              endTime: e.target.value,
+                            }))
+                          }
+                        />
+                      </FormFieldWrapper>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="status-mode" className="text-xs">Mod</Label>
+                      <Select
+                        disabled={isSubmitting || saved}
+                        value={statusPlan.mode}
+                        onValueChange={(v) =>
                           setStatusPlan((p) => ({
                             ...p,
-                            beginTime: e.target.value + ":00",
+                            mode: v as "remainOpen" | "normal",
                           }))
                         }
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Bitiş</Label>
-                      <Input
-                        type="time"
-                        step={1}
-                        value={statusPlan.endTime.slice(0, 5)}
-                        onChange={(e) =>
-                          setStatusPlan((p) => ({
-                            ...p,
-                            endTime: e.target.value + ":00",
-                          }))
-                        }
-                      />
+                      >
+                        <SelectTrigger id="status-mode">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="remainOpen">Sürekli Açık</SelectItem>
+                          <SelectItem value="normal">Normal</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Mod</Label>
-                    <Select
-                      value={statusPlan.mode}
-                      onValueChange={(v) =>
-                        setStatusPlan((p) => ({
-                          ...p,
-                          mode: v as "remainOpen" | "normal",
-                        }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="remainOpen">Sürekli Açık</SelectItem>
-                        <SelectItem value="normal">Normal</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
 
-                {/* Doğrulama Modu Planı */}
-                <div className="rounded-md border p-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">Doğrulama Modu Planı</p>
-                    <Switch
-                      checked={verifyPlan.enabled}
-                      onCheckedChange={(checked) =>
-                        setVerifyPlan((p) => ({ ...p, enabled: checked }))
-                      }
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Başlangıç</Label>
-                      <Input
-                        type="time"
-                        step={1}
-                        value={verifyPlan.beginTime.slice(0, 5)}
-                        onChange={(e) =>
-                          setVerifyPlan((p) => ({
-                            ...p,
-                            beginTime: e.target.value + ":00",
-                          }))
+                  {/* Doğrulama Modu Planı */}
+                  <div className="rounded-md border p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="verify-enabled" className="text-sm font-medium">Doğrulama Modu Planı</Label>
+                      <Switch
+                        disabled={isSubmitting || saved}
+                        id="verify-enabled"
+                        checked={verifyPlan.enabled}
+                        onCheckedChange={(checked) =>
+                          setVerifyPlan((p) => ({ ...p, enabled: checked }))
                         }
                       />
                     </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormFieldWrapper htmlFor="verify-beginTime" label="Başlangıç (TR saati)" error={timeErrors["verify-beginTime"]}>
+                        <Input
+                          id="verify-beginTime"
+                          type="time"
+                          step={60}
+                          value={verifyPlan.beginTime.slice(0, 5)}
+                          onChange={(e) =>
+                            setVerifyPlan((p) => ({
+                              ...p,
+                              beginTime: e.target.value,
+                            }))
+                          }
+                        />
+                      </FormFieldWrapper>
+                      <FormFieldWrapper htmlFor="verify-endTime" label="Bitiş (TR saati)" error={timeErrors["verify-endTime"]}>
+                        <Input
+                          id="verify-endTime"
+                          type="time"
+                          step={60}
+                          value={verifyPlan.endTime.slice(0, 5)}
+                          onChange={(e) =>
+                            setVerifyPlan((p) => ({
+                              ...p,
+                              endTime: e.target.value,
+                            }))
+                          }
+                        />
+                      </FormFieldWrapper>
+                    </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">Bitiş</Label>
-                      <Input
-                        type="time"
-                        step={1}
-                        value={verifyPlan.endTime.slice(0, 5)}
-                        onChange={(e) =>
-                          setVerifyPlan((p) => ({
-                            ...p,
-                            endTime: e.target.value + ":00",
-                          }))
+                      <Label htmlFor="verify-mode" className="text-xs">Doğrulama Modu</Label>
+                      <Select
+                        disabled={isSubmitting || saved}
+                        value={verifyPlan.verifyMode}
+                        onValueChange={(v) =>
+                          setVerifyPlan((p) => ({ ...p, verifyMode: v }))
                         }
-                      />
+                      >
+                        <SelectTrigger id="verify-mode">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {VERIFY_MODES.map((m) => (
+                            <SelectItem key={m.value} value={m.value}>
+                              {m.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Doğrulama Modu</Label>
-                    <Select
-                      value={verifyPlan.verifyMode}
-                      onValueChange={(v) =>
-                        setVerifyPlan((p) => ({ ...p, verifyMode: v }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {VERIFY_MODES.map((m) => (
-                          <SelectItem key={m.value} value={m.value}>
-                            {m.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+                </>
+              )}
+            </div>
 
+          </fieldset>
+          {saved && (
+            <div className="mb-4 space-y-2 rounded-md border p-3" role="status" aria-live="polite">
+              <StatusBadge tone="success">Kaydedildi</StatusBadge>
+              <p className="text-sm">Ayarlar veritabanına kaydedildi.</p>
+              {planResults.map((result) => (
+                <div key={result.key} className="space-y-1">
+                  <StatusBadge tone={result.ok ? "success" : "warning"}>
+                    {result.key === "status" ? "Kapı durum planı" : "Doğrulama planı"}
+                    {result.ok ? ": Cihaza uygulandı" : ": Cihaza uygulanamadı"}
+                  </StatusBadge>
+                  {!result.ok && <p className="text-sm">{result.error || "Cihazdan başarılı sonuç alınamadı; cihazdaki durum doğrulanamadı."}</p>}
+                </div>
+              ))}
+              {isSubmitting && <p className="text-sm">Planlar cihaza gönderiliyor…</p>}
+            </div>
+          )}
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
+              disabled={isSubmitting}
               onClick={() => onOpenChange(false)}
             >
-              İptal
+              {saved ? "Kapat" : "İptal"}
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Kaydediliyor..." : "Kaydet"}
-            </Button>
+            {saved ? (
+              planResults.some((result) => !result.ok) && (
+                <Button type="button" disabled={isSubmitting} onClick={() => void retryAction.run()}>
+                  {isSubmitting ? "Gönderiliyor…" : "Tekrar gönder"}
+                </Button>
+              )
+            ) : (
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Kaydediliyor…" : "Kaydet"}
+              </Button>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>

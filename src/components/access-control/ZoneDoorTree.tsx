@@ -16,7 +16,8 @@ import { EditDoorDialog, type DoorForEdit } from "./EditDoorDialog";
 import { AddReaderDialog } from "./AddReaderDialog";
 import { MoveReaderDialog } from "./MoveReaderDialog";
 import { toast } from "@/hooks/use-toast";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
+import { notify } from "@/lib/notify";
 
 interface ZoneDoorTreeProps {
   onSelectDoor?: (doorId: string | null) => void;
@@ -47,7 +48,7 @@ type DoorNode = DoorForEdit & {
 };
 
 export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDoorTreeProps) => {
-  const { projectId, loading: projectLoading } = useActiveProject();
+  const { projectId, loading: projectLoading } = useActiveProjectScope();
   const queryArgs = !projectLoading && projectId ? { projectId } : "skip";
   const zonesData = useQuery(api.zones.list, queryArgs);
   const doorsData = useQuery(api.doors.list, queryArgs);
@@ -181,32 +182,8 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
     }
   };
 
-  const handleDeleteZone = async (zoneId: Id<"zones">) => {
-    try {
-      await removeZone({ zoneId });
-      toast({ title: "Başarılı", description: "Bölge silindi" });
-      onZoneAdded?.();
-    } catch (e) {
-      toast({
-        title: "Hata",
-        description: e instanceof Error ? e.message : "Bölge silinirken bir hata oluştu",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDeleteDoor = async (doorId: Id<"doors">) => {
-    try {
-      await removeDoor({ doorId });
-      toast({ title: "Başarılı", description: "Kapı silindi" });
-    } catch (e) {
-      toast({
-        title: "Hata",
-        description: e instanceof Error ? e.message : "Kapı silinirken bir hata oluştu",
-        variant: "destructive",
-      });
-    }
-  };
+  const [deleteZone, setDeleteZone] = useState<ZoneNode | null>(null);
+  const [deleteDoor, setDeleteDoor] = useState<DoorNode | null>(null);
 
   const handleAddDoor = (zoneId: Id<"zones">, zoneName: string) => {
     setSelectedZoneForDoor({ id: zoneId, name: zoneName });
@@ -448,7 +425,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
               size="icon"
               aria-label="Kapıyı sil"
               className="h-6 w-6 hover:bg-accent/80"
-              onClick={() => handleDeleteDoor(door._id)}
+              onClick={() => setDeleteDoor(door)}
             >
               <Trash2 className="h-3 w-3" />
             </Button>
@@ -476,11 +453,53 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
 
   return (
     <>
+      <ConfirmDestructive
+        open={deleteZone !== null}
+        onOpenChange={(open) => { if (!open) setDeleteZone(null); }}
+        title="Bölge silinsin mi?"
+        objectName={deleteZone?.name ?? "Bölge"}
+        effects={["Boş bölge kaldırılır. Kapı veya cihaz eklenmişse silme işlemi engellenir.", "Kart okuma geçmişi korunur."]}
+        confirmLabel="Bölgeyi sil"
+        onConfirm={async () => {
+          if (!deleteZone) return;
+          await removeZone({ zoneId: deleteZone._id });
+          notify.success("Bölge silindi");
+          if (selectedZone === deleteZone._id) {
+            setSelectedZone(null);
+            onSelectZone?.(null);
+          }
+          onZoneAdded?.();
+        }}
+      />
+      <ConfirmDestructive
+        open={deleteDoor !== null}
+        onOpenChange={(open) => { if (!open) setDeleteDoor(null); }}
+        title="Kapı silinsin mi?"
+        objectName={deleteDoor?.name ?? "Kapı"}
+        effects={[
+          `Kapı ve bağlı ${deleteDoor ? readersByDoor.get(String(deleteDoor._id))?.length ?? 0 : 0} okuyucu silinir.`,
+          "Erişim kuralları ve grup-kapı bağlantıları otomatik silinmez; kuralları ayrıca gözden geçirin.",
+          "Cihazdaki erişim izinleri bu işlemle kaldırılmaz.",
+          "Kart okuma geçmişi korunur.",
+        ]}
+        confirmLabel="Kapıyı ve okuyucularını sil"
+        onConfirm={async () => {
+          if (!deleteDoor) return;
+          await removeDoor({ doorId: deleteDoor._id });
+          notify.success("Kapı ve okuyucuları silindi");
+          if (selectedDoor === deleteDoor._id) {
+            setSelectedDoor(null);
+            onSelectDoor?.(null);
+          }
+        }}
+      />
       <ConfirmDestructive open={deleteReader !== null} onOpenChange={(open) => { if (!open) setDeleteReader(null); }} title="Okuyucuyu sil" objectName={deleteReader?.name ?? "Okuyucu"} effects={["Okuyucunun kapı eşlemesi kaldırılır.", "Son okuyucuysa kaynak kapı okuyucusuz kalır; kart okuma geçmişi korunur."]} confirmLabel="Okuyucuyu sil" onConfirm={async () => { if (deleteReader) await handleDeleteReader(deleteReader.id); }} />
       <ul role="tree" className="space-y-0.5">
         {zones.map((zone) => {
           const isExpanded = expandedZones.includes(zone._id);
           const zoneDevices = devices.filter((d) => String(d.zoneId) === String(zone._id));
+          const zoneDoorCount = doors.filter((door) => door.zoneId === zone._id).length;
+          const zoneBlocked = zoneDoorCount > 0 || zoneDevices.length > 0;
           const manualDoors = doors.filter(
             (door) => String(door.zoneId) === String(zone._id) && !door.deviceId
           );
@@ -521,7 +540,7 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
                   <span className="flex-1 truncate text-sm">{zone.name}</span>
                 </button>
 
-                <div className="flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 pr-1">
+                <div className={cn("flex items-center pr-1", !zoneBlocked && "opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100")}>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -532,16 +551,23 @@ export const ZoneDoorTree = ({ onSelectDoor, onSelectZone, onZoneAdded }: ZoneDo
                   >
                     <Plus className="h-3 w-3" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 hover:bg-accent/80"
-                    title="Bölgeyi sil"
-                    aria-label="Bölgeyi sil"
-                    onClick={() => handleDeleteZone(zone._id)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+                  {zoneBlocked ? (
+                    <span className="max-w-48 text-xs text-muted-foreground" role="note">
+                      Önce kapıları taşıyın/silin ({zoneDoorCount} kapı)
+                      {zoneDevices.length > 0 && `; ${zoneDevices.length} cihazı da taşıyın/silin`}.
+                    </span>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 hover:bg-accent/80"
+                      title="Bölgeyi sil"
+                      aria-label={`${zone.name} bölgesini sil`}
+                      onClick={() => setDeleteZone(zone)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  )}
                 </div>
               </div>
 

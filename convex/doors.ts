@@ -1,11 +1,12 @@
 
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
+import { resolveProjectScope } from "./lib/projectScope";
 import { deleteReadersForDoor } from "./readers";
 import { deriveHikReaderNoFromDoorNo } from "./lib/hikReaderNumbers";
 
@@ -257,16 +258,16 @@ export const update = authedMutation({
 export const remove = authedMutation({
   args: { doorId: v.id("doors") },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const allowedProjectIds = await resolveProjectScope(ctx);
     const door = await ctx.db.get(args.doorId);
-    if (!door) throw new Error("Kapı bulunamadı");
+    if (!door) throw new ConvexError("Kapı bulunamadı");
     if (!isProjectAllowed(allowedProjectIds, door.projectId)) {
-      throw new Error("Bu kapıya erişim yetkiniz yok");
+      throw new ConvexError("Bu kapıya erişim yetkiniz yok");
     }
     if (door.deviceId) {
       const owner = await ctx.db.get(door.deviceId);
       if (owner?.brand === "ide_smart") {
-        throw new Error(
+        throw new ConvexError(
           "Bu kapı bir IDE Smart paneline ait — kapıları paneli silerek kaldırın.",
         );
       }
