@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import {
   exportToExcel,
   exportToCsv,
@@ -44,15 +45,18 @@ export function PDKSEnhancedExportPanel({
   >("daily");
   const { toast } = useToast();
   const convex = useConvex();
+  const { projectId } = useActiveProject();
 
   const handleSgkExport = async () => {
     setIsExporting(true);
     try {
       const year = selectedDate.getFullYear();
       const month = selectedDate.getMonth() + 1;
+      // APHB işyeri (proje) bazlıdır; aktif proje seçili değilse backend "Proje seçin" der.
       const result = await convex.query(api.sgkExport.buildAphbForMonth, {
         year,
         month,
+        projectId,
       });
       if (!result.xml) {
         toast({
@@ -71,7 +75,16 @@ export function PDKSEnhancedExportPanel({
       URL.revokeObjectURL(url);
       toast({
         title: "SGK Aylık Bildirim",
-        description: `${result.filename} indirildi.`,
+        description: (
+          <div>
+            <p>{result.filename} indirildi.</p>
+            {result.warnings.length > 0 && (
+              <ul className="mt-2 list-disc pl-4">
+                {result.warnings.map((warning, index) => <li key={index}>{warning}</li>)}
+              </ul>
+            )}
+          </div>
+        ),
       });
     } catch (e) {
       toast({
