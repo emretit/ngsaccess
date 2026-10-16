@@ -92,8 +92,8 @@ export function AiChatPanel({ onClose, filters: _filters }: AiChatPanelProps) {
     <div className="flex flex-col h-full border-l">
       <div className="flex items-center justify-between p-4 border-b">
         <h3 className="font-medium">PDKS AI Asistan</h3>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X size={18} />
+        <Button variant="ghost" size="icon" onClick={onClose} aria-label="Asistanı kapat">
+          <X size={18} aria-hidden="true" />
         </Button>
       </div>
 
