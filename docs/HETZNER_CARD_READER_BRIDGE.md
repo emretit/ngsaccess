@@ -165,3 +165,12 @@ ssh -i ~/.ssh/id_ed25519_hetzner root@157.90.114.86 'bash -c "
 ```
 
 `sites-available/` dosyası ve loglar disk'te kalır; tamamen silmek istersen ek `rm` komutu.
+
+## Hik relay
+
+Windows Hik köprüsü için ayrı SSE uyandırma servisi, bağımlılıksız Node sunucusu,
+testler, systemd ve nginx örnekleri `infra/hik-relay/` altındadır.
+[Kurulum ve işletim checklist'i](../infra/hik-relay/RUNBOOK.md) DNS/TLS,
+gizli anahtar, uçtan uca doğrulama ve geri alma adımlarını içerir.
+Bu servis mevcut `ngs-card-reader` :8090 ve MQTT yapılandırmasını değiştirmez;
+relay kapalıyken köprüler 15 dakika emniyet poll'unu sürdürür.

@@ -1,0 +1,19 @@
+[Unit]
+Description=NgAccess Hik bridge wake relay
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /opt/ngs-hik-relay/server.mjs
+EnvironmentFile=/etc/ngs-hik-relay.env
+Restart=always
+RestartSec=5
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target
