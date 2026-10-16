@@ -1,4 +1,7 @@
-import { useEffect, useState } from "react";
+import { createCardCaptureSession } from "./cardCaptureSession";
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useDevices } from "@/hooks/useDevices";
@@ -18,11 +21,12 @@ const STORAGE_KEY = "ngs.visitorRegisterReader";
 
 interface VisitorCardCaptureProps {
   onCapture: (cardNo: string) => void;
+  currentCard?: string;
 }
 
 // Kayıt okuyucusu seçilir; ziyaretçi kartı bastırılınca okunan numara Convex reaktif
 // query ile anında yakalanıp forma düşürülür (getLastUnknownByDevice → bilinmeyen kart).
-export default function VisitorCardCapture({ onCapture }: VisitorCardCaptureProps) {
+export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCardCaptureProps) {
   const { devices } = useDevices();
 
   const [readerId, setReaderIdState] = useState<Id<"devices"> | null>(() => {
@@ -37,21 +41,23 @@ export default function VisitorCardCapture({ onCapture }: VisitorCardCaptureProp
   const [sinceTime, setSinceTime] = useState<string | null>(null);
   const [captured, setCaptured] = useState<string | null>(null);
 
-  useEffect(() => {
-    setSinceTime(new Date().toISOString());
-  }, []);
+  const session = useRef(createCardCaptureSession());
+  const [replacement, setReplacement] = useState<string | null>(null);
 
   const reading = useQuery(
     api.cardReadings.getLastUnknownByDevice,
-    readerId && sinceTime ? { deviceId: readerId, sinceTime } : "skip",
+    readerId && sinceTime && !captured ? { deviceId: readerId, sinceTime } : "skip",
   );
 
   useEffect(() => {
-    if (reading?.cardNo && reading.cardNo !== captured) {
-      setCaptured(reading.cardNo);
-      onCapture(reading.cardNo);
-    }
-  }, [reading, captured, onCapture]);
+    if (!sinceTime || captured) return;
+    const card = session.current.capture(reading?.cardNo);
+    if (!card) return;
+    setCaptured(card);
+    setSinceTime(null);
+    if (currentCard && currentCard !== card) setReplacement(card);
+    else onCapture(card);
+  }, [reading, captured, onCapture, sinceTime, currentCard]);
 
   const setReaderId = (id: Id<"devices"> | null) => {
     setReaderIdState(id);
@@ -61,16 +67,17 @@ export default function VisitorCardCapture({ onCapture }: VisitorCardCaptureProp
     } catch {
       /* storage devre dışı olabilir */
     }
-    setSinceTime(new Date().toISOString());
+    setSinceTime(null);
     setCaptured(null);
   };
 
   const rearm = () => {
+    session.current.rearm();
     setSinceTime(new Date().toISOString());
     setCaptured(null);
   };
 
-  const listening = !!readerId && !captured;
+  const listening = !!readerId && !!sinceTime && !captured;
 
   return (
     <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
@@ -98,16 +105,16 @@ export default function VisitorCardCapture({ onCapture }: VisitorCardCaptureProp
       {readerId && (
         <div className="flex items-center justify-between gap-2 text-sm">
           {captured ? (
-            <span className="flex items-center gap-1.5 text-green-600">
+            <StatusBadge tone="success">
               <CheckCircle2 className="h-4 w-4" />
               Kart okundu: <span className="font-mono">{captured}</span>
-            </span>
-          ) : (
+            </StatusBadge>
+          ) : listening ? (
             <span className="flex items-center gap-1.5 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               Kartı okutucuya okutun…
             </span>
-          )}
+          ) : <span className="text-muted-foreground">Dinleme kapalı</span>}
           <Button
             type="button"
             variant="ghost"
@@ -117,10 +124,17 @@ export default function VisitorCardCapture({ onCapture }: VisitorCardCaptureProp
             disabled={listening}
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            Yeniden oku
+            {captured ? "Yeniden oku" : "Okumayı başlat"}
           </Button>
         </div>
       )}
+      <ConfirmDestructive
+        open={replacement !== null}
+        onOpenChange={(open) => { if (!open) setReplacement(null); }}
+        title="Kart değiştirilsin mi?" objectName={`${currentCard ?? ""} → ${replacement ?? ""}`}
+        effects={["Formdaki kart numarası yeni okunan kartla değiştirilecek."]} confirmLabel="Kartı değiştir"
+        onConfirm={async () => { if (replacement) onCapture(replacement); setReplacement(null); }}
+      />
     </div>
   );
 }

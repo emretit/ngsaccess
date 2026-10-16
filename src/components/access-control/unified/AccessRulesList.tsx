@@ -372,7 +372,7 @@ const AccessRulesList = ({ onCreateRule, onEditRule }: AccessRulesListProps) => 
                       <p className="text-xs text-muted-foreground">
                         {rule.startTime && rule.endTime
                           ? `${rule.startTime} - ${rule.endTime}`
-                          : '24 saat'
+                          : rule.startTime || rule.endTime ? 'Eksik saat aralığı — düzenleyin' : 'Tüm gün'
                         }
                       </p>
                     </div>

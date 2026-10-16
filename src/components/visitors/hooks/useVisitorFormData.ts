@@ -70,7 +70,7 @@ export const useVisitorFormData = (visitor?: Visitor | null) => {
         visitorCompany: visitor.visitorCompany || "",
         visitPurpose: visitor.visitPurpose || "",
         hostEmployeeId: visitor.hostEmployeeId ?? null,
-        cardNumber: visitor.cardNumber || "",
+        cardNumber: visitor.cardNumber?.startsWith("IADE:") ? "" : visitor.cardNumber || "",
         presetRuleId: visitor.accessRuleId ?? null,
         accessExpiresAt: visitor.accessExpiresAt
           ? isoToLocalInput(visitor.accessExpiresAt)

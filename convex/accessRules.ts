@@ -1,3 +1,5 @@
+import { toPatch } from "./lib/nullablePatch";
+import { assertAccessSchedule, assertAccessScheduleUpdate } from "./lib/accessRuleUx";
 
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
@@ -157,6 +159,8 @@ export const create = authedMutation({
     if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
+    assertAccessSchedule(args);
+    if (!args.name.trim()) throw new Error("Kural adı zorunludur");
     const now = new Date().toISOString();
     return await ctx.db.insert("accessRules", {
       ...args,
@@ -173,8 +177,8 @@ export const update = authedMutation({
     name: v.optional(v.string()),
     targetType: v.optional(v.string()),
     description: v.optional(v.string()),
-    startTime: v.optional(v.string()),
-    endTime: v.optional(v.string()),
+    startTime: v.optional(v.union(v.null(), v.string())),
+    endTime: v.optional(v.union(v.null(), v.string())),
     days: v.optional(v.array(v.string())),
     priority: v.optional(v.number()),
     accessDirection: v.optional(v.string()),
@@ -190,10 +194,9 @@ export const update = authedMutation({
       throw new Error("Bu kurala erişim yetkiniz yok");
     }
     const { ruleId, ...updates } = args;
-    const clean: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-    for (const [k, v] of Object.entries(updates)) {
-      if (v !== undefined) clean[k] = v;
-    }
+    const clean = { ...toPatch(updates), updatedAt: new Date().toISOString() };
+    assertAccessScheduleUpdate(rule, updates);
+    if (updates.name !== undefined && !updates.name.trim()) throw new Error("Kural adı zorunludur");
     await ctx.db.patch(ruleId, clean);
 
     // Plan-ilişkili alanlardan biri değiştiyse week plan'ı cihazlara yeniden yaz.
@@ -331,6 +334,8 @@ export const createWithGroups = authedMutation({
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
     const { employeeIds, deviceIds, doorIds, ...ruleData } = args;
+    assertAccessSchedule(args);
+    if (!args.name.trim()) throw new Error("Kural adı zorunludur");
     const now = new Date().toISOString();
     const ruleId = await ctx.db.insert("accessRules", {
       ...ruleData,
@@ -411,8 +416,8 @@ export const updateWithGroups = authedMutation({
     name: v.optional(v.string()),
     targetType: v.optional(v.string()),
     description: v.optional(v.string()),
-    startTime: v.optional(v.string()),
-    endTime: v.optional(v.string()),
+    startTime: v.optional(v.union(v.null(), v.string())),
+    endTime: v.optional(v.union(v.null(), v.string())),
     days: v.optional(v.array(v.string())),
     priority: v.optional(v.number()),
     accessDirection: v.optional(v.string()),
@@ -434,10 +439,9 @@ export const updateWithGroups = authedMutation({
     }
     const { ruleId, employeeIds, deviceIds, doorIds, projectId: _ignoredProjectId, ...updates } = args;
     const now = new Date().toISOString();
-    const clean: Record<string, unknown> = { updatedAt: now };
-    for (const [k, v] of Object.entries(updates)) {
-      if (v !== undefined) clean[k] = v;
-    }
+    const clean = { ...toPatch(updates), updatedAt: new Date().toISOString() };
+    assertAccessScheduleUpdate(rule, updates);
+    if (updates.name !== undefined && !updates.name.trim()) throw new Error("Kural adı zorunludur");
     await ctx.db.patch(ruleId, clean);
 
     // Düzenleme-ÖNCESİ durumu yakala: çıkarılan üye/cihazların erişim kaybettiği panelleri
@@ -452,7 +456,7 @@ export const updateWithGroups = authedMutation({
     const oldEmployeeIds = oldMembers.map((m) => m.employeeId);
     const ruleIdePanelsBefore = await resolveRuleIdeDeviceIds(ctx, ruleId, rule.projectId);
 
-    if (employeeIds !== undefined) {
+    if (employeeIds !== undefined && rule.targetType !== "visitor") {
       await Promise.all(oldMembers.map((m) => ctx.db.delete(m._id)));
       await Promise.all(
         employeeIds.map((empId) =>
@@ -526,9 +530,9 @@ export const updateWithGroups = authedMutation({
 
     // Düzenleme-SONRASI: kalan ve çıkarılan üyeler.
     const survivingMemberIds =
-      employeeIds !== undefined ? employeeIds : oldEmployeeIds;
+      employeeIds !== undefined && rule.targetType !== "visitor" ? employeeIds : oldEmployeeIds;
     const removedEmployeeIds =
-      employeeIds !== undefined ? diffIds(oldEmployeeIds, employeeIds).removed : [];
+      employeeIds !== undefined && rule.targetType !== "visitor" ? diffIds(oldEmployeeIds, employeeIds).removed : [];
 
     const syncJobs: Promise<unknown>[] = [
       ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, {

@@ -14,9 +14,9 @@ const dayEnum = z.enum([
 
 export const accessRuleSchema = z
   .object({
-    name: z.string().min(1, "Lütfen kural adı girin."),
+    name: z.string().trim().min(1, "Lütfen kural adı girin."),
     description: z.string().optional(),
-    targetType: z.enum(["all", "department", "position", "individual"]),
+    targetType: z.enum(["all", "department", "position", "individual", "visitor"]),
     selectedEmployees: z.array(z.string()),
     selectedDevices: z.array(z.string()),
     selectedZones: z.array(z.string()),
@@ -54,10 +54,13 @@ export const accessRuleSchema = z
         path: ["selectedDevices"],
       });
     }
+    if (Boolean(data.startTime) !== Boolean(data.endTime)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Başlangıç ve bitiş saatini birlikte girin veya tüm günü seçin.", path: [data.startTime ? "endTime" : "startTime"] });
+    }
     if (data.startTime && data.endTime && data.startTime >= data.endTime) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Bitiş saati başlangıçtan sonra olmalı.",
+        message: "Bitiş saati başlangıçtan sonra olmalı; geceyi aşan plan için ayrı kurallar oluşturun.",
         path: ["endTime"],
       });
     }

@@ -20,7 +20,7 @@ interface CreateRuleDialogProps {
 const FORM_ID = "access-rule-form";
 
 const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRuleDialogProps) => {
-  const { formData, setFormData, handleSubmit, isSubmitting } = useRuleForm(editingRule, open, onClose);
+  const { formData, setFormData, handleSubmit, isSubmitting, errors } = useRuleForm(editingRule, open, onClose);
 
   const submittingRef = useRef(false);
   const submit: typeof handleSubmit = async (event) => {
@@ -45,11 +45,15 @@ const CreateRuleDialog = ({ open, onOpenChange, editingRule, onClose }: CreateRu
 
         <form id={FORM_ID} onSubmit={submit} className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
           <RuleBasicInfo formData={formData} setFormData={setFormData} />
-          <TimeSchedule formData={formData} setFormData={setFormData} />
+          <TimeSchedule formData={formData} setFormData={setFormData} errors={errors} />
+          {errors.name && <p role="alert" className="text-sm text-destructive">{errors.name}</p>}
 
           <div className="grid gap-x-6 gap-y-5 md:grid-cols-2 pt-2 border-t">
-            <DepartmentTree formData={formData} setFormData={setFormData} />
-            <ZoneDeviceTree formData={formData} setFormData={setFormData} />
+            <div id="rule-employees" tabIndex={-1}>
+              {formData.target_type === 'visitor' ? <p className="text-sm text-muted-foreground">Ziyaretçi bölgesi: mevcut ziyaretçi üyelikleri korunur. Ziyaretçiler bu bölgeye Ziyaretçiler ekranından eklenir.</p> : <DepartmentTree formData={formData} setFormData={setFormData} />}
+              {errors.selectedEmployees && <p role="alert" className="text-sm text-destructive">{errors.selectedEmployees}</p>}
+            </div>
+            <div id="rule-devices" tabIndex={-1}><ZoneDeviceTree formData={formData} setFormData={setFormData} />{errors.selectedDevices && <p role="alert" className="text-sm text-destructive">{errors.selectedDevices}</p>}</div>
           </div>
         </form>
 

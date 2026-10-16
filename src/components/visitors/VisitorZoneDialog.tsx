@@ -18,7 +18,9 @@ import { TimeSchedule } from "@/components/access-control/unified/components/Tim
 import { ZoneDeviceTree } from "@/components/access-control/unified/components/ZoneDeviceTree";
 import { DEFAULT_WORKDAYS } from "@/components/access-control/unified/components/weekdays";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
-import { toast } from "@/hooks/use-toast";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { notify } from "@/lib/notify";
+import { accessScheduleError } from "../../../convex/lib/accessRuleUx";
 import { Loader2 } from "lucide-react";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -50,48 +52,31 @@ interface VisitorZoneDialogProps {
 export default function VisitorZoneDialog({ isOpen, onClose }: VisitorZoneDialogProps) {
   const { projectId } = useActiveProject();
   const [formData, setFormData] = useState<ZoneFormData>(emptyZone);
-  const [isSaving, setIsSaving] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
   const createRule = useMutation(api.accessRules.createWithGroups);
 
+  const save = useAsyncAction(async () => {
+    await createRule({
+      name: formData.name.trim(), projectId, targetType: "visitor",
+      startTime: formData.start_time || undefined, endTime: formData.end_time || undefined,
+      days: formData.days, accessDirection: "both",
+      deviceIds: formData.selected_devices as Id<"devices">[],
+      doorIds: formData.selected_doors as Id<"doors">[],
+    });
+  }, { success: "Ziyaretçi bölgesi oluşturuldu", error: "Bölge oluşturulamadı" });
+  const isSaving = save.pending;
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
-      toast({ title: "Hata", description: "Bölge adı girin", variant: "destructive" });
-      return;
-    }
-    if (formData.selected_devices.length === 0) {
-      toast({ title: "Hata", description: "En az bir kapı/cihaz seçin", variant: "destructive" });
-      return;
-    }
-    setIsSaving(true);
-    try {
-      await createRule({
-        name: formData.name.trim(),
-        projectId,
-        targetType: "visitor",
-        startTime: formData.start_time.trim() || undefined,
-        endTime: formData.end_time.trim() || undefined,
-        days: formData.days,
-        accessDirection: "both",
-        deviceIds: formData.selected_devices as Id<"devices">[],
-        doorIds: formData.selected_doors as Id<"doors">[],
-      });
-      toast({ title: "Başarılı", description: "Ziyaretçi bölgesi oluşturuldu" });
-      setFormData(emptyZone());
-      onClose();
-    } catch (err) {
-      toast({
-        title: "Hata",
-        description: (err as Error).message || "Bölge oluşturulamadı",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSaving(false);
-    }
+    if (!formData.name.trim()) { notify.error("Bölge adı girin"); return; }
+    if (!formData.selected_devices.length && !formData.selected_doors.length) { notify.error("En az bir kapı/cihaz seçin"); return; }
+    const error = accessScheduleError({ days: formData.days, startTime: formData.start_time, endTime: formData.end_time });
+    setScheduleError(error);
+    if (error) { requestAnimationFrame(() => document.getElementById("start_time")?.focus()); return; }
+    if (await save.run()) { setFormData(emptyZone()); onClose(); }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isSaving && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Yeni Ziyaretçi Bölgesi</DialogTitle>
@@ -113,10 +98,11 @@ export default function VisitorZoneDialog({ isOpen, onClose }: VisitorZoneDialog
           </div>
 
           <TimeSchedule formData={formData} setFormData={setFormData} />
+          {scheduleError && <p role="alert" className="text-sm text-destructive">{scheduleError}</p>}
           <ZoneDeviceTree formData={formData} setFormData={setFormData} />
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
               İptal
             </Button>
             <Button type="submit" disabled={isSaving}>

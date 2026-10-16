@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Visitor } from "@/types/visitor";
-import { Loader2 } from "lucide-react";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import FormActions from "@/components/employees/FormActions";
 import VisitorFormFields from "./VisitorFormFields";
 import { useVisitorFormData } from "./hooks/useVisitorFormData";
@@ -22,7 +22,7 @@ export default function VisitorForm({ visitor, onClose, onSave }: VisitorFormPro
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const result = visitorFormSchema.safeParse(formData);
+    const result = visitorFormSchema.safeParse({ ...formData, isEditing: !!visitor });
     if (!result.success) {
       const errors: Record<string, string> = {};
       for (const issue of result.error.issues) {
@@ -30,6 +30,8 @@ export default function VisitorForm({ visitor, onClose, onSave }: VisitorFormPro
         if (key && !errors[key]) errors[key] = issue.message;
       }
       setFieldErrors(errors);
+      const ids: Record<string, string> = { firstName: "v_first_name", lastName: "v_last_name", cardNumber: "v_card", presetRuleId: "v_zone", accessExpiresAt: "v_expires" };
+      requestAnimationFrame(() => document.getElementById(ids[String(result.error.issues[0]?.path[0])])?.focus());
       return;
     }
     setFieldErrors({});
@@ -39,10 +41,7 @@ export default function VisitorForm({ visitor, onClose, onSave }: VisitorFormPro
   return (
     <form onSubmit={onSubmit} className="space-y-5" noValidate>
       {optionsLoading ? (
-        <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-          Form bilgileri yükleniyor...
-        </div>
+        <SectionSkeleton rows={5} label="Form bilgileri yükleniyor" />
       ) : (
         <VisitorFormFields
           formData={formData}

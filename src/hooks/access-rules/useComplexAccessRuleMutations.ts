@@ -30,8 +30,8 @@ interface UpdateRuleWithMembersParams {
     name?: string;
     description?: string;
     targetType?: string;
-    startTime?: string;
-    endTime?: string;
+    startTime?: string | null;
+    endTime?: string | null;
     days?: string[];
     accessDirection?: string;
     priority?: number;

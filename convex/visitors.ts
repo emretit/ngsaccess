@@ -1,3 +1,5 @@
+import { toPatch } from "./lib/nullablePatch";
+import { VISITOR_PRESENCE_READING_LIMIT, visitorPresence, visitorDetailsError, visitorExpiryError } from "./lib/visitorPresence";
 import { internalMutation } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
@@ -123,12 +125,12 @@ export const list = authedQuery({
       visitors.map(async (vz) => {
         const host = vz.hostEmployeeId ? await ctx.db.get(vz.hostEmployeeId) : null;
         const rule = vz.accessRuleId ? await ctx.db.get(vz.accessRuleId) : null;
-        // Son kart okuması — "şu an binada" hesabı için (entry → içeride).
-        const lastReading = await ctx.db
+        // Olay zamanına göre son başarılı yönlü okuma; retler konumu değiştirmez.
+        const readings = await ctx.db
           .query("cardReadings")
           .withIndex("by_employee", (q) => q.eq("employeeId", vz._id))
           .order("desc")
-          .first();
+          .take(VISITOR_PRESENCE_READING_LIMIT);
         // KVKK rıza durumu.
         const consents = await ctx.db
           .query("employeeConsents")
@@ -143,8 +145,7 @@ export const list = authedQuery({
             ? { _id: host._id, firstName: host.firstName, lastName: host.lastName }
             : null,
           presetRule: rule ? { _id: rule._id, name: rule.name } : null,
-          lastDirection: lastReading?.direction ?? null,
-          lastReadingAt: lastReading?.accessTime ?? null,
+          ...visitorPresence(readings),
           hasKvkkConsent: !!activeConsent,
           kvkkConsentAt: activeConsent?.grantedAt ?? null,
         };
@@ -191,6 +192,8 @@ export const create = adminMutation({
       throw new Error("Bu ziyaretçi bölgesine erişim yetkiniz yok");
     }
 
+    const validationError = visitorDetailsError(args);
+    if (validationError) throw new Error(validationError);
     const cardNumber = args.cardNumber.trim();
     if (!cardNumber) throw new Error("Kart numarası zorunludur");
     const dupCard = await findDuplicateEmployee(ctx, "cardNumber", cardNumber);
@@ -273,12 +276,12 @@ export const update = adminMutation({
     lastName: v.optional(v.string()),
     cardNumber: v.optional(v.string()),
     accessExpiresAt: v.optional(v.string()),
-    visitorPhone: v.optional(v.string()),
-    visitorCompany: v.optional(v.string()),
-    visitPurpose: v.optional(v.string()),
-    hostEmployeeId: v.optional(v.id("employees")),
+    visitorPhone: v.optional(v.union(v.null(), v.string())),
+    visitorCompany: v.optional(v.union(v.null(), v.string())),
+    visitPurpose: v.optional(v.union(v.null(), v.string())),
+    hostEmployeeId: v.optional(v.union(v.null(), v.id("employees"))),
     isActive: v.optional(v.boolean()),
-    notes: v.optional(v.string()),
+    notes: v.optional(v.union(v.null(), v.string())),
     kvkkConsent: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -289,6 +292,18 @@ export const update = adminMutation({
       throw new Error("Bu ziyaretçiye erişim yetkiniz yok");
     }
 
+    const effective = { ...visitor, ...toPatch(args) };
+    // İade edilmiş pasif kayıt kişisel bilgi düzenlemesine açık kalır.
+    if (effective.isActive || args.cardNumber !== undefined) {
+      const validationError = visitorDetailsError(effective, Date.now(), false);
+      if (validationError) throw new Error(validationError);
+    }
+    if (args.accessExpiresAt !== undefined) {
+      const expiryError = visitorExpiryError(args.accessExpiresAt);
+      if (expiryError) throw new Error(expiryError);
+    }
+    if (args.firstName !== undefined && !args.firstName.trim()) throw new Error("Ad alanı zorunludur");
+    if (args.lastName !== undefined && !args.lastName.trim()) throw new Error("Soyad alanı zorunludur");
     const newCard = args.cardNumber?.trim();
     const cardChanged = newCard !== undefined && newCard !== visitor.cardNumber;
     if (cardChanged) {
@@ -314,16 +329,16 @@ export const update = adminMutation({
     const patch: Record<string, unknown> = { updatedAt: now };
     if (args.firstName !== undefined) patch.firstName = args.firstName.trim();
     if (args.lastName !== undefined) patch.lastName = args.lastName.trim();
-    if (args.visitorPhone !== undefined) patch.visitorPhone = args.visitorPhone.trim() || undefined;
-    if (args.visitorCompany !== undefined) patch.visitorCompany = args.visitorCompany.trim() || undefined;
-    if (args.visitPurpose !== undefined) patch.visitPurpose = args.visitPurpose.trim() || undefined;
-    if (args.hostEmployeeId !== undefined) patch.hostEmployeeId = args.hostEmployeeId;
-    if (args.notes !== undefined) patch.notes = args.notes.trim() || undefined;
+    if (args.visitorPhone !== undefined) patch.visitorPhone = toPatch({ visitorPhone: args.visitorPhone?.trim() || null }).visitorPhone;
+    if (args.visitorCompany !== undefined) patch.visitorCompany = toPatch({ visitorCompany: args.visitorCompany?.trim() || null }).visitorCompany;
+    if (args.visitPurpose !== undefined) patch.visitPurpose = toPatch({ visitPurpose: args.visitPurpose?.trim() || null }).visitPurpose;
+    if (args.hostEmployeeId !== undefined) patch.hostEmployeeId = toPatch({ hostEmployeeId: args.hostEmployeeId }).hostEmployeeId;
+    if (args.notes !== undefined) patch.notes = toPatch({ notes: args.notes?.trim() || null }).notes;
     if (args.accessExpiresAt !== undefined) patch.accessExpiresAt = args.accessExpiresAt;
     if (cardChanged) patch.cardNumber = newCard;
     if (activeChanged) {
       patch.isActive = args.isActive;
-      patch.visitorStatus = args.isActive ? "checkedIn" : "checkedOut";
+      patch.visitorStatus = args.isActive ? "checkedIn" : "preRegistered";
     }
     await ctx.db.patch(args.visitorId, patch);
 

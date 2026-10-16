@@ -13,19 +13,12 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { Edit2, Trash2, LogOut, Undo2 } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { notify } from "@/lib/notify";
 import { formatVisitorTime } from "./visitorTime";
 
 interface VisitorTableProps {
@@ -36,58 +29,17 @@ interface VisitorTableProps {
 
 export default function VisitorTable({ visitors, onEdit, onRefresh }: VisitorTableProps) {
   const [deleteTarget, setDeleteTarget] = useState<Visitor | null>(null);
-  const [checkingOutId, setCheckingOutId] = useState<string | null>(null);
+  const [checkoutTarget, setCheckoutTarget] = useState<Visitor | null>(null);
 
   const removeEmployee = useMutation(api.employees.remove);
   const checkOut = useMutation(api.visitors.checkOut);
   const releaseCard = useMutation(api.visitors.releaseCard);
 
-  const handleReleaseCard = async (visitor: Visitor) => {
-    try {
-      await releaseCard({ visitorId: visitor._id });
-      toast({ title: "Kart serbest", description: "Kart başka ziyaretçiye verilebilir" });
-      onRefresh?.();
-    } catch (err) {
-      toast({
-        title: "Hata",
-        description: (err as Error).message || "Kart serbest bırakılamadı",
-        variant: "destructive",
-      });
-    }
-  };
+  const release = useAsyncAction(async (visitor: Visitor) => {
+    await releaseCard({ visitorId: visitor._id });
+    onRefresh?.();
+  }, { success: "Kart serbest; başka ziyaretçiye verilebilir", error: "Kart serbest bırakılamadı" });
 
-  const handleDeleteConfirm = async () => {
-    if (!deleteTarget) return;
-    try {
-      await removeEmployee({ employeeId: deleteTarget._id });
-      toast({ title: "Başarılı", description: "Ziyaretçi silindi" });
-      setDeleteTarget(null);
-      onRefresh?.();
-    } catch (err) {
-      toast({
-        title: "Hata",
-        description: (err as Error).message || "Ziyaretçi silinemedi",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleCheckOut = async (visitor: Visitor) => {
-    setCheckingOutId(visitor._id);
-    try {
-      await checkOut({ visitorId: visitor._id });
-      toast({ title: "Çıkış", description: `${visitor.firstName} ${visitor.lastName} çıkış yaptı` });
-      onRefresh?.();
-    } catch (err) {
-      toast({
-        title: "Hata",
-        description: (err as Error).message || "Çıkış işlemi başarısız",
-        variant: "destructive",
-      });
-    } finally {
-      setCheckingOutId(null);
-    }
-  };
 
   return (
     <div className="overflow-x-auto">
@@ -108,7 +60,7 @@ export default function VisitorTable({ visitors, onEdit, onRefresh }: VisitorTab
           {visitors.length === 0 ? (
             <TableRow>
               <TableCell colSpan={8} className="h-32 text-center text-muted-foreground text-sm">
-                Ziyaretçi bulunamadı.
+                <EmptyState title="Ziyaretçi bulunamadı" description="Seçili filtrelere uygun kayıt yok." />
               </TableCell>
             </TableRow>
           ) : (
@@ -119,7 +71,7 @@ export default function VisitorTable({ visitors, onEdit, onRefresh }: VisitorTab
                   key={visitor._id}
                   className="cursor-pointer transition-colors hover:bg-muted/50"
                   onClick={(e) => {
-                    if ((e.target as HTMLElement).closest("button")) return;
+                    if ((e.target as HTMLElement).closest("button, a")) return;
                     onEdit(visitor);
                   }}
                 >
@@ -144,9 +96,11 @@ export default function VisitorTable({ visitors, onEdit, onRefresh }: VisitorTab
                   </TableCell>
                   <TableCell className="text-sm">{formatVisitorTime(visitor.accessExpiresAt)}</TableCell>
                   <TableCell>
-                    <Badge variant={status.variant} className="text-xs">
+                    <StatusBadge tone={status.variant === "success" ? "success" : status.variant === "destructive" ? "danger" : status.variant === "default" ? "info" : "neutral"}>
                       {status.label}
-                    </Badge>
+                    </StatusBadge>
+                    <a href="#visitor-sync-status" className="block text-xs underline mt-1">Proje cihaz durumu</a>
+                    <div className="text-xs text-muted-foreground mt-1">{visitor.presence === "inside" ? "Son başarılı okuma: içeride" : visitor.presence === "outside" ? "Son başarılı okuma: dışarıda" : "Konum bilinmiyor"}</div>
                   </TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-0.5">
@@ -154,10 +108,10 @@ export default function VisitorTable({ visitors, onEdit, onRefresh }: VisitorTab
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleCheckOut(visitor)}
-                          disabled={checkingOutId === visitor._id}
+                          onClick={() => setCheckoutTarget(visitor)}
+                          disabled={release.pending}
                           className="h-8 w-8 text-muted-foreground hover:text-amber-600"
-                          title="Çıkış Yaptır"
+                          title="Ziyareti sonlandır" aria-label={`${visitor.firstName} ${visitor.lastName} ziyaretini sonlandır`}
                         >
                           <LogOut className="h-4 w-4" />
                         </Button>
@@ -166,9 +120,10 @@ export default function VisitorTable({ visitors, onEdit, onRefresh }: VisitorTab
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleReleaseCard(visitor)}
+                          onClick={() => release.run(visitor)}
+                          disabled={release.pending}
                           className="h-8 w-8 text-muted-foreground hover:text-amber-600"
-                          title="Kartı Serbest Bırak (rozet iadesi)"
+                          title="Kartı Serbest Bırak (rozet iadesi)" aria-label={`${visitor.firstName} ${visitor.lastName} kartını serbest bırak`}
                         >
                           <Undo2 className="h-4 w-4" />
                         </Button>
@@ -178,7 +133,7 @@ export default function VisitorTable({ visitors, onEdit, onRefresh }: VisitorTab
                         size="icon"
                         onClick={() => onEdit(visitor)}
                         className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                        title="Düzenle"
+                        title="Düzenle" aria-label={`${visitor.firstName} ${visitor.lastName} ziyaretçisini düzenle`}
                       >
                         <Edit2 className="h-4 w-4" />
                       </Button>
@@ -187,7 +142,7 @@ export default function VisitorTable({ visitors, onEdit, onRefresh }: VisitorTab
                         size="icon"
                         onClick={() => setDeleteTarget(visitor)}
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        title="Sil"
+                        title="Sil" aria-label={`${visitor.firstName} ${visitor.lastName} ziyaretçisini sil`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -200,25 +155,34 @@ export default function VisitorTable({ visitors, onEdit, onRefresh }: VisitorTab
         </TableBody>
       </Table>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Ziyaretçiyi silmek istediğinize emin misiniz?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bu işlem geri alınamaz. Ziyaretçi kalıcı olarak silinecek ve cihazlardan kaldırılacaktır.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>İptal</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Sil
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDestructive
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Ziyaretçi silinsin mi?"
+        objectName={deleteTarget ? `${deleteTarget.firstName} ${deleteTarget.lastName}` : ""}
+        effects={["Ziyaretçi kaydı ve bölge üyelikleri kalıcı olarak silinir.", "Cihazlardan kaldırma işlemi başlatılır; bağlı kişisel veriler temizlenir."]}
+        confirmLabel="Ziyaretçiyi sil"
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          await removeEmployee({ employeeId: deleteTarget._id });
+          notify.success("Ziyaretçi silindi");
+          onRefresh?.();
+        }}
+      />
+      <ConfirmDestructive
+        open={checkoutTarget !== null}
+        onOpenChange={(open) => { if (!open) setCheckoutTarget(null); }}
+        title="Ziyaret sonlandırılsın mı?"
+        objectName={checkoutTarget ? `${checkoutTarget.firstName} ${checkoutTarget.lastName}` : ""}
+        effects={["Erişim pasife alınır ve cihazlardan kaldırma işlemi başlatılır.", "Bu işlem fiziksel çıkış okuması oluşturmaz; kart iadesi ayrıca yapılır."]}
+        confirmLabel="Ziyareti sonlandır"
+        onConfirm={async () => {
+          if (!checkoutTarget) return;
+          await checkOut({ visitorId: checkoutTarget._id });
+          notify.success("Ziyaret sonlandırıldı", "Cihaz işlemleri senkronizasyon şeridinden izlenebilir.");
+          onRefresh?.();
+        }}
+      />
     </div>
   );
 }

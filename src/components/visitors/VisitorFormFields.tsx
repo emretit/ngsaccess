@@ -101,15 +101,16 @@ export default function VisitorFormFields({
         <div>
           <Label htmlFor="v_host">Ziyaret Edilen Kişi</Label>
           <Select
-            value={formData.hostEmployeeId ?? ""}
+            value={formData.hostEmployeeId ?? "none"}
             onValueChange={(value) =>
-              handleChange("hostEmployeeId", (value || null) as Id<"employees"> | null)
+              handleChange("hostEmployeeId", (value === "none" ? null : value) as Id<"employees"> | null)
             }
           >
             <SelectTrigger id="v_host">
               <SelectValue placeholder="Personel seçin" />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="none">Seçilmedi</SelectItem>
               {hostEmployees.map((emp) => (
                 <SelectItem key={emp.id} value={emp.id}>
                   {emp.name}
@@ -124,7 +125,7 @@ export default function VisitorFormFields({
       <div className="space-y-4">
         <h3 className="text-lg font-medium">Erişim Bilgileri</h3>
 
-        <VisitorCardCapture onCapture={(no) => handleChange("cardNumber", no)} />
+        <VisitorCardCapture currentCard={formData.cardNumber} onCapture={(no) => handleChange("cardNumber", no)} />
 
         <div>
           <Label htmlFor="v_card">Kart Numarası *</Label>
@@ -148,7 +149,7 @@ export default function VisitorFormFields({
             }
             disabled={isEditing}
           >
-            <SelectTrigger id="v_zone">
+            <SelectTrigger id="v_zone" aria-invalid={!!errors.presetRuleId} aria-describedby={errors.presetRuleId ? "v_zone-error" : undefined}>
               <SelectValue placeholder="Erişebileceği bölge" />
             </SelectTrigger>
             <SelectContent>
@@ -159,6 +160,7 @@ export default function VisitorFormFields({
               ))}
             </SelectContent>
           </Select>
+          <FieldError id="v_zone-error" message={errors.presetRuleId} />
           {isEditing ? (
             <p className="text-xs text-muted-foreground mt-1">
               Bölge düzenlemede değiştirilemez. Farklı bölge için yeni ziyaretçi oluşturun.
@@ -178,10 +180,13 @@ export default function VisitorFormFields({
             type="datetime-local"
             value={formData.accessExpiresAt}
             onChange={(e) => handleChange("accessExpiresAt", e.target.value)}
+            aria-invalid={!!errors.accessExpiresAt}
+            aria-describedby={errors.accessExpiresAt ? "v_expires-error" : undefined}
             required
           />
+          <FieldError id="v_expires-error" message={errors.accessExpiresAt} />
           <p className="text-xs text-muted-foreground mt-1">
-            Bu zamandan sonra erişim otomatik olarak iptal edilir (TR saati).
+            Bu zaman erişim süresinin sonudur (TR saati). Cihaza uygulanma durumu üstteki senkronizasyon şeridinden izlenir.
           </p>
         </div>
 
