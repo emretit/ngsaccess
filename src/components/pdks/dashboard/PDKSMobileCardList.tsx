@@ -36,6 +36,7 @@ interface PDKSMobileCardListProps {
   onShowDetail?: (employeeId: Id<"employees">) => void;
   onEdit?: (record: MobileEmployeeRecord) => void;
   canEdit?: boolean;
+  editDate?: string;
 }
 
 export function PDKSMobileCardList({
@@ -45,6 +46,7 @@ export function PDKSMobileCardList({
   onShowDetail,
   onEdit,
   canEdit,
+  editDate,
 }: PDKSMobileCardListProps) {
   if (records.length === 0) {
     return (
@@ -121,7 +123,7 @@ export function PDKSMobileCardList({
                 )}
 
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-border/60">
-                  {canEdit && onEdit && (
+                  {canEdit && editDate && onEdit && (
                     <Button
                       size="sm"
                       variant="ghost"

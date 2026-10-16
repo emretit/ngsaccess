@@ -1,3 +1,5 @@
+import type { PdksSummary } from "@/lib/pdksSummary";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Users, UserCheck, Clock, Timer, Building, Palmtree, ArrowUp, ArrowDown, Minus } from "lucide-react";
 import { Line, LineChart, ResponsiveContainer } from "recharts";
 import { cn } from "@/lib/utils";
@@ -10,21 +12,12 @@ interface PreviousSeries {
   leaveToday: number[];
 }
 
-interface SummaryData {
-  totalEmployees: number;
-  presentToday: number;
-  lateArrivals: number;
-  overtimeHours: number;
-  insideBuilding: number;
-  leaveToday?: number;
-  devamOrani?: number;
-  topLateDepartment?: string;
-  topLateDepartmentCount?: number;
-  previousSeries?: PreviousSeries;
-}
-
 interface PDKSSummaryCardsProps {
-  data: SummaryData;
+  data: PdksSummary;
+  loading?: boolean;
+  liveData?: { insideBuilding: number; previousSeries?: PreviousSeries };
+  liveLoading?: boolean;
+  isPeriod?: boolean;
   onCardClick?: (statusFilter: StatusFilter) => void;
 }
 
@@ -100,7 +93,7 @@ function TrendBadge({
   );
 }
 
-export function PDKSSummaryCards({ data, onCardClick }: PDKSSummaryCardsProps) {
+export function PDKSSummaryCards({ data, loading, liveData, liveLoading, isPeriod, onCardClick }: PDKSSummaryCardsProps) {
   const stats: Array<{
     title: string;
     value: number | string;
@@ -119,28 +112,24 @@ export function PDKSSummaryCards({ data, onCardClick }: PDKSSummaryCardsProps) {
       color: "text-blue-600",
     },
     {
-      title: "Bugün Mevcut",
-      value: data.presentToday,
+      title: isPeriod ? "Mevcut (kişi-gün)" : "Mevcut",
+      value: data.present,
       icon: UserCheck,
       color: "text-emerald-600",
-      sub: `%${data.devamOrani ?? 0}`,
+      sub: `%${data.attendanceRate ?? 0}`,
       statusFilter: "present",
-      current: data.presentToday,
-      series: data.previousSeries?.presentToday,
+      current: data.present,
+      series: liveData?.previousSeries?.presentToday,
     },
     {
-      title: "Geç Kalanlar",
-      value: data.lateArrivals,
+      title: isPeriod ? "Geç (kişi-gün)" : "Geç Kalanlar",
+      value: data.late,
       icon: Clock,
       color: "text-orange-600",
-      sub:
-        data.topLateDepartment && data.topLateDepartment !== "-"
-          ? `${data.topLateDepartment} (${data.topLateDepartmentCount})`
-          : undefined,
       statusFilter: "late",
-      current: data.lateArrivals,
+      current: data.late,
       invertColor: true,
-      series: data.previousSeries?.lateArrivals,
+      series: liveData?.previousSeries?.lateArrivals,
     },
     {
       title: "Mesai",
@@ -149,27 +138,32 @@ export function PDKSSummaryCards({ data, onCardClick }: PDKSSummaryCardsProps) {
       color: "text-purple-600",
       statusFilter: "overtime",
       current: data.overtimeHours,
-      series: data.previousSeries?.overtimeHours,
+      series: liveData?.previousSeries?.overtimeHours,
     },
     {
-      title: "İzindeki",
-      value: data.leaveToday ?? 0,
+      title: isPeriod ? "İzinli (kişi-gün)" : "İzindeki",
+      value: data.leave ?? 0,
       icon: Palmtree,
       color: "text-amber-600",
       statusFilter: "leave",
-      current: data.leaveToday ?? 0,
-      series: data.previousSeries?.leaveToday,
+      current: data.leave ?? 0,
+      series: liveData?.previousSeries?.leaveToday,
     },
     {
-      title: "İçeride",
-      value: data.insideBuilding,
-      icon: Building,
+      title: isPeriod ? "Devamsız (kişi-gün)" : "Devamsız",
+      value: data.absent,
+      icon: Users,
       color: "text-rose-600",
+      statusFilter: "absent",
     },
+    ...(liveData ? [{
+      title: "İçeride", value: liveData.insideBuilding,
+      icon: Building, color: "text-rose-600",
+    }] : []),
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 rounded-lg border bg-card divide-y sm:divide-y-0 sm:divide-x divide-border overflow-hidden">
+    <div className={cn("grid grid-cols-2 sm:grid-cols-3 rounded-lg border bg-card divide-y sm:divide-y-0 sm:divide-x divide-border overflow-hidden", liveData ? "lg:grid-cols-7" : "lg:grid-cols-6")}>
       {stats.map((stat, i) => {
         const clickable = !!stat.statusFilter && !!onCardClick;
         const rowDivider =
@@ -205,7 +199,7 @@ export function PDKSSummaryCards({ data, onCardClick }: PDKSSummaryCardsProps) {
               </div>
               <div className="flex items-baseline gap-1.5 mt-0.5">
                 <span className="text-lg font-semibold tabular-nums text-foreground leading-none">
-                  {stat.value}
+                  {loading || (stat.title === "İçeride" && liveLoading) ? <Skeleton className="h-5 w-12" /> : stat.value}
                 </span>
                 {stat.current !== undefined && (
                   <TrendBadge

@@ -1,3 +1,7 @@
+import { subDays } from "date-fns";
+import { toLocalDateString } from "@/lib/date";
+import { summarizePdksRecords } from "@/lib/pdksSummary";
+import { PDKSDateNavigator } from "@/components/pdks/dashboard/PDKSDateNavigator";
 import { useCallback, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
@@ -24,9 +28,7 @@ import { usePdksTableData } from "@/hooks/usePdksTableData";
 import { usePdksFilterParams } from "@/hooks/usePdksFilterParams";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, BarChart3, Table2, RefreshCw, Download, X, Calendar as CalendarIcon, LayoutGrid } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { LoadingSpinner } from "@/components/ui/loading-spinner";
+import { MessageSquare, BarChart3, Table2, Download, X, LayoutGrid } from "lucide-react";
 import type { Id } from "../../convex/_generated/dataModel";
 
 const DEFAULT_FILTERS: FilterValues = {
@@ -50,18 +52,9 @@ export default function PDKSRecords() {
     employeeId: Id<"employees">;
     date?: string;
   } | null>(null);
-  const { toast } = useToast();
-
-  const { stats: summaryData, isLoading: statsLoading } = usePdksStats({
-    companyId: filters.companyId,
-    departmentId: filters.departmentId,
-    positionId: filters.positionId,
-    shiftId: filters.shiftId,
-    compareWithPrevious: true,
-  });
-
   const {
     tableRecords: rawTableRecords,
+    allRecords,
     isLoading: tableLoading,
     selectedDate,
     dateRangeLabel,
@@ -69,18 +62,27 @@ export default function PDKSRecords() {
     endDate,
   } = usePdksTableData(filters);
 
-  const tableRecords = smartPreset
+  const todayKey = toLocalDateString();
+  const selectedDateKey = toLocalDateString(selectedDate);
+  const showLiveStats = filters.reportType === "daily" && selectedDateKey === todayKey;
+
+  const { stats: liveData, isLoading: statsLoading } = usePdksStats({
+    companyId: filters.companyId,
+    departmentId: filters.departmentId,
+    positionId: filters.positionId,
+    shiftId: filters.shiftId,
+    compareWithPrevious: true,
+    enabled: showLiveStats,
+  });
+
+  const effectiveSmartPreset = smartPreset?.date && smartPreset.date !== selectedDateKey ? null : smartPreset;
+  const tableRecords = effectiveSmartPreset
     ? rawTableRecords.filter((r) =>
-        smartPreset.employeeIds.some((id) => String(id) === String(r.id)),
+        effectiveSmartPreset.employeeIds.some((id) => String(id) === String(r.id)),
       )
     : rawTableRecords;
 
-  const handleRefreshData = () => {
-    toast({
-      title: "Veriler güncellendi",
-      description: "PDKS verileri yenilendi.",
-    });
-  };
+  const summaryData = summarizePdksRecords(allRecords, todayKey);
 
   const activeFilterCount =
     (filters.dateRange.from ? 1 : 0) +
@@ -106,38 +108,22 @@ export default function PDKSRecords() {
     []
   );
 
-  if (statsLoading) {
-    return <LoadingSpinner text="PDKS kayıtları yükleniyor..." />;
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">PDKS Dashboard</h1>
+          <h1 className="text-2xl font-bold text-foreground">PDKS Kayıtları</h1>
           <div className="flex flex-wrap items-center gap-2 mt-1">
             <p className="text-sm text-muted-foreground">
               Personel Devam Kontrol Sistemi
             </p>
-            <Badge variant="outline" className="gap-1.5 text-xs">
-              <CalendarIcon className="h-3 w-3" />
-              {dateRangeLabel}
-            </Badge>
+            <PDKSDateNavigator values={filters} onChange={setFilters} />
             <Badge variant="secondary" className="text-xs">
               {tableRecords.length} çalışan
             </Badge>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefreshData}
-            className="gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            <span className="hidden sm:inline">Yenile</span>
-          </Button>
           <PDKSSavedViews filters={filters} onApply={setFilters} />
           <Button
             variant="outline"
@@ -165,11 +151,23 @@ export default function PDKSRecords() {
         <PDKSActiveFilterChips values={filters} onChange={setFilters} />
       </div>
 
-      <PDKSSmartPresets selection={smartPreset} onChange={setSmartPreset} />
+      <PDKSSmartPresets
+        key={selectedDateKey}
+        anchorDate={selectedDate}
+        selection={effectiveSmartPreset}
+        onChange={setSmartPreset}
+      />
 
       <PDKSOvertimeAlert />
 
-      <PDKSSummaryCards data={summaryData} onCardClick={handleCardClick} />
+      <PDKSSummaryCards
+        data={summaryData}
+        loading={tableLoading}
+        liveData={showLiveStats ? liveData : undefined}
+        liveLoading={statsLoading}
+        isPeriod={filters.reportType !== "daily"}
+        onCardClick={handleCardClick}
+      />
 
       <PDKSInlineQuery
         filters={filters}
@@ -203,9 +201,11 @@ export default function PDKSRecords() {
           <div className="p-4">
             <TabsContent value="table" className="mt-0">
               <PDKSTableView
+                key={`${filters.reportType}:${startDate}:${endDate}`}
                 records={tableRecords}
                 loading={tableLoading}
                 selectedDate={selectedDate}
+                editDate={filters.reportType === "daily" ? selectedDateKey : undefined}
                 onShowDetail={(employeeId) => setDrilldown({ employeeId })}
               />
             </TabsContent>
@@ -221,7 +221,10 @@ export default function PDKSRecords() {
             </TabsContent>
 
             <TabsContent value="charts" className="mt-0">
-              <PDKSChartView />
+              <PDKSChartView
+                startDate={filters.reportType === "daily" ? toLocalDateString(subDays(selectedDate, 6)) : startDate}
+                endDate={endDate}
+              />
             </TabsContent>
 
             <TabsContent value="export" className="mt-0">

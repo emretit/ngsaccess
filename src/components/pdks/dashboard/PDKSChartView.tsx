@@ -24,7 +24,7 @@ const CHART_COLORS = {
   primary: "hsl(var(--primary))",
 };
 
-export function PDKSChartView() {
+export function PDKSChartView({ startDate, endDate }: { startDate: string; endDate: string }) {
   const {
     dailyAttendance,
     departmentAbsence,
@@ -32,7 +32,7 @@ export function PDKSChartView() {
     hourlyTrend,
     lateMinutesSamples,
     isLoading,
-  } = usePdksChartData(7);
+  } = usePdksChartData(startDate, endDate);
 
   const dailyAttendanceData = dailyAttendance.length
     ? dailyAttendance.map((d) => ({
@@ -102,7 +102,7 @@ export function PDKSChartView() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-600 text-sm font-medium">Haftalık Ortalama Devam</p>
+                <p className="text-blue-600 text-sm font-medium">Dönem Ortalama Devam</p>
                 <p className="text-2xl font-bold text-foreground">%{avgRate}</p>
               </div>
               <TrendingUp className="h-8 w-8 text-blue-600" />
@@ -159,7 +159,7 @@ export function PDKSChartView() {
         <Card className="border border-border bg-card shadow-sm hover:shadow transition-shadow">
           <CardHeader>
             <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-              📊 Haftalık Devam Durumu
+              📊 Dönem Devam Durumu
             </CardTitle>
           </CardHeader>
           <CardContent>

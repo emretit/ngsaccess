@@ -4,6 +4,7 @@ import { useProjectAccess } from "./useProjectAccess";
 import type { Id } from "../../convex/_generated/dataModel";
 
 export interface PdksStatsFilters {
+  enabled?: boolean;
   companyId?: Id<"companies">;
   departmentId?: Id<"departments">;
   positionId?: Id<"positions">;
@@ -29,7 +30,7 @@ export const usePdksStats = (filters?: PdksStatsFilters) => {
 
   const stats = useQuery(
     api.dashboard.getPdksStats,
-    !projectLoading
+    !projectLoading && filters?.enabled !== false
       ? {
           companyId: filters?.companyId,
           departmentId: filters?.departmentId,

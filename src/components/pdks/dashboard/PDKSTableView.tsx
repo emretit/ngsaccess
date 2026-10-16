@@ -63,10 +63,11 @@ interface PDKSTableViewProps {
   records: EmployeeRecord[];
   loading?: boolean;
   selectedDate?: Date;
+  editDate?: string;
   onShowDetail?: (employeeId: Id<"employees">) => void;
 }
 
-export function PDKSTableView({ records, loading = false, selectedDate, onShowDetail }: PDKSTableViewProps) {
+export function PDKSTableView({ records, loading = false, selectedDate, editDate, onShowDetail }: PDKSTableViewProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -76,7 +77,7 @@ export function PDKSTableView({ records, loading = false, selectedDate, onShowDe
   const convex = useConvex();
   const { profile } = useAuth();
   const canEdit =
-    profile?.role === "super_admin" || profile?.role === "project_admin";
+    !!editDate && (profile?.role === "super_admin" || profile?.role === "project_admin");
 
   const safeRecords = Array.isArray(records) ? records : [];
 
@@ -286,6 +287,7 @@ export function PDKSTableView({ records, loading = false, selectedDate, onShowDe
             onShowDetail={onShowDetail}
             onEdit={(r) => setEditingRecord(r as EmployeeRecord)}
             canEdit={canEdit}
+            editDate={editDate}
           />
         </div>
         <div className="overflow-x-auto hidden md:block">
@@ -471,12 +473,13 @@ export function PDKSTableView({ records, loading = false, selectedDate, onShowDe
           </Table>
         </div>
       </CardContent>
-      {editingRecord && (
+      {editingRecord && editDate && (
         <ManualPdksEditDialog
+          key={editDate}
           open={!!editingRecord}
           employeeId={editingRecord.id as Id<"employees">}
           employeeName={editingRecord.name}
-          date={toLocalDateString(selectedDate ?? new Date())}
+          date={editDate}
           initialEntry={
             editingRecord.firstEntry !== "-" ? editingRecord.firstEntry : ""
           }

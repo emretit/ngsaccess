@@ -1,14 +1,16 @@
-import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useProjectAccess } from "./useProjectAccess";
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from "date-fns";
+import { filterPdksTableRows } from "../../convex/lib/pdksTable";
+import { tr } from "date-fns/locale";
 import type { Id } from "../../convex/_generated/dataModel";
 
 export type ExportFormat = "daily" | "weekly" | "monthly" | "custom";
 export type PdksStatusFilter = "all" | "present" | "late" | "absent" | "leave" | "overtime";
 
 export interface PdksTableFilters {
+  anchorDate?: Date;
   dateRange?: { from?: Date; to?: Date };
   reportType?: ExportFormat;
   companyId?: Id<"companies">;
@@ -21,7 +23,7 @@ export interface PdksTableFilters {
 
 export const usePdksTableData = (filters?: PdksTableFilters) => {
   const { loading: projectLoading } = useProjectAccess();
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const selectedDate = filters?.anchorDate ?? new Date();
 
   const reportType = filters?.reportType ?? "daily";
   const isMatrix = reportType !== "daily";
@@ -34,7 +36,6 @@ export const usePdksTableData = (filters?: PdksTableFilters) => {
       departmentId: filters?.departmentId,
       positionId: filters?.positionId,
       shiftId: filters?.shiftId,
-      statusFilter: filters?.statusFilter,
       person: filters?.person,
       viewMode: (isMatrix ? "matrix" : "single") as "matrix" | "single",
     };
@@ -89,7 +90,7 @@ export const usePdksTableData = (filters?: PdksTableFilters) => {
       return `${format(w, "dd.MM.yyyy")} - ${format(we, "dd.MM.yyyy")}`;
     }
     if (reportType === "monthly") {
-      return format(selectedDate, "MMMM yyyy");
+      return format(selectedDate, "MMMM yyyy", { locale: tr });
     }
     return format(selectedDate, "dd.MM.yyyy");
   };
@@ -100,11 +101,11 @@ export const usePdksTableData = (filters?: PdksTableFilters) => {
 
   return {
     tableData: tableData ?? [],
-    tableRecords: tableData ?? [],
+    allRecords: tableData ?? [],
+    tableRecords: filterPdksTableRows(tableData ?? [], filters?.statusFilter),
     isLoading: projectLoading || tableData === undefined,
     error: null,
     selectedDate,
-    setSelectedDate,
     dateRangeLabel: dateRangeLabel(),
     isMatrix,
     startDate,

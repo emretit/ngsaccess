@@ -10,15 +10,17 @@ import type { Id } from "../../../../convex/_generated/dataModel";
 export interface SmartPresetSelection {
   key: "repeat-late" | "annual-overtime-near" | "break-violation";
   label: string;
+  date?: string;
   employeeIds: Id<"employees">[];
 }
 
 interface PDKSSmartPresetsProps {
+  anchorDate: Date;
   selection: SmartPresetSelection | null;
   onChange: (sel: SmartPresetSelection | null) => void;
 }
 
-export function PDKSSmartPresets({ selection, onChange }: PDKSSmartPresetsProps) {
+export function PDKSSmartPresets({ anchorDate, selection, onChange }: PDKSSmartPresetsProps) {
   const convex = useConvex();
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
 
@@ -39,11 +41,11 @@ export function PDKSSmartPresets({ selection, onChange }: PDKSSmartPresetsProps)
         employeeIds = rows.filter((r) => r.utilizationPct >= 80).map((r) => r.employeeId);
       } else if (key === "break-violation") {
         const rows = await convex.query(api.dashboard.getBreakViolations, {
-          date: toLocalDateString(new Date()),
+          date: toLocalDateString(anchorDate),
         });
         employeeIds = rows.map((r) => r.employeeId);
       }
-      onChange({ key, label, employeeIds });
+      onChange({ key, label, employeeIds, date: key === "break-violation" ? toLocalDateString(anchorDate) : undefined });
     } finally {
       setLoadingKey(null);
     }
@@ -56,7 +58,7 @@ export function PDKSSmartPresets({ selection, onChange }: PDKSSmartPresetsProps)
   }> = [
     { key: "repeat-late", label: "Sürekli geç kalanlar (30g · 3+)", icon: Clock },
     { key: "annual-overtime-near", label: "270h yaklaşanlar (%80+)", icon: AlertTriangle },
-    { key: "break-violation", label: "Mola ihlali (bugün)", icon: Coffee },
+    { key: "break-violation", label: `Mola ihlali (${toLocalDateString(anchorDate) === toLocalDateString(new Date()) ? "bugün" : toLocalDateString(anchorDate)})`, icon: Coffee },
   ];
 
   return (

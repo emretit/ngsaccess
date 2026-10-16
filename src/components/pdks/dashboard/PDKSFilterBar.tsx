@@ -27,6 +27,7 @@ export type ReportType = "daily" | "weekly" | "monthly" | "custom";
 export type StatusFilter = "all" | "present" | "late" | "absent" | "leave" | "overtime";
 
 export interface FilterValues {
+  anchorDate?: Date;
   dateRange: { from: Date | undefined; to: Date | undefined };
   reportType: ReportType;
   companyId?: Id<"companies">;
@@ -42,31 +43,25 @@ interface PDKSFilterBarProps {
   onChange: (values: FilterValues) => void;
 }
 
+const thisPeriod =
+  (reportType: ReportType, statusFilter: StatusFilter) =>
+  (c: FilterValues): FilterValues => ({
+    ...c,
+    anchorDate: new Date(),
+    dateRange: { from: undefined, to: undefined },
+    reportType,
+    statusFilter,
+  });
+
 const QUICK_CHIPS: Array<{
   key: string;
   label: string;
   apply: (current: FilterValues) => FilterValues;
 }> = [
-  {
-    key: "today-late",
-    label: "Bugün geç kalanlar",
-    apply: (c) => ({ ...c, reportType: "daily", statusFilter: "late" }),
-  },
-  {
-    key: "week-absent",
-    label: "Bu hafta hiç gelmeyenler",
-    apply: (c) => ({ ...c, reportType: "weekly", statusFilter: "absent" }),
-  },
-  {
-    key: "today-overtime",
-    label: "Mesai yapanlar",
-    apply: (c) => ({ ...c, reportType: "daily", statusFilter: "overtime" }),
-  },
-  {
-    key: "week-leave",
-    label: "Bu hafta izinde olanlar",
-    apply: (c) => ({ ...c, reportType: "weekly", statusFilter: "leave" }),
-  },
+  { key: "today-late", label: "Bugün geç kalanlar", apply: thisPeriod("daily", "late") },
+  { key: "week-absent", label: "Bu hafta hiç gelmeyenler", apply: thisPeriod("weekly", "absent") },
+  { key: "today-overtime", label: "Mesai yapanlar", apply: thisPeriod("daily", "overtime") },
+  { key: "week-leave", label: "Bu hafta izinde olanlar", apply: thisPeriod("weekly", "leave") },
 ];
 
 export function PDKSFilterBar({ values, onChange }: PDKSFilterBarProps) {
@@ -212,7 +207,12 @@ export function PDKSFilterBar({ values, onChange }: PDKSFilterBarProps) {
           </label>
           <Select
             value={values.reportType}
-            onValueChange={(v) => update({ reportType: v as ReportType })}
+            onValueChange={(v) =>
+              update({
+                reportType: v as ReportType,
+                ...(v !== "custom" && { dateRange: { from: undefined, to: undefined } }),
+              })
+            }
           >
             <SelectTrigger className="h-9">
               <SelectValue />

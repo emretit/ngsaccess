@@ -6,7 +6,7 @@ import type {
   StatusFilter,
 } from "@/components/pdks/dashboard/PDKSFilterBar";
 import type { Id, TableNames } from "../../convex/_generated/dataModel";
-import { toLocalDateString } from "@/lib/date";
+import { parseDateString, toLocalDateString } from "@/lib/date";
 
 export const REPORT_TYPES: ReportType[] = ["daily", "weekly", "monthly", "custom"];
 export const STATUS_FILTERS: StatusFilter[] = [
@@ -18,10 +18,10 @@ export const STATUS_FILTERS: StatusFilter[] = [
   "overtime",
 ];
 
+/** Geçersiz biçim ve taşan tarihleri (2026-02-31) reddeder. */
 function parseDate(s: string | null): Date | undefined {
-  if (!s) return undefined;
-  const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? undefined : d;
+  const d = parseDateString(s);
+  return d && toLocalDateString(d) === s ? d : undefined;
 }
 
 export function usePdksFilterParams(defaults: FilterValues): {
@@ -36,6 +36,7 @@ export function usePdksFilterParams(defaults: FilterValues): {
     const getId = <T extends TableNames>(key: string) =>
       (params.get(key) ?? undefined) as Id<T> | undefined;
     return {
+      anchorDate: parseDate(params.get("date")) ?? defaults.anchorDate ?? new Date(),
       dateRange: {
         from: parseDate(params.get("from")) ?? defaults.dateRange.from,
         to: parseDate(params.get("to")) ?? defaults.dateRange.to,
@@ -57,6 +58,8 @@ export function usePdksFilterParams(defaults: FilterValues): {
   const setFilters = useCallback(
     (next: FilterValues) => {
       const sp = new URLSearchParams();
+      const anchorKey = toLocalDateString(next.anchorDate ?? new Date());
+      if (anchorKey !== toLocalDateString(new Date())) sp.set("date", anchorKey);
       if (next.dateRange.from) sp.set("from", toLocalDateString(next.dateRange.from));
       if (next.dateRange.to) sp.set("to", toLocalDateString(next.dateRange.to));
       if (next.reportType !== "daily") sp.set("report", next.reportType);

@@ -38,10 +38,12 @@ function serialize(f: FilterValues): SerializableFilters {
 }
 
 function deserialize(s: SerializableFilters): FilterValues {
+  // Tarih aralığı yalnız "custom"da anlamlı; gün/hafta/ay görünümleri bugüne göre açılır.
+  const isCustom = s.reportType === "custom";
   return {
     dateRange: {
-      from: s.dateFrom ? new Date(s.dateFrom) : undefined,
-      to: s.dateTo ? new Date(s.dateTo) : undefined,
+      from: isCustom && s.dateFrom ? new Date(s.dateFrom) : undefined,
+      to: isCustom && s.dateTo ? new Date(s.dateTo) : undefined,
     },
     reportType: s.reportType as FilterValues["reportType"],
     companyId: s.companyId as FilterValues["companyId"],
