@@ -2,15 +2,17 @@ import { parseHHMM } from "./pdksHelpers";
 
 /**
  * 4857 sayılı İş Kanunu madde 68:
- * - 4 saate kadar (≤240dk): mola yok
- * - 4-7.5 saat (241-449dk): en az 30 dk mola
- * - 7.5 saat ve üzeri (≥450dk): en az 60 dk mola
+ * - 4 saat veya daha kısa (1-240dk): en az 15 dk mola
+ * - 4 saatten fazla, 7.5 saate kadar dahil (241-450dk): en az 30 dk mola
+ * - 7.5 saatten fazla (>450dk): en az 60 dk mola
+ * - Çalışma yoksa (≤0dk): mola yok
  *
  * Mola süresi çalışma süresinden sayılmaz; dolayısıyla bordro/FM hesabında düşülür.
  */
 export function legalBreakMinutes(totalRawMinutes: number): number {
-  if (totalRawMinutes < 240) return 0;
-  if (totalRawMinutes < 450) return 30;
+  if (totalRawMinutes <= 0) return 0;
+  if (totalRawMinutes <= 240) return 15;
+  if (totalRawMinutes <= 450) return 30;
   return 60;
 }
 
