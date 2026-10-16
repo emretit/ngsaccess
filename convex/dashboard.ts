@@ -1,3 +1,4 @@
+import { summarizeDailyReadings } from "./lib/dashboardActivity";
 import { trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
 import type { QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
@@ -26,13 +27,20 @@ import {
 
 type AuthedCtx = QueryCtx & { user: Doc<"users"> };
 
+async function dashboardProjectIds(ctx: AuthedCtx, projectId?: Id<"projects">) {
+  const allowed = await getProjectIdsForUser(ctx);
+  if (projectId && !allowed.includes(projectId)) {
+    throw new Error("Bu projeye erişim yetkiniz yok");
+  }
+  return projectId ? [projectId] : allowed;
+}
+
 export const getStats = authedQuery({
   args: {
-    projectIds: v.optional(v.array(v.id("projects"))),
-    isSuperAdmin: v.optional(v.boolean()),
+    projectId: v.optional(v.id("projects")),
   },
-  handler: async (ctx) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+  handler: async (ctx, args) => {
+    const allowedProjectIds = await dashboardProjectIds(ctx, args.projectId);
     const today = trTodayKey();
     const { startISO: todayISO, endISO: todayEndISO } = trDayRangeISO(today, today);
 
@@ -41,7 +49,7 @@ export const getStats = authedQuery({
     let todayReadings: unknown[] = [];
     let pendingRules: unknown[] = [];
 
-    if (ctx.user.role === "super_admin") {
+    if (ctx.user.role === "super_admin" && !args.projectId) {
       [employees, devices, todayReadings, pendingRules] = await Promise.all([
         ctx.db.query("employees").collect(),
         ctx.db.query("devices").filter((q) => q.eq(q.field("isActive"), true)).collect(),
@@ -134,6 +142,7 @@ async function loadPdksDataset(
     departmentId?: Id<"departments">;
     positionId?: Id<"positions">;
     shiftId?: Id<"shifts">;
+    projectId?: Id<"projects">;
   }
 ): Promise<{
   employees: Doc<"employees">[];
@@ -143,11 +152,11 @@ async function loadPdksDataset(
   shiftResolver: ShiftResolver;
   workSettings: EffectiveWorkSettings;
 }> {
-  const allowedProjectIds = await getProjectIdsForUser(ctx);
+  const allowedProjectIds = await dashboardProjectIds(ctx, filters.projectId);
   let employees: Doc<"employees">[] = [];
   let readings: Doc<"cardReadings">[] = [];
 
-  if (ctx.user.role === "super_admin") {
+  if (ctx.user.role === "super_admin" && !filters.projectId) {
     [employees, readings] = await Promise.all([
       ctx.db
         .query("employees")
@@ -177,16 +186,15 @@ async function loadPdksDataset(
       ),
       Promise.all(
         allowedProjectIds.map((pid) =>
-          ctx.db
-            .query("cardReadings")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .filter((q) =>
-              q.and(
-                q.gte(q.field("accessTime"), rangeStartISO),
-                q.lte(q.field("accessTime"), rangeEndISO)
-              )
-            )
-            .collect()
+          filters.projectId
+            ? ctx.db.query("cardReadings")
+                .withIndex("by_project_access_time", (q) =>
+                  q.eq("projectId", pid).gte("accessTime", rangeStartISO).lte("accessTime", rangeEndISO))
+                .collect()
+            : ctx.db.query("cardReadings")
+                .withIndex("by_project", (q) => q.eq("projectId", pid))
+                .filter((q) => q.and(q.gte(q.field("accessTime"), rangeStartISO), q.lte(q.field("accessTime"), rangeEndISO)))
+                .collect()
         )
       ),
     ]);
@@ -212,9 +220,9 @@ async function loadPdksDataset(
   );
 
   const settingsProjectId =
-    ctx.user.role === "super_admin"
+    filters.projectId ?? (ctx.user.role === "super_admin"
       ? employees[0]?.projectId
-      : allowedProjectIds[0];
+      : allowedProjectIds[0]);
   const workSettings = settingsProjectId
     ? await getEffectiveWorkSettings(ctx, settingsProjectId)
     : DEFAULT_WORK_SETTINGS;
@@ -750,13 +758,14 @@ export const getCurrentlyInside = authedQuery({
 export const getRecentReadings = authedQuery({
   args: {
     limit: v.optional(v.number()),
+    projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const allowedProjectIds = await dashboardProjectIds(ctx, args.projectId);
     const limit = args.limit ?? 10;
 
     let readings;
-    if (ctx.user.role === "super_admin") {
+    if (ctx.user.role === "super_admin" && !args.projectId) {
       readings = await ctx.db
         .query("cardReadings")
         .withIndex("by_access_time")
@@ -767,7 +776,7 @@ export const getRecentReadings = authedQuery({
         allowedProjectIds.map((pid) =>
           ctx.db
             .query("cardReadings")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
+            .withIndex("by_project_access_time", (q) => q.eq("projectId", pid))
             .order("desc")
             .take(limit)
         )
@@ -791,5 +800,37 @@ export const getRecentReadings = authedQuery({
         };
       })
     );
+  },
+});
+
+export const getActivitySummary = authedQuery({
+  args: { projectId: v.optional(v.id("projects")) },
+  handler: async (ctx, args) => {
+    const today = trTodayKey();
+    const { startISO, endISO } = trDayRangeISO(today, today);
+    const dataset = await loadPdksDataset(ctx, startISO, endISO, args);
+    const employeeIds = new Set(dataset.employees.map((employee) => employee._id));
+    const readings = dataset.readings.filter((reading) =>
+      reading.employeeId && employeeIds.has(reading.employeeId) && reading.accessStatus === "izin_verildi"
+    ).sort((a, b) => a.accessTime.localeCompare(b.accessTime));
+    const daily = summarizeDailyReadings(readings);
+    const { core } = computePdksCoreInMemory(
+      dataset.employees, readings.filter((reading) => reading.direction !== "exit"), dataset.leaves,
+      { start: startISO, end: endISO }, dataset.deptNameById, dataset.shiftResolver, dataset.workSettings,
+    );
+    const settingsProjectId = args.projectId ?? dataset.employees[0]?.projectId;
+    const settings = settingsProjectId
+      ? await ctx.db.query("workSettings").withIndex("by_project", (q) => q.eq("projectId", settingsProjectId)).first()
+      : null;
+    const hasReadings = readings.length > 0;
+    return {
+      workHours: hasReadings && settings
+        ? `${dataset.workSettings.workStartTime} – ${dataset.workSettings.workEndTime}` : null,
+      averageFirstEntry: daily.averageFirstEntry,
+      averageLastExit: daily.averageLastExit,
+      lateArrivals: hasReadings ? core.lateArrivals : null,
+      presentToday: hasReadings ? core.presentToday : null,
+      insideBuilding: hasReadings ? daily.insideBuilding : null,
+    };
   },
 });

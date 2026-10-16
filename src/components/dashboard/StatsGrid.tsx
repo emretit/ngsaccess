@@ -2,13 +2,23 @@
 import React from 'react';
 import { Users, Cpu, Key, AlertCircle } from 'lucide-react';
 import StatusCard from '@/components/StatusCard';
-import { DashboardStats } from '@/utils/dashboardUtils';
+import type { FunctionReturnType } from 'convex/server';
+import { api } from '../../../convex/_generated/api';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface StatsGridProps {
-  stats: DashboardStats;
+  stats: FunctionReturnType<typeof api.dashboard.getStats> | undefined;
+  loading: boolean;
 }
 
-const StatsGrid: React.FC<StatsGridProps> = ({ stats }) => {
+const StatsGrid: React.FC<StatsGridProps> = ({ stats, loading }) => {
+  if (loading || !stats) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" role="status" aria-label="Proje istatistikleri yükleniyor">
+        {[0, 1, 2, 3].map((key) => <Skeleton key={key} className="h-28 rounded-lg" />)}
+      </div>
+    );
+  }
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       <StatusCard
@@ -27,7 +37,7 @@ const StatsGrid: React.FC<StatsGridProps> = ({ stats }) => {
         icon={<Key className="h-4 w-4 text-[hsl(var(--warning))]" />}
       />
       <StatusCard
-        title="Bekleyen İstekler"
+        title="Pasif erişim kuralları"
         value={stats.pendingRequests.toString()}
         icon={<AlertCircle className="h-4 w-4 text-destructive" />}
       />

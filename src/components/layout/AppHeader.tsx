@@ -1,5 +1,4 @@
 import { Link } from "react-router-dom";
-import { Bell } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -55,14 +54,8 @@ export function AppHeader({ title, className, children }: AppHeaderProps) {
 
       {children}
 
-      {/* Sağ taraf: Bildirimler + Kullanıcı */}
+      {/* Sağ taraf: Kullanıcı */}
       <div className="ml-auto flex items-center gap-1">
-        <Button variant="ghost" size="icon" className="relative h-8 w-8">
-          <Bell className="h-4 w-4" />
-          <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-destructive" />
-          <span className="sr-only">Bildirimler</span>
-        </Button>
-
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-8 w-8 rounded-full p-0">

@@ -1,8 +1,10 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { format } from 'date-fns';
-import { tr } from 'date-fns/locale';
+import type { FunctionReturnType } from 'convex/server';
+import { api } from '../../../convex/_generated/api';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -12,15 +14,24 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { CardReading } from '@/types/access-control';
+type RecentReadings = FunctionReturnType<typeof api.dashboard.getRecentReadings>;
+
+const trDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' });
+const trTime = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' });
+const trDate = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'short' });
+
+function formatReadingTime(date: Date) {
+  const day = trDay.format(date) === trDay.format(new Date()) ? 'Bugün' : trDate.format(date);
+  return `${day} ${trTime.format(date)}`;
+}
 
 interface RecentReadingsTableProps {
-  readings: CardReading[];
+  readings: RecentReadings;
   loading: boolean;
 }
 
 const RecentReadingsTable: React.FC<RecentReadingsTableProps> = ({ readings, loading }) => {
-  const getStatusBadge = (reading: CardReading) => {
+  const getStatusBadge = (reading: RecentReadings[number]) => {
     // Use accessStatus for badge determination
     const hasAccess = reading.accessStatus === 'izin_verildi';
 
@@ -49,7 +60,7 @@ const RecentReadingsTable: React.FC<RecentReadingsTableProps> = ({ readings, loa
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Saat</TableHead>
+                <TableHead>Tarih / Saat</TableHead>
                 <TableHead>Personel</TableHead>
                 <TableHead>Cihaz</TableHead>
                 <TableHead>Durum</TableHead>
@@ -59,13 +70,13 @@ const RecentReadingsTable: React.FC<RecentReadingsTableProps> = ({ readings, loa
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-4">
-                    Yükleniyor...
+                    <Skeleton className="h-10 w-full" aria-label="Son okumalar yükleniyor" />
                   </TableCell>
                 </TableRow>
               ) : readings.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">
-                    Henüz kart okutma kaydı yok
+                    <EmptyState title="Henüz kart okutma kaydı yok" description="Personel ve cihaz kurulumunu kontrol etmek için aşağıdaki hızlı erişim bağlantılarını kullanabilirsiniz." className="py-6" />
                   </TableCell>
                 </TableRow>
               ) : (
@@ -76,7 +87,7 @@ const RecentReadingsTable: React.FC<RecentReadingsTableProps> = ({ readings, loa
                   return (
                   <TableRow key={reading._id}>
                     <TableCell>
-                      {isValidDate ? format(date, 'HH:mm', { locale: tr }) : '-'}
+                      {isValidDate ? formatReadingTime(date) : '-'}
                     </TableCell>
                     <TableCell>{reading.employeeName}</TableCell>
                     <TableCell>{reading.devices?.name || '-'}</TableCell>

@@ -1,52 +1,28 @@
-
 import { useDashboard } from '@/hooks/useDashboard';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import StatsGrid from '@/components/dashboard/StatsGrid';
 import ActivitySummaryCard from '@/components/dashboard/ActivitySummaryCard';
 import RecentReadingsTable from '@/components/dashboard/RecentReadingsTable';
 import QuickLinksGrid from '@/components/dashboard/QuickLinksGrid';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { EmptyState } from '@/components/shared/EmptyState';
 
 export default function Index() {
-  const {
-    stats,
-    recentReadings,
-    statsLoading,
-    readingsLoading,
-    userName,
-    session,
-    refetchStats,
-    refetchReadings
-  } = useDashboard();
-
-  const loading = statsLoading || readingsLoading;
-  const refreshData = () => { refetchStats(); refetchReadings(); };
-
-  // If not authenticated yet (loading state), show a simple loading screen
-  if (!session && loading) {
-    return <LoadingSpinner text="Dashboard hazırlanıyor..." />;
-  }
-
+  const dashboard = useDashboard();
   return (
     <div className="space-y-8 p-6">
-      <DashboardHeader 
-        userName={userName} 
-        loading={loading} 
-        onRefresh={refreshData} 
-      />
-
-      <StatsGrid stats={stats} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ActivitySummaryCard />
-      </div>
-
-      <RecentReadingsTable 
-        readings={recentReadings} 
-        loading={loading} 
-      />
-
-      <QuickLinksGrid />
+      <DashboardHeader userName={dashboard.userName} projectName={dashboard.projectName} />
+      {dashboard.noProject ? (
+        <EmptyState title="Erişilebilir proje bulunamadı" description="Proje erişimi için yöneticinizle iletişime geçin." />
+      ) : (
+        <>
+          <StatsGrid stats={dashboard.stats} loading={dashboard.statsLoading} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <ActivitySummaryCard summary={dashboard.activitySummary} loading={dashboard.activityLoading} />
+          </div>
+          <RecentReadingsTable readings={dashboard.recentReadings} loading={dashboard.readingsLoading} />
+          <QuickLinksGrid />
+        </>
+      )}
     </div>
   );
 }

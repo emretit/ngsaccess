@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,16 +33,6 @@ export default function EmployeeSetup() {
     authRecord.tokenExpiresAt
       ? new Date(authRecord.tokenExpiresAt) > new Date()
       : false;
-
-  useEffect(() => {
-    if (!token) {
-      toast({
-        title: "Geçersiz bağlantı",
-        description: "Şifre belirleme bağlantısı geçersiz.",
-        variant: "destructive",
-      });
-    }
-  }, [token]);
 
   const validatePassword = (pwd: string) => ({
     minLength: pwd.length >= 8,
@@ -79,6 +69,19 @@ export default function EmployeeSetup() {
       setIsLoading(false);
     }
   };
+
+  if (!token) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-muted/50 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader><CardTitle className="text-center">Geçersiz veya eksik bağlantı</CardTitle></CardHeader>
+          <CardContent className="text-center">
+            Yöneticinizden yeni bir şifre belirleme bağlantısı isteyin.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (authRecord === undefined) {
     return <div className="flex items-center justify-center min-h-screen"><p>Yükleniyor...</p></div>;
@@ -121,7 +124,7 @@ export default function EmployeeSetup() {
             <CardTitle className="text-center text-red-600">Geçersiz Bağlantı</CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-3">
-            <p>Bu şifre belirleme bağlantısı geçersiz veya süresi dolmuş.</p>
+            <p>{authRecord ? "Bu şifre belirleme bağlantısının süresi dolmuş." : "Bu şifre belirleme bağlantısı geçersiz."}</p>
             <p className="text-sm text-muted-foreground">
               Yöneticinizden yeni bir kurulum bağlantısı isteyin. Bu sekmeyi kapatabilirsiniz.
             </p>

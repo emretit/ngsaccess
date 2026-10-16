@@ -1,38 +1,28 @@
-import { useQuery } from "convex/react";
-import { useConvexAuth } from "convex/react";
+import { useQuery, useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useProjectAccess } from "./useProjectAccess";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useAuth } from "@/components/auth/AuthProvider";
 
 export const useDashboard = () => {
   const { isAuthenticated } = useConvexAuth();
   const { profile } = useAuth();
-  const { loading: projectLoading } = useProjectAccess();
+  const { projectId, activeProject, loading: projectLoading } = useActiveProject();
+  const enabled = !projectLoading && isAuthenticated && !!projectId;
+  const stats = useQuery(api.dashboard.getStats, enabled ? { projectId } : "skip");
+  const recentReadings = useQuery(api.dashboard.getRecentReadings, enabled ? { projectId, limit: 10 } : "skip");
+  const activitySummary = useQuery(api.dashboard.getActivitySummary, enabled ? { projectId } : "skip");
 
-  const stats = useQuery(
-    api.dashboard.getStats,
-    !projectLoading && isAuthenticated ? {} : "skip"
-  );
-
-  const recentReadings = useQuery(
-    api.dashboard.getRecentReadings,
-    !projectLoading && isAuthenticated ? { limit: 10 } : "skip"
-  );
-
-  const userName =
-    (profile as { fullName?: string; name?: string; email?: string } | null)?.fullName ??
-    (profile as { name?: string } | null)?.name ??
-    (profile as { email?: string } | null)?.email ??
-    "Kullanıcı";
+  const userName = profile?.fullName ?? profile?.email ?? "Kullanıcı";
 
   return {
-    stats: stats ?? { employees: 0, devices: 0, cardReadings: 0, pendingRequests: 0 },
+    stats,
     recentReadings: recentReadings ?? [],
-    statsLoading: projectLoading || stats === undefined,
-    readingsLoading: projectLoading || recentReadings === undefined,
+    activitySummary,
+    statsLoading: projectLoading || (enabled && stats === undefined),
+    readingsLoading: projectLoading || (enabled && recentReadings === undefined),
+    activityLoading: projectLoading || (enabled && activitySummary === undefined),
+    noProject: !projectLoading && !projectId,
+    projectName: activeProject?.name,
     userName,
-    session: isAuthenticated ? { user: profile } : null,
-    refetchStats: () => {},
-    refetchReadings: () => {},
   };
 };
