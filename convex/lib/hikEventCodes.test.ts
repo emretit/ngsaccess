@@ -80,6 +80,52 @@ describe("hikEventCodes – inferDenialReason", () => {
   });
 });
 
+// SDK/ISAPI "Access Control Event Types" tablosundan golden değerler. Bu kodlar
+// PDKS kaydının izin/ret kararını belirler — yanlış eşleme bordroyu bozar.
+describe("hikEventCodes – SDK golden eşleme", () => {
+  it.each([
+    [0x01, "kart"],
+    [0x02, "kart + şifre"],
+    [0x26, "parmak izi"],
+    [0x28, "kart + parmak izi"],
+    [0x3c, "yüz + kart"],
+    [0x45, "personel no + parmak izi"],
+    [0x4b, "yüz"],
+    [0x4d, "personel no + yüz"],
+    [0x65, "personel no + şifre"],
+    [0x9c, "QR kod"],
+    [0xbe, "iris"],
+  ])("minor %i (%s) → izin_verildi", (minor) => {
+    expect(inferAccessStatus(DEVICE_EVENT, minor)).toBe("izin_verildi");
+  });
+
+  it.each([
+    [0x03, "kart + şifre başarısız"],
+    [0x06, "yetki yok"],
+    [0x27, "parmak izi eşleşmedi"],
+    [0x3d, "yüz + kart başarısız"],
+    [0x4c, "yüz doğrulama başarısız"],
+    [0x4e, "personel no + yüz başarısız"],
+    [0x50, "yüz tanıma başarısız"],
+    [0x71, "kara liste"],
+    [0x94, "şifre deneme limiti"],
+    [0x98, "personel no yok"],
+  ])("minor %i (%s) → reddedildi", (minor) => {
+    expect(inferAccessStatus(DEVICE_EVENT, minor)).toBe("reddedildi");
+  });
+
+  it("regresyon: 76 (0x4c FACE_VERIFY_FAIL) izin sayılmaz, 77 (0x4d) ret sayılmaz", () => {
+    expect(inferAccessStatus(DEVICE_EVENT, 76)).toBe("reddedildi");
+    expect(inferAccessStatus(DEVICE_EVENT, 77)).toBe("izin_verildi");
+  });
+
+  it("kapı/buton durum kodları access kararı üretmez", () => {
+    for (const minor of [0x15, 0x16, 0x17, 0x19, 0x1a, 0x1c]) {
+      expect(inferAccessStatus(DEVICE_EVENT, minor)).toBeUndefined();
+    }
+  });
+});
+
 describe("hikEventCodes – tablo tutarlılığı", () => {
   it("GRANTED ve DENIED kümeleri kesişmez", () => {
     const overlap = [...HIK_SUB_EVENT_GRANTED].filter((c) =>
