@@ -2,8 +2,10 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { authedQuery, authedMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
+import { authedQuery, authedMutation, adminMutation } from "./lib/customFunctions";
+import { resolveProjectScope } from "./lib/projectScope";
+import { scanIdeSync, assertSyncScope } from "./lib/syncStatusScope";
+import { canRetrySync, syncDismissPatch } from "./lib/syncStatusLogic";
 
 /**
  * Delete op'unun "kayıt zaten yok" yanıtı (idempotent). Yalnız markAck'in delete dalında
@@ -541,31 +543,26 @@ export const getRuleIoIdsForPanel = internalQuery({
 
 /** UI: çözülmemiş IDE komut sorunları (failed op'lar). RBAC: kullanıcının projeleri. */
 export const listSyncIssues = authedQuery({
-  args: { limit: v.optional(v.number()) },
+  args: { projectId: v.optional(v.id("projects")), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const max = args.limit ?? 50;
-    const failed = await ctx.db
-      .query("idePendingOperations")
-      .withIndex("by_status_nextRetry", (q) => q.eq("status", "failed"))
-      .take(max * 4);
-
-    const visible = failed.filter((o) => isProjectAllowed(allowedProjectIds, o.projectId));
-    const deviceIds = Array.from(new Set(visible.map((o) => o.deviceId)));
-    const devices = await Promise.all(deviceIds.map((id) => ctx.db.get(id)));
-    const deviceMap = new Map(
-      devices.filter((d): d is NonNullable<typeof d> => d !== null).map((d) => [d._id, d]),
-    );
-
-    return visible.slice(0, max).map((o) => ({
-      _id: o._id,
-      deviceId: o.deviceId,
-      deviceName: deviceMap.get(o.deviceId)?.name ?? "(bilinmeyen cihaz)",
-      opType: o.opType,
-      attempts: o.attempts,
-      lastError: o.lastError ?? null,
-      createdAt: o.createdAt,
+    const projectIds = await resolveProjectScope(ctx, args.projectId);
+    const scan = await scanIdeSync(ctx, projectIds, ["failed"], true);
+    const max = Math.min(100, Math.max(1, Math.floor(args.limit ?? 50)));
+    const visible = scan.rows.sort((a, b) => b.createdAt - a.createdAt);
+    const items = await Promise.all(visible.slice(0, max).map(async (op) => {
+      const [device, project] = await Promise.all([
+        ctx.db.get(op.deviceId), op.projectId ? ctx.db.get(op.projectId) : null,
+      ]);
+      return {
+        _id: op._id, deviceId: op.deviceId,
+        deviceName: device?.name ?? "(silinmiş cihaz)",
+        projectId: op.projectId, projectName: project?.name ?? "Bilinmeyen proje",
+        status: op.status, lastError: op.lastError ?? null, createdAt: op.createdAt,
+        nextRetryAt: op.nextRetryAt,
+        opType: op.opType, attempts: op.attempts, maxAttempts: op.maxAttempts ?? 5, canRetry: device?.brand === "ide_smart",
+      };
     }));
+    return { items, hasMore: scan.hasMore || visible.length > max, unknown: scan.unknown };
   },
 });
 
@@ -587,34 +584,56 @@ export const getOpStatuses = internalQuery({
   },
 });
 
-/** UI: tek bir başarısız (terminal) IDE op'unu sil — banner'dan kapat. RBAC: kullanıcının projeleri. */
+/** UI: başarısız IDE uyarısını gizle; operasyonu koru. */
 export const dismissSyncIssue = authedMutation({
   args: { opId: v.id("idePendingOperations") },
-  handler: async (ctx, args): Promise<void> => {
-    const allowed = await getProjectIdsForUser(ctx);
+  handler: async (ctx, args) => {
+    const projectIds = await resolveProjectScope(ctx);
     const op = await ctx.db.get(args.opId);
-    // Sadece terminal "failed" op silinir — pending/sent (uçuşta) op'a dokunma.
-    if (!op || op.status !== "failed") return;
-    if (!isProjectAllowed(allowed, op.projectId)) return;
-    await ctx.db.delete(args.opId);
+    if (!op) return;
+    await assertSyncScope(ctx, projectIds, op);
+    if (op.status !== "failed" || op.dismissedAt !== undefined) return;
+    await ctx.db.patch(op._id, syncDismissPatch(ctx.user._id, Date.now()));
   },
 });
 
-/** UI: kullanıcının projelerindeki tüm başarısız IDE op'larını sil. Silinen sayısını döner. */
+/** UI: seçili kapsamdaki görünür uyarıları sınırlı bir batch ile kapat. */
 export const dismissAllSyncIssues = authedMutation({
-  args: {},
-  handler: async (ctx): Promise<number> => {
-    const allowed = await getProjectIdsForUser(ctx);
-    const failed = await ctx.db
-      .query("idePendingOperations")
-      .withIndex("by_status_nextRetry", (q) => q.eq("status", "failed"))
-      .collect();
-    let n = 0;
-    for (const op of failed) {
-      if (!isProjectAllowed(allowed, op.projectId)) continue;
-      await ctx.db.delete(op._id);
-      n++;
+  args: { projectId: v.optional(v.id("projects")), issueIds: v.optional(v.array(v.id("idePendingOperations"))) },
+  handler: async (ctx, args) => {
+    const projectIds = await resolveProjectScope(ctx, args.projectId);
+    if (args.issueIds && args.issueIds.length > 100) throw new Error("Bir seferde en fazla 100 uyarı kapatılabilir");
+    const scan = await scanIdeSync(ctx, projectIds, ["failed"], true);
+    const requested = args.issueIds
+      ? (await Promise.all([...new Set(args.issueIds)].map((id) => ctx.db.get(id))))
+        .filter((op): op is NonNullable<typeof op> => op !== null)
+      : scan.rows;
+    // Önizleme ile aynı kimlikler; yeni gelen uyarılar toplu kapatmaya dahil edilmez.
+    for (const op of requested) await assertSyncScope(ctx, projectIds, op);
+    const targets = requested.filter((op) => op.status === "failed" && op.dismissedAt === undefined).slice(0, 100);
+    const now = Date.now();
+    for (const op of targets) {
+      await ctx.db.patch(op._id, syncDismissPatch(ctx.user._id, now));
     }
-    return n;
+    return { count: targets.length, hasMore: scan.hasMore || scan.rows.length > targets.length, unknown: scan.unknown };
+  },
+});
+
+/** Tek op yeniden sıraya alınır; bridge claim/ack akışı değişmez. */
+export const retrySyncIssue = adminMutation({
+  args: { opId: v.id("idePendingOperations") },
+  handler: async (ctx, args) => {
+    const projectIds = await resolveProjectScope(ctx);
+    const op = await ctx.db.get(args.opId);
+    if (!op) throw new Error("İşlem bulunamadı");
+    const device = await assertSyncScope(ctx, projectIds, op);
+    if (!canRetrySync(op.status)) return { queued: false };
+    if (!device || device.brand !== "ide_smart") throw new Error("Cihaz bulunamadı veya IDE Smart değil");
+    await ctx.db.patch(op._id, {
+      status: "pending", nextRetryAt: Date.now(),
+      attempts: 0, msxId: undefined, sentAt: undefined, ackedAt: undefined, responseMessage: undefined,
+      dismissedAt: undefined, dismissedBy: undefined, lastError: undefined,
+    });
+    return { queued: true };
   },
 });

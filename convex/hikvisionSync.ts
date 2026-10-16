@@ -1,8 +1,10 @@
 import { v } from "convex/values";
 import { internalQuery, internalMutation } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { adminQuery, authedQuery, authedMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
+import { adminQuery, authedQuery, authedMutation, adminMutation } from "./lib/customFunctions";
+import { resolveProjectScope } from "./lib/projectScope";
+import { scanHikSync, assertSyncScope } from "./lib/syncStatusScope";
+import { canRetrySync, syncDismissPatch } from "./lib/syncStatusLogic";
 
 const HIK_BRIDGE_PROCESSING_TIMEOUT_MS = 2 * 60 * 1000;
 const HIK_BRIDGE_MAX_POLL = 25;
@@ -640,89 +642,46 @@ export const requeueStaleLocalBridgeOperations = internalMutation({
 });
 
 /**
- * Failed records'tan caller'ın görebileceklerini filtreler.
- * super_admin tümünü görür; diğerleri sadece kendi projelerinin kayıtlarını.
- * projectId=undefined (orphan) kayıtlar sadece super_admin'e görünür ve sadece o dismiss edebilir.
- */
-function filterVisibleFailures<T extends { projectId?: Id<"projects"> }>(
-  ctx: { user: { role?: string } },
-  rows: T[],
-  allowedProjectIds: Id<"projects">[],
-): T[] {
-  if (ctx.user.role === "super_admin") return rows;
-  return rows.filter((f) =>
-    f.projectId !== undefined && isProjectAllowed(allowedProjectIds, f.projectId),
-  );
-}
-
-/**
  * UI banner için: çözümlenmemiş (status=failed) sync hatalarını döner.
  * payload field'ı UI'ya **döndürülmez** (PII leak vektörünü kapatmak için).
  * Detay gerekiyorsa adminQuery yazılmalı.
  */
 export const listSyncIssues = authedQuery({
-  args: { limit: v.optional(v.number()) },
+  args: { projectId: v.optional(v.id("projects")), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const max = args.limit ?? 50;
-
-    // 4x overfetch — RBAC + device-exists + brand=hikvision filtreleri sonrası slice.
-    const failed = await ctx.db
-      .query("hikPendingOperations")
-      .withIndex("by_status_created", (q) => q.eq("status", "failed"))
-      .order("desc")
-      .take(max * 4);
-
-    const rbacFiltered = filterVisibleFailures(ctx, failed, allowedProjectIds);
-
-    // Cihaz dedupe + lookup
-    const deviceIds = Array.from(new Set(rbacFiltered.map((f) => f.deviceId)));
-    const devices = await Promise.all(deviceIds.map((id) => ctx.db.get(id)));
-    const deviceMap = new Map(
-      devices.filter((d): d is NonNullable<typeof d> => d !== null).map((d) => [d._id, d]),
-    );
-
-    // Önce filtre, SONRA slice — non-Hik/silinmiş cihaz hataları slice quota'sını yemesin.
-    const hikOnly = rbacFiltered.filter((f) => {
-      const device = deviceMap.get(f.deviceId);
-      return device !== undefined && device.brand === "hikvision";
-    });
-
-    return hikOnly.slice(0, max).map((f) => {
-      const device = deviceMap.get(f.deviceId);
+    const projectIds = await resolveProjectScope(ctx, args.projectId);
+    const scan = await scanHikSync(ctx, projectIds, ["failed"], true);
+    const max = Math.min(100, Math.max(1, Math.floor(args.limit ?? 50)));
+    const visible = scan.rows.sort((a, b) => b.createdAt - a.createdAt);
+    const items = await Promise.all(visible.slice(0, max).map(async (op) => {
+      const [device, project] = await Promise.all([
+        ctx.db.get(op.deviceId), op.projectId ? ctx.db.get(op.projectId) : null,
+      ]);
       return {
-        _id: f._id,
-        deviceId: f.deviceId,
-        deviceName: device?.name ?? "(bilinmeyen cihaz)",
-        deviceBrand: device?.brand ?? null,
-        operation: f.operation,
-        lastError: f.lastError,
-        attemptCount: f.attemptCount,
-        createdAt: f.createdAt,
+        _id: op._id, deviceId: op.deviceId,
+        deviceName: device?.name ?? "(silinmiş cihaz)",
+        projectId: op.projectId, projectName: project?.name ?? "Bilinmeyen proje",
+        status: op.status, lastError: op.lastError ?? null, createdAt: op.createdAt,
+        nextRetryAt: op.nextRetryAt,
+        operation: op.operation, deviceBrand: device?.brand ?? null, attemptCount: op.attemptCount, attempts: op.attemptCount, maxAttempts: 5, canRetry: device?.hikTransport === "localBridge",
       };
-    });
+    }));
+    return { items, hasMore: scan.hasMore || visible.length > max, unknown: scan.unknown };
   },
 });
 
 /**
- * Kullanıcı hatayı görmüş olarak işaretler (status=done).
- * Orphan (projectId=undefined) kayıtları sadece super_admin dismiss edebilir.
+ * Kullanıcı uyarıyı kapatır; operasyon sonucu korunur.
  */
 export const dismissSyncIssue = authedMutation({
   args: { issueId: v.id("hikPendingOperations") },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const issue = await ctx.db.get(args.issueId);
-    if (!issue) return;
-    if (ctx.user.role !== "super_admin") {
-      if (!issue.projectId || !isProjectAllowed(allowedProjectIds, issue.projectId)) {
-        throw new Error("Bu kayda erişim yetkiniz yok");
-      }
-    }
-    await ctx.db.patch(args.issueId, {
-      status: "done",
-      completedAt: Date.now(),
-    });
+    const projectIds = await resolveProjectScope(ctx);
+    const op = await ctx.db.get(args.issueId);
+    if (!op) return;
+    await assertSyncScope(ctx, projectIds, op);
+    if (op.status !== "failed" || op.dismissedAt !== undefined) return;
+    await ctx.db.patch(op._id, syncDismissPatch(ctx.user._id, Date.now()));
   },
 });
 
@@ -905,6 +864,8 @@ export const markOpRetried = internalMutation({
     await ctx.db.patch(args.id, {
       attemptCount: row.attemptCount + 1,
       lastError: args.lastError,
+      dismissedAt: undefined,
+      dismissedBy: undefined,
     });
   },
 });
@@ -948,7 +909,7 @@ export const cleanupStaleSyncIssues = internalMutation({
       const isNonHik = device !== undefined && device.brand !== "hikvision";
       const isStaleTerminal = f.createdAt < cutoffAt && f.attemptCount >= 5;
       if (isOrphan || isNonHik || isStaleTerminal) {
-        patches.push(ctx.db.patch(f._id, { status: "done", completedAt: now }));
+        patches.push(ctx.db.patch(f._id, { status: "done", completedAt: now, dismissedAt: now }));
       }
     }
     await Promise.all(patches);
@@ -960,19 +921,41 @@ export const cleanupStaleSyncIssues = internalMutation({
  * Tüm görünür sync hatalarını topluca temizle (banner'daki "Hepsini kapat" için).
  */
 export const dismissAllSyncIssues = authedMutation({
-  args: {},
-  handler: async (ctx) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const failed = await ctx.db
-      .query("hikPendingOperations")
-      .withIndex("by_status_created", (q) => q.eq("status", "failed"))
-      .collect();
+  args: { projectId: v.optional(v.id("projects")), issueIds: v.optional(v.array(v.id("hikPendingOperations"))) },
+  handler: async (ctx, args) => {
+    const projectIds = await resolveProjectScope(ctx, args.projectId);
+    if (args.issueIds && args.issueIds.length > 100) throw new Error("Bir seferde en fazla 100 uyarı kapatılabilir");
+    const scan = await scanHikSync(ctx, projectIds, ["failed"], true);
+    const requested = args.issueIds
+      ? (await Promise.all([...new Set(args.issueIds)].map((id) => ctx.db.get(id))))
+        .filter((op): op is NonNullable<typeof op> => op !== null)
+      : scan.rows;
+    // Önizleme ile aynı kimlikler; yeni gelen uyarılar toplu kapatmaya dahil edilmez.
+    for (const op of requested) await assertSyncScope(ctx, projectIds, op);
+    const targets = requested.filter((op) => op.status === "failed" && op.dismissedAt === undefined).slice(0, 100);
+    const now = Date.now();
+    for (const op of targets) {
+      await ctx.db.patch(op._id, syncDismissPatch(ctx.user._id, now));
+    }
+    return { count: targets.length, hasMore: scan.hasMore || scan.rows.length > targets.length, unknown: scan.unknown };
+  },
+});
 
-    const targets = filterVisibleFailures(ctx, failed, allowedProjectIds);
-    const completedAt = Date.now();
-    await Promise.all(
-      targets.map((f) => ctx.db.patch(f._id, { status: "done", completedAt })),
-    );
-    return targets.length;
+/** Tek op yeniden sıraya alınır; bridge claim/ack akışı değişmez. */
+export const retrySyncIssue = adminMutation({
+  args: { issueId: v.id("hikPendingOperations") },
+  handler: async (ctx, args) => {
+    const projectIds = await resolveProjectScope(ctx);
+    const op = await ctx.db.get(args.issueId);
+    if (!op) throw new Error("İşlem bulunamadı");
+    const device = await assertSyncScope(ctx, projectIds, op);
+    if (!canRetrySync(op.status)) return { queued: false };
+    if (!device || device.brand !== "hikvision" || device.hikTransport !== "localBridge") throw new Error("Bu cihaz için tek işlem yeniden denemesi desteklenmiyor; cihaz sayfasını kullanın");
+    await ctx.db.patch(op._id, {
+      status: "pending", nextRetryAt: Date.now(),
+      attemptCount: 0, processingStartedAt: undefined, completedAt: undefined, claimedBy: undefined,
+      dismissedAt: undefined, dismissedBy: undefined, lastError: undefined,
+    });
+    return { queued: true };
   },
 });

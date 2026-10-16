@@ -1,5 +1,6 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { DevicesContent } from '@/components/devices/DevicesContent';
@@ -22,7 +23,22 @@ import { AccessDenied } from '@/components/shared/AccessDenied';
 import { useToast } from '@/hooks/use-toast';
 
 const Devices = () => {
-  const { projectId } = useActiveProjectScope();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedDeviceId = searchParams.get("deviceId");
+  const { projectId, loading: scopeLoading } = useActiveProjectScope();
+  const previousProject = useRef<string | null>(null);
+  useEffect(() => {
+    if (scopeLoading) return;
+    const nextProject = projectId ?? "none";
+    if (previousProject.current !== null && previousProject.current !== nextProject) {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        next.delete("deviceId");
+        return next;
+      }, { replace: true });
+    }
+    previousProject.current = nextProject;
+  }, [projectId, scopeLoading, setSearchParams]);
   const { loading: projectLoading, isAdmin } = useProjectAccess();
   const { devices, isLoading, hasProjectAccess } = useProjectFilteredDevices();
   const { zones } = useZonesAndDoors();
@@ -38,6 +54,23 @@ const Devices = () => {
     device: null
   });
   const [claimOpen, setClaimOpen] = useState(false);
+
+  useEffect(() => {
+    if (isLoading) return;
+    const device = devices.find((candidate) => candidate._id === requestedDeviceId);
+    if (device) setDevicePanel((previous) => previous.open && previous.device?._id === device._id ? previous : { open: true, device });
+    else setDevicePanel((previous) => previous.device ? { open: false, device: null } : previous);
+  }, [devices, isLoading, requestedDeviceId]);
+
+  const setDeviceUrl = (deviceId: string | null) => {
+    setSearchParams((previous) => {
+      const next = new URLSearchParams(previous);
+      if (deviceId) next.set("deviceId", deviceId);
+      else next.delete("deviceId");
+      return next;
+    }, { replace: true });
+  };
+
   
   const { toast } = useToast();
   
@@ -62,6 +95,7 @@ const Devices = () => {
 
   // "Yeni Cihaz Ekle" — sıfırdan oluşturma (marka seçici → form), aktif projeye yazar.
   const handleNewDevice = () => {
+    setDeviceUrl(null);
     setDevicePanel({ open: true, device: null });
   };
 
@@ -83,14 +117,17 @@ const Devices = () => {
   };
 
   const handleEditDevice = (device: Device) => {
+    setDeviceUrl(device._id);
     setDevicePanel({ open: true, device });
   };
 
   const handleDevicePanelClose = () => {
+    setDeviceUrl(null);
     setDevicePanel({ open: false, device: null });
   };
 
   const handleDevicePanelSuccess = () => {
+    setDeviceUrl(null);
     setDevicePanel({ open: false, device: null });
 
   };

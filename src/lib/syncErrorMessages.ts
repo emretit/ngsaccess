@@ -1,6 +1,6 @@
 /**
  * Panel/cihaz sync hatalarının (IDE Smart + Hikvision) ham mesajını kullanıcıya
- * anlaşılır Türkçe açıklamaya çevirir. Eşleşme yoksa ham mesaj korunur (bilgi kaybı yok).
+ * anlaşılır Türkçe açıklamaya çevirir. Ham mesaj arayüzde ikincil teknik ayrıntı olarak gösterilir.
  *
  * Ham mesajlar genelde paneldekinden gelir (ör. "already exists",
  * "forbidden: create_data user requires level 1, you are 0"). UI bunları doğrudan
@@ -18,7 +18,7 @@ interface ErrorRule {
 const RULES: ErrorRule[] = [
   {
     match: /already exists/i,
-    message: "Cihaz güncel — bu kayıt panelde zaten mevcut.",
+    message: "Kayıt panelde zaten mevcut; işlemin uygulandığı doğrulanmadı.",
   },
   {
     match: /requires level 1|you are 0|level 1, you are/i,
@@ -26,7 +26,7 @@ const RULES: ErrorRule[] = [
   },
   {
     match: /token expired|token.*expire/i,
-    message: "Panel oturumu (token) doldu — yeniden denenecek.",
+    message: "Panel oturumu (token) doldu.",
   },
   {
     match: /not bound/i,
@@ -38,7 +38,7 @@ const RULES: ErrorRule[] = [
   },
   {
     match: /ack timeout|timed? ?out|timeout/i,
-    message: "Panel zamanında yanıt vermedi (bağlantı/zaman aşımı) — yeniden denenecek.",
+    message: "Panel zamanında yanıt vermedi (bağlantı/zaman aşımı).",
   },
   {
     match: /not permitted|not allowed/i,
@@ -62,11 +62,33 @@ const RULES: ErrorRule[] = [
 // Hem bu frontend modülü hem convex/syncStatus query'si aynı predicate'i kullanır.
 export { isBenignSyncError } from "../../convex/lib/syncErrors";
 
-/** Ham sync hatasını anlaşılır mesaja çevirir. Boşsa genel mesaj, eşleşme yoksa ham metin. */
-export function friendlySyncError(raw: string | null | undefined): string {
-  if (!raw || !raw.trim()) return "Bilinmeyen senkronizasyon hatası.";
-  for (const rule of RULES) {
-    if (rule.match.test(raw)) return rule.message;
+export interface SyncRetryState {
+  status: string;
+  attempts: number;
+  maxAttempts: number;
+  nextRetryAt?: number;
+}
+
+/** Yeniden deneme vaadi yalnız kuyruk durumu ve zamanıyla doğrulanır. */
+export function friendlySyncError(
+  raw: string | null | undefined,
+  operation?: SyncRetryState,
+  now = Date.now(),
+): string {
+  const description = RULES.find((rule) => raw && rule.match.test(raw))?.message
+    ?? "Senkronizasyon işlemi tamamlanamadı.";
+  if (!operation) return description;
+  let retry = "";
+  if (operation.status === "failed" && operation.attempts >= operation.maxAttempts) {
+    retry = "Tekrar deneme limiti doldu — müdahale gerekli.";
+  } else if (operation.status === "failed") {
+    retry = "İşlem başarısız — otomatik yeniden deneme zamanı bilinmiyor.";
+  } else if (operation.status === "pending") {
+    retry = operation.nextRetryAt !== undefined && operation.nextRetryAt > now
+      ? `~${Math.ceil((operation.nextRetryAt - now) / 1000)} sn sonra tekrar denenecek.`
+      : "Yeniden deneme kuyruğunda; cihaz onayı bekleniyor.";
+  } else if (operation.status === "sent" || operation.status === "processing") {
+    retry = "Cihaz yanıtı bekleniyor.";
   }
-  return raw;
+  return [description, retry].filter(Boolean).join(" ");
 }
