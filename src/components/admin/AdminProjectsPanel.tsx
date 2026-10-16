@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { ConvexError } from "convex/values";
+import { toast as notify } from "sonner";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -38,6 +40,8 @@ const AdminProjectsPanel = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isSavingProject, setIsSavingProject] = useState(false);
+  const [isDeletingProject, setIsDeletingProject] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [currentProjectId, setCurrentProjectId] = useState<Id<"projects"> | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
   const [formData, setFormData] = useState<ProjectForm>({ name: "", description: "", isActive: true });
@@ -92,6 +96,7 @@ const AdminProjectsPanel = () => {
 
   const handleDeleteClick = (projectId: Id<"projects">) => {
     setCurrentProjectId(projectId);
+    setDeleteError(null);
     setIsDeleteDialogOpen(true);
   };
 
@@ -118,13 +123,20 @@ const AdminProjectsPanel = () => {
   };
 
   const handleDeleteProject = async () => {
-    if (!currentProjectId) return;
+    if (!currentProjectId || isDeletingProject) return;
+    setIsDeletingProject(true);
+    setDeleteError(null);
     try {
       await removeProject({ id: currentProjectId });
       toast({ title: "Proje silindi", description: "Proje başarıyla silindi" });
       setIsDeleteDialogOpen(false);
     } catch (error: unknown) {
-      toast({ variant: "destructive", title: "Hata", description: (error as Error)?.message ?? "Proje silinirken bir hata oluştu" });
+      const message = error instanceof ConvexError && typeof error.data === "string"
+        ? error.data : error instanceof Error ? error.message : "Proje silinirken bir hata oluştu";
+      setDeleteError(message);
+      notify.error(message);
+    } finally {
+      setIsDeletingProject(false);
     }
   };
 
@@ -297,17 +309,23 @@ const AdminProjectsPanel = () => {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={(open) => { if (!isDeletingProject) setIsDeleteDialogOpen(open); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Proje Silme</AlertDialogTitle>
             <AlertDialogDescription>
               Bu işlem geri alınamaz. "{currentProject?.name}" projesini silmek istediğinize emin misiniz?
+              Personel, cihaz veya diğer iş verileri olan projeler silinemez.
+              Ayarlar, kullanıcı üyelikleri, davetler ve sohbetler projeyle birlikte silinir; denetim geçmişi korunur.
+              İş verilerini korumak için projeyi pasife alabilirsiniz.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
           <AlertDialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>İptal</Button>
-            <Button variant="destructive" onClick={handleDeleteProject}>Sil</Button>
+            <Button variant="outline" disabled={isDeletingProject} onClick={() => setIsDeleteDialogOpen(false)}>İptal</Button>
+            <Button variant="destructive" disabled={isDeletingProject} onClick={handleDeleteProject}>
+              {isDeletingProject ? "Siliniyor…" : "Sil"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

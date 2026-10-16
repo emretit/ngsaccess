@@ -20,7 +20,8 @@ const AdminUsersPanel = () => {
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [resendingId, setResendingId] = useState<string | null>(null);
 
-  const expiredInvites = useQuery(api.invites.listExpired) ?? [];
+  const isSuperAdmin = useQuery(api.users.isSuperAdmin);
+  const expiredInvites = useQuery(api.invites.listExpired, isSuperAdmin === true ? {} : "skip") ?? [];
   const sendInviteEmail = useAction(api.actions.sendEmail.sendUserInviteEmail);
 
   const handleResendInvite = async (email: string, projectId: string, role: "project_admin" | "project_user") => {
@@ -75,7 +76,8 @@ const AdminUsersPanel = () => {
 
   const handleDelete = async () => {
     if (userToDelete) {
-      await handleDeleteUser(userToDelete);
+      const deleted = await handleDeleteUser(userToDelete);
+      if (!deleted) return;
       setIsDeleteDialogOpen(false);
       setUserToDelete(null);
     }

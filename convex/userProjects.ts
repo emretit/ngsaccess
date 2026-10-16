@@ -15,10 +15,10 @@ export const getByCurrentUser = query({
     const enriched = await Promise.all(
       rows.map(async (r) => {
         const project = await ctx.db.get(r.projectId);
-        return { ...r, projectName: project?.name ?? "Proje" };
+        return project ? { ...r, projectName: project.name } : null;
       })
     );
-    return enriched;
+    return enriched.filter((p): p is NonNullable<typeof p> => p !== null);
   },
 });
 

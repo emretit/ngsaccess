@@ -1,9 +1,10 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { optionalAuthQuery, authedMutation, adminQuery, superAdminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, verifyUser } from "./lib/auth";
+import { userProtectionError } from "./lib/adminGuards";
 
 /** Kurulum sayfası için: Sistemde super_admin var mı? (Public - auth gerekmez) */
 export const hasSuperAdmin = query({
@@ -64,6 +65,17 @@ export const updateRole = superAdminMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const target = await ctx.db.get(args.userId);
+    if (!target) throw new ConvexError("Kullanıcı bulunamadı");
+    const removesSuperAdmin = target.role === "super_admin" && args.role !== "super_admin";
+    const admins = removesSuperAdmin ? await ctx.db.query("users")
+      .withIndex("by_role", (q) => q.eq("role", "super_admin"))
+      .take(2) : [];
+    const protectionError = userProtectionError({
+      isSelf: args.userId === ctx.user._id, isSuperAdmin: target.role === "super_admin",
+      removesSuperAdmin, adminCount: admins.length, deleting: false,
+    });
+    if (protectionError) throw new ConvexError(protectionError);
     await ctx.db.patch(args.userId, {
       role: args.role,
       updatedAt: new Date().toISOString(),
@@ -191,9 +203,16 @@ export const deleteUser = superAdminMutation({
   args: { userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    if (args.userId === ctx.user._id) {
-      throw new Error("Kendi hesabınızı silemezsiniz");
-    }
+    const target = await ctx.db.get(args.userId);
+    if (!target) throw new ConvexError("Kullanıcı bulunamadı");
+    const admins = target.role === "super_admin" ? await ctx.db.query("users")
+      .withIndex("by_role", (q) => q.eq("role", "super_admin"))
+      .take(2) : [];
+    const protectionError = userProtectionError({
+      isSelf: args.userId === ctx.user._id, isSuperAdmin: target.role === "super_admin",
+      removesSuperAdmin: true, adminCount: admins.length, deleting: true,
+    });
+    if (protectionError) throw new ConvexError(protectionError);
     const accounts = await ctx.db
       .query("authAccounts")
       .withIndex("userIdAndProvider", (q) => q.eq("userId", args.userId))

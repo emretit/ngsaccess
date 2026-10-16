@@ -1,5 +1,6 @@
 import { query } from "./_generated/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
+import { projectDeletionBlockingTables, projectDeletionBlockers, projectDeletionCleanupTables, projectDeletionError } from "./lib/adminGuards";
 import { authedMutation, authedQuery, superAdminMutation } from "./lib/customFunctions";
 
 export const list = authedQuery({
@@ -90,6 +91,29 @@ export const remove = authedMutation({
     if (!isSuperAdmin && !isOwner) {
       throw new Error("Sadece proje sahibi veya süper admin silebilir");
     }
+    // Sayım proje index'inde 101'de durur; büyük kümeler alt sınır olarak gösterilir.
+    const counts = await Promise.all(projectDeletionBlockingTables.map(async (entry) => {
+      const rows = entry.index === "by_project"
+        ? await ctx.db.query(entry.table).withIndex(entry.index, (q) => q.eq("projectId", args.id)).take(101)
+        : entry.index === "by_project_employee"
+          ? await ctx.db.query(entry.table).withIndex(entry.index, (q) => q.eq("projectId", args.id)).take(101)
+          : entry.index === "by_project_device"
+            ? await ctx.db.query(entry.table).withIndex(entry.index, (q) => q.eq("projectId", args.id)).take(101)
+            : await ctx.db.query(entry.table).withIndex(entry.index, (q) => q.eq("projectId", args.id)).take(101);
+      return [entry.table, rows.length] as const;
+    }));
+    const deletionError = projectDeletionError(projectDeletionBlockers(Object.fromEntries(counts)));
+    if (deletionError) throw new ConvexError(deletionError);
+
+    for (const table of projectDeletionCleanupTables) {
+      // invites küçük bir tablo ve proje index'i yok; yalnız eşleşen davetler silinir.
+      const rows = table === "invites"
+        ? ctx.db.query(table).filter((q) => q.eq(q.field("projectId"), args.id))
+        : ctx.db.query(table).withIndex("by_project", (q) => q.eq("projectId", args.id));
+      // Sohbet mesajları chatConversations satırının içinde tutulur.
+      for await (const row of rows) await ctx.db.delete(row._id);
+    }
+    // auditLog geçmişi korunur.
     await ctx.db.delete(args.id);
     return args.id;
   },

@@ -19,6 +19,7 @@ import { exportSgkToExcel, exportSgkToPdf, type SgkReportData } from "@/utils/sg
 import { exportReportsToExcel } from "@/utils/reportsExport";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { toast } from "sonner";
+import { reportSchedulePayload } from "../../../../convex/lib/adminGuards";
 
 const MONTHS = [
   { value: 1, label: "Ocak" },
@@ -52,6 +53,7 @@ export function ReportsSettings() {
   const [reportType, setReportType] = useState("sgk");
   const [scheduledEmail, setScheduledEmail] = useState("");
   const [scheduledEnabled, setScheduledEnabled] = useState(false);
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false);
   const [hourlyRate, setHourlyRate] = useState<number | undefined>(undefined);
   const [overtimePeriod, setOvertimePeriod] = useState<"month" | "year">("month");
 
@@ -117,19 +119,15 @@ export function ReportsSettings() {
   };
 
   const handleSaveSchedule = async () => {
-    if (!scheduledEmail) {
-      toast.error("Email adresi girin");
-      return;
-    }
+    if (isSavingSchedule || scheduleData === undefined) return;
+    setIsSavingSchedule(true);
     try {
-      await saveSchedule({
-        reportType,
-        email: scheduledEmail,
-        enabled: scheduledEnabled,
-      });
+      await saveSchedule(reportSchedulePayload(reportType, scheduledEmail, scheduledEnabled));
       toast.success("Zamanlanmış rapor ayarları kaydedildi");
-    } catch {
-      toast.error("Kaydetme başarısız");
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Kaydetme başarısız");
+    } finally {
+      setIsSavingSchedule(false);
     }
   };
 
@@ -333,6 +331,7 @@ export function ReportsSettings() {
           <div className="flex items-center gap-4">
             <Switch
               checked={scheduledEnabled}
+              disabled={isSavingSchedule || scheduleData === undefined}
               onCheckedChange={setScheduledEnabled}
             />
             <Label>Aylık rapor e-postasını al</Label>
@@ -344,12 +343,18 @@ export function ReportsSettings() {
                 type="email"
                 placeholder="rapor@firma.com"
                 value={scheduledEmail}
+                disabled={isSavingSchedule || scheduleData === undefined}
                 onChange={(e) => setScheduledEmail(e.target.value)}
               />
-              <Button onClick={handleSaveSchedule} size="sm">
-                Kaydet
-              </Button>
             </div>
+          )}
+          <Button onClick={handleSaveSchedule} size="sm" disabled={isSavingSchedule || scheduleData === undefined}>
+            {isSavingSchedule ? "Kaydediliyor…" : "Kaydet"}
+          </Button>
+          {scheduleData !== undefined && (
+            <p className="text-sm text-muted-foreground" role="status">
+              Kayıtlı durum: {scheduleData?.enabled ? `Açık — ${scheduleData.email}` : "Kapalı"}
+            </p>
           )}
         </CardContent>
       </Card>

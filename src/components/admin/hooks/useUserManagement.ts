@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { ConvexError } from "convex/values";
+import { toast as notify } from "sonner";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useToast } from "@/hooks/use-toast";
@@ -52,11 +54,8 @@ export const useUserManagement = () => {
         setCurrentUser(null);
         return true;
       } catch (error: unknown) {
-        toast({
-          title: "Hata",
-          description: (error as Error)?.message ?? "Kullanıcı güncellenemedi",
-          variant: "destructive",
-        });
+        notify.error(error instanceof ConvexError && typeof error.data === "string"
+          ? error.data : error instanceof Error ? error.message : "Kullanıcı güncellenemedi");
         return false;
       }
     }
@@ -113,12 +112,11 @@ export const useUserManagement = () => {
     try {
       await deleteUserMut({ userId: user._id });
       toast({ title: "Kullanıcı silindi", description: `${user.email ?? user._id} kaldırıldı.` });
+      return true;
     } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Kullanıcı silinemedi",
-        variant: "destructive",
-      });
+      notify.error(error instanceof ConvexError && typeof error.data === "string"
+        ? error.data : error instanceof Error ? error.message : "Kullanıcı silinemedi");
+      return false;
     }
   };
 
