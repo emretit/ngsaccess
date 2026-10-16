@@ -131,6 +131,9 @@ export function BridgeIntegrationCard() {
                     ? `Son bağlantı: ${new Date(b.lastSeenAt).toLocaleString("tr-TR")}`
                     : "Henüz bağlanmadı"}
                 </span>
+                {b.lastClientInfo && (
+                  <span className="break-words text-xs text-muted-foreground">{b.lastClientInfo}</span>
+                )}
               </div>
               {!b.lastSeenAt && (
                 <Badge variant="secondary" className="shrink-0">
@@ -174,6 +177,9 @@ export function BridgeIntegrationCard() {
         <p className="text-xs text-muted-foreground">
           Token'ı bridge EXE'de <code className="font-mono">http://127.0.0.1:8787/__bridge</code> ekranına
           yapıştırın. Bir bridge, projedeki tüm localBridge panellerini tek token ile yönetir.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Köprü 15 dakikada bir yoklar; işlem olunca anında uyandırılır.
         </p>
         <ConfirmDestructive
           open={revokeOpen}

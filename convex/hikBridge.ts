@@ -1,4 +1,7 @@
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
+import { earliestPendingRetryAt, planNextWake, relayConfig } from "./lib/hikWake";
+import type { MutationCtx } from "./_generated/server";
 import { internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { adminMutation, adminQuery } from "./lib/customFunctions";
@@ -66,12 +69,30 @@ type RosterOperation = {
   createdAt: number;
 };
 
+/** Aynı projedeki işleri köprü başına en fazla iki saniyede bir uyandırır. */
+export async function scheduleBridgeWakeForProject(
+  ctx: MutationCtx,
+  projectId: Id<"projects"> | undefined,
+): Promise<void> {
+  if (!projectId || !relayConfig(process.env)) return;
+  const bridges = await ctx.db.query("hikBridges")
+    .withIndex("by_project", (q) => q.eq("projectId", projectId))
+    .take(10);
+  const now = Date.now();
+  for (const bridge of bridges) {
+    const plan = planNextWake(now, bridge.nextWakeAt);
+    if (!plan.schedule) continue;
+    await ctx.db.patch(bridge._id, { nextWakeAt: plan.fireAt });
+    await ctx.scheduler.runAt(plan.fireAt, internal.actions.hikBridgeWake.wake, { bridgeId: bridge._id });
+  }
+}
+
 /**
  * Bridge token ile: o projedeki localBridge cihazlarının roster'ı + bekleyen işler.
  * Auth bridge token ile yapılır; geçersiz token hiçbir veri döndürmez.
  */
 export const claimBridgeRoster = internalMutation({
-  args: { token: v.string(), max: v.optional(v.number()) },
+  args: { token: v.string(), max: v.optional(v.number()), clientInfo: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const bridge = await ctx.db
       .query("hikBridges")
@@ -82,7 +103,11 @@ export const claimBridgeRoster = internalMutation({
     }
 
     const now = Date.now();
-    await ctx.db.patch(bridge._id, { lastSeenAt: now });
+    const clientInfo = args.clientInfo?.slice(0, 200);
+    const patch: { lastSeenAt?: number; lastClientInfo?: string } = {};
+    if (!bridge.lastSeenAt || now - bridge.lastSeenAt >= 60_000) patch.lastSeenAt = now;
+    if (clientInfo !== undefined && clientInfo !== bridge.lastClientInfo) patch.lastClientInfo = clientInfo;
+    if (Object.keys(patch).length > 0) await ctx.db.patch(bridge._id, patch);
 
     const projectDevices = await ctx.db
       .query("devices")
@@ -123,6 +148,8 @@ export const claimBridgeRoster = internalMutation({
     const max = Math.min(Math.max(requestedMax, 1), HIK_BRIDGE_MAX_POLL);
     const staleCutoff = now - HIK_BRIDGE_PROCESSING_TIMEOUT_MS;
     const operations: RosterOperation[] = [];
+    // Backoff'taki en erken retry — köprü bu kadar sonra tekrar yoklar (15 dk beklemesin).
+    let nextDueAt: number | null = null;
 
     for (const panel of panels) {
       // IP girilmemiş panelin işini claim ETME — bridge worker'ı host'suz cihaz için
@@ -174,6 +201,10 @@ export const claimBridgeRoster = internalMutation({
         )
         .take(HIK_BRIDGE_PENDING_SCAN);
       const dueAll = pending.filter((op) => (op.nextRetryAt ?? 0) <= now);
+      const panelNextDue = earliestPendingRetryAt(pending, now, HIK_BRIDGE_MAX_ATTEMPTS);
+      if (panelNextDue !== null && (nextDueAt === null || panelNextDue < nextDueAt)) {
+        nextDueAt = panelNextDue;
+      }
 
       // Maksimum denemeyi aşanları terminal failed yap (her panel için — quota'dan bağımsız).
       await Promise.all(
@@ -221,6 +252,8 @@ export const claimBridgeRoster = internalMutation({
 
     return {
       ok: true as const,
+      bridgeId: String(bridge._id),
+      nextDueAt,
       bridge: { projectId: bridge.projectId, name: bridge.name ?? null },
       devices,
       operations,
@@ -331,6 +364,7 @@ export const listBridges = adminQuery({
       name: b.name ?? null,
       token: b.token,
       lastSeenAt: b.lastSeenAt ?? null,
+      lastClientInfo: b.lastClientInfo ?? null,
       createdAt: b.createdAt,
     }));
   },

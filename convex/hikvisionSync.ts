@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import { scheduleBridgeWakeForProject } from "./hikBridge";
 import { internalQuery, internalMutation } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { adminQuery, authedQuery, authedMutation, adminMutation } from "./lib/customFunctions";
@@ -437,10 +438,11 @@ export const enqueueLocalBridgeOperation = internalMutation({
           claimedBy: undefined,
           lastError: undefined,
         });
+        await scheduleBridgeWakeForProject(ctx, device.projectId);
         return existing._id;
       }
     }
-    return await ctx.db.insert("hikPendingOperations", {
+    const opId = await ctx.db.insert("hikPendingOperations", {
       deviceId: args.deviceId,
       projectId: args.projectId,
       operation: args.operation,
@@ -450,6 +452,8 @@ export const enqueueLocalBridgeOperation = internalMutation({
       nextRetryAt: now,
       createdAt: now,
     });
+    await scheduleBridgeWakeForProject(ctx, device.projectId);
+    return opId;
   },
 });
 
@@ -956,6 +960,7 @@ export const retrySyncIssue = adminMutation({
       attemptCount: 0, processingStartedAt: undefined, completedAt: undefined, claimedBy: undefined,
       dismissedAt: undefined, dismissedBy: undefined, lastError: undefined,
     });
+    await scheduleBridgeWakeForProject(ctx, device.projectId);
     return { queued: true };
   },
 });

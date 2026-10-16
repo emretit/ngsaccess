@@ -10,6 +10,7 @@
 
 import type * as accessRules from "../accessRules.js";
 import type * as actions_getChatData from "../actions/getChatData.js";
+import type * as actions_hikBridgeWake from "../actions/hikBridgeWake.js";
 import type * as actions_hikDebug from "../actions/hikDebug.js";
 import type * as actions_hikGatewayDevice from "../actions/hikGatewayDevice.js";
 import type * as actions_hikQueueWorker from "../actions/hikQueueWorker.js";
@@ -80,6 +81,7 @@ import type * as lib_gateway_persons from "../lib/gateway/persons.js";
 import type * as lib_gateway_plans from "../lib/gateway/plans.js";
 import type * as lib_gateway_readers from "../lib/gateway/readers.js";
 import type * as lib_gateway_scheduling from "../lib/gateway/scheduling.js";
+import type * as lib_hikWake from "../lib/hikWake.js";
 import type * as lib_hikEventCatalog from "../lib/hikEventCatalog.js";
 import type * as lib_hikEventCodes from "../lib/hikEventCodes.js";
 import type * as lib_hikGateway from "../lib/hikGateway.js";
@@ -131,6 +133,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   accessRules: typeof accessRules;
   "actions/getChatData": typeof actions_getChatData;
+  "actions/hikBridgeWake": typeof actions_hikBridgeWake;
   "actions/hikDebug": typeof actions_hikDebug;
   "actions/hikGatewayDevice": typeof actions_hikGatewayDevice;
   "actions/hikQueueWorker": typeof actions_hikQueueWorker;
@@ -201,6 +204,7 @@ declare const fullApi: ApiFromModules<{
   "lib/gateway/plans": typeof lib_gateway_plans;
   "lib/gateway/readers": typeof lib_gateway_readers;
   "lib/gateway/scheduling": typeof lib_gateway_scheduling;
+  "lib/hikWake": typeof lib_hikWake;
   "lib/hikEventCatalog": typeof lib_hikEventCatalog;
   "lib/hikEventCodes": typeof lib_hikEventCodes;
   "lib/hikGateway": typeof lib_hikGateway;

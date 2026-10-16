@@ -371,6 +371,10 @@ export default defineSchema({
     token: v.string(),
     name: v.optional(v.string()),
     lastSeenAt: v.optional(v.number()),
+    /** Son roster çağrısının User-Agent'ı (köprü sürümü + makine adı; ≤200 karakter). */
+    lastClientInfo: v.optional(v.string()),
+    /** Planlanmış bir sonraki uyandırma zamanı (ms) — enqueue debounce'u (≤1 uyandırma / 2 sn). */
+    nextWakeAt: v.optional(v.number()),
     createdAt: v.number(),
   })
     .index("by_token", ["token"])
