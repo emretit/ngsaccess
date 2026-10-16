@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { toast } from "@/hooks/use-toast";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { Eye, EyeOff, Lock, CheckCircle, XCircle, Smartphone } from "lucide-react";
 import { useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -17,7 +17,6 @@ export default function EmployeeSetup() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
   const authRecord = useQuery(
@@ -44,31 +43,18 @@ export default function EmployeeSetup() {
   const passwordChecks = validatePassword(password);
   const isPasswordValid = Object.values(passwordChecks).every(Boolean);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) return;
-    if (!isPasswordValid) {
-      toast({ title: "Hata", description: "Şifre gereksinimleri karşılanmıyor.", variant: "destructive" });
-      return;
-    }
-    if (password !== confirmPassword) {
-      toast({ title: "Hata", description: "Şifreler eşleşmiyor.", variant: "destructive" });
-      return;
-    }
-    setIsLoading(true);
+  const savePassword = useAsyncAction(async () => {
+    if (!token || !isPasswordValid || password !== confirmPassword) throw new Error("Şifre gereksinimlerini ve şifre tekrarını kontrol edin.");
     try {
       const result = await setPasswordAction({ token, password });
-      if (!result.success) {
-        toast({ title: "Hata", description: result.error ?? "Şifre belirlenemedi.", variant: "destructive" });
-        return;
-      }
-      setIsSuccess(true);
-    } catch (error: unknown) {
-      toast({ title: "Hata", description: (error as Error)?.message ?? "Bir hata oluştu.", variant: "destructive" });
-    } finally {
-      setIsLoading(false);
+      if (!result.success) throw new Error("Şifre belirlenemedi.");
+    } catch {
+      throw new Error("Şifre belirlenemedi. Bağlantınızın süresi dolmuş veya kullanılmış olabilir. Yöneticinizden yeni bağlantı isteyin.");
     }
-  };
+    setIsSuccess(true);
+  });
+  const isLoading = savePassword.pending;
+  const handleSubmit = (event: React.FormEvent) => { event.preventDefault(); void savePassword.run(); };
 
   if (!token) {
     return (
@@ -92,7 +78,7 @@ export default function EmployeeSetup() {
       <div className="flex items-center justify-center min-h-screen bg-muted/50 p-4">
         <Card className="w-full max-w-md shadow-lg">
           <CardHeader>
-            <CardTitle className="text-center text-2xl flex items-center justify-center gap-2 text-green-600">
+            <CardTitle className="text-center text-2xl flex items-center justify-center gap-2 text-primary">
               <CheckCircle className="h-7 w-7" />
               Şifreniz Belirlendi
             </CardTitle>
@@ -121,7 +107,7 @@ export default function EmployeeSetup() {
       <div className="flex items-center justify-center min-h-screen bg-muted/50 p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-center text-red-600">Geçersiz Bağlantı</CardTitle>
+            <CardTitle className="text-center text-destructive">Geçersiz Bağlantı</CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-3">
             <p>{authRecord ? "Bu şifre belirleme bağlantısının süresi dolmuş." : "Bu şifre belirleme bağlantısı geçersiz."}</p>
@@ -147,12 +133,12 @@ export default function EmployeeSetup() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit}><fieldset disabled={isLoading} className="space-y-4">
             <div>
               <Label htmlFor="password">Yeni Şifre</Label>
               <div className="relative">
                 <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} required />
-                <button type="button" className="absolute right-3 top-2.5" onClick={() => setShowPassword(!showPassword)}>
+                <button type="button" className="absolute right-3 top-2.5" aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"} onClick={() => setShowPassword(!showPassword)}>
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
@@ -160,8 +146,8 @@ export default function EmployeeSetup() {
             <div className="space-y-1 text-sm">
               {Object.entries({ minLength: "En az 8 karakter", hasUpper: "Büyük harf", hasLower: "Küçük harf", hasNumber: "Rakam" }).map(([k, label]) => (
                 <div key={k} className="flex items-center gap-2">
-                  {passwordChecks[k as keyof typeof passwordChecks] ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-muted-foreground/60" />}
-                  <span className={passwordChecks[k as keyof typeof passwordChecks] ? "text-green-600" : "text-muted-foreground/70"}>{label}</span>
+                  {passwordChecks[k as keyof typeof passwordChecks] ? <CheckCircle className="h-4 w-4 text-primary" /> : <XCircle className="h-4 w-4 text-muted-foreground/60" />}
+                  <span className={passwordChecks[k as keyof typeof passwordChecks] ? "text-primary" : "text-muted-foreground/70"}>{label}</span>
                 </div>
               ))}
             </div>
@@ -169,7 +155,7 @@ export default function EmployeeSetup() {
               <Label htmlFor="confirmPassword">Şifre Tekrar</Label>
               <div className="relative">
                 <Input id="confirmPassword" type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
-                <button type="button" className="absolute right-3 top-2.5" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                <button type="button" className="absolute right-3 top-2.5" aria-label={showConfirmPassword ? "Şifre tekrarını gizle" : "Şifre tekrarını göster"} onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
                   {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
@@ -177,7 +163,7 @@ export default function EmployeeSetup() {
             <Button type="submit" className="w-full" disabled={isLoading || !isPasswordValid}>
               {isLoading ? "Kaydediliyor..." : "Şifremi Belirle"}
             </Button>
-          </form>
+          </fieldset></form>
         </CardContent>
       </Card>
     </div>

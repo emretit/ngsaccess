@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Building2, Eye, EyeOff, Home, Lock, Mail, ShieldCheck, User } from 'lucide-react';
 
+import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +19,6 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // NOT: "girişli kullanıcıyı /home'a at" effect'i KASITLI olarak yok.
@@ -27,8 +27,7 @@ export default function Register() {
   // handleSubmit yapar → /login?confirmEmail=true. Doğrulanmamış erişim backend
   // guard'ı + AuthProvider tarafından zaten engelleniyor.
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const registration = useAsyncAction(async () => {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedFirstName = firstName.trim();
     const normalizedLastName = lastName.trim();
@@ -42,48 +41,34 @@ export default function Register() {
       !password
     ) {
       setError('Lütfen tüm alanları doldurun.');
-      return;
+      throw new Error('Lütfen tüm alanları doldurun.');
     }
     if (password.length < 8) {
       setError('Şifre en az 8 karakter olmalıdır.');
-      return;
+      throw new Error('Şifre en az 8 karakter olmalıdır.');
     }
-    setSubmitting(true);
     setError(null);
-    try {
-      const fullName = `${normalizedFirstName} ${normalizedLastName}`;
-      const { error: signUpError } = await signUp(
-        normalizedEmail,
-        password,
-        fullName,
-        normalizedCompanyName,
-      );
-      if (signUpError) {
-        const rawMessage =
-          (signUpError as Error)?.message ?? 'Kayıt olurken bir hata oluştu.';
-        // Convex Auth'un ham "Invalid password" hatasını anlaşılır Türkçe'ye çevir.
-        const message = rawMessage.includes('Invalid password')
-          ? 'Şifre en az 8 karakter olmalıdır.'
-          : rawMessage;
-        setError(message);
-        toast({
-          title: 'Kayıt hatası',
-          description: message,
-          variant: 'destructive',
-        });
-        return;
-      }
-      // Hesap oluştu ve doğrulama maili gönderildi; oturum açılmadı.
-      // Pafta modeli: giriş ekranına geç + "mailinizi onaylayın" bilgisi göster.
-      toast({
-        title: 'Kayıt başarılı',
-        description: 'E-posta adresinize bir doğrulama linki gönderdik. Hesabınızı onaylayın.',
-      });
-      navigate('/login?confirmEmail=true');
-    } finally {
-      setSubmitting(false);
+    const fullName = `${normalizedFirstName} ${normalizedLastName}`;
+    const { error: signUpError, verificationQueued } = await signUp(
+      normalizedEmail,
+      password,
+      fullName,
+      normalizedCompanyName,
+    );
+    if (signUpError) {
+      const message = 'Hesap oluşturulamadı. Bilgilerinizi kontrol edin; mevcut hesabınız varsa giriş yapın.';
+      setError(message);
+      throw new Error(message);
     }
-  };
+    // Hesap ve mail talebi ayrı sonuçlardır; kurtarma giriş ekranında sürer.
+    toast({
+      title: 'Kayıt başarılı',
+      description: verificationQueued ? 'Doğrulama bağlantısı gönderimi istendi.' : 'Hesabınız oluşturuldu ancak doğrulama maili istenemedi. Giriş ekranından yeni bağlantı isteyin.',
+    });
+    navigate('/login?confirmEmail=true', { state: { email: normalizedEmail, verificationQueued } });
+  });
+  const submitting = registration.pending;
+  const handleSubmit = (event: React.FormEvent) => { event.preventDefault(); void registration.run(); };
 
   if (loading) {
     return <LoadingSpinner text="Kayıt işlemi kontrol ediliyor..." />;

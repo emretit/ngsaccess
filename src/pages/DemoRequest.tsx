@@ -5,7 +5,6 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import DemoRequestHero from "@/components/demo/DemoRequestHero";
 import DemoFeatures from "@/components/demo/DemoFeatures";
-import DemoStats from "@/components/demo/DemoStats";
 import EnhancedDemoRequestForm from "@/components/demo/EnhancedDemoRequestForm";
 import LandingHeader from "@/components/landing/LandingHeader";
 import LandingFooter from "@/components/landing/LandingFooter";
@@ -15,7 +14,7 @@ export default function DemoRequest() {
   const { user, loading } = useAuth();
   
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && user && user.verified !== false) {
       navigate('/home');
     }
   }, [user, loading, navigate]);
@@ -27,11 +26,10 @@ export default function DemoRequest() {
   return (
     <div className="min-h-screen bg-background">
       <LandingHeader />
-      <main>
+      <main id="main" tabIndex={-1}>
+        <EnhancedDemoRequestForm />
         <DemoRequestHero />
         <DemoFeatures />
-        <DemoStats />
-        <EnhancedDemoRequestForm />
       </main>
       <LandingFooter />
     </div>

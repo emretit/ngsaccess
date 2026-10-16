@@ -1,3 +1,4 @@
+import { deferAuthGuard, registerAccount } from './registrationFlow';
 import React, { createContext, useContext, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthActions } from "@convex-dev/auth/react";
@@ -21,18 +22,15 @@ interface AuthContextType {
     password: string,
     name: string,
     companyName: string,
-  ) => Promise<{ error: unknown | null }>;
+  ) => Promise<{ error: unknown | null; accountCreated?: boolean; verificationQueued?: boolean }>;
+  verificationEmail: string | null;
+  runSetup: (action: () => Promise<void>) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   checkUserRole: (requiredRole: UserRole) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-const PUBLIC_PATHS = [
-  '/', '/login', '/register', '/verify-email', '/demo-request',
-  '/check-in', '/user-setup', '/admin-setup', '/employee-setup', '/system-admin',
-];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useConvexAuth();
@@ -42,6 +40,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const requestVerification = useMutation(api.emailVerification.requestVerification);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const setupActiveRef = useRef(false);
+  const [setupPhase, setSetupPhase] = React.useState<"idle" | "working" | "completed">("idle");
+  const [signupPending, setSignupPending] = React.useState(false);
+  const [verificationEmail, setVerificationEmail] = React.useState<string | null>(null);
 
   const loading = isLoading || (isAuthenticated && user === undefined);
   const profile = user ?? null;
@@ -60,7 +63,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // signUp devam ediyor: oturum geçici olarak açık ama hemen kapatılacak.
     // Bu pencerede hiçbir yönlendirme/proje oluşturma yapma (dashboard flash'ı önlenir).
-    if (signingUpRef.current) return;
+    if (deferAuthGuard(location.pathname, signingUpRef.current, setupActiveRef.current)) return;
+    if (setupActiveRef.current) {
+      setupActiveRef.current = false;
+      setSetupPhase("idle");
+    }
 
     if (isAuthenticated && profile) {
       // Doğrulanmamış self-signup kullanıcısı içeri giremez.
@@ -68,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (profile.verified === false) {
         if (!blockedRef.current) {
           blockedRef.current = true;
+          setVerificationEmail(profile.email ?? null);
           void convexSignOut()
             .then(() => {
               toast({
@@ -86,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       blockedRef.current = false;
+      setVerificationEmail(null);
 
       // Doğrulanmış kullanıcı: projesi yoksa otomatik oluştur (idempotent).
       if (!ensuredRef.current) {
@@ -106,12 +115,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (!isAuthenticated) {
+      blockedRef.current = false;
       ensuredRef.current = false;
-      if (!PUBLIC_PATHS.includes(location.pathname)) {
-        navigate('/login');
-      }
     }
-  }, [isAuthenticated, isLoading, profile, location.pathname, navigate, convexSignOut, ensureProject]);
+  }, [isAuthenticated, isLoading, profile, location.pathname, navigate, convexSignOut, ensureProject, signupPending, setupPhase]);
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -143,32 +150,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Bu pencerede effect'in /home'a yönlendirmesini engelle (dashboard flash'ı).
     signingUpRef.current = true;
+    setSignupPending(true);
     try {
-      // Convex Auth signUp hesabı oluşturur ve oturum açar.
-      // verified=false ve firstCompanyName, auth.ts'teki profile() callback ile
-      // BU çağrıda users'a yazılır (companyName parametresi profile'a ulaşır).
-      await convexSignIn("password", {
-        email: normalizedEmail,
-        password,
-        name: normalizedName,
-        companyName: normalizedCompanyName,
-        flow: "signUp",
+      return await registerAccount({
+        createAccount: () => convexSignIn("password", {
+          email: normalizedEmail,
+          password,
+          name: normalizedName,
+          companyName: normalizedCompanyName,
+          flow: "signUp",
+        }),
+        requestVerification: () => requestVerification({ email: normalizedEmail }),
+        signOut: convexSignOut,
       });
-      // Doğrulama token'ını üret ve doğrulama mailini gönder.
-      await requestVerification({ email: normalizedEmail });
-      // Doğrulanana kadar içeri girilmesin — oturumu hemen kapat.
-      await convexSignOut();
-      return { error: null };
-    } catch (error: unknown) {
-      // signUp yarıda kaldıysa oturumu temizlemeye çalış.
-      try {
-        await convexSignOut();
-      } catch {
-        // yok say
-      }
-      return { error };
     } finally {
       signingUpRef.current = false;
+      setSignupPending(false);
+    }
+  };
+
+  const runSetup = async (action: () => Promise<void>) => {
+    setupActiveRef.current = true;
+    setSetupPhase("working");
+    try {
+      await action();
+      setSetupPhase("completed");
+    } catch (error: unknown) {
+      try { await convexSignOut(); } catch { /* Backend doğrulama kontrolü sürer. */ }
+      setupActiveRef.current = false;
+      setSetupPhase("idle");
+      throw error;
     }
   };
 
@@ -189,6 +200,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user: user ?? null,
         profile,
         loading,
+        verificationEmail,
+        runSetup,
         signIn,
         signUp,
         signOut,

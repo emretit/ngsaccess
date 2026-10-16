@@ -1,3 +1,4 @@
+import { ACCOUNT_CTA } from './publicCopy';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -48,7 +49,7 @@ const HeroSection = () => {
 
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1]">
               Personel devam takibini{' '}
-              <span className="text-primary">5 dakikada</span> kurun.
+              <span className="text-primary">tek yerden</span> yönetin.
             </h1>
 
             <p className="mt-6 text-lg md:text-xl text-muted-foreground leading-relaxed">
@@ -59,7 +60,7 @@ const HeroSection = () => {
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <Button size="lg" className="text-base shadow-lg shadow-primary/20" asChild>
                 <Link to="/register">
-                  14 Gün Ücretsiz Dene
+                  {ACCOUNT_CTA}
                   <ChevronRight className="ml-1 h-4 w-4" />
                 </Link>
               </Button>

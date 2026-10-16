@@ -1,3 +1,4 @@
+import { ACCOUNT_CTA } from './publicCopy';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -42,7 +43,7 @@ const PLANS: Plan[] = [
     description: 'Büyüyen işletmeler için',
     monthlyPrice: 799,
     yearlyPrice: 639,
-    buttonText: '14 Gün Ücretsiz Dene',
+    buttonText: ACCOUNT_CTA,
     buttonVariant: 'default',
     popular: true,
     ctaPath: '/register',
@@ -61,9 +62,9 @@ const PLANS: Plan[] = [
     monthlyPrice: null,
     yearlyPrice: null,
     customLabel: 'Özel Fiyat',
-    buttonText: 'Satış Ekibiyle Görüş',
+    buttonText: ACCOUNT_CTA,
     buttonVariant: 'outline',
-    ctaPath: '/demo-request?plan=enterprise',
+    ctaPath: '/demo-request',
     features: [
       'Sınırsız çalışan',
       'Hikvision & özel entegrasyonlar',

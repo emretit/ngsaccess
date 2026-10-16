@@ -20,7 +20,7 @@ const FAQS = [
   },
   {
     q: 'Kaç çalışana kadar destekliyorsunuz?',
-    a: 'Ücretsiz plan 5 çalışan, Profesyonel plan 50 çalışan ve Kurumsal plan sınırsız çalışan içindir. 1.000+ çalışanı olan müşterilerimiz aktif olarak sistemi kullanıyor.',
+    a: 'Fiyatlandırma tablosunda Başlangıç 10, Profesyonel 50 çalışan içindir; Kurumsal kapsamı ayrıca değerlendirilir. Hesap oluşturmak ücretli plan satın almaz.',
   },
   {
     q: 'Mobil uygulamayı kim kullanır?',
@@ -28,7 +28,7 @@ const FAQS = [
   },
   {
     q: 'İptal ve geri ödeme politikası nedir?',
-    a: '14 gün ücretsiz deneme süresinde istediğiniz zaman iptal edebilirsiniz, kart bilgisi alınmaz. Ücretli planlarda ay sonuna kadar iptal hakkınız vardır, sonraki dönem ücretlendirilmez.',
+    a: 'Hesap oluştururken kart bilgisi alınmaz. Ücretli plan, deneme süresi ve iptal koşulları için iletişime geçin.',
   },
 ];
 

@@ -34,8 +34,7 @@ const LandingHeader = () => {
   const handleAnchor = (href: string) => (e: React.MouseEvent) => {
     e.preventDefault();
     setMobileOpen(false);
-    const id = href.replace('#', '');
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    navigate(`/${href}`);
   };
 
   return (
@@ -60,7 +59,7 @@ const LandingHeader = () => {
               {NAV_LINKS.map((link) => (
                 <a
                   key={link.href}
-                  href={link.href}
+                  href={`/${link.href}`}
                   onClick={handleAnchor(link.href)}
                   className="px-3 py-2 text-sm font-medium text-foreground/80 hover:text-primary transition-colors rounded-md hover:bg-primary/5"
                 >
@@ -81,7 +80,7 @@ const LandingHeader = () => {
                 onClick={() => navigate('/register')}
                 className="bg-primary hover:bg-primary/90 shadow-sm"
               >
-                Ücretsiz Demo
+                Ücretsiz hesap oluştur
               </Button>
             </div>
 
@@ -90,13 +89,13 @@ const LandingHeader = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="md:hidden"
+                  className="lg:hidden"
                   aria-label="Menüyü aç"
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[380px]">
+              <SheetContent side="right" className="w-[min(300px,100vw)] sm:w-[380px]">
                 <SheetHeader className="text-left">
                   <SheetTitle>
                     <Logo variant="compact" tone="dark" size="md" />
@@ -106,7 +105,7 @@ const LandingHeader = () => {
                   {NAV_LINKS.map((link) => (
                     <a
                       key={link.href}
-                      href={link.href}
+                      href={`/${link.href}`}
                       onClick={handleAnchor(link.href)}
                       className="px-3 py-3 text-base font-medium text-foreground rounded-md hover:bg-primary/10 hover:text-primary transition-colors"
                     >
@@ -131,7 +130,7 @@ const LandingHeader = () => {
                     }}
                     className="bg-primary hover:bg-primary/90"
                   >
-                    Ücretsiz Demo
+                    Ücretsiz hesap oluştur
                   </Button>
                 </div>
               </SheetContent>

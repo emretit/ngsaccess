@@ -1,3 +1,4 @@
+import { checkInTokenState, CHECK_IN_TOKEN_TTL_MS } from "./lib/checkInUx";
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { employeeAuthedMutation } from "./lib/customFunctions";
@@ -13,7 +14,7 @@ export const createMyCheckInToken = employeeAuthedMutation({
 
     const token = crypto.randomUUID();
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + 10 * 1000).toISOString();
+    const expiresAt = new Date(now.getTime() + CHECK_IN_TOKEN_TTL_MS).toISOString();
     const createdAt = now.toISOString();
 
     await ctx.db.insert("checkInTokens", {
@@ -42,19 +43,25 @@ export const checkInWithToken = mutation({
       .withIndex("by_token", (q) => q.eq("token", args.token))
       .first();
 
-    if (!record) {
+    const state = checkInTokenState(record, Date.now());
+    if (!record || state === "invalid") {
       return { success: false, error: "Geçersiz veya süresi dolmuş kod" };
     }
-    if (record.usedAt) {
-      return { success: false, error: "Bu kod zaten kullanıldı" };
-    }
-    if (new Date() > new Date(record.expiresAt)) {
+    if (state === "expired") {
       return { success: false, error: "Kodun süresi doldu" };
     }
 
     const employee = await ctx.db.get(record.employeeId);
     if (!employee) {
       return { success: false, error: "Çalışan bulunamadı" };
+    }
+
+    if (state === "completed") {
+      return {
+        success: true,
+        employeeName: `${employee.firstName} ${employee.lastName}`,
+        accessTime: record.usedAt,
+      };
     }
 
     const now = new Date().toISOString();
@@ -76,6 +83,7 @@ export const checkInWithToken = mutation({
       success: true,
       employeeName: `${employee.firstName} ${employee.lastName}`,
       accessTime: now,
+      locationRecorded: args.latitude != null && args.longitude != null,
     };
   },
 });

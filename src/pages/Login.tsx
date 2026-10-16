@@ -1,33 +1,34 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from 'convex/react';
 import { ArrowRight, Eye, EyeOff, Home, Lock, Mail, MailCheck, RefreshCw, ShieldCheck } from 'lucide-react';
 
+import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { toast } from '@/hooks/use-toast';
 import { api } from '@/lib/convexApi';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { user, loading, signIn } = useAuth();
+  const { user, loading, signIn, verificationEmail } = useAuth();
   const hasAdmin = useQuery(api.users.hasSuperAdmin);
   const [searchParams] = useSearchParams();
 
-  const [email, setEmail] = useState('');
+  const location = useLocation();
+  const savedEmail: unknown = location.state?.email;
+  const [email, setEmail] = useState(typeof savedEmail === 'string' ? savedEmail : '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Kayıttan yeni gelindi mi? (Register → /login?confirmEmail=true)
-  const [showConfirmBanner, setShowConfirmBanner] = useState(
+  const [showConfirmBanner] = useState(
     searchParams.get('confirmEmail') === 'true',
   );
   // Doğrulanmamış hesapla giriş denendi mi? (signIn guard tetikledi)
   const [emailNotConfirmed, setEmailNotConfirmed] = useState(false);
-  const [resending, setResending] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
   const [resendDone, setResendDone] = useState(false);
   const requestVerification = useMutation(api.emailVerification.requestVerification);
 
@@ -40,51 +41,48 @@ export default function Login() {
     }
   }, [user, loading, navigate]);
 
-  const handleResend = async () => {
-    if (!email || resending || resendDone) return;
-    setResending(true);
+  useEffect(() => {
+    if (!verificationEmail) return;
+    setEmail(verificationEmail);
+    setEmailNotConfirmed(true);
+  }, [verificationEmail]);
+
+  useEffect(() => {
+    setResendDone(false);
+    setCooldown(0);
+  }, [email]);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setTimeout(() => setCooldown((value) => value - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [cooldown]);
+
+  const resend = useAsyncAction(async () => {
+    if (!email || cooldown > 0) return;
     try {
       await requestVerification({ email: email.trim().toLowerCase() });
-      setResendDone(true);
-      toast({ title: 'Doğrulama maili gönderildi', description: 'Gelen kutunuzu kontrol edin.' });
     } catch {
-      toast({ title: 'Gönderilemedi', description: 'Lütfen birkaç dakika sonra tekrar deneyin.', variant: 'destructive' });
-    } finally {
-      setResending(false);
+      throw new Error('Gönderim istenemedi. Birkaç dakika sonra tekrar deneyin.');
     }
-  };
+    setResendDone(true);
+    setCooldown(60);
+  });
+  const resending = resend.pending;
+  const handleResend = () => { void resend.run(); };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) {
-      setError('E-posta ve şifre alanlarını doldurun.');
-      return;
-    }
-    setSubmitting(true);
+  const login = useAsyncAction(async () => {
+    if (!email || !password) throw new Error('E-posta ve şifre alanlarını doldurun.');
     setError(null);
-    setShowConfirmBanner(false);
-    setEmailNotConfirmed(false);
-    try {
-      const { error: signInError } = await signIn(email.trim().toLowerCase(), password);
-      if (signInError) {
-        const message =
-          (signInError as Error)?.message ?? 'Giriş yapılırken bir hata oluştu.';
-        // Doğrulanmamış hesap → sarı bilgi banner'ı göster, kırmızı hata değil.
-        if (message.includes('doğrula')) {
-          setEmailNotConfirmed(true);
-          return;
-        }
-        setError(message);
-        toast({
-          title: 'Giriş hatası',
-          description: message,
-          variant: 'destructive',
-        });
-      }
-    } finally {
-      setSubmitting(false);
+    const result = await signIn(email.trim().toLowerCase(), password);
+    if (result.error) {
+      const message = 'Giriş yapılamadı. E-posta ve şifrenizi kontrol edin; hesabınız doğrulanmadıysa yeni bağlantı isteyin.';
+      setError(message);
+      throw new Error(message);
     }
-  };
+  });
+  const submitting = login.pending;
+  const handleSubmit = (event: React.FormEvent) => { event.preventDefault(); void login.run(); };
 
   if (loading) {
     return <LoadingSpinner text="Giriş kontrol ediliyor..." />;
@@ -133,16 +131,13 @@ export default function Login() {
             <div className="flex items-start gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-950/40">
               <MailCheck className="mt-0.5 h-5 w-5 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
               <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                Hesabınız oluşturuldu. E-posta adresinize bir{' '}
-                <span className="font-semibold">doğrulama linki</span> gönderdik. Giriş yapmadan
-                önce maildeki <span className="font-semibold">Hesabı Doğrula</span> butonuna tıklayın.
-                Mail birkaç dakika içinde gelmezse spam klasörünü kontrol edin.
+                Hesabınız oluşturuldu. Giriş için e-posta adresinizi doğrulayın. Mail ulaşmadıysa aşağıdan yeni bağlantı isteyin; yeniden kayıt olmanız gerekmez.
               </p>
             </div>
           )}
 
           {/* Doğrulanmamış hesapla giriş denendi */}
-          {emailNotConfirmed && (
+          {(emailNotConfirmed || showConfirmBanner) && (
             <div className="flex items-start gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-800 dark:bg-yellow-950/40">
               <MailCheck className="mt-0.5 h-5 w-5 flex-shrink-0 text-yellow-600 dark:text-yellow-400" />
               <div className="flex-1 space-y-2">
@@ -154,16 +149,18 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={handleResend}
-                  disabled={resending || resendDone || !email}
+                  disabled={resending || cooldown > 0 || !email}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold text-yellow-700 underline-offset-2 hover:underline disabled:opacity-50 dark:text-yellow-300"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${resending ? 'animate-spin' : ''}`} />
-                  {resendDone ? 'Mail gönderildi' : resending ? 'Gönderiliyor...' : 'Tekrar gönder'}
+                  {cooldown > 0 ? `${cooldown} saniye sonra tekrar isteyin` : resending ? 'Gönderiliyor...' : 'Doğrulama bağlantısını tekrar iste'}
                 </button>
               </div>
             </div>
           )}
 
+          {!emailNotConfirmed && !showConfirmBanner && <Button variant="outline" disabled={resending || cooldown > 0 || !email} onClick={handleResend}>Doğrulama bağlantısı iste</Button>}
+          {resendDone && <p role="status" className="text-sm text-muted-foreground">Doğrulama gerekiyorsa bağlantı gönderimi istendi. Gelen kutunuzu ve spam klasörünü kontrol edin.</p>}
           {/* Giriş formu */}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-4">

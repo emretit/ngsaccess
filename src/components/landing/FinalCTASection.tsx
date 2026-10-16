@@ -1,3 +1,4 @@
+import { ACCOUNT_CTA } from './publicCopy';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ChevronRight, MessageCircle } from 'lucide-react';
@@ -32,12 +33,12 @@ const FinalCTASection = () => {
           transition={{ duration: 0.5 }}
         >
           <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
-            Kurmak 5 dakika.
+            Kuruluma başlayın.
             <br />
             <span className="text-yellow-300">Faydası ömür boyu.</span>
           </h2>
           <p className="mt-6 text-lg md:text-xl text-white/85 max-w-2xl mx-auto">
-            14 gün boyunca tüm özellikleri ücretsiz deneyin. Kredi kartı bilgisi
+            Ücretsiz hesabınızı oluşturun. Kredi kartı bilgisi
             gerekmez, istediğiniz zaman iptal edebilirsiniz.
           </p>
 
@@ -48,7 +49,7 @@ const FinalCTASection = () => {
               asChild
             >
               <Link to="/register">
-                14 Gün Ücretsiz Dene
+                {ACCOUNT_CTA}
                 <ChevronRight className="ml-1 h-4 w-4" />
               </Link>
             </Button>

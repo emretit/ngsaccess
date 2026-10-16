@@ -1,27 +1,10 @@
-import { useLocation } from "react-router-dom";
-import { useEffect } from "react";
+import { Link } from 'react-router-dom';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { Button } from '@/components/ui/button';
 
-const NotFound = () => {
-  const location = useLocation();
-
-  useEffect(() => {
-    console.error(
-      "404 Error: User attempted to access non-existent route:",
-      location.pathname
-    );
-  }, [location.pathname]);
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">404</h1>
-        <p className="text-xl text-gray-600 mb-4">Sayfa bulunamadı</p>
-        <a href="/" className="text-blue-500 hover:text-blue-700 underline">
-          Ana Sayfaya Dön
-        </a>
-      </div>
-    </div>
-  );
-};
-
-export default NotFound;
+export default function NotFound() {
+  const { user } = useAuth();
+  return <main className="min-h-screen flex items-center justify-center bg-background p-4 text-foreground">
+    <div className="space-y-4 text-center"><h1 className="text-4xl font-bold">404</h1><p className="text-xl text-muted-foreground">Sayfa bulunamadı</p><Button asChild><Link to={user && user.verified !== false ? '/home' : '/'}>Ana sayfaya dön</Link></Button></div>
+  </main>;
+}

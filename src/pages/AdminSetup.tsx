@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation, useQuery } from "convex/react";
@@ -8,10 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Lock, Shield } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 
 export default function AdminSetup() {
   const navigate = useNavigate();
+  const { runSetup, user } = useAuth();
   const { signIn: convexSignIn } = useAuthActions();
   const hasAdmin = useQuery(api.users.hasSuperAdmin);
   const initializeAdmin = useMutation(api.users.initializeAdmin);
@@ -19,37 +21,25 @@ export default function AdminSetup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [secret, setSecret] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [existingAccount, setExistingAccount] = useState(false);
+  const [completed, setCompleted] = useState(false);
 
-  useEffect(() => {
-    if (hasAdmin === true) {
-      navigate("/login");
-    }
-  }, [hasAdmin, navigate]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password || !secret) {
-      toast({ title: "Hata", description: "Tüm alanları doldurun.", variant: "destructive" });
-      return;
-    }
-    setIsLoading(true);
+  const setup = useAsyncAction(async () => {
+    if (!email || password.length < 8 || !secret) throw new Error("E-posta, en az 8 karakterlik şifre ve kurulum kodu gereklidir.");
     try {
-      try {
-        await convexSignIn("password", { email, password, name: email.split("@")[0], flow: "signUp" });
-      } catch {
-        await convexSignIn("password", { email, password, flow: "signIn" });
-      }
-      await initializeAdmin({ secret });
-      toast({ title: "Kurulum tamamlandı", description: "Süper admin olarak giriş yaptınız." });
-      navigate("/home");
-    } catch (error: unknown) {
-      const msg = (error as Error)?.message ?? "Bir hata oluştu.";
-      toast({ title: "Kurulum başarısız", description: msg, variant: "destructive" });
-    } finally {
-      setIsLoading(false);
+      await runSetup(async () => {
+        await convexSignIn("password", { email: email.trim().toLowerCase(), password, name: email.split("@")[0], flow: existingAccount ? "signIn" : "signUp" });
+        await initializeAdmin({ secret });
+      });
+    } catch {
+      throw new Error("Kurulum tamamlanamadı. Bilgilerinizi ve kurulum kodunu kontrol edin. Hesabınız oluştuysa mevcut hesap seçeneğiyle devam edin veya kurulum sorumlusuna başvurun.");
     }
-  };
+    setCompleted(true);
+  });
+  const isLoading = setup.pending;
+  const handleSubmit = (event: React.FormEvent) => { event.preventDefault(); void setup.run(); };
+
+  if (completed) return <div className="min-h-screen flex flex-col items-center justify-center gap-4"><h1>Yönetici kurulumu tamamlandı</h1><Button disabled={!user || user.verified === false} onClick={() => navigate("/home")}>{!user || user.verified === false ? "Oturum hazırlanıyor..." : "Ana sayfaya geç"}</Button></div>;
 
   if (hasAdmin === undefined) {
     return (
@@ -60,7 +50,7 @@ export default function AdminSetup() {
   }
 
   if (hasAdmin === true) {
-    return null;
+    return <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-4"><h1>{isLoading ? "Kurulum tamamlanıyor..." : "İlk yönetici kurulumu tamamlanmış"}</h1><Button disabled={isLoading} onClick={() => navigate("/login")}>Giriş yap</Button></div>;
   }
 
   return (
@@ -72,11 +62,12 @@ export default function AdminSetup() {
             İlk Yönetici Kurulumu
           </CardTitle>
           <CardDescription className="text-center">
-            Henüz sistemde yönetici yok. ADMIN_SETUP_SECRET ile ilk süper admini oluşturun.
+            İlk yönetici hesabını kurulum sorumlusundan aldığınız kodla etkinleştirin.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <Button variant="outline" className="mb-4 w-full" disabled={isLoading} onClick={() => setExistingAccount((value) => !value)}>{existingAccount ? "Yeni hesap oluştur" : "Mevcut hesabımla devam et"}</Button>
+          <form onSubmit={handleSubmit}><fieldset disabled={isLoading} className="space-y-4">
             <div>
               <Label htmlFor="email">E-posta</Label>
               <Input
@@ -96,13 +87,14 @@ export default function AdminSetup() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                placeholder="••••••••"
+                minLength={8}
+                placeholder="En az 8 karakter"
               />
             </div>
             <div>
               <Label htmlFor="secret" className="flex items-center gap-2">
                 <Lock className="h-4 w-4" />
-                Kurulum Gizli Kodu
+                Kurulum kodu
               </Label>
               <Input
                 id="secret"
@@ -110,16 +102,16 @@ export default function AdminSetup() {
                 value={secret}
                 onChange={(e) => setSecret(e.target.value)}
                 required
-                placeholder="Convex env: ADMIN_SETUP_SECRET"
+                placeholder="Kurulum kodunuz"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Convex Dashboard → Settings → Environment Variables
+                Kurulum kodunu bilmiyorsanız kurulum sorumlusuna başvurun.
               </p>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Kuruluyor..." : "Süper Admin Oluştur"}
             </Button>
-          </form>
+          </fieldset></form>
         </CardContent>
       </Card>
     </div>
