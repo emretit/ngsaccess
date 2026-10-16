@@ -1,4 +1,4 @@
-import { trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
+import { toUtcISO, trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
 import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
@@ -1552,6 +1552,12 @@ export const backfillHikEventRow = internalMutation({
       return { inserted: false, reason: "device-not-found" };
     }
 
+    // Cihaz zamanı (+03:00 vb.) UTC Z'ye: aralık sorguları ve index sırası string karşılaştırır.
+    // Geçersizse atla — tarihsel olayı "şimdi" ile yazmak PDKS'te yanlış güne düşürür.
+    const eventTime = toUtcISO(args.event.time);
+    if (!eventTime) {
+      return { inserted: false, reason: "invalid-time" };
+    }
     const cardNo = args.event.cardNo.trim();
     const shouldCreateCardReading = shouldCreateCardReadingForHikEvent(
       args.event.major,
@@ -1576,7 +1582,7 @@ export const backfillHikEventRow = internalMutation({
         projectId: device.projectId,
         deviceId: args.deviceId,
         source: "hikvision",
-        eventTime: args.event.time,
+        eventTime,
         category: event.category,
         severity: event.severity,
         label: event.label,
@@ -1586,8 +1592,8 @@ export const backfillHikEventRow = internalMutation({
         rawData: rawData.length > 10000 ? rawData.slice(0, 10000) : rawData,
         hikDevIndex: device.hikDevIndex,
         hikSerialNo: args.event.serialNo,
-        createdAt: args.event.time,
-        updatedAt: args.event.time,
+        createdAt: eventTime,
+        updatedAt: eventTime,
       });
       return { inserted: true, reason: "device-event" };
     }
@@ -1630,7 +1636,7 @@ export const backfillHikEventRow = internalMutation({
       cardNo,
       employeeName,
       // accessTime = event'in cihaz zamanı (Date.now() DEĞİL — backfill)
-      accessTime: args.event.time,
+      accessTime: eventTime,
       accessStatus,
       hikMajorEventType: args.event.major,
       hikSubEventType: args.event.minor,
@@ -1640,8 +1646,8 @@ export const backfillHikEventRow = internalMutation({
       hikPictureURL: args.event.pictureURL,
       hikDateTime: args.event.time,
       hikDenialReason: denialReason,
-      createdAt: args.event.time,
-      updatedAt: args.event.time,
+      createdAt: eventTime,
+      updatedAt: eventTime,
     });
 
     return { inserted: true };

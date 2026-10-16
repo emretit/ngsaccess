@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { trDateKey, trDayRangeISO, trTodayKey } from "./trDate";
+import { toUtcISO, trDateKey, trDayRangeISO, trTodayKey } from "./trDate";
 
 describe("trDateKey", () => {
   it.each([
@@ -48,5 +48,26 @@ describe("trTodayKey", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("toUtcISO", () => {
+  it("+03:00 cihaz zamanını UTC Z'ye çevirir (TR 22:30 aynı TR gününde kalır)", () => {
+    expect(toUtcISO("2026-10-16T22:30:00+03:00")).toBe("2026-10-16T19:30:00.000Z");
+    expect(trDateKey(toUtcISO("2026-10-16T22:30:00+03:00") ?? "")).toBe("2026-10-16");
+  });
+  it("Z ve milisaniyeli değerleri kanonik biçime getirir", () => {
+    expect(toUtcISO("2026-10-16T06:00:00Z")).toBe("2026-10-16T06:00:00.000Z");
+    expect(toUtcISO("2026-10-16T06:00:00.000Z")).toBe("2026-10-16T06:00:00.000Z");
+  });
+  it("offset'siz değeri TR saati kabul eder", () => {
+    expect(toUtcISO("2026-10-16 09:00:00")).toBe("2026-10-16T06:00:00.000Z");
+    expect(toUtcISO("2026-10-16T09:00:00")).toBe("2026-10-16T06:00:00.000Z");
+  });
+  it("geçersiz değerde undefined döner", () => {
+    expect(toUtcISO("")).toBeUndefined();
+    expect(toUtcISO("dün akşam")).toBeUndefined();
+    expect(toUtcISO("2026-02-30T22:30:00+03:00")).toBeUndefined();
+    expect(toUtcISO("2026-10-16")).toBeUndefined();
   });
 });

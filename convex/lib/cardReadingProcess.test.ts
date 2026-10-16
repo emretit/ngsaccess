@@ -34,27 +34,27 @@ describe("cardReadingProcess – ideTimeToISO (panel UTC+3 → UTC ISO)", () => 
 });
 
 describe("cardReadingProcess – startOfTurkeyDayISO (TR gün başı)", () => {
-  it("gün ortası → o TR gününün 00:00 (+03:00)", () => {
+  it("gün ortası → o TR gününün 00:00'ı, UTC Z (accessTime ile string kıyaslanır)", () => {
     expect(startOfTurkeyDayISO("2026-06-22T09:00:00.000Z")).toBe(
-      "2026-06-22T00:00:00.000+03:00",
+      "2026-06-21T21:00:00.000Z",
     );
   });
 
   it("TR günü 00:00 = UTC önceki günün 21:00 (sınır, hâlâ önceki gün)", () => {
     expect(startOfTurkeyDayISO("2026-06-22T20:59:00.000Z")).toBe(
-      "2026-06-22T00:00:00.000+03:00",
+      "2026-06-21T21:00:00.000Z",
     );
   });
 
   it("UTC 21:00 → TR ertesi güne geçer", () => {
     expect(startOfTurkeyDayISO("2026-06-22T21:00:00.000Z")).toBe(
-      "2026-06-23T00:00:00.000+03:00",
+      "2026-06-22T21:00:00.000Z",
     );
   });
 
   it("ay/yıl sınırı: 31 Aralık 22:00 UTC → 1 Ocak TR", () => {
     expect(startOfTurkeyDayISO("2026-12-31T22:00:00.000Z")).toBe(
-      "2027-01-01T00:00:00.000+03:00",
+      "2026-12-31T21:00:00.000Z",
     );
   });
 });

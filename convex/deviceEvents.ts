@@ -3,6 +3,7 @@ import { internalMutation } from "./_generated/server";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { classifyHikEvent } from "./lib/hikEventCatalog";
+import { toUtcISO } from "./lib/trDate";
 
 const SOURCE_VALIDATOR = v.union(
   v.literal("hikvision"),
@@ -158,7 +159,7 @@ export const recordHikDeviceEvent = internalMutation({
       projectId,
       deviceId,
       source: args.source ?? "hikvision",
-      eventTime: args.eventTime,
+      eventTime: toUtcISO(args.eventTime) ?? now,
       category: event.category,
       severity: event.severity,
       label: event.label,

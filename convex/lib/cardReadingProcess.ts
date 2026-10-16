@@ -7,7 +7,7 @@
  * `resolveActiveMatchingRuleIds`) `MutationCtx` alır. Güvenlik-hassas cross-tenant /
  * cihaz-doğrulama mantığı `cardReadings.processCardReading` içinde YERİNDE kalır.
  */
-import { trDateKey } from "./trDate";
+import { trDateKey, trDayRangeISO } from "./trDate";
 import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 
@@ -30,7 +30,7 @@ export function ideTimeToISO(ideTime: string | undefined): string | undefined {
 // Türkiye saatiyle (UTC+3, DST yok) verilen ISO timestamp'inin günü başlangıcının
 // UTC ISO karşılığını döndürür. Toggle'ı günlük resetlemek için kullanılır.
 export function startOfTurkeyDayISO(nowISO: string): string {
-  return `${trDateKey(nowISO)}T00:00:00.000+03:00`;
+  return trDayRangeISO(trDateKey(nowISO), trDateKey(nowISO)).startISO;
 }
 
 // Cihazın yön ayarına ve toggle state'ine göre okumanın yönünü çözer.
