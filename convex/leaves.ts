@@ -1,6 +1,7 @@
 import { v } from "convex/values";
-import { authedQuery, authedMutation } from "./lib/customFunctions";
+import { authedQuery, adminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
+import { approvedLeaveFields, leaveDecisionPatch } from "./lib/leaveRules";
 
 export const list = authedQuery({
   args: {
@@ -43,7 +44,7 @@ export const list = authedQuery({
   },
 });
 
-export const create = authedMutation({
+export const create = adminMutation({
   args: {
     employeeId: v.id("employees"),
     projectId: v.optional(v.id("projects")),
@@ -75,17 +76,16 @@ export const create = authedMutation({
     const now = new Date().toISOString();
     return await ctx.db.insert("leaves", {
       ...args,
-      status: "pending",
+      ...approvedLeaveFields(ctx.user),
       createdAt: now,
       updatedAt: now,
     });
   },
 });
 
-export const approve = authedMutation({
+export const approve = adminMutation({
   args: {
     leaveId: v.id("leaves"),
-    approvedBy: v.id("users"),
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -95,19 +95,15 @@ export const approve = authedMutation({
       throw new Error("Bu izne erişim yetkiniz yok");
     }
     const now = new Date().toISOString();
-    await ctx.db.patch(args.leaveId, {
-      status: "approved",
-      approvedBy: args.approvedBy,
-      notes: args.notes,
-      updatedAt: now,
-    });
+    await ctx.db.patch(args.leaveId, leaveDecisionPatch(
+      ctx.user.role, leave.status, "approved", ctx.user._id, now, args.notes,
+    ));
   },
 });
 
-export const reject = authedMutation({
+export const reject = adminMutation({
   args: {
     leaveId: v.id("leaves"),
-    approvedBy: v.id("users"),
     notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -117,12 +113,9 @@ export const reject = authedMutation({
       throw new Error("Bu izne erişim yetkiniz yok");
     }
     const now = new Date().toISOString();
-    await ctx.db.patch(args.leaveId, {
-      status: "rejected",
-      approvedBy: args.approvedBy,
-      notes: args.notes,
-      updatedAt: now,
-    });
+    await ctx.db.patch(args.leaveId, leaveDecisionPatch(
+      ctx.user.role, leave.status, "rejected", ctx.user._id, now, args.notes,
+    ));
   },
 });
 

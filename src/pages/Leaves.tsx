@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { Id } from "../../convex/_generated/dataModel";
+import type { Id } from "../../convex/_generated/dataModel";
+import type { FunctionReturnType } from "convex/server";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { Palmtree, Plus, Check, X, Calendar } from "lucide-react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { useToast } from "@/hooks/use-toast";
+import { toast as notify } from "sonner";
 
 const LEAVE_TYPES = [
   { value: "annual", label: "Yıllık İzin" },
@@ -40,10 +42,11 @@ type LeaveTypeValue = (typeof LEAVE_TYPES)[number]["value"];
 export default function Leaves() {
   const { loading: projectLoading } = useProjectAccess();
   const { profile } = useAuth();
+  const isAdmin = profile?.role === "super_admin" || profile?.role === "project_admin";
   const createLeave = useMutation(api.leaves.create);
   const approveLeave = useMutation(api.leaves.approve);
   const rejectLeave = useMutation(api.leaves.reject);
-  const leaves = useQuery(
+  const leaves: FunctionReturnType<typeof api.leaves.list> | undefined = useQuery(
     api.leaves.list,
     !projectLoading ? {} : "skip"
   );
@@ -51,6 +54,8 @@ export default function Leaves() {
   const { toast } = useToast();
 
   const [showForm, setShowForm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [decidingLeaveId, setDecidingLeaveId] = useState<Id<"leaves"> | null>(null);
   const [formData, setFormData] = useState({
     employeeId: "" as "" | (string & {}),
     leaveType: "annual",
@@ -59,11 +64,50 @@ export default function Leaves() {
     notes: "",
   });
 
-  if (projectLoading) {
+  if (projectLoading || leaves === undefined || employees === undefined) {
     return <LoadingSpinner text="İzin verileri yükleniyor..." />;
   }
 
   const pendingLeaves = leaves?.filter((l) => l.status === "pending") ?? [];
+
+  const employeeById = new Map(employees.map((employee) => [employee._id, employee]));
+
+  const renderLeaveDetails = (leave: FunctionReturnType<typeof api.leaves.list>[number]) => {
+    const employee = employeeById.get(leave.employeeId);
+    const start = parseDateString(leave.startDate);
+    const end = parseDateString(leave.endDate);
+    const days = start && end
+      ? Math.round((Date.UTC(end.getFullYear(), end.getMonth(), end.getDate()) - Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())) / 86400000) + 1
+      : undefined;
+    return (
+      <div className="min-w-0">
+        <span className="font-medium block">
+          {employee ? `${employee.firstName} ${employee.lastName}` : "Personel bulunamadı"}
+        </span>
+        <span className="text-sm text-muted-foreground block">{employee?.departments?.name ?? "Departman belirtilmemiş"}</span>
+        <span className="text-sm block">{getLeaveTypeLabel(leave.leaveType)}</span>
+        <span className="text-sm text-muted-foreground block">
+          {start?.toLocaleDateString("tr-TR") ?? leave.startDate} - {end?.toLocaleDateString("tr-TR") ?? leave.endDate}
+          {days !== undefined && days > 0 ? ` · ${days} gün` : " · Süre hesaplanamadı"}
+        </span>
+        {leave.notes && <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">{leave.notes}</p>}
+      </div>
+    );
+  };
+
+  const decideLeave = async (leaveId: Id<"leaves">, decision: "approved" | "rejected") => {
+    if (!isAdmin || decidingLeaveId) return;
+    setDecidingLeaveId(leaveId);
+    try {
+      if (decision === "approved") await approveLeave({ leaveId });
+      else await rejectLeave({ leaveId });
+      notify.success(decision === "approved" ? "İzin onaylandı" : "İzin reddedildi");
+    } catch (error) {
+      notify.error("İşlem tamamlanamadı", { description: error instanceof Error ? error.message : "Lütfen tekrar deneyin." });
+    } finally {
+      setDecidingLeaveId(null);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -96,23 +140,23 @@ export default function Leaves() {
               </p>
             </div>
           </div>
-          <div className="ml-auto">
+          {isAdmin && <div className="ml-auto">
             <Button
               onClick={() => setShowForm(!showForm)}
               size="sm"
               className="h-8 gap-1.5 text-xs"
             >
               <Plus className="h-3.5 w-3.5" />
-              İzin Talebi
+              İzin Ekle
             </Button>
-          </div>
+          </div>}
         </div>
       </div>
 
-      {showForm && (
+      {isAdmin && showForm && (
         <Card>
           <CardHeader>
-            <CardTitle>Yeni İzin Talebi</CardTitle>
+            <CardTitle>İzin Ekle</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -174,14 +218,16 @@ export default function Leaves() {
               <div className="md:col-span-2">
                 <Label>Not (Opsiyonel)</Label>
                 <Input
-                  placeholder="İzin talebi notu..."
+                  placeholder="İzin notu..."
                   value={formData.notes}
                   onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
                 />
               </div>
             </div>
             <Button
+              disabled={isSubmitting}
               onClick={async () => {
+                if (!isAdmin || isSubmitting) return;
                 if (!formData.employeeId || !formData.startDate || !formData.endDate) {
                   toast({
                     title: "Eksik bilgi",
@@ -190,6 +236,7 @@ export default function Leaves() {
                   });
                   return;
                 }
+                setIsSubmitting(true);
                 try {
                   const emp = employees?.find((e) => e._id === formData.employeeId);
                   await createLeave({
@@ -200,96 +247,58 @@ export default function Leaves() {
                     endDate: formData.endDate,
                     notes: formData.notes || undefined,
                   });
-                  toast({ title: "İzin talebi gönderildi", description: "Talep onay bekliyor." });
+                  toast({ title: "İzin kaydedildi" });
                   setFormData({ employeeId: "", leaveType: "annual", startDate: "", endDate: "", notes: "" });
                   setShowForm(false);
                 } catch {
                   toast({
                     title: "Hata",
-                    description: "İzin talebi oluşturulamadı.",
+                    description: "İzin kaydedilemedi.",
                     variant: "destructive",
                   });
+                } finally {
+                  setIsSubmitting(false);
                 }
               }}
             >
-              Talebi Gönder
+              {isSubmitting ? "Kaydediliyor..." : "İzin Ekle"}
             </Button>
           </CardContent>
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+      <div className={`grid grid-cols-1 gap-6 ${pendingLeaves.length > 0 ? "lg:grid-cols-2" : ""}`}>
+        {pendingLeaves.length > 0 && <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Bekleyen Talepler ({pendingLeaves.length})
+              Bekleyen İzinler ({pendingLeaves.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {pendingLeaves.length > 0 ? (
-              <ul className="space-y-3">
-                {pendingLeaves.map((l) => (
-                  <li
-                    key={l._id}
-                    className="flex justify-between items-center p-3 rounded-lg bg-muted/50"
-                  >
-                    <div>
-                      <span className="font-medium">{getLeaveTypeLabel(l.leaveType)}</span>
-                      <span className="text-sm text-muted-foreground block">
-                        {l.startDate} - {l.endDate}
-                      </span>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-green-600"
-                        onClick={async () => {
-                          const userId = (profile as { _id?: Id<"users"> })?._id;
-                          if (!userId) {
-                            toast({ title: "Yetki gerekli", description: "Onay için giriş yapmalısınız.", variant: "destructive" });
-                            return;
-                          }
-                          try {
-                            await approveLeave({ leaveId: l._id, approvedBy: userId });
-                            toast({ title: "İzin onaylandı" });
-                          } catch {
-                            toast({ title: "Hata", variant: "destructive" });
-                          }
-                        }}
-                      >
-                        <Check className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="text-red-600"
-                        onClick={async () => {
-                          const userId = (profile as { _id?: Id<"users"> })?._id;
-                          if (!userId) {
-                            toast({ title: "Yetki gerekli", description: "Red için giriş yapmalısınız.", variant: "destructive" });
-                            return;
-                          }
-                          try {
-                            await rejectLeave({ leaveId: l._id, approvedBy: userId });
-                            toast({ title: "İzin reddedildi" });
-                          } catch {
-                            toast({ title: "Hata", variant: "destructive" });
-                          }
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted-foreground text-sm">Bekleyen izin talebi yok.</p>
-            )}
+            <ul className="space-y-3">
+              {pendingLeaves.map((leave) => (
+                <li key={leave._id} className="flex justify-between items-center gap-3 p-3 rounded-lg bg-muted/50">
+                  {renderLeaveDetails(leave)}
+                  {isAdmin && <div className="flex gap-2 shrink-0">
+                    <Button size="sm" variant="outline" className="text-green-600" disabled={decidingLeaveId !== null}
+                      aria-label={`${employeeById.get(leave.employeeId)?.firstName ?? "Personel"} iznini onayla`}
+                      onClick={() => decideLeave(leave._id, "approved")}>
+                      <Check className="h-4 w-4" />
+                      Onayla
+                    </Button>
+                    <Button size="sm" variant="outline" className="text-red-600" disabled={decidingLeaveId !== null}
+                      aria-label={`${employeeById.get(leave.employeeId)?.firstName ?? "Personel"} iznini reddet`}
+                      onClick={() => decideLeave(leave._id, "rejected")}>
+                      <X className="h-4 w-4" />
+                      Reddet
+                    </Button>
+                  </div>}
+                </li>
+              ))}
+            </ul>
           </CardContent>
-        </Card>
+        </Card>}
 
         <Card>
           <CardHeader>
@@ -306,12 +315,7 @@ export default function Leaves() {
                     key={l._id}
                     className="flex justify-between items-center p-3 rounded-lg bg-muted/50 text-sm"
                   >
-                    <div>
-                      <span className="font-medium">{getLeaveTypeLabel(l.leaveType)}</span>
-                      <span className="text-muted-foreground block">
-                        {l.startDate} - {l.endDate}
-                      </span>
-                    </div>
+                    {renderLeaveDetails(l)}
                     {getStatusBadge(l.status)}
                   </li>
                 ))}
