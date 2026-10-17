@@ -1,39 +1,28 @@
+import { useNavigate } from "react-router-dom";
+import { ScanLine } from "lucide-react";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import VirtualReader from "@/components/devices/VirtualReader";
-
-const sampleReaders = [
-  { id: "VR-001", label: "Main Entrance" },
-  { id: "VR-002", label: "Staff Door" },
-  { id: "VR-003", label: "Cafeteria" },
-  { id: "VR-004", label: "Conference Room" },
-  { id: "VR-005", label: "IT Department" },
-  { id: "VR-006", label: "HR Office" },
-];
-
+// Sanal okuyucu modeli + QR sözleşmesi (B1) henüz yok; sabit örnek listesi üretimde gösterilmez.
 const VirtualReaders = () => {
-  return (
-    <div className="container mx-auto p-6">
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Virtual QR Readers</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Click on any reader to simulate a QR code scan.
-          </p>
-        </CardContent>
-      </Card>
+  const navigate = useNavigate();
+  const { activeProject } = useActiveProjectScope();
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {sampleReaders.map((reader) => (
-          <VirtualReader
-            key={reader.id}
-            id={reader.id}
-            label={reader.label}
-          />
-        ))}
-      </div>
+  return (
+    <div className="mx-auto max-w-[1536px] space-y-7">
+      <PageHeader
+        title="Sanal Okuyucular"
+        scope={`${activeProject?.name ?? "Proje seçilmedi"} · Telefonla QR okutulan giriş noktaları`}
+      />
+      <section className="rounded-md border border-line bg-surface">
+        <EmptyState
+          icon={ScanLine}
+          title="Henüz kullanıma açılmadı"
+          description="Telefonla QR okutularak kullanılan sanal okuyucular hazırlanıyor. Fiziksel QR okuyucuları Cihazlar sayfasından ekleyip yönetebilirsiniz."
+          action={{ label: "Cihazlara git", onClick: () => navigate("/devices") }}
+        />
+      </section>
     </div>
   );
 };
