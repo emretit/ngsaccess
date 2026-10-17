@@ -83,7 +83,11 @@ function ProjectReadings({ projectId }: { projectId: Id<"projects"> }) {
   const open = (r: Reading, anchor: HTMLElement) => { trigger.current = anchor; setActiveReading(r._id); setParams(current => { const next = new URLSearchParams(current); next.set("reading", r._id); return next; }); };
   const close = () => { setActiveReading(null); setDirty(false); setParams(current => { const next = new URLSearchParams(current); next.delete("reading"); return next; }, { replace: true }); };
   const reading = params.get("reading");
+  // Router URL'yi transition ile geç günceller; yalnız URL değişince (geri/ileri) senkronla, aksi halde open() paneli anında kapatır.
+  const syncedReading = useRef(reading);
   useEffect(() => {
+    if (reading === syncedReading.current) return;
+    syncedReading.current = reading;
     if (reading === activeReading) return;
     const move = () => { setDirty(false); setActiveReading(reading); setParams(current => { const next = new URLSearchParams(current); if (reading) next.set("reading", reading); else next.delete("reading"); return next; }, { replace: true }); };
     if (dirty || pending) {
