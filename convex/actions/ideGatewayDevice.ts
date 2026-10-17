@@ -71,7 +71,7 @@ async function loadIdePanel(
  * mutation'da (adminMutation) zaten denetlenmiştir.
  */
 export const syncEmployeeToIdePanels = internalAction({
-  args: { employeeId: v.id("employees") },
+  args: { employeeId: v.id("employees"), runId: v.optional(v.id("deviceSyncRuns")), targetDeviceIds: v.optional(v.array(v.id("devices"))) },
   handler: async (
     ctx,
     args,
@@ -89,7 +89,7 @@ export const syncEmployeeToIdePanels = internalAction({
 
     // IDE paneline bağlı (kural×cihaz) çiftleri. Hiç yoksa sessiz no-op: Hikvision-only
     // kurulumda her employee mutation'ı boşa IDE push tetiklemesin.
-    const ideRules = data.deviceRules.filter((dr) => dr.device.brand === "ide_smart");
+    const ideRules = data.deviceRules.filter((dr) => dr.device.brand === "ide_smart" && (!args.targetDeviceIds || args.targetDeviceIds.includes(dr.device._id)));
     if (ideRules.length === 0) return { ok: true, queued: 0, skipped: [], opIds: [] };
 
     // Kart no doğrulaması yalnızca gerçekten IDE paneli VARSA anlamlı.
@@ -146,6 +146,7 @@ export const syncEmployeeToIdePanels = internalAction({
           days: dr.rule.days,
         });
         const permOpId = await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
+          runId: args.runId,
           deviceId,
           projectId: panel.projectId,
           opType: "upsertPermission",
@@ -165,6 +166,7 @@ export const syncEmployeeToIdePanels = internalAction({
       }
 
       const userOpId = await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
+          runId: args.runId,
         deviceId,
         projectId: panel.projectId,
         opType: "upsertUser",
@@ -257,7 +259,7 @@ export const deleteIdeUserFromPanels = internalAction({
  * internalAction (scheduler/mutation tetikli; yetki tetikleyen mutation'da denetlenir).
  */
 export const syncPermissionToIdePanels = internalAction({
-  args: { accessRuleId: v.id("accessRules") },
+  args: { accessRuleId: v.id("accessRules"), runId: v.optional(v.id("deviceSyncRuns")), targetDeviceIds: v.optional(v.array(v.id("devices"))) },
   handler: async (
     ctx,
     args,
@@ -283,7 +285,7 @@ export const syncPermissionToIdePanels = internalAction({
     const opIds: Id<"idePendingOperations">[] = [];
     let queued = 0;
     for (const device of data.devices) {
-      if (device.brand !== "ide_smart" || seen.has(device._id)) continue;
+      if (device.brand !== "ide_smart" || seen.has(device._id) || (args.targetDeviceIds && !args.targetDeviceIds.includes(device._id))) continue;
       seen.add(device._id);
       const panel = await ctx.runQuery(internal.devices.getByIdInternal, { id: device._id });
       if (!panel?.ideUuid) continue;
@@ -302,6 +304,7 @@ export const syncPermissionToIdePanels = internalAction({
         days: data.rule.days,
       });
       const permOpId = await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
+          runId: args.runId,
         deviceId: device._id,
         projectId: panel.projectId,
         opType: "upsertPermission",

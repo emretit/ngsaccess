@@ -208,6 +208,7 @@ function targetKey(opType: IdeOpType, payload: Record<string, unknown>): string 
 export const enqueueIdeOp = internalMutation({
   args: {
     deviceId: v.id("devices"),
+    runId: v.optional(v.id("deviceSyncRuns")),
     projectId: v.optional(v.id("projects")),
     opType: v.union(
       v.literal("openDoor"),
@@ -228,7 +229,7 @@ export const enqueueIdeOp = internalMutation({
     }
 
     const payload = (args.payload ?? {}) as Record<string, unknown>;
-    const idempotencyKey = `${args.deviceId}:${args.opType}:${targetKey(args.opType, payload)}`;
+    const idempotencyKey = `${args.deviceId}:${args.opType}:${targetKey(args.opType, payload)}${args.runId ? `:${args.runId}` : ""}`;
     const now = Date.now();
 
     // openDoor dışı op'lar için açık pending/sent dedupe.
@@ -253,6 +254,7 @@ export const enqueueIdeOp = internalMutation({
     return await ctx.db.insert("idePendingOperations", {
       projectId: args.projectId,
       deviceId: args.deviceId,
+      runId: args.runId,
       opType: args.opType,
       payload: args.payload,
       status: "pending",

@@ -56,12 +56,14 @@ async function enqueueLocalBridgeOp(
   device: HikDeviceRef,
   operation: ResolveOp,
   payload: Record<string, unknown>,
+  runId?: Id<"deviceSyncRuns">,
 ): Promise<void> {
   await ctx.runMutation(internal.hikvisionSync.enqueueLocalBridgeOperation, {
     deviceId: device._id,
     projectId: device.projectId,
     operation,
     payload,
+    runId,
   });
 }
 
@@ -472,6 +474,8 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
 export const syncWeekPlanToDevicesInternal = internalAction({
   args: {
     accessRuleId: v.id("accessRules"),
+    runId: v.optional(v.id("deviceSyncRuns")),
+    targetDeviceIds: v.optional(v.array(v.id("devices"))),
     allowedProjectIds: v.optional(v.array(v.id("projects"))),
   },
   handler: async (
@@ -518,7 +522,8 @@ export const syncWeekPlanToDevicesInternal = internalAction({
 
     const errors: string[] = [];
     const skippedDevices: { device: typeof devices[number]; reason: string }[] = [];
-    const hikDevices = filterHikvisionDevices(devices);
+    const hikDevices = filterHikvisionDevices(devices).filter(d =>
+      !args.targetDeviceIds || args.targetDeviceIds.includes(d._id));
     const allowedDevices = hikDevices.filter((d) => {
       if (!isAllowed(d.projectId)) {
         skippedDevices.push({ device: d, reason: "bu cihaza erişim yetkiniz yok" });
@@ -556,16 +561,16 @@ export const syncWeekPlanToDevicesInternal = internalAction({
             weekPlanNo,
             templateName: rule.name ?? `Rule ${weekPlanNo}`,
             schedule,
-          });
+          }, args.runId);
           return { ok: true as const, device: d };
         }
         if (!d.hikDevIndex) {
           return { ok: false as const, error: "gateway'e kayıtlı değil", device: d };
         }
-        const wp = await setWeekPlanOnDevice(d.hikDevIndex!, weekPlanNo, schedule);
+        const wp = await setWeekPlanOnDevice(d.hikDevIndex, weekPlanNo, schedule);
         if (!wp.ok) return { ...wp, device: d };
         // Aynı numarayı template no olarak da kullan — basitlik için 1-1 eşleme.
-        const tpl = await setPlanTemplate(d.hikDevIndex!, weekPlanNo, {
+        const tpl = await setPlanTemplate(d.hikDevIndex, weekPlanNo, {
           weekPlanNo,
           templateName: rule.name ?? `Rule ${weekPlanNo}`,
         });
@@ -614,23 +619,23 @@ export const syncWeekPlanToDevicesInternal = internalAction({
               planTemplateNo: weekPlanNo,
               doorCount: doorCountFor(d),
               doorRights: allDoorRights(d),
-            });
+            }, args.runId);
             return true;
           }
           if (!d.hikDevIndex) return false;
-          const r = await upsertPersonToDevice(d.hikDevIndex!, {
+          const r = await upsertPersonToDevice(d.hikDevIndex, {
             employeeNo: emp.cardNumber,
             name: `${emp.firstName} ${emp.lastName}`,
             planTemplateNo: weekPlanNo,
             doorCount: d.hikDoorCount,
           });
           if (!r.ok) return false;
-          await addCardToDevice(d.hikDevIndex!, {
+          const cardResult = await addCardToDevice(d.hikDevIndex, {
             employeeNo: emp.cardNumber,
             cardNo: emp.cardNumber,
             cardType: "normalCard",
           });
-          return true;
+          return args.runId ? cardResult.ok : true;
         }),
       ),
     );

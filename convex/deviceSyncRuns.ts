@@ -1,0 +1,390 @@
+import { ConvexError, v } from "convex/values";
+import { internal } from "./_generated/api";
+import { internalAction, internalMutation, internalQuery } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { authedAction, authedQuery } from "./lib/customFunctions";
+import { requireAdmin } from "./lib/auth";
+import { resolveProjectScope } from "./lib/projectScope";
+import { refreshDelay, summaryChanged, operationStatus, skippedReason, skipReasons, summarizeRun, targetStatus } from "./lib/deviceSyncRun";
+
+const MAX_DEVICES = 200;
+const MAX_RULES = 100;
+const MAX_MEMBERS = 500;
+const MAX_OPS = 2000;
+const RUN_TIMEOUT_MS = 10 * 60 * 1000;
+
+async function updateSummary(ctx: MutationCtx, runId: Id<"deviceSyncRuns">,
+  loaded?: { run: Doc<"deviceSyncRuns">; targets: Doc<"deviceSyncRunTargets">[] }) {
+  const run = loaded?.run ?? await ctx.db.get(runId);
+  if (!run) return;
+  const targets = loaded?.targets ?? await ctx.db.query("deviceSyncRunTargets")
+    .withIndex("by_run", q => q.eq("runId", runId)).take(MAX_DEVICES + 1);
+  const summary = summarizeRun(targets.map(t => t.status), run.dispatchFinished === true);
+  const next = { ...summary, finishedAt: summary.status === "running" ? undefined : run.finishedAt ?? Date.now() };
+  if (summaryChanged(run, next)) await ctx.db.patch(runId, next);
+  return summary.status;
+}
+
+/** Shared in-transaction evidence reader; it never creates a per-target timer. */
+async function refreshOneTarget(ctx: MutationCtx, target: Doc<"deviceSyncRunTargets">,
+  run: Doc<"deviceSyncRuns">, failure = target.reason): Promise<Doc<"deviceSyncRunTargets">> {
+  if (target.status !== "queued") return target;
+  const timedOut = Date.now() - run.startedAt >= RUN_TIMEOUT_MS;
+  if (!target.dispatchFinished) {
+    if (!timedOut) return target;
+    const patch = { status: "unknown" as const, reason: "Süre doldu; cihaz sonucu doğrulanamadı", updatedAt: Date.now() };
+    await ctx.db.patch(target._id, patch);
+    return { ...target, ...patch };
+  }
+  const ops = target.brand === "ide_smart"
+    ? await ctx.db.query("idePendingOperations").withIndex("by_run_device", q => q.eq("runId", run._id).eq("deviceId", target.deviceId)).take(MAX_OPS + 1)
+    : await ctx.db.query("hikPendingOperations").withIndex("by_run_device", q => q.eq("runId", run._id).eq("deviceId", target.deviceId)).take(MAX_OPS + 1);
+  const statuses = ops.map(op => operationStatus(target.brand, op));
+  if (failure) statuses.push("failed");
+  const status = ops.length > MAX_OPS ? "unknown" : targetStatus(statuses, timedOut);
+  const reason = (ops.length > MAX_OPS ? "İşlem okuma sınırı aşıldı (2000)"
+    : failure ?? ops.find(op => op.status === "failed")?.lastError
+      ?? (status === "unknown" ? "Cihaz sonucu doğrulanamadı" : undefined))?.slice(0, 2000);
+  if (target.status === status && target.reason === reason) return target;
+  const patch = { status, reason, updatedAt: Date.now() };
+  await ctx.db.patch(target._id, patch);
+  return { ...target, ...patch };
+}
+
+async function refreshRun(ctx: MutationCtx, runId: Id<"deviceSyncRuns">) {
+  const run = await ctx.db.get(runId);
+  if (!run || run.status !== "running") return;
+  const targets = await ctx.db.query("deviceSyncRunTargets")
+    .withIndex("by_run", q => q.eq("runId", runId)).take(MAX_DEVICES + 1);
+  const refreshed = [];
+  // Sequential reads share one transaction and one run timer.
+  for (const target of targets) refreshed.push(await refreshOneTarget(ctx, target, run));
+  return await updateSummary(ctx, runId, { run, targets: refreshed });
+}
+
+/** Auth remains inside the transaction; public callers cannot supply startedBy. */
+export const createRun = internalMutation({
+  args: { projectId: v.optional(v.id("projects")), ruleId: v.optional(v.id("accessRules")) },
+  handler: async (ctx, args): Promise<Id<"deviceSyncRuns">> => {
+    const user = await requireAdmin(ctx);
+    const rule = args.ruleId ? await ctx.db.get(args.ruleId) : null;
+    if (args.ruleId && !rule) throw new ConvexError("Kural bulunamadı");
+    const projectId = rule?.projectId ?? args.projectId;
+    if (!projectId) throw new ConvexError("Önce bir proje seçin");
+    await resolveProjectScope(ctx, projectId);
+    const devices = await ctx.db.query("devices").withIndex("by_project", q => q.eq("projectId", projectId)).take(MAX_DEVICES + 1);
+    const rules = rule ? [rule] : await ctx.db.query("accessRules").withIndex("by_project", q => q.eq("projectId", projectId)).take(MAX_RULES + 1);
+    if (devices.length > MAX_DEVICES || rules.length > MAX_RULES) {
+      throw new ConvexError("Gönderim sınırı aşıldı: bir çalıştırmada en fazla 200 cihaz ve 100 kural desteklenir.");
+    }
+    const ruleIds = rules.filter(r => r.isActive !== false).map(r => r._id);
+    const startedAt = Date.now();
+    const runId = await ctx.db.insert("deviceSyncRuns", {
+      projectId, kind: args.ruleId ? "rule_sync" : "project_resync", ruleId: args.ruleId,
+      startedBy: user._id, startedAt, status: "running",
+      counts: summarizeRun([], false).counts, dispatchFinished: true,
+    });
+    const ideTargetIds: Id<"deviceSyncRunTargets">[] = [];
+    for (const device of devices) {
+      const reason = skippedReason(device, Date.now()) ?? (ruleIds.length === 0 ? skipReasons.noRule : undefined);
+      const targetId = await ctx.db.insert("deviceSyncRunTargets", {
+        runId, deviceId: device._id, deviceName: device.name, brand: device.brand ?? "other",
+        status: reason ? "skipped" : "queued", reason, updatedAt: startedAt,
+      });
+      if (!reason && device.brand === "ide_smart") ideTargetIds.push(targetId);
+      else if (!reason) await ctx.scheduler.runAfter(0, internal.deviceSyncRuns.executeTarget, { targetId, ruleIds });
+    }
+    if (ideTargetIds.length) await ctx.scheduler.runAfter(0, internal.deviceSyncRuns.executeIdeTargets, { targetIds: ideTargetIds, ruleIds });
+    // A scheduled watchdog also settles actions that crashed before recording an outcome.
+    await ctx.scheduler.runAfter(RUN_TIMEOUT_MS, internal.deviceSyncRuns.expireRun, { runId });
+    const status = await updateSummary(ctx, runId);
+    if (status === "running") await ctx.scheduler.runAfter(refreshDelay(0), internal.deviceSyncRuns.refreshSummary, { runId, pollAttempt: 1 });
+    return runId;
+  },
+});
+
+export const startProjectResync = authedAction({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args): Promise<{ runId: Id<"deviceSyncRuns"> }> => {
+    const runId: Id<"deviceSyncRuns"> = await ctx.runMutation(internal.deviceSyncRuns.createRun, args);
+    return { runId };
+  },
+});
+export const startRuleSync = authedAction({
+  args: { ruleId: v.id("accessRules") },
+  handler: async (ctx, args): Promise<{ runId: Id<"deviceSyncRuns"> }> => {
+    const runId: Id<"deviceSyncRuns"> = await ctx.runMutation(internal.deviceSyncRuns.createRun, args);
+    return { runId };
+  },
+});
+
+export const loadTarget = internalQuery({
+  args: { targetId: v.id("deviceSyncRunTargets") },
+  handler: async (ctx, args) => {
+    const target = await ctx.db.get(args.targetId);
+    if (!target) return null;
+    const run = await ctx.db.get(target.runId);
+    const device = await ctx.db.get(target.deviceId);
+    return run && device?.projectId === run.projectId ? { target, run, device } : null;
+  },
+});
+
+type IdeRulePlan = { employeeIds: Id<"employees">[]; deviceIds: Id<"devices">[] };
+async function readRuleDispatch(ctx: QueryCtx, args: {
+  ruleId: Id<"accessRules">; deviceIds: Id<"devices">[]; projectId: Id<"projects">;
+}): Promise<IdeRulePlan | null> {
+  const rule = await ctx.db.get(args.ruleId);
+  if (!rule || rule.projectId !== args.projectId || rule.isActive === false) return null;
+  const relations = await ctx.db.query("groupDevices")
+    .withIndex("by_project_group", q => q.eq("projectId", args.projectId).eq("groupId", args.ruleId)).take(MAX_DEVICES + 1);
+  if (relations.length > MAX_DEVICES) throw new ConvexError("Kural cihaz sınırı aşıldı (200)");
+  const deviceIds = [...new Set(relations.filter(r => args.deviceIds.includes(r.deviceId)).map(r => r.deviceId))];
+  if (!deviceIds.length) return null;
+  const members = await ctx.db.query("groupMembers")
+    .withIndex("by_project_group", q => q.eq("projectId", args.projectId).eq("groupId", args.ruleId)).take(MAX_MEMBERS + 1);
+  if (members.length > MAX_MEMBERS) throw new ConvexError("Kural 500’den fazla kişi içeriyor; bu çalıştırmada gönderilemedi. Kuralı daha küçük gruplara ayırın.");
+  const employees = await Promise.all(members.map(m => ctx.db.get(m.employeeId)));
+  if (employees.some(e => e !== null && e.projectId !== args.projectId)) throw new ConvexError("Kural başka projeye ait kişi içeriyor; gönderim durduruldu");
+  return { deviceIds, employeeIds: [...new Set(employees.filter((e): e is NonNullable<typeof e> => e !== null)
+    .filter(e => e.projectId === args.projectId && e.isActive === true).map(e => e._id))] };
+}
+
+/** Fail explicitly before calling the legacy graph readers if a rule exceeds the bound. */
+export const prepareRule = internalQuery({
+  args: { ruleId: v.id("accessRules"), deviceId: v.id("devices"), projectId: v.id("projects") },
+  handler: async (ctx, args): Promise<Id<"employees">[] | null> =>
+    (await readRuleDispatch(ctx, { ...args, deviceIds: [args.deviceId] }))?.employeeIds ?? null,
+});
+export const prepareIdeRule = internalQuery({
+  args: { ruleId: v.id("accessRules"), deviceIds: v.array(v.id("devices")), projectId: v.id("projects") },
+  handler: async (ctx, args): Promise<IdeRulePlan | null> => await readRuleDispatch(ctx, args),
+});
+
+/** IDE employee actions already group every permission by panel. Dispatch each person
+ * once per run, with the union of matching devices across all selected rules. */
+export const executeIdeTargets = internalAction({
+  args: { targetIds: v.array(v.id("deviceSyncRunTargets")), ruleIds: v.array(v.id("accessRules")) },
+  handler: async (ctx, args): Promise<void> => {
+    type Loaded = { target: Doc<"deviceSyncRunTargets">; run: Doc<"deviceSyncRuns">; device: Doc<"devices"> };
+    const loaded: (Loaded | null)[] = await Promise.all(args.targetIds.map(targetId =>
+      ctx.runQuery(internal.deviceSyncRuns.loadTarget, { targetId })));
+    const targets: Loaded[] = [];
+    for (const item of loaded) {
+      if (!item || item.target.status !== "queued" || item.device.brand !== "ide_smart") continue;
+      const skip = skippedReason(item.device, Date.now());
+      if (skip) await ctx.runMutation(internal.deviceSyncRuns.finishTarget, { targetId: item.target._id, skipped: skip });
+      else targets.push(item);
+    }
+    const run = targets[0]?.run;
+    if (!run) return;
+    const deviceIds = targets.map(item => item.device._id);
+    const matched = new Set<Id<"devices">>();
+    const failures = new Map<Id<"devices">, string>();
+    const employeeDevices = new Map<Id<"employees">, Set<Id<"devices">>>();
+    const recordFailure = (ids: Id<"devices">[], message: string) => { for (const id of ids) failures.set(id, message); };
+    const checkTimeout = () => { if (Date.now() - run.startedAt >= RUN_TIMEOUT_MS) throw new ConvexError("Gönderim zaman sınırı aşıldı"); };
+    try {
+      if (targets.some(item => item.run._id !== run._id)) throw new ConvexError("Gönderim hedefleri aynı çalıştırmaya ait olmalı");
+      for (const ruleId of args.ruleIds) {
+        checkTimeout();
+        try {
+          const plan: IdeRulePlan | null = await ctx.runQuery(internal.deviceSyncRuns.prepareIdeRule, { ruleId, deviceIds, projectId: run.projectId });
+          if (!plan) continue;
+          for (const id of plan.deviceIds) matched.add(id);
+          for (const employeeId of plan.employeeIds) {
+            const ids = employeeDevices.get(employeeId) ?? new Set<Id<"devices">>();
+            for (const id of plan.deviceIds) ids.add(id);
+            employeeDevices.set(employeeId, ids);
+          }
+          const result = await ctx.runAction(internal.actions.ideGatewayDevice.syncPermissionToIdePanels, {
+            accessRuleId: ruleId, runId: run._id, targetDeviceIds: plan.deviceIds,
+          });
+          if (!result.ok || result.queued < plan.deviceIds.length || result.skipped.length) {
+            recordFailure(plan.deviceIds, result.error ?? (result.skipped.join("; ") || "İzin gönderilemedi"));
+          }
+        } catch (error) {
+          recordFailure(deviceIds, error instanceof Error ? error.message : "Kural gönderilemedi");
+        }
+      }
+      for (const [employeeId, ids] of employeeDevices) {
+        checkTimeout();
+        const targetDeviceIds = [...ids];
+        try {
+          const result = await ctx.runAction(internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId, runId: run._id, targetDeviceIds });
+          if (!result.ok || result.queued < targetDeviceIds.length || result.skipped.length) {
+            recordFailure(targetDeviceIds, result.error ?? (result.skipped.join("; ") || "Kişi gönderilemedi"));
+          }
+        } catch (error) {
+          recordFailure(targetDeviceIds, error instanceof Error ? error.message : "Kişi gönderilemedi");
+        }
+      }
+    } catch (error) {
+      recordFailure(deviceIds, error instanceof Error ? error.message : "Cihaza gönderim başlatılamadı");
+    }
+    for (const { target, device } of targets) {
+      const failure = failures.get(device._id);
+      await ctx.runMutation(internal.deviceSyncRuns.finishTarget, { targetId: target._id, failure,
+        skipped: !matched.has(device._id) && !failure ? skipReasons.noRule : undefined });
+    }
+  },
+});
+
+/** Atomically allocate once even when multiple device workers reach the same rule. */
+export const ensureWeekPlan = internalMutation({
+  args: { ruleId: v.id("accessRules"), projectId: v.id("projects") },
+  handler: async (ctx, args): Promise<number> => {
+    const rule = await ctx.db.get(args.ruleId);
+    if (!rule || rule.projectId !== args.projectId) throw new ConvexError("Kural bulunamadı");
+    if (rule.hikWeekPlanNo) {
+      if (!Number.isSafeInteger(rule.hikWeekPlanNo) || rule.hikWeekPlanNo < 1 || rule.hikWeekPlanNo > 65535) {
+        throw new ConvexError("Hikvision plan numarası geçersiz (1–65535)");
+      }
+      return rule.hikWeekPlanNo;
+    }
+    const last = await ctx.db.query("accessRules").withIndex("by_hikWeekPlanNo").order("desc").first();
+    const weekPlanNo = Math.max(1, last?.hikWeekPlanNo ?? 1) + 1;
+    if (!Number.isSafeInteger(weekPlanNo) || weekPlanNo > 65535) throw new ConvexError("Hikvision plan numarası sınırı aşıldı (65535)");
+    await ctx.db.patch(rule._id, { hikWeekPlanNo: weekPlanNo });
+    return weekPlanNo;
+  },
+});
+
+export const executeTarget = internalAction({
+  args: { targetId: v.id("deviceSyncRunTargets"), ruleIds: v.array(v.id("accessRules")) },
+  handler: async (ctx, args): Promise<void> => {
+    const loaded: { target: Doc<"deviceSyncRunTargets">; run: Doc<"deviceSyncRuns">; device: Doc<"devices"> } | null =
+      await ctx.runQuery(internal.deviceSyncRuns.loadTarget, { targetId: args.targetId });
+    if (!loaded || loaded.target.status !== "queued") return;
+    const { run, target, device } = loaded;
+    const syncedEmployees = new Set<Id<"employees">>();
+    let matched = false;
+    let failure: string | undefined;
+    try {
+      const skip = skippedReason(device, Date.now());
+      if (skip) {
+        await ctx.runMutation(internal.deviceSyncRuns.finishTarget, { targetId: target._id, skipped: skip });
+        return;
+      }
+      for (const ruleId of args.ruleIds) {
+        if (Date.now() - run.startedAt >= RUN_TIMEOUT_MS) throw new ConvexError("Gönderim zaman sınırı aşıldı");
+        const employees: Id<"employees">[] | null = await ctx.runQuery(internal.deviceSyncRuns.prepareRule, {
+          ruleId, deviceId: device._id, projectId: run.projectId,
+        });
+        if (employees === null) continue;
+        matched = true;
+        if (device.brand === "hikvision") {
+          await ctx.runMutation(internal.deviceSyncRuns.ensureWeekPlan, { ruleId, projectId: run.projectId });
+          const result = await ctx.runAction(internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, {
+            accessRuleId: ruleId, runId: run._id, targetDeviceIds: [device._id], allowedProjectIds: [run.projectId],
+          });
+          if (result.failed || result.synced !== 1 || result.employeesSynced < employees.length) {
+            failure = result.errors.join("; ") || "Kural veya kişi bilgilerinin tümü gönderilemedi";
+          }
+        } else {
+          const permission = await ctx.runAction(internal.actions.ideGatewayDevice.syncPermissionToIdePanels, {
+            accessRuleId: ruleId, runId: run._id, targetDeviceIds: [device._id],
+          });
+          if (!permission.ok || permission.queued === 0 || permission.skipped.length) {
+            failure = permission.error ?? (permission.skipped.join("; ") || "İzin gönderilemedi");
+          }
+          for (const employeeId of employees) {
+            // The employee action already includes every panel permission for this person.
+            if (syncedEmployees.has(employeeId)) continue;
+            syncedEmployees.add(employeeId);
+            if (Date.now() - run.startedAt >= RUN_TIMEOUT_MS) throw new ConvexError("Gönderim zaman sınırı aşıldı");
+            const result = await ctx.runAction(internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
+              employeeId, runId: run._id, targetDeviceIds: [device._id],
+            });
+            if (!result.ok || result.queued === 0 || result.skipped.length) {
+              failure = result.error ?? (result.skipped.join("; ") || "Kişi gönderilemedi");
+            }
+          }
+        }
+      }
+    } catch (error) {
+      failure = error instanceof Error ? error.message : "Cihaza gönderim başlatılamadı";
+    }
+    await ctx.runMutation(internal.deviceSyncRuns.finishTarget, {
+      targetId: target._id, failure,
+      skipped: !matched && !failure ? skipReasons.noRule : undefined,
+      directSent: device.brand === "hikvision" && device.hikTransport !== "localBridge",
+    });
+  },
+});
+
+export const finishTarget = internalMutation({
+  args: { targetId: v.id("deviceSyncRunTargets"), failure: v.optional(v.string()), skipped: v.optional(v.string()), directSent: v.optional(v.boolean()) },
+  handler: async (ctx, args) => {
+    const target = await ctx.db.get(args.targetId);
+    if (!target || target.status !== "queued") return;
+    const status = args.skipped ? "skipped" : args.directSent ? args.failure ? "failed" : "sent" : "queued";
+    const reason = (args.skipped ?? args.failure)?.slice(0, 2000);
+    if (target.dispatchFinished === true && target.status === status && target.reason === reason) return;
+    await ctx.db.patch(target._id, { dispatchFinished: true, status, reason, updatedAt: Date.now() });
+  },
+});
+
+/** Compatibility for jobs already scheduled by the previous implementation; no re-poll. */
+export const refreshTarget = internalMutation({
+  args: { targetId: v.id("deviceSyncRunTargets"), failure: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const target = await ctx.db.get(args.targetId);
+    if (!target || target.status !== "queued") return;
+    const run = await ctx.db.get(target.runId);
+    if (run) await refreshOneTarget(ctx, target, run, args.failure ?? target.reason);
+  },
+});
+
+export const expireRun = internalMutation({
+  args: { runId: v.id("deviceSyncRuns") },
+  handler: async (ctx, args) => { await refreshRun(ctx, args.runId); },
+});
+
+/** One run-wide evidence/summary writer, with no writes when nothing changed. */
+export const refreshSummary = internalMutation({
+  args: { runId: v.id("deviceSyncRuns"), pollAttempt: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const status = await refreshRun(ctx, args.runId);
+    if (status !== "running") return;
+    const run = await ctx.db.get(args.runId);
+    if (!run) return;
+    const remaining = RUN_TIMEOUT_MS - (Date.now() - run.startedAt);
+    if (remaining <= 0) return;
+    const attempt = args.pollAttempt ?? 0;
+    await ctx.scheduler.runAfter(Math.min(refreshDelay(attempt), remaining), internal.deviceSyncRuns.refreshSummary,
+      { runId: args.runId, pollAttempt: attempt + 1 });
+  },
+});
+
+export const listRecent = authedQuery({
+  args: { projectId: v.id("projects"), ruleId: v.optional(v.id("accessRules")), limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    await resolveProjectScope(ctx, args.projectId);
+    const limit = args.limit === undefined ? 10 : Math.max(1, Math.min(20, Math.floor(args.limit)));
+    if (!Number.isFinite(limit)) throw new ConvexError("Geçersiz liste sınırı");
+    if (args.ruleId) {
+      const rule = await ctx.db.get(args.ruleId);
+      if (!rule?.projectId || rule.projectId !== args.projectId) throw new ConvexError("Kural bu projeye ait değil");
+      await resolveProjectScope(ctx, rule.projectId);
+    }
+    const runs = args.ruleId
+      ? await ctx.db.query("deviceSyncRuns").withIndex("by_rule_started", q => q.eq("ruleId", args.ruleId)).order("desc").take(limit)
+      : await ctx.db.query("deviceSyncRuns").withIndex("by_project_started", q => q.eq("projectId", args.projectId)).order("desc").take(limit);
+    return await Promise.all(runs.filter(run => run.projectId === args.projectId).map(async run => {
+      const targets = await ctx.db.query("deviceSyncRunTargets").withIndex("by_run", q => q.eq("runId", run._id)).take(MAX_DEVICES + 1);
+      return { ...run, ...summarizeRun(targets.map(t => t.status), run.dispatchFinished === true) };
+    }));
+  },
+});
+export const get = authedQuery({
+  args: { runId: v.id("deviceSyncRuns") },
+  handler: async (ctx, args) => {
+    const run = await ctx.db.get(args.runId);
+    if (!run) throw new ConvexError("Gönderim çalıştırması bulunamadı");
+    await resolveProjectScope(ctx, run.projectId);
+    const targets = await ctx.db.query("deviceSyncRunTargets")
+      .withIndex("by_run", q => q.eq("runId", run._id)).take(MAX_DEVICES + 1);
+    return { ...run, ...summarizeRun(targets.map(t => t.status), run.dispatchFinished === true), targets };
+  },
+});

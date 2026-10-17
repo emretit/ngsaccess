@@ -570,6 +570,53 @@ export const getDetails = authedQuery({
   },
 });
 
+/** Each cursor belongs to one rule and kind; exhaust all three before editing membership. */
+export const listRuleMembers = authedQuery({
+  args: {
+    ruleId: v.id("accessRules"),
+    kind: v.union(v.literal("people"), v.literal("devices"), v.literal("doors")),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const rule = await ctx.db.get(args.ruleId);
+    if (!rule?.projectId) throw new Error("Kural bulunamadı");
+    await resolveProjectScope(ctx, rule.projectId);
+    if (!Number.isFinite(args.paginationOpts.numItems)) throw new Error("Geçersiz sayfa boyutu");
+    const paginationOpts = { ...args.paginationOpts, numItems: Math.max(1, Math.min(50, Math.floor(args.paginationOpts.numItems))) };
+    if (args.kind === "people") {
+      const result = await ctx.db.query("groupMembers")
+        .withIndex("by_project_group", q => q.eq("projectId", rule.projectId).eq("groupId", rule._id))
+        .paginate(paginationOpts);
+      const page = await Promise.all(result.page.map(async member => {
+        const employee = await ctx.db.get(member.employeeId);
+        return { ...member, employees: employee && employee.projectId === rule.projectId
+          ? { id: employee._id, firstName: employee.firstName, lastName: employee.lastName, email: employee.email } : null };
+      }));
+      return { ...result, kind: "people" as const, page };
+    }
+    if (args.kind === "devices") {
+      const result = await ctx.db.query("groupDevices")
+        .withIndex("by_project_group", q => q.eq("projectId", rule.projectId).eq("groupId", rule._id))
+        .paginate(paginationOpts);
+      const page = await Promise.all(result.page.map(async member => {
+        const device = await ctx.db.get(member.deviceId);
+        return { ...member, devices: device && device.projectId === rule.projectId
+          ? { id: device._id, name: device.name, brand: device.brand, ideUuid: device.ideUuid,
+              deviceSerial: device.deviceSerial, zoneId: device.zoneId, doorId: device.doorId } : null };
+      }));
+      return { ...result, kind: "devices" as const, page };
+    }
+    const result = await ctx.db.query("groupDoors")
+      .withIndex("by_group", q => q.eq("groupId", rule._id)).paginate(paginationOpts);
+    const page = await Promise.all(result.page.map(async member => {
+      const door = await ctx.db.get(member.doorId);
+      return { ...member, doors: door && door.projectId === rule.projectId
+        ? { doorId: door._id, deviceId: door.deviceId, name: door.name } : null };
+    }));
+    return { ...result, kind: "doors" as const, page };
+  },
+});
+
 export const create = authedMutation({
   args: {
     name: v.string(),

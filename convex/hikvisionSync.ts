@@ -400,6 +400,7 @@ export const recordSyncFailure = internalMutation({
 export const enqueueLocalBridgeOperation = internalMutation({
   args: {
     deviceId: v.id("devices"),
+    runId: v.optional(v.id("deviceSyncRuns")),
     projectId: v.optional(v.id("projects")),
     operation: hikOperationValidator,
     payload: v.any(),
@@ -423,6 +424,8 @@ export const enqueueLocalBridgeOperation = internalMutation({
         .take(HIK_BRIDGE_DEDUPE_SCAN);
       const existing = existingRows.find(
         (op) =>
+          op.runId === args.runId &&
+          (!args.runId || stablePayloadKey(op.payload) === stablePayloadKey(args.payload)) &&
           op.operation === args.operation &&
           localBridgeOperationKey(op.deviceId, op.operation, op.payload) === newKey,
       );
@@ -444,6 +447,7 @@ export const enqueueLocalBridgeOperation = internalMutation({
     }
     const opId = await ctx.db.insert("hikPendingOperations", {
       deviceId: args.deviceId,
+      runId: args.runId,
       projectId: args.projectId,
       operation: args.operation,
       payload: args.payload,
@@ -840,6 +844,8 @@ export const resolveTargetFailures = internalMutation({
     const now = Date.now();
     const writes: Promise<unknown>[] = [];
     for (const f of matches) {
+      // Run evidence belongs to that attempt; a later enqueue is not its delivery proof.
+      if (f.runId) continue;
       if (!opSet.has(f.operation)) continue;
       const payload = (f.payload ?? {}) as Record<string, unknown>;
       // employeeId/accessRuleId verilmişse sadece eşleşenleri temizle.

@@ -408,6 +408,7 @@ export default defineSchema({
     .index("by_project", ["projectId"])
     .index("by_project_active", ["projectId", "isActive"])
     .index("by_active", ["isActive"])
+    .index("by_hikWeekPlanNo", ["hikWeekPlanNo"])
     .searchIndex("search_name", { searchField: "name", filterFields: ["projectId", "isActive"] }),
 
   groupMembers: defineTable({
@@ -495,7 +496,8 @@ export default defineSchema({
     .index("by_project_device_time", ["projectId", "deviceId", "accessTime"])
     .index("by_project_device_status_time", ["projectId", "deviceId", "accessStatus", "accessTime"])
     .index("by_project_device_employee_time", ["projectId", "deviceId", "employeeId", "accessTime"])
-    .index("by_employee_status_time", ["employeeId", "accessStatus", "accessTime"]),
+    .index("by_employee_status_time", ["employeeId", "accessStatus", "accessTime"])
+    .index("by_project_employee_time", ["projectId", "employeeId", "accessTime"]),
 
   // Hikvision access dışı olaylar: alarm, exception, operation, status.
   // PDKS hesaplarını şişirmemek için cardReadings'ten ayrı tutulur.
@@ -604,12 +606,15 @@ export default defineSchema({
     /** Kullanıcı uyarıyı kapattı; operasyon sonucu (status) DEĞİŞMEZ. */
     dismissedAt: v.optional(v.number()),
     dismissedBy: v.optional(v.id("users")),
+    /** Bu op'u üreten cihaz gönderim çalıştırması (deviceSyncRuns); eski op'larda yok. */
+    runId: v.optional(v.id("deviceSyncRuns")),
   })
     .index("by_device_status", ["deviceId", "status"])
     .index("by_status_created", ["status", "createdAt"])
     .index("by_status_nextRetry", ["status", "nextRetryAt"])
     .index("by_project_status_created", ["projectId", "status", "createdAt"])
-    .index("by_project_status_dismissed_created", ["projectId", "status", "dismissedAt", "createdAt"]),
+    .index("by_project_status_dismissed_created", ["projectId", "status", "dismissedAt", "createdAt"])
+    .index("by_run_device", ["runId", "deviceId"]),
 
   /**
    * IDE Smart bulut→panel komut kuyruğu. Convex serverless MQTT tutamaz; Hetzner'daki
@@ -664,13 +669,65 @@ export default defineSchema({
     /** Kullanıcı uyarıyı kapattı; operasyon sonucu (status) DEĞİŞMEZ. */
     dismissedAt: v.optional(v.number()),
     dismissedBy: v.optional(v.id("users")),
+    /** Bu op'u üreten cihaz gönderim çalıştırması (deviceSyncRuns); eski op'larda yok. */
+    runId: v.optional(v.id("deviceSyncRuns")),
   })
     .index("by_device_status", ["deviceId", "status"])
     .index("by_status_nextRetry", ["status", "nextRetryAt"])
     .index("by_msx", ["deviceId", "msxId"])
     .index("by_idempotency", ["idempotencyKey"])
     .index("by_project_status_created", ["projectId", "status", "createdAt"])
-    .index("by_project_status_dismissed_created", ["projectId", "status", "dismissedAt", "createdAt"]),
+    .index("by_project_status_dismissed_created", ["projectId", "status", "dismissedAt", "createdAt"])
+    .index("by_run_device", ["runId", "deviceId"]),
+
+  /** Cihazlara gönderim çalıştırması (proje geneli veya tek kural); hedef satırları deviceSyncRunTargets'ta. */
+  deviceSyncRuns: defineTable({
+    projectId: v.id("projects"),
+    kind: v.union(v.literal("project_resync"), v.literal("rule_sync")),
+    ruleId: v.optional(v.id("accessRules")),
+    startedBy: v.id("users"),
+    startedAt: v.number(),
+    finishedAt: v.optional(v.number()),
+    status: v.union(
+      v.literal("running"),
+      v.literal("done"),
+      v.literal("partial"),
+      v.literal("failed"),
+    ),
+    counts: v.object({
+      queued: v.number(),
+      sent: v.number(),
+      verified: v.number(),
+      failed: v.number(),
+      skipped: v.number(),
+      unknown: v.number(),
+    }),
+    dispatchFinished: v.optional(v.boolean()),
+  })
+    .index("by_project_started", ["projectId", "startedAt"])
+    .index("by_rule_started", ["ruleId", "startedAt"]),
+
+  /** Çalıştırma başına hedef cihaz durumu (Hik done = sent; IDE acked = verified). */
+  deviceSyncRunTargets: defineTable({
+    runId: v.id("deviceSyncRuns"),
+    deviceId: v.id("devices"),
+    deviceName: v.string(),
+    brand: v.string(),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("sent"),
+      v.literal("verified"),
+      v.literal("failed"),
+      v.literal("skipped"),
+      v.literal("unknown"),
+    ),
+    reason: v.optional(v.string()),
+    updatedAt: v.number(),
+    /** Hedef action op üretimini tamamladı; watchdog yarım kalan dispatch'i verified saymaz. */
+    dispatchFinished: v.optional(v.boolean()),
+  })
+    .index("by_run", ["runId"])
+    .index("by_run_device", ["runId", "deviceId"]),
 
   /**
    * IDE Smart panelinde GERÇEKTE bulunan kullanıcıların (kart) takibi.
@@ -790,7 +847,9 @@ export default defineSchema({
     .index("by_employee", ["employeeId"])
     .index("by_shift", ["shiftId"])
     .index("by_project", ["projectId"])
-    .index("by_dates", ["startDate", "endDate"]),
+    .index("by_dates", ["startDate", "endDate"])
+    .index("by_project_end", ["projectId", "endDate"])
+    .index("by_employee_end", ["employeeId", "endDate"]),
 
   // ═══════ 8 · AYARLAR (GENEL / MAIL / BİLDİRİM) ════════════════════════
   generalSettings: defineTable({
