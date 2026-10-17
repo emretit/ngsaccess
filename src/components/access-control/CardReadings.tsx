@@ -80,8 +80,9 @@ function ProjectReadings({ projectId }: { projectId: Id<"projects"> }) {
   const [pending, setPending] = useState(false);
   const { requestClose: requestRouteClose, dialog: routeDialog } = useUnsavedChangesGuard(dirty);
   const change = useCallback((next: Partial<Filters>) => setParams(current => writeFilters(current, { ...readFilters(current, projectId), ...next }, projectId), { replace: true }), [projectId, setParams]);
-  const open = (r: Reading, anchor: HTMLElement) => { trigger.current = anchor; setActiveReading(r._id); setParams(current => { const next = new URLSearchParams(current); next.set("reading", r._id); return next; }); };
-  const close = () => { setActiveReading(null); setDirty(false); setParams(current => { const next = new URLSearchParams(current); next.delete("reading"); return next; }, { replace: true }); };
+  const writeReading = useCallback((id: string | null, replace: boolean) => setParams(current => { const next = new URLSearchParams(current); if (id) next.set("reading", id); else next.delete("reading"); return next; }, replace ? { replace: true } : undefined), [setParams]);
+  const open = (r: Reading, anchor: HTMLElement) => { trigger.current = anchor; setActiveReading(r._id); writeReading(r._id, false); };
+  const close = () => { setActiveReading(null); setDirty(false); writeReading(null, true); };
   const reading = params.get("reading");
   // Router URL'yi transition ile geç günceller; yalnız URL değişince (geri/ileri) senkronla, aksi halde open() paneli anında kapatır.
   const syncedReading = useRef(reading);
@@ -89,17 +90,18 @@ function ProjectReadings({ projectId }: { projectId: Id<"projects"> }) {
     if (reading === syncedReading.current) return;
     syncedReading.current = reading;
     if (reading === activeReading) return;
-    const move = () => { setDirty(false); setActiveReading(reading); setParams(current => { const next = new URLSearchParams(current); if (reading) next.set("reading", reading); else next.delete("reading"); return next; }, { replace: true }); };
+    const move = () => { setDirty(false); setActiveReading(reading); writeReading(reading, true); };
     if (dirty || pending) {
-      setParams(current => { const next = new URLSearchParams(current); if (activeReading) next.set("reading", activeReading); else next.delete("reading"); return next; }, { replace: true });
+      writeReading(activeReading, true);
       if (!pending) requestRouteClose(move);
     } else move();
-  }, [reading, activeReading, dirty, pending, requestRouteClose, setParams]);
+  }, [reading, activeReading, dirty, pending, requestRouteClose, writeReading]);
   useEffect(() => { if (params.get("liveProject") && params.get("liveProject") !== projectId) setParams(current => { const next = writeFilters(current, readFilters(current, projectId), projectId); next.delete("reading"); return next; }, { replace: true }); }, [projectId, params, setParams]);
+  const filterBar = <CardReadingsFilters projectId={projectId} filters={filters} change={change} />;
   return <div className="min-w-0 space-y-4">
     <div className="flex flex-wrap gap-2" aria-label="Görünüm"><Button variant="outline" aria-pressed={filters.mode === "live"} onClick={() => change({ mode: "live", start: "", end: "" })}>Canlı</Button><Button variant="outline" aria-pressed={filters.mode === "history"} onClick={() => change({ mode: "history" })}>Geçmiş</Button></div>
     <QuerySectionBoundary resetKey={`${projectId}:${filters.mode}:${filters.device}:${filters.employee}:${filters.door}:${filters.result}:${filters.start}:${filters.end}`} description="Okumalar yüklenemedi. Filtreleriniz korunuyor.">
-      {filters.mode === "live" ? <Live projectId={projectId} filters={filters} onOpen={open} filterBar={<CardReadingsFilters projectId={projectId} filters={filters} change={change} />} /> : <History key={`${filters.device}:${filters.employee}:${filters.door}:${filters.result}:${filters.start}:${filters.end}`} projectId={projectId} filters={filters} onOpen={open} filterBar={<CardReadingsFilters projectId={projectId} filters={filters} change={change} />} />}
+      {filters.mode === "live" ? <Live projectId={projectId} filters={filters} onOpen={open} filterBar={filterBar} /> : <History key={`${filters.device}:${filters.employee}:${filters.door}:${filters.result}:${filters.start}:${filters.end}`} projectId={projectId} filters={filters} onOpen={open} filterBar={filterBar} />}
     </QuerySectionBoundary>
     {activeReading && <ReadingDetailPanel key={activeReading} readingId={activeReading} onClose={close} trigger={trigger} onDirtyChange={setDirty} onPendingChange={setPending} />}
     {routeDialog}
