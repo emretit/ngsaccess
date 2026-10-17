@@ -1,98 +1,56 @@
-import { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { useRef, useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
+import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { notify } from "@/lib/notify";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
-import { Id } from "../../../convex/_generated/dataModel";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { Id } from "../../../convex/_generated/dataModel";
 
-interface AddDoorDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
-  zoneId: Id<"zones">;
-  zoneName: string;
-}
+interface AddDoorDialogProps { open: boolean; onOpenChange: (open: boolean) => void; onSuccess: () => void; zoneId: Id<"zones">; zoneName: string; }
 
 export function AddDoorDialog({ open, onOpenChange, onSuccess, zoneId, zoneName }: AddDoorDialogProps) {
-  const [name, setName] = useState("");
-  const [doorCode, setDoorCode] = useState("");
-  const [readerDirection, setReaderDirection] = useState<"entry" | "exit" | "both">("both");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
   const { projectId } = useActiveProject();
-  const createDoor = useMutation(api.doors.create);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      toast({ variant: "destructive", title: "Hata", description: "Kapı adı gereklidir." });
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      await createDoor({
-        name: name.trim(),
-        doorCode: doorCode.trim() || undefined,
-        readerDirection,
-        zoneId,
-        projectId,
-        status: "active",
-      });
-      toast({ title: "Başarılı", description: `${zoneName} bölgesine kapı başarıyla eklendi.` });
-      setName("");
-      setDoorCode("");
-      setReaderDirection("both");
-      onSuccess();
-      onOpenChange(false);
-    } catch (error: unknown) {
-      toast({ variant: "destructive", title: "Hata", description: (error as Error)?.message ?? "Kapı eklenirken hata oluştu." });
-    } finally {
-      setIsSubmitting(false);
-    }
+  const [direction, setDirection] = useState<"entry" | "exit" | "both">("both");
+  const [doorCode, setDoorCode] = useState("");
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string>();
+  const nameInput = useRef<HTMLInputElement>(null);
+  const guard = useUnsavedChangesGuard(open && (name !== "" || direction !== "both" || doorCode !== ""));
+  const create = useMutation(api.doors.create);
+  const { run, pending } = useAsyncAction(async () => {
+    await create({ name: name.trim(), projectId, zoneId, readerDirection: direction, doorCode: doorCode.trim() || undefined, status: "active" });
+    notify.success("Kapı eklendi");
+    setName(""); onSuccess(); setDoorCode(""); setDirection("both");
+    onOpenChange(false);
+  }, { error: "Kapı eklenemedi" });
+  const close = () => { if (!pending) guard.requestClose(() => { setName(""); setError(undefined); setDoorCode(""); setDirection("both"); onOpenChange(false); }); };
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!name.trim()) { setError("Kapı adı gereklidir."); nameInput.current?.focus(); return; }
+    setError(undefined);
+    void run();
   };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>{zoneName} - Yeni Kapı Ekle</DialogTitle>
-          <DialogDescription>Bu bölgeye yeni bir kapı tanımlayın.</DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">Ad *</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" placeholder="Kapı adı" required />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="doorCode" className="text-right">Kapı Kodu</Label>
-              <Input id="doorCode" value={doorCode} onChange={(e) => setDoorCode(e.target.value)} className="col-span-3" placeholder="Kapı kodu (opsiyonel)" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="readerDirection" className="text-right">Erişim Yönü</Label>
-              <Select value={readerDirection} onValueChange={(v) => setReaderDirection(v as "entry" | "exit" | "both")}>
-                <SelectTrigger id="readerDirection" className="col-span-3">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="entry">Giriş</SelectItem>
-                  <SelectItem value="exit">Çıkış</SelectItem>
-                  <SelectItem value="both">Giriş/Çıkış</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>İptal</Button>
-            <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Ekleniyor..." : "Ekle"}</Button>
-          </DialogFooter>
+  return <>
+    <Dialog open={open} onOpenChange={next => { if (!next) close(); }}>
+      <DialogContent className="sm:max-w-[480px] max-h-[90dvh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Kapı ekle</DialogTitle></DialogHeader>
+        <p className="break-words text-sm text-muted-foreground">{zoneName}</p>
+        <form onSubmit={submit} noValidate className="space-y-4" aria-busy={pending}>
+          {error && <p role="alert" className="text-sm text-destructive">Kaydedilemedi. {error}</p>}
+          <fieldset disabled={pending} className="space-y-4">
+            <FormFieldWrapper htmlFor="add-door-name" label="Kapı adı" error={error}><Input ref={nameInput} id="add-door-name" value={name} onChange={e => { setName(e.target.value); setError(undefined); }} /></FormFieldWrapper>
+            <FormFieldWrapper htmlFor="add-door-code" label="Kapı kodu"><Input id="add-door-code" value={doorCode} onChange={e => setDoorCode(e.target.value)} /></FormFieldWrapper><FormFieldWrapper htmlFor="add-door-direction" label="Yön">{control => <Select disabled={pending} value={direction} onValueChange={value => { if (value === "entry" || value === "exit" || value === "both") setDirection(value); }}><SelectTrigger {...control}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="entry">Giriş</SelectItem><SelectItem value="exit">Çıkış</SelectItem><SelectItem value="both">Giriş/Çıkış</SelectItem></SelectContent></Select>}</FormFieldWrapper>
+          </fieldset>
+          <DialogFooter className="border-t border-line pt-4"><Button type="button" variant="outline" disabled={pending} onClick={close}>İptal</Button><Button type="submit" disabled={pending}>{pending ? "Ekleniyor…" : "Ekle"}</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
-  );
+    {guard.dialog}
+  </>;
 }

@@ -1,3 +1,4 @@
+import { PasswordField } from "@/components/shared/PasswordField";
 import {
   FormField,
   FormItem,
@@ -72,8 +73,7 @@ export function DeviceHikLocalBridgeSection({
             <FormItem>
               <FormLabel>Cihaz Şifresi</FormLabel>
               <FormControl>
-                <Input
-                  type="password"
+                <PasswordField
                   placeholder="Panel şifresi"
                   autoComplete="new-password"
                   {...field}
@@ -88,7 +88,7 @@ export function DeviceHikLocalBridgeSection({
 
       {device && (
         <p className="pt-2 border-t text-xs text-muted-foreground">
-          Kapı açmak için Cihaz Merkezi sekmesinde hedef kapıyı seçip onaylayın.
+          Kapı açmak için Genel bakış sekmesinde hedef kapıyı seçip onaylayın.
         </p>
       )}
     </>

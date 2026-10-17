@@ -1,3 +1,4 @@
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -9,13 +10,15 @@ import { Button } from "@/components/ui/button";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
 interface ZoneDoorTreePanelProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   selectedZoneId: string | null;
   selectedDoorId: string | null;
   onSelectZone?: (zoneId: string | null) => void;
   onSelectDoor?: (doorId: string | null) => void;
 }
 
-export function ZoneDoorTreePanel({ selectedZoneId, selectedDoorId, onSelectZone, onSelectDoor }: ZoneDoorTreePanelProps) {
+export function ZoneDoorTreePanel({ open = true, onOpenChange, selectedZoneId, selectedDoorId, onSelectZone, onSelectDoor }: ZoneDoorTreePanelProps) {
   const { activeProject, isSuperAdmin, projectId, loading: projectLoading } = useActiveProject();
   const [showAddZoneDialog, setShowAddZoneDialog] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -39,12 +42,14 @@ export function ZoneDoorTreePanel({ selectedZoneId, selectedDoorId, onSelectZone
 
   return (
     <>
-      <div className="w-full min-w-0 lg:w-[300px] shrink-0 bg-card rounded-xl border shadow-xs">
+      <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent size="full" className="w-full sm:max-w-[480px] min-w-0 overflow-y-auto p-0">
+        <SheetHeader className="border-b border-line p-5 pr-12 text-left"><SheetTitle>Bölge ve kapı</SheetTitle><SheetDescription>Konum seçerek cihaz listesini filtreleyin.</SheetDescription></SheetHeader>
         <div className="p-4 border-b border-border">
           <div className="flex items-center gap-2">
             <button type="button" onClick={handleProjectHeaderClick} className="flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`${companyName}: bölge ve kapı filtrelerini temizle`}>
-            <Building2 className="h-4 w-4 text-primary" />
-            <span className="text-base font-semibold text-primary break-words">{companyName}</span>
+            <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 text-sm font-semibold break-all">{companyName}</span>
             </button>
             <Button
               size="icon"
@@ -59,9 +64,9 @@ export function ZoneDoorTreePanel({ selectedZoneId, selectedDoorId, onSelectZone
               <Plus className="h-3.5 w-3.5" />
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">Bölgeler & Kapılar</p>
+          <p className="text-xs text-muted-foreground mt-1">Bölgeler ve kapılar</p>
         </div>
-        <div className="p-2 max-h-72 lg:max-h-[calc(100vh-12rem)] overflow-y-auto">
+        <div className="min-w-0 p-3">
           <ZoneDoorTree
             key={`${projectId}-${refreshKey}`}
             selectedZoneId={selectedZoneId}
@@ -71,7 +76,8 @@ export function ZoneDoorTreePanel({ selectedZoneId, selectedDoorId, onSelectZone
             onZoneAdded={handleZoneAdded}
           />
         </div>
-      </div>
+      </SheetContent>
+      </Sheet>
 
       <AddZoneDialog
         open={showAddZoneDialog}

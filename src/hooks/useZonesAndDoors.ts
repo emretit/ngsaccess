@@ -5,6 +5,10 @@ import type { Zone, Door } from "@/types/access-control";
 
 export type { Zone, Door };
 
+// Sabit boş diziler: yüklenirken her render'da yeni [] dönerse diziye bağlı effect'ler sonsuz döngüye girer.
+const NO_ZONES: Zone[] = [];
+const NO_DOORS: Door[] = [];
+
 export function useZonesAndDoors() {
   const { projectId, loading: projectLoading } = useActiveProject();
 
@@ -17,8 +21,8 @@ export function useZonesAndDoors() {
     (!!projectId && (zones === undefined || doors === undefined));
 
   return {
-    zones: (zones ?? []) as Zone[],
-    doors: (doors ?? []) as Door[],
+    zones: (zones as Zone[] | undefined) ?? NO_ZONES,
+    doors: (doors as Door[] | undefined) ?? NO_DOORS,
     loading,
     error: null,
     refreshData: () => {},

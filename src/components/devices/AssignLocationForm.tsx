@@ -11,8 +11,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { toast } from "sonner";
-import { useZonesAndDoors } from "@/hooks/useZonesAndDoors"; 
+import { notify } from "@/lib/notify";
+import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
+import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { ServerDevice } from '@/types/device';
 
 interface AssignLocationFormProps {
@@ -32,12 +33,14 @@ export function AssignLocationForm({
 }: AssignLocationFormProps) {
   const isPanel = device?.brand === "ide_smart" || device?.brand === "hikvision";
   const { zones, doors, loading } = useZonesAndDoors();
+  const [attempted, setAttempted] = useState(false);
   const [selectedZoneId, setSelectedZoneId] = useState<string>("");
   const [selectedDoorId, setSelectedDoorId] = useState<string>("");
   const [filteredDoors, setFilteredDoors] = useState<typeof doors>([]);
 
 
   useEffect(() => {
+    if (open) setAttempted(false);
     if (open && device) {
       const zoneValue = device.zoneId ?? "";
       const doorValue = device.doorId ?? "";
@@ -77,23 +80,29 @@ export function AssignLocationForm({
   const { run: assign, pending: isSubmitting } = useAsyncAction(async () => {
     if (!selectedZoneId || (!isPanel && !selectedDoorId)) throw new Error("Lütfen bölge ve kapı seçin");
     await onSubmit(selectedZoneId, selectedDoorId);
-    toast.success(`${deviceName} cihazının konumu güncellendi.`);
+    notify.success(`${deviceName} cihazının konumu güncellendi.`);
   }, { error: "Konum atanamadı" });
+  const guard = useUnsavedChangesGuard(open && (selectedZoneId !== (device?.zoneId ?? "") || selectedDoorId !== (device?.doorId ?? "")));
+  const close = () => { if (!isSubmitting) guard.requestClose(onClose); };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAttempted(true);
+    if (!selectedZoneId || (!isPanel && !selectedDoorId)) { document.getElementById(!selectedZoneId ? "zone" : "door")?.focus(); return; }
     if (await assign()) onClose();
   };
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen && !isSubmitting) onClose(); }}>
+    <>
+    <Dialog open={open} onOpenChange={nextOpen => { if (!nextOpen) close(); }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{deviceName} — Konum Ata</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
+          {attempted && (!selectedZoneId || (!isPanel && !selectedDoorId)) && <p role="alert" className="text-sm text-destructive">Konum atanamadı. Bölge ve uygun kapıyı seçin.</p>}
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="zone" className="text-right">
+            <div className="grid gap-2">
+              <Label htmlFor="zone" >
                 Bölge
               </Label>
               <Select
@@ -101,7 +110,7 @@ export function AssignLocationForm({
                 onValueChange={setSelectedZoneId}
                 disabled={loading || isSubmitting}
               >
-                <SelectTrigger className="col-span-3">
+                <SelectTrigger id="zone" aria-invalid={attempted && !selectedZoneId} aria-describedby={attempted && !selectedZoneId ? "assign-zone-error" : undefined}>
                   <SelectValue placeholder="Bölge seçin" />
                 </SelectTrigger>
                 <SelectContent>
@@ -112,9 +121,10 @@ export function AssignLocationForm({
                   ))}
                 </SelectContent>
               </Select>
+              {attempted && !selectedZoneId && <p id="assign-zone-error" className="text-xs text-destructive">Bölge seçin.</p>}
             </div>
-            {isPanel ? <p className="text-sm text-muted-foreground">Panelin tüm kapıları ve okuyucuları seçilen bölgeye taşınır. Kapı eşlemesi değiştirilmez.</p> : <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="door" className="text-right">
+            {isPanel ? <p className="text-sm text-muted-foreground">Panelin tüm kapıları ve okuyucuları seçilen bölgeye taşınır. Kapı eşlemesi değiştirilmez.</p> : <div className="grid gap-2">
+              <Label htmlFor="door" >
                 Kapı
               </Label>
               <Select
@@ -122,7 +132,7 @@ export function AssignLocationForm({
                 onValueChange={setSelectedDoorId}
                 disabled={!selectedZoneId || loading || isSubmitting}
               >
-                <SelectTrigger className="col-span-3">
+                <SelectTrigger id="door" aria-invalid={attempted && !selectedDoorId} aria-describedby={attempted && !selectedDoorId ? "assign-door-error" : undefined}>
                   <SelectValue placeholder="Kapı seçin" />
                 </SelectTrigger>
                 <SelectContent>
@@ -133,18 +143,21 @@ export function AssignLocationForm({
                   ))}
                 </SelectContent>
               </Select>
+              {attempted && !selectedDoorId && <p id="assign-door-error" className="text-xs text-destructive">Kapı seçin.</p>}
             </div>}
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            <Button type="button" variant="outline" onClick={close} disabled={isSubmitting}>
               İptal
             </Button>
-            <Button type="submit" disabled={isSubmitting || !selectedZoneId || (!isPanel && !selectedDoorId)}>
+            <Button type="submit" disabled={isSubmitting || loading}>
               {isSubmitting ? "Atanıyor..." : "Konum Ata"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+    {guard.dialog}
+    </>
   );
 }

@@ -1,3 +1,4 @@
+import { PasswordField } from "@/components/shared/PasswordField";
 
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -45,7 +46,7 @@ export function DeviceNetworkSection({ form }: DeviceNetworkSectionProps) {
           <FormItem>
             <FormLabel>Cihaz Şifresi</FormLabel>
             <FormControl>
-              <Input type="password" placeholder="Cihaz şifresi" {...field} />
+              <PasswordField placeholder="Cihaz şifresi" {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>

@@ -1,131 +1,82 @@
-import { useEffect, useState } from "react";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { DeviceForm } from "@/components/devices/DeviceForm";
-import { BrandPickerStep } from "@/components/devices/BrandPickerStep";
-import { DeviceApiTokenCard } from "@/components/devices/DeviceApiTokenCard";
-import { DeviceCommandCenter } from "@/components/devices/DeviceCommandCenter";
+import { useCallback, useEffect, useState } from "react";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import type { Id } from "../../../convex/_generated/dataModel";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { DeviceForm } from "./DeviceForm";
+import { BrandPickerStep } from "./BrandPickerStep";
+import { DeviceApiTokenCard } from "./DeviceApiTokenCard";
+import { DeviceCommandCenter } from "./DeviceCommandCenter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
+import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { ServerDevice } from "@/types/device";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { Loader2 } from "lucide-react";
 import { BRAND_LABELS, type DeviceBrand } from "./hooks/useDeviceFormSchema";
 
-interface DeviceDetailsPanelProps {
-  open: boolean;
-  onClose: () => void;
-  selectedDevice: ServerDevice | null;
-  onSuccess: () => void;
-}
-
-type Step = "picker" | "form";
-
-export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess }: DeviceDetailsPanelProps) {
-  const projectsData = useQuery(api.projects.list);
-  const projectsLoading = projectsData === undefined;
-  const projects = (projectsData ?? []).map((p: { _id: string; name: string }) => ({ _id: p._id as never, name: p.name }));
-
-  // Yeni cihazda picker ile başla; edit'te direkt form.
-  const [step, setStep] = useState<Step>(selectedDevice ? "form" : "picker");
-  const [pickedBrand, setPickedBrand] = useState<DeviceBrand>("other");
-
+interface DeviceDetailsPanelProps { open: boolean; onClose: () => void; selectedDevice: ServerDevice | null; onSuccess: () => void; projectId: Id<"projects"> | undefined; }
+export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess, projectId: draftProjectId }: DeviceDetailsPanelProps) {
+  const { projectId, setActiveProjectId } = useActiveProject();
+  const projectChanged = open && projectId !== draftProjectId;
+  const projects = useQuery(api.projects.list, open ? {} : "skip");
+  const [commandPending, setCommandPending] = useState(false);
+  const [step, setStep] = useState<"picker" | "form">("picker");
+  const [brand, setBrand] = useState<DeviceBrand>("other");
+  const [draftBrands, setDraftBrands] = useState<DeviceBrand[]>([]);
+  const [formStates, setFormStates] = useState<Partial<Record<DeviceBrand, { dirty: boolean; pending: boolean }>>>({});
+  const updateFormState = useCallback((brand: DeviceBrand, dirty: boolean, pending: boolean) => {
+    setFormStates(current => current[brand]?.dirty === dirty && current[brand]?.pending === pending ? current : { ...current, [brand]: { dirty, pending } });
+  }, []);
   useEffect(() => {
-    if (open) {
-      setStep(selectedDevice ? "form" : "picker");
-      setPickedBrand(selectedDevice?.brand ?? "other");
-    }
+    if (!open) return;
+    setStep(selectedDevice ? "form" : "picker");
+    setBrand(selectedDevice?.brand ?? "other");
+    setDraftBrands([]);
+    setFormStates({});
+    setCommandPending(false);
   }, [open, selectedDevice]);
-
-  // Edit'te brand'i async pickedBrand state'ini beklemeden DOĞRUDAN cihazdan al. Aksi halde
-  // form ilk render'da "other" layout'uyla kurulup pickedBrand "hikvision"a geçince layout
-  // yeniden kuruluyor; bu yarış anında çağrılan form.reset değerleri Select'lere (Cihaz Tipi,
-  // Kapı Sayısı, İletişim Yöntemi) yapışmadan kayboluyordu. Yeni cihazda picker'ın seçtiği
-  // pickedBrand kullanılır.
-  const brandForForm: DeviceBrand = selectedDevice?.brand ?? pickedBrand;
-
-  const handleBrandSelect = (brand: DeviceBrand) => {
-    setPickedBrand(brand);
-    setStep("form");
-  };
-
-  return (
-    <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <SheetContent size="lg" className="p-0">
-        <div className="p-6 border-b">
-          <SheetHeader>
-            <SheetTitle>
-              {selectedDevice
-                ? "Cihazı Düzenle"
-                : step === "picker"
-                  ? "Yeni Cihaz"
-                  : `Yeni Cihaz — ${BRAND_LABELS[brandForForm]}`}
-            </SheetTitle>
-          </SheetHeader>
-        </div>
-
-        {projectsLoading ? (
-          <div className="flex items-center justify-center h-[calc(100vh-120px)]">
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <span className="text-sm text-muted-foreground">Yükleniyor...</span>
-            </div>
-          </div>
-        ) : (
-          <ScrollArea className="h-[calc(100vh-120px)]">
-            <div className="p-6 space-y-6">
-              {step === "picker" && !selectedDevice ? (
-                <BrandPickerStep onSelect={handleBrandSelect} onCancel={onClose} />
-              ) : selectedDevice ? (
-                <Tabs defaultValue="info" className="space-y-4">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="info">Bilgiler</TabsTrigger>
-                    <TabsTrigger value="command-center">Cihaz Merkezi</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="info" className="space-y-6">
-                    <DeviceForm
-                      key={selectedDevice._id}
-                      open={open}
-                      device={selectedDevice}
-                      projects={projects}
-                      defaultBrand={brandForForm}
-                      onSuccess={onSuccess}
-                      onClose={onClose}
-                    />
-                    <DeviceApiTokenCard
-                      deviceId={selectedDevice._id}
-                      deviceName={selectedDevice.name}
-                      currentToken={selectedDevice.apiToken}
-                      currentTokenCreatedAt={selectedDevice.apiTokenCreatedAt}
-                    />
-                  </TabsContent>
-                  <TabsContent value="command-center">
-                    <DeviceCommandCenter device={selectedDevice} onUpdated={() => {}} />
-                  </TabsContent>
-                </Tabs>
-              ) : (
-                <>
-                  <DeviceForm
-                    key="new"
-                    open={open}
-                    device={null}
-                    projects={projects}
-                    defaultBrand={brandForForm}
-                    onBack={() => setStep("picker")}
-                    onSuccess={onSuccess}
-                    onClose={onClose}
-                  />
-                </>
-              )}
-            </div>
-          </ScrollArea>
-        )}
+  const pending = commandPending || Object.values(formStates).some(state => state?.pending);
+  const dirty = Object.values(formStates).some(state => state?.dirty);
+  const guard = useUnsavedChangesGuard(open && dirty);
+  const { requestClose } = guard;
+  useEffect(() => {
+    if (!projectChanged) return;
+    const nextProjectId = projectId;
+    if (draftProjectId && (dirty || pending)) {
+      setActiveProjectId(draftProjectId);
+      if (!pending) requestClose(() => {
+        setFormStates({});
+        onClose();
+        if (nextProjectId) setActiveProjectId(nextProjectId);
+      });
+    } else onClose();
+  }, [projectChanged, projectId, draftProjectId, dirty, pending, setActiveProjectId, requestClose, onClose]);
+  const close = () => { if (!pending) guard.requestClose(onClose); };
+  const pickBrand = (value: DeviceBrand) => { setBrand(value); setDraftBrands(current => current.includes(value) ? current : [...current, value]); setStep("form"); };
+  return <>
+    <Sheet open={open} onOpenChange={next => { if (!next) close(); }}>
+      <SheetContent size="full" className="w-full sm:max-w-[620px] min-w-0 overflow-y-auto p-0">
+        <SheetHeader className="border-b border-line p-5 pr-12 text-left"><SheetTitle className="break-words">{selectedDevice?.name ?? (step === "picker" ? "Yeni cihaz" : `Yeni cihaz · ${BRAND_LABELS[brand]}`)}</SheetTitle></SheetHeader>
+        <fieldset disabled={projectChanged} onSubmitCapture={event => { if (projectChanged) { event.preventDefault(); event.stopPropagation(); } }} className="min-w-0 p-5">
+          {projects === undefined || !draftProjectId ? <SectionSkeleton label="Cihaz bilgileri yükleniyor" /> : selectedDevice ? (
+            <Tabs key={selectedDevice._id} defaultValue="overview" className="min-w-0 space-y-5">
+              <TabsList className="grid w-full grid-cols-2"><TabsTrigger value="overview">Genel bakış</TabsTrigger><TabsTrigger value="settings">Ayarlar</TabsTrigger></TabsList>
+              <TabsContent value="overview" forceMount className="data-[state=inactive]:hidden"><QuerySectionBoundary resetKey={selectedDevice._id}><DeviceCommandCenter device={selectedDevice} onPendingChange={setCommandPending} /></QuerySectionBoundary></TabsContent>
+              <TabsContent value="settings" forceMount className="space-y-5 data-[state=inactive]:hidden">
+                <DeviceForm projectIdOverride={draftProjectId} open={open} device={selectedDevice} projects={projects} defaultBrand={selectedDevice.brand ?? "other"} onSuccess={onSuccess} onClose={close} onStateChange={updateFormState} />
+                <DeviceApiTokenCard key={selectedDevice._id} deviceId={selectedDevice._id} deviceName={selectedDevice.name} currentToken={selectedDevice.apiToken} currentTokenCreatedAt={selectedDevice.apiTokenCreatedAt} />
+              </TabsContent>
+            </Tabs>
+          ) : <>
+            {step === "picker" && <BrandPickerStep onSelect={pickBrand} onCancel={close} />}
+            {draftBrands.map(draftBrand => <div key={draftBrand} hidden={step !== "form" || draftBrand !== brand}>
+              <DeviceForm projectIdOverride={draftProjectId} open={open} device={null} projects={projects} defaultBrand={draftBrand} onBack={() => setStep("picker")} onSuccess={onSuccess} onClose={close} onStateChange={updateFormState} />
+            </div>)}
+          </>}
+        </fieldset>
       </SheetContent>
     </Sheet>
-  );
+    {guard.dialog}
+  </>;
 }

@@ -1,4 +1,4 @@
-import { toast as sonnerToast } from "sonner";
+import { notify } from "@/lib/notify";
 import { useRef, useState } from "react";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -46,20 +46,15 @@ export function DeviceLocationSection({
   const brand = form.watch("brand");
   const showDoorCount = brand !== "hikvision";
 
-  const toast = ({ description }: { title: string; description: string; variant?: string }) => sonnerToast.error(description);
   const handleCreateZone = async () => {
     const trimmedName = newZoneName.trim();
     const deviceName = form.getValues("name").trim();
     if (!trimmedName) {
-      toast({ title: "Hata", description: "Bölge adı gereklidir.", variant: "destructive" });
+      notify.error("Bölge adı gereklidir.");
       return;
     }
     if (deviceName && trimmedName.toLocaleLowerCase("tr-TR") === deviceName.toLocaleLowerCase("tr-TR")) {
-      toast({
-        title: "Hata",
-        description: "Bölge adı cihaz adıyla aynı olamaz.",
-        variant: "destructive",
-      });
+      notify.error("Bölge adı cihaz adıyla aynı olamaz.");
       return;
     }
 

@@ -1,3 +1,4 @@
+import { PasswordField } from "@/components/shared/PasswordField";
 import { useEffect, useState } from "react";
 import { useAction, useQuery } from "convex/react";
 import type { UseFormReturn } from "react-hook-form";
@@ -59,7 +60,7 @@ export function DeviceHikvisionSection({ form, device: initialDevice, onUpdated 
               <FormControl><SelectTrigger><SelectValue placeholder="Seçin" /></SelectTrigger></FormControl>
               <SelectContent>
                 <SelectItem value="gateway">Gateway (ISUP)</SelectItem>
-                <SelectItem value="localBridge">Yerel Bridge (LAN Windows EXE)</SelectItem>
+                <SelectItem value="localBridge">Yerel köprü (LAN)</SelectItem>
               </SelectContent>
             </Select>
             <FormMessage />
@@ -79,7 +80,7 @@ export function DeviceHikvisionSection({ form, device: initialDevice, onUpdated 
             <FormItem><FormLabel>Ehome ID (zorunlu)</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
           )} />
           <FormField control={form.control} name="ehome_key" render={({ field }) => (
-            <FormItem><FormLabel>Şifreleme Anahtarı (zorunlu)</FormLabel><FormControl><Input type="password" {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+            <FormItem><FormLabel>Şifreleme Anahtarı (zorunlu)</FormLabel><FormControl><PasswordField {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
           )} />
         </div>
         {device?.hikOfflineHint && <p className="text-sm text-destructive">{device.hikOfflineHint}</p>}
@@ -88,7 +89,7 @@ export function DeviceHikvisionSection({ form, device: initialDevice, onUpdated 
           <Button type="button" variant="destructive" size="sm" onClick={() => setRemoveOpen(true)}>Gateway bağlantısını kaldır</Button>
         </div>}
       </> : null}
-      {device && <p className="text-sm text-muted-foreground">Kapı açma, özellik tarama, kart okutma ve diğer tanılama işlemleri Cihaz Merkezi sekmesindedir. Sonuçlar bu sekmede açık kalır.</p>}
+      {device && <p className="text-sm text-muted-foreground">Kapı açma, özellik tarama, kart okutma ve diğer tanılama işlemleri Genel bakış sekmesindedir.</p>}
     </div>
   );
 }

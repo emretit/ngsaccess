@@ -5,7 +5,8 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { RowActions } from "@/components/shared/RowActions";
+import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Device } from "@/types/device";
 import { Edit2, Trash2, MapPin, QrCode, Undo2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -32,7 +33,6 @@ interface DeviceTableRowProps {
 
 export function DeviceTableRow({
   device,
-  rowIndex,
   zoneName,
   showProject,
   projectName,
@@ -47,99 +47,41 @@ export function DeviceTableRow({
 }: DeviceTableRowProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [releaseOpen, setReleaseOpen] = useState(false);
-  const getStatusBadge = () => <StatusBadge tone={device.connectionStatus === "online" ? "success" : "neutral"}>{device.connectionStatus === "online" ? "Çevrimiçi" : device.connectionStatus === "never" ? "Henüz bağlanmadı" : "Çevrimdışı"}</StatusBadge>;
+  const getStatusBadge = () => <StatusBadge className="max-w-full gap-1 px-1.5 whitespace-normal text-left md:whitespace-nowrap" tone={device.connectionStatus === "online" ? "success" : "neutral"}>{device.connectionStatus === "online" ? "Çevrimiçi" : device.connectionStatus === "never" ? "Henüz bağlanmadı" : "Çevrimdışı"}</StatusBadge>;
 
   const deviceId = String(device._id ?? "");
 
   return (
-    <TableRow 
-      className="cursor-pointer hover:bg-muted/50"
-      onClick={(e) => {
-        if ((e.target as HTMLElement).closest('button, input[type="checkbox"]')) return;
-        onEditDevice(device);
-      }}
-    >
-      <TableCell onClick={(e) => e.stopPropagation()}>
+    <TableRow data-state={selected ? "selected" : undefined}>
+      <TableCell className="px-2 py-0 md:px-3" onClick={(e) => e.stopPropagation()}>
         <Checkbox
           aria-label={`${deviceDisplayName(device)} cihazını seç`}
           checked={selected}
           onCheckedChange={(checked) => onSelect(checked === true, device._id)}
         />
       </TableCell>
-      <TableCell className="font-medium text-muted-foreground">{rowIndex ?? '-'}</TableCell>
       {showProject && (
-        <TableCell>
+        <TableCell className="hidden lg:table-cell">
           {projectName ? <Badge variant="secondary">{projectName}</Badge> : <span className="text-muted-foreground">—</span>}
         </TableCell>
       )}
-      <TableCell className="font-medium"><button type="button" onClick={() => onEditDevice(device)} className="text-left rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{deviceDisplayName(device)}</button></TableCell>
-      <TableCell>
-        {device.brand === "ide_smart"
-          ? device.ideUuid || "-"
-          : device.deviceSerial || "-"}
-      </TableCell>
-      <TableCell><span>{deviceModel(device)}</span>{device.deviceType && <span className="block text-xs text-muted-foreground">{device.deviceType}</span>}</TableCell>
-      {!hideLocation && (
-        <>
-          <TableCell>{zoneName || '-'}</TableCell>
-        </>
-      )}
-      <TableCell>{getStatusBadge()}</TableCell>
-      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-end gap-1">
-          {onQRClick && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onQRClick(device)}
-              className="h-8 w-8"
-              disabled={!(device.deviceSerial?.trim() || device.ideUuid?.trim())}
-              aria-label="Cihaz kimlik QR kodunu göster"
-              title="Cihaz kimlik etiketi — geçiş yetkisi sağlamaz"
-            >
-              <QrCode className="h-4 w-4" />
-            </Button>
-          )}
-          {!hideLocation && onAssignLocation && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onAssignLocation(device)}
-              className="h-8 w-8"
-              title="Konum Ata"
-              aria-label={`${deviceDisplayName(device)} cihazına konum ata`}
-            >
-              <MapPin className="h-4 w-4" />
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onEditDevice(device)}
-            className="h-8 w-8"
-            title="Düzenle"
-            aria-label={`${deviceDisplayName(device)} cihazını düzenle`}
-          >
-            <Edit2 className="h-4 w-4" />
-          </Button>
-          {onReleaseDevice && device.brand === "ide_smart" && (
-            <>
-              <Button variant="ghost" size="icon" aria-label="Havuza geri al" onClick={() => setReleaseOpen(true)}><Undo2 className="h-4 w-4" /></Button>
-              <ConfirmDestructive open={releaseOpen} onOpenChange={setReleaseOpen} title="Havuza geri al" objectName={device.name}
-                effects={["Cihazın kapıları, okuyucuları ve erişim bağlantıları silinir.", "Kart okuma geçmişi korunur; cihaz başka projeye atanabilir."]}
-                confirmLabel="Havuza al" onConfirm={async () => { await onReleaseDevice(device); }} />
-            </>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={(event) => { event.stopPropagation(); setDeleteDialogOpen(true); }}
-            className="h-8 w-8 text-destructive hover:text-destructive"
-            title="Sil"
-            aria-label={`${deviceDisplayName(device)} cihazını sil`}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+      <TableCell className="min-w-0 overflow-hidden whitespace-normal break-words px-2 md:px-4 font-medium"><button type="button" onClick={() => onEditDevice(device)} title={deviceDisplayName(device)} className="min-h-11 md:min-h-0 max-w-full break-words text-left md:block md:truncate md:whitespace-nowrap rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{deviceDisplayName(device)}</button></TableCell>
+      <TableCell title={deviceModel(device)} className="hidden md:table-cell truncate whitespace-nowrap"><span>{deviceModel(device) || "Belirtilmedi"}</span></TableCell>
+      <TableCell title={device.ideUuid || device.deviceSerial} className="hidden xl:table-cell tabular-nums truncate whitespace-nowrap">{device.brand === "ide_smart" ? device.ideUuid || "—" : device.deviceSerial || "—"}</TableCell>
+      {!hideLocation && <TableCell title={zoneName} className="hidden lg:table-cell truncate whitespace-nowrap">{zoneName || "—"}</TableCell>}
+      <TableCell className="px-1 whitespace-normal [&_span]:whitespace-normal">{getStatusBadge()}</TableCell>
+      <TableCell className="px-0 py-0 text-right md:px-1" onClick={(e) => e.stopPropagation()}>
+        <RowActions label={`${deviceDisplayName(device)} işlemleri`}>
+          <DropdownMenuItem onSelect={() => onEditDevice(device)}><Edit2 className="mr-2 h-4 w-4" />Ayrıntıyı görüntüle</DropdownMenuItem>
+          {onQRClick && <DropdownMenuItem disabled={!(device.deviceSerial?.trim() || device.ideUuid?.trim())} onSelect={() => onQRClick(device)}><QrCode className="mr-2 h-4 w-4" />Kimlik QR kodu</DropdownMenuItem>}
+          {!hideLocation && onAssignLocation && <DropdownMenuItem onSelect={() => onAssignLocation(device)}><MapPin className="mr-2 h-4 w-4" />Konum ata</DropdownMenuItem>}
+          {onReleaseDevice && device.brand === "ide_smart" && <DropdownMenuItem onSelect={() => setReleaseOpen(true)}><Undo2 className="mr-2 h-4 w-4" />Havuza geri al</DropdownMenuItem>}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="text-destructive" onSelect={() => setDeleteDialogOpen(true)}><Trash2 className="mr-2 h-4 w-4" />Cihazı sil</DropdownMenuItem>
+        </RowActions>
+        {onReleaseDevice && <ConfirmDestructive open={releaseOpen} onOpenChange={setReleaseOpen} title="Havuza geri al" objectName={device.name}
+          effects={["Cihazın kapıları, okuyucuları ve erişim bağlantıları silinir.", "Kart okuma geçmişi korunur; cihaz başka projeye atanabilir."]}
+          confirmLabel="Havuza al" onConfirm={async () => { await onReleaseDevice(device); }} />}
           <DeviceDeleteDialog
             isOpen={deleteDialogOpen}
             onOpenChange={setDeleteDialogOpen}
@@ -147,7 +89,6 @@ export function DeviceTableRow({
             deviceName={device.name ?? device.deviceSerial ?? "Bu cihaz"}
             onConfirm={() => onDeleteDevice(deviceId)}
           />
-        </div>
       </TableCell>
     </TableRow>
   );

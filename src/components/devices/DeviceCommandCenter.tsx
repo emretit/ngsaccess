@@ -15,11 +15,11 @@ import {
   Settings2,
   ShieldAlert,
   SlidersHorizontal,
-  Wifi,
-  WifiOff,
 } from "lucide-react";
 import { deviceConnection, commandResultMessage, capabilityLabel } from "@/lib/deviceStatus";
-import { toast } from "sonner";
+import { notify } from "@/lib/notify";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -60,15 +60,16 @@ type BrandAdapter = {
 };
 
 interface DeviceCommandCenterProps {
+  onPendingChange?: (pending: boolean) => void;
   device: ServerDevice;
   onUpdated?: () => void;
 }
 
 function formatDateTime(value: string | number | undefined): string {
-  if (value === undefined) return "-";
+  if (value === undefined) return "Henüz sinyal alınmadı";
   const date = typeof value === "number" ? new Date(value) : new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString("tr-TR");
+  if (Number.isNaN(date.getTime())) return "Henüz sinyal alınmadı";
+  return `${date.toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })} (TR)`;
 }
 
 function formatDirection(value: string | undefined): string {
@@ -128,7 +129,7 @@ function getAdapter(device: ServerDevice, hasIdeDoor: boolean): BrandAdapter {
     const canGatewayCommand = isGateway && hasGatewayDevice;
     return {
       label: "Hikvision",
-      transport: device.hikTransport === "localBridge" ? "Yerel Bridge" : "Gateway",
+      transport: device.hikTransport === "localBridge" ? "Yerel köprü" : "Gateway",
       supported: {
         capabilities: canGatewayCommand,
         workStatus: canGatewayCommand,
@@ -139,9 +140,9 @@ function getAdapter(device: ServerDevice, hasIdeDoor: boolean): BrandAdapter {
         triggerSync: false,
       },
       unsupportedReasons: [
-        canGatewayCommand ? "" : "Gateway aksiyonları için cihazın gateway kaydı gerekir.",
+        canGatewayCommand ? "" : "Gateway işlemleri için cihazın gateway kaydı gerekir.",
         device.hikTransport === "localBridge"
-          ? "Okuyucu cfg ve capability taraması localBridge transport'ta kapalıdır."
+          ? "Yerel köprü bağlantısında okuyucu ayarları ve özellik taraması desteklenmiyor."
           : "",
       ].filter((item) => item.length > 0),
     };
@@ -150,7 +151,7 @@ function getAdapter(device: ServerDevice, hasIdeDoor: boolean): BrandAdapter {
   if (brand === "ide_smart") {
     return {
       label: "IDE Smart",
-      transport: "MQTT Bridge",
+      transport: "MQTT köprüsü",
       supported: {
         capabilities: false,
         workStatus: false,
@@ -183,7 +184,7 @@ function getAdapter(device: ServerDevice, hasIdeDoor: boolean): BrandAdapter {
   };
 }
 
-export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterProps) {
+export function DeviceCommandCenter({ device, onUpdated, onPendingChange }: DeviceCommandCenterProps) {
   const [clock, setClock] = useState(() => Date.now());
   useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 15000); return () => window.clearInterval(timer); }, []);
   const overview = useQuery(api.deviceCenter.getOverview, { deviceId: device._id });
@@ -215,11 +216,12 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
         await recordOperation({ deviceId: device._id, label: `${label}: ${result.queued ? "sıraya alındı" : result.ok ? "sonuç alındı" : "başarısız"}`, ok: result.ok, rawData: stringifyUnknown(result) });
       } catch (error: unknown) { console.warn("Operation audit kaydı yazılamadı", error); }
       if (!result.ok) throw new Error(result.error ?? "İşlem başarısız");
-      toast.success(commandResultMessage(result));
+      notify.success(result.queued ? "Komut sıraya alındı; cihaz onayı bekleniyor." : commandResultMessage(result));
       onSuccess?.(result);
       onUpdated?.();
     } finally { setBusy(null); }
   });
+  useEffect(() => { onPendingChange?.(pending); }, [pending, onPendingChange]);
   const runImmediate = (id: string, label: string, run: () => Promise<OperationResult>, onSuccess?: (result: OperationResult) => void) => execute(id, label, run, onSuccess);
   const runConfirmed = async () => {
     if (!pendingAction) return;
@@ -227,14 +229,7 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
   };
 
   if (overview === undefined) {
-    return (
-      <div className="flex min-h-[18rem] items-center justify-center rounded-md border bg-muted/20">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Cihaz merkezi yükleniyor...
-        </div>
-      </div>
-    );
+    return <SectionSkeleton rows={5} label="Cihaz bilgileri yükleniyor" />;
   }
 
   if (overview === null) {
@@ -245,7 +240,8 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
     );
   }
 
-  const connected = deviceConnection(overview.device, clock) === "online";
+  const connection = deviceConnection(overview.device, clock);
+  const connected = connection === "online";
   const hasIdeDoor = overview.doors.some((door) => typeof door.ioId === "number");
   const adapter = getAdapter(overview.device, hasIdeDoor);
   const queueRows: { label: string; value: number }[] =
@@ -322,16 +318,16 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
     );
 
   const handleFetchReaderCfg = (readerId: Id<"readers">) =>
-    runImmediate("readerCfg", "Okuyucu cfg oku", async () => {
+    runImmediate("readerCfg", "Okuyucu ayarlarını oku", async () => {
       const result = await fetchReaderCfg({ readerId });
       return result.ok
         ? { ok: true }
-        : { ok: false, error: result.error ?? "Okuyucu cfg alınamadı" };
+        : { ok: false, error: result.error ?? "Okuyucu ayarları alınamadı" };
     });
 
   const handleOpenDoor = (doorId: Id<"doors">, doorNo: number | undefined, doorName: string) => {
     if (device.brand !== "ide_smart" && (doorNo === undefined || !Number.isInteger(doorNo) || doorNo < 1)) {
-      toast.error("Kapı numarası tanımlı veya geçerli değil. Kapı eşlemesini düzeltip tekrar deneyin.");
+      notify.error("Kapı numarası tanımlı veya geçerli değil. Kapı eşlemesini düzeltip tekrar deneyin.");
       return;
     }
     makeConfirmed({
@@ -380,47 +376,52 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
         const result = await triggerIdeSync({ deviceId: device._id });
         return result.ok
           ? { ok: true, queued: true }
-          : { ok: false, error: result.error ?? "Sync kuyruğa alınamadı" };
+          : { ok: false, error: result.error ?? "Senkron komutu kuyruğa alınamadı" };
       },
     });
   };
 
   return (
-    <div className="space-y-4">
-      <section className="rounded-md border bg-background p-4">
+    <div className="min-w-0 divide-y divide-line">
+      <section className="min-w-0 py-5 first:pt-0">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-base font-semibold">Cihaz Merkezi</h3>
+              <h3 className="text-base font-semibold">Bağlantı</h3>
               <Badge variant="outline">{adapter.label}</Badge>
               <Badge variant="secondary">{adapter.transport}</Badge>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="break-all text-sm text-muted-foreground">
               {overview.device.deviceIp ?? overview.device.deviceSerial ?? overview.device.ideUuid ?? "Temel cihaz kaydı"}
             </p>
           </div>
-          <Badge variant={connected ? "success" : "outline"} className="gap-1">
-            {connected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-            {connected ? "Online" : "Offline / belirsiz"}
-          </Badge>
+          <StatusBadge tone={connected ? "success" : "neutral"}>
+            {connected ? "Çevrimiçi" : connection === "never" ? "Henüz bağlanmadı" : "Çevrimdışı"}
+          </StatusBadge>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Metric label="Kapı" value={String(overview.doors.length)} />
-          <Metric label="Okuyucu" value={String(overview.readers.length)} />
-          <Metric label="Son sinyal" value={formatDateTime(overview.device.lastSeen ?? overview.device.hikLastSeenAt)} />
-          <Metric label="Model" value={overview.device.hikModel ?? overview.device.ideUuid ?? "-"} />
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-2">
+          <Metric label="Son sinyal" value={formatDateTime(overview.device.brand === "hikvision" && overview.device.hikTransport !== "localBridge" ? overview.device.hikLastSeenAt ?? overview.device.lastSeen : overview.device.lastSeen)} />
+          <Metric label="Kapı / okuyucu" value={`${overview.doors.length} / ${overview.readers.length}`} />
+          <Metric label="Model" value={overview.device.hikModel ?? "Belirtilmedi"} />
+          <div className="flex min-w-0 items-start gap-2"><div className="min-w-0 flex-1"><Metric label="Kimlik" value={overview.device.ideUuid ?? overview.device.deviceSerial ?? "Belirtilmedi"} /></div><Button variant="ghost" size="sm" aria-label="Cihaz kimliğini kopyala" disabled={!(overview.device.ideUuid || overview.device.deviceSerial)} onClick={async () => {
+            const identity = overview.device.ideUuid || overview.device.deviceSerial;
+            if (!identity) return;
+            try { await navigator.clipboard.writeText(identity); notify.success("Cihaz kimliği kopyalandı"); }
+            catch (error: unknown) { notify.error("Cihaz kimliği kopyalanamadı", error); }
+          }}>Kopyala</Button></div>
         </div>
       </section>
 
-      <section className="rounded-md border bg-background p-4">
+      <section className="min-w-0 py-5 first:pt-0">
         <div className="mb-3 flex items-center gap-2">
           <Activity className="h-4 w-4 text-muted-foreground" />
-          <h4 className="text-sm font-semibold">Tanılama</h4>
+          <h4 className="text-sm font-semibold">İşlemler</h4>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-md border bg-muted/20 p-3">
-            <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">Kuyruk</div>
+        <div>
+          <div className="min-w-0 border-b border-line py-3">
+            <p className="mb-2 text-xs text-muted-foreground">Yalnız yüklenen kuyruk kayıtları. Tamamlanan işlemler fiziksel kapı açılışını doğrulamaz.</p>
+            <p role="status" className="mb-2 text-sm">{queueRows.filter(row => row.label === "Bekleyen" || row.label === "Gönderildi" || row.label === "İşleniyor").reduce((total, row) => total + row.value, 0)} işlem bekliyor · {queueRows.find(row => row.label === "Hatalı")?.value ?? 0} işlem başarısız</p>
             <div className="grid grid-cols-2 gap-2">
               {queueRows.map((row) => (
                 <Metric key={row.label} label={row.label} value={String(row.value)} compact />
@@ -428,64 +429,19 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
             </div>
           </div>
 
-          <div className="rounded-md border bg-muted/20 p-3">
-            <div className="mb-2 text-xs font-medium uppercase text-muted-foreground">Capability Snapshot</div>
-            {overview.capabilities ? (
-              <div className="space-y-2 text-sm">
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="success">{overview.capabilities.supported} destekli</Badge>
-                  <Badge variant="outline">{overview.capabilities.unsupported} yok</Badge>
-                  <Badge variant="warning">{overview.capabilities.failed} hata</Badge>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Son tarama: {formatDateTime(overview.capabilities.updatedAt)}
-                  <details className="mt-2"><summary>Tüm özellikler ve sorgu sonuçları</summary><ul className="space-y-1">{overview.capabilities.probes.map((probe) => <li key={probe.key}>{probe.label}: {capabilityLabel(probe)}{!probe.ok && probe.error ? ` — ${probe.error}` : ""}</li>)}</ul></details>
-                </div>
-              </div>
-            ) : (
-              <div className="text-sm text-muted-foreground">Snapshot yok.</div>
-            )}
-          </div>
         </div>
       </section>
 
-      <section className="rounded-md border bg-background p-4">
-        <div className="mb-3 flex items-center gap-2">
-          <History className="h-4 w-4 text-muted-foreground" />
-          <h4 className="text-sm font-semibold">Son Cihaz Olayları</h4>
-        </div>
-        {overview.recentEvents.length === 0 ? (
-          <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">Kayıt yok.</div>
-        ) : (
-          <div className="space-y-2">
-            {overview.recentEvents.map((event) => (
-              <div key={event._id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 p-3">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{event.label}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatDateTime(event.eventTime)}
-                    {event.cardNo ? ` · Kart ${event.cardNo}` : ""}
-                  </div>
-                </div>
-                <Badge variant={eventVariant(event.category, event.severity)}>
-                  {eventCategoryLabel(event.category)}
-                </Badge>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="rounded-md border bg-background p-4">
+      <section className="min-w-0 py-5 first:pt-0">
         <div className="mb-3 flex items-center gap-2">
           <DoorOpen className="h-4 w-4 text-muted-foreground" />
-          <h4 className="text-sm font-semibold">Kapılar & Okuyucular</h4>
+          <h4 className="text-sm font-semibold">Kapılar ve okuyucular</h4>
         </div>
         <div className="space-y-3">
           {overview.doors.map((door) => {
             const doorReaders = overview.readers.filter((reader) => reader.doorId === door._id);
             return (
-              <div key={door._id} className="rounded-md border bg-muted/20 p-3">
+              <div key={door._id} className="min-w-0 border-b border-line py-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
                     <div className="font-medium">{door.name}</div>
@@ -550,14 +506,60 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
         </div>
       </section>
 
-      <section className="rounded-md border bg-background p-4">
+      <details className="min-w-0 py-5"><summary className="cursor-pointer text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring">Teknik ayrıntı</summary>
+          <div className="min-w-0 border-b border-line py-3">
+            <div className="mb-2 text-xs font-medium text-muted-foreground">Cihaz özellikleri</div>
+            {overview.capabilities ? (
+              <div className="space-y-2 text-sm">
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="success">{overview.capabilities.supported} destekli</Badge>
+                  <Badge variant="outline">{overview.capabilities.unsupported} yok</Badge>
+                  <Badge variant="warning">{overview.capabilities.failed} hata</Badge>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Son tarama: {formatDateTime(overview.capabilities.updatedAt)}
+                  <details className="mt-2"><summary>Tüm özellikler ve sorgu sonuçları</summary><ul className="space-y-1">{overview.capabilities.probes.map((probe) => <li key={probe.key}>{probe.label}: {capabilityLabel(probe)}{!probe.ok && probe.error ? ` — ${probe.error}` : ""}</li>)}</ul></details>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">Henüz özellik taraması yapılmadı.</div>
+            )}
+          </div>
+      <section className="min-w-0 py-5 first:pt-0">
+        <div className="mb-3 flex items-center gap-2">
+          <History className="h-4 w-4 text-muted-foreground" />
+          <h4 className="text-sm font-semibold">Son Cihaz Olayları</h4>
+        </div>
+        {overview.recentEvents.length === 0 ? (
+          <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">Kayıt yok.</div>
+        ) : (
+          <div className="space-y-2">
+            {overview.recentEvents.map((event) => (
+              <div key={event._id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 p-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium">{event.label}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {formatDateTime(event.eventTime)}
+                    {event.cardNo ? ` · Kart ${event.cardNo}` : ""}
+                  </div>
+                </div>
+                <Badge variant={eventVariant(event.category, event.severity)}>
+                  {eventCategoryLabel(event.category)}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="min-w-0 py-5 first:pt-0">
         <div className="mb-3 flex items-center gap-2">
           <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-          <h4 className="text-sm font-semibold">Aksiyonlar</h4>
+          <h4 className="text-sm font-semibold">Cihaz işlemleri</h4>
         </div>
         <div className="flex flex-wrap gap-2">
           <ActionButton busy={busy === "capabilities"} disabled={!adapter.supported.capabilities || busy !== null} icon={<ScanLine className="h-4 w-4" />} onClick={handleFetchCapabilities}>
-            Özellikleri Tara
+            Özellikleri tara
           </ActionButton>
           <ActionButton busy={busy === "workStatus"} disabled={!adapter.supported.workStatus || busy !== null} icon={<Activity className="h-4 w-4" />} onClick={handleFetchWorkStatus}>
             Çalışma Durumu
@@ -572,7 +574,7 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
             Kart Okut
           </ActionButton>
           <ActionButton busy={busy === "triggerIdeSync"} disabled={!adapter.supported.triggerSync || busy !== null} icon={<RefreshCw className="h-4 w-4" />} onClick={handleTriggerIdeSync}>
-            IDE Sync
+            Panel senkronu
           </ActionButton>
           <ActionButton busy={busy === "reboot"} disabled={!adapter.supported.reboot || busy !== null} icon={<RotateCw className="h-4 w-4" />} onClick={handleReboot}>
             Yeniden Başlat
@@ -582,12 +584,12 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
         {(adapter.unsupportedReasons.length > 0 || capturedCard || reconcileSummary) && (
           <div className="mt-3 space-y-2 text-sm">
             {capturedCard && (
-              <div className="rounded-md border bg-muted/20 p-2">
+              <div className="min-w-0 py-2">
                 Okunan kart: <span className="font-mono">{capturedCard}</span>
               </div>
             )}
             {reconcileSummary && (
-              <div className="rounded-md border bg-muted/20 p-2">Son eşitlik: {reconcileSummary}</div>
+              <div className="min-w-0 py-2">Son eşitlik: {reconcileSummary}</div>
             )}
             {adapter.unsupportedReasons.map((reason) => (
               <div key={reason} className="flex items-start gap-2 rounded-md border border-dashed p-2 text-muted-foreground">
@@ -599,27 +601,28 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
         )}
       </section>
 
-      <section className="rounded-md border bg-background p-4">
+      <section className="min-w-0 py-5 first:pt-0">
         <div className="mb-3 flex items-center gap-2">
           <ShieldAlert className="h-4 w-4 text-muted-foreground" />
-          <h4 className="text-sm font-semibold">Gelişmiş Politikalar</h4>
+          <h4 className="text-sm font-semibold">Gelişmiş politikalar</h4>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" size="sm" disabled>
             Anti-passback
           </Button>
           <Button type="button" variant="outline" size="sm" disabled>
-            Holiday Plan
+            Tatil planı
           </Button>
           <Button type="button" variant="outline" size="sm" disabled>
-            Plan Uygula
+            Plan uygula
           </Button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Capability destek kontrolü ve onaylı write akışı hazırlandıkça bu işlemler açılacak.
+          Destek kontrolü ve onaylı kaydetme akışı hazırlandıkça bu işlemler açılacak.
         </p>
       </section>
 
+      </details>
       <AlertDialog open={pendingAction !== null} onOpenChange={(open) => { if (!open && !pending) setPendingAction(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -638,9 +641,9 @@ export function DeviceCommandCenter({ device, onUpdated }: DeviceCommandCenterPr
 
 function Metric({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
   return (
-    <div className="rounded-md border bg-muted/20 p-2">
+    <div className="min-w-0 py-2">
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={compact ? "text-sm font-semibold" : "truncate text-sm font-semibold"}>{value}</div>
+      <div className={compact ? "text-sm font-semibold tabular-nums" : "break-all text-sm font-medium tabular-nums"}>{value}</div>
     </div>
   );
 }

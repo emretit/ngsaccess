@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 
 import { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
@@ -14,9 +16,12 @@ import { DeviceHikvisionSection } from "./form-sections/DeviceHikvisionSection";
 import { DeviceIdeSmartSection } from "./form-sections/DeviceIdeSmartSection";
 import { DeviceNameSection } from "./form-sections/DeviceNameSection";
 import { DeviceZoneSection } from "./form-sections/DeviceZoneSection";
+import { BRAND_LABELS } from "./hooks/useDeviceFormSchema";
+import { getHikModelSpec } from "../../../convex/lib/hikModels";
 import type { DeviceBrand } from "./hooks/useDeviceFormSchema";
 
 interface DeviceFormProps {
+  onStateChange?: (brand: DeviceBrand, dirty: boolean, pending: boolean) => void;
   open: boolean;
   onClose: () => void;
   device?: (ServerDevice & { _id?: Id<"devices"> }) | null;
@@ -32,9 +37,10 @@ interface DeviceFormProps {
 
 export function DeviceForm({
   open,
+  onStateChange,
   onClose,
   device,
-  projects: _projects,
+  projects,
   defaultBrand,
   onBack,
   onSuccess,
@@ -49,10 +55,22 @@ export function DeviceForm({
     doors,
     locationLoading,
     selectedZoneId,
+    currentProjectId,
     filteredDoors: _filteredDoors,
     onSubmit,
   } = useDeviceFormLogic({ device, defaultBrand, onSuccess, projectIdOverride, adminMode });
 
+  const formElement = useRef<HTMLFormElement>(null);
+  const focusFirstError = () => {
+    const control = formElement.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
+    control?.closest("details")?.setAttribute("open", "");
+    control?.focus();
+  };
+  const dirty = form.formState.isDirty;
+  const guard = useUnsavedChangesGuard(!onStateChange && dirty);
+  const formBrand = defaultBrand ?? device?.brand ?? "other";
+  useEffect(() => { onStateChange?.(formBrand, dirty, isLoading); }, [onStateChange, formBrand, dirty, isLoading]);
+  const close = () => { if (!isLoading) { if (onStateChange) onClose(); else guard.requestClose(onClose); } };
   if (!open) return null;
 
   // Zone/door ID mapping for form components (expect .id; Convex uses _id)
@@ -68,7 +86,13 @@ export function DeviceForm({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit as never)} className="space-y-4">
+      <form ref={formElement} onSubmit={event => { void form.handleSubmit(onSubmit, () => requestAnimationFrame(focusFirstError))(event); }} className="min-w-0 space-y-4" noValidate aria-busy={isLoading}>
+        <p className="text-sm text-muted-foreground">Proje: {projects.find(project => project._id === currentProjectId)?.name ?? "Seçili proje"}</p>
+        {Object.keys(form.formState.errors).length > 0 && <div role="alert" className="rounded-md border border-danger p-3 text-sm">
+          <p className="font-medium">Kaydedilemedi. İşaretli alanları kontrol edin.</p>
+          <ul className="mt-1 list-disc pl-4">{Object.entries(form.formState.errors).map(([key, error]) => error && typeof error.message === "string" ? <li key={key}>{error.message}</li> : null)}</ul>
+          <button type="button" className="mt-2 underline focus-visible:ring-2 focus-visible:ring-ring" onClick={focusFirstError}>İlk hatalı alana git</button>
+        </div>}
         <fieldset disabled={isLoading || !!connectionError} className="space-y-4">
         {adminMode ? (
           // Admin: yalnız bağlantı kimliği. İsim seri/UUID'den türetilir; bölge,
@@ -103,7 +127,7 @@ export function DeviceForm({
             <DeviceStatusSection form={form} />
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-4">
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-4">
               <DeviceBasicSection form={form} isEdit={!!device} />
               {brand !== "hikvision" && <DeviceNetworkSection form={form} />}
@@ -155,16 +179,22 @@ export function DeviceForm({
 
         </fieldset>
         {connectionError && <p role="alert" className="text-sm text-destructive">{connectionError}</p>}
+        {!device && <section className="space-y-1 border-t border-line pt-4 text-sm" aria-label="Kayıt özeti">
+          <h3 className="font-medium">Kaydetmeden önce gözden geçirin</h3>
+          <p className="break-words">{form.watch("name") || "Cihaz adı girilmedi"} · {BRAND_LABELS[brand]}</p>
+          <p className="break-words text-muted-foreground">{selectedZoneId === "__new__" ? `Yeni bölge: ${form.watch("new_zone_name") || "Ad girilmedi"}` : zones.find(zone => zone._id === selectedZoneId)?.name ?? "Bölge seçilmedi"}</p>
+          <p className="text-muted-foreground">{brand === "hikvision" && getHikModelSpec(form.watch("hik_model")) ? `${getHikModelSpec(form.watch("hik_model"))?.doorCount} kapı · ${(getHikModelSpec(form.watch("hik_model"))?.doorCount ?? 0) * (getHikModelSpec(form.watch("hik_model"))?.defaultReadersPerDoor ?? 0)} okuyucu oluşturulacak.` : `${brand === "ide_smart" ? form.watch("ide_door_count") ?? 4 : brand === "hikvision" ? form.watch("hik_door_count") ?? 4 : form.watch("door_count") ?? 1} kapı oluşturulacak.`}</p>
+        </section>}
         {device && <p className="text-sm text-muted-foreground">Model ve kapı sayısı mevcut kapı/okuyucu yapısını değiştirmez. Topoloji düzenleme bu ekranda desteklenmiyor.</p>}
-        <div className="flex justify-between gap-2 pt-4 border-t">
+        <div className="sticky bottom-0 flex flex-wrap justify-between gap-2 border-t border-line bg-surface py-4">
           {onBack && !device ? (
             <Button
               type="button"
               variant="ghost"
               onClick={onBack}
-              disabled={isLoading}
+              disabled={isLoading || !!connectionError}
             >
-              ← Marka Seç
+              Marka seç
             </Button>
           ) : (
             <span />
@@ -173,7 +203,7 @@ export function DeviceForm({
             <Button
               type="button"
               variant="outline"
-              onClick={onClose}
+              onClick={close}
               disabled={isLoading}
             >
               İptal
@@ -183,6 +213,7 @@ export function DeviceForm({
             </Button>
           </div>
         </div>
+        {guard.dialog}
       </form>
     </Form>
   );

@@ -18,21 +18,21 @@ interface BrandOption {
 const OPTIONS: BrandOption[] = [
   {
     value: "hikvision",
-    description: "Erişim terminali / yüz tanıma — Device Gateway (ISUP 5.0) üzerinden",
+    description: "Gateway veya yerel köprü",
     Icon: Cpu,
-    iconClass: "text-red-600",
+    iconClass: "text-muted-foreground",
   },
   {
     value: "ide_smart",
-    description: "Çok kapılı erişim paneli — bölge olarak eklenir, kapıları otomatik oluşturulur (HTTP/JSON)",
+    description: "MQTT ile bağlanan çok kapılı panel",
     Icon: LayoutGrid,
-    iconClass: "text-emerald-600",
+    iconClass: "text-muted-foreground",
   },
   {
     value: "other",
-    description: "ESP32, QR okuyucu, jenerik cihaz — HTTP push ile event gönderir",
+    description: "ESP32, QR okuyucu ve diğer cihazlar",
     Icon: Wifi,
-    iconClass: "text-blue-600",
+    iconClass: "text-muted-foreground",
   },
 ];
 
@@ -46,15 +46,15 @@ export function BrandPickerStep({ onSelect, onCancel }: BrandPickerStepProps) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-2">
         {OPTIONS.map(({ value, description, Icon, iconClass }) => (
           <button
             key={value}
             type="button"
             onClick={() => onSelect(value)}
-            className="group flex flex-col items-start gap-3 rounded-lg border bg-card p-4 text-left transition-colors hover:border-primary hover:bg-accent"
+            className="group flex items-center gap-3 rounded-md border border-line bg-surface p-4 text-left transition-colors hover:bg-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <Icon className={`w-8 h-8 ${iconClass}`} />
+            <Icon className={`w-5 h-5 ${iconClass}`} />
             <div>
               <div className="font-semibold">{BRAND_LABELS[value]}</div>
               <p className="text-xs text-muted-foreground mt-1 leading-relaxed">

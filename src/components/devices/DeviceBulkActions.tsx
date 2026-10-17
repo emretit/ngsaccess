@@ -1,24 +1,5 @@
-
 import { Button } from "@/components/ui/button";
-
-interface DeviceBulkActionsProps {
-  selectedCount: number;
-  onDelete: () => void;
-}
-
-export function DeviceBulkActions({
-  selectedCount,
-  onDelete
-}: DeviceBulkActionsProps) {
-  return (
-    <div className="flex flex-wrap items-center gap-4 p-4 bg-muted rounded-lg">
-      <span className="text-sm font-medium">{selectedCount} cihaz seçildi</span>
-      <Button
-        variant="destructive"
-        onClick={onDelete}
-      >
-        Seçilenleri Sil
-      </Button>
-    </div>
-  );
+import { BulkBar } from "@/components/shared/BulkBar";
+export function DeviceBulkActions({ selectedCount, onDelete, onClear }: { selectedCount: number; onDelete: () => void; onClear: () => void }) {
+  return <BulkBar count={selectedCount} onClear={onClear}><Button variant="destructive" size="sm" onClick={onDelete}>Seçilenleri sil</Button></BulkBar>;
 }

@@ -1,3 +1,4 @@
+import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "convex/react";
 import { ArrowRightLeft } from "lucide-react";
@@ -77,13 +78,16 @@ export function MoveReaderDialog({
     setTargetDoorId(selected?.id ?? "");
   };
 
+  const guard = useUnsavedChangesGuard(open && (targetDoorId !== "" || direction !== currentDirection));
+  const close = () => { if (!isSubmitting) guard.requestClose(() => onOpenChange(false)); };
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (await move()) onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!isSubmitting) onOpenChange(next); }}>
+    <>
+    <Dialog open={open} onOpenChange={next => { if (!next) close(); }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -98,6 +102,7 @@ export function MoveReaderDialog({
             <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">{readerName}</div>
           </div>
 
+          {conflict && <p role="alert" className="text-sm text-destructive">Taşıma yapılamaz. Hedef kapıda bu yön dolu.</p>}
           <FormFieldWrapper htmlFor="targetDoor" label="Hedef kapı">
             {control => <Select disabled={isSubmitting} value={targetDoorId} onValueChange={handleTargetChange}>
               <SelectTrigger {...control}>
@@ -130,7 +135,7 @@ export function MoveReaderDialog({
           </FormFieldWrapper>
           <p className="text-sm text-muted-foreground">Yön: {currentDirection === "entry" ? "Giriş" : currentDirection === "exit" ? "Çıkış" : "Giriş/Çıkış"} → {direction === "entry" ? "Giriş" : direction === "exit" ? "Çıkış" : "Giriş/Çıkış"}</p>
           <DialogFooter>
-            <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" disabled={isSubmitting} onClick={close}>
               İptal
             </Button>
             <Button type="submit" disabled={isSubmitting || !targetDoorId || conflict}>
@@ -140,5 +145,7 @@ export function MoveReaderDialog({
         </form>
       </DialogContent>
     </Dialog>
+    {guard.dialog}
+    </>
   );
 }

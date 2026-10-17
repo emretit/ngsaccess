@@ -1,3 +1,7 @@
+import { RowActions } from "@/components/shared/RowActions";
+import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
@@ -6,11 +10,10 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { getHikModelSpec } from "../../../convex/lib/hikModels";
 
-import { ArrowRightLeft, ChevronRight, Building2, Cpu, HardDrive, Plus, Trash2, DoorClosed, DoorOpen, Loader2, ScanLine, Settings2 } from "lucide-react";
+import { ArrowRightLeft, ChevronRight, Building2, Plus, Trash2, DoorClosed, DoorOpen, Loader2, ScanLine, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { deviceDisplayName } from "@/lib/deviceDisplay";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { AddDoorDialog } from "./AddDoorDialog";
 import { EditDoorDialog } from "./EditDoorDialog";
 import { AddReaderDialog } from "./AddReaderDialog";
@@ -96,7 +99,6 @@ export const ZoneDoorTree = ({ selectedZoneId: selectedZone, selectedDoorId: sel
   };
 
   const [expandedZones, setExpandedZones] = useState<Id<"zones">[]>([]);
-  const [expandedDevices, setExpandedDevices] = useState<Id<"devices">[]>([]);
   const [showAddDoorDialog, setShowAddDoorDialog] = useState(false);
   const [selectedZoneForDoor, setSelectedZoneForDoor] = useState<{ id: Id<"zones">; name: string } | null>(null);
   const [openingDoorId, setOpeningDoorId] = useState<Id<"doors"> | null>(null);
@@ -125,18 +127,17 @@ export const ZoneDoorTree = ({ selectedZoneId: selectedZone, selectedDoorId: sel
     device: DeviceNode | undefined;
   } | null>(null);
 
-  const handleOpenIdeDoor = async (deviceId: Id<"devices">, doorId: Id<"doors">) => {
-    setOpeningDoorId(doorId);
+  const [openTarget, setOpenTarget] = useState<{ deviceId: Id<"devices">; doorId: Id<"doors">; doorName: string; deviceName: string } | null>(null);
+  const { run: sendOpen, pending: opening } = useAsyncAction(async () => {
+    if (!openTarget) return;
+    setOpeningDoorId(openTarget.doorId);
     try {
-      const res = await openIdeDoor({ deviceId, doorId });
-      if (res.ok) notify.success(res.queued ? "Komut kuyruğa alındı" : "Komut panele gönderildi", "Kapının fiziksel açılışı henüz doğrulanmadı.");
-      else notify.error("Kapı açılamadı", res.error);
-    } catch (error: unknown) {
-      notify.error("Kapı açılamadı", error);
-    } finally {
-      setOpeningDoorId(null);
-    }
-  };
+      const result = await openIdeDoor({ deviceId: openTarget.deviceId, doorId: openTarget.doorId });
+      if (!result.ok) throw new Error(result.error ?? "Komut gönderilemedi");
+      notify.success(result.queued ? "Komut sıraya alındı; cihaz onayı bekleniyor." : "Komut panele gönderildi", "Kapının fiziksel açılışı henüz doğrulanmadı.");
+      setOpenTarget(null);
+    } finally { setOpeningDoorId(null); }
+  }, { error: "Kapı komutu gönderilemedi" });
 
   const handleFetchHikReaderCfg = async (readerId: Id<"readers">) => {
     setFetchingReaderCfgId(readerId);
@@ -171,8 +172,6 @@ export const ZoneDoorTree = ({ selectedZoneId: selectedZone, selectedDoorId: sel
 
   const toggleZone = (id: Id<"zones">) =>
     setExpandedZones((prev) => (prev.includes(id) ? prev.filter((z) => z !== id) : [...prev, id]));
-  const toggleDevice = (id: Id<"devices">) =>
-    setExpandedDevices((prev) => (prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]));
 
   const targetDoorsForMove = (door: DoorNode, device: DeviceNode | null) => {
     const scopeDoors = door.deviceId
@@ -233,7 +232,7 @@ export const ZoneDoorTree = ({ selectedZoneId: selectedZone, selectedDoorId: sel
         title={technicalDetails.length > 0 ? technicalDetails.join(" · ") : undefined}
       >
         <ScanLine className="h-3.5 w-3.5 shrink-0" />
-        <span className="min-w-0 flex-1 truncate">
+        <span className="min-w-0 flex-1 break-all">
           {readerLabel}
           <span className="text-muted-foreground/70"> · {dirLabel}</span>
         </span>
@@ -246,63 +245,12 @@ export const ZoneDoorTree = ({ selectedZoneId: selectedZone, selectedDoorId: sel
           {reader.lastReadAt ? lastLabel : ""}
         </span>
         <StatusBadge tone={reader.online ? "success" : "neutral"} className="text-[10px]">{reader.online ? "Çevrimiçi" : "Çevrimdışı"}</StatusBadge>
-        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 opacity-100 group-hover/reader:opacity-100 group-focus-within/reader:opacity-100"
-          aria-label={`${reader.readerName} okuyucusunu düzenle`}
-          onClick={() => setEditReader({ door, reader, isIdeDoor: panelDevice?.brand === "ide_smart" })}>
-          <Settings2 className="h-3 w-3" />
-        </Button>
-        {reader.readerId && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 shrink-0 opacity-100 transition-opacity motion-reduce:transition-none group-hover/reader:opacity-100 group-focus-within/reader:opacity-100"
-            title="Okuyucuyu Taşı"
-            aria-label={`${reader.readerName} okuyucusunu taşı`}
-            onClick={() => {
-              setMoveReader({
-                readerId: reader.readerId as Id<"readers">,
-                readerName: reader.readerName,
-                currentDoorId: door._id,
-                currentDirection: reader.readerDirection,
-                targetDoors: targetDoorsForMove(door, panelDevice),
-              });
-            }}
-          >
-            <ArrowRightLeft className="h-3 w-3" />
-          </Button>
-        )}
-        {canFetchHikCfg && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 shrink-0 opacity-100 transition-opacity motion-reduce:transition-none group-hover/reader:opacity-100 group-focus-within/reader:opacity-100 hover:bg-accent/80"
-            title="Hikvision Okuyucu Ayarlarını Oku"
-            aria-label="Hikvision Okuyucu Ayarlarını Oku"
-            disabled={fetchingCfg}
-            onClick={(event) => {
-              event.stopPropagation();
-              void handleFetchHikReaderCfg(reader.readerId as Id<"readers">);
-            }}
-          >
-            {fetchingCfg ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Settings2 className="h-3 w-3" />
-            )}
-          </Button>
-        )}
-        {reader.readerId && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 shrink-0 opacity-100 transition-opacity motion-reduce:transition-none group-hover/reader:opacity-100 group-focus-within/reader:opacity-100 hover:bg-accent/80"
-            title="Okuyucuyu Sil"
-            aria-label={`${reader.readerName} okuyucusunu sil`}
-            onClick={() => setDeleteReader({ id: reader.readerId as Id<"readers">, name: `${door.name} / ${reader.readerName ?? "Okuyucu"}` })}
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-        )}
+        <RowActions label={`${reader.readerName} okuyucu işlemleri`}>
+          <DropdownMenuItem onSelect={() => setEditReader({ door, reader, isIdeDoor: panelDevice?.brand === "ide_smart" })}><Settings2 className="mr-2 h-4 w-4" />Düzenle</DropdownMenuItem>
+          {reader.readerId && <DropdownMenuItem onSelect={() => setMoveReader({ readerId: reader.readerId as Id<"readers">, readerName: reader.readerName, currentDoorId: door._id, currentDirection: reader.readerDirection, targetDoors: targetDoorsForMove(door, panelDevice) })}><ArrowRightLeft className="mr-2 h-4 w-4" />Taşı</DropdownMenuItem>}
+          {canFetchHikCfg && <DropdownMenuItem disabled={fetchingCfg} onSelect={() => { void handleFetchHikReaderCfg(reader.readerId as Id<"readers">); }}><Settings2 className="mr-2 h-4 w-4" />{fetchingCfg ? "Ayarlar okunuyor…" : "Cihaz ayarlarını oku"}</DropdownMenuItem>}
+          {reader.readerId && <><DropdownMenuSeparator /><DropdownMenuItem className="text-destructive" onSelect={() => setDeleteReader({ id: reader.readerId as Id<"readers">, name: `${door.name} / ${reader.readerName}` })}><Trash2 className="mr-2 h-4 w-4" />Sil</DropdownMenuItem></>}
+        </RowActions>
       </div>
     );
   };
@@ -321,7 +269,7 @@ export const ZoneDoorTree = ({ selectedZoneId: selectedZone, selectedDoorId: sel
       (deviceCapacity === null || !device?._id || countReadersForDevice(device._id) < deviceCapacity);
     return (
       <>
-        {readers.length === 0 && <p className="text-xs text-muted-foreground py-1">Okuyucu atanmamış</p>}
+        {readers.length === 0 && <p className="text-xs text-muted-foreground py-1">Bu kapıya okuyucu atanmamış.</p>}
         {readers.map((reader) => renderReaderRow(door, reader, device))}
         {canCreateReader && (
           <button
@@ -363,7 +311,7 @@ export const ZoneDoorTree = ({ selectedZoneId: selectedZone, selectedDoorId: sel
           }}
         >
           <DoorClosed className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <span className="flex-1 truncate text-sm">{door.name}</span>
+          <span className="min-w-0 flex-1 break-all text-sm">{door.name}{panelDevice && <span className="mt-0.5 block text-xs font-normal text-muted-foreground">{deviceDisplayName(panelDevice)}</span>}</span>
         </button>
         <div className="flex opacity-100 transition-opacity motion-reduce:transition-none group-hover:opacity-100 group-focus-within:opacity-100 pr-1">
           <Button
@@ -383,8 +331,8 @@ export const ZoneDoorTree = ({ selectedZoneId: selectedZone, selectedDoorId: sel
               className="h-8 w-8 shrink-0 hover:bg-accent"
               title="Kapıyı Aç"
               aria-label={`${door.name} kapısını aç`}
-              disabled={openingDoorId === door._id}
-              onClick={() => void handleOpenIdeDoor(panelDeviceId, door._id)}
+              disabled={opening || openingDoorId === door._id}
+              onClick={() => setOpenTarget({ deviceId: panelDeviceId, doorId: door._id, doorName: door.name, deviceName: panelDevice ? deviceDisplayName(panelDevice) : "Cihaz" })}
             >
               {openingDoorId === door._id ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -417,12 +365,15 @@ export const ZoneDoorTree = ({ selectedZoneId: selectedZone, selectedDoorId: sel
 
   if (zones.length === 0) {
     return (
-      <EmptyState title="Bölge yok" description="Bölge ekleyerek cihaz ve kapılarınızı düzenleyin." className="py-6" />
+      <EmptyState title="Henüz bölge yok" description="Cihazları yerleştirmek için bir bölge ekleyin." className="py-6" />
     );
   }
 
   return (
     <>
+      <AlertDialog open={openTarget !== null} onOpenChange={next => { if (!next && !opening) setOpenTarget(null); }}>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Kapı komutu gönderilsin mi?</AlertDialogTitle><AlertDialogDescription>{openTarget?.deviceName} cihazındaki {openTarget?.doorName} kapısına açma komutu gönderilecek. Fiziksel açılış ayrıca doğrulanmalıdır.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={opening}>Vazgeç</AlertDialogCancel><Button disabled={opening} onClick={() => void sendOpen()}>{opening ? "Gönderiliyor…" : "Komutu gönder"}</Button></AlertDialogFooter></AlertDialogContent>
+      </AlertDialog>
       <ConfirmDestructive
         open={deleteZone !== null}
         onOpenChange={(open) => { if (!open) setDeleteZone(null); }}
@@ -462,15 +413,13 @@ export const ZoneDoorTree = ({ selectedZoneId: selectedZone, selectedDoorId: sel
         }}
       />
       <ConfirmDestructive open={deleteReader !== null} onOpenChange={(open) => { if (!open) setDeleteReader(null); }} title="Okuyucuyu sil" objectName={deleteReader?.name ?? "Okuyucu"} effects={["Okuyucunun kapı eşlemesi kaldırılır.", "Son okuyucuysa kaynak kapı okuyucusuz kalır; kart okuma geçmişi korunur."]} confirmLabel="Okuyucuyu sil" onConfirm={async () => { if (deleteReader) await handleDeleteReader(deleteReader.id); }} />
-      <ul aria-label="Bölgeler, cihazlar ve kapılar" className="space-y-0.5">
+      <ul aria-label="Bölgeler, kapılar ve okuyucular" className="space-y-0.5">
         {zones.map((zone) => {
           const isExpanded = expandedZones.includes(zone._id);
           const zoneDevices = devices.filter((d) => String(d.zoneId) === String(zone._id));
           const zoneDoorCount = doors.filter((door) => door.zoneId === zone._id).length;
           const zoneBlocked = zoneDoorCount > 0 || zoneDevices.length > 0;
-          const manualDoors = doors.filter(
-            (door) => String(door.zoneId) === String(zone._id) && !door.deviceId
-          );
+          const zoneDoors = doors.filter(door => String(door.zoneId) === String(zone._id));
 
           return (
             <li key={zone._id}>
@@ -505,91 +454,22 @@ export const ZoneDoorTree = ({ selectedZoneId: selectedZone, selectedDoorId: sel
                   }}
                 >
                   <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="flex-1 truncate text-sm">{zone.name}</span>
+                  <span className="flex-1 break-words text-sm">{zone.name}</span>
                 </button>
 
-                <div className={cn("flex items-center pr-1", !zoneBlocked && "opacity-100 transition-opacity motion-reduce:transition-none group-hover:opacity-100 group-focus-within:opacity-100")}>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 hover:bg-accent/80"
-                    title="Kapı ekle"
-                    aria-label="Kapı ekle"
-                    onClick={() => handleAddDoor(zone._id, zone.name)}
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
-                  {zoneBlocked ? (
-                    <span className="max-w-48 break-words text-xs text-muted-foreground" role="note">
-                      Önce kapıları taşıyın/silin ({zoneDoorCount} kapı)
-                      {zoneDevices.length > 0 && `; ${zoneDevices.length} cihazı da taşıyın/silin`}.
-                    </span>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 shrink-0 hover:bg-accent/80"
-                      title="Bölgeyi sil"
-                      aria-label={`${zone.name} bölgesini sil`}
-                      onClick={() => setDeleteZone(zone)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
+                <RowActions label={`${zone.name} bölge işlemleri`}>
+                  <DropdownMenuItem onSelect={() => handleAddDoor(zone._id, zone.name)}><Plus className="mr-2 h-4 w-4" />Kapı ekle</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {zoneBlocked && <DropdownMenuLabel className="max-w-64 whitespace-normal text-xs font-normal text-muted-foreground">Önce {zoneDoorCount} kapıyı ve {zoneDevices.length} cihazı taşıyın veya silin.</DropdownMenuLabel>}
+                  <DropdownMenuItem disabled={zoneBlocked} className="text-destructive" onSelect={() => setDeleteZone(zone)}><Trash2 className="mr-2 h-4 w-4" />Bölgeyi sil</DropdownMenuItem>
+                </RowActions>
               </div>
 
               <ul hidden={!isExpanded}>
-                {zoneDevices.length === 0 && manualDoors.length === 0 ? (
-                  <li className="text-xs text-muted-foreground pl-8 py-2">Cihaz/kapı yok</li>
-                ) : (
-                  <>
-                    {zoneDevices.map((device) => {
-                      const isPanel = device.brand === "ide_smart";
-                      const deviceDoors = doors.filter((door) => String(door.deviceId) === String(device._id));
-                      const devExpanded = expandedDevices.includes(device._id);
-                      return (
-                        <li key={device._id}>
-                          <div
-                            className={cn(
-                              "group flex items-center gap-1 rounded-md p-2 transition-colors motion-reduce:transition-none ml-3",
-                              "hover:bg-accent hover:text-accent-foreground"
-                            )}
-                          >
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 shrink-0 p-0 hover:bg-transparent"
-                              aria-label={`${deviceDisplayName(device)} kapılarını ${devExpanded ? "daralt" : "genişlet"}`}
-                              aria-expanded={devExpanded}
-                              onClick={() => toggleDevice(device._id)}
-                            >
-                              <ChevronRight className={cn("h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200 motion-reduce:transition-none", devExpanded && "rotate-90")} />
-                            </Button>
-                            {isPanel ? (
-                              <Cpu className="h-4 w-4 shrink-0 text-primary" />
-                            ) : (
-                              <HardDrive className="h-4 w-4 shrink-0 text-muted-foreground" />
-                            )}
-                            <span className="flex-1 truncate text-sm">{deviceDisplayName(device)}</span>
-                            <Badge variant="secondary" className="h-4 px-1 text-[10px] font-normal">
-                              {deviceDoors.length} kapı
-                            </Badge>
-                          </div>
-                          <ul hidden={!devExpanded}>
-                            {deviceDoors.length === 0 ? (
-                              <li className="text-xs text-muted-foreground pl-12 py-1.5">Kapı yok</li>
-                            ) : (
-                              deviceDoors.map((door) => renderDoor(door, isPanel ? device._id : null, device))
-                            )}
-                          </ul>
-                        </li>
-                      );
-                    })}
-
-                    {manualDoors.map((door) => renderDoor(door, null, null))}
-                  </>
-                )}
+                {zoneDoors.length === 0 ? <li className="py-2 pl-8 text-xs text-muted-foreground">Bu bölgede kapı yok.</li> : zoneDoors.map(door => {
+                  const owner = devices.find(device => device._id === door.deviceId) ?? null;
+                  return renderDoor(door, owner?.brand === "ide_smart" ? owner._id : null, owner);
+                })}
               </ul>
             </li>
           );

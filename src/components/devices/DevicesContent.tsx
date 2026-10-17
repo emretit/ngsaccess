@@ -1,5 +1,9 @@
 
-import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { DeviceSyncStatusBanner } from "@/components/sync/DeviceSyncStatusBanner";
+import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { DeviceAddMenu } from "./DeviceAddMenu";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { Device } from "@/types/device";
 import { DeviceList } from "@/components/devices/DeviceList";
 import { DeviceFilters } from "@/components/devices/DeviceFilters";
@@ -8,6 +12,9 @@ import { Zone } from "@/hooks/useZonesAndDoors";
 import { useDeviceFilters } from "@/hooks/useDeviceFilters";
 
 interface DevicesContentProps {
+  onOpenLocation?: () => void;
+  onClearLocation?: () => void;
+  locationLabel?: string;
   devices: Device[];
   isLoading: boolean;
   zones: Zone[];
@@ -28,6 +35,7 @@ interface DevicesContentProps {
 
 export function DevicesContent({
   devices,
+  onOpenLocation, onClearLocation, locationLabel,
   isLoading,
   zones,
   selectedZoneId,
@@ -41,6 +49,7 @@ export function DevicesContent({
   onReleaseDevice,
   canManage = true
 }: DevicesContentProps) {
+  const { activeProject } = useActiveProject();
   // Use the extracted filter hook
   const {
     clearFilters,
@@ -55,10 +64,17 @@ export function DevicesContent({
   } = useDeviceFilters(devices, selectedZoneId, selectedDoorId);
 
   return (
-    <div className="min-w-0 space-y-3">
-      <DeviceFilters 
+    <div className="min-w-0 space-y-5">
+      <PageHeader title="Cihazlar" scope={`${activeProject?.name ?? "Proje"} · Cihaz envanteri`}>
+        {canManage && <DeviceAddMenu onAddNew={onAddNew} onAddFromCloud={onAddFromCloud} />}
+      </PageHeader>
+      <DeviceStats devices={devices} loading={isLoading} />
+      <QuerySectionBoundary resetKey={activeProject?._id ?? "none"}><DeviceSyncStatusBanner /></QuerySectionBoundary>
+      <DeviceFilters
         onClearFilters={clearFilters}
-        locationLabel={selectedDoorId ? "Kapı filtresi etkin" : selectedZoneId ? `Bölge: ${zones.find(zone => zone._id === selectedZoneId)?.name ?? "Seçili bölge"}` : undefined}
+        locationLabel={locationLabel}
+        onOpenLocation={onOpenLocation}
+        onClearLocation={onClearLocation}
         search={search}
         onSearchChange={setSearch}
         statusFilter={statusFilter}
@@ -73,10 +89,11 @@ export function DevicesContent({
         filteredCount={filteredDevices.length}
       />
 
-      {isLoading ? <SectionSkeleton rows={2} label="Cihaz özeti yükleniyor" /> : <DeviceStats devices={filteredDevices} />}
 
-      <div className="rounded-xl border bg-card shadow-xs overflow-hidden">
-        <DeviceList 
+
+      <div className="min-w-0">
+        <DeviceList
+          filterKey={`${activeProject?._id}:${search}:${statusFilter}:${typeFilter}:${selectedZoneId}:${selectedDoorId}`}
           onClearFilters={clearFilters}
           onAddDevice={canManage ? onAddNew : undefined}
           devices={devices}

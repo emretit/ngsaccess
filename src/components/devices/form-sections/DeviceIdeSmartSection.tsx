@@ -1,3 +1,4 @@
+import { PasswordField } from "@/components/shared/PasswordField";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { UseFormReturn } from "react-hook-form";
@@ -18,7 +19,7 @@ interface DeviceIdeSmartSectionProps {
  */
 export function DeviceIdeSmartSection({ form, isEdit }: DeviceIdeSmartSectionProps) {
   return (
-    <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+    <div className="space-y-4 border-t border-line pt-4">
       <h4 className="text-sm font-semibold">IDE Smart Panel</h4>
 
       <FormField
@@ -35,7 +36,7 @@ export function DeviceIdeSmartSection({ form, isEdit }: DeviceIdeSmartSectionPro
         )}
       />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField
           control={form.control}
           name="ide_user"
@@ -56,7 +57,7 @@ export function DeviceIdeSmartSection({ form, isEdit }: DeviceIdeSmartSectionPro
             <FormItem>
               <FormLabel>Şifre</FormLabel>
               <FormControl>
-                <Input type="password" placeholder="Panel şifresi" {...field} value={field.value ?? ""} />
+                <PasswordField placeholder="Panel şifresi" {...field} value={field.value ?? ""} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -78,8 +79,8 @@ export function DeviceIdeSmartSection({ form, isEdit }: DeviceIdeSmartSectionPro
         )}
       />
 
-      <div className="space-y-4 rounded-md border border-dashed bg-background/40 p-3">
-        <div className="grid grid-cols-2 gap-4">
+      <details className="space-y-4 border-t border-line pt-3"><summary className="cursor-pointer text-sm">İsteğe bağlı LAN bilgileri</summary>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="device_ip"
@@ -107,7 +108,7 @@ export function DeviceIdeSmartSection({ form, isEdit }: DeviceIdeSmartSectionPro
             )}
           />
         </div>
-      </div>
+      </details>
     </div>
   );
 }

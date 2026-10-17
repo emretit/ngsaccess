@@ -4,7 +4,7 @@ import { useMutation } from "convex/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/notify";
 import { Copy, KeyRound, RefreshCw } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -18,7 +18,7 @@ interface DeviceApiTokenCardProps {
 
 function maskToken(token?: string): string {
   if (!token) return "—";
-  if (token.length <= 12) return token;
+  if (token.length <= 12) return "••••••••";
   return `${token.slice(0, 6)}••••••${token.slice(-4)}`;
 }
 
@@ -28,7 +28,6 @@ export function DeviceApiTokenCard({
   currentToken,
   currentTokenCreatedAt,
 }: DeviceApiTokenCardProps) {
-  const { toast } = useToast();
   const regenerate = useMutation(api.devices.regenerateApiToken);
   const [revealedToken, setRevealedToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -39,10 +38,7 @@ export function DeviceApiTokenCard({
     try {
       const result = await regenerate({ deviceId });
       setRevealedToken(result.token);
-      toast({
-        title: "Yeni token oluşturuldu",
-        description: "Token'ı kopyalayıp cihaz bridge config'ine yapıştırın. Bu pencereyi kapattıktan sonra bir daha gösterilmeyecek.",
-      });
+      notify.success("Yeni anahtar oluşturuldu", "Anahtarı kopyalayıp cihaz köprüsü yapılandırmasına uygulayın.");
     } finally {
       setBusy(false);
     }
@@ -51,33 +47,33 @@ export function DeviceApiTokenCard({
   const handleCopy = async (value: string) => {
     try {
       await navigator.clipboard.writeText(value);
-      toast({ title: "Kopyalandı" });
+      notify.success("Anahtar kopyalandı");
     } catch {
-      toast({ title: "Kopyalanamadı", variant: "destructive" });
+      notify.error("Anahtar kopyalanamadı");
     }
   };
 
   return (
-    <Card>
+    <Card className="min-w-0 border-0 border-t rounded-none shadow-none">
       <ConfirmDestructive open={confirmOpen} onOpenChange={setConfirmOpen} title="Cihaz bağlantı anahtarını yenile" objectName={deviceName ?? deviceId} effects={["Eski anahtar hemen geçersiz olur.", "Yeni anahtarı kopyalayıp bridge yapılandırmasına uygulayana kadar bağlantı durabilir."]} confirmLabel="Anahtarı yenile" onConfirm={handleRegenerate} />
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <KeyRound className="h-4 w-4 text-primary" />
-          Cihaz API Token
+          Cihaz bağlantı anahtarı
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className="text-xs text-muted-foreground">
+        <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">Bağlantı anahtarı nasıl kullanılır?</summary><p className="mt-2 break-words">
           Token'sız kart olayı reddedilir. Bridge <code className="rounded bg-muted px-1 py-0.5">Authorization: Bearer &lt;token&gt;</code> header'ı yollar; header ekleyemeyen cihazda (Hikvision httpHosts) adresin sonuna <code className="rounded bg-muted px-1 py-0.5">/card-reader?token=&lt;token&gt;</code> yazın. Token sızarsa "Yenile" ile geri çevir; eski token geçersiz olur.
-        </p>
+        </p></details>
 
         {revealedToken ? (
           <div className="space-y-2">
-            <div className="text-xs font-semibold text-amber-600 dark:text-amber-400">
-              Bu token bir daha gösterilmeyecek — şimdi kopyalayın:
+            <div className="text-xs font-semibold text-warning">
+              Yeni anahtarı kopyalayıp cihaz yapılandırmasına uygulayın:
             </div>
-            <div className="flex gap-2">
-              <Input value={revealedToken} readOnly className="font-mono text-xs" />
+            <div className="flex min-w-0 gap-2">
+              <Input value={revealedToken} readOnly className="min-w-0 font-mono text-xs" />
               <Button variant="outline" size="sm" aria-label="Yeni anahtarı kopyala" onClick={() => handleCopy(revealedToken)}>
                 <Copy className="h-4 w-4" />
               </Button>
@@ -97,7 +93,7 @@ export function DeviceApiTokenCard({
 
         <Button onClick={() => setConfirmOpen(true)} disabled={busy} size="sm" variant="outline">
           <RefreshCw className={`mr-2 h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} />
-          {currentToken ? "Token'ı Yenile" : "Token Oluştur"}
+          {currentToken ? "Anahtarı yenile" : "Anahtar oluştur"}
         </Button>
       </CardContent>
     </Card>

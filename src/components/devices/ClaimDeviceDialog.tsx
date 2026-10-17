@@ -22,10 +22,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Inbox } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { PasswordField } from "@/components/shared/PasswordField";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
-import { computeDeviceStatus } from "@/lib/deviceStatus";
+import { deviceConnection } from "@/lib/deviceStatus";
 
 interface ClaimDeviceDialogProps {
   open: boolean;
@@ -44,7 +46,7 @@ const NEW_ZONE = "__new__";
  */
 export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialogProps) {
   const { isSuperAdmin } = useProjectAccess();
-  const { projectId: activeProjectId } = useActiveProject();
+  const { projectId: activeProjectId, activeProject } = useActiveProject();
 
   const claimable = useQuery(api.adminDevices.listForClaim, open ? {} : "skip");
   const projects = useQuery(api.projects.list, open && isSuperAdmin ? {} : "skip");
@@ -52,6 +54,7 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
   const [selectedId, setSelectedId] = useState<Id<"adminDevices"> | null>(null);
   const [targetProjectId, setTargetProjectId] = useState<Id<"projects"> | null>(null);
   const [name, setName] = useState("");
+  const [attempted, setAttempted] = useState(false);
   const [doorCount, setDoorCount] = useState(4);
   const [ideUser, setIdeUser] = useState("");
   const [idePassword, setIdePassword] = useState("");
@@ -68,6 +71,7 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
   useEffect(() => {
     if (open) {
       setSelectedId(null);
+      setAttempted(false);
       setTargetProjectId(activeProjectId ?? null);
       setName("");
       setDoorCount(4);
@@ -122,53 +126,90 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
           ? { newZoneName: newZoneName.trim() }
           : { zoneId: zoneChoice as Id<"zones"> }),
       });
-      toast({ title: "Başarılı", description: "Cihaz projeye eklendi" });
+
       onSuccess();
   }, { error: "Cihaz projeye eklenemedi" });
 
+  const guard = useUnsavedChangesGuard(open && (selectedId !== null || name !== "" || newZoneName !== ""));
+  const close = () => { if (!submitting) guard.requestClose(onClose); };
+  const errors = [
+    ...(!targetProjectId ? [{ id: "claim-project", message: "Proje seçin." }] : []),
+    ...(!selectedId ? [{ id: "claim-device", message: "Atanacak cihazı seçin." }] : []),
+    ...(isIde && !ideUser.trim() ? [{ id: "claim-user", message: "Panel kullanıcı adı gereklidir." }] : []),
+    ...(isIde && !idePassword.trim() ? [{ id: "claim-password", message: "Panel şifresi gereklidir." }] : []),
+    ...(zoneChoice === NEW_ZONE && (!newZoneName.trim() || newZoneName.trim().toLocaleLowerCase("tr-TR") === name.trim().toLocaleLowerCase("tr-TR")) ? [{ id: "claim-zone-name", message: !newZoneName.trim() ? "Yeni bölge adı girin veya mevcut bir bölge seçin." : "Bölge adı cihaz adıyla aynı olamaz." }] : []),
+  ];
+  const submit = () => { setAttempted(true); if (errors[0]) document.getElementById(errors[0].id)?.focus(); else void handleSubmit(); };
   const loading = claimable === undefined;
   const empty = !loading && (claimable ?? []).length === 0;
 
   return (
-    <Sheet open={open} onOpenChange={(isOpen) => !isOpen && !submitting && onClose()}>
-      <SheetContent size="lg" className="p-0">
-        <div className="p-6 border-b">
+    <>
+    <Sheet open={open} onOpenChange={next => { if (!next) close(); }}>
+      <SheetContent size="full" className="flex w-full min-w-0 flex-col p-0 sm:max-w-[620px]">
+        <div className="shrink-0 border-b p-5 pr-12">
           <SheetHeader>
-            <SheetTitle>Havuzdan Cihaz Ekle</SheetTitle>
+            <SheetTitle>Havuzdan ata</SheetTitle>
           </SheetHeader>
           <p className="mt-1 text-sm text-muted-foreground">
             Admin tarafından eklenmiş, henüz bir projeye atanmamış cihazlardan seçin.
           </p>
         </div>
 
-        <ScrollArea className="h-[calc(100vh-120px)]">
+        <ScrollArea className="min-h-0 flex-1">
           <div className="p-6 space-y-6">
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <SectionSkeleton rows={4} label="Atanabilecek cihazlar yükleniyor" />
               </div>
             ) : empty ? (
               <div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
                 <Inbox className="h-8 w-8" />
-                <p className="text-sm">Havuzda atanmamış cihaz yok.</p>
+                <p className="text-sm">Atanabilecek cihaz yok.</p>
                 <p className="text-xs">Yeni cihazlar Admin → Cihaz Yönetimi'nde UUID ile eklenir.</p>
               </div>
             ) : (
-              <>
+              <form onSubmit={event => { event.preventDefault(); submit(); }} noValidate>
+              <fieldset disabled={submitting} className="space-y-5">
+                {!isSuperAdmin && <p className="text-sm text-muted-foreground">Proje: {activeProject?.name ?? "Proje seçilmedi"}</p>}
+                {attempted && errors.length > 0 && <div role="alert" className="rounded-md border border-danger p-3 text-sm"><p className="font-medium">Atama tamamlanamadı. Alanları kontrol edin.</p>{errors.map(error => <button key={error.id} type="button" className="block text-left underline" onClick={() => document.getElementById(error.id)?.focus()}>{error.message}</button>)}</div>}
+                {isSuperAdmin && (
+                  <div className="space-y-2">
+                    <Label htmlFor="claim-project">Proje</Label>
+                    <Select
+                      value={targetProjectId ?? undefined}
+                      onValueChange={(v) => {
+                        setTargetProjectId(v as Id<"projects">);
+                        // Proje değişince eski projeye ait seçili bölge geçersiz → sıfırla.
+                        setZoneChoice(NEW_ZONE);
+                      }}
+                    >
+                      <SelectTrigger id="claim-project" aria-invalid={attempted && errors.some(error => error.id === "claim-project")} aria-describedby={attempted && errors.some(error => error.id === "claim-project") ? "claim-project-error" : undefined}>
+                        <SelectValue placeholder="Projeyi seçin" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(projects ?? []).map((p) => (
+                          <SelectItem key={p._id} value={p._id}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+  {attempted && errors.find(error => error.id === "claim-project") && <p id="claim-project-error" className="text-xs text-destructive">{errors.find(error => error.id === "claim-project")?.message}</p>}
+                </div>
+                )}
                 <div className="space-y-2">
-                  <Label>Cihaz</Label>
+                  <Label htmlFor="claim-device">Cihaz</Label>
                   <Select value={selectedId ?? undefined} onValueChange={(v) => onSelectDevice(v as Id<"adminDevices">)}>
-                    <SelectTrigger>
+                    <SelectTrigger id="claim-device" aria-invalid={attempted && errors.some(error => error.id === "claim-device")} aria-describedby={attempted && errors.some(error => error.id === "claim-device") ? "claim-device-error" : undefined}>
                       <SelectValue placeholder="Havuzdan bir cihaz seçin" />
                     </SelectTrigger>
                     <SelectContent>
                       {(claimable ?? []).map((d) => {
-                        const online = computeDeviceStatus(d.lastSeen, nowMs) === "online";
+                        const online = deviceConnection(d, nowMs) === "online";
                         return (
                           <SelectItem key={d._id} value={d._id}>
                             <span className="flex items-center gap-2">
                               <span
-                                className={`inline-block h-2 w-2 rounded-full ${online ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
+                                className={`inline-block h-2 w-2 rounded-full ${online ? "bg-success" : "bg-muted-foreground/40"}`}
                               />
                               {d.name}
                               {d.ideUuid && d.ideUuid !== d.name && (
@@ -183,65 +224,46 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
                   {selected && (
                     <p className="text-xs text-muted-foreground">
                       Marka: {selected.brand ?? "—"} ·{" "}
-                      {computeDeviceStatus(selected.lastSeen, nowMs) === "online" ? (
-                        <span className="text-emerald-600">Online</span>
+                      {deviceConnection(selected, nowMs) === "online" ? (
+                        <span className="text-success">Çevrimiçi</span>
                       ) : (
-                        <span>Offline (panel bağlanınca canlanır)</span>
+                        <span>{deviceConnection(selected, nowMs) === "never" ? "Henüz bağlanmadı" : "Çevrimdışı"}</span>
                       )}
                     </p>
                   )}
+{attempted && errors.find(error => error.id === "claim-device") && <p id="claim-device-error" className="text-xs text-destructive">{errors.find(error => error.id === "claim-device")?.message}</p>}
                 </div>
 
-                {isSuperAdmin && (
-                  <div className="space-y-2">
-                    <Label>Proje</Label>
-                    <Select
-                      value={targetProjectId ?? undefined}
-                      onValueChange={(v) => {
-                        setTargetProjectId(v as Id<"projects">);
-                        // Proje değişince eski projeye ait seçili bölge geçersiz → sıfırla.
-                        setZoneChoice(NEW_ZONE);
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Projeyi seçin" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(projects ?? []).map((p) => (
-                          <SelectItem key={p._id} value={p._id}>{p.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+
 
                 <div className="space-y-2">
-                  <Label>Panel adı</Label>
-                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Panel adı" />
+                  <Label htmlFor="claim-device-name">Panel adı</Label>
+                  <Input id="claim-device-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Panel adı" />
                 </div>
 
                 {isIde && (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-2">
-                      <Label>Panel kullanıcı adı</Label>
-                      <Input
+                      <Label htmlFor="claim-user">Panel kullanıcı adı</Label>
+                      <Input id="claim-user" aria-invalid={attempted && errors.some(error => error.id === "claim-user")} aria-describedby={attempted && errors.some(error => error.id === "claim-user") ? "claim-user-error" : undefined}
                         value={ideUser}
                         onChange={(e) => setIdeUser(e.target.value)}
                         placeholder="admin"
                         autoComplete="off"
                       />
+{attempted && errors.find(error => error.id === "claim-user") && <p id="claim-user-error" className="text-xs text-destructive">{errors.find(error => error.id === "claim-user")?.message}</p>}
                     </div>
                     <div className="space-y-2">
-                      <Label>Panel şifresi</Label>
-                      <Input
-                        type="password"
+                      <Label htmlFor="claim-password">Panel şifresi</Label>
+                      <PasswordField id="claim-password" aria-invalid={attempted && errors.some(error => error.id === "claim-password")} aria-describedby={attempted && errors.some(error => error.id === "claim-password") ? "claim-password-error" : undefined}
                         value={idePassword}
                         onChange={(e) => setIdePassword(e.target.value)}
                         placeholder="Panel şifresi"
                         autoComplete="off"
                       />
+{attempted && errors.find(error => error.id === "claim-password") && <p id="claim-password-error" className="text-xs text-destructive">{errors.find(error => error.id === "claim-password")?.message}</p>}
                     </div>
-                    <p className="col-span-2 text-xs text-muted-foreground">
+                    <p className="sm:col-span-2 text-xs text-muted-foreground">
                       Panelin MQTT giriş bilgisi. Boş bırakılırsa cihaza komut gönderilemez ve
                       senkronizasyon takılı kalır.
                     </p>
@@ -249,9 +271,9 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
                 )}
 
                 <div className="space-y-2">
-                  <Label>Bölge</Label>
+                  <Label htmlFor="claim-zone">Bölge</Label>
                   <Select value={zoneChoice} onValueChange={setZoneChoice}>
-                    <SelectTrigger>
+                    <SelectTrigger id="claim-zone">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -278,8 +300,8 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Kapı sayısı</Label>
-                  <Input
+                  <Label htmlFor="claim-door-count">Kapı sayısı</Label>
+                  <Input id="claim-door-count"
                     type="number"
                     min={1}
                     max={8}
@@ -289,18 +311,21 @@ export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialo
                   <p className="text-xs text-muted-foreground">Panelin aktüatör sayısı (1–8). Her kapı bir IO'ya bağlanır.</p>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2">
-                  <Button variant="outline" onClick={onClose} disabled={submitting}>İptal</Button>
-                  <Button onClick={() => void handleSubmit()} disabled={!canSubmit || submitting}>
+                <div className="sticky bottom-0 flex justify-end gap-2 border-t border-line bg-surface py-4">
+                  <Button type="button" variant="outline" onClick={close} disabled={submitting}>İptal</Button>
+                  <Button type="submit" disabled={submitting}>
                     {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                    Projeye Ekle
+                    Projeye ata
                   </Button>
                 </div>
-              </>
+              </fieldset>
+              </form>
             )}
           </div>
         </ScrollArea>
       </SheetContent>
     </Sheet>
+    {guard.dialog}
+    </>
   );
 }

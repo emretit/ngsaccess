@@ -1,12 +1,13 @@
-import { Search, Filter, Smartphone } from "lucide-react";
+import { MapPin, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DeviceAddMenu } from "./DeviceAddMenu";
+import { FilterBar } from "@/components/shared/FilterBar";
 
 interface DeviceFiltersProps {
   onClearFilters?: () => void;
   locationLabel?: string;
+  onOpenLocation?: () => void;
+  onClearLocation?: () => void;
   search: string;
   onSearchChange: (value: string) => void;
   statusFilter: string;
@@ -24,89 +25,27 @@ interface DeviceFiltersProps {
   filteredCount: number;
 }
 
-export function DeviceFilters({
-  onClearFilters,
-  locationLabel,
-  search,
-  onSearchChange,
-  statusFilter,
-  onStatusFilterChange,
-  typeFilter,
-  onTypeFilterChange,
-  deviceTypes,
-  onAddNew,
-  onAddFromCloud,
-  showNewDevice = true,
-  deviceCount,
-  filteredCount
-}: DeviceFiltersProps) {
-  return (
-    <div className="rounded-xl border bg-card shadow-xs p-4 md:p-6">
-      <div className="flex items-center gap-3 flex-wrap">
-        {/* Sol: Başlık */}
-        <div className="flex items-center gap-2 mr-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-            <Smartphone className="h-4 w-4 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold leading-tight">Cihazlar</h2>
-            <p className="text-xs text-muted-foreground">
-              {deviceCount} cihaz bulundu, {filteredCount} tanesi gösteriliyor
-            </p>
-          </div>
-        </div>
-
-        {/* Arama */}
-        <div className="relative w-full min-w-0 sm:flex-1 sm:min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            type="search"
-            aria-label="Cihaz adı, seri numarası veya UUID ile ara"
-            placeholder="Ad, seri no veya UUID ile ara..."
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-8 h-8 text-sm"
-          />
-        </div>
-
-        {/* Sağ: Kontroller */}
-        <div className="flex flex-wrap items-center gap-2 w-full">
-          <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-            <SelectTrigger aria-label="Bağlantı durumu filtresi" className="w-full sm:w-40 h-9 text-xs">
-              <Filter className="mr-1.5 h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              <SelectValue placeholder="Durum" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="text-xs">Tümü</SelectItem>
-              <SelectItem value="online" className="text-xs">Çevrimiçi</SelectItem>
-              <SelectItem value="offline" className="text-xs">Çevrimdışı</SelectItem>
-              <SelectItem value="never">Henüz bağlanmadı</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={typeFilter} onValueChange={onTypeFilterChange}>
-            <SelectTrigger aria-label="Cihaz tipi filtresi" className="w-full sm:w-40 h-9 text-xs">
-              <SelectValue placeholder="Tip" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="text-xs">Tümü</SelectItem>
-              {deviceTypes.map((type) => (
-                <SelectItem key={type} value={type} className="text-xs">
-                  {type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {showNewDevice && (
-            <DeviceAddMenu onAddNew={onAddNew} onAddFromCloud={onAddFromCloud} />
-          )}
-        </div>
-      </div>
-      {(search || statusFilter !== "all" || typeFilter !== "all" || locationLabel) && <div className="mt-3 flex flex-wrap items-center gap-2 text-sm" aria-label="Etkin filtreler">
-        <span className="break-words">{[search && `Arama: ${search}`, statusFilter !== "all" && `Durum: ${{ online: "Çevrimiçi", offline: "Çevrimdışı", never: "Henüz bağlanmadı" }[statusFilter] ?? statusFilter}`, typeFilter !== "all" && `Tip: ${typeFilter}`, locationLabel].filter(Boolean).join(" · ")}</span>
-        {onClearFilters && <Button type="button" variant="outline" size="sm" onClick={onClearFilters}>Filtreleri temizle</Button>}
-      </div>}
-    </div>
-  );
+export function DeviceFilters({ onClearFilters, locationLabel, onOpenLocation, onClearLocation,
+  search, onSearchChange, statusFilter, onStatusFilterChange, typeFilter, onTypeFilterChange, deviceTypes }: DeviceFiltersProps) {
+  return <FilterBar search={search} onSearchChange={onSearchChange}
+    searchLabel="Cihaz adı, seri numarası veya UUID ile ara" placeholder="Ad, seri no veya UUID ara…"
+    hasFilters={statusFilter !== "all" || typeFilter !== "all" || !!locationLabel} onClear={() => onClearFilters?.()}>
+    <Select value={statusFilter} onValueChange={onStatusFilterChange}>
+      <SelectTrigger aria-label="Bağlantı filtresi" className="w-auto max-w-full min-w-36"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">Bağlantı: Tümü</SelectItem>
+        <SelectItem value="online">Bağlantı: Çevrimiçi</SelectItem>
+        <SelectItem value="offline">Bağlantı: Çevrimdışı</SelectItem>
+        <SelectItem value="never">Bağlantı: Henüz bağlanmadı</SelectItem>
+      </SelectContent>
+    </Select>
+    <Select value={typeFilter} onValueChange={onTypeFilterChange}>
+      <SelectTrigger aria-label="Cihaz tipi filtresi" className="w-auto max-w-full min-w-28"><SelectValue /></SelectTrigger>
+      <SelectContent><SelectItem value="all">Tip: Tümü</SelectItem>
+        {deviceTypes.map(type => <SelectItem key={type} value={type}>Tip: {type}</SelectItem>)}
+      </SelectContent>
+    </Select>
+    {onOpenLocation && <Button variant="outline" onClick={onOpenLocation}><MapPin className="mr-2 h-4 w-4" />Bölge ve kapı</Button>}
+    {locationLabel && <Button variant="secondary" className="h-auto min-h-9 max-w-full whitespace-normal text-left" onClick={onClearLocation} aria-label={`${locationLabel} konum filtresini temizle`}>{locationLabel}<X className="ml-2 h-3.5 w-3.5 shrink-0" /></Button>}
+  </FilterBar>;
 }

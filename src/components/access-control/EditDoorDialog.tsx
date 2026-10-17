@@ -1,3 +1,4 @@
+import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { useState } from "react";
 import {
   Dialog,
@@ -203,16 +204,20 @@ export function EditDoorDialog({
   }, { error: "Planlar gönderilemedi" });
   const isSubmitting = saveAction.pending || retryAction.pending;
 
+  const guard = useUnsavedChangesGuard(open && (!saved && (name !== door.name || doorCode !== (door.doorCode ?? "") || hikDoorNo !== (door.hikDoorNo !== undefined ? String(door.hikDoorNo) : "") || JSON.stringify(statusPlan) !== JSON.stringify(door.hikDoorStatusPlan ? { ...door.hikDoorStatusPlan, beginTime: door.hikDoorStatusPlan.beginTime.slice(0, 5), endTime: door.hikDoorStatusPlan.endTime.slice(0, 5) } : DEFAULT_STATUS_PLAN) || JSON.stringify(verifyPlan) !== JSON.stringify(door.hikVerifyPlan ? { ...door.hikVerifyPlan, beginTime: door.hikVerifyPlan.beginTime.slice(0, 5), endTime: door.hikVerifyPlan.endTime.slice(0, 5) } : DEFAULT_VERIFY_PLAN))));
+  const close = () => { if (!isSubmitting) guard.requestClose(() => onOpenChange(false)); };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saved || isSubmitting) return;
     if (!name.trim()) {
-      notify.error("Kapı adı gereklidir.");
+      setTimeErrors({ name: "Kapı adı gereklidir." });
+      document.getElementById("edit-door-name")?.focus();
       return;
     }
     const parsedDoorNo = hikDoorNo.trim() !== "" ? Number(hikDoorNo) : undefined;
     if (showHikSection && (parsedDoorNo === undefined || !Number.isInteger(parsedDoorNo) || parsedDoorNo < 1)) {
-      notify.error("Hikvision kapı numarası 1 veya üzeri bir tam sayı olmalıdır.");
+      setTimeErrors({ hikDoorNo: "Hikvision kapı numarası 1 veya üzeri bir tam sayı olmalıdır." });
+      document.getElementById("hik-door-no")?.focus();
       return;
     }
     const errors: Record<string, string> = {};
@@ -230,12 +235,13 @@ export function EditDoorDialog({
       }
     }
     setTimeErrors(errors);
-    if (Object.keys(errors).length > 0) return;
+    if (Object.keys(errors).length > 0) { document.getElementById(Object.keys(errors)[0])?.focus(); return; }
     await saveAction.run(parsedDoorNo);
   };
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!isSubmitting) onOpenChange(next); }}>
+    <>
+    <Dialog open={open} onOpenChange={next => { if (!next) close(); }}>
       <DialogContent className="sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Kapıyı Düzenle</DialogTitle>
@@ -244,32 +250,34 @@ export function EditDoorDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
+        <form onSubmit={handleSubmit} aria-busy={isSubmitting} noValidate>
+          {Object.keys(timeErrors).length > 0 && <div role="alert" className="mb-4 text-sm text-destructive"><p className="font-medium">Kaydedilemedi. Alanları kontrol edin.</p><ul className="list-disc pl-4">{Object.entries(timeErrors).map(([key, message]) => <li key={key}>{message}</li>)}</ul></div>}
           <fieldset disabled={isSubmitting || saved}>
             <div className="grid gap-4 py-4">
               {/* Temel alanlar */}
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-door-name" className="text-right">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-door-name" >
                   Ad *
                 </Label>
                 <Input
-                  id="edit-door-name"
+                  id="edit-door-name" aria-invalid={!!timeErrors.name} aria-describedby={timeErrors.name ? "edit-door-name-error" : undefined}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="col-span-3"
+
                   placeholder="Kapı adı"
                   required
                 />
+                {timeErrors.name && <p id="edit-door-name-error" className="text-xs text-destructive">{timeErrors.name}</p>}
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-door-code" className="text-right">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-door-code" >
                   Kapı Kodu
                 </Label>
                 <Input
                   id="edit-door-code"
                   value={doorCode}
                   onChange={(e) => setDoorCode(e.target.value)}
-                  className="col-span-3"
+
                   placeholder="Kapı kodu (opsiyonel)"
                 />
               </div>
@@ -283,13 +291,13 @@ export function EditDoorDialog({
                   </p>
 
                   {/* hikDoorNo */}
-                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="hik-door-no" className="text-right">
+                  <div className="grid gap-2">
+                    <Label htmlFor="hik-door-no" >
                       Kapı No *
                     </Label>
-                    <div className="col-span-3">
+                    <div >
                       <Input
-                        id="hik-door-no"
+                        id="hik-door-no" aria-invalid={!!timeErrors.hikDoorNo} aria-describedby={timeErrors.hikDoorNo ? "edit-door-number-error" : undefined}
                         type="number"
                         min={1}
                         value={hikDoorNo}
@@ -297,6 +305,7 @@ export function EditDoorDialog({
                         placeholder="Cihazdaki fiziksel kapı no (1, 2, ...)"
                         required
                       />
+                      {timeErrors.hikDoorNo && <p id="edit-door-number-error" className="text-xs text-destructive">{timeErrors.hikDoorNo}</p>}
                       <p className="mt-1 text-xs text-muted-foreground">
                         Cihazda bu kapıya atanan fiziksel numara (1'den başlar).
                       </p>
@@ -460,7 +469,7 @@ export function EditDoorDialog({
               type="button"
               variant="outline"
               disabled={isSubmitting}
-              onClick={() => onOpenChange(false)}
+              onClick={close}
             >
               {saved ? "Kapat" : "İptal"}
             </Button>
@@ -479,5 +488,7 @@ export function EditDoorDialog({
         </form>
       </DialogContent>
     </Dialog>
+    {guard.dialog}
+    </>
   );
 }
