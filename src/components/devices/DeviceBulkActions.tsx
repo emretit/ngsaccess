@@ -11,7 +11,7 @@ export function DeviceBulkActions({
   onDelete
 }: DeviceBulkActionsProps) {
   return (
-    <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
+    <div className="flex flex-wrap items-center gap-4 p-4 bg-muted rounded-lg">
       <span className="text-sm font-medium">{selectedCount} cihaz seçildi</span>
       <Button
         variant="destructive"

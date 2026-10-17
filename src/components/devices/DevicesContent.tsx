@@ -1,4 +1,5 @@
 
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { Device } from "@/types/device";
 import { DeviceList } from "@/components/devices/DeviceList";
 import { DeviceFilters } from "@/components/devices/DeviceFilters";
@@ -42,6 +43,7 @@ export function DevicesContent({
 }: DevicesContentProps) {
   // Use the extracted filter hook
   const {
+    clearFilters,
     search,
     setSearch,
     statusFilter,
@@ -53,8 +55,10 @@ export function DevicesContent({
   } = useDeviceFilters(devices, selectedZoneId, selectedDoorId);
 
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 space-y-3">
       <DeviceFilters 
+        onClearFilters={clearFilters}
+        locationLabel={selectedDoorId ? "Kapı filtresi etkin" : selectedZoneId ? `Bölge: ${zones.find(zone => zone._id === selectedZoneId)?.name ?? "Seçili bölge"}` : undefined}
         search={search}
         onSearchChange={setSearch}
         statusFilter={statusFilter}
@@ -69,10 +73,12 @@ export function DevicesContent({
         filteredCount={filteredDevices.length}
       />
 
-      <DeviceStats devices={filteredDevices} />
+      {isLoading ? <SectionSkeleton rows={2} label="Cihaz özeti yükleniyor" /> : <DeviceStats devices={filteredDevices} />}
 
       <div className="rounded-xl border bg-card shadow-xs overflow-hidden">
         <DeviceList 
+          onClearFilters={clearFilters}
+          onAddDevice={canManage ? onAddNew : undefined}
           devices={devices}
           filteredDevices={filteredDevices}
           isLoading={isLoading}

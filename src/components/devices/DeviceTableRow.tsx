@@ -1,3 +1,4 @@
+import { deviceDisplayName, deviceModel } from "@/lib/deviceDisplay";
 import { useState } from "react";
 import { DeviceDeleteDialog } from "./DeviceDeleteDialog";
 import { TableCell, TableRow } from "@/components/ui/table";
@@ -60,9 +61,9 @@ export function DeviceTableRow({
     >
       <TableCell onClick={(e) => e.stopPropagation()}>
         <Checkbox
-          aria-label={`${device.name} cihazını seç`}
+          aria-label={`${deviceDisplayName(device)} cihazını seç`}
           checked={selected}
-          onCheckedChange={(checked) => onSelect(checked as boolean, device._id)}
+          onCheckedChange={(checked) => onSelect(checked === true, device._id)}
         />
       </TableCell>
       <TableCell className="font-medium text-muted-foreground">{rowIndex ?? '-'}</TableCell>
@@ -71,13 +72,13 @@ export function DeviceTableRow({
           {projectName ? <Badge variant="secondary">{projectName}</Badge> : <span className="text-muted-foreground">—</span>}
         </TableCell>
       )}
-      <TableCell className="font-medium">{device.name || "—"}</TableCell>
+      <TableCell className="font-medium"><button type="button" onClick={() => onEditDevice(device)} className="text-left rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{deviceDisplayName(device)}</button></TableCell>
       <TableCell>
         {device.brand === "ide_smart"
           ? device.ideUuid || "-"
           : device.deviceSerial || "-"}
       </TableCell>
-      <TableCell>{device.deviceType || '-'}</TableCell>
+      <TableCell><span>{deviceModel(device)}</span>{device.deviceType && <span className="block text-xs text-muted-foreground">{device.deviceType}</span>}</TableCell>
       {!hideLocation && (
         <>
           <TableCell>{zoneName || '-'}</TableCell>
@@ -106,6 +107,7 @@ export function DeviceTableRow({
               onClick={() => onAssignLocation(device)}
               className="h-8 w-8"
               title="Konum Ata"
+              aria-label={`${deviceDisplayName(device)} cihazına konum ata`}
             >
               <MapPin className="h-4 w-4" />
             </Button>
@@ -116,6 +118,7 @@ export function DeviceTableRow({
             onClick={() => onEditDevice(device)}
             className="h-8 w-8"
             title="Düzenle"
+            aria-label={`${deviceDisplayName(device)} cihazını düzenle`}
           >
             <Edit2 className="h-4 w-4" />
           </Button>
@@ -133,6 +136,7 @@ export function DeviceTableRow({
             onClick={(event) => { event.stopPropagation(); setDeleteDialogOpen(true); }}
             className="h-8 w-8 text-destructive hover:text-destructive"
             title="Sil"
+            aria-label={`${deviceDisplayName(device)} cihazını sil`}
           >
             <Trash2 className="h-4 w-4" />
           </Button>

@@ -1,9 +1,12 @@
 import { Search, Filter, Smartphone } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DeviceAddMenu } from "./DeviceAddMenu";
 
 interface DeviceFiltersProps {
+  onClearFilters?: () => void;
+  locationLabel?: string;
   search: string;
   onSearchChange: (value: string) => void;
   statusFilter: string;
@@ -22,6 +25,8 @@ interface DeviceFiltersProps {
 }
 
 export function DeviceFilters({
+  onClearFilters,
+  locationLabel,
   search,
   onSearchChange,
   statusFilter,
@@ -52,11 +57,12 @@ export function DeviceFilters({
         </div>
 
         {/* Arama */}
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
+        <div className="relative w-full min-w-0 sm:flex-1 sm:min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Cihaz adı veya seri no ile ara..."
+            aria-label="Cihaz adı, seri numarası veya UUID ile ara"
+            placeholder="Ad, seri no veya UUID ile ara..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             className="pl-8 h-8 text-sm"
@@ -64,9 +70,9 @@ export function DeviceFilters({
         </div>
 
         {/* Sağ: Kontroller */}
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full">
           <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-            <SelectTrigger className="w-[100px] h-8 text-xs">
+            <SelectTrigger aria-label="Bağlantı durumu filtresi" className="w-full sm:w-40 h-9 text-xs">
               <Filter className="mr-1.5 h-3.5 w-3.5 text-muted-foreground shrink-0" />
               <SelectValue placeholder="Durum" />
             </SelectTrigger>
@@ -79,7 +85,7 @@ export function DeviceFilters({
           </Select>
 
           <Select value={typeFilter} onValueChange={onTypeFilterChange}>
-            <SelectTrigger className="w-[100px] h-8 text-xs">
+            <SelectTrigger aria-label="Cihaz tipi filtresi" className="w-full sm:w-40 h-9 text-xs">
               <SelectValue placeholder="Tip" />
             </SelectTrigger>
             <SelectContent>
@@ -97,6 +103,10 @@ export function DeviceFilters({
           )}
         </div>
       </div>
+      {(search || statusFilter !== "all" || typeFilter !== "all" || locationLabel) && <div className="mt-3 flex flex-wrap items-center gap-2 text-sm" aria-label="Etkin filtreler">
+        <span className="break-words">{[search && `Arama: ${search}`, statusFilter !== "all" && `Durum: ${{ online: "Çevrimiçi", offline: "Çevrimdışı", never: "Henüz bağlanmadı" }[statusFilter] ?? statusFilter}`, typeFilter !== "all" && `Tip: ${typeFilter}`, locationLabel].filter(Boolean).join(" · ")}</span>
+        {onClearFilters && <Button type="button" variant="outline" size="sm" onClick={onClearFilters}>Filtreleri temizle</Button>}
+      </div>}
     </div>
   );
 }

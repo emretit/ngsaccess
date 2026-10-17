@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { readDeviceFilters, writeDeviceFilters, deviceMatchesFilters } from '@/lib/deviceDisplay';
 import { Device } from '@/types/device';
 
 export function useDeviceFilters(
@@ -6,9 +8,12 @@ export function useDeviceFilters(
   selectedZoneId: string | null,
   selectedDoorId: string | null
 ) {
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [params, setParams] = useSearchParams();
+  const { search, status: statusFilter, type: typeFilter } = readDeviceFilters(params);
+  const setSearch = (search: string) => setParams(current => writeDeviceFilters(current, { search }));
+  const setStatusFilter = (status: string) => setParams(current => writeDeviceFilters(current, { status }));
+  const setTypeFilter = (type: string) => setParams(current => writeDeviceFilters(current, { type }));
+  const clearFilters = () => setParams(current => writeDeviceFilters(current, { search: '', status: 'all', type: 'all', zoneId: null, doorId: null }));
 
   // Extract unique device types for filtering
   const deviceTypes = useMemo(() => {
@@ -18,50 +23,13 @@ export function useDeviceFilters(
     ));
   }, [devices]);
 
-  // Apply all filters to devices
-  const filteredDevices = useMemo(() => {
-    return devices.filter(device => {
-      // Filter by zone/door
-      const locationMatch = () => {
-        if (selectedDoorId != null) {
-          return device.doorId === selectedDoorId || device.doorIds?.some((id) => id === selectedDoorId);
-        }
-        if (selectedZoneId != null) {
-          return device.zoneId === selectedZoneId;
-        }
-        return true;
-      };
-
-      // Filter by search text
-      const searchMatch = () => {
-        if (!search) return true;
-        const searchLower = search.toLowerCase();
-        return (
-          (device.name ?? '').toLowerCase().includes(searchLower) ||
-          (device.deviceSerial ?? '').toLowerCase().includes(searchLower) ||
-          (device.description ?? '').toLowerCase().includes(searchLower)
-        );
-      };
-
-      // Filter by status
-      const statusMatch = () => {
-        if (statusFilter === 'all') return true;
-        return device.connectionStatus === statusFilter;
-      };
-
-      // Filter by type
-      const typeMatch = () => {
-        if (typeFilter === 'all') return true;
-        const deviceType = device.deviceType ?? '';
-        return deviceType.toLowerCase() === typeFilter.toLowerCase();
-      };
-
-      return locationMatch() && searchMatch() && statusMatch() && typeMatch();
-    });
-  }, [devices, selectedZoneId, selectedDoorId, search, statusFilter, typeFilter]);
+  const filteredDevices = useMemo(() => devices.filter(device => deviceMatchesFilters(device, {
+    search, status: statusFilter, type: typeFilter, zoneId: selectedZoneId, doorId: selectedDoorId,
+  })), [devices, selectedZoneId, selectedDoorId, search, statusFilter, typeFilter]);
 
   return {
     search,
+    clearFilters,
     setSearch,
     statusFilter,
     setStatusFilter,

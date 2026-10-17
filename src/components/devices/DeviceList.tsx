@@ -10,13 +10,18 @@ import {
 import { Device } from "@/types/device";
 import { Zone } from "@/hooks/useZonesAndDoors";
 import { DeviceTableRow } from "@/components/devices/DeviceTableRow";
-import { Loader2, Smartphone } from "lucide-react";
+import { Smartphone } from "lucide-react";
 import { DeviceBulkActions } from "./DeviceBulkActions";
 import { DeviceDeleteDialog } from "./DeviceDeleteDialog";
 import { useDeviceTable } from "@/hooks/useDeviceTable";
 import { Checkbox } from "@/components/ui/checkbox";
 
+import { EmptyState } from "@/components/shared/EmptyState";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+
 interface DeviceListProps {
+  onClearFilters?: () => void;
+  onAddDevice?: () => void;
   devices: Device[];
   filteredDevices: Device[];
   isLoading: boolean;
@@ -34,6 +39,8 @@ interface DeviceListProps {
 }
 
 export function DeviceList({
+  onClearFilters,
+  onAddDevice,
   devices,
   filteredDevices,
   isLoading,
@@ -76,8 +83,8 @@ export function DeviceList({
         />
       )}
       
-      <div className="rounded-md border overflow-x-auto">
-        <Table>
+      <div role="region" aria-label="Cihaz listesi, yatay kaydırılabilir" tabIndex={0} className="max-w-full rounded-md border overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <Table className="min-w-[760px]">
           <TableHeader className="sticky top-0 bg-card border-b-2 border-border">
             <TableRow>
               <TableHead className="w-[50px] bg-muted/50 font-semibold">
@@ -105,10 +112,7 @@ export function DeviceList({
             {isLoading ? (
               <TableRow>
                 <TableCell colSpan={colCount} className="text-center py-16">
-                  <div className="flex flex-col items-center justify-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
-                    <span className="text-muted-foreground font-medium">Cihazlar yükleniyor...</span>
-                  </div>
+                  <SectionSkeleton rows={4} label="Cihazlar yükleniyor" />
                 </TableCell>
               </TableRow>
             ) : filteredDevices.length > 0 ? (
@@ -133,23 +137,10 @@ export function DeviceList({
             ) : (
               <TableRow>
                 <TableCell colSpan={colCount} className="text-center py-16">
-                  <div className="flex flex-col items-center justify-center space-y-4">
-                    <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center">
-                      <Smartphone className="h-8 w-8 text-muted-foreground/70" />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-lg font-medium text-foreground mb-2">
-                        {devices.length > 0
-                          ? "Filtrelere uygun cihaz bulunamadı"
-                          : "Henüz cihaz bulunmuyor"}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {devices.length > 0 
-                          ? "Lütfen filtrelerinizi değiştirip tekrar deneyin" 
-                          : "Yeni cihaz eklemek için 'Yeni Cihaz Ekle' butonuna tıklayın"}
-                      </p>
-                    </div>
-                  </div>
+                  <EmptyState icon={Smartphone}
+                    title={devices.length ? "Filtrelere uygun cihaz bulunamadı" : "Henüz cihaz bulunmuyor"}
+                    description={devices.length ? "Etkin filtreleri temizleyerek tüm cihazları görüntüleyin." : "Bu projeye henüz cihaz eklenmemiş."}
+                    action={devices.length && onClearFilters ? { label: "Filtreleri temizle", onClick: onClearFilters } : onAddDevice ? { label: "Cihaz ekle", onClick: onAddDevice } : undefined} />
                 </TableCell>
               </TableRow>
             )}

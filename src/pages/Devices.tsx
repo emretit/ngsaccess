@@ -18,7 +18,9 @@ import { useActiveProjectScope } from '@/hooks/useActiveProjectScope';
 import { notify } from '@/lib/notify';
 import { Device, ServerDevice } from '@/types/device';
 import { useProjectAccess } from '@/hooks/useProjectAccess';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { SectionSkeleton } from '@/components/shared/SectionSkeleton';
+import { DeviceListErrorBoundary } from '@/components/devices/DeviceListErrorBoundary';
+import { readDeviceFilters, writeDeviceFilters, resetDeviceFiltersForProject } from '@/lib/deviceDisplay';
 import { AccessDenied } from '@/components/shared/AccessDenied';
 import { useToast } from '@/hooks/use-toast';
 
@@ -31,19 +33,16 @@ const Devices = () => {
     if (scopeLoading) return;
     const nextProject = projectId ?? "none";
     if (previousProject.current !== null && previousProject.current !== nextProject) {
-      setSearchParams((current) => {
-        const next = new URLSearchParams(current);
-        next.delete("deviceId");
-        return next;
-      }, { replace: true });
+      setSearchParams(resetDeviceFiltersForProject, { replace: true });
     }
     previousProject.current = nextProject;
   }, [projectId, scopeLoading, setSearchParams]);
   const { loading: projectLoading, isAdmin } = useProjectAccess();
   const { devices, isLoading, hasProjectAccess } = useProjectFilteredDevices();
   const { zones } = useZonesAndDoors();
-  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
-  const [selectedDoorId, setSelectedDoorId] = useState<string | null>(null);
+  const { zoneId: selectedZoneId, doorId: selectedDoorId } = readDeviceFilters(searchParams);
+  const setSelectedZoneId = (zoneId: string | null) => setSearchParams(current => writeDeviceFilters(current, { zoneId, doorId: null }));
+  const setSelectedDoorId = (doorId: string | null) => setSearchParams(current => writeDeviceFilters(current, { doorId }));
   
   // Device panel state: device=null → sıfırdan yeni cihaz (marka seçici), device=X → düzenleme.
   const [devicePanel, setDevicePanel] = useState<{
@@ -83,16 +82,6 @@ const Devices = () => {
   // Device actions
   const { handleDeleteDevice } = useDeviceActions();
   
-  // Device table selection
-  useEffect(() => { setSelectedDoorId(null); setSelectedZoneId(null); }, [projectId]);
-
-  // Clear selections when zone/door changes
-  useEffect(() => {
-    if (selectedZoneId) {
-      setSelectedDoorId(null);
-    }
-  }, [selectedZoneId]);
-
   // "Yeni Cihaz Ekle" — sıfırdan oluşturma (marka seçici → form), aktif projeye yazar.
   const handleNewDevice = () => {
     setDeviceUrl(null);
@@ -132,25 +121,22 @@ const Devices = () => {
 
   };
 
-  // Loading durumunda (hem project hem devices loading) loading göster
-  if (projectLoading || isLoading) {
-    return <LoadingSpinner text="Cihazlar yükleniyor..." />;
-  }
-
   // Proje erişimi yoksa ve loading de tamamlandıysa mesaj göster
   if (!projectLoading && !isLoading && !hasProjectAccess) {
     return <AccessDenied />;
   }
 
   return (
-    <div className="flex gap-4 min-h-full">
+    <div className="flex flex-col lg:flex-row gap-4 min-h-full min-w-0">
       <ZoneDoorTreePanel
+          selectedZoneId={selectedZoneId}
+          selectedDoorId={selectedDoorId}
           onSelectZone={setSelectedZoneId}
           onSelectDoor={setSelectedDoorId}
         />
 
       <div className="flex-1 min-w-0 space-y-3">
-        <DevicesContent
+        {projectLoading ? <SectionSkeleton rows={5} label="Proje yükleniyor" /> : <DevicesContent
           devices={devices}
           isLoading={isLoading}
           zones={zones}
@@ -164,7 +150,7 @@ const Devices = () => {
           onQRClick={handleQRClick}
           onReleaseDevice={isAdmin ? handleReleaseDevice : undefined}
           canManage={isAdmin}
-        />
+        />}
       </div>
 
       {/* Device Details Panel (sadece düzenleme) */}
@@ -202,4 +188,6 @@ const Devices = () => {
   );
 };
 
-export default Devices;
+const DevicesPage = () => <DeviceListErrorBoundary><Devices /></DeviceListErrorBoundary>;
+
+export default DevicesPage;

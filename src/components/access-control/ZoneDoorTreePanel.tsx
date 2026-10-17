@@ -9,11 +9,13 @@ import { Button } from "@/components/ui/button";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
 interface ZoneDoorTreePanelProps {
+  selectedZoneId: string | null;
+  selectedDoorId: string | null;
   onSelectZone?: (zoneId: string | null) => void;
   onSelectDoor?: (doorId: string | null) => void;
 }
 
-export function ZoneDoorTreePanel({ onSelectZone, onSelectDoor }: ZoneDoorTreePanelProps) {
+export function ZoneDoorTreePanel({ selectedZoneId, selectedDoorId, onSelectZone, onSelectDoor }: ZoneDoorTreePanelProps) {
   const { activeProject, isSuperAdmin, projectId, loading: projectLoading } = useActiveProject();
   const [showAddZoneDialog, setShowAddZoneDialog] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -32,23 +34,23 @@ export function ZoneDoorTreePanel({ onSelectZone, onSelectDoor }: ZoneDoorTreePa
 
   const handleProjectHeaderClick = () => {
     onSelectZone?.(null);
-    onSelectDoor?.(null);
+
   };
 
   return (
     <>
-      <div className="h-full w-full md:w-[240px] shrink-0 bg-card rounded-xl border shadow-xs">
+      <div className="w-full min-w-0 lg:w-[300px] shrink-0 bg-card rounded-xl border shadow-xs">
         <div className="p-4 border-b border-border">
-          <div
-            className="flex items-center gap-2 cursor-pointer hover:text-primary/90 transition-colors"
-            onClick={handleProjectHeaderClick}
-          >
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={handleProjectHeaderClick} className="flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`${companyName}: bölge ve kapı filtrelerini temizle`}>
             <Building2 className="h-4 w-4 text-primary" />
-            <h2 className="text-base font-semibold text-primary flex-1">{companyName}</h2>
+            <span className="text-base font-semibold text-primary break-words">{companyName}</span>
+            </button>
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7"
+              className="h-8 w-8 shrink-0"
+              aria-label="Bölge ekle"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowAddZoneDialog(true);
@@ -59,9 +61,11 @@ export function ZoneDoorTreePanel({ onSelectZone, onSelectDoor }: ZoneDoorTreePa
           </div>
           <p className="text-xs text-muted-foreground mt-1">Bölgeler & Kapılar</p>
         </div>
-        <div className="p-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
+        <div className="p-2 max-h-72 lg:max-h-[calc(100vh-12rem)] overflow-y-auto">
           <ZoneDoorTree
-            key={refreshKey}
+            key={`${projectId}-${refreshKey}`}
+            selectedZoneId={selectedZoneId}
+            selectedDoorId={selectedDoorId}
             onSelectZone={onSelectZone}
             onSelectDoor={onSelectDoor}
             onZoneAdded={handleZoneAdded}

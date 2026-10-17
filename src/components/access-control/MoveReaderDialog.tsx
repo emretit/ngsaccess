@@ -5,7 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import {
   Select,
   SelectContent,
@@ -16,13 +16,14 @@ import {
 import { notify } from "@/lib/notify";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 
-type ReaderDirection = "entry" | "exit" | "both";
+import { initialReaderMoveSelection, readerMoveConflict, type ReaderDirection } from "./readerMove";
 
 interface TargetDoor {
   id: Id<"doors">;
   name: string;
   readerCount: number;
   maxReaders: number;
+  directions: ReaderDirection[];
 }
 
 interface MoveReaderDialogProps {
@@ -33,11 +34,6 @@ interface MoveReaderDialogProps {
   currentDoorId: Id<"doors">;
   currentDirection: ReaderDirection;
   targetDoors: TargetDoor[];
-}
-
-function nextDirection(target: TargetDoor | undefined): ReaderDirection {
-  if (!target) return "entry";
-  return target.readerCount > 0 ? "exit" : "entry";
 }
 
 export function MoveReaderDialog({
@@ -58,24 +54,27 @@ export function MoveReaderDialog({
   const [targetDoorId, setTargetDoorId] = useState<Id<"doors"> | "">("");
   const [direction, setDirection] = useState<ReaderDirection>(currentDirection);
 
+  const selectedTarget = availableTargets.find(door => door.id === targetDoorId);
+  const conflict = readerMoveConflict(direction, selectedTarget?.directions ?? []);
+
   const moveReader = useMutation(api.readers.move);
   const { run: move, pending: isSubmitting } = useAsyncAction(async () => {
-    if (!targetDoorId) throw new Error("Hedef kapı seçin");
+    if (conflict) throw new Error("Hedefte bu yön dolu. Başka yön veya kapı seçin.");
+    if (!targetDoorId || !selectedTarget) throw new Error("Hedef kapı seçin");
     await moveReader({ readerId, targetDoorId, direction });
     notify.success("Okuyucu taşındı");
   });
 
   useEffect(() => {
     if (!open) return;
-    const firstTarget = availableTargets[0];
-    setTargetDoorId(firstTarget?.id ?? "");
-    setDirection(nextDirection(firstTarget));
-  }, [open, availableTargets]);
+    const initial = initialReaderMoveSelection(currentDirection);
+    setTargetDoorId(initial.targetDoorId);
+    setDirection(initial.direction);
+  }, [open, readerId, currentDirection]);
 
   const handleTargetChange = (value: string) => {
     const selected = availableTargets.find((door) => door.id === value);
-    setTargetDoorId((selected?.id ?? "") as Id<"doors"> | "");
-    setDirection(nextDirection(selected));
+    setTargetDoorId(selected?.id ?? "");
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -95,14 +94,13 @@ export function MoveReaderDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           <p className="text-sm text-muted-foreground">{readerName}, {targetDoors.find((door) => door.id === currentDoorId)?.name ?? "kaynak kapı"} üzerinden seçilen hedefe mantıksal olarak taşınacak. Kaynaktaki son okuyucuysa kapı okuyucusuz kalır. Fiziksel kablolama değişmez.</p>
           <div className="space-y-2">
-            <Label>Okuyucu</Label>
+            <p className="text-sm font-medium">Okuyucu</p>
             <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">{readerName}</div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="targetDoor">Hedef Kapı</Label>
-            <Select value={targetDoorId} onValueChange={handleTargetChange}>
-              <SelectTrigger id="targetDoor">
+          <FormFieldWrapper htmlFor="targetDoor" label="Hedef kapı">
+            {control => <Select disabled={isSubmitting} value={targetDoorId} onValueChange={handleTargetChange}>
+              <SelectTrigger {...control}>
                 <SelectValue placeholder="Kapı seçin" />
               </SelectTrigger>
               <SelectContent>
@@ -112,16 +110,15 @@ export function MoveReaderDialog({
                   </SelectItem>
                 ))}
               </SelectContent>
-            </Select>
-            {availableTargets.length === 0 && (
-              <p className="text-xs text-muted-foreground">Bu panelde taşınabilecek boş kapı yok.</p>
-            )}
-          </div>
+            </Select>}
+          </FormFieldWrapper>
+          {availableTargets.length === 0 && (
+            <p className="text-xs text-muted-foreground">Bu panelde taşınabilecek boş kapı yok.</p>
+          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="readerDirection">Yeni Yön</Label>
-            <Select value={direction} onValueChange={(value) => setDirection(value as ReaderDirection)}>
-              <SelectTrigger id="readerDirection">
+          <FormFieldWrapper htmlFor="readerDirection" label="Yeni yön" error={conflict ? "Hedef kapıda bu yön dolu. Yönü veya hedef kapıyı kendiniz değiştirin." : undefined}>
+            {control => <Select disabled={isSubmitting} value={direction} onValueChange={(value) => setDirection(value as ReaderDirection)}>
+              <SelectTrigger {...control}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -129,14 +126,14 @@ export function MoveReaderDialog({
                 <SelectItem value="exit">Çıkış</SelectItem>
                 <SelectItem value="both">Giriş/Çıkış</SelectItem>
               </SelectContent>
-            </Select>
-          </div>
-
+            </Select>}
+          </FormFieldWrapper>
+          <p className="text-sm text-muted-foreground">Yön: {currentDirection === "entry" ? "Giriş" : currentDirection === "exit" ? "Çıkış" : "Giriş/Çıkış"} → {direction === "entry" ? "Giriş" : direction === "exit" ? "Çıkış" : "Giriş/Çıkış"}</p>
           <DialogFooter>
             <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => onOpenChange(false)}>
               İptal
             </Button>
-            <Button type="submit" disabled={isSubmitting || !targetDoorId}>
+            <Button type="submit" disabled={isSubmitting || !targetDoorId || conflict}>
               {isSubmitting ? "Taşınıyor..." : "Taşı"}
             </Button>
           </DialogFooter>

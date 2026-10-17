@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -11,7 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/notify";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
@@ -45,92 +46,59 @@ export function EditReaderDialog({
   const [name, setName] = useState(readerName);
   const [direction, setDirection] = useState<ReaderDirection>(readerDirection);
   const [requireSensor, setRequireSensor] = useState(initialRequireSensor ?? true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
+  const [partialSave, setPartialSave] = useState(false);
   const updateDoor = useMutation(api.doors.update);
   const updateReader = useMutation(api.readers.update);
 
+  const { run, pending: isSubmitting } = useAsyncAction(async () => {
+    setPartialSave(false);
+    if (!name.trim()) throw new Error("Okuyucu adı gereklidir.");
+    if (readerId) {
+      await updateReader({ readerId, name: name.trim(), direction });
+      if (isIdeDoor) {
+        try { await updateDoor({ doorId, requireSensor }); }
+        catch (error: unknown) { setPartialSave(true); throw error; }
+      }
+    } else {
+      await updateDoor({ doorId, readerName: name.trim(), readerDirection: direction,
+        ...(isIdeDoor ? { requireSensor } : {}) });
+    }
+    notify.success("Okuyucu güncellendi");
+  }, { error: "Okuyucu ayarları kaydedilemedi" });
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      toast({ variant: "destructive", title: "Hata", description: "Okuyucu adı gereklidir." });
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      if (readerId) {
-        // Okuyucu ad/yönü readers tablosuna; sensör ayarı (IDE) ayrıca kapıya yazılır.
-        await updateReader({ readerId, name: name.trim(), direction });
-        if (isIdeDoor) await updateDoor({ doorId, requireSensor });
-      } else {
-        // Legacy kapı: readers satırı yok → eski davranış (kapı alanları).
-        await updateDoor({
-          doorId,
-          readerName: name.trim(),
-          readerDirection: direction,
-          ...(isIdeDoor ? { requireSensor } : {}),
-        });
-      }
-      toast({ title: "Başarılı", description: "Okuyucu güncellendi." });
-      onOpenChange(false);
-    } catch (error: unknown) {
-      toast({
-        variant: "destructive",
-        title: "Hata",
-        description: error instanceof Error ? error.message : "Okuyucu güncellenirken hata oluştu.",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+    if (await run()) onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={next => { if (!isSubmitting) onOpenChange(next); }}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Okuyucuyu Düzenle</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="readerName" className="text-right">Ad *</Label>
-              <Input
-                id="readerName"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="col-span-3"
-                placeholder="Okuyucu adı"
-                required
-              />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="readerDirection" className="text-right">Yön</Label>
-              <Select value={direction} onValueChange={(val) => setDirection(val as ReaderDirection)}>
-                <SelectTrigger id="readerDirection" className="col-span-3">
-                  <SelectValue />
-                </SelectTrigger>
+          {partialSave && <p role="alert" className="text-sm text-destructive">Okuyucu adı ve yönü kaydedildi; kapı sensörü kaydedilemedi. Sensör ayarını yeniden deneyin.</p>}
+          <fieldset disabled={isSubmitting} className="grid gap-4 py-4">
+            <FormFieldWrapper htmlFor="readerName" label="Okuyucu adı *">
+              <Input id="readerName" value={name} onChange={e => setName(e.target.value)} placeholder="Okuyucu adı" required />
+            </FormFieldWrapper>
+            <FormFieldWrapper htmlFor="readerDirection" label="Yön">
+              {control => <Select disabled={isSubmitting} value={direction} onValueChange={value => setDirection(value as ReaderDirection)}>
+                <SelectTrigger {...control}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="entry">Giriş</SelectItem>
                   <SelectItem value="exit">Çıkış</SelectItem>
                   <SelectItem value="both">Giriş/Çıkış</SelectItem>
                 </SelectContent>
-              </Select>
-            </div>
-            {isIdeDoor && (
-              <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="requireSensor" className="text-right pt-1">Kapı Sensörü</Label>
-                <div className="col-span-3 flex items-start gap-2">
-                  <Switch id="requireSensor" checked={requireSensor} onCheckedChange={setRequireSensor} />
-                  <span className="text-xs text-muted-foreground">
-                    Açık: kapıda fiziksel sensör var, açılış sensörle onaylanır. Kapalı: sensörsüz kapı —
-                    role darbesi sensör beklemeden tamamlanır (sensörsüzde kapalı olmalı, yoksa erişim "busy"de takılır).
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
+              </Select>}
+            </FormFieldWrapper>
+            {isIdeDoor && <FormFieldWrapper htmlFor="requireSensor" label="Kapı sensörü (bu kapıya ait)"
+              hint="Kapıda fiziksel sensör varsa açın. Kapalıysa açılış sensör yanıtı beklenmeden tamamlanır.">
+              <Switch id="requireSensor" disabled={isSubmitting} checked={requireSensor} onCheckedChange={setRequireSensor} />
+            </FormFieldWrapper>}
+          </fieldset>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>İptal</Button>
+            <Button type="button" variant="outline" disabled={isSubmitting} onClick={() => onOpenChange(false)}>İptal</Button>
             <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Kaydediliyor..." : "Kaydet"}</Button>
           </DialogFooter>
         </form>
