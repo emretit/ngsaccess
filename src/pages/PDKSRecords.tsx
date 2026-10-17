@@ -1,277 +1,508 @@
-import { subDays } from "date-fns";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toLocalDateString } from "@/lib/date";
 import { summarizePdksRecords } from "@/lib/pdksSummary";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { usePdksTableData } from "@/hooks/usePdksTableData";
+import { usePdksFilterOptions } from "@/hooks/usePdksFilterOptions";
+import { usePdksFilterParams } from "@/hooks/usePdksFilterParams";
 import { PDKSDateNavigator } from "@/components/pdks/dashboard/PDKSDateNavigator";
-import { useCallback, useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { PDKSFilterBar, type FilterValues, type StatusFilter } from "@/components/pdks/dashboard/PDKSFilterBar";
-import { PDKSSummaryCards } from "@/components/pdks/dashboard/PDKSSummaryCards";
+import {
+  PDKSFilterBar,
+  clearPdksFilters,
+  type FilterValues,
+  type ReportType,
+} from "@/components/pdks/dashboard/PDKSFilterBar";
 import { PDKSTableView } from "@/components/pdks/dashboard/PDKSTableView";
+import { PDKSChartView } from "@/components/pdks/dashboard/PDKSChartView";
 import { PDKSHeatmapView } from "@/components/pdks/dashboard/PDKSHeatmapView";
 import { PDKSEmployeeDetailDrawer } from "@/components/pdks/dashboard/PDKSEmployeeDetailDrawer";
-import { PDKSChartView } from "@/components/pdks/dashboard/PDKSChartView";
 import { PDKSEnhancedExportPanel } from "@/components/pdks/dashboard/PDKSEnhancedExportPanel";
-import { PDKSMobileDrawer } from "@/components/pdks/dashboard/PDKSMobileDrawer";
-import { PDKSQuickPresets } from "@/components/pdks/dashboard/PDKSQuickPresets";
-import { PDKSActiveFilterChips } from "@/components/pdks/dashboard/PDKSActiveFilterChips";
-import { PDKSSavedViews } from "@/components/pdks/dashboard/PDKSSavedViews";
-import { PDKSOvertimeAlert } from "@/components/pdks/dashboard/PDKSOvertimeAlert";
 import { PDKSImportDialog } from "@/components/pdks/dashboard/PDKSImportDialog";
-import { PDKSSmartPresets, type SmartPresetSelection } from "@/components/pdks/dashboard/PDKSSmartPresets";
-import { Upload } from "lucide-react";
+import { PDKSQuickPresets } from "@/components/pdks/dashboard/PDKSQuickPresets";
+import {
+  PDKSSmartPresets,
+  type SmartPresetSelection,
+} from "@/components/pdks/dashboard/PDKSSmartPresets";
+import { PDKSOvertimeAlert } from "@/components/pdks/dashboard/PDKSOvertimeAlert";
+import { PDKSSavedViews } from "@/components/pdks/dashboard/PDKSSavedViews";
 import { PDKSAiChat } from "@/components/pdks/PDKSAiChat";
-import { PDKSInlineQuery } from "@/components/pdks/PDKSInlineQuery";
-import { usePdksStats } from "@/hooks/usePdksStats";
-import { usePdksTableData } from "@/hooks/usePdksTableData";
-import { usePdksFilterParams } from "@/hooks/usePdksFilterParams";
+import { STATUS_FILTER_LABELS } from "@/components/pdks/statusMeta";
+import {
+  formatDuration,
+  readableDate,
+} from "@/components/pdks/lib/presentation";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { BulkBar } from "@/components/shared/BulkBar";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { MessageSquare, BarChart3, Table2, Download, X, LayoutGrid } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { Id } from "../../convex/_generated/dataModel";
-
 const DEFAULT_FILTERS: FilterValues = {
   dateRange: { from: undefined, to: undefined },
   reportType: "daily",
-  companyId: undefined,
-  departmentId: undefined,
-  positionId: undefined,
-  shiftId: undefined,
   statusFilter: "all",
   person: "",
 };
-
 export default function PDKSRecords() {
-  const [activeTab, setActiveTab] = useState("table");
-  const [showAiChat, setShowAiChat] = useState(false);
-  const [showImport, setShowImport] = useState(false);
-  const [smartPreset, setSmartPreset] = useState<SmartPresetSelection | null>(null);
-  const { filters, setFilters } = usePdksFilterParams(DEFAULT_FILTERS);
+  const { projectId } = useActiveProject();
+  const { filters, setFilters } = usePdksFilterParams(DEFAULT_FILTERS, projectId);
+  return (
+    <QuerySectionBoundary
+      title="PDKS kayıtları yüklenemedi."
+      description="Bağlantınızı kontrol edip yeniden deneyin."
+      resetKey={`${projectId}:${JSON.stringify(filters)}`}
+      className="min-w-0 max-w-full"
+    >
+      <PDKSContent key={projectId} filters={filters} setFilters={setFilters} />
+    </QuerySectionBoundary>
+  );
+}
+function PDKSContent({
+  filters,
+  setFilters,
+}: {
+  filters: FilterValues;
+  setFilters: (v: FilterValues) => void;
+}) {
+  const navigate = useNavigate();
+  const { departments, companies, positions, shifts } = usePdksFilterOptions();
+  const {
+    projectId,
+    activeProject,
+    loading: projectLoading,
+  } = useActiveProject();
+  const [ai, setAi] = useState(false),
+    [importOpen, setImport] = useState(false),
+    [datesOpen, setDatesOpen] = useState(false),
+    [analysis, setAnalysis] = useState(false),
+    [warningsOpen, setWarningsOpen] = useState(false);
+  const [rangeError, setRangeError] = useState("");
+  const [smartPreset, setSmartPreset] = useState<SmartPresetSelection | null>(
+    null,
+  );
+  const [selection, setSelection] = useState<{
+    scope: string;
+    ids: Set<string>;
+  }>({ scope: "", ids: new Set() });
   const [drilldown, setDrilldown] = useState<{
+    scope: string;
     employeeId: Id<"employees">;
-    date?: string;
+    date: string;
   } | null>(null);
   const {
-    tableRecords: rawTableRecords,
-    allRecords,
-    isLoading: tableLoading,
+    tableRecords: rawRecords,
+    allRecords: rawAllRecords,
+    isLoading,
     selectedDate,
     dateRangeLabel,
     startDate,
     endDate,
   } = usePdksTableData(filters);
-
-  const todayKey = toLocalDateString();
   const selectedDateKey = toLocalDateString(selectedDate);
-  const showLiveStats = filters.reportType === "daily" && selectedDateKey === todayKey;
-
-  const { stats: liveData, isLoading: statsLoading } = usePdksStats({
-    companyId: filters.companyId,
-    departmentId: filters.departmentId,
-    positionId: filters.positionId,
-    shiftId: filters.shiftId,
-    compareWithPrevious: true,
-    enabled: showLiveStats,
-  });
-
-  const effectiveSmartPreset = smartPreset?.date && smartPreset.date !== selectedDateKey ? null : smartPreset;
-  const tableRecords = effectiveSmartPreset
-    ? rawTableRecords.filter((r) =>
-        effectiveSmartPreset.employeeIds.some((id) => String(id) === String(r.id)),
-      )
-    : rawTableRecords;
-
-  const summaryData = summarizePdksRecords(allRecords, todayKey);
-
-  const activeFilterCount =
-    (filters.dateRange.from ? 1 : 0) +
-    (filters.reportType !== "daily" ? 1 : 0) +
-    (filters.companyId ? 1 : 0) +
-    (filters.departmentId ? 1 : 0) +
-    (filters.positionId ? 1 : 0) +
-    (filters.shiftId ? 1 : 0) +
-    (filters.statusFilter !== "all" ? 1 : 0) +
-    (filters.person ? 1 : 0);
-
-  const handleCardClick = useCallback(
-    (status: StatusFilter) => {
-      setFilters({ ...filters, statusFilter: status });
-    },
-    [filters, setFilters]
+  const effectiveSmartPreset =
+    smartPreset?.date && smartPreset.date !== selectedDateKey
+      ? null
+      : smartPreset;
+  const matchesSmartPreset = (id: string) =>
+    !effectiveSmartPreset ||
+    effectiveSmartPreset.employeeIds.some((employeeId) => employeeId === id);
+  const records = rawRecords.filter((record) => matchesSmartPreset(record.id));
+  const allRecords = rawAllRecords.filter((record) =>
+    matchesSmartPreset(record.id),
   );
-
-  const handleHeatmapCellClick = useCallback(
-    (employeeId: string, date: string) => {
-      setDrilldown({ employeeId: employeeId as Id<"employees">, date });
-    },
-    []
+  const scope = `${projectId}:${JSON.stringify(filters)}:${effectiveSmartPreset?.key ?? ""}`;
+  const selectedIds =
+    selection.scope === scope
+      ? new Set(
+          [...selection.ids].filter((id) =>
+            records.some((record) => record.id === id),
+          ),
+        )
+      : new Set<string>();
+  const detail = drilldown?.scope === scope ? drilldown : null;
+  const summary = summarizePdksRecords(allRecords, toLocalDateString());
+  const exportRows = selectedIds.size
+    ? records.filter((r) => selectedIds.has(r.id))
+    : records;
+  const hasFilters = Boolean(
+    filters.person ||
+    filters.companyId ||
+    filters.departmentId ||
+    filters.positionId ||
+    filters.shiftId ||
+    filters.statusFilter !== "all" ||
+    effectiveSmartPreset,
   );
-
+  const filterSummary =
+    [
+      effectiveSmartPreset?.label,
+      filters.person && `Ad / soyad: ${filters.person}`,
+      filters.departmentId &&
+        `Departman: ${departments?.find((d) => d._id === filters.departmentId)?.name ?? "Seçili"}`,
+      filters.companyId &&
+        `Şirket: ${companies?.find((c) => c._id === filters.companyId)?.name ?? "Seçili"}`,
+      filters.positionId &&
+        `Pozisyon: ${positions?.find((p) => p._id === filters.positionId)?.name ?? "Seçili"}`,
+      filters.shiftId &&
+        `Vardiya: ${shifts?.find((s) => s._id === filters.shiftId)?.name ?? "Seçili"}`,
+      filters.statusFilter !== "all" &&
+        STATUS_FILTER_LABELS[filters.statusFilter],
+    ]
+      .filter(Boolean)
+      .join(" · ") || "Tüm personel";
+  const openDetail = (employeeId: string, date: string) =>
+    setDrilldown({ scope, employeeId: employeeId as Id<"employees">, date });
+  const counters = [
+    { status: "present", value: summary.present },
+    { status: "late", value: summary.late },
+    { status: "absent", value: summary.absent },
+    { status: "leave", value: summary.leave },
+  ] as const;
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">PDKS Kayıtları</h1>
-          <div className="flex flex-wrap items-center gap-2 mt-1">
-            <p className="text-sm text-muted-foreground">
-              Personel Devam Kontrol Sistemi
-            </p>
-            <PDKSDateNavigator values={filters} onChange={setFilters} />
-            <Badge variant="secondary" className="text-xs">
-              {tableRecords.length} çalışan
-            </Badge>
-          </div>
+    <div className="min-w-0 max-w-full space-y-4">
+      <PageHeader
+        title="PDKS Kayıtları"
+        scope={`${activeProject?.name ?? "Proje seçin"} · ${filters.reportType === "daily" ? readableDate(selectedDateKey) : dateRangeLabel}`}
+        secondaryMenu={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">Diğer</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setImport(true)}>
+                İçe aktar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setWarningsOpen(true)}>
+                Uyarılar
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setAi(true)}>
+                Asistan
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setAnalysis((v) => !v)}>
+                {analysis ? "Kayıtlara dön" : "Analiz"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
+      >
+        <PDKSEnhancedExportPanel
+          records={exportRows}
+          dateRange={dateRangeLabel}
+          selectedDate={selectedDate}
+          filterSummary={filterSummary}
+          selectedCount={selectedIds.size}
+          totalCount={records.length}
+          disabled={isLoading || !projectId}
+        />
+      </PageHeader>
+      <div className="flex min-w-0 flex-col flex-wrap gap-3 sm:flex-row sm:items-center">
+        <div
+          className="flex flex-wrap gap-1"
+          role="group"
+          aria-label="Rapor dönemi"
+        >
+          {(
+            [
+              ["daily", "Günlük"],
+              ["weekly", "Haftalık"],
+              ["monthly", "Aylık"],
+            ] as const
+          ).map(([value, label]) => (
+            <Button
+              key={value}
+              variant={filters.reportType === value ? "secondary" : "ghost"}
+              aria-pressed={filters.reportType === value}
+              onClick={() =>
+                setFilters({
+                  ...filters,
+                  reportType: value as ReportType,
+                  dateRange: { from: undefined, to: undefined },
+                })
+              }
+            >
+              {label}
+            </Button>
+          ))}
         </div>
-        <div className="flex items-center gap-2">
-          <PDKSSavedViews filters={filters} onApply={setFilters} />
+        <PDKSDateNavigator values={filters} onChange={setFilters} />
+        <Button variant="ghost" onClick={() => setDatesOpen(true)}>
+          Tarih ve kayıtlı görünümler
+        </Button>
+      </div>
+      <PDKSFilterBar
+        values={filters}
+        onChange={setFilters}
+        onClear={() => setSmartPreset(null)}
+      />
+      {effectiveSmartPreset && (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span>{effectiveSmartPreset.label}</span>
           <Button
-            variant="outline"
             size="sm"
-            onClick={() => setShowImport(true)}
-            className="gap-2"
+            variant="ghost"
+            onClick={() => setSmartPreset(null)}
           >
-            <Upload className="h-4 w-4" />
-            <span className="hidden sm:inline">İçe Aktar</span>
+            Uyarı filtresini kaldır
           </Button>
-          <PDKSMobileDrawer
-            values={filters}
-            onChange={setFilters}
-            activeFilterCount={activeFilterCount}
-          />
         </div>
-      </div>
-
-      <div className="hidden lg:block">
-        <PDKSFilterBar values={filters} onChange={setFilters} />
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <PDKSQuickPresets values={filters} onChange={setFilters} />
-        <PDKSActiveFilterChips values={filters} onChange={setFilters} />
-      </div>
-
-      <PDKSSmartPresets
-        key={selectedDateKey}
-        anchorDate={selectedDate}
-        selection={effectiveSmartPreset}
-        onChange={setSmartPreset}
-      />
-
-      <PDKSOvertimeAlert />
-
-      <PDKSSummaryCards
-        data={summaryData}
-        loading={tableLoading}
-        liveData={showLiveStats ? liveData : undefined}
-        liveLoading={statsLoading}
-        isPeriod={filters.reportType !== "daily"}
-        onCardClick={handleCardClick}
-      />
-
-      <PDKSInlineQuery
-        filters={filters}
-        onApplyFilters={setFilters}
-        onOpenChat={() => setShowAiChat(true)}
-      />
-
-      <Card className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="px-4 py-3 border-b border-border">
-            <TabsList className="grid w-full grid-cols-4 h-10 bg-muted">
-              <TabsTrigger value="table" className="flex items-center gap-2 text-xs sm:text-sm">
-                <Table2 className="h-4 w-4" />
-                <span>Tablo</span>
-              </TabsTrigger>
-              <TabsTrigger value="heatmap" className="flex items-center gap-2 text-xs sm:text-sm">
-                <LayoutGrid className="h-4 w-4" />
-                <span>Heatmap</span>
-              </TabsTrigger>
-              <TabsTrigger value="charts" className="flex items-center gap-2 text-xs sm:text-sm">
-                <BarChart3 className="h-4 w-4" />
-                <span>Grafikler</span>
-              </TabsTrigger>
-              <TabsTrigger value="export" className="flex items-center gap-2 text-xs sm:text-sm">
-                <Download className="h-4 w-4" />
-                <span>Dışa Aktar</span>
-              </TabsTrigger>
-            </TabsList>
+      )}
+      {projectLoading || isLoading ? (
+        <SectionSkeleton rows={6} label="PDKS kayıtları yükleniyor." />
+      ) : !projectId ? (
+        <EmptyState
+          title="Bir proje seçin."
+          description="PDKS kayıtlarını görmek için üst çubuktan proje seçin."
+        />
+      ) : (
+        <>
+          <div
+            className="flex flex-wrap items-center gap-x-4 gap-y-2 border-y py-3 text-xs tabular-nums"
+            aria-label="Durum özeti"
+          >
+            <span>{summary.totalEmployees} personel</span>
+            {counters.map((c) => (
+              <span key={c.status}>
+                {STATUS_FILTER_LABELS[c.status]} <strong>{c.value}</strong>{" "}
+                {filters.reportType === "daily" ? "kişi" : "kişi-gün"}
+              </span>
+            ))}
+            <span>
+              Fazla mesai{" "}
+              {formatDuration(Math.round(summary.overtimeHours * 60))}
+            </span>
+            <label className="flex flex-wrap items-center gap-2">
+              Durum
+              <select
+                className="h-9 rounded-md border border-input bg-background px-2"
+                value={filters.statusFilter}
+                onChange={(e) =>
+                  setFilters({
+                    ...filters,
+                    statusFilter: e.target
+                      .value as FilterValues["statusFilter"],
+                  })
+                }
+              >
+                {Object.entries(STATUS_FILTER_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-
-          <div className="p-4">
-            <TabsContent value="table" className="mt-0">
-              <PDKSTableView
-                key={`${filters.reportType}:${startDate}:${endDate}`}
-                records={tableRecords}
-                loading={tableLoading}
-                selectedDate={selectedDate}
-                editDate={filters.reportType === "daily" ? selectedDateKey : undefined}
-                onShowDetail={(employeeId) => setDrilldown({ employeeId })}
-              />
-            </TabsContent>
-
-            <TabsContent value="heatmap" className="mt-0">
-              <PDKSHeatmapView
-                records={tableRecords}
-                loading={tableLoading}
-                startDate={startDate}
-                endDate={endDate}
-                onCellClick={handleHeatmapCellClick}
-              />
-            </TabsContent>
-
-            <TabsContent value="charts" className="mt-0">
-              <PDKSChartView
-                startDate={filters.reportType === "daily" ? toLocalDateString(subDays(selectedDate, 6)) : startDate}
-                endDate={endDate}
-              />
-            </TabsContent>
-
-            <TabsContent value="export" className="mt-0">
-              <PDKSEnhancedExportPanel
-                records={tableRecords}
-                selectedDate={selectedDate}
-                dateRange={dateRangeLabel}
-              />
-            </TabsContent>
-          </div>
-        </Tabs>
-      </Card>
-
+          <BulkBar
+            count={selectedIds.size}
+            onClear={() => setSelection({ scope, ids: new Set() })}
+          >
+            <span className="text-xs">
+              Dışa aktar menüsü seçili satırları kullanır.
+            </span>
+          </BulkBar>
+          {records.length === 0 ? (
+            <EmptyState
+              title={
+                hasFilters
+                  ? "Bu filtrelerle eşleşen personel yok."
+                  : "Bu projede personel bulunamadı."
+              }
+              description={
+                hasFilters
+                  ? "Aramayı değiştirin veya filtreleri temizleyin."
+                  : "Personel ekleyerek PDKS kayıtlarını izlemeye başlayın."
+              }
+              action={{
+                label: hasFilters ? "Filtreleri temizle" : "Kişilere git",
+                onClick: () => {
+                  if (hasFilters) {
+                    setSmartPreset(null);
+                    setFilters(clearPdksFilters(filters));
+                  } else navigate("/employees");
+                },
+              }}
+            />
+          ) : analysis ? (
+            <PDKSChartView
+              records={records}
+              scope={`${activeProject?.name} · ${dateRangeLabel} · ${filterSummary}`}
+            />
+          ) : filters.reportType === "daily" ? (
+            <PDKSTableView
+              records={records}
+              selectedIds={selectedIds}
+              onSelectionChange={(ids) => setSelection({ scope, ids })}
+              onShowDetail={(id) => openDetail(id, selectedDateKey)}
+            />
+          ) : (
+            <PDKSHeatmapView
+              records={records}
+              loading={false}
+              startDate={startDate}
+              endDate={endDate}
+              onCellClick={openDetail}
+            />
+          )}
+          <p className="text-xs text-muted-foreground">
+            {records.length} personel gösteriliyor · Saatler İstanbul saatidir.
+          </p>
+        </>
+      )}
       <PDKSEmployeeDetailDrawer
-        open={drilldown !== null}
-        onOpenChange={(open) => !open && setDrilldown(null)}
-        employeeId={drilldown?.employeeId ?? null}
+        open={detail !== null}
+        onOpenChange={(open) => {
+          if (!open) setDrilldown(null);
+        }}
+        employeeId={detail?.employeeId ?? null}
         startDate={startDate}
         endDate={endDate}
-        highlightDate={drilldown?.date}
+        highlightDate={detail?.date}
       />
-
-      <PDKSImportDialog open={showImport} onOpenChange={setShowImport} />
-
-      <Sheet open={showAiChat} onOpenChange={setShowAiChat}>
-        <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
-          <SheetHeader className="px-4 py-3 border-b border-border bg-primary text-primary-foreground">
-            <SheetTitle className="flex items-center gap-2 text-primary-foreground">
-              <MessageSquare className="h-5 w-5" />
-              AI Asistan — PDKS Veri Analizi
-            </SheetTitle>
+      <PDKSImportDialog open={importOpen} onOpenChange={setImport} />
+      <Sheet open={ai} onOpenChange={setAi}>
+        <SheetContent className="flex w-full flex-col sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle>PDKS Asistanı</SheetTitle>
+            <SheetDescription>
+              Asistan sorguları kendi kapsamını belirtir. Bu sayfanın
+              filtrelerini otomatik uygulamaz.
+            </SheetDescription>
           </SheetHeader>
-          <div className="flex-1 overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-hidden">
             <PDKSAiChat />
           </div>
         </SheetContent>
       </Sheet>
-
-      <div className="lg:hidden fixed bottom-6 right-6 z-40">
-        <Button
-          onClick={() => setShowAiChat(!showAiChat)}
-          size="icon"
-          className="rounded-full h-14 w-14 shadow-lg"
-        >
-          {showAiChat ? <X className="h-5 w-5" /> : <MessageSquare className="h-5 w-5" />}
-        </Button>
-      </div>
+      <Sheet open={warningsOpen} onOpenChange={setWarningsOpen}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+          <SheetHeader>
+            <SheetTitle>Uyarılar</SheetTitle>
+            <SheetDescription>
+              {activeProject?.name} · Her uyarının tarih kapsamı aşağıda
+              belirtilir.
+            </SheetDescription>
+          </SheetHeader>
+          <QuerySectionBoundary
+            resetKey={`${projectId}:${selectedDateKey}`}
+            title="Uyarılar yüklenemedi."
+          >
+            <div className="mt-5 space-y-5">
+              <PDKSSmartPresets
+                anchorDate={selectedDate}
+                selection={effectiveSmartPreset}
+                onChange={setSmartPreset}
+              />
+              <PDKSOvertimeAlert year={selectedDate.getFullYear()} />
+            </div>
+          </QuerySectionBoundary>
+        </SheetContent>
+      </Sheet>
+      <Sheet open={datesOpen} onOpenChange={(open) => {
+        setDatesOpen(open);
+        if (!open) setRangeError("");
+      }}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Tarih ve kayıtlı görünümler</SheetTitle>
+            <SheetDescription>Seçili dönem: {dateRangeLabel}</SheetDescription>
+          </SheetHeader>
+          <div className="mt-5 space-y-5">
+            <PDKSQuickPresets values={filters} onChange={setFilters} />
+            <PDKSSavedViews filters={filters} onApply={setFilters} />
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">
+                Özel tarih aralığı
+              </legend>
+              <label className="block text-xs">
+                Başlangıç
+                <input
+                  type="date"
+                  className="mt-1 block h-9 w-full rounded-md border bg-background px-3"
+                  value={
+                    filters.dateRange.from
+                      ? toLocalDateString(filters.dateRange.from)
+                      : startDate
+                  }
+                  max={
+                    filters.dateRange.to
+                      ? toLocalDateString(filters.dateRange.to)
+                      : undefined
+                  }
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    const from = new Date(`${e.target.value}T12:00:00`);
+                    const to =
+                      filters.dateRange.to ?? new Date(`${endDate}T12:00:00`);
+                    if (from > to) {
+                      setRangeError("Başlangıç tarihi bitişten sonra olamaz.");
+                      return;
+                    }
+                    setRangeError("");
+                    setFilters({
+                      ...filters,
+                      reportType: "custom",
+                      dateRange: { from, to },
+                    });
+                  }}
+                />
+              </label>
+              <label className="block text-xs">
+                Bitiş
+                <input
+                  type="date"
+                  className="mt-1 block h-9 w-full rounded-md border bg-background px-3"
+                  value={
+                    filters.dateRange.to
+                      ? toLocalDateString(filters.dateRange.to)
+                      : endDate
+                  }
+                  min={
+                    filters.dateRange.from
+                      ? toLocalDateString(filters.dateRange.from)
+                      : undefined
+                  }
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    const from =
+                      filters.dateRange.from ??
+                      new Date(`${startDate}T12:00:00`);
+                    const to = new Date(`${e.target.value}T12:00:00`);
+                    if (from > to) {
+                      setRangeError("Bitiş tarihi başlangıçtan önce olamaz.");
+                      return;
+                    }
+                    setRangeError("");
+                    setFilters({
+                      ...filters,
+                      reportType: "custom",
+                      dateRange: { from, to },
+                    });
+                  }}
+                />
+              </label>
+              {rangeError && (
+                <p role="alert" className="text-xs text-danger">
+                  {rangeError}
+                </p>
+              )}
+            </fieldset>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

@@ -1,13 +1,29 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useProjectAccess } from "./useProjectAccess";
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from "date-fns";
-import { filterPdksTableRows } from "../../convex/lib/pdksTable";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import {
+  startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+  format,
+} from "date-fns";
+import { filterPdksRows } from "@/components/pdks/lib/presentation";
 import { tr } from "date-fns/locale";
 import type { Id } from "../../convex/_generated/dataModel";
 
 export type ExportFormat = "daily" | "weekly" | "monthly" | "custom";
-export type PdksStatusFilter = "all" | "present" | "late" | "absent" | "leave" | "overtime";
+export type PdksStatusFilter =
+  | "all"
+  | "present"
+  | "late"
+  | "absent"
+  | "leave"
+  | "overtime"
+  | "weekend"
+  | "holiday"
+  | "future"
+  | "noData";
 
 export interface PdksTableFilters {
   anchorDate?: Date;
@@ -22,7 +38,7 @@ export interface PdksTableFilters {
 }
 
 export const usePdksTableData = (filters?: PdksTableFilters) => {
-  const { loading: projectLoading } = useProjectAccess();
+  const { loading: projectLoading, projectId } = useActiveProject();
   const selectedDate = filters?.anchorDate ?? new Date();
 
   const reportType = filters?.reportType ?? "daily";
@@ -32,12 +48,14 @@ export const usePdksTableData = (filters?: PdksTableFilters) => {
     const dateRange = filters?.dateRange;
 
     const baseArgs = {
+      projectId,
       companyId: filters?.companyId,
       departmentId: filters?.departmentId,
       positionId: filters?.positionId,
       shiftId: filters?.shiftId,
       person: filters?.person,
-      viewMode: (isMatrix ? "matrix" : "single") as "matrix" | "single",
+      // Even a daily report needs its day cell for scoped analysis / late minutes.
+      viewMode: "matrix" as const,
     };
 
     if (reportType === "custom" && dateRange?.from && dateRange?.to) {
@@ -76,7 +94,7 @@ export const usePdksTableData = (filters?: PdksTableFilters) => {
 
   const tableData = useQuery(
     api.cardReadings.getPdksTableData,
-    !projectLoading ? getQueryArgs() : "skip"
+    !projectLoading && projectId ? getQueryArgs() : "skip",
   );
 
   const dateRangeLabel = () => {
@@ -102,14 +120,13 @@ export const usePdksTableData = (filters?: PdksTableFilters) => {
   return {
     tableData: tableData ?? [],
     allRecords: tableData ?? [],
-    tableRecords: filterPdksTableRows(tableData ?? [], filters?.statusFilter),
-    isLoading: projectLoading || tableData === undefined,
-    error: null,
+    tableRecords: filterPdksRows(tableData ?? [], filters?.statusFilter),
+    isLoading:
+      projectLoading || (Boolean(projectId) && tableData === undefined),
     selectedDate,
     dateRangeLabel: dateRangeLabel(),
     isMatrix,
     startDate,
     endDate,
-    refetch: () => {},
   };
 };

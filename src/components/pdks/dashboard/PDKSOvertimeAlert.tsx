@@ -1,58 +1,53 @@
-import { useMemo } from "react";
 import { useQuery } from "convex/react";
-import { AlertTriangle, ShieldAlert } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { api } from "../../../../convex/_generated/api";
-
-const WARNING_PCT = 80;
-const CRITICAL_PCT = 100;
-
-export function PDKSOvertimeAlert() {
-  const year = useMemo(() => new Date().getFullYear(), []);
-  const balance = useQuery(api.dashboard.getAnnualOvertimeBalance, { year });
-
-  if (!balance) return null;
-
-  const critical = balance.filter((b) => b.utilizationPct >= CRITICAL_PCT);
-  const warning = balance.filter(
-    (b) => b.utilizationPct >= WARNING_PCT && b.utilizationPct < CRITICAL_PCT,
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { formatDuration } from "../lib/presentation";
+export function PDKSOvertimeAlert({
+  year = new Date().getFullYear(),
+}: {
+  year?: number;
+}) {
+  const { projectId, activeProject } = useActiveProject();
+  const balance = useQuery(
+    api.dashboard.getAnnualOvertimeBalance,
+    projectId ? { projectId, year } : "skip",
   );
-
-  if (critical.length === 0 && warning.length === 0) return null;
-
-  const top = critical.length > 0 ? critical : warning;
-  const Icon = critical.length > 0 ? ShieldAlert : AlertTriangle;
-
+  if (!projectId) return <p className="text-sm">Bir proje seçin.</p>;
+  if (balance === undefined)
+    return (
+      <SectionSkeleton
+        rows={2}
+        label="Yıllık fazla mesai uyarıları yükleniyor."
+      />
+    );
+  const warnings = balance.filter((item) => item.utilizationPct >= 80);
   return (
-    <Alert
-      variant={critical.length > 0 ? "destructive" : "default"}
-      className={critical.length > 0 ? undefined : "border-amber-500 text-amber-700"}
-    >
-      <Icon className="h-4 w-4" />
-      <AlertTitle>
-        {critical.length > 0
-          ? `${critical.length} çalışan 270 saat yıllık fazla mesai sınırını aştı`
-          : `${warning.length} çalışan 270 saat sınırına yaklaşıyor (%${WARNING_PCT}+)`}
-      </AlertTitle>
-      <AlertDescription>
-        <div className="flex flex-wrap gap-1.5 mt-2">
-          {top.slice(0, 8).map((b) => (
-            <Badge
-              key={b.employeeId}
-              variant={critical.length > 0 ? "destructive" : "outline"}
-              className="text-xs font-normal"
-            >
-              {b.firstName} {b.lastName} — {b.totalOvertimeHours}h ({b.utilizationPct}%)
-            </Badge>
+    <section className="space-y-2 border-y py-4">
+      <h3 className="text-sm font-medium">Yıllık fazla mesai uyarıları</h3>
+      <p className="text-xs text-muted-foreground">
+        {year} yılı · {activeProject?.name} · Kişi ve organizasyon filtreleri
+        uygulanmaz.
+      </p>
+      {warnings.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Yıllık sınıra yaklaşan personel bulunmuyor.
+        </p>
+      ) : (
+        <ul className="divide-y">
+          {warnings.map((item) => (
+            <li key={item.employeeId} className="py-2 text-xs">
+              <p>
+                {item.firstName} {item.lastName} · %{item.utilizationPct}
+              </p>
+              <p className="mt-1 text-muted-foreground tabular-nums">
+                {formatDuration(item.totalOvertimeMinutes)} / {item.limitHours}{" "}
+                saat
+              </p>
+            </li>
           ))}
-          {top.length > 8 && (
-            <span className="text-xs text-muted-foreground">
-              +{top.length - 8} daha
-            </span>
-          )}
-        </div>
-      </AlertDescription>
-    </Alert>
+        </ul>
+      )}
+    </section>
   );
 }

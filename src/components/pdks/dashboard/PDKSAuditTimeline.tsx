@@ -78,7 +78,7 @@ export function PDKSAuditTimeline({
             </div>
           )}
           {e.note && (
-            <div className="mt-1 text-[10px] text-amber-700 bg-amber-50 rounded px-2 py-0.5 inline-block">
+            <div className="mt-1 text-[10px] text-muted-foreground bg-muted rounded px-2 py-0.5 inline-block">
               {e.note}
             </div>
           )}

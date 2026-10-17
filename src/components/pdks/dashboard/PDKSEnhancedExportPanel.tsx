@@ -1,200 +1,230 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useConvex } from "convex/react";
-import { Download, FileText, FileSpreadsheet, FileType, FileBadge } from "lucide-react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../../convex/_generated/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   exportToExcel,
   exportToCsv,
   exportToPdf,
+  exportMonthlyPayrollSheet,
   type PDKSExportRecord,
 } from "@/utils/pdksExport";
-import { format as formatDate } from "date-fns";
+import { notify, errorMessage } from "@/lib/notify";
+import { format } from "date-fns";
 import { tr } from "date-fns/locale";
-
-interface PDKSEnhancedExportPanelProps {
+type ExportType = "Excel" | "CSV" | "PDF" | "payroll" | "aphb";
+type Aphb = FunctionReturnType<typeof api.sgkExport.buildAphbForMonth>;
+interface Props {
   records?: PDKSExportRecord[];
   dateRange?: string;
   selectedDate?: Date;
+  filterSummary?: string;
+  selectedCount?: number;
+  totalCount?: number;
+  disabled?: boolean;
 }
-
 export function PDKSEnhancedExportPanel({
   records = [],
   dateRange = "",
   selectedDate = new Date(),
-}: PDKSEnhancedExportPanelProps) {
-  const [isExporting, setIsExporting] = useState(false);
-  const [exportFormat, setExportFormat] = useState<
-    "daily" | "weekly" | "monthly" | "custom"
-  >("daily");
-  const { toast } = useToast();
+  filterSummary = "Tüm personel",
+  selectedCount = 0,
+  totalCount = records.length,
+  disabled,
+}: Props) {
+  const { projectId, activeProject } = useActiveProject();
   const convex = useConvex();
-  const { projectId } = useActiveProject();
-
-  const handleSgkExport = async () => {
-    setIsExporting(true);
+  const [type, setType] = useState<ExportType | null>(null),
+    [pending, setPending] = useState(false),
+    [error, setError] = useState("");
+  const [aphb, setAphb] = useState<Aphb | null>(null);
+  const lock = useRef(false);
+  const monthly = type === "aphb" || type === "payroll";
+  const labels: Record<ExportType, string> = {
+    Excel: "Excel (.xlsx)",
+    CSV: "CSV",
+    PDF: "PDF",
+    payroll: "Aylık bordro cetveli",
+    aphb: "SGK aylık bildirim (APHB)",
+  };
+  const choose = (next: ExportType) => {
+    setError("");
+    setAphb(null);
+    setType(next);
+  };
+  const execute = async () => {
+    if (lock.current || !type) return;
+    lock.current = true;
+    setPending(true);
+    setError("");
     try {
-      const year = selectedDate.getFullYear();
-      const month = selectedDate.getMonth() + 1;
-      // APHB işyeri (proje) bazlıdır; aktif proje seçili değilse backend "Proje seçin" der.
-      const result = await convex.query(api.sgkExport.buildAphbForMonth, {
-        year,
-        month,
-        projectId,
-      });
-      if (!result.xml) {
-        toast({
-          title: "SGK XML üretilemedi",
-          description: "Veri bulunamadı.",
-          variant: "destructive",
-        });
-        return;
-      }
-      const blob = new Blob([result.xml], { type: "application/xml" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = result.filename;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast({
-        title: "SGK Aylık Bildirim",
-        description: (
-          <div>
-            <p>{result.filename} indirildi.</p>
-            {result.warnings.length > 0 && (
-              <ul className="mt-2 list-disc pl-4">
-                {result.warnings.map((warning, index) => <li key={index}>{warning}</li>)}
-              </ul>
-            )}
-          </div>
-        ),
-      });
+      if (type === "aphb") {
+        if (!aphb) {
+          const result = await convex.query(api.sgkExport.buildAphbForMonth, {
+            projectId,
+            year: selectedDate.getFullYear(),
+            month: selectedDate.getMonth() + 1,
+          });
+          if (!result.xml) throw new Error("Bildirim için veri bulunamadı.");
+          setAphb(result);
+          return;
+        }
+        const url = URL.createObjectURL(
+          new Blob([aphb.xml], { type: "application/xml" }),
+        );
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = aphb.filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else if (type === "payroll") {
+        const data = await convex.query(
+          api.cardReadings.getMonthlyPayrollSheet,
+          {
+            projectId,
+            year: selectedDate.getFullYear(),
+            month: selectedDate.getMonth() + 1,
+          },
+        );
+        await exportMonthlyPayrollSheet(data);
+      } else if (type === "Excel") await exportToExcel(records, { dateRange });
+      else if (type === "CSV") exportToCsv(records, { dateRange });
+      else await exportToPdf(records, { dateRange });
+      notify.success("Rapor oluşturuldu");
+      setType(null);
     } catch (e) {
-      toast({
-        title: "SGK XML hatası",
-        description: e instanceof Error ? e.message : "Bilinmeyen hata",
-        variant: "destructive",
-      });
+      setError(`Rapor oluşturulamadı. Seçiminiz korundu. ${errorMessage(e)}`);
     } finally {
-      setIsExporting(false);
+      lock.current = false;
+      setPending(false);
     }
   };
-
-  const handleExport = async (exportType: "Excel" | "PDF" | "CSV") => {
-    setIsExporting(true);
-    try {
-      const rangeLabel =
-        dateRange || formatDate(selectedDate, "dd-MM-yyyy", { locale: tr });
-
-      if (exportType === "Excel") {
-        await exportToExcel(records, { dateRange: rangeLabel });
-      } else if (exportType === "CSV") {
-        exportToCsv(records, { dateRange: rangeLabel });
-      } else if (exportType === "PDF") {
-        await exportToPdf(records, { dateRange: rangeLabel });
-      }
-
-      toast({
-        title: "Dışa Aktarma Tamamlandı",
-        description: `Rapor ${exportType} formatında oluşturuldu.`,
-      });
-    } catch {
-      toast({
-        title: "Hata",
-        description: "Dışa aktarma sırasında bir hata oluştu.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <Card className="border border-border shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Download className="h-4 w-4 text-primary" />
-            Hızlı Dışa Aktarma
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button className="w-full" disabled={isExporting}>
-                <Download className="mr-2 h-4 w-4" />
-                {isExporting ? "Dışa Aktarılıyor..." : "Rapor İndir"}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-48">
-              <DropdownMenuItem onClick={() => handleExport("Excel")}>
-                <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" />
-                Excel (.xlsx)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("PDF")}>
-                <FileType className="mr-2 h-4 w-4 text-red-600" />
-                PDF Raporu
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport("CSV")}>
-                <FileText className="mr-2 h-4 w-4 text-blue-600" />
-                CSV Verileri
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleSgkExport}>
-                <FileBadge className="mr-2 h-4 w-4 text-amber-600" />
-                SGK Aylık Bildirim (XML)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <p className="text-xs text-muted-foreground">
-            {records.length} kayıt dışa aktarılacak.
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card className="border border-border shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Rapor Formatı</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <label className="block text-xs font-medium text-muted-foreground">
-            Zaman Aralığı
-          </label>
-          <Select
-            value={exportFormat}
-            onValueChange={(v) => setExportFormat(v as typeof exportFormat)}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="daily">Günlük Özet</SelectItem>
-              <SelectItem value="weekly">Haftalık Analiz</SelectItem>
-              <SelectItem value="monthly">Aylık Rapor</SelectItem>
-              <SelectItem value="custom">Özel Aralık</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-muted-foreground pt-1">
-            Bu seçim filtre çubuğundaki rapor türü ile bağımsız çalışır.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button disabled={disabled}>Dışa aktar</Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {(["Excel", "CSV", "PDF"] as const).map((k) => (
+            <DropdownMenuItem key={k} onClick={() => choose(k)}>
+              {labels[k]}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          {(["payroll", "aphb"] as const).map((k) => (
+            <DropdownMenuItem key={k} onClick={() => choose(k)}>
+              {labels[k]}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Dialog
+        open={type !== null}
+        onOpenChange={(open) => {
+          if (!open && !lock.current) setType(null);
+        }}
+      >
+        <DialogContent className="max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{type ? labels[type] : "Dışa aktar"}</DialogTitle>
+            <DialogDescription>
+              İndirmeden önce rapor kapsamını kontrol edin.
+            </DialogDescription>
+          </DialogHeader>
+          <dl className="space-y-2 text-sm">
+            <div>
+              <dt className="text-muted-foreground">Proje</dt>
+              <dd>{activeProject?.name ?? "Proje seçilmedi"}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Dönem</dt>
+              <dd>
+                {monthly
+                  ? format(selectedDate, "MMMM yyyy", { locale: tr })
+                  : dateRange}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Filtreler</dt>
+              <dd>{filterSummary}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Kapsam</dt>
+              <dd>
+                {monthly
+                  ? "Tüm proje / ay; kişi, durum, organizasyon filtreleri ve satır seçimi uygulanmaz."
+                  : selectedCount
+                    ? `${selectedCount} seçili / ${totalCount} filtreli satır`
+                    : `${records.length} filtreli satır (tümü)`}
+              </dd>
+            </div>
+          </dl>
+          {type === "aphb" && (
+            <p className="text-xs text-muted-foreground">
+              Önce bildirim hazırlanır. Uyarılar indirmeden önce aşağıda
+              gösterilir.
+            </p>
+          )}
+          {aphb && (
+            <div role="status" className="border-y py-3 text-sm">
+              <h3 className="font-medium">APHB kontrol sonucu</h3>
+              {aphb.warnings.length ? (
+                <ul className="mt-2 list-disc space-y-1 pl-4">
+                  {aphb.warnings.map((w, i) => (
+                    <li key={i}>{w}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>Uyarı bulunamadı.</p>
+              )}
+            </div>
+          )}
+          {error && (
+            <p role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          )}
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              disabled={pending}
+              onClick={() => setType(null)}
+            >
+              Vazgeç
+            </Button>
+            <Button
+              disabled={
+                pending || !projectId || (!monthly && records.length === 0)
+              }
+              onClick={() => void execute()}
+            >
+              {pending
+                ? "Rapor hazırlanıyor…"
+                : type === "aphb" && !aphb
+                  ? "Önizlemeyi hazırla"
+                  : "İndir"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

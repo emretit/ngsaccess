@@ -1,83 +1,58 @@
-import type { StatusFilter } from "./dashboard/PDKSFilterBar";
+import type { StatusTone } from "@/lib/statusTone";
+import type { PdksDayStatus } from "../../../convex/lib/pdksTable";
 
-export type DayStatus =
-  | "present"
-  | "late"
-  | "absent"
-  | "leave"
-  | "overtime"
-  | "weekend"
-  | "holiday";
-
+export type DayStatus = PdksDayStatus | "overtime";
 interface StatusMeta {
   label: string;
   shortLabel: string;
+  code: string;
+  tone: StatusTone;
   bgClass: string;
   textClass: string;
   badgeClass: string;
 }
-
+const toneClasses: Record<StatusTone, [string, string]> = {
+  neutral: ["bg-muted", "text-muted-foreground"],
+  success: ["bg-success-bg", "text-success"],
+  warning: ["bg-warning-bg", "text-warning"],
+  danger: ["bg-danger-bg", "text-danger"],
+  info: ["bg-info-bg", "text-info"],
+};
+function meta(
+  label: string,
+  code: string,
+  tone: StatusTone = "neutral",
+): StatusMeta {
+  return {
+    label,
+    shortLabel: label,
+    code,
+    tone,
+    bgClass: toneClasses[tone][0],
+    textClass: toneClasses[tone][1],
+    badgeClass:
+      tone === "neutral"
+        ? "bg-muted text-muted-foreground border-border"
+        : `status-${tone}-badge`,
+  };
+}
 export const STATUS_META: Record<DayStatus, StatusMeta> = {
-  present: {
-    label: "Mevcut",
-    shortLabel: "Mevcut",
-    bgClass: "status-success-bg",
-    textClass: "status-success-text",
-    badgeClass: "status-success-badge",
-  },
-  late: {
-    label: "Geç kalan",
-    shortLabel: "Geç",
-    bgClass: "status-warning-bg",
-    textClass: "status-warning-text",
-    badgeClass: "status-warning-badge",
-  },
-  absent: {
-    label: "Devamsız",
-    shortLabel: "Yok",
-    bgClass: "status-danger-bg",
-    textClass: "status-danger-text",
-    badgeClass: "status-danger-badge",
-  },
-  leave: {
-    label: "İzinli",
-    shortLabel: "İzinli",
-    bgClass: "status-info-bg",
-    textClass: "status-info-text",
-    badgeClass: "status-info-badge",
-  },
-  overtime: {
-    label: "Mesai yapan",
-    shortLabel: "Mesai",
-    bgClass: "status-purple-bg",
-    textClass: "status-purple-text",
-    badgeClass: "status-purple-badge",
-  },
-  weekend: {
-    label: "Hafta sonu",
-    shortLabel: "H.sonu",
-    bgClass: "bg-muted",
-    textClass: "text-muted-foreground",
-    badgeClass: "bg-muted text-muted-foreground border-border",
-  },
-  holiday: {
-    label: "Tatil",
-    shortLabel: "Tatil",
-    bgClass: "bg-muted",
-    textClass: "text-muted-foreground",
-    badgeClass: "bg-muted text-muted-foreground border-border",
-  },
+  present: meta("Mevcut", "M", "success"),
+  late: meta("Geç", "G", "warning"),
+  absent: meta("Devamsız", "D", "danger"),
+  leave: meta("İzinli", "İ", "info"),
+  weekend: meta("Hafta tatili", "HT"),
+  holiday: meta("Resmî tatil", "RT"),
+  future: meta("Henüz gelmedi", "—"),
+  noData: meta("Veri yok", "—"),
+  overtime: meta("Fazla mesai", "FM"),
 };
-
-export const STATUS_FILTER_LABELS: Record<StatusFilter, string> = {
+export const STATUS_FILTER_LABELS = {
   all: "Tümü",
-  present: STATUS_META.present.label,
-  late: STATUS_META.late.label,
-  absent: STATUS_META.absent.label,
-  leave: STATUS_META.leave.label,
-  overtime: STATUS_META.overtime.label,
-};
-
+  ...Object.fromEntries(
+    Object.entries(STATUS_META).map(([key, value]) => [key, value.label]),
+  ),
+} as Record<"all" | DayStatus, string>;
 export function isDayStatus(s: string): s is DayStatus {
-  return s in STATUS_META;
+  return Object.prototype.hasOwnProperty.call(STATUS_META, s);
 }

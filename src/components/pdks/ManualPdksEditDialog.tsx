@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -10,39 +10,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Loader2, AlertTriangle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-
+import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
+import { errorMessage, notify } from "@/lib/notify";
+import { displayTime, readableDate, validateManual } from "./lib/presentation";
 interface Props {
   open: boolean;
   employeeId: Id<"employees">;
   employeeName: string;
-  date: string; // YYYY-MM-DD
+  date: string;
   initialEntry: string;
   initialExit: string;
   onClose: () => void;
 }
-
-const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-function normalizeTime(v: string): string {
-  // "08:30" formatına dönüştür (locale string'i de kabul et)
-  if (HHMM.test(v)) return v;
-  const m = v.match(/(\d{1,2})[:.](\d{2})/);
-  if (m) {
-    const h = String(Math.min(23, Math.max(0, parseInt(m[1], 10)))).padStart(2, "0");
-    const min = String(Math.min(59, Math.max(0, parseInt(m[2], 10)))).padStart(2, "0");
-    return `${h}:${min}`;
-  }
-  return v;
+export function ManualPdksEditDialog(props: Props) {
+  // A fresh form per employee/date/open prevents edits from silently changing day.
+  if (!props.open) return null;
+  return <ManualForm key={`${props.employeeId}:${props.date}`} {...props} />;
 }
-
-export function ManualPdksEditDialog({
-  open,
+function ManualForm({
   employeeId,
   employeeName,
   date,
@@ -50,133 +38,181 @@ export function ManualPdksEditDialog({
   initialExit,
   onClose,
 }: Props) {
-  const [entryTime, setEntryTime] = useState(normalizeTime(initialEntry));
-  const [exitTime, setExitTime] = useState(normalizeTime(initialExit));
-  const [note, setNote] = useState("");
+  const originalEntry = displayTime(initialEntry) === "—" ? "" : initialEntry;
+  const originalExit = displayTime(initialExit) === "—" ? "" : initialExit;
+  const [entry, setEntry] = useState(originalEntry),
+    [exit, setExit] = useState(originalExit),
+    [note, setNote] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
-  const { toast } = useToast();
+  const lock = useRef(false);
   const upsert = useMutation(api.pdksRecords.upsertManual);
-
-  useEffect(() => {
-    if (open) {
-      setEntryTime(normalizeTime(initialEntry));
-      setExitTime(normalizeTime(initialExit));
-      setNote("");
-    }
-  }, [open, initialEntry, initialExit]);
-
-  const handleSave = async () => {
-    if (entryTime && !HHMM.test(entryTime)) {
-      toast({
-        title: "Geçersiz giriş saati",
-        description: "Format: HH:MM (örn 08:30)",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (exitTime && !HHMM.test(exitTime)) {
-      toast({
-        title: "Geçersiz çıkış saati",
-        description: "Format: HH:MM (örn 17:45)",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (entryTime && exitTime && entryTime >= exitTime) {
-      toast({
-        title: "Saatler tutarsız",
-        description: "Çıkış, girişten sonra olmalı.",
-        variant: "destructive",
-      });
-      return;
-    }
+  const guard = useUnsavedChangesGuard(
+    entry !== originalEntry || exit !== originalExit || note.length > 0,
+  );
+  const close = () => {
+    if (!lock.current) guard.requestClose(onClose);
+  };
+  const save = async () => {
+    if (lock.current) return;
+    const next = validateManual(entry, exit, note);
+    setErrors(next);
+    if (Object.keys(next).length) return;
+    lock.current = true;
     setSaving(true);
     try {
       await upsert({
         employeeId,
         date,
-        entryTime: entryTime || undefined,
-        exitTime: exitTime || undefined,
-        note: note.trim() || undefined,
+        entryTime: entry || undefined,
+        exitTime: exit || undefined,
+        note: note.trim(),
       });
-      toast({
-        title: "Manuel kayıt güncellendi",
-        description: `${employeeName} — ${date}`,
-      });
+      notify.success("Manuel kayıt güncellendi");
       onClose();
-    } catch (e) {
-      toast({
-        title: "Hata",
-        description: e instanceof Error ? e.message : "Kayıt başarısız",
-        variant: "destructive",
-      });
+    } catch (error) {
+      setErrors({ server: errorMessage(error) });
     } finally {
+      lock.current = false;
       setSaving(false);
     }
   };
-
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Manuel PDKS Düzeltmesi</DialogTitle>
-          <DialogDescription>
-            {employeeName} — {date}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="rounded-md border border-orange-200 bg-orange-50 p-3 flex gap-2 text-sm text-orange-900">
-          <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
-          <p>
-            Bu kayıt manuel olarak düzenlenecek ve denetim kaydına işlenecektir.
-            Çalışan kart okumaları korunur; yalnızca puantaj hesabı bu girdileri
-            kullanır.
+    <>
+      <Dialog
+        open
+        onOpenChange={(open) => {
+          if (!open) close();
+        }}
+      >
+        <DialogContent className="max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] max-w-md overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Manuel düzelt</DialogTitle>
+            <DialogDescription>
+              {employeeName} · {readableDate(date)}
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Kart okumaları korunur; değişiklik denetim kaydına işlenir.
           </p>
-        </div>
-
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="entry">Giriş saati</Label>
-              <Input
-                id="entry"
-                type="time"
-                value={entryTime}
-                onChange={(e) => setEntryTime(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="exit">Çıkış saati</Label>
-              <Input
-                id="exit"
-                type="time"
-                value={exitTime}
-                onChange={(e) => setExitTime(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="note">Açıklama (zorunlu değil)</Label>
-            <Textarea
-              id="note"
-              placeholder="Sebep / kaynak"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={3}
-            />
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose} disabled={saving}>
-            İptal
-          </Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Kaydet
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void save();
+            }}
+            className="space-y-4"
+            noValidate
+          >
+            <fieldset disabled={saving} className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                {(
+                  [
+                    {
+                      key: "entry",
+                      label: "Giriş saati",
+                      value: entry,
+                      original: originalEntry,
+                      change: setEntry,
+                    },
+                    {
+                      key: "exit",
+                      label: "Çıkış saati",
+                      value: exit,
+                      original: originalExit,
+                      change: setExit,
+                    },
+                  ] as const
+                ).map((field) => (
+                  <div key={field.key}>
+                    <label className="text-sm" htmlFor={`manual-${field.key}`}>
+                      {field.label}
+                    </label>
+                    <p className="my-1 text-xs text-muted-foreground">
+                      Mevcut: {field.original || "—"}
+                    </p>
+                    <Input
+                      id={`manual-${field.key}`}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="08:30"
+                      value={field.value}
+                      onChange={(e) => field.change(e.target.value)}
+                      aria-invalid={Boolean(errors[field.key])}
+                      aria-describedby={
+                        errors[field.key]
+                          ? `manual-${field.key}-error`
+                          : undefined
+                      }
+                    />
+                    {errors[field.key] && (
+                      <p
+                        id={`manual-${field.key}-error`}
+                        className="mt-1 text-xs text-danger"
+                      >
+                        {errors[field.key]}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div>
+                <label htmlFor="manual-note" className="text-sm">
+                  Gerekçe (zorunlu)
+                </label>
+                <Textarea
+                  id="manual-note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  minLength={3}
+                  maxLength={500}
+                  required
+                  rows={3}
+                  aria-invalid={Boolean(errors.note)}
+                  aria-describedby={errors.note ? "manual-note-help manual-note-error" : "manual-note-help"}
+                />
+                <p
+                  id="manual-note-help"
+                  className="mt-1 text-xs text-muted-foreground"
+                >
+                  3–500 karakter.
+                </p>
+                {errors.note && (
+                  <p id="manual-note-error" className="text-xs text-danger">
+                    {errors.note}
+                  </p>
+                )}
+              </div>
+            </fieldset>
+            {Object.keys(errors).length > 0 && (
+              <div
+                role="alert"
+                className="rounded-md border p-3 text-sm text-danger"
+              >
+                <p className="font-medium">Düzeltme kaydedilemedi.</p>
+                <ul className="mt-1 list-disc pl-4">
+                  {Object.values(errors).map((error) => (
+                    <li key={error}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={close}
+                disabled={saving}
+              >
+                Vazgeç
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Kaydediliyor…" : "Kaydet"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {guard.dialog}
+    </>
   );
 }

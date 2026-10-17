@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type {
   FilterValues,
@@ -6,9 +6,15 @@ import type {
   StatusFilter,
 } from "@/components/pdks/dashboard/PDKSFilterBar";
 import type { Id, TableNames } from "../../convex/_generated/dataModel";
+import { projectScopedPdksParams } from "@/components/pdks/lib/filterParams";
 import { parseDateString, toLocalDateString } from "@/lib/date";
 
-export const REPORT_TYPES: ReportType[] = ["daily", "weekly", "monthly", "custom"];
+export const REPORT_TYPES: ReportType[] = [
+  "daily",
+  "weekly",
+  "monthly",
+  "custom",
+];
 export const STATUS_FILTERS: StatusFilter[] = [
   "all",
   "present",
@@ -16,6 +22,10 @@ export const STATUS_FILTERS: StatusFilter[] = [
   "absent",
   "leave",
   "overtime",
+  "weekend",
+  "holiday",
+  "future",
+  "noData",
 ];
 
 /** Geçersiz biçim ve taşan tarihleri (2026-02-31) reddeder. */
@@ -24,11 +34,22 @@ function parseDate(s: string | null): Date | undefined {
   return d && toLocalDateString(d) === s ? d : undefined;
 }
 
-export function usePdksFilterParams(defaults: FilterValues): {
+export function usePdksFilterParams(defaults: FilterValues, projectId?: string): {
   filters: FilterValues;
   setFilters: (next: FilterValues) => void;
 } {
-  const [params, setParams] = useSearchParams();
+  const [urlParams, setParams] = useSearchParams();
+  const [previousProjectId, setPreviousProjectId] = useState(projectId);
+  // Derive clean filters during render, before children can query the new project.
+  const params = useMemo(
+    () => projectScopedPdksParams(urlParams, previousProjectId, projectId),
+    [urlParams, previousProjectId, projectId],
+  );
+  useEffect(() => {
+    if (previousProjectId === projectId) return;
+    if (params !== urlParams) setParams(params, { replace: true });
+    setPreviousProjectId(projectId);
+  }, [params, urlParams, previousProjectId, projectId, setParams]);
 
   const filters = useMemo<FilterValues>(() => {
     const reportRaw = params.get("report");
@@ -36,7 +57,8 @@ export function usePdksFilterParams(defaults: FilterValues): {
     const getId = <T extends TableNames>(key: string) =>
       (params.get(key) ?? undefined) as Id<T> | undefined;
     return {
-      anchorDate: parseDate(params.get("date")) ?? defaults.anchorDate ?? new Date(),
+      anchorDate:
+        parseDate(params.get("date")) ?? defaults.anchorDate ?? new Date(),
       dateRange: {
         from: parseDate(params.get("from")) ?? defaults.dateRange.from,
         to: parseDate(params.get("to")) ?? defaults.dateRange.to,
@@ -57,10 +79,25 @@ export function usePdksFilterParams(defaults: FilterValues): {
 
   const setFilters = useCallback(
     (next: FilterValues) => {
-      const sp = new URLSearchParams();
+      const sp = new URLSearchParams(params);
+      for (const key of [
+        "date",
+        "from",
+        "to",
+        "report",
+        "company",
+        "dept",
+        "pos",
+        "shift",
+        "status",
+        "person",
+      ])
+        sp.delete(key);
       const anchorKey = toLocalDateString(next.anchorDate ?? new Date());
-      if (anchorKey !== toLocalDateString(new Date())) sp.set("date", anchorKey);
-      if (next.dateRange.from) sp.set("from", toLocalDateString(next.dateRange.from));
+      if (anchorKey !== toLocalDateString(new Date()))
+        sp.set("date", anchorKey);
+      if (next.dateRange.from)
+        sp.set("from", toLocalDateString(next.dateRange.from));
       if (next.dateRange.to) sp.set("to", toLocalDateString(next.dateRange.to));
       if (next.reportType !== "daily") sp.set("report", next.reportType);
       if (next.companyId) sp.set("company", next.companyId);
@@ -71,7 +108,7 @@ export function usePdksFilterParams(defaults: FilterValues): {
       if (next.person) sp.set("person", next.person);
       setParams(sp, { replace: true });
     },
-    [setParams]
+    [params, setParams],
   );
 
   return { filters, setFilters };

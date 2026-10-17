@@ -1,31 +1,18 @@
-import { useEffect, useRef, useState } from "react";
-import { CalendarIcon, Search, X } from "lucide-react";
-import { useQuery } from "convex/react";
-import { api } from "../../../../convex/_generated/api";
+import { usePdksFilterOptions } from "@/hooks/usePdksFilterOptions";
+import { useState } from "react";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import type { PdksStatusFilter } from "@/hooks/usePdksTableData";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
+import { FilterBar } from "@/components/shared/FilterBar";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
-import { cn } from "@/lib/utils";
-
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 export type ReportType = "daily" | "weekly" | "monthly" | "custom";
-export type StatusFilter = "all" | "present" | "late" | "absent" | "leave" | "overtime";
-
+export type StatusFilter = PdksStatusFilter;
 export interface FilterValues {
   anchorDate?: Date;
   dateRange: { from: Date | undefined; to: Date | undefined };
@@ -37,336 +24,161 @@ export interface FilterValues {
   statusFilter: StatusFilter;
   person: string;
 }
-
-interface PDKSFilterBarProps {
+export function clearPdksFilters(values: FilterValues): FilterValues {
+  return {
+    ...values,
+    person: "",
+    companyId: undefined,
+    departmentId: undefined,
+    positionId: undefined,
+    shiftId: undefined,
+    statusFilter: "all",
+  };
+}
+export function PDKSFilterBar({
+  values,
+  onChange,
+  onClear,
+}: {
   values: FilterValues;
   onChange: (values: FilterValues) => void;
-}
-
-const thisPeriod =
-  (reportType: ReportType, statusFilter: StatusFilter) =>
-  (c: FilterValues): FilterValues => ({
-    ...c,
-    anchorDate: new Date(),
-    dateRange: { from: undefined, to: undefined },
-    reportType,
-    statusFilter,
-  });
-
-const QUICK_CHIPS: Array<{
-  key: string;
-  label: string;
-  apply: (current: FilterValues) => FilterValues;
-}> = [
-  { key: "today-late", label: "Bugün geç kalanlar", apply: thisPeriod("daily", "late") },
-  { key: "week-absent", label: "Bu hafta hiç gelmeyenler", apply: thisPeriod("weekly", "absent") },
-  { key: "today-overtime", label: "Mesai yapanlar", apply: thisPeriod("daily", "overtime") },
-  { key: "week-leave", label: "Bu hafta izinde olanlar", apply: thisPeriod("weekly", "leave") },
-];
-
-export function PDKSFilterBar({ values, onChange }: PDKSFilterBarProps) {
-  const departments = useQuery(api.departments.list, {});
-  const companies = useQuery(api.companies.list, {});
-  const positions = useQuery(api.positions.list, {});
-  const shifts = useQuery(api.shifts.list, {});
-
-  // Person input için debounce
-  const [personDraft, setPersonDraft] = useState(values.person);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (personDraft === values.person) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      onChange({ ...values, person: personDraft });
-    }, 300);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [personDraft, onChange, values]);
-
-  // Dış kaynaktan değişirse senkronize et (chip vs.)
-  useEffect(() => {
-    if (values.person !== personDraft) setPersonDraft(values.person);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [values.person]);
-
-  const update = (patch: Partial<FilterValues>) => {
-    onChange({ ...values, ...patch });
-  };
-
-  const clearAll = () => {
-    onChange({
-      dateRange: { from: undefined, to: undefined },
-      reportType: "daily",
-      companyId: undefined,
-      departmentId: undefined,
-      positionId: undefined,
-      shiftId: undefined,
-      statusFilter: "all",
-      person: "",
-    });
-    setPersonDraft("");
-  };
-
-  const activeCount =
-    (values.dateRange.from ? 1 : 0) +
-    (values.reportType !== "daily" ? 1 : 0) +
-    (values.companyId ? 1 : 0) +
-    (values.departmentId ? 1 : 0) +
-    (values.positionId ? 1 : 0) +
-    (values.shiftId ? 1 : 0) +
-    (values.statusFilter !== "all" ? 1 : 0) +
-    (values.person ? 1 : 0);
-
+  onClear?: () => void;
+}) {
+  const [advanced, setAdvanced] = useState(false);
+  const { departments, companies, positions, shifts } = usePdksFilterOptions();
+  const controlClass =
+    "h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm";
   return (
-    <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-      {/* Quick chips */}
-      <div className="flex flex-wrap gap-2">
-        {QUICK_CHIPS.map((chip) => (
-          <Button
-            key={chip.key}
-            variant="outline"
-            size="sm"
-            className="h-7 text-xs rounded-full"
-            onClick={() => onChange(chip.apply(values))}
-          >
-            {chip.label}
-          </Button>
-        ))}
-        {activeCount > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-xs ml-auto text-muted-foreground"
-            onClick={clearAll}
-          >
-            <X className="h-3 w-3 mr-1" />
-            Filtreleri temizle
-            <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">
-              {activeCount}
-            </Badge>
-          </Button>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2">
-        {/* Tarih aralığı */}
-        <div className="col-span-2 md:col-span-3 lg:col-span-2">
-          <label className="block text-xs font-medium text-muted-foreground mb-1">
-            Tarih Aralığı
-          </label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className={cn(
-                  "w-full justify-start text-left font-normal h-9",
-                  !values.dateRange.from && "text-muted-foreground"
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {values.dateRange.from ? (
-                  values.dateRange.to ? (
-                    <>
-                      {format(values.dateRange.from, "dd MMM", { locale: tr })} -{" "}
-                      {format(values.dateRange.to, "dd MMM yyyy", { locale: tr })}
-                    </>
-                  ) : (
-                    format(values.dateRange.from, "dd MMM yyyy", { locale: tr })
-                  )
-                ) : (
-                  <span>Tarih seçin</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                initialFocus
-                mode="range"
-                defaultMonth={values.dateRange.from}
-                selected={values.dateRange}
-                onSelect={(range) =>
-                  update({
-                    dateRange: { from: range?.from, to: range?.to },
-                    reportType: range?.from && range?.to ? "custom" : values.reportType,
+    <FilterBar
+      search={values.person}
+      onSearchChange={(person) => onChange({ ...values, person })}
+      searchLabel="Ad / soyad"
+      placeholder="Ad veya soyad ara"
+      hasFilters={Boolean(
+        values.companyId ||
+        values.departmentId ||
+        values.positionId ||
+        values.shiftId ||
+        values.statusFilter !== "all",
+      )}
+      onClear={() => {
+        onClear?.();
+        onChange(clearPdksFilters(values));
+      }}
+    >
+      <label className="text-xs sm:w-48">
+        Departman
+        <select
+          className={`${controlClass} mt-1`}
+          value={values.departmentId ?? ""}
+          onChange={(e) =>
+            onChange({
+              ...values,
+              departmentId: (e.target.value || undefined) as
+                | Id<"departments">
+                | undefined,
+            })
+          }
+        >
+          <option value="">Tüm departmanlar</option>
+          {departments?.map((d) => (
+            <option key={d._id} value={d._id}>
+              {d.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Button variant="outline" onClick={() => setAdvanced(true)}>
+        Diğer filtreler
+        {[values.companyId, values.positionId, values.shiftId].filter(Boolean)
+          .length > 0 &&
+          ` (${[values.companyId, values.positionId, values.shiftId].filter(Boolean).length})`}
+      </Button>
+      <Sheet open={advanced} onOpenChange={setAdvanced}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Diğer filtreler</SheetTitle>
+            <SheetDescription>
+              Tarih ve proje seçiminiz korunur.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6 space-y-5">
+            <label className="block text-sm">
+              Şirket
+              <select
+                className={`${controlClass} mt-1`}
+                value={values.companyId ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    ...values,
+                    companyId: (e.target.value || undefined) as
+                      | Id<"companies">
+                      | undefined,
                   })
                 }
-                numberOfMonths={2}
-                className="pointer-events-auto"
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        {/* Rapor türü */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">
-            Rapor
-          </label>
-          <Select
-            value={values.reportType}
-            onValueChange={(v) =>
-              update({
-                reportType: v as ReportType,
-                ...(v !== "custom" && { dateRange: { from: undefined, to: undefined } }),
-              })
-            }
-          >
-            <SelectTrigger className="h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="daily">Günlük</SelectItem>
-              <SelectItem value="weekly">Haftalık</SelectItem>
-              <SelectItem value="monthly">Aylık</SelectItem>
-              <SelectItem value="custom">Özel</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Şirket */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">
-            Şirket
-          </label>
-          <Select
-            value={values.companyId ?? "all"}
-            onValueChange={(v) =>
-              update({ companyId: v === "all" ? undefined : (v as Id<"companies">) })
-            }
-          >
-            <SelectTrigger className="h-9">
-              <SelectValue placeholder="Tümü" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tümü</SelectItem>
-              {companies?.map((c) => (
-                <SelectItem key={c._id} value={c._id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Departman */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">
-            Departman
-          </label>
-          <Select
-            value={values.departmentId ?? "all"}
-            onValueChange={(v) =>
-              update({ departmentId: v === "all" ? undefined : (v as Id<"departments">) })
-            }
-          >
-            <SelectTrigger className="h-9">
-              <SelectValue placeholder="Tümü" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tümü</SelectItem>
-              {departments?.map((d) => (
-                <SelectItem key={d._id} value={d._id}>
-                  {d.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Pozisyon */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">
-            Pozisyon
-          </label>
-          <Select
-            value={values.positionId ?? "all"}
-            onValueChange={(v) =>
-              update({ positionId: v === "all" ? undefined : (v as Id<"positions">) })
-            }
-          >
-            <SelectTrigger className="h-9">
-              <SelectValue placeholder="Tümü" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tümü</SelectItem>
-              {positions?.map((p) => (
-                <SelectItem key={p._id} value={p._id}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Vardiya */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">
-            Vardiya
-          </label>
-          <Select
-            value={values.shiftId ?? "all"}
-            onValueChange={(v) =>
-              update({ shiftId: v === "all" ? undefined : (v as Id<"shifts">) })
-            }
-          >
-            <SelectTrigger className="h-9">
-              <SelectValue placeholder="Tümü" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tümü</SelectItem>
-              {shifts?.map((s) => (
-                <SelectItem key={s._id} value={s._id}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-        {/* Status */}
-        <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">
-            Durum
-          </label>
-          <Select
-            value={values.statusFilter}
-            onValueChange={(v) => update({ statusFilter: v as StatusFilter })}
-          >
-            <SelectTrigger className="h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tümü</SelectItem>
-              <SelectItem value="present">Mevcut</SelectItem>
-              <SelectItem value="late">Geç kalan</SelectItem>
-              <SelectItem value="absent">Yok / Devamsız</SelectItem>
-              <SelectItem value="leave">İzinli</SelectItem>
-              <SelectItem value="overtime">Mesai yapan</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Personel arama */}
-        <div className="md:col-span-2">
-          <label className="block text-xs font-medium text-muted-foreground mb-1">
-            Personel ara
-          </label>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder="Ad veya soyad ile ara..."
-              value={personDraft}
-              onChange={(e) => setPersonDraft(e.target.value)}
-              className="pl-9 h-9"
-            />
+              >
+                <option value="">Tüm şirketler</option>
+                {companies?.map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm">
+              Pozisyon
+              <select
+                className={`${controlClass} mt-1`}
+                value={values.positionId ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    ...values,
+                    positionId: (e.target.value || undefined) as
+                      | Id<"positions">
+                      | undefined,
+                  })
+                }
+              >
+                <option value="">Tüm pozisyonlar</option>
+                {positions?.map((p) => (
+                  <option key={p._id} value={p._id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm">
+              Vardiya
+              <select
+                className={`${controlClass} mt-1`}
+                value={values.shiftId ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    ...values,
+                    shiftId: (e.target.value || undefined) as
+                      | Id<"shifts">
+                      | undefined,
+                  })
+                }
+              >
+                <option value="">Tüm vardiyalar</option>
+                {shifts?.map((s) => (
+                  <option key={s._id} value={s._id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setAdvanced(false)}
+            >
+              Tamam
+            </Button>
           </div>
-        </div>
-      </div>
-    </div>
+        </SheetContent>
+      </Sheet>
+    </FilterBar>
   );
 }

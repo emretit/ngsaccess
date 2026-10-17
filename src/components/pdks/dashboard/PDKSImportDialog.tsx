@@ -1,210 +1,176 @@
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { useAction } from "convex/react";
-import { Upload, AlertCircle, CheckCircle2 } from "lucide-react";
+import type { FunctionReturnType } from "convex/server";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useToast } from "@/hooks/use-toast";
+import { errorMessage } from "@/lib/notify";
 import { api } from "../../../../convex/_generated/api";
 
-interface PreviewRow {
-  index: number;
-  identifier: string;
-  date: string;
-  entryTime?: string;
-  exitTime?: string;
-  note?: string;
-  matchedName?: string;
-  employeeId?: string;
-  error?: string;
-}
-
-interface PDKSImportDialogProps {
+type Preview = FunctionReturnType<typeof api.actions.pdksImport.previewPdksCsv>;
+type ImportResult = {
+  inserted: number;
+  updated: number;
+  errors: number | { index: number; message: string }[];
+};
+interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
 const SAMPLE_CSV = `tcNo,tarih,giris,cikis,not
 12345678901,2026-05-15,09:00,18:00,Manuel düzeltme
 98765432109,2026-05-15,08:30,17:30,`;
 
-export function PDKSImportDialog({ open, onOpenChange }: PDKSImportDialogProps) {
+export function PDKSImportDialog(props: Props) {
+  return props.open ? <ImportForm {...props} /> : null;
+}
+function ImportForm({ onOpenChange }: Props) {
   const [csvText, setCsvText] = useState("");
-  const [preview, setPreview] = useState<{ rows: PreviewRow[]; summary: { total: number; matched: number; errors: number } } | null>(null);
-  const [importing, setImporting] = useState(false);
-  const { toast } = useToast();
+  const [note, setNote] = useState("");
+  const [noteError, setNoteError] = useState("");
+  const [serverError, setServerError] = useState("");
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
+  const [pending, setPending] = useState(false);
+  const lock = useRef(false);
   const previewAction = useAction(api.actions.pdksImport.previewPdksCsv);
   const importAction = useAction(api.actions.pdksImport.importPdksCsv);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    file.text().then((text) => setCsvText(text));
+  const close = (open: boolean) => {
+    if (!lock.current) onOpenChange(open);
   };
-
+  const handleFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      setCsvText(await file.text());
+      setServerError("");
+    } catch (error) {
+      setServerError(errorMessage(error));
+    }
+  };
   const handlePreview = async () => {
-    if (!csvText.trim()) {
-      toast({ title: "CSV içeriği boş", variant: "destructive" });
+    if (lock.current || !csvText.trim()) return;
+    lock.current = true;
+    setPending(true);
+    setServerError("");
+    try {
+      setPreview(await previewAction({ csvText }));
+    } catch (error) {
+      setServerError(errorMessage(error));
+    } finally {
+      lock.current = false;
+      setPending(false);
+    }
+  };
+  const handleImport = async () => {
+    if (lock.current || !preview || preview.summary.matched === 0 || result) return;
+    const reason = note.trim();
+    if (reason.length < 3 || reason.length > 500) {
+      setNoteError("Gerekçe 3–500 karakter olmalı.");
       return;
     }
+    setNoteError("");
+    setServerError("");
+    lock.current = true;
+    setPending(true);
     try {
-      const result = await previewAction({ csvText });
-      setPreview(result);
-    } catch (e) {
-      toast({
-        title: "CSV ön izleme hatası",
-        description: e instanceof Error ? e.message : "Bilinmeyen hata",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleImport = async () => {
-    if (!preview || preview.summary.matched === 0) return;
-    setImporting(true);
-    try {
-      const result = await importAction({ csvText });
-      toast({
-        title: "İçe aktarım tamamlandı",
-        description: `${result.inserted} yeni, ${result.updated} güncel, ${result.errors} hata`,
-      });
-      setCsvText("");
-      setPreview(null);
-      onOpenChange(false);
-    } catch (e) {
-      toast({
-        title: "İçe aktarım hatası",
-        description: e instanceof Error ? e.message : "Bilinmeyen hata",
-        variant: "destructive",
-      });
+      setResult(await importAction({ csvText, note: reason }));
+    } catch (error) {
+      setServerError(errorMessage(error));
     } finally {
-      setImporting(false);
+      lock.current = false;
+      setPending(false);
     }
   };
-
+  const rowErrors = result && Array.isArray(result.errors) ? result.errors : [];
+  const errorCount = result
+    ? typeof result.errors === "number" ? result.errors : result.errors.length
+    : 0;
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+    <Dialog open onOpenChange={close}>
+      <DialogContent className="flex max-h-[85dvh] w-[calc(100%-32px)] max-w-3xl flex-col overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
-            PDKS CSV İçe Aktarımı
-          </DialogTitle>
+          <DialogTitle>PDKS CSV İçe Aktarımı</DialogTitle>
           <DialogDescription>
-            CSV dosyası yükle veya yapıştır. Başlıklar: <code>tcNo, tarih, giris, cikis, not</code>.
-            Tarih YYYY-MM-DD, saat HH:MM formatında.
+            CSV dosyası yükleyin veya yapıştırın. Başlıklar: tcNo, tarih, giris, cikis, not.
+            Tarih YYYY-MM-DD, saat HH:MM biçiminde olmalı.
           </DialogDescription>
         </DialogHeader>
-
-        <div className="flex-1 overflow-hidden flex flex-col gap-3 min-h-0">
+        <div className="min-w-0 space-y-4">
           {!preview && (
             <>
-              <div className="flex items-center gap-2">
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={handleFileSelect}
-                  className="text-sm"
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setCsvText(SAMPLE_CSV)}
-                  type="button"
-                >
-                  Örnek doldur
-                </Button>
-              </div>
-              <Textarea
-                value={csvText}
-                onChange={(e) => setCsvText(e.target.value)}
-                placeholder="CSV içeriğini buraya yapıştırın..."
-                className="font-mono text-xs flex-1 min-h-[200px]"
-              />
+              <label className="block text-sm">
+                CSV dosyası
+                <input type="file" accept=".csv,text/csv" disabled={pending}
+                  onChange={(event) => void handleFile(event)}
+                  className="mt-1 block w-full min-w-0 text-sm" />
+              </label>
+              <Button variant="ghost" size="sm" disabled={pending}
+                onClick={() => setCsvText(SAMPLE_CSV)}>Örnek doldur</Button>
+              <label htmlFor="pdks-import-csv" className="block text-sm">CSV içeriği</label>
+              <Textarea id="pdks-import-csv" value={csvText} disabled={pending}
+                onChange={(event) => setCsvText(event.target.value)}
+                className="min-h-[200px] font-mono text-xs" />
             </>
           )}
-
           {preview && (
             <>
-              <div className="flex items-center gap-3">
-                <Badge variant="secondary">Toplam: {preview.summary.total}</Badge>
-                <Badge variant="default" className="bg-emerald-600">
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  Eşleşen: {preview.summary.matched}
-                </Badge>
-                {preview.summary.errors > 0 && (
-                  <Badge variant="destructive">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    Hata: {preview.summary.errors}
-                  </Badge>
-                )}
-              </div>
-              <ScrollArea className="flex-1 border rounded-md">
-                <div className="p-2 space-y-1">
-                  {preview.rows.map((r) => (
-                    <div
-                      key={r.index}
-                      className={`text-xs px-2 py-1 rounded ${
-                        r.error
-                          ? "bg-destructive/10 text-destructive"
-                          : "bg-emerald-50 text-emerald-900"
-                      }`}
-                    >
-                      <span className="font-mono">{r.identifier}</span>
-                      {r.matchedName && (
-                        <span className="ml-2 font-medium">→ {r.matchedName}</span>
-                      )}
-                      <span className="ml-2 text-muted-foreground">
-                        {r.date} {r.entryTime ?? "—"}{r.exitTime ? `–${r.exitTime}` : ""}
-                      </span>
-                      {r.error && <span className="ml-2">⚠ {r.error}</span>}
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
+              <p className="text-sm">
+                Toplam: {preview.summary.total} · Eşleşen: {preview.summary.matched} ·
+                Hatalı: {preview.summary.errors}
+              </p>
+              <ul className="max-h-60 divide-y overflow-y-auto border-y">
+                {preview.rows.map((row) => (
+                  <li key={row.index} className="break-words py-2 text-xs">
+                    <span className="font-medium">Satır {row.index}: {row.matchedName || row.identifier}</span>
+                    <span className="ml-2 text-muted-foreground">
+                      {row.date} · {row.entryTime || "—"}–{row.exitTime || "—"}
+                    </span>
+                    {row.error && <p className="mt-1 text-danger">{row.error}</p>}
+                  </li>
+                ))}
+              </ul>
             </>
+          )}
+          {!result && (
+            <div>
+              <label htmlFor="pdks-import-note" className="text-sm">Gerekçe (zorunlu)</label>
+              <Textarea id="pdks-import-note" value={note} required minLength={3} maxLength={500}
+                disabled={pending} rows={3} onChange={(event) => setNote(event.target.value)}
+                aria-invalid={Boolean(noteError)}
+                aria-describedby={noteError ? "pdks-import-note-help pdks-import-note-error" : "pdks-import-note-help"} />
+              <p id="pdks-import-note-help" className="mt-1 text-xs text-muted-foreground">
+                3–500 karakter. Tüm satırlara uygulanır; CSV satırındaki notun yerine kullanılır.
+              </p>
+              {noteError && <p id="pdks-import-note-error" role="alert" className="mt-1 text-xs text-danger">{noteError}</p>}
+            </div>
+          )}
+          {serverError && <p role="alert" className="text-sm text-danger">{serverError}</p>}
+          {result && (
+            <div className="space-y-2">
+              <p role="status" className="text-sm">
+                İçe aktarım tamamlandı: {result.inserted} yeni, {result.updated} güncel, {errorCount} hata.
+              </p>
+              {rowErrors.length > 0 && (
+                <ul aria-label="İçe aktarma hataları" className="max-h-60 space-y-2 overflow-y-auto text-sm text-danger">
+                  {rowErrors.map((error) => <li key={error.index}>Satır {error.index}: {error.message}</li>)}
+                </ul>
+              )}
+            </div>
           )}
         </div>
-
-        <DialogFooter>
-          {!preview && (
-            <>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>
-                İptal
-              </Button>
-              <Button onClick={handlePreview} disabled={!csvText.trim()}>
-                Ön izle
-              </Button>
-            </>
-          )}
-          {preview && (
-            <>
-              <Button
-                variant="outline"
-                onClick={() => setPreview(null)}
-                disabled={importing}
-              >
-                Geri
-              </Button>
-              <Button
-                onClick={handleImport}
-                disabled={importing || preview.summary.matched === 0}
-              >
-                {importing
-                  ? "İçe aktarılıyor..."
-                  : `${preview.summary.matched} satırı içe aktar`}
-              </Button>
-            </>
-          )}
+        <DialogFooter className="flex-wrap">
+          <Button variant="outline" disabled={pending} onClick={() => close(false)}>
+            {result ? "Kapat" : "Vazgeç"}
+          </Button>
+          {preview && !result && <Button variant="ghost" disabled={pending}
+            onClick={() => setPreview(null)}>Geri</Button>}
+          {!result && <Button disabled={pending || (!preview ? !csvText.trim() : preview.summary.matched === 0)}
+            onClick={() => void (preview ? handleImport() : handlePreview())}>
+            {pending ? "İşleniyor…" : preview ? `${preview.summary.matched} satırı içe aktar` : "Ön izle"}
+          </Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

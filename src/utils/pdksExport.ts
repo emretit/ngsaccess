@@ -1,9 +1,14 @@
+import { STATUS_FILTER_LABELS } from "@/components/pdks/statusMeta";
+import { formatDuration } from "@/components/pdks/lib/presentation";
 import { toLocalDateString } from "@/lib/date";
 
 export interface PDKSExportRecord {
   id: string;
   name: string;
   employeeId: string;
+  cardNumber?: string;
+  totalMinutes?: number;
+  overtimeMinutes?: number;
   payrollCode?: string;
   payrollEmployeeCode?: string;
   department: string;
@@ -45,25 +50,18 @@ export interface MonthlyPayrollSheet {
   }>;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  present: "Mevcut",
-  late: "Geç",
-  absent: "Yok",
-  leave: "İzinli",
-};
-
 /**
  * PDKS tablo verisini Excel (.xlsx) formatında dışa aktarır
  */
 export async function exportToExcel(
   records: PDKSExportRecord[],
-  options: { title?: string; dateRange?: string } = {}
+  options: { title?: string; dateRange?: string } = {},
 ): Promise<void> {
   const { dateRange = "" } = options;
 
   const headers = [
     "Çalışan",
-    "ID",
+    "Kart no",
     "Bordro Kodu",
     "Departman",
     "Gün Kodu",
@@ -77,16 +75,21 @@ export async function exportToExcel(
 
   const rows = records.map((r) => [
     r.name,
-    r.employeeId,
+    r.cardNumber ?? r.employeeId,
     r.payrollEmployeeCode ?? "",
     r.department,
     r.payrollCode ?? "",
     r.firstEntry,
     r.lastExit,
-    r.totalHours,
-    r.overtime,
+    r.totalMinutes === undefined
+      ? r.totalHours
+      : formatDuration(r.totalMinutes),
+    r.overtimeMinutes === undefined
+      ? r.overtime
+      : formatDuration(r.overtimeMinutes),
     r.leaveType,
-    STATUS_LABELS[r.status] ?? r.status,
+    STATUS_FILTER_LABELS[r.status as keyof typeof STATUS_FILTER_LABELS] ??
+      r.status,
   ]);
 
   const { default: ExcelJS } = await import("exceljs");
@@ -130,13 +133,13 @@ export async function exportToExcel(
  */
 export function exportToCsv(
   records: PDKSExportRecord[],
-  options: { dateRange?: string } = {}
+  options: { dateRange?: string } = {},
 ): void {
   const { dateRange = "" } = options;
 
   const headers = [
     "Çalışan",
-    "ID",
+    "Kart no",
     "Bordro Kodu",
     "Departman",
     "Gün Kodu",
@@ -154,23 +157,30 @@ export function exportToCsv(
   const rows = records.map((r) =>
     [
       r.name,
-      r.employeeId,
+      r.cardNumber ?? r.employeeId,
       r.payrollEmployeeCode ?? "",
       r.department,
       r.payrollCode ?? "",
       r.firstEntry,
       r.lastExit,
-      r.totalHours,
-      r.overtime,
+      r.totalMinutes === undefined
+        ? r.totalHours
+        : formatDuration(r.totalMinutes),
+      r.overtimeMinutes === undefined
+        ? r.overtime
+        : formatDuration(r.overtimeMinutes),
       r.leaveType,
-      STATUS_LABELS[r.status] ?? r.status,
+      STATUS_FILTER_LABELS[r.status as keyof typeof STATUS_FILTER_LABELS] ??
+        r.status,
     ]
       .map((c) => escapeCsv(String(c)))
-      .join(",")
+      .join(","),
   );
 
   const csvContent = [headers.join(","), ...rows].join("\n");
-  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob(["\uFEFF" + csvContent], {
+    type: "text/csv;charset=utf-8",
+  });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -184,7 +194,7 @@ export function exportToCsv(
  */
 export async function exportToPdf(
   records: PDKSExportRecord[],
-  options: { title?: string; dateRange?: string } = {}
+  options: { title?: string; dateRange?: string } = {},
 ): Promise<void> {
   const { title = "PDKS Raporu", dateRange = "" } = options;
 
@@ -213,7 +223,7 @@ export async function exportToPdf(
   doc.setFontSize(9);
   const headers = [
     "Çalışan",
-    "ID",
+    "Kart no",
     "Bordro",
     "Departman",
     "Gün",
@@ -244,16 +254,21 @@ export async function exportToPdf(
     x = margin;
     const rowData = [
       r.name.substring(0, 22),
-      r.employeeId,
+      r.cardNumber ?? r.employeeId,
       r.payrollEmployeeCode ?? "",
       r.department.substring(0, 16),
       r.payrollCode ?? "",
       r.firstEntry,
       r.lastExit,
-      r.totalHours,
-      r.overtime,
+      r.totalMinutes === undefined
+        ? r.totalHours
+        : formatDuration(r.totalMinutes),
+      r.overtimeMinutes === undefined
+        ? r.overtime
+        : formatDuration(r.overtimeMinutes),
       r.leaveType,
-      STATUS_LABELS[r.status] ?? r.status,
+      STATUS_FILTER_LABELS[r.status as keyof typeof STATUS_FILTER_LABELS] ??
+        r.status,
     ];
 
     rowData.forEach((cell, i) => {
@@ -289,13 +304,13 @@ const MONTH_NAMES_TR = [
  * Sağ tarafta: toplam saat, FM saat, izin gün, devamsız gün, geç gün.
  */
 export async function exportMonthlyPayrollSheet(
-  data: MonthlyPayrollSheet
+  data: MonthlyPayrollSheet,
 ): Promise<void> {
   const { default: ExcelJS } = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet(
     `${MONTH_NAMES_TR[data.month - 1]} ${data.year}`,
-    { views: [{ state: "frozen", xSplit: 4, ySplit: 2 }] }
+    { views: [{ state: "frozen", xSplit: 4, ySplit: 2 }] },
   );
 
   const dayCount = data.days.length;
@@ -385,7 +400,9 @@ export async function exportMonthlyPayrollSheet(
 
     // Toplamlar
     const totalsCol = 5 + dayCount;
-    sheet.getCell(r, totalsCol).value = (row.totals.totalMinutes / 60).toFixed(2);
+    sheet.getCell(r, totalsCol).value = (row.totals.totalMinutes / 60).toFixed(
+      2,
+    );
     sheet.getCell(r, totalsCol + 1).value = (
       row.totals.overtimeMinutes / 60
     ).toFixed(2);
@@ -419,13 +436,18 @@ export async function exportMonthlyPayrollSheet(
   signatureRow.getCell(1).value = "Hazırlayan (Muhasebe)";
   signatureRow.getCell(1).font = { bold: true, size: 10 };
   signatureRow.getCell(Math.floor(totalCols / 2)).value = "Onaylayan (Müdür)";
-  signatureRow.getCell(Math.floor(totalCols / 2)).font = { bold: true, size: 10 };
-  signatureRow.getCell(totalCols).value = `Tarih: ${new Date().toLocaleDateString("tr-TR")}`;
+  signatureRow.getCell(Math.floor(totalCols / 2)).font = {
+    bold: true,
+    size: 10,
+  };
+  signatureRow.getCell(totalCols).value =
+    `Tarih: ${new Date().toLocaleDateString("tr-TR")}`;
   signatureRow.getCell(totalCols).font = { size: 10 };
 
   const linesRow = sheet.addRow([]);
   linesRow.getCell(1).value = "İmza: ____________________";
-  linesRow.getCell(Math.floor(totalCols / 2)).value = "İmza: ____________________";
+  linesRow.getCell(Math.floor(totalCols / 2)).value =
+    "İmza: ____________________";
 
   // Print ayarları (landscape A4, fit to page width)
   sheet.pageSetup = {

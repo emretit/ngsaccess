@@ -1,18 +1,19 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useProjectAccess } from "./useProjectAccess";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
 export const usePdksChartData = (startDate: string, endDate: string) => {
-  const { loading: projectLoading } = useProjectAccess();
+  const { loading: projectLoading, projectId } = useActiveProject();
 
   const chartData = useQuery(
     api.cardReadings.getPdksChartData,
     !projectLoading
       ? {
+          projectId,
           startDate,
           endDate,
         }
-      : "skip"
+      : "skip",
   );
 
   return {

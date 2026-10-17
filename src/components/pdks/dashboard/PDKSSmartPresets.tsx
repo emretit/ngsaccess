@@ -1,3 +1,6 @@
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { notify } from "@/lib/notify";
+import { readableDate } from "../lib/presentation";
 import { useState } from "react";
 import { useConvex } from "convex/react";
 import { AlertTriangle, Clock, Coffee, X } from "lucide-react";
@@ -20,32 +23,54 @@ interface PDKSSmartPresetsProps {
   onChange: (sel: SmartPresetSelection | null) => void;
 }
 
-export function PDKSSmartPresets({ anchorDate, selection, onChange }: PDKSSmartPresetsProps) {
+export function PDKSSmartPresets({
+  anchorDate,
+  selection,
+  onChange,
+}: PDKSSmartPresetsProps) {
   const convex = useConvex();
+  const { projectId, activeProject } = useActiveProject();
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
 
   const runPreset = async (key: SmartPresetSelection["key"], label: string) => {
+    if (loadingKey || !projectId) return;
     setLoadingKey(key);
     try {
       let employeeIds: Id<"employees">[] = [];
       if (key === "repeat-late") {
         const rows = await convex.query(api.dashboard.getRepeatLateOffenders, {
+          projectId,
           daysBack: 30,
           minCount: 3,
         });
         employeeIds = rows.map((r) => r.employeeId);
       } else if (key === "annual-overtime-near") {
-        const rows = await convex.query(api.dashboard.getAnnualOvertimeBalance, {
-          year: new Date().getFullYear(),
-        });
-        employeeIds = rows.filter((r) => r.utilizationPct >= 80).map((r) => r.employeeId);
+        const rows = await convex.query(
+          api.dashboard.getAnnualOvertimeBalance,
+          {
+            projectId,
+            year: anchorDate.getFullYear(),
+          },
+        );
+        employeeIds = rows
+          .filter((r) => r.utilizationPct >= 80)
+          .map((r) => r.employeeId);
       } else if (key === "break-violation") {
         const rows = await convex.query(api.dashboard.getBreakViolations, {
+          projectId,
           date: toLocalDateString(anchorDate),
         });
         employeeIds = rows.map((r) => r.employeeId);
       }
-      onChange({ key, label, employeeIds, date: key === "break-violation" ? toLocalDateString(anchorDate) : undefined });
+      onChange({
+        key,
+        label,
+        employeeIds,
+        date:
+          key === "break-violation" ? toLocalDateString(anchorDate) : undefined,
+      });
+    } catch (error) {
+      notify.error("Uyarı listesi yüklenemedi", error);
     } finally {
       setLoadingKey(null);
     }
@@ -56,13 +81,29 @@ export function PDKSSmartPresets({ anchorDate, selection, onChange }: PDKSSmartP
     label: string;
     icon: typeof AlertTriangle;
   }> = [
-    { key: "repeat-late", label: "Sürekli geç kalanlar (30g · 3+)", icon: Clock },
-    { key: "annual-overtime-near", label: "270h yaklaşanlar (%80+)", icon: AlertTriangle },
-    { key: "break-violation", label: `Mola ihlali (${toLocalDateString(anchorDate) === toLocalDateString(new Date()) ? "bugün" : toLocalDateString(anchorDate)})`, icon: Coffee },
+    {
+      key: "repeat-late",
+      label: "Tekrar geç kalanlar · son 30 gün (3+ gün)",
+      icon: Clock,
+    },
+    {
+      key: "annual-overtime-near",
+      label: `Yıllık mesai sınırına yaklaşanlar · ${anchorDate.getFullYear()} yılı`,
+      icon: AlertTriangle,
+    },
+    {
+      key: "break-violation",
+      label: `Mola uyarıları · ${readableDate(toLocalDateString(anchorDate))}`,
+      icon: Coffee,
+    },
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground">
+        {activeProject?.name} · Bu uyarılar kendi tarih kapsamını kullanır.
+        Listeye uygulandığında mevcut dönem ve filtreler korunur.
+      </p>
       {presets.map((p) => {
         const Icon = p.icon;
         const active = selection?.key === p.key;
@@ -72,22 +113,25 @@ export function PDKSSmartPresets({ anchorDate, selection, onChange }: PDKSSmartP
             key={p.key}
             variant={active ? "default" : "outline"}
             size="sm"
-            disabled={loading}
-            className="h-7 text-xs rounded-full gap-1.5"
+            disabled={Boolean(loadingKey) || !projectId}
+            className="h-auto min-h-9 max-w-full justify-start gap-1.5 whitespace-normal text-left text-xs"
             onClick={() => runPreset(p.key, p.label)}
           >
             <Icon className="h-3 w-3" />
-            {loading ? "..." : p.label}
+            {loading ? "Yükleniyor…" : p.label}
           </Button>
         );
       })}
       {selection && (
-        <Badge variant="secondary" className="gap-1 pr-1 text-xs font-normal">
+        <Badge
+          variant="secondary"
+          className="max-w-full gap-1 whitespace-normal pr-1 text-xs font-normal"
+        >
           {selection.employeeIds.length} kişi · {selection.label}
           <button
             type="button"
             onClick={() => onChange(null)}
-            className="ml-0.5 rounded-full hover:bg-background/60 p-0.5"
+            className="ml-0.5 shrink-0 rounded-sm hover:bg-background/60 p-2"
             aria-label="Akıllı filtreyi kaldır"
           >
             <X className="h-3 w-3" />
