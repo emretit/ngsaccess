@@ -1,24 +1,24 @@
-
-import React from 'react';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { EmployeeFormData } from './hooks/useEmployeeFormData';
-import type { Id } from '../../../convex/_generated/dataModel';
-import { FieldError } from '@/components/shared/FormFieldWrapper';
-
-interface EmployeeFormFieldsProps {
+import { useEffect, useState, type ReactNode } from "react";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { FieldError } from "@/components/shared/FormFieldWrapper";
+import type { EmployeeFormData } from "./hooks/useEmployeeFormData";
+interface Option {
+  id: string;
+  name: string;
+}
+interface Props {
   formData: EmployeeFormData;
   setFormData: (data: EmployeeFormData) => void;
-  companies: { id: string; name: string }[];
-  departments: { id: string; name: string }[];
-  accessRules: { id: string; name: string }[];
-  positions: { id: string; name: string }[];
+  companies: Option[];
+  departments: Option[];
+  accessRules: Option[];
+  positions: Option[];
   errors?: Partial<Record<string, string>>;
+  photo?: ReactNode;
 }
-
 export default function EmployeeFormFields({
   formData,
   setFormData,
@@ -27,244 +27,197 @@ export default function EmployeeFormFields({
   accessRules,
   positions,
   errors = {},
-}: EmployeeFormFieldsProps) {
-  const handleInputChange = <K extends keyof EmployeeFormData>(field: K, value: EmployeeFormData[K]) => {
-    setFormData({ ...formData, [field]: value });
-  };
-
+  photo,
+}: Props) {
+  const [otherOpen, setOtherOpen] = useState(false);
+  useEffect(() => {
+    if (errors.hourlyRate || errors.monthlySalary) setOtherOpen(true);
+  }, [errors.hourlyRate, errors.monthlySalary]);
+  const update = <K extends keyof EmployeeFormData>(
+    key: K,
+    value: EmployeeFormData[K],
+  ) => setFormData({ ...formData, [key]: value });
+  const input = (
+    key:
+      | "firstName"
+      | "lastName"
+      | "email"
+      | "cardNumber"
+      | "tcNo"
+      | "payrollCode",
+    label: string,
+    type = "text",
+  ) => (
+    <div>
+      <Label htmlFor={`employee-${key}`}>{label}</Label>
+      <Input
+        id={`employee-${key}`}
+        name={key}
+        type={type}
+        required={["firstName", "lastName", "email", "cardNumber"].includes(
+          key,
+        )}
+        value={formData[key]}
+        onChange={(e) => update(key, e.target.value)}
+        aria-invalid={!!errors[key]}
+        aria-describedby={errors[key] ? `employee-${key}-error` : undefined}
+        maxLength={key === "tcNo" ? 11 : undefined}
+      />
+      <FieldError id={`employee-${key}-error`} message={errors[key]} />
+    </div>
+  );
+  const select = (
+    key: "companyId" | "departmentId" | "positionId" | "accessRuleId",
+    label: string,
+    options: Option[],
+  ) => (
+    <div>
+      <Label htmlFor={`employee-${key}`}>{label}</Label>
+      <select
+        id={`employee-${key}`}
+        name={key}
+        className="mt-1 h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm"
+        value={formData[key] ?? ""}
+        onChange={(e) =>
+          update(key, (e.target.value || null) as EmployeeFormData[typeof key])
+        }
+      >
+        <option value="">
+          {key === "accessRuleId" ? "Yeni kural ekleme" : "Atanmamış"}
+        </option>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+  const section = (title: string, children: ReactNode) => (
+    <fieldset className="min-w-0 space-y-4 border-t pt-5">
+      <legend className="text-base font-semibold">{title}</legend>
+      {children}
+    </fieldset>
+  );
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* Personal Information */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium">Kişisel Bilgiler</h3>
-
-        <div>
-          <Label htmlFor="first_name">Ad *</Label>
-          <Input
-            id="first_name"
-            value={formData.firstName}
-            onChange={(e) => handleInputChange('firstName', e.target.value)}
-            aria-invalid={!!errors.firstName}
-            aria-describedby={errors.firstName ? "first_name-error" : undefined}
-          />
-          <FieldError id="first_name-error" message={errors.firstName} />
-        </div>
-
-        <div>
-          <Label htmlFor="last_name">Soyad *</Label>
-          <Input
-            id="last_name"
-            value={formData.lastName}
-            onChange={(e) => handleInputChange('lastName', e.target.value)}
-            aria-invalid={!!errors.lastName}
-            aria-describedby={errors.lastName ? "last_name-error" : undefined}
-          />
-          <FieldError id="last_name-error" message={errors.lastName} />
-        </div>
-
-        <div>
-          <Label htmlFor="email">E-posta *</Label>
-          <Input
-            id="email"
-            type="email"
-            value={formData.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
-            aria-invalid={!!errors.email}
-            aria-describedby={errors.email ? "email-error" : undefined}
-          />
-          <FieldError id="email-error" message={errors.email} />
-        </div>
-
-        <div>
-          <Label htmlFor="tc_no">TC Kimlik No</Label>
-          <Input
-            id="tc_no"
-            value={formData.tcNo}
-            onChange={(e) => handleInputChange('tcNo', e.target.value)}
-            maxLength={11}
-            aria-invalid={!!errors.tcNo}
-            aria-describedby={errors.tcNo ? "tc_no-error" : undefined}
-          />
-          <FieldError id="tc_no-error" message={errors.tcNo} />
-        </div>
-
-        <div>
-          <Label htmlFor="card_number">Kart Numarası *</Label>
-          <Input
-            id="card_number"
-            value={formData.cardNumber}
-            onChange={(e) => handleInputChange('cardNumber', e.target.value)}
-            aria-invalid={!!errors.cardNumber}
-            aria-describedby={errors.cardNumber ? "card_number-error" : undefined}
-          />
-          <FieldError id="card_number-error" message={errors.cardNumber} />
-        </div>
-
-        <div>
-          <Label htmlFor="payroll_code">Bordro Kodu</Label>
-          <Input
-            id="payroll_code"
-            value={formData.payrollCode}
-            onChange={(e) => handleInputChange('payrollCode', e.target.value)}
-            placeholder="Bordro yazılımındaki personel kodu"
-          />
-        </div>
-      </div>
-
-      {/* Work Information */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium">İş Bilgileri</h3>
-
-        <div>
-          <Label htmlFor="company_id">Şirket</Label>
-          <Select
-            value={formData.companyId ?? ''}
-            onValueChange={(value) => handleInputChange('companyId', (value === '__none' ? null : value || null) as Id<'companies'> | null)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Şirket seçin" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none">Atanmamış</SelectItem>
-              {companies.map((company) => (
-                <SelectItem key={company.id} value={company.id}>
-                  {company.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label htmlFor="department_id">Departman</Label>
-          <Select
-            value={formData.departmentId ?? ''}
-            onValueChange={(value) => handleInputChange('departmentId', (value === '__none' ? null : value || null) as Id<'departments'> | null)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Departman seçin" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none">Atanmamış</SelectItem>
-              {departments.map((department) => (
-                <SelectItem key={department.id} value={department.id}>
-                  {department.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label htmlFor="position_id">Pozisyon</Label>
-          <Select
-            value={formData.positionId ?? ''}
-            onValueChange={(value) => handleInputChange('positionId', (value === '__none' ? null : value || null) as Id<'positions'> | null)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Pozisyon seçin" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none">Atanmamış</SelectItem>
-              {positions.map((position) => (
-                <SelectItem key={position.id} value={position.id}>
-                  {position.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <p className="text-xs text-muted-foreground">Bu seçim mevcut erişimleri kaldırmaz. Üyelikleri kaldırmak için <a href="/access-control" className="underline">Erişim Yönetimi</a> sayfasını kullanın.</p>
-          <Label htmlFor="access_rule_id">Erişim kuralı ekle</Label>
-          <Select
-            value={formData.accessRuleId ?? ''}
-            onValueChange={(value) => handleInputChange('accessRuleId', (value === '__none' ? null : value || null) as Id<'accessRules'> | null)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Erişim kuralı seçin" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none">Yeni kural ekleme</SelectItem>
-              {accessRules.map((rule) => (
-                <SelectItem key={rule.id} value={rule.id}>
-                  {rule.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label htmlFor="shift">Vardiya</Label>
-          <Input
-            id="shift"
-            value={formData.shift || ''}
-            onChange={(e) => handleInputChange('shift', e.target.value)}
-            placeholder="Vardiya bilgisi"
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="hourly_rate">Saatlik Ücret (TL)</Label>
-          <Input
-            id="hourly_rate"
-            type="number"
-            min={0}
-            step="0.01"
-            value={formData.hourlyRate ?? ''}
-            onChange={(e) =>
-              handleInputChange(
-                'hourlyRate',
-                e.target.value === '' ? null : Number(e.target.value)
-              )
-            }
-            placeholder="Mesai TL hesabı için"
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="monthly_salary">Aylık Maaş (TL)</Label>
-          <Input
-            id="monthly_salary"
-            type="number"
-            min={0}
-            step="0.01"
-            value={formData.monthlySalary ?? ''}
-            onChange={(e) =>
-              handleInputChange(
-                'monthlySalary',
-                e.target.value === '' ? null : Number(e.target.value)
-              )
-            }
-            placeholder="Saatlik ücret yoksa kullanılır"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            İkisi de boşsa mesai TL hesabı yapılmaz.
+    <div className="min-w-0 space-y-6">
+      {section(
+        "Kimlik",
+        <div className="grid gap-4 sm:grid-cols-2">
+          {input("firstName", "Ad *")}
+          {input("lastName", "Soyad *")}
+        </div>,
+      )}
+      {section(
+        "İletişim",
+        <>
+          {input("email", "E-posta *", "email")}
+          <p className="text-xs text-muted-foreground">
+            Mobil giriş kurulum bağlantısı bu adrese gönderilir.
           </p>
+        </>,
+      )}
+      {section(
+        "Organizasyon",
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {select("companyId", "Şirket", companies)}
+            {select("departmentId", "Departman", departments)}
+            {select("positionId", "Pozisyon", positions)}
+          </div>
+          <Label htmlFor="employee-isActive" className="flex min-h-11 items-center gap-2 text-sm">
+            <Checkbox
+              id="employee-isActive"
+              name="isActive"
+              checked={formData.isActive}
+              onCheckedChange={(checked) => update("isActive", checked === true)}
+            />
+            Aktif
+          </Label>
+        </>,
+      )}
+      {section(
+        "Kart / kimlik",
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {input("cardNumber", "Kart numarası *")}
+            {input("tcNo", "TC kimlik no")}
+            {input("payrollCode", "Bordro kodu")}
+            {select("accessRuleId", "Erişim kuralı ekle", accessRules)}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Bu seçim mevcut erişimleri kaldırmaz. Üyelikleri kaldırmak için{" "}
+            <a className="underline" href="/access-control">
+              Geçiş Kontrol
+            </a>{" "}
+            sayfasını kullanın.
+          </p>
+        </>,
+      )}
+      {section("Fotoğraf", photo)}
+      <details
+        open={otherOpen}
+        onToggle={(event) => setOtherOpen(event.currentTarget.open)}
+        className="border-t pt-5"
+      >
+        <summary className="cursor-pointer text-base font-semibold">
+          İsteğe bağlı diğer alanlar
+        </summary>
+        <div className="mt-4 space-y-4">
+          {(["hourlyRate", "monthlySalary"] as const).map((key) => (
+            <div key={key}>
+              <Label htmlFor={`employee-${key}`}>
+                {key === "hourlyRate"
+                  ? "Saatlik ücret (TL)"
+                  : "Aylık maaş (TL)"}
+              </Label>
+              <Input
+                id={`employee-${key}`}
+                name={key}
+                type="number"
+                min={0}
+                step="0.01"
+                value={formData[key] ?? ""}
+                onChange={(e) =>
+                  update(
+                    key,
+                    e.target.value === "" ? null : Number(e.target.value),
+                  )
+                }
+                aria-invalid={!!errors[key]}
+                aria-describedby={
+                  errors[key] ? `employee-${key}-error` : undefined
+                }
+              />
+              <FieldError id={`employee-${key}-error`} message={errors[key]} />
+            </div>
+          ))}
+          <p className="text-xs text-muted-foreground">
+            İki ücret de boşsa mesai TL hesabı yapılmaz.
+          </p>
+          <div>
+            <Label htmlFor="employee-shift">Eski vardiya notu</Label>
+            <Input
+              id="employee-shift"
+              name="shift"
+              value={formData.shift ?? ""}
+              onChange={(e) => update("shift", e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Bu not vardiya ataması oluşturmaz.
+            </p>
+          </div>
+          <div>
+            <Label htmlFor="employee-notes">Notlar</Label>
+            <Textarea
+              id="employee-notes"
+              name="notes"
+              value={formData.notes}
+              onChange={(e) => update("notes", e.target.value)}
+            />
+          </div>
         </div>
-
-        <div>
-          <Label htmlFor="notes">Notlar</Label>
-          <Textarea
-            id="notes"
-            value={formData.notes}
-            onChange={(e) => handleInputChange('notes', e.target.value)}
-            placeholder="Ek notlar..."
-            rows={3}
-          />
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="is_active"
-            checked={formData.isActive}
-            onCheckedChange={(checked) => handleInputChange('isActive', checked === true)}
-          />
-          <Label htmlFor="is_active">Aktif</Label>
-        </div>
-      </div>
+      </details>
     </div>
   );
 }

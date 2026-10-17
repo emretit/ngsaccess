@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
@@ -9,9 +8,14 @@ interface FormActionsProps {
 
 export default function FormActions({ isLoading, onClose }: FormActionsProps) {
   return (
-    <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-      <Button variant="outline" disabled={isLoading} onClick={onClose} type="button">
-        İptal
+    <div className="sticky bottom-0 flex justify-end gap-3 border-t bg-background px-5 py-4">
+      <Button
+        variant="outline"
+        disabled={isLoading}
+        onClick={onClose}
+        type="button"
+      >
+        Vazgeç
       </Button>
       <Button type="submit" disabled={isLoading}>
         {isLoading ? (
@@ -20,7 +24,7 @@ export default function FormActions({ isLoading, onClose }: FormActionsProps) {
             Kaydediliyor
           </>
         ) : (
-          'Kaydet'
+          "Kaydet"
         )}
       </Button>
     </div>

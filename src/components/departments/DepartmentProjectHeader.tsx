@@ -1,39 +1,31 @@
-
-import { Building2, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-interface DepartmentProjectHeaderProps {
+export function DepartmentProjectHeader({
+  projectName,
+  onProjectClick,
+  onAddClick,
+}: {
   projectName: string;
   onProjectClick: () => void;
   onAddClick: () => void;
-}
-
-export function DepartmentProjectHeader({ 
-  projectName, 
-  onProjectClick, 
-  onAddClick 
-}: DepartmentProjectHeaderProps) {
+}) {
   return (
-    <div className="p-4 border-b border-gray-100">
-      <div
-        className="flex items-center gap-2 cursor-pointer hover:text-primary/90 transition-colors"
+    <div className="flex min-w-0 items-center border-b py-2">
+      <button
+        className="min-h-11 min-w-0 flex-1 truncate text-left text-sm font-semibold"
         onClick={onProjectClick}
       >
-        <Building2 className="h-4 w-4 text-primary" />
-        <h2 className="text-base font-semibold text-primary flex-1">{projectName}</h2>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="h-7 w-7"
-          onClick={(e) => {
-            e.stopPropagation();
-            onAddClick();
-          }}
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-      <p className="text-xs text-muted-foreground mt-1">Departmanlar</p>
+        {projectName}
+      </button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-11 w-11 shrink-0"
+        aria-label="Departman ekle"
+        onClick={onAddClick}
+      >
+        <Plus className="h-4 w-4" />
+      </Button>
     </div>
   );
 }

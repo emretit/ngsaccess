@@ -17,21 +17,35 @@ export interface Department {
 export function useDepartments() {
   const { projectId, loading: projectLoading } = useActiveProjectScope();
 
-
   const departments = useQuery(
     api.departments.list,
-    !projectLoading && projectId ? { projectId } : "skip"
+    !projectLoading && projectId ? { projectId } : "skip",
   );
 
   const createDept = useMutation(api.departments.create);
+  const updateDept = useMutation(api.departments.update);
+  const renameDepartment = async (
+    departmentId: Id<"departments">,
+    name: string,
+  ) => {
+    await updateDept({ departmentId, name: name.trim() });
+    return true;
+  };
   const removeDept = useMutation(api.departments.remove);
 
-  const addDepartment = async (name: string, parentId: Id<"departments"> | null = null) => {
+  const addDepartment = async (
+    name: string,
+    parentId: Id<"departments"> | null = null,
+  ) => {
     if (!name.trim()) throw new Error("Departman adı zorunludur");
     if (!projectId) throw new Error("Departman eklemek için proje seçin");
-    const parentDept = parentId ? (departments ?? []).find(d => d._id === parentId) : null;
+    const parentDept = parentId
+      ? (departments ?? []).find((d) => d._id === parentId)
+      : null;
     await createDept({
-      name: name.trim(), projectId, parentId: parentId ?? undefined,
+      name: name.trim(),
+      projectId,
+      parentId: parentId ?? undefined,
       level: parentDept ? (parentDept.level ?? 0) + 1 : 0,
     });
     return true;
@@ -44,9 +58,11 @@ export function useDepartments() {
 
   return {
     departments: (departments ?? []) as Department[],
-    isLoading: projectLoading || Boolean(projectId && departments === undefined),
+    isLoading:
+      projectLoading || Boolean(projectId && departments === undefined),
     error: null,
     addDepartment,
+    renameDepartment,
     deleteDepartment,
     fetchDepartments: () => {},
   };

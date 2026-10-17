@@ -1,118 +1,131 @@
-
-import { Employee } from '@/types/employee';
+import { Link } from "react-router-dom";
+import type { Employee } from "@/types/employee";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Edit2, Mail } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
-import { format } from 'date-fns';
-import { EmployeeConsentsCard } from './EmployeeConsentsCard';
-import type { Id } from "../../../convex/_generated/dataModel";
-
-interface EmployeeDetailProps {
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { EmployeeActivityBoundary } from "./EmployeeActivityBoundary";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { EmployeeSyncSection } from "./EmployeeSyncSection";
+import { EmployeeRecentReadings } from "./EmployeeRecentReadings";
+export default function EmployeeDetails({
+  employee,
+  onEdit,
+}: {
   employee: Employee | null;
   onEdit: () => void;
-}
-
-export default function EmployeeDetails({ employee, onEdit }: EmployeeDetailProps) {
-  if (!employee) return null;
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-start">
-        <div className="flex items-center gap-4">
-          <Avatar className="h-20 w-20">
-            <AvatarImage src={employee.photoUrl || ''} alt={`${employee.firstName} ${employee.lastName}`} />
-            <AvatarFallback className="text-xl">
-              {employee.firstName?.[0]}{employee.lastName?.[0]}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <h3 className="font-medium text-lg">{employee.firstName} {employee.lastName}</h3>
-            <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-              <Mail className="h-3 w-3" /> {employee.email}
-            </p>
-            <div className="mt-1">
-              <Badge variant={employee.isActive ? "success" : "secondary"}>
-                {employee.isActive ? 'Aktif' : 'Pasif'}
-              </Badge>
-            </div>
-          </div>
-        </div>
-        <Button variant="outline" size="sm" onClick={onEdit}>
-          <Edit2 className="h-4 w-4 mr-2" />
-          Düzenle
-        </Button>
-      </div>
-
-      <Separator />
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium">Kişisel Bilgiler</h4>
-          <DetailItem label="TC No" value={employee.tcNo} />
-          <DetailItem label="Kart No" value={employee.cardNumber} />
-        </div>
-
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium">İş Bilgileri</h4>
-          <DetailItem label="Departman" value={employee.departments?.name || '-'} />
-          <DetailItem label="Pozisyon" value={employee.positions?.name || '-'} />
-          <DetailItem label="Vardiya" value={employee.shift || '-'} />
-        </div>
-      </div>
-
-      <Separator />
-
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium">Sistem Bilgileri</h4>
-        <div className="grid grid-cols-2 gap-4">
-          <DetailItem
-            label="Oluşturulma Tarihi"
-            value={employee.createdAt ? format(new Date(employee.createdAt), 'dd.MM.yyyy HH:mm') : '-'}
-          />
-          <DetailItem
-            label="Son Güncelleme"
-            value={employee.updatedAt ? format(new Date(employee.updatedAt), 'dd.MM.yyyy HH:mm') : '-'}
-          />
-        </div>
-      </div>
-
-      {employee.notes && (
-        <>
-          <Separator />
-          <div>
-            <h4 className="text-sm font-medium mb-2">Notlar</h4>
-            <div className="text-sm p-3 bg-muted rounded-md">
-              {employee.notes}
-            </div>
-          </div>
-        </>
-      )}
-
-      {employee._id && (
-        <>
-          <Separator />
-          <EmployeeConsentsCard employeeId={employee._id as Id<"employees">} />
-        </>
-      )}
-    </div>
-  );
-}
-
-function DetailItem({
-  label,
-  value,
-  valueClass = ''
-}: {
-  label: string;
-  value: string | number | null | undefined;
-  valueClass?: string;
+  onClose: () => void;
 }) {
+  const { isAdmin, projectId } = useActiveProjectScope();
+  const rules = useQuery(
+    api.accessRules.list,
+    projectId ? { projectId } : "skip",
+  );
+  if (!employee) return null;
+  const current = employee;
+  const memberships = rules?.filter((rule) =>
+    rule.groupMembers.some((member) => member.employeeId === current._id),
+  );
+  const items = [
+    ["E-posta", current.email],
+    ["Departman", current.departments?.name],
+    ["Pozisyon", current.positions?.name],
+    ["Kart no", current.cardNumber],
+    ["Bordro kodu", current.payrollCode],
+    ["TC kimlik no", current.tcNo ? `•••••••${current.tcNo.slice(-4)}` : null],
+    ["Eski vardiya notu", current.shift],
+  ];
   return (
-    <div className="flex justify-between">
-      <span className="text-sm text-muted-foreground">{label}:</span>
-      <span className={`text-sm font-medium ${valueClass}`}>{value || '-'}</span>
+    <div className="min-w-0 space-y-6 break-words">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold">
+            {current.firstName} {current.lastName}
+          </h2>
+          <p className="my-2 text-xs text-muted-foreground">
+            {current.payrollCode || "Bordro kodu yok"}
+          </p>
+          <StatusBadge tone={current.isActive ? "success" : "neutral"}>
+            {current.isActive ? "Aktif" : "Pasif"}
+          </StatusBadge>
+        </div>
+        {isAdmin && (
+          <Button variant="outline" onClick={onEdit}>
+            Düzenle
+          </Button>
+        )}
+      </div>
+      <section className="border-t pt-5">
+        <h3 className="mb-4 text-base font-semibold">Genel bilgiler</h3>
+        <dl className="grid min-w-0 gap-4 sm:grid-cols-2">
+          {items.map(([label, value]) => (
+            <div key={label} className="min-w-0">
+              <dt className="text-xs text-muted-foreground">{label}</dt>
+              <dd className="mt-1 break-words text-sm">{value || "—"}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+      <section className="space-y-3 border-t pt-5">
+        <h3 className="text-base font-semibold">Erişim yetkileri</h3>
+        {memberships === undefined ? (
+          <SectionSkeleton label="Erişim yetkileri yükleniyor" />
+        ) : memberships.length === 0 ? (
+          <EmptyState compact title="Bu kişiye erişim kuralı atanmamış." />
+        ) : (
+          <ul className="divide-y">
+            {memberships.map((rule) => (
+              <li
+                key={rule._id}
+                className="flex items-center justify-between gap-3 py-2 text-sm"
+              >
+                <span>{rule.name}</span>
+                <StatusBadge
+                  tone={rule.isActive === false ? "neutral" : "success"}
+                >
+                  {rule.isActive === false ? "Pasif" : "Aktif"}
+                </StatusBadge>
+              </li>
+            ))}
+          </ul>
+        )}
+        <Link className="text-sm underline" to="/access-control">
+          Geçiş Kontrol{isAdmin ? " · Üyelikleri yönet" : ""}
+        </Link>
+      </section>
+      <EmployeeActivityBoundary
+        employeeId={employee._id}
+        projectId={projectId}
+        title="Cihaz senkron durumu"
+        description="Cihaz senkron durumu yüklenemedi."
+      >
+        <EmployeeSyncSection employeeId={employee._id} />
+      </EmployeeActivityBoundary>
+      <EmployeeActivityBoundary
+        employeeId={employee._id}
+        projectId={projectId}
+        title="Son geçişler"
+        description="Son geçişler yüklenemedi."
+      >
+        <EmployeeRecentReadings employeeId={employee._id} />
+      </EmployeeActivityBoundary>
+      <section className="space-y-3 border-t pt-5">
+        <h3 className="text-base font-semibold">Fotoğraf ve veri kayıtları</h3>
+        {current.photoUrl ? (
+          <img
+            src={current.photoUrl}
+            alt={`${current.firstName} ${current.lastName}`}
+            className="h-24 w-24 rounded-full object-cover"
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">Fotoğraf eklenmemiş.</p>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Fotoğraf personel profilinde kullanılır.
+        </p>
+      </section>
     </div>
   );
 }

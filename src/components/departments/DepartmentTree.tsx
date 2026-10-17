@@ -13,26 +13,51 @@ import { useDepartments } from "@/hooks/useDepartments";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
 interface DepartmentTreeProps {
+  selectedValue?: string;
+  onSelectUnassigned?: () => void;
   onSelectDepartment: (id: Id<"departments"> | null) => void;
 }
 
-export default function DepartmentTree({ onSelectDepartment }: DepartmentTreeProps) {
-  const { departments, isLoading, addDepartment, deleteDepartment } = useDepartments();
-  const { activeProject, isSuperAdmin, projectId, loading: projectLoading } = useActiveProject();
-  const [selectedDepartment, setSelectedDepartment] = useState<Id<"departments"> | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<(typeof departments)[number] | null>(null);
+export default function DepartmentTree({
+  onSelectDepartment,
+  selectedValue,
+  onSelectUnassigned,
+}: DepartmentTreeProps) {
+  const {
+    departments,
+    isLoading,
+    addDepartment,
+    deleteDepartment,
+    renameDepartment,
+  } = useDepartments();
+  const {
+    activeProject,
+    isSuperAdmin,
+    projectId,
+    loading: projectLoading,
+  } = useActiveProject();
+  const [renameTarget, setRenameTarget] = useState<
+    (typeof departments)[number] | null
+  >(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [selectedDepartment, setSelectedDepartment] =
+    useState<Id<"departments"> | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<
+    (typeof departments)[number] | null
+  >(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAddTopLevelDialog, setShowAddTopLevelDialog] = useState(false);
-  const [addingToParentId, setAddingToParentId] = useState<Id<"departments"> | null>(null);
+  const [addingToParentId, setAddingToParentId] =
+    useState<Id<"departments"> | null>(null);
 
   useEffect(() => {
     setSelectedDepartment(null);
-    onSelectDepartment(null);
     setDeleteTarget(null);
+    setRenameTarget(null);
+    setMobileOpen(false);
     setShowAddDialog(false);
     setShowAddTopLevelDialog(false);
     setAddingToParentId(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
   const generalSettings = useQuery(
@@ -71,24 +96,29 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
   };
 
   const renderDepartmentTree = (parentId: Id<"departments"> | null = null) => {
-    const children = departments.filter(dept => (dept.parentId ?? null) === parentId);
+    const children = departments.filter(
+      (dept) => (dept.parentId ?? null) === parentId,
+    );
 
     if (!children.length) return null;
 
-    return children.map(department => {
-      const hasChildren = departments.some(dept => dept.parentId === department._id);
+    return children.map((department) => {
+      const hasChildren = departments.some(
+        (dept) => dept.parentId === department._id,
+      );
 
       return (
         <DepartmentTreeItem
           key={department._id}
           department={department}
           level={department.level ?? 0}
-          isSelected={selectedDepartment === department._id}
+          isSelected={(selectedValue ?? selectedDepartment) === department._id}
           onSelect={handleSelectDepartment}
           onAddSubDepartment={(parentId) => {
             setAddingToParentId(parentId);
             setShowAddDialog(true);
           }}
+          onRename={() => setRenameTarget(department)}
           onDelete={() => setDeleteTarget(department)}
           hasChildren={hasChildren}
         >
@@ -99,42 +129,104 @@ export default function DepartmentTree({ onSelectDepartment }: DepartmentTreePro
   };
 
   return (
-    <div className="h-full w-full md:w-[220px] shrink-0 bg-card rounded-xl border shadow-xs">
-      <DepartmentProjectHeader
-        projectName={companyName}
-        onProjectClick={handleProjectHeaderClick}
-        onAddClick={() => setShowAddTopLevelDialog(true)}
-      />
+    <div className="w-full min-w-0 shrink-0 min-[1100px]:w-[220px]">
+      <button
+        type="button"
+        className="block min-h-11 w-full min-w-0 truncate rounded-md border px-3 text-left text-sm min-[1100px]:hidden"
+        aria-expanded={mobileOpen}
+        aria-controls="employee-departments"
+        onClick={() => setMobileOpen(!mobileOpen)}
+      >
+        Departmanlar ·{" "}
+        {selectedValue === "unassigned"
+          ? "Atanmamış"
+          : (departments.find((d) => d._id === selectedValue)?.name ??
+            "Tüm personel")}
+      </button>
+      <div
+        id="employee-departments"
+        className={mobileOpen ? "block" : "hidden min-[1100px]:block"}
+      >
+        <DepartmentProjectHeader
+          projectName={companyName}
+          onProjectClick={handleProjectHeaderClick}
+          onAddClick={() => setShowAddTopLevelDialog(true)}
+        />
 
-      <div className="p-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
-        {isLoading ? (
-          <SectionSkeleton label="Departmanlar yükleniyor" />
-        ) : departments.length === 0 ? (
-          <EmptyState title="Departman yok" />
-        ) : (
-          <ul role="tree" className="space-y-0.5">
-            {renderDepartmentTree()}
-          </ul>
-        )}
+        <div className="py-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
+          <button
+            className="min-h-11 w-full rounded-md px-3 text-left text-sm aria-pressed:bg-selected aria-pressed:text-primary"
+            aria-pressed={!(selectedValue ?? selectedDepartment)}
+            onClick={handleProjectHeaderClick}
+          >
+            Tüm personel
+          </button>
+          {onSelectUnassigned && (
+            <button
+              className="min-h-11 w-full rounded-md px-3 text-left text-sm aria-pressed:bg-selected aria-pressed:text-primary"
+              aria-pressed={selectedValue === "unassigned"}
+              onClick={onSelectUnassigned}
+            >
+              Atanmamış
+            </button>
+          )}
+          <p className="px-3 py-2 text-xs text-muted-foreground">
+            Yalnız doğrudan bağlı kişiler gösterilir.
+          </p>
+          {isLoading ? (
+            <SectionSkeleton label="Departmanlar yükleniyor" />
+          ) : departments.length === 0 ? (
+            <EmptyState title="Departman yok" />
+          ) : (
+            <ul className="space-y-0.5">{renderDepartmentTree()}</ul>
+          )}
+        </div>
       </div>
-
-      <ConfirmDestructive open={deleteTarget !== null} onOpenChange={open => { if (!open) setDeleteTarget(null); }}
-        confirmLabel="Departmanı sil" title="Departman silinsin mi?" objectName={deleteTarget?.name ?? ""}
-        effects={["Departman kalıcı silinir.", "Çalışanı veya alt departmanı varsa işlem engellenir; önce bağlı kayıtları taşıyın."]}
+      <AddDepartmentDialog
+        isOpen={renameTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setRenameTarget(null);
+        }}
+        title="Departmanı yeniden adlandır"
+        description={renameTarget?.name}
+        successMessage="Departman adı güncellendi"
+        onAdd={async (name) => {
+          if (!renameTarget) return false;
+          await renameDepartment(renameTarget._id, name);
+          setRenameTarget(null);
+          return true;
+        }}
+      />
+      <ConfirmDestructive
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        confirmLabel="Departmanı sil"
+        title="Departman silinsin mi?"
+        objectName={deleteTarget?.name ?? ""}
+        effects={[
+          "Departman kalıcı silinir.",
+          "Çalışanı veya alt departmanı varsa işlem engellenir; önce bağlı kayıtları taşıyın.",
+        ]}
         onConfirm={async () => {
           if (!deleteTarget) return;
           await deleteDepartment(deleteTarget._id);
-          if (selectedDepartment === deleteTarget._id) handleProjectHeaderClick();
-        }} />
-      <AddDepartmentDialog key={`${projectId}-${addingToParentId ?? "top"}`}
+          if ((selectedValue ?? selectedDepartment) === deleteTarget._id)
+            handleProjectHeaderClick();
+        }}
+      />
+      <AddDepartmentDialog
+        key={`${projectId}-${addingToParentId ?? "top"}`}
         isOpen={showAddDialog}
         onOpenChange={setShowAddDialog}
         onAdd={handleAddDepartment}
         title="Yeni Departman Ekle"
-        description={addingToParentId ? "Alt departmanın adını girin" : "Yeni departmanın adını girin"}
+        description={`${companyName} · ${departments.find((d) => d._id === addingToParentId)?.name ?? "Üst seviye"}: departman adını girin`}
       />
 
-      <AddDepartmentDialog key={projectId}
+      <AddDepartmentDialog
+        key={projectId}
         isOpen={showAddTopLevelDialog}
         onOpenChange={setShowAddTopLevelDialog}
         onAdd={handleAddTopLevelDepartment}

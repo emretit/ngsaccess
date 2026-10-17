@@ -1,8 +1,7 @@
+import { departmentPath } from "./lib/departmentPath";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
-import { notify } from "@/lib/notify";
-
-
+import { errorMessage, notify } from "@/lib/notify";
 
 import { useState } from "react";
 import { useMutation, useAction, useQuery } from "convex/react";
@@ -12,19 +11,27 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { Employee } from "@/types/employee";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { Edit2, Trash2, Smartphone, Upload, Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useEmployeeTable } from "@/hooks/useEmployeeTable";
 import { EmployeeBulkActions } from "./EmployeeBulkActions";
 import { EmployeeDeleteDialog } from "./EmployeeDeleteDialog";
 import { EmployeePasswordResetDialog } from "./EmployeePasswordResetDialog";
-import { toast } from "@/hooks/use-toast";
+import { RowActions } from "@/components/shared/RowActions";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 
 interface EmployeeTableProps {
   employees: Employee[];
+  sort?: string;
+  onSortChange?: (sort: string) => void;
   onEdit: (employee: Employee) => void;
   onDelete: (employee: Employee) => void;
   onViewDetails: (employee: Employee) => void;
@@ -33,58 +40,64 @@ interface EmployeeTableProps {
 
 export default function EmployeeTable({
   employees,
+  sort = "name:asc",
+  onSortChange,
   onEdit,
   onDelete: _onDelete,
-  onViewDetails: _onViewDetails,
-  onRefresh
+  onViewDetails,
+  onRefresh,
 }: EmployeeTableProps) {
-  const { isAdmin } = useActiveProjectScope();
+  const { isAdmin, projectId } = useActiveProjectScope();
   const [failedSyncIds, setFailedSyncIds] = useState<Id<"employees">[]>([]);
   const [syncReport, setSyncReport] = useState<string[]>([]);
-  const [selectedEmployeeForReset, setSelectedEmployeeForReset] = useState<Employee | null>(null);
+  const [selectedEmployeeForReset, setSelectedEmployeeForReset] =
+    useState<Employee | null>(null);
   const [showPasswordResetDialog, setShowPasswordResetDialog] = useState(false);
-  const [showIndividualDeleteDialog, setShowIndividualDeleteDialog] = useState(false);
-  const [selectedEmployeeForDelete, setSelectedEmployeeForDelete] = useState<Employee | null>(null);
-  const [syncingEmployeeId, setSyncingEmployeeId] = useState<string | null>(null);
+  const [showIndividualDeleteDialog, setShowIndividualDeleteDialog] =
+    useState(false);
+  const [selectedEmployeeForDelete, setSelectedEmployeeForDelete] =
+    useState<Employee | null>(null);
   const [isBulkSyncing, setIsBulkSyncing] = useState(false);
 
-  const syncEmployeeToDevices = useAction(api.actions.hikvisionSync.syncEmployeeToDevices);
-  const allDepartments = useQuery(api.departments.list, {}) ?? []; // dropdown filter — empty during load is acceptable UX
+  const syncEmployeeToDevices = useAction(
+    api.actions.hikvisionSync.syncEmployeeToDevices,
+  );
+  const allDepartments =
+    useQuery(api.departments.list, projectId ? { projectId } : "skip") ?? []; // dropdown filter — empty during load is acceptable UX
 
   const syncAction = useAsyncAction(async (employee: Employee) => {
     const empId = employee._id;
-    setSyncingEmployeeId(empId);
     try {
       const result = await syncEmployeeToDevices({ employeeId: empId });
       setFailedSyncIds(result.failed > 0 ? [empId] : []);
-      setSyncReport([`${employee.firstName} ${employee.lastName}: ${result.synced} başarılı, ${result.failed} başarısız`, ...result.errors]);
+      setSyncReport([
+        `${employee.firstName} ${employee.lastName}: ${result.synced} başarılı, ${result.failed} başarısız`,
+        ...result.errors,
+      ]);
       if (result.failed > 0) {
-        notify.error("Kısmi veya başarısız senkronizasyon", result.errors.join("; "));
+        notify.error(
+          "İşlem bazı kişiler için tamamlanamadı.",
+          result.errors.join("; "),
+        );
       } else if (result.synced > 0) {
-        toast({
-          title: "Senkronizasyon Başarılı",
-          description: `${employee.firstName} ${employee.lastName} — ${result.synced} cihaza gönderildi.`,
-        });
+        notify.success(
+          "Cihaz gönderimi tamamlandı",
+          `${employee.firstName} ${employee.lastName} — ${result.synced} cihaza gönderildi.`,
+        );
       } else if (result.errors.length > 0) {
-        toast({
-          title: "Senkronizasyon Hatası",
-          description: result.errors.join(", "),
-          variant: "destructive",
-        });
+        notify.error("Cihaz gönderimi tamamlanamadı", result.errors.join(", "));
       } else {
-        toast({
-          title: "Bilgi",
-          description: "Bu çalışanın bağlı olduğu cihaz veya kart numarası bulunamadı.",
-        });
+        notify.info(
+          "Bilgi",
+          "Bu çalışanın bağlı olduğu cihaz veya kart numarası bulunamadı.",
+        );
       }
     } catch (err) {
-      toast({
-        title: "Hata",
-        description: (err as Error).message || "Senkronizasyon sırasında bir hata oluştu.",
-        variant: "destructive",
-      });
-    } finally {
-      setSyncingEmployeeId(null);
+      setFailedSyncIds([empId]);
+      setSyncReport([
+        `${employee.firstName} ${employee.lastName}: ${errorMessage(err)}`,
+      ]);
+      notify.error("Cihaz gönderimi tamamlanamadı", err);
     }
   });
   const handleSyncToDevice = syncAction.run;
@@ -100,8 +113,8 @@ export default function EmployeeTable({
     handleSelectEmployee,
     handleBulkDelete: originalHandleBulkDelete,
     handleBulkDepartmentUpdate: originalHandleBulkDepartmentUpdate,
-    requestSort,
-    departmentPending
+    clearSelection,
+    departmentPending,
   } = useEmployeeTable(employees);
 
   const handlePasswordResetClick = (employee: Employee) => {
@@ -144,192 +157,272 @@ export default function EmployeeTable({
     const failedIds: Id<"employees">[] = [];
     for (const empId of retry ? failedSyncIds : selectedEmployees) {
       try {
-        const result = await syncEmployeeToDevices({ employeeId: empId as Id<"employees"> });
+        const result = await syncEmployeeToDevices({
+          employeeId: empId as Id<"employees">,
+        });
         totalSynced += result.synced;
         totalFailed += result.failed;
         if (result.failed > 0) failedIds.push(empId);
-        allErrors.push(...result.errors.map(error => `${employees.find(emp => emp._id === empId)?.firstName ?? empId}: ${error}`));
+        allErrors.push(
+          ...result.errors.map(
+            (error) =>
+              `${employees.find((emp) => emp._id === empId)?.firstName ?? empId}: ${error}`,
+          ),
+        );
       } catch (err) {
         totalFailed++;
         failedIds.push(empId);
-        allErrors.push((err as Error).message);
+        allErrors.push(
+          `${employees.find((emp) => emp._id === empId)?.firstName ?? empId}: ${errorMessage(err)}`,
+        );
       }
     }
 
     setFailedSyncIds(failedIds);
-    setSyncReport([`${totalSynced} cihaz başarılı, ${totalFailed} başarısız`, ...allErrors]);
+    setSyncReport([
+      `${totalSynced} cihaz başarılı, ${totalFailed} başarısız`,
+      ...allErrors,
+    ]);
     setIsBulkSyncing(false);
 
     if (totalSynced > 0) {
-      toast({
-        title: "Toplu Senkronizasyon Tamamlandı",
-        description: `${totalSynced} cihaza gönderildi${totalFailed > 0 ? `, ${totalFailed} hata` : ""}.`,
-      });
+      notify.info(
+        "Toplu cihaz gönderimi tamamlandı",
+        `${totalSynced} cihaza gönderildi${totalFailed > 0 ? `, ${totalFailed} hata` : ""}.`,
+      );
     } else if (allErrors.length > 0) {
-      toast({
-        title: "Senkronizasyon Hatası",
-        description: allErrors.join("; "),
-        variant: "destructive",
-      });
+      notify.error("Cihaz gönderimi tamamlanamadı", allErrors.join("; "));
     } else {
-      toast({ title: "Bilgi", description: "Seçili çalışanlar için bağlı cihaz bulunamadı." });
+      notify.info("Bilgi", "Seçili çalışanlar için bağlı cihaz bulunamadı.");
     }
   });
   const handleBulkSyncToDevices = bulkSyncAction.run;
 
+  const column = (key: string, label: string, className?: string) => (
+    <TableHead
+      className={className}
+      aria-sort={
+        sort.startsWith(`${key}:`)
+          ? sort.endsWith(":desc")
+            ? "descending"
+            : "ascending"
+          : "none"
+      }
+    >
+      <button
+        type="button"
+        className="min-h-9 text-left"
+        onClick={() =>
+          onSortChange?.(`${key}:${sort === `${key}:asc` ? "desc" : "asc"}`)
+        }
+      >
+        {label}
+        {sort.startsWith(`${key}:`)
+          ? sort.endsWith(":desc")
+            ? " ↓"
+            : " ↑"
+          : ""}
+      </button>
+    </TableHead>
+  );
   return (
     <div className="space-y-4">
       {isAdmin && selectedEmployees.length > 0 && (
         <EmployeeBulkActions
+          onClear={() => {
+            if (!departmentPending && !isBulkSyncing && !syncAction.pending)
+              clearSelection();
+          }}
+          names={employees
+            .filter((emp) => selectedEmployees.includes(emp._id))
+            .map(
+              (emp) =>
+                `${emp.firstName} ${emp.lastName} (${emp.payrollCode || "Bordro kodu yok"})`,
+            )
+            .join(", ")}
           selectedCount={selectedEmployees.length}
-          departments={allDepartments.map(d => ({ _id: d._id, name: d.name }))}
+          departments={allDepartments.map((d) => ({
+            _id: d._id,
+            name: departmentPath(d._id, allDepartments),
+          }))}
           selectedDepartment={selectedDepartment}
           onDepartmentChange={setSelectedDepartment}
           onUpdateDepartment={handleBulkDepartmentUpdate}
           onDelete={() => setShowDeleteDialog(true)}
-          onSyncToDevices={() => { void handleBulkSyncToDevices(false); }}
+          onSyncToDevices={() => {
+            void handleBulkSyncToDevices(false);
+          }}
           isSyncing={isBulkSyncing || syncAction.pending}
-          pending={departmentPending}
+          pending={departmentPending || isBulkSyncing || syncAction.pending}
         />
       )}
 
-      {syncReport.length > 0 && <div role="status" className="rounded-md border p-3 text-sm"><p className="font-medium">Son senkronizasyon sonucu</p>{syncReport.map((line, index) => <p key={index}>{line}</p>)}{failedSyncIds.length > 0 && <Button disabled={bulkSyncAction.pending} onClick={() => { void handleBulkSyncToDevices(true); }}>Başarısız kişileri yeniden gönder</Button>}</div>}
-      <div className="overflow-x-auto">
-        <Table className="min-w-[800px]">
+      {syncReport.length > 0 && (
+        <div
+          role="status"
+          className="break-words rounded-md border p-3 text-sm"
+        >
+          <p className="font-medium">Son cihaz gönderimi sonucu</p>
+          <p className="text-muted-foreground">
+            Gönderim sonucu cihazda doğrulandığı anlamına gelmez.
+          </p>
+          {syncReport.map((line, index) => (
+            <p key={index}>{line}</p>
+          ))}
+          {failedSyncIds.length > 0 && (
+            <Button
+              disabled={bulkSyncAction.pending}
+              onClick={() => {
+                void handleBulkSyncToDevices(true);
+              }}
+            >
+              Başarısız kişileri yeniden gönder
+            </Button>
+          )}
+        </div>
+      )}
+      <div className="min-w-0 overflow-x-auto rounded-md border">
+        <Table className="w-full table-fixed text-xs">
           <TableHeader>
-            <TableRow className="bg-muted/50 hover:bg-muted/50">
-              <TableHead className="w-[50px] font-semibold text-foreground">
+            <TableRow className="h-9 bg-muted/50">
+              <TableHead className="w-10">
                 <Checkbox
-                  disabled={!isAdmin}
-                  checked={employees.length > 0 && employees.every(emp => selectedEmployees.includes(emp._id)) ? true : selectedEmployees.length > 0 ? "indeterminate" : false}
-                  onCheckedChange={handleSelectAll}
+                  aria-label="Bu sayfadaki personeli seç"
+                  className="relative data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-primary-foreground data-[state=indeterminate]:after:absolute data-[state=indeterminate]:after:inset-x-[3px] data-[state=indeterminate]:after:top-1/2 data-[state=indeterminate]:after:h-0.5 data-[state=indeterminate]:after:-translate-y-1/2 data-[state=indeterminate]:after:bg-current data-[state=indeterminate]:after:content-[''] [&[data-state=indeterminate]_svg]:hidden"
+                  disabled={
+                    !isAdmin ||
+                    departmentPending ||
+                    isBulkSyncing ||
+                    syncAction.pending
+                  }
+                  checked={
+                    employees.length > 0 &&
+                    employees.every((emp) =>
+                      selectedEmployees.includes(emp._id),
+                    )
+                      ? true
+                      : employees.some((emp) => selectedEmployees.includes(emp._id))
+                        ? "indeterminate"
+                        : false
+                  }
+                  onCheckedChange={(checked) => handleSelectAll(checked === true)}
                 />
               </TableHead>
-              <TableHead className="font-semibold text-foreground w-[56px]">Foto</TableHead>
-              <TableHead onClick={() => requestSort('firstName')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
-                Ad Soyad
+              {column("name", "Ad soyad")}
+              {column("email", "E-posta", "hidden min-[1100px]:table-cell")}
+              {column(
+                "department",
+                "Departman",
+                "hidden min-[760px]:table-cell",
+              )}
+              {column("position", "Pozisyon", "hidden min-[1100px]:table-cell")}
+              {column("card", "Kart no", "hidden min-[760px]:table-cell")}
+              {column("status", "Durum", "w-[68px]")}
+              <TableHead className="w-11">
+                <span className="sr-only">İşlemler</span>
               </TableHead>
-              <TableHead onClick={() => requestSort('email')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
-                E-posta
-              </TableHead>
-              <TableHead onClick={() => requestSort('departmentId')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
-                Departman
-              </TableHead>
-              <TableHead onClick={() => requestSort('positionId')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
-                Pozisyon
-              </TableHead>
-              <TableHead onClick={() => requestSort('cardNumber')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
-                Kart No
-              </TableHead>
-              <TableHead className="font-semibold text-foreground">
-                Bordro Kodu
-              </TableHead>
-              <TableHead onClick={() => requestSort('isActive')} className="cursor-pointer font-semibold text-foreground select-none hover:text-primary transition-colors">
-                Durum
-              </TableHead>
-              <TableHead className="text-right font-semibold text-foreground">İşlemler</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedEmployees.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={10} className="h-32 text-center text-muted-foreground text-sm">
-                  <EmptyState title="Personel bulunamadı" description="Arama veya departman filtresini değiştirebilirsiniz." />
-                </TableCell>
-              </TableRow>
-            ) : sortedEmployees.map((employee: Employee) => (
-              <TableRow
-                key={employee._id}
-                className="cursor-pointer transition-colors hover:bg-muted/50"
-                onClick={(e) => {
-                  if ((e.target as HTMLElement).closest('button, input[type="checkbox"]')) return;
-                  if (isAdmin) onEdit(employee);
-                }}
-              >
-                <TableCell onClick={(e) => e.stopPropagation()}>
+            {sortedEmployees.map((employee) => (
+              <TableRow key={employee._id} className="h-[42px]">
+                <TableCell className="px-2 py-0">
                   <Checkbox
+                    aria-label={`${employee.firstName} ${employee.lastName} seç`}
+                    disabled={
+                      !isAdmin ||
+                      departmentPending ||
+                      isBulkSyncing ||
+                      syncAction.pending
+                    }
                     checked={selectedEmployees.includes(employee._id)}
-                    disabled={!isAdmin}
-                    onCheckedChange={(checked) => handleSelectEmployee(checked as boolean, employee._id)}
+                    onCheckedChange={(checked) =>
+                      handleSelectEmployee(checked === true, employee._id)
+                    }
                   />
                 </TableCell>
-                <TableCell>
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={employee.photoUrl || ''} alt={`${employee.firstName} ${employee.lastName}`} />
-                    <AvatarFallback className="text-xs font-medium bg-primary/10 text-primary">
-                      {employee.firstName?.[0]}{employee.lastName?.[0]}
-                    </AvatarFallback>
-                  </Avatar>
+                <TableCell className="px-2 py-1">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Avatar className="hidden h-7 w-7 shrink-0 min-[760px]:flex">
+                      <AvatarImage src={employee.photoUrl ?? ""} alt="" />
+                      <AvatarFallback>
+                        {employee.firstName[0]}
+                        {employee.lastName[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <button
+                        type="button"
+                        className="max-w-full truncate text-left font-medium hover:underline"
+                        onClick={() => onViewDetails(employee)}
+                      >
+                        {employee.firstName} {employee.lastName}
+                      </button>
+                      <p className="truncate text-[11px] text-muted-foreground min-[760px]:hidden">
+                        {employee.departments?.name ?? "Atanmamış"}
+                        {employee.payrollCode ? ` · ${employee.payrollCode}` : ""}
+                      </p>
+                    </div>
+                  </div>
                 </TableCell>
-                <TableCell className="font-medium">{employee.firstName} {employee.lastName}</TableCell>
-                <TableCell className="text-muted-foreground text-sm">{employee.email}</TableCell>
-                <TableCell>
-                  {employee.departments?.name ? (
-                    <span className="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-950 px-2 py-0.5 text-xs font-medium text-blue-700 dark:text-blue-300">
-                      {employee.departments.name}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground text-sm">—</span>
-                  )}
+                <TableCell className="hidden truncate min-[1100px]:table-cell">
+                  {employee.email}
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {employee.positions?.name ?? <span className="text-muted-foreground">—</span>}
+                <TableCell className="hidden truncate min-[760px]:table-cell">
+                  {employee.departments?.name ?? "Atanmamış"}
                 </TableCell>
-                <TableCell className="font-mono text-sm">{employee.cardNumber || <span className="text-muted-foreground">—</span>}</TableCell>
-                <TableCell className="font-mono text-sm">
-                  {employee.payrollCode || <span className="text-muted-foreground">—</span>}
+                <TableCell className="hidden truncate min-[1100px]:table-cell">
+                  {employee.positions?.name ?? "—"}
                 </TableCell>
-                <TableCell>
-                  <StatusBadge tone={employee.isActive ? "success" : "neutral"} className="text-xs">
-                    {employee.isActive ? 'Aktif' : 'Pasif'}
+                <TableCell className="hidden truncate tabular-nums min-[760px]:table-cell">
+                  {employee.cardNumber || "—"}
+                </TableCell>
+                <TableCell className="px-1 py-0">
+                  <StatusBadge tone={employee.isActive ? "success" : "neutral"}>
+                    {employee.isActive ? "Aktif" : "Pasif"}
                   </StatusBadge>
                 </TableCell>
-                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                  <div className={isAdmin ? "flex items-center justify-end gap-0.5" : "hidden"}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`${employee.firstName} cihazlara gönder`}
-                      onClick={() => handleSyncToDevice(employee)}
-                      disabled={syncAction.pending || bulkSyncAction.pending}
-                      className="h-8 w-8 text-muted-foreground hover:text-primary"
-                      title="Cihaza Senkronize Et"
+                <TableCell className="px-0 py-0">
+                  <div className="max-[759px]:[&_button]:h-11 max-[759px]:[&_button]:w-11">
+                    <RowActions
+                      label={`${employee.firstName} ${employee.lastName} işlemleri`}
                     >
-                      {syncingEmployeeId === employee._id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Upload className="h-4 w-4" />
+                      <DropdownMenuItem
+                        onSelect={() => onViewDetails(employee)}
+                      >
+                        Ayrıntı
+                      </DropdownMenuItem>
+                      {isAdmin && (
+                        <>
+                          <DropdownMenuItem onSelect={() => onEdit(employee)}>
+                            Düzenle
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={
+                              syncAction.pending || bulkSyncAction.pending
+                            }
+                            onSelect={() => {
+                              void handleSyncToDevice(employee);
+                            }}
+                          >
+                            Cihazlara gönder
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() => handlePasswordResetClick(employee)}
+                          >
+                            Mobil giriş bağlantısı gönder
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onSelect={() =>
+                              handleIndividualDeleteClick(employee)
+                            }
+                          >
+                            Sil
+                          </DropdownMenuItem>
+                        </>
                       )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`${employee.firstName} mobil girişini sıfırla`}
-                      onClick={() => handlePasswordResetClick(employee)}
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                      title="Mobil Uygulama Şifresi Kur"
-                    >
-                      <Smartphone className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`${employee.firstName} düzenle`}
-                      onClick={() => isAdmin && onEdit(employee)}
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      disabled={!isAdmin}
-                      aria-label={`${employee.firstName} sil`}
-                      onClick={() => handleIndividualDeleteClick(employee)}
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    </RowActions>
                   </div>
                 </TableCell>
               </TableRow>
@@ -342,7 +435,13 @@ export default function EmployeeTable({
         isOpen={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
         selectedCount={selectedEmployees.length}
-        names={employees.filter(emp => selectedEmployees.includes(emp._id)).map(emp => `${emp.firstName} ${emp.lastName}`).join(", ")}
+        names={employees
+          .filter((emp) => selectedEmployees.includes(emp._id))
+          .map(
+            (emp) =>
+              `${emp.firstName} ${emp.lastName} (${emp.payrollCode || "Bordro kodu yok"})`,
+          )
+          .join(", ")}
         onConfirm={handleBulkDelete}
       />
 
@@ -350,7 +449,11 @@ export default function EmployeeTable({
         isOpen={showIndividualDeleteDialog}
         onOpenChange={setShowIndividualDeleteDialog}
         selectedCount={1}
-        names={selectedEmployeeForDelete ? `${selectedEmployeeForDelete.firstName} ${selectedEmployeeForDelete.lastName}` : ""}
+        names={
+          selectedEmployeeForDelete
+            ? `${selectedEmployeeForDelete.firstName} ${selectedEmployeeForDelete.lastName} (${selectedEmployeeForDelete.payrollCode || "Bordro kodu yok"})`
+            : ""
+        }
         onConfirm={handleIndividualDeleteConfirm}
       />
 

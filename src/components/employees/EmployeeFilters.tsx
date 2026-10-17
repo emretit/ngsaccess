@@ -1,78 +1,78 @@
-
-import { UserPlus, Search, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-interface EmployeeFiltersProps {
+import { FilterBar } from "@/components/shared/FilterBar";
+interface Props {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   itemsPerPage: number;
   onItemsPerPageChange: (value: number) => void;
-  onNewEmployee: () => void;
-  canWrite?: boolean;
+  status: string;
+  onStatusChange: (value: string) => void;
+  sort: string;
+  onSortChange: (value: string) => void;
+  onClear: () => void;
+  hasFilters: boolean;
 }
-
-export function EmployeeFilters({
-  searchQuery,
-  onSearchChange,
-  itemsPerPage,
-  onItemsPerPageChange,
-  onNewEmployee,
-  canWrite = false
-}: EmployeeFiltersProps) {
-  const PAGE_SIZE_OPTIONS = [10, 50, 100];
-
+export function EmployeeFilters(p: Props) {
+  const selectClass =
+    "h-9 max-w-full rounded-md border border-input bg-background px-2 text-sm";
   return (
-    <div className="rounded-xl border bg-card shadow-xs p-4 md:p-6">
-      <div className="flex items-center gap-3 flex-wrap">
-        {/* Sol: Başlık */}
-        <div className="flex items-center gap-2 mr-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-            <Users className="h-4 w-4 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold leading-tight">Personel Listesi</h2>
-            <p className="text-xs text-muted-foreground">Tüm personelleri yönetin</p>
-          </div>
-        </div>
-
-        {/* Arama */}
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Ad, e-posta, TC veya kart no..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-8 h-8 text-sm"
-          />
-        </div>
-
-        {/* Sağ: Kontroller */}
-        <div className="flex items-center gap-2 ml-auto">
-          <Select
-            value={String(itemsPerPage)}
-            onValueChange={(value) => onItemsPerPageChange(Number(value))}
+    <FilterBar
+      search={p.searchQuery}
+      onSearchChange={p.onSearchChange}
+      searchLabel="Personel ara"
+      placeholder="Ad, e-posta, kart veya bordro…"
+      onClear={p.onClear}
+      hasFilters={p.hasFilters}
+      end={
+        <label className="flex items-center gap-2 text-xs">
+          Sayfa boyutu
+          <select
+            aria-label="Sayfa boyutu"
+            className={selectClass}
+            value={p.itemsPerPage}
+            onChange={(e) => p.onItemsPerPageChange(Number(e.target.value))}
           >
-            <SelectTrigger className="w-[80px] h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <SelectItem key={size} value={String(size)} className="text-xs">
-                  {size} kayıt
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button disabled={!canWrite} title={!canWrite ? "Personel yazma işlemleri yalnız yöneticilere açıktır" : undefined} onClick={onNewEmployee} size="sm" className="h-8 gap-1.5 text-xs">
-            <UserPlus className="h-3.5 w-3.5" />
-            Yeni Personel
-          </Button>
-        </div>
-      </div>
-    </div>
+            {[10, 25, 50, 100].map((n) => (
+              <option key={n}>{n}</option>
+            ))}
+          </select>
+        </label>
+      }
+    >
+      <select
+        aria-label="Personel durumu"
+        className={selectClass}
+        value={p.status}
+        onChange={(e) => p.onStatusChange(e.target.value)}
+      >
+        <option value="all">Tüm durumlar</option>
+        <option value="active">Aktif</option>
+        <option value="inactive">Pasif</option>
+      </select>
+      <select
+        aria-label="Personel sıralaması"
+        className={selectClass}
+        value={p.sort}
+        onChange={(e) => p.onSortChange(e.target.value)}
+      >
+        {[
+          ["name:asc", "Ad (A–Z)"],
+          ["name:desc", "Ad (Z–A)"],
+          ["department:asc", "Departman (A–Z)"],
+          ["department:desc", "Departman (Z–A)"],
+          ["email:asc", "E-posta (A–Z)"],
+          ["email:desc", "E-posta (Z–A)"],
+          ["position:asc", "Pozisyon (A–Z)"],
+          ["position:desc", "Pozisyon (Z–A)"],
+          ["card:asc", "Kart no (artan)"],
+          ["card:desc", "Kart no (azalan)"],
+          ["status:asc", "Durum (artan)"],
+          ["status:desc", "Durum (azalan)"],
+        ].map(([v, l]) => (
+          <option key={v} value={v}>
+            {l}
+          </option>
+        ))}
+      </select>
+    </FilterBar>
   );
 }

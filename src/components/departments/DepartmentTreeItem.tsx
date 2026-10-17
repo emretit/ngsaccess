@@ -1,117 +1,83 @@
-
-import { useState } from "react";
-import { ChevronRight, Users, Plus, Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useId, useState, type ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
+import { RowActions } from "@/components/shared/RowActions";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Department } from "@/types/department";
+import type { Department } from "@/types/department";
 import type { Id } from "../../../convex/_generated/dataModel";
-
-interface DepartmentTreeItemProps {
+interface Props {
   department: Department;
-  children?: React.ReactNode;
+  children?: ReactNode;
   level: number;
   isSelected: boolean;
   onSelect: (id: Id<"departments">) => void;
-  onAddSubDepartment: (parentId: Id<"departments">) => void;
+  onAddSubDepartment: (id: Id<"departments">) => void;
+  onRename?: () => void;
   onDelete: (id: Id<"departments">) => void;
   hasChildren: boolean;
 }
-
 export function DepartmentTreeItem({
   department,
   children,
-  level,
   isSelected,
   onSelect,
   onAddSubDepartment,
   onDelete,
+  onRename,
   hasChildren,
-}: DepartmentTreeItemProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    switch (e.key) {
-      case "Enter":
-        onSelect(department._id);
-        break;
-      case "ArrowRight":
-        setIsExpanded(true);
-        break;
-      case "ArrowLeft":
-        setIsExpanded(false);
-        break;
-    }
-  };
-
+}: Props) {
+  const [expanded, setExpanded] = useState(true);
+  const id = useId();
   return (
-    <li role="treeitem" aria-expanded={isExpanded}>
+    <li>
       <div
-        className={cn(
-          "group flex items-center gap-1 rounded-md p-2 transition-all",
-          "hover:bg-accent hover:text-accent-foreground",
-          isSelected && "bg-accent/80 text-accent-foreground font-medium",
-          level === 0 ? "mt-0" : "mt-0.5"
-        )}
-        style={{ paddingLeft: `${level * 12 + 8}px` }}
-        onClick={() => onSelect(department._id)}
-        onKeyDown={handleKeyDown}
-        tabIndex={0}
+        className={`flex min-w-0 items-center rounded-md ${isSelected ? "bg-selected text-primary" : "hover:bg-muted"}`}
       >
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-5 w-5 p-0 hover:bg-transparent"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsExpanded(!isExpanded);
-          }}
+        {hasChildren && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 shrink-0"
+            aria-label={`${department.name} alt departmanları`}
+            aria-expanded={expanded}
+            aria-controls={id}
+            onClick={() => setExpanded(!expanded)}
+          >
+            <ChevronRight
+              className={`h-4 w-4 ${expanded ? "rotate-90" : ""}`}
+            />
+          </Button>
+        )}
+        <button
+          className="min-h-11 min-w-0 flex-1 truncate px-2 text-left text-sm"
+          aria-pressed={isSelected}
+          onClick={() => onSelect(department._id)}
         >
-          <ChevronRight
-            className={cn(
-              "h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-200",
-              isExpanded && "rotate-90"
+          {department.name}
+        </button>
+        <div className="shrink-0 [&_button]:h-11 [&_button]:w-11">
+          <RowActions label={`${department.name} işlemleri`}>
+            {onRename && (
+              <DropdownMenuItem onSelect={onRename}>
+                Yeniden adlandır
+              </DropdownMenuItem>
             )}
-          />
-        </Button>
-
-        <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
-        <span className="flex-1 truncate text-sm">{department.name}</span>
-
-        <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 hover:bg-accent/80"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddSubDepartment(department._id);
-            }}
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 hover:bg-accent/80"
-            disabled={hasChildren}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(department._id);
-            }}
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
+            <DropdownMenuItem
+              onSelect={() => onAddSubDepartment(department._id)}
+            >
+              Alt departman ekle
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={hasChildren}
+              onSelect={() => onDelete(department._id)}
+            >
+              Sil
+            </DropdownMenuItem>
+          </RowActions>
         </div>
       </div>
-
-      {children && (
-        <ul
-          role="group"
-          className={cn(
-            "overflow-hidden transition-all duration-200",
-            isExpanded ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"
-          )}
-        >
+      {hasChildren && (
+        <ul id={id} hidden={!expanded} className="ml-2 border-l pl-1">
           {children}
         </ul>
       )}
