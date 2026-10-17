@@ -1,14 +1,16 @@
+import { paginationOptsValidator } from "convex/server";
+import { visitorTimeISO, visitorSensitiveFields, maskedVisitorCard, visitorMatchesSearch, visitorStatus, visitorTime, visitorExpiryValidation, visitorUpdateExpiryError } from "./lib/visitorStatus";
 import { resolveProjectScope } from "./lib/projectScope";
 import { assertAccessProjectUnchanged } from "./lib/accessScope";
 import { validateVisitorAccessRelations } from "./lib/accessScopeRelations";
 import { toPatch } from "./lib/nullablePatch";
-import { visitorPresence, visitorDetailsError, visitorExpiryError } from "./lib/visitorPresence";
+import { visitorPresence, visitorDetailsError } from "./lib/visitorPresence";
 import { internalMutation } from "./_generated/server";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { authedQuery, adminMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
+import { getProjectIdsForUser, isManager } from "./lib/auth";
 import { Doc, Id } from "./_generated/dataModel";
 import {
   findDuplicateEmployee,
@@ -19,14 +21,16 @@ import { resolveEmployeeIdeDeviceIds } from "./lib/accessGraph";
 import { writeAudit } from "./lib/audit";
 
 /** Aktif `visitor_kvkk` rızası var mı? */
-async function activeKvkkConsentId(ctx: MutationCtx, employeeId: Id<"employees">) {
-  const rows = await ctx.db
+async function activeKvkkConsentId(ctx: QueryCtx | MutationCtx, employeeId: Id<"employees">) {
+  const rows = ctx.db
     .query("employeeConsents")
     .withIndex("by_employee_type", (q) =>
       q.eq("employeeId", employeeId).eq("consentType", "visitor_kvkk"),
-    )
-    .collect();
-  return rows.find((r) => !r.revokedAt) ?? null;
+    ).order("desc");
+  for await (const row of rows) {
+    if (!row.revokedAt) return row;
+  }
+  return null;
 }
 
 /** KVKK rızası yoksa kaydet + audit yaz (varsa no-op). */
@@ -118,6 +122,7 @@ export const list = authedQuery({
         const activeConsent = consents.find((c) => !c.revokedAt) ?? null;
         return {
           ...vz,
+          status: visitorStatus(vz),
           host: host?.projectId === vz.projectId && host
             ? { _id: host._id, firstName: host.firstName, lastName: host.lastName }
             : null,
@@ -128,6 +133,136 @@ export const list = authedQuery({
         };
       }),
     );
+  },
+});
+
+// İzinli son olay ve aynı andaki yön çelişkisi; patolojik eşzamanlı yoğunlukta bilinmiyor.
+async function latestVisitorPresence(ctx: QueryCtx, visitor: Doc<"employees">) {
+  const latest = await ctx.db.query("cardReadings")
+    .withIndex("by_employee_status_time", q => q.eq("employeeId", visitor._id).eq("accessStatus", "izin_verildi"))
+    .order("desc").first();
+  if (!latest || latest.projectId !== visitor.projectId) return visitorPresence([]);
+  const simultaneous = await ctx.db.query("cardReadings")
+    .withIndex("by_employee_status_time", q => q.eq("employeeId", visitor._id).eq("accessStatus", "izin_verildi").eq("accessTime", latest.accessTime))
+    .take(51);
+  return visitorPresence(simultaneous.length > 50 ? [] : simultaneous.filter(row => row.projectId === visitor.projectId));
+}
+
+async function visitorListRow(ctx: QueryCtx, visitor: Doc<"employees">, now: number) {
+  const [host, rule, presence, consent] = await Promise.all([
+    visitor.hostEmployeeId ? ctx.db.get(visitor.hostEmployeeId) : null,
+    visitor.accessRuleId ? ctx.db.get(visitor.accessRuleId) : null,
+    latestVisitorPresence(ctx, visitor),
+    activeKvkkConsentId(ctx, visitor._id),
+  ]);
+  return {
+    _id: visitor._id,
+    firstName: visitor.firstName,
+    lastName: visitor.lastName,
+    company: visitor.visitorCompany ?? null,
+    cardNumber: maskedVisitorCard(visitor.cardNumber),
+    hostName: host?.projectId === visitor.projectId && host ? `${host.firstName} ${host.lastName}` : null,
+    presetRuleName: rule?.projectId === visitor.projectId && rule ? rule.name : null,
+    visitStart: visitorTimeISO(visitor.accessStartsAt),
+    visitEnd: visitorTimeISO(visitor.accessExpiresAt),
+    status: visitorStatus(visitor, now),
+    lastSeenAt: presence.lastReadingAt,
+    lastDirection: presence.lastDirection,
+    presence: presence.presence,
+    hasKvkkConsent: consent !== null,
+  };
+}
+
+/** Cursor ham proje kayıtlarında ilerler; boş süzülmüş sayfa son sayfa anlamına gelmez. */
+export const listPage = authedQuery({
+  args: {
+    projectId: v.id("projects"),
+    status: v.optional(v.union(v.literal("active"), v.literal("checkedOut"), v.literal("expired"), v.literal("preRegistered"), v.literal("inactive"))),
+    search: v.optional(v.string()),
+    paginationOpts: paginationOptsValidator,
+    // İstemci dakika değişiminde yeniler; zaman hesabı yine sunucu Date.now() ile yapılır.
+    refreshKey: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    await resolveProjectScope(ctx, args.projectId);
+    if (!Number.isInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 100) {
+      throw new Error("Sayfa boyutu 1–100 arasında olmalıdır");
+    }
+    const now = Date.now();
+    const result = await ctx.db.query("employees")
+      .withIndex("by_project_visitor", q => q.eq("projectId", args.projectId).eq("isVisitor", true))
+      .order("desc").paginate(args.paginationOpts);
+    const matches = result.page.filter(visitor => (!args.status || visitorStatus(visitor, now) === args.status) && visitorMatchesSearch(visitor, args.search));
+    return {
+      ...result,
+      page: await Promise.all(matches.map(visitor => visitorListRow(ctx, visitor, now))),
+      searchScope: "page" as const,
+      statusScope: "page" as const,
+      scannedCount: result.page.length,
+      evaluatedAt: new Date(now).toISOString(),
+    };
+  },
+});
+
+/** Özet liste/filtrelerden bağımsızdır; kesilen toplamlar yalnız taranan alt kümeyi temsil eder. */
+export const summary = authedQuery({
+  args: { projectId: v.id("projects"), refreshKey: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    await resolveProjectScope(ctx, args.projectId);
+    const scanLimit = 500;
+    const rows = await ctx.db.query("employees")
+      .withIndex("by_project_visitor", q => q.eq("projectId", args.projectId).eq("isVisitor", true))
+      .order("desc").take(scanLimit + 1);
+    const visitors = rows.slice(0, scanLimit);
+    const now = Date.now();
+    const counts = { active: 0, checkedOut: 0, expired: 0, preRegistered: 0, inactive: 0 };
+    for (const visitor of visitors) counts[visitorStatus(visitor, now)]++;
+    const presences = await Promise.all(visitors.map(visitor => latestVisitorPresence(ctx, visitor)));
+    return {
+      total: visitors.length,
+      counts,
+      accessActive: counts.active,
+      accessClosed: visitors.length - counts.active,
+      inside: presences.filter(presence => presence.presence === "inside").length,
+      truncated: rows.length > scanLimit,
+      scanLimit,
+      evaluatedAt: new Date(now).toISOString(),
+    };
+  },
+});
+
+export const getDetail = authedQuery({
+  args: { visitorId: v.id("employees"), refreshKey: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const visitor = await ctx.db.get(args.visitorId);
+    if (!visitor || visitor.isVisitor !== true) return null;
+    const allowed = await resolveProjectScope(ctx, visitor.projectId);
+    if (!visitor.projectId || !allowed.includes(visitor.projectId)) throw new Error("Bu ziyaretçiye erişim yetkiniz yok");
+    const [row, consent, accepted, denied, unknown] = await Promise.all([
+      visitorListRow(ctx, visitor, Date.now()),
+      activeKvkkConsentId(ctx, visitor._id),
+      ctx.db.query("cardReadings").withIndex("by_employee_status_time", q => q.eq("employeeId", visitor._id).eq("accessStatus", "izin_verildi")).order("desc").take(10),
+      ctx.db.query("cardReadings").withIndex("by_employee_status_time", q => q.eq("employeeId", visitor._id).eq("accessStatus", "reddedildi")).order("desc").take(10),
+      ctx.db.query("cardReadings").withIndex("by_employee_status_time", q => q.eq("employeeId", visitor._id).eq("accessStatus", undefined)).order("desc").take(10),
+    ]);
+    return {
+      ...row,
+      projectId: visitor.projectId,
+      ...visitorSensitiveFields(visitor, isManager(ctx.user)),
+      cardReleased: visitor.cardNumber.startsWith("IADE:"),
+      isActive: visitor.isActive ?? false,
+      hostEmployeeId: visitor.hostEmployeeId ?? null,
+      presetRuleId: visitor.accessRuleId ?? null,
+      email: visitor.email,
+      visitorPhone: visitor.visitorPhone ?? null,
+      visitorCompany: visitor.visitorCompany ?? null,
+      visitPurpose: visitor.visitPurpose ?? null,
+      notes: visitor.notes ?? null,
+      kvkkConsent: consent ? { grantedAt: consent.grantedAt, documentUrl: consent.documentUrl ?? null, version: null } : null,
+      recentReadings: [...accepted, ...denied, ...unknown].filter(reading => reading.projectId === visitor.projectId)
+        .sort((a, b) => b.accessTime.localeCompare(a.accessTime)).slice(0, 10)
+        .map(reading => ({ _id: reading._id, accessTime: reading.accessTime, accessStatus: reading.accessStatus ?? null, direction: reading.direction ?? null, deviceId: reading.deviceId ?? null })),
+    };
   },
 });
 
@@ -155,7 +290,7 @@ export const create = adminMutation({
     await validateVisitorAccessRelations(ctx, args.projectId, args.presetRuleId, args.hostEmployeeId);
     const inAllowed = (projectId: Id<"projects"> | undefined) => projectId === args.projectId;
 
-    const validationError = visitorDetailsError(args);
+    const validationError = visitorDetailsError(args, Date.now(), false) ?? visitorExpiryValidation(args.accessExpiresAt);
     if (validationError) throw new Error(validationError);
     const cardNumber = args.cardNumber.trim();
     if (!cardNumber) throw new Error("Kart numarası zorunludur");
@@ -199,7 +334,7 @@ export const create = adminMutation({
       isActive,
       isVisitor: true,
       visitorStatus: isActive ? "checkedIn" : "preRegistered",
-      accessExpiresAt: args.accessExpiresAt,
+      accessExpiresAt: new Date(visitorTime(args.accessExpiresAt)).toISOString(),
       accessStartsAt: args.accessStartsAt ?? now,
       visitorPhone: args.visitorPhone?.trim() || undefined,
       visitorCompany: args.visitorCompany?.trim() || undefined,
@@ -262,10 +397,8 @@ export const update = adminMutation({
       const validationError = visitorDetailsError(effective, Date.now(), false);
       if (validationError) throw new Error(validationError);
     }
-    if (args.accessExpiresAt !== undefined) {
-      const expiryError = visitorExpiryError(args.accessExpiresAt);
-      if (expiryError) throw new Error(expiryError);
-    }
+    const expiryError = visitorUpdateExpiryError(visitor, args);
+    if (expiryError) throw new Error(expiryError);
     if (args.firstName !== undefined && !args.firstName.trim()) throw new Error("Ad alanı zorunludur");
     if (args.lastName !== undefined && !args.lastName.trim()) throw new Error("Soyad alanı zorunludur");
     const newCard = args.cardNumber?.trim();
@@ -298,7 +431,9 @@ export const update = adminMutation({
     if (args.visitPurpose !== undefined) patch.visitPurpose = toPatch({ visitPurpose: args.visitPurpose?.trim() || null }).visitPurpose;
     if (args.hostEmployeeId !== undefined) patch.hostEmployeeId = toPatch({ hostEmployeeId: args.hostEmployeeId }).hostEmployeeId;
     if (args.notes !== undefined) patch.notes = toPatch({ notes: args.notes?.trim() || null }).notes;
-    if (args.accessExpiresAt !== undefined) patch.accessExpiresAt = args.accessExpiresAt;
+    if (args.accessExpiresAt !== undefined && args.accessExpiresAt !== visitor.accessExpiresAt) {
+      patch.accessExpiresAt = new Date(visitorTime(args.accessExpiresAt)).toISOString();
+    }
     if (cardChanged) patch.cardNumber = newCard;
     if (activeChanged) {
       patch.isActive = args.isActive;
@@ -399,13 +534,17 @@ export const releaseCard = adminMutation({
 export const expireVisitorAccess = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const now = new Date().toISOString();
-    const expired = await ctx.db
+    const nowMs = Date.now();
+    const now = new Date(nowMs).toISOString();
+    // Include legacy Istanbul wall-clock strings in the index window, then compare instants.
+    const legacyUpperBound = new Date(nowMs + 3 * 60 * 60 * 1000).toISOString();
+    const candidates = await ctx.db
       .query("employees")
       .withIndex("by_visitor_active_expiry", (q) =>
-        q.eq("isVisitor", true).eq("isActive", true).lte("accessExpiresAt", now),
+        q.eq("isVisitor", true).eq("isActive", true).lte("accessExpiresAt", legacyUpperBound),
       )
       .collect();
+    const expired = candidates.filter(visitor => visitorTime(visitor.accessExpiresAt) <= nowMs);
     for (const vz of expired) {
       // Deaktivasyondan ÖNCE IDE panellerini çöz; patch sonrası kartı FİZİKSEL sök
       // (status=0 upsert kart kaydını panelde bırakırdı).
