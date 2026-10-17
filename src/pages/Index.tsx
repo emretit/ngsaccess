@@ -9,10 +9,10 @@ import { EmptyState } from '@/components/shared/EmptyState';
 export default function Index() {
   const dashboard = useDashboard();
   return (
-    <div className="space-y-8 p-6">
+    <div className="space-y-8 p-2 sm:p-6">
       <DashboardHeader userName={dashboard.userName} projectName={dashboard.projectName} />
       {dashboard.noProject ? (
-        <EmptyState title="Erişilebilir proje bulunamadı" description="Proje erişimi için yöneticinizle iletişime geçin." />
+        <EmptyState title="Proje ataması bekleniyor" description="Henüz erişebileceğiniz bir proje yok. Yeni hesabınızın kurulumu veya mevcut bir projeye atanmanız için yöneticinizle iletişime geçin." />
       ) : (
         <>
           <StatsGrid stats={dashboard.stats} loading={dashboard.statsLoading} />

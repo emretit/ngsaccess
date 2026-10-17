@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Check, QrCode, UserCheck, Bell, Apple, Play } from 'lucide-react';
 
 const HIGHLIGHTS = [
@@ -9,21 +9,22 @@ const HIGHLIGHTS = [
 ];
 
 const MobileAppSection = () => {
+  const reducedMotion = useReducedMotion();
   return (
     <section className="py-20 md:py-28 bg-background">
       <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
+            initial={reducedMotion ? false : { opacity: 0, x: -20 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: '-100px' }}
-            transition={{ duration: 0.5 }}
+            transition={reducedMotion ? { duration: 0 } : { duration: 0.5 }}
           >
             <div className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold mb-4">
               MOBİL UYGULAMA
             </div>
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
-              Sahada da yanınızda — iOS ve Android için ücretsiz
+              Sahada kullanım için hazırlanıyor — iOS ve Android
             </h2>
             <p className="mt-4 text-lg text-muted-foreground leading-relaxed">
               Yöneticiler ve güvenlik personeli için sahada hızlı işlem. Personel
@@ -73,16 +74,16 @@ const MobileAppSection = () => {
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={reducedMotion ? false : { opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true, margin: '-100px' }}
-            transition={{ duration: 0.6 }}
+            transition={reducedMotion ? { duration: 0 } : { duration: 0.6 }}
             className="relative flex justify-center"
           >
             <div className="relative">
               <PhoneFrame primary>
                 <div className="h-full burgundy-gradient flex flex-col">
-                  <div className="px-6 pt-12 pb-6 text-white">
+                  <div className="px-6 pt-12 pb-6 text-primary-foreground">
                     <div className="text-xs opacity-80 mb-1">Hoş geldin,</div>
                     <div className="text-xl font-bold">Ahmet Yılmaz</div>
                   </div>
@@ -137,8 +138,8 @@ const MobileAppSection = () => {
                         <span
                           className={`text-[9px] px-1.5 py-0.5 rounded-full ${
                             row.tag === 'Giriş'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-amber-100 text-amber-700'
+                              ? 'bg-[hsl(var(--success-subtle))] text-[hsl(var(--success))]'
+                              : 'bg-[hsl(var(--warning-subtle))] text-[hsl(var(--warning))]'
                           }`}
                         >
                           {row.tag}

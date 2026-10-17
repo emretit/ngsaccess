@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Users, Cpu, Key, AlertCircle } from 'lucide-react';
-import StatusCard from '@/components/StatusCard';
+import { StatCard } from '@/components/shared/StatCard';
 import type { FunctionReturnType } from 'convex/server';
 import { api } from '../../../convex/_generated/api';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,25 +21,25 @@ const StatsGrid: React.FC<StatsGridProps> = ({ stats, loading }) => {
   }
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <StatusCard
-        title="Toplam Personel"
+      <StatCard
+        label="Toplam Personel"
         value={stats.employees.toString()}
-        icon={<Users className="h-4 w-4 text-primary" />}
+        Icon={Users}
       />
-      <StatusCard
-        title="Aktif Cihazlar"
+      <StatCard
+        label="Aktif Cihazlar"
         value={stats.devices.toString()}
-        icon={<Cpu className="h-4 w-4 text-[hsl(var(--success))]" />}
+        Icon={Cpu} tone="success"
       />
-      <StatusCard
-        title="Bugünkü Geçişler"
+      <StatCard
+        label="Bugünkü Geçişler"
         value={stats.cardReadings.toString()}
-        icon={<Key className="h-4 w-4 text-[hsl(var(--warning))]" />}
+        Icon={Key} tone="warning"
       />
-      <StatusCard
-        title="Pasif erişim kuralları"
+      <StatCard
+        label="Pasif erişim kuralları"
         value={stats.pendingRequests.toString()}
-        icon={<AlertCircle className="h-4 w-4 text-destructive" />}
+        Icon={AlertCircle} tone="danger"
       />
     </div>
   );

@@ -1,15 +1,12 @@
-import { motion } from 'framer-motion';
+import { marketingFacts } from "@/components/landing/marketingFacts";
+import { motion, useReducedMotion } from 'framer-motion';
 
-const STATS = [
-  { value: '200+', label: 'Aktif Şirket' },
-  { value: '50.000+', label: 'Takip Edilen Personel' },
-  { value: '99.9%', label: 'Uptime Garantisi' },
-  { value: '24/7', label: 'Türkçe Destek' },
-];
+const STATS = marketingFacts.capabilities;
 
 const StatsSection = () => {
+  const reducedMotion = useReducedMotion();
   return (
-    <section className="relative burgundy-gradient text-white py-14 md:py-16 overflow-hidden">
+    <section className="relative burgundy-gradient text-primary-foreground py-14 md:py-16 overflow-hidden">
       <div
         aria-hidden
         className="absolute inset-0 opacity-10"
@@ -24,16 +21,16 @@ const StatsSection = () => {
           {STATS.map((stat, idx) => (
             <motion.div
               key={stat.label}
-              initial={{ opacity: 0, y: 16 }}
+              initial={reducedMotion ? false : { opacity: 0, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-50px' }}
-              transition={{ duration: 0.4, delay: idx * 0.08 }}
+              transition={reducedMotion ? { duration: 0 } : { duration: 0.4, delay: idx * 0.08 }}
               className="text-center"
             >
-              <div className="text-4xl md:text-5xl font-bold tabular-nums tracking-tight">
+              <div className="text-2xl md:text-3xl font-bold tabular-nums tracking-tight">
                 {stat.value}
               </div>
-              <div className="mt-2 text-sm md:text-base text-white/80">
+              <div className="mt-2 text-sm md:text-base text-primary-foreground">
                 {stat.label}
               </div>
             </motion.div>

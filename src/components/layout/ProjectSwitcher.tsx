@@ -18,7 +18,7 @@ export function ProjectSwitcher() {
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-white/70 group-data-[collapsible=icon]:hidden">
+      <div className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground">
         <FolderKanban className="h-3.5 w-3.5 shrink-0" />
         <span className="truncate">Yükleniyor…</span>
       </div>
@@ -26,7 +26,7 @@ export function ProjectSwitcher() {
   }
 
   if (projects.length === 0) {
-    return null;
+    return <span className="text-xs text-muted-foreground" role="status">Proje ataması bekleniyor</span>;
   }
 
   const role = profile?.role;
@@ -34,24 +34,24 @@ export function ProjectSwitcher() {
   const multi = projects.length > 1;
 
   const baseClass = cn(
-    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-white",
-    "group-data-[collapsible=icon]:hidden"
+    "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-foreground",
+    "min-h-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
   );
 
   const labelContent = (
     <>
-      <FolderKanban className="h-3.5 w-3.5 shrink-0 text-white/80" />
+      <FolderKanban className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate font-medium leading-tight">
           {activeProject?.name ?? "Proje seç"}
         </span>
         {roleLabel && (
-          <span className="truncate text-[10px] text-white/60 leading-tight">
+          <span className="truncate text-[10px] text-muted-foreground leading-tight">
             {roleLabel}
           </span>
         )}
       </div>
-      {multi && <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-white/60" />}
+      {multi && <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
     </>
   );
 
@@ -62,11 +62,11 @@ export function ProjectSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className={cn(baseClass, "hover:bg-white/10")}>
+        <button type="button" aria-label={`Proje seç: ${activeProject?.name ?? "Seçim yapın"}`} className={cn(baseClass, "hover:bg-muted")}>
           {labelContent}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="right" align="end" className="w-56">
+      <DropdownMenuContent side="bottom" align="end" className="w-56">
         <DropdownMenuLabel className="text-xs text-muted-foreground">
           Proje Seç
         </DropdownMenuLabel>

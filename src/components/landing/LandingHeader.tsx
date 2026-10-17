@@ -1,3 +1,4 @@
+import { ACCOUNT_CTA } from "./marketingFacts";
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Menu } from 'lucide-react';
@@ -15,7 +16,6 @@ const NAV_LINKS = [
   { href: '#features', label: 'Özellikler' },
   { href: '#how-it-works', label: 'Nasıl Çalışır' },
   { href: '#pricing', label: 'Fiyatlandırma' },
-  { href: '#testimonials', label: 'Müşteriler' },
   { href: '#faq', label: 'SSS' },
 ];
 
@@ -80,7 +80,7 @@ const LandingHeader = () => {
                 onClick={() => navigate('/register')}
                 className="bg-primary hover:bg-primary/90 shadow-sm"
               >
-                Ücretsiz hesap oluştur
+                {ACCOUNT_CTA}
               </Button>
             </div>
 
@@ -130,7 +130,7 @@ const LandingHeader = () => {
                     }}
                     className="bg-primary hover:bg-primary/90"
                   >
-                    Ücretsiz hesap oluştur
+                    {ACCOUNT_CTA}
                   </Button>
                 </div>
               </SheetContent>

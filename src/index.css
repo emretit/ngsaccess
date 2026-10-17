@@ -16,10 +16,10 @@
         --secondary: 210 40% 96.1%;
         --secondary-foreground: 222.2 47.4% 11.2%;
         --muted: 210 40% 96.1%;
-        --muted-foreground: 215.4 16.3% 46.9%;
+        --muted-foreground: 215 18% 40%;
         --accent: 0 59% 28%; /* #711A1A - burgundy */
         --accent-foreground: 0 0% 100%;
-        --destructive: 0 84.2% 60.2%;
+        --destructive: 0 72% 42%;
         --destructive-foreground: 0 0% 100%;
         --border: 214.3 31.8% 91.4%;
         --input: 214.3 31.8% 91.4%;
@@ -31,13 +31,13 @@
         --chart-5: 27 87% 67%;
         --radius: 0.75rem;
         /* Semantic status tokens */
-        --success: 142 71% 45%;
+        --success: 142 71% 27%;
         --success-foreground: 0 0% 100%;
         --success-subtle: 142 71% 95%;
-        --warning: 38 92% 50%;
-        --warning-foreground: 0 0% 0%;
+        --warning: 38 92% 29%;
+        --warning-foreground: 0 0% 100%;
         --warning-subtle: 38 92% 95%;
-        --info: 221 83% 53%;
+        --info: 221 83% 43%;
         --info-foreground: 0 0% 100%;
         --info-subtle: 221 83% 95%;
         /* Sidebar (shadcn) - burgundy arka plan, beyaz yazı */
@@ -59,15 +59,15 @@
         --popover: 222.2 84% 4.9%;
         --popover-foreground: 210 40% 98%;
         --primary: 0 59% 65%; /* Lighter burgundy for dark mode */
-        --primary-foreground: 0 0% 100%;
+        --primary-foreground: 0 0% 5%;
         --secondary: 217.2 32.6% 17.5%;
         --secondary-foreground: 210 40% 98%;
         --muted: 217.2 32.6% 17.5%;
         --muted-foreground: 215 20.2% 65.1%;
         --accent: 0 59% 65%; /* Lighter burgundy for dark mode */
-        --accent-foreground: 0 0% 100%;
-        --destructive: 0 62.8% 30.6%;
-        --destructive-foreground: 0 0% 100%;
+        --accent-foreground: 0 0% 5%;
+        --destructive: 0 85% 72%;
+        --destructive-foreground: 0 0% 5%;
         --border: 217.2 32.6% 17.5%;
         --input: 217.2 32.6% 17.5%;
         --ring: 0 59% 65%; /* Lighter burgundy for dark mode */
@@ -100,7 +100,7 @@
 
 @layer components {
     body {
-        @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100;
+        @apply bg-background text-foreground;
         font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
         font-feature-settings: "ss01", "ss02", "cv01", "cv02", "cv03";
         -webkit-font-smoothing: antialiased;
@@ -130,8 +130,8 @@
         @apply bg-background text-foreground;
     }
     
-    html {
-        @apply scroll-smooth;
+    @media (prefers-reduced-motion: no-preference) {
+        html { scroll-behavior: smooth; }
     }
     
     /* Font smoothing for better text rendering */
@@ -147,7 +147,7 @@
     
     /* Skip to content link for keyboard accessibility */
     .skip-link {
-        @apply sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 z-50 bg-white dark:bg-gray-900 px-4 py-2 text-primary font-medium;
+        @apply sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 z-50 bg-background px-4 py-2 text-primary font-medium;
     }
 }
 
@@ -158,24 +158,24 @@
     .status-success-badge {
         background-color: hsl(var(--success-subtle));
         /* darkened for AA contrast on subtle bg (4.5:1+) */
-        color: hsl(142 71% 28%);
+        color: hsl(var(--success));
         border-color: hsl(var(--success) / 0.3);
     }
     .dark .status-success-badge {
         background-color: hsl(var(--success-subtle));
-        color: hsl(142 71% 75%);
+        color: hsl(var(--success));
     }
     .status-warning-bg   { background-color: hsl(var(--warning)); }
     .status-warning-text { color: hsl(var(--warning-foreground)); }
     .status-warning-badge {
         background-color: hsl(var(--warning-subtle));
         /* darkened amber for AA contrast on subtle bg */
-        color: hsl(38 92% 30%);
+        color: hsl(var(--warning));
         border-color: hsl(var(--warning) / 0.3);
     }
     .dark .status-warning-badge {
         background-color: hsl(var(--warning-subtle));
-        color: hsl(38 92% 75%);
+        color: hsl(var(--warning));
     }
     .status-danger-bg   { background-color: hsl(var(--destructive)); }
     .status-danger-text { color: hsl(var(--destructive-foreground)); }
@@ -189,12 +189,12 @@
     .status-info-badge {
         background-color: hsl(var(--info-subtle));
         /* blue at 53% L on near-white is already ~5.4:1 but darken for safety */
-        color: hsl(221 83% 38%);
+        color: hsl(var(--info));
         border-color: hsl(var(--info) / 0.3);
     }
     .dark .status-info-badge {
         background-color: hsl(var(--info-subtle));
-        color: hsl(221 83% 75%);
+        color: hsl(var(--info));
     }
     .status-purple-bg   { background-color: hsl(270 60% 50%); }
     .status-purple-text { color: #fff; }
@@ -221,5 +221,14 @@
         text-rendering: optimizeLegibility;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
     }
 }

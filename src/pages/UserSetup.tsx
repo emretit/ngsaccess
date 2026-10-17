@@ -1,3 +1,6 @@
+import { PasswordField } from "@/components/shared/PasswordField";
+import { ErrorState } from "@/components/shared/ErrorState";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -6,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { Eye, EyeOff, Lock, CheckCircle, XCircle } from "lucide-react";
+import { Lock, CheckCircle, XCircle } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -26,9 +29,10 @@ export default function UserSetup() {
   );
 
   const [email, setEmail] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+  const fail: (message: string) => never = (message) => { setFormError(message); document.getElementById("password")?.focus(); throw new Error(message); };
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [existingAccount, setExistingAccount] = useState(false);
   const [completed, setCompleted] = useState(false);
 
@@ -50,9 +54,11 @@ export default function UserSetup() {
   const isPasswordValid = Object.values(passwordChecks).every(Boolean);
 
   const setup = useAsyncAction(async () => {
-    if (!token) throw new Error("Davet bağlantısı eksik.");
+    setFormError(null);
+    if (!password) fail("Şifrenizi girin.");
+    if (!token) fail("Davet bağlantısı eksik.");
     if (!existingAccount && (!isPasswordValid || password !== confirmPassword)) {
-      throw new Error("Şifre gereksinimlerini ve şifre tekrarını kontrol edin.");
+      fail("Şifre gereksinimlerini ve şifre tekrarını kontrol edin.");
     }
     try {
       await runSetup(async () => {
@@ -60,24 +66,31 @@ export default function UserSetup() {
         await consumeInvite({ token, email });
       });
     } catch {
-      throw new Error("Kurulum tamamlanamadı. Hesabınız oluştuysa mevcut hesabınızla devam edin; davet için yöneticinizden yeni bağlantı isteyebilirsiniz.");
+      fail("Kurulum tamamlanamadı. Hesabınız oluştuysa mevcut hesabınızla devam edin; davet için yöneticinizden yeni bağlantı isteyebilirsiniz.");
     }
     setCompleted(true);
   });
   const isLoading = setup.pending;
+  useEffect(() => {
+    if (formError && !isLoading) document.getElementById("password")?.focus();
+  }, [formError, isLoading]);
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     void setup.run();
   };
 
   if (completed) return <div className="min-h-screen flex flex-col items-center justify-center gap-4"><h1>Hesabınız etkinleştirildi</h1><Button disabled={!user || user.verified === false} onClick={() => navigate("/home")}>{!user || user.verified === false ? "Oturum hazırlanıyor..." : "Ana sayfaya geç"}</Button></div>;
-  if (!token || inviteData === null || inviteData?.type === "reset") return <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-4"><h1>Bu bağlantıyla kurulum yapılamıyor</h1><p>Bağlantı eksik, kullanılmış veya süresi dolmuş olabilir. Yöneticinizden yeni davet isteyin. Şifre sıfırlama bu ekranda desteklenmiyor.</p><Link to="/login" className="text-primary underline">Mevcut hesabımla giriş yap</Link></div>;
+  if (!token || inviteData === null || inviteData?.type === "reset") return <div className="min-h-screen flex flex-col items-center justify-center p-4">
+    <ErrorState title={inviteData?.type === "reset" ? "Şifre sıfırlama henüz desteklenmiyor" : "Davet bağlantısı geçersiz"}
+      description={inviteData?.type === "reset" ? "Bu ekran yalnız hesap davetleri içindir. Şifre yardımı için yöneticinizle iletişime geçin." : "Bağlantı eksik, kullanılmış veya süresi dolmuş olabilir. Yöneticinizden yeni davet isteyin."} />
+    <Link to="/login" className="text-primary underline">Mevcut hesabımla giriş yap</Link>
+  </div>;
 
   // Davet verisi yüklenirken bekle
   if (token && inviteData === undefined) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-muted-foreground">Davet kontrol ediliyor...</p>
+        <SectionSkeleton label="Davet kontrol ediliyor" className="w-full max-w-md p-4" />
       </div>
     );
   }
@@ -95,8 +108,9 @@ export default function UserSetup() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <p role="status" className="mb-3 text-sm font-medium">{existingAccount ? "Mevcut hesapla daveti kabul et" : "Yeni hesap oluştur ve daveti kabul et"}</p>
           <Button type="button" variant="outline" className="mb-4 w-full" disabled={isLoading} onClick={() => setExistingAccount((value) => !value)}>{existingAccount ? "Yeni hesap oluştur" : "Mevcut hesabımla devam et"}</Button>
-          <form onSubmit={handleSubmit}><fieldset disabled={isLoading} className="space-y-4">
+          <form noValidate onSubmit={handleSubmit}><fieldset disabled={isLoading} className="space-y-4">
             <div>
               <Label htmlFor="email">E-posta</Label>
               <Input
@@ -110,24 +124,14 @@ export default function UserSetup() {
               />
             </div>
             <div>
-              <Label htmlFor="password">Şifre</Label>
-              <div className="relative">
-                <Input
+              <Label htmlFor="password">{existingAccount ? "Mevcut şifreniz" : "Yeni şifre"}</Label>
+              <PasswordField aria-invalid={Boolean(formError)} aria-describedby={formError ? "setup-error" : "password-help"} disabled={isLoading}
                   id="password"
-                  type={showPassword ? "text" : "password"}
+
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
-                <button
-                  type="button"
-                  aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
-                  className="absolute right-3 top-2.5"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
             </div>
             <div hidden={existingAccount} className="space-y-1 text-sm">
               {Object.entries({
@@ -139,8 +143,8 @@ export default function UserSetup() {
                 <div key={k} className="flex items-center gap-2">
                   {passwordChecks[k as keyof typeof passwordChecks]
                     ? <CheckCircle className="h-4 w-4 text-primary" />
-                    : <XCircle className="h-4 w-4 text-muted-foreground/60" />}
-                  <span className={passwordChecks[k as keyof typeof passwordChecks] ? "text-primary" : "text-muted-foreground/70"}>
+                    : <XCircle className="h-4 w-4 text-muted-foreground" />}
+                  <span className={passwordChecks[k as keyof typeof passwordChecks] ? "text-primary" : "text-muted-foreground"}>
                     {label}
                   </span>
                 </div>
@@ -148,15 +152,17 @@ export default function UserSetup() {
             </div>
             <div hidden={existingAccount}>
               <Label htmlFor="confirmPassword">Şifre Tekrar</Label>
-              <Input
+              <PasswordField disabled={isLoading} aria-invalid={Boolean(formError)} aria-describedby={formError ? "setup-error" : "password-help"}
                 id="confirmPassword"
-                type="password"
+
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required={!existingAccount}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading || (!existingAccount && !isPasswordValid)}>
+            <p id="password-help" className="text-xs text-muted-foreground">Yeni şifre en az 8 karakter, büyük harf, küçük harf ve rakam içermelidir.</p>
+            {formError && <p id="setup-error" role="alert" className="text-sm text-destructive">{formError}</p>}
+            <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Hesap oluşturuluyor..." : "Hesabı Aktif Et"}
             </Button>
           </fieldset></form>

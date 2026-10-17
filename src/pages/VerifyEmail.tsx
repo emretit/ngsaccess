@@ -1,3 +1,4 @@
+import { emailSchema } from "@/components/shared/authFormSchemas";
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation } from 'convex/react';
@@ -17,6 +18,7 @@ export default function VerifyEmail() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState('');
+  const [emailError, setEmailError] = useState<string>();
   const [cooldown, setCooldown] = useState(0);
   const ran = useRef<string | null>(null);
 
@@ -60,8 +62,14 @@ export default function VerifyEmail() {
       {status === 'loading' ? <SectionSkeleton label="E-posta doğrulanıyor" /> : <>
         <h1 className="text-2xl font-bold">{status === 'success' ? 'Hesabınız doğrulandı' : 'Doğrulama tamamlanamadı'}</h1>
         <p role="status" className="text-muted-foreground">{status === 'success' ? 'Artık mevcut hesabınızla giriş yapabilirsiniz.' : message}</p>
-        {status === 'error' && <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); void resend.run(); }}>
-          <FormFieldWrapper htmlFor="verification-email" label="E-posta adresi">
+        {status === 'error' && <form noValidate className="space-y-3" onSubmit={(event) => {
+          event.preventDefault();
+          const parsed = emailSchema.safeParse(email);
+          setEmailError(parsed.success ? undefined : parsed.error.issues[0]?.message);
+          if (!parsed.success) { document.getElementById("verification-email")?.focus(); return; }
+          void resend.run();
+        }}>
+          <FormFieldWrapper htmlFor="verification-email" label="E-posta adresi" error={emailError}>
             <Input id="verification-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} disabled={resend.pending} />
           </FormFieldWrapper>
           <Button disabled={resend.pending || cooldown > 0 || !email.trim()} type="submit" className="w-full">{resend.pending ? 'Gönderiliyor...' : cooldown ? `${cooldown} saniye sonra tekrar isteyin` : 'Yeni doğrulama bağlantısı iste'}</Button>

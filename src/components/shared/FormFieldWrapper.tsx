@@ -2,58 +2,49 @@ import React from "react";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
+export interface FieldControlProps {
+  id: string;
+  "aria-invalid": boolean;
+  "aria-describedby"?: string;
+}
 interface FormFieldWrapperProps {
   htmlFor: string;
   label: string;
   error?: string;
+  hint?: string;
   className?: string;
-  children: React.ReactNode;
+  children: React.ReactNode | ((props: FieldControlProps) => React.ReactNode);
 }
 
-/**
- * Label + input slot + inline hata mesajı sarmalayıcısı.
- * `error` verildiğinde tek child element'e otomatik olarak
- * `aria-invalid` ve `aria-describedby` enjekte eder.
- */
-export function FormFieldWrapper({
-  htmlFor,
-  label,
-  error,
-  className,
-  children,
-}: FormFieldWrapperProps) {
-  const errorId = error ? `${htmlFor}-error` : undefined;
-
-  const enhancedChildren = error
-    ? React.Children.map(children, (child) =>
-        React.isValidElement(child)
-          ? React.cloneElement(child, {
-              "aria-invalid": true,
-              "aria-describedby": errorId,
-            } as object)
-          : child
-      )
-    : children;
-
-  return (
-    <div className={cn("space-y-1", className)}>
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {enhancedChildren}
-      {error && (
-        <p id={errorId} className="text-xs text-destructive" role="alert" aria-live="polite">
-          {error}
-        </p>
-      )}
-    </div>
-  );
+/** Tek kontrol veya render slot'u; DOM sarmalayıcılarına ARIA eklenmez. */
+export function FormFieldWrapper({ htmlFor, label, error, hint, className, children }: FormFieldWrapperProps) {
+  const errorId = `${htmlFor}-error`;
+  const hintId = `${htmlFor}-hint`;
+  const control: FieldControlProps = {
+    id: htmlFor,
+    "aria-invalid": Boolean(error),
+    "aria-describedby": [hint && hintId, error && errorId].filter(Boolean).join(" ") || undefined,
+  };
+  const enhance = (nodes: React.ReactNode): React.ReactNode => React.Children.map(nodes, (child) => {
+    if (!React.isValidElement<{ id?: string; children?: React.ReactNode; "aria-describedby"?: string; "aria-invalid"?: boolean | "true" | "false" | "grammar" | "spelling" }>(child)) return child;
+    if (typeof child.type === "string" && !["input", "select", "textarea", "button"].includes(child.type) || child.type === React.Fragment) {
+      return React.cloneElement(child, {}, enhance(child.props.children));
+    }
+    return React.cloneElement(child, {
+      ...control,
+      "aria-invalid": control["aria-invalid"] || child.props["aria-invalid"] || false,
+      "aria-describedby": [child.props["aria-describedby"], control["aria-describedby"]].filter(Boolean).join(" ") || undefined,
+    });
+  });
+  return <div className={cn("space-y-1", className)}>
+    <Label htmlFor={htmlFor}>{label}</Label>
+    {typeof children === "function" ? children(control) : enhance(children)}
+    {hint && <p id={hintId} className="text-xs text-muted-foreground">{hint}</p>}
+    <FieldError message={error} id={errorId} />
+  </div>;
 }
 
-/** Bağımsız satır içi hata metni. `id` verilirse input'un aria-describedby'ı bu id'ye point etmeli. */
 export function FieldError({ message, id }: { message?: string; id?: string }) {
   if (!message) return null;
-  return (
-    <p id={id} className="text-xs text-destructive mt-1" role="alert" aria-live="polite">
-      {message}
-    </p>
-  );
+  return <p id={id} className="text-xs text-destructive mt-1" role="alert">{message}</p>;
 }

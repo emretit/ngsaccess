@@ -1,46 +1,13 @@
 import { capabilities } from "@/lib/capabilities";
 import { Link, useLocation } from "react-router-dom";
 import {
-  Users,
-  Dices,
-  Shield,
-  ShieldCheck,
-  DoorOpen,
-  Activity,
-  FileText,
-  CalendarClock,
-  Palmtree,
-  Settings,
-  ClipboardList,
-} from "lucide-react";
-import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/components/auth/AuthProvider";
 
-interface NavItem {
-  name: string;
-  href: string;
-  icon: typeof Users;
-  adminOnly?: boolean;
-  superAdminOnly?: boolean;
-}
-
-const navItems: NavItem[] = [
-  { name: "Kişiler", href: "/employees", icon: Users },
-  { name: "Cihazlar", href: "/devices", icon: Dices },
-  { name: "Geçiş Kontrol", href: "/access-control", icon: Shield },
-  { name: "Ziyaretçiler", href: "/visitors", icon: DoorOpen },
-  { name: "Canlı İzleme", href: "/live-monitoring", icon: Activity },
-  { name: "PDKS Kayıtları", href: "/pdks-records", icon: FileText },
-  { name: "Vardiyalar", href: "/shifts", icon: CalendarClock },
-  { name: "İzinler", href: "/leaves", icon: Palmtree },
-  { name: "Denetim Kaydı", href: "/audit-log", icon: ClipboardList, adminOnly: true },
-  { name: "Admin", href: "/system-admin", icon: ShieldCheck, superAdminOnly: true },
-  { name: "Ayarlar", href: "/settings", icon: Settings },
-];
+import { routeMeta } from "@/lib/routeMeta";
 
 export function AppSidebarNav() {
   const location = useLocation();
@@ -49,8 +16,8 @@ export function AppSidebarNav() {
 
   return (
     <SidebarMenu>
-      {navItems
-        .filter((item) => (item.href !== "/settings" || isAdmin) && (!item.adminOnly || isAdmin) && (!item.superAdminOnly || isSuperAdmin))
+      {routeMeta
+        .filter((item) => (item.menu !== false) && (!item.adminOnly || isAdmin) && (!item.superAdminOnly || isSuperAdmin))
         .map((item) => {
         const Icon = item.icon;
         const isActive = location.pathname === item.href;
@@ -67,7 +34,7 @@ export function AppSidebarNav() {
                   : undefined
               }
             >
-              <Link to={item.href}>
+              <Link to={item.href} aria-current={isActive ? "page" : undefined}>
                 <Icon className="h-4 w-4" />
                 <span>{item.name}</span>
               </Link>

@@ -8,7 +8,7 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar";
 import { AppSidebarNav } from "./AppSidebarNav";
-import { ProjectSwitcher } from "./ProjectSwitcher";
+
 
 export function AppSidebar() {
   return (
@@ -34,7 +34,6 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border gap-1">
-        <ProjectSwitcher />
         <p className="text-[10px] text-white/60 truncate px-2 group-data-[collapsible=icon]:hidden">
           PDKS v1.0
         </p>

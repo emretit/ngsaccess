@@ -85,7 +85,11 @@ export function ActiveProjectProvider({ children }: { children: ReactNode }) {
     () => readStoredId()
   );
 
+  const projectsResolved = !authLoading && isAuthenticated && Boolean(profile) &&
+    (isSuperAdmin ? allProjects !== undefined : userProjects !== undefined);
+
   useEffect(() => {
+    if (!projectsResolved) return;
     if (projectIds.length === 0) {
       if (activeProjectId !== null) {
         setActiveProjectIdState(null);
@@ -98,7 +102,7 @@ export function ActiveProjectProvider({ children }: { children: ReactNode }) {
       setActiveProjectIdState(next);
       writeStoredId(next);
     }
-  }, [projectIds, activeProjectId]);
+  }, [projectIds, activeProjectId, projectsResolved]);
 
   const setActiveProjectId = useCallback((id: Id<"projects">) => {
     setActiveProjectIdState((prev) => {

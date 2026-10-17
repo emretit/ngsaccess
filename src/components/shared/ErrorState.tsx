@@ -7,6 +7,7 @@ interface ErrorStateProps {
   description?: string;
   onRetry?: () => void;
   className?: string;
+  compact?: boolean;
 }
 
 export function ErrorState({
@@ -14,11 +15,14 @@ export function ErrorState({
   description = "Veriler yüklenirken bir sorun oluştu. Lütfen tekrar deneyin.",
   onRetry,
   className,
+  compact = false,
 }: ErrorStateProps) {
   return (
     <div
+      role="alert"
       className={cn(
         "flex flex-col items-center justify-center py-16 px-4 text-center",
+        compact && "min-h-0 py-6",
         className
       )}
     >

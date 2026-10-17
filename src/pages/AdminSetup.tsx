@@ -1,5 +1,8 @@
+import { emailSchema } from "@/components/shared/authFormSchemas";
+import { PasswordField } from "@/components/shared/PasswordField";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation, useQuery } from "convex/react";
@@ -19,24 +22,30 @@ export default function AdminSetup() {
   const initializeAdmin = useMutation(api.users.initializeAdmin);
 
   const [email, setEmail] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+  const fail: (message: string) => never = (message) => { setFormError(message); document.getElementById("password")?.focus(); throw new Error(message); };
   const [password, setPassword] = useState("");
   const [secret, setSecret] = useState("");
   const [existingAccount, setExistingAccount] = useState(false);
   const [completed, setCompleted] = useState(false);
 
   const setup = useAsyncAction(async () => {
-    if (!email || password.length < 8 || !secret) throw new Error("E-posta, en az 8 karakterlik şifre ve kurulum kodu gereklidir.");
+    setFormError(null);
+    if (!emailSchema.safeParse(email).success || (!password || (!existingAccount && password.length < 8)) || !secret) fail("E-posta, en az 8 karakterlik şifre ve kurulum kodu gereklidir.");
     try {
       await runSetup(async () => {
         await convexSignIn("password", { email: email.trim().toLowerCase(), password, name: email.split("@")[0], flow: existingAccount ? "signIn" : "signUp" });
         await initializeAdmin({ secret });
       });
     } catch {
-      throw new Error("Kurulum tamamlanamadı. Bilgilerinizi ve kurulum kodunu kontrol edin. Hesabınız oluştuysa mevcut hesap seçeneğiyle devam edin veya kurulum sorumlusuna başvurun.");
+      fail("Kurulum tamamlanamadı. Bilgilerinizi ve kurulum kodunu kontrol edin. Hesabınız oluştuysa mevcut hesap seçeneğiyle devam edin veya kurulum sorumlusuna başvurun.");
     }
     setCompleted(true);
   });
   const isLoading = setup.pending;
+  useEffect(() => {
+    if (formError && !isLoading) document.getElementById("password")?.focus();
+  }, [formError, isLoading]);
   const handleSubmit = (event: React.FormEvent) => { event.preventDefault(); void setup.run(); };
 
   if (completed) return <div className="min-h-screen flex flex-col items-center justify-center gap-4"><h1>Yönetici kurulumu tamamlandı</h1><Button disabled={!user || user.verified === false} onClick={() => navigate("/home")}>{!user || user.verified === false ? "Oturum hazırlanıyor..." : "Ana sayfaya geç"}</Button></div>;
@@ -44,7 +53,7 @@ export default function AdminSetup() {
   if (hasAdmin === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Kontrol ediliyor...</p>
+        <SectionSkeleton label="Kurulum kontrol ediliyor" className="w-full max-w-md p-4" />
       </div>
     );
   }
@@ -67,7 +76,7 @@ export default function AdminSetup() {
         </CardHeader>
         <CardContent>
           <Button variant="outline" className="mb-4 w-full" disabled={isLoading} onClick={() => setExistingAccount((value) => !value)}>{existingAccount ? "Yeni hesap oluştur" : "Mevcut hesabımla devam et"}</Button>
-          <form onSubmit={handleSubmit}><fieldset disabled={isLoading} className="space-y-4">
+          <form noValidate onSubmit={handleSubmit}><fieldset disabled={isLoading} className="space-y-4">
             <div>
               <Label htmlFor="email">E-posta</Label>
               <Input
@@ -81,13 +90,13 @@ export default function AdminSetup() {
             </div>
             <div>
               <Label htmlFor="password">Şifre</Label>
-              <Input
+              <PasswordField disabled={isLoading} aria-invalid={Boolean(formError)} aria-describedby={formError ? "setup-error" : "password-help"}
                 id="password"
-                type="password"
+
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={8}
+                minLength={existingAccount ? undefined : 8}
                 placeholder="En az 8 karakter"
               />
             </div>
@@ -96,9 +105,9 @@ export default function AdminSetup() {
                 <Lock className="h-4 w-4" />
                 Kurulum kodu
               </Label>
-              <Input
+              <PasswordField disabled={isLoading} aria-invalid={Boolean(formError)} aria-describedby={formError ? "setup-error" : "password-help"}
                 id="secret"
-                type="password"
+
                 value={secret}
                 onChange={(e) => setSecret(e.target.value)}
                 required
@@ -108,6 +117,8 @@ export default function AdminSetup() {
                 Kurulum kodunu bilmiyorsanız kurulum sorumlusuna başvurun.
               </p>
             </div>
+            <p id="password-help" className="text-xs text-muted-foreground">Mevcut hesapla girişte mevcut şifrenizi kullanın; yeni hesap şifresi en az 8 karakter olmalıdır.</p>
+            {formError && <p id="setup-error" role="alert" className="text-sm text-destructive">{formError}</p>}
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Kuruluyor..." : "Süper Admin Oluştur"}
             </Button>

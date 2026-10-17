@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { UploadCloud, Cable, Activity, ArrowRight } from 'lucide-react';
 
 const STEPS = [
@@ -26,6 +26,7 @@ const STEPS = [
 ];
 
 const HowItWorksSection = () => {
+  const reducedMotion = useReducedMotion();
   return (
     <section
       id="how-it-works"
@@ -52,16 +53,16 @@ const HowItWorksSection = () => {
             {STEPS.map((step, idx) => (
               <motion.div
                 key={step.number}
-                initial={{ opacity: 0, y: 20 }}
+                initial={reducedMotion ? false : { opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-50px' }}
-                transition={{ duration: 0.5, delay: idx * 0.15 }}
+                transition={reducedMotion ? { duration: 0 } : { duration: 0.5, delay: idx * 0.15 }}
                 className="relative"
               >
                 <div className="rounded-2xl border bg-card p-8 h-full shadow-sm hover:shadow-md transition-shadow">
                   <div className="relative inline-flex">
                     <div className="rounded-2xl burgundy-gradient w-14 h-14 flex items-center justify-center shadow-lg shadow-primary/20">
-                      <step.icon className="h-7 w-7 text-white" />
+                      <step.icon className="h-7 w-7 text-primary-foreground" />
                     </div>
                     <div className="absolute -top-2 -right-3 bg-card border border-primary/20 rounded-full px-2 py-0.5 text-xs font-bold text-primary shadow-sm">
                       {step.number}

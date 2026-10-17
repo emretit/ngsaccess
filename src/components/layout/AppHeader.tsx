@@ -1,3 +1,4 @@
+import { ProjectSwitcher } from "./ProjectSwitcher";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import { capabilities } from "@/lib/capabilities";
@@ -44,7 +45,7 @@ export function AppHeader({ title, className, children }: AppHeaderProps) {
   return (
     <header
       className={cn(
-        "flex h-11 shrink-0 items-center gap-2 border-b bg-card/95 backdrop-blur-sm px-3 md:px-4",
+        "flex min-h-14 flex-wrap shrink-0 items-center gap-2 border-b bg-card/95 backdrop-blur-sm px-3 py-1 md:px-4",
         className
       )}
     >
@@ -55,6 +56,7 @@ export function AppHeader({ title, className, children }: AppHeaderProps) {
         <h1 className="text-sm font-semibold truncate">{title}</h1>
       )}
 
+      <div className="min-w-0 max-w-[min(18rem,55vw)]"><ProjectSwitcher /></div>
       {children}
 
       {/* Sağ taraf: Kullanıcı */}

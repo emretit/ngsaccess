@@ -115,3 +115,11 @@ await ctx.db.patch(id, toPatch(fields));
 </FormFieldWrapper>
 <Button size="icon" aria-label="Cihazı düzenle"><Pencil aria-hidden="true" /></Button>
 ```
+
+## Dalga 3 — ortak form ve durum bileşenleri
+
+- `PasswordField` standart `Input` props/ref sözleşmesini (`type` hariç) taşır. Görünür `Label` veya `FormFieldWrapper` ile kullanın; `disabled` input ve 44px göster/gizle düğmesini birlikte kilitler.
+- `FormFieldWrapper htmlFor="email" label="E-posta" hint="…" error={message}` tek kontrolün `id`, `aria-invalid`, `aria-describedby` alanlarını ayarlar; ipucu/hata ile mevcut açıklama id'sini birleştirir. Karmaşık kontrollerde açık slot kullanın: `{(control) => <Input {...control} />}`. İkon/dekorasyonları slot dışında bırakın.
+- `const { requestClose, dialog } = useUnsavedChangesGuard(isDirty)`: modal `onOpenChange`, iptal ve kapat düğmelerinde `requestClose(() => setOpen(false))` çağırın ve `{dialog}` render edin. Başarıyla kaydetme doğrudan kapanabilir. Sekme kapatmada tarayıcı uyarısı vardır; rota değişimi için gezinme callback'ini ayrıca `requestClose` üzerinden geçirin. **API sabit:** `requestClose(close: () => void): void`.
+- `QuerySectionBoundary` sorguyu çağıran **çocuk bileşeni** sarar; kendi parent'ındaki query hatasını yakalayamaz. Opsiyonel `title`, `description`, `onRetry`, `resetKey: string | number`, `className`; yeniden deneme çocukları yeniden mount eder, `resetKey` proje/filtre değişiminde hata durumunu temizler. ErrorState içinde yeniden deneme gösterilir; kardeş bölümler ayakta kalır.
+- `EmptyState`, `ErrorState`, `AccessDenied` isteğe bağlı `compact` destekler. `StatCard` `loading` ve null/undefined değeri destekler; bilinmeyen değer sıfır yerine “—” gösterilir. Badge: mevcut varyantlara ek `danger`, `successSubtle`, `warningSubtle`, `dangerSubtle`, `infoSubtle`.

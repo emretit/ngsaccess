@@ -1,9 +1,0 @@
-@import 'tailwindcss/theme' layer(theme);
-
-@import 'tailwindcss/preflight' layer(base);
-
-@layer base {
-  :root {
-    --burgundy: 139, 28, 38;
-  }
-}

@@ -1,3 +1,4 @@
+import { marketingFacts } from "./marketingFacts";
 import {
   Accordion,
   AccordionContent,
@@ -8,7 +9,7 @@ import {
 const FAQS = [
   {
     q: 'KVKK uyumlu mu?',
-    a: 'Evet. NGS Plus, KVKK kapsamında veri işleme, açık rıza yönetimi ve aydınlatma metni süreçlerine uygundur. Tüm kişisel veriler şifreli olarak saklanır, audit log ile her erişim kayıt altına alınır.',
+    a: 'Kuruluşunuzun veri işleme ve aydınlatma yükümlülükleri ayrıca değerlendirilmelidir. Ürün kapsamı ve sözleşme bilgileri için bizimle iletişime geçin.',
   },
   {
     q: 'Mevcut kart okuyucularımı kullanabilir miyim?',
@@ -16,19 +17,19 @@ const FAQS = [
   },
   {
     q: 'Veriler nerede saklanıyor?',
-    a: 'Veriler Türkiye lokasyonlu sunucularda (veya tercih ederseniz AB) ISO 27001 sertifikalı veri merkezlerinde saklanır. Yedeklemeler günlük olarak alınır.',
+    a: 'Barındırma lokasyonu ve yedekleme koşulları için güncel sözleşme bilgilerini bizimle iletişime geçerek öğrenebilirsiniz.',
   },
   {
     q: 'Kaç çalışana kadar destekliyorsunuz?',
-    a: 'Fiyatlandırma tablosunda Başlangıç 10, Profesyonel 50 çalışan içindir; Kurumsal kapsamı ayrıca değerlendirilir. Hesap oluşturmak ücretli plan satın almaz.',
+    a: marketingFacts.planDescription,
   },
   {
     q: 'Mobil uygulamayı kim kullanır?',
-    a: 'Yöneticiler ve güvenlik personeli için tasarlanmıştır: sahada QR tarama, ziyaretçi karşılama, gerçek zamanlı bildirim. Çalışanlar için ayrı bir uygulama gerektirmez — kart veya sabit QR yeterlidir.',
+    a: marketingFacts.mobileDescription,
   },
   {
     q: 'İptal ve geri ödeme politikası nedir?',
-    a: 'Hesap oluştururken kart bilgisi alınmaz. Ücretli plan, deneme süresi ve iptal koşulları için iletişime geçin.',
+    a: marketingFacts.trialDescription,
   },
 ];
 

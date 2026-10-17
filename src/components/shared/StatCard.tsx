@@ -32,7 +32,8 @@ const toneStyles: Record<StatTone, { icon: string; label: string }> = {
 
 interface StatCardProps {
   label: string;
-  value: string | number;
+  value: string | number | null | undefined;
+  loading?: boolean;
   Icon: LucideIcon;
   tone?: StatTone;
   /** Küçük yardımcı metin (örn. yüzde) */
@@ -40,7 +41,7 @@ interface StatCardProps {
   className?: string;
 }
 
-export function StatCard({ label, value, Icon, tone = "default", meta, className }: StatCardProps) {
+export function StatCard({ label, value, Icon, tone = "default", meta, className, loading = false }: StatCardProps) {
   const styles = toneStyles[tone];
   return (
     <div className={cn("rounded-xl border bg-card shadow-xs px-4 py-3 flex items-center gap-3", className)}>
@@ -49,7 +50,7 @@ export function StatCard({ label, value, Icon, tone = "default", meta, className
       </div>
       <div>
         <p className="text-xs text-muted-foreground font-medium">{label}</p>
-        <p className="text-xl font-bold tabular-nums leading-tight">{value}</p>
+        <p className="text-xl font-bold tabular-nums leading-tight" aria-busy={loading}>{loading ? "Yükleniyor…" : value ?? "—"}</p>
         {meta && <p className={cn("text-xs font-medium leading-none", styles.label)}>{meta}</p>}
       </div>
     </div>

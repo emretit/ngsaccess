@@ -5,7 +5,8 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useQuery, useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
-import { toast } from '@/hooks/use-toast';
+import { notify } from '@/lib/notify';
+import { safeReturnPath } from '@/lib/routeMeta';
 import { checkUserRole } from '@/services/authService';
 
 type UserRole = "super_admin" | "project_admin" | "project_user";
@@ -78,12 +79,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setVerificationEmail(profile.email ?? null);
           void convexSignOut()
             .then(() => {
-              toast({
-                title: "E-posta doğrulanmadı",
-                description: "Giriş yapmadan önce e-postanıza gönderdiğimiz doğrulama linkine tıklayın.",
-                variant: "destructive",
-              });
-              navigate('/login');
+              notify.error("E-posta doğrulanmadı", "Giriş yapmadan önce e-postanızdaki doğrulama bağlantısını açın.");
+              const next = location.pathname === '/login' ? new URLSearchParams(location.search).get('next') : location.pathname + location.search + location.hash;
+              navigate(`/login?next=${encodeURIComponent(safeReturnPath(next))}`, { replace: true });
             })
             .catch(() => {
               // signOut başarısız olursa tekrar denenebilsin.
@@ -110,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         location.pathname === '/register' ||
         location.pathname === '/verify-email'
       ) {
-        navigate('/home');
+        navigate(safeReturnPath(new URLSearchParams(location.search).get('next')), { replace: true });
       }
     }
 
@@ -118,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       blockedRef.current = false;
       ensuredRef.current = false;
     }
-  }, [isAuthenticated, isLoading, profile, location.pathname, navigate, convexSignOut, ensureProject, signupPending, setupPhase]);
+  }, [isAuthenticated, isLoading, profile, location.pathname, location.search, location.hash, navigate, convexSignOut, ensureProject, signupPending, setupPhase]);
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -185,7 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await convexSignOut();
-    toast({ title: "Çıkış yapıldı", description: "Başarıyla çıkış yaptınız" });
+    notify.success("Çıkış yapıldı", "Başarıyla çıkış yaptınız");
     navigate('/');
   };
 

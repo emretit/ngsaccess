@@ -1,12 +1,13 @@
-import { ACCOUNT_CTA } from './publicCopy';
+import { ACCOUNT_CTA, SETUP_DESCRIPTION } from './publicCopy';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ChevronRight, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const FinalCTASection = () => {
+  const reducedMotion = useReducedMotion();
   return (
-    <section className="py-20 md:py-28 burgundy-gradient text-white relative overflow-hidden">
+    <section className="py-20 md:py-28 burgundy-gradient text-primary-foreground relative overflow-hidden">
       <div
         aria-hidden
         className="absolute inset-0 opacity-10"
@@ -27,19 +28,18 @@ const FinalCTASection = () => {
 
       <div className="relative w-full px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto text-center">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={reducedMotion ? false : { opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-100px' }}
-          transition={{ duration: 0.5 }}
+          transition={reducedMotion ? { duration: 0 } : { duration: 0.5 }}
         >
           <h2 className="text-3xl md:text-5xl font-bold tracking-tight">
             Kuruluma başlayın.
             <br />
-            <span className="text-yellow-300">Faydası ömür boyu.</span>
+            <span className="text-primary-foreground">Projenizi hazırlayın.</span>
           </h2>
-          <p className="mt-6 text-lg md:text-xl text-white/85 max-w-2xl mx-auto">
-            Ücretsiz hesabınızı oluşturun. Kredi kartı bilgisi
-            gerekmez, istediğiniz zaman iptal edebilirsiniz.
+          <p className="mt-6 text-lg md:text-xl text-primary-foreground max-w-2xl mx-auto">
+            {SETUP_DESCRIPTION}
           </p>
 
           <div className="mt-10 flex flex-col sm:flex-row gap-3 justify-center">
@@ -56,7 +56,7 @@ const FinalCTASection = () => {
             <Button
               size="lg"
               variant="outline"
-              className="bg-transparent border-white/40 text-white hover:bg-white/10 hover:text-white text-base"
+              className="bg-transparent border-white/40 text-primary-foreground hover:bg-white/10 hover:text-primary-foreground text-base"
               asChild
             >
               <a href="mailto:info@ngsplus.app">

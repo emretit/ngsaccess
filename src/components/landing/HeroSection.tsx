@@ -1,6 +1,6 @@
-import { ACCOUNT_CTA } from './publicCopy';
+import { ACCOUNT_CTA, SETUP_DESCRIPTION } from './publicCopy';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   ChevronRight,
   Check,
@@ -15,11 +15,12 @@ import { Badge } from '@/components/ui/badge';
 
 const TRUST_ITEMS = [
   'Kredi kartı gerekmez',
-  'KVKK uyumlu',
+  'Proje bazlı erişim',
   'Türkçe destek',
 ];
 
 const HeroSection = () => {
+  const reducedMotion = useReducedMotion();
   return (
     <section className="relative overflow-hidden bg-linear-to-b from-background via-background to-muted/40 py-20 md:py-28">
       <div
@@ -34,9 +35,9 @@ const HeroSection = () => {
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center max-w-7xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={reducedMotion ? false : { opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={reducedMotion ? { duration: 0 } : { duration: 0.6 }}
             className="max-w-2xl"
           >
             <Badge
@@ -53,8 +54,7 @@ const HeroSection = () => {
             </h1>
 
             <p className="mt-6 text-lg md:text-xl text-muted-foreground leading-relaxed">
-              QR kod, kart okuyucu ve mobil uygulama tek bir bulut platformda.
-              Vardiya, izin ve raporlama dahil — kurulum gerektirmez.
+              QR kod, kart okuyucu, vardiya ve izin kayıtlarını bir arada yönetin. {SETUP_DESCRIPTION}
             </p>
 
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
@@ -83,9 +83,9 @@ const HeroSection = () => {
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={reducedMotion ? false : { opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.7, delay: 0.2 }}
+            transition={reducedMotion ? { duration: 0 } : { duration: 0.7, delay: 0.2 }}
             className="relative hidden lg:block"
           >
             <HeroMockup />
@@ -97,6 +97,7 @@ const HeroSection = () => {
 };
 
 const HeroMockup = () => {
+  const reducedMotion = useReducedMotion();
   return (
     <div className="relative">
       {/* Background dashboard card */}
@@ -107,14 +108,14 @@ const HeroMockup = () => {
             <div className="font-semibold text-lg">Devam Özeti</div>
           </div>
           <Badge variant="outline" className="text-primary border-primary/30 bg-primary/5">
-            Canlı
+            Örnek görünüm
           </Badge>
         </div>
 
         <div className="grid grid-cols-3 gap-3 mb-5">
           {[
-            { label: 'Giriş', value: '142', icon: TrendingUp, color: 'text-emerald-600' },
-            { label: 'Geç Kalan', value: '3', icon: Clock, color: 'text-amber-600' },
+            { label: 'Giriş', value: '142', icon: TrendingUp, color: 'text-[hsl(var(--success))]' },
+            { label: 'Geç Kalan', value: '3', icon: Clock, color: 'text-[hsl(var(--warning))]' },
             { label: 'İzinli', value: '8', icon: ShieldCheck, color: 'text-primary' },
           ].map((stat) => (
             <div
@@ -156,27 +157,27 @@ const HeroMockup = () => {
 
       {/* Floating QR card */}
       <motion.div
-        initial={{ opacity: 0, x: -30, y: -10 }}
+        initial={reducedMotion ? false : { opacity: 0, x: -30, y: -10 }}
         animate={{ opacity: 1, x: 0, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.5 }}
+        transition={reducedMotion ? { duration: 0 } : { duration: 0.6, delay: 0.5 }}
         className="absolute -left-8 -top-8 rounded-xl border bg-card shadow-xl p-4 w-44 hidden xl:block"
       >
         <div className="rounded-lg burgundy-gradient h-24 flex items-center justify-center mb-2">
-          <QrCode className="h-12 w-12 text-white" />
+          <QrCode className="h-12 w-12 text-primary-foreground" />
         </div>
         <div className="text-xs font-semibold">Mobil QR Tarama</div>
-        <div className="text-[10px] text-muted-foreground mt-0.5">iOS · Android</div>
+        <div className="text-[10px] text-muted-foreground mt-0.5">Mobil uygulama yakında</div>
       </motion.div>
 
       {/* Floating notification toast */}
       <motion.div
-        initial={{ opacity: 0, x: 30, y: 10 }}
+        initial={reducedMotion ? false : { opacity: 0, x: 30, y: 10 }}
         animate={{ opacity: 1, x: 0, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.7 }}
+        transition={reducedMotion ? { duration: 0 } : { duration: 0.6, delay: 0.7 }}
         className="absolute -right-6 -bottom-6 rounded-xl border bg-card shadow-xl p-3 w-60 flex items-center gap-3"
       >
-        <div className="h-9 w-9 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-          <Check className="h-5 w-5 text-emerald-600" />
+        <div className="h-9 w-9 rounded-full bg-[hsl(var(--success-subtle))] flex items-center justify-center shrink-0">
+          <Check className="h-5 w-5 text-[hsl(var(--success))]" />
         </div>
         <div className="min-w-0">
           <div className="text-xs font-semibold">Yeni giriş kaydedildi</div>

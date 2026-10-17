@@ -11,6 +11,7 @@ interface EmptyStateProps {
     onClick: () => void;
   };
   className?: string;
+  compact?: boolean;
 }
 
 export function EmptyState({
@@ -19,11 +20,14 @@ export function EmptyState({
   description,
   action,
   className,
+  compact = false,
 }: EmptyStateProps) {
   return (
     <div
+      role="status"
       className={cn(
         "flex flex-col items-center justify-center py-16 px-4 text-center",
+        compact && "min-h-0 py-6",
         className
       )}
     >

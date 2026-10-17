@@ -1,13 +1,16 @@
-import { useState } from 'react';
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
+import { PasswordField } from "@/components/shared/PasswordField";
+import { registrationSchema, fieldMessages } from "@/components/shared/authFormSchemas";
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowRight, Building2, Eye, EyeOff, Home, Lock, Mail, ShieldCheck, User } from 'lucide-react';
+import { ArrowRight, Home, ShieldCheck } from 'lucide-react';
 
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
-import { toast } from '@/hooks/use-toast';
+import { notify } from '@/lib/notify';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -18,7 +21,7 @@ export default function Register() {
   const [companyName, setCompanyName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
   // NOT: "girişli kullanıcıyı /home'a at" effect'i KASITLI olarak yok.
@@ -58,17 +61,28 @@ export default function Register() {
     if (signUpError) {
       const message = 'Hesap oluşturulamadı. Bilgilerinizi kontrol edin; mevcut hesabınız varsa giriş yapın.';
       setError(message);
+      document.getElementById("email")?.focus();
       throw new Error(message);
     }
     // Hesap ve mail talebi ayrı sonuçlardır; kurtarma giriş ekranında sürer.
-    toast({
-      title: 'Kayıt başarılı',
-      description: verificationQueued ? 'Doğrulama bağlantısı gönderimi istendi.' : 'Hesabınız oluşturuldu ancak doğrulama maili istenemedi. Giriş ekranından yeni bağlantı isteyin.',
-    });
+    notify.success('Kayıt başarılı', verificationQueued ? 'Doğrulama bağlantısı gönderimi istendi.' : 'Hesabınız oluşturuldu ancak doğrulama maili istenemedi. Giriş ekranından yeni bağlantı isteyin.');
     navigate('/login?confirmEmail=true', { state: { email: normalizedEmail, verificationQueued } });
   });
   const submitting = registration.pending;
-  const handleSubmit = (event: React.FormEvent) => { event.preventDefault(); void registration.run(); };
+  useEffect(() => {
+    if (error && !submitting) document.getElementById("email")?.focus();
+  }, [error, submitting]);
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const result = registrationSchema.safeParse({ firstName, lastName, companyName, email, password });
+    if (!result.success) {
+      setFieldErrors(fieldMessages(result.error));
+      document.getElementById(String(result.error.issues[0]?.path[0]))?.focus();
+      return;
+    }
+    setFieldErrors({});
+    void registration.run();
+  };
 
   if (loading) {
     return <LoadingSpinner text="Kayıt işlemi kontrol ediliyor..." />;
@@ -80,7 +94,7 @@ export default function Register() {
       <Link
         to="/"
         aria-label="Ana sayfa"
-        className="group fixed left-6 top-6 z-50 inline-flex items-center gap-2 rounded-full border border-border bg-card/90 px-4 py-2.5 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-105 hover:border-primary/30 hover:shadow-xl"
+        className="group absolute left-6 top-6 z-50 inline-flex items-center gap-2 rounded-full border border-border bg-card/90 px-4 py-2.5 shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-105 hover:border-primary/30 hover:shadow-xl"
       >
         <Home className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary" />
         <span className="text-sm font-medium text-muted-foreground transition-colors group-hover:text-primary">
@@ -89,7 +103,7 @@ export default function Register() {
       </Link>
 
       {/* Sol taraf - Form */}
-      <div className="flex flex-1 items-center justify-center px-6 py-12 sm:px-8">
+      <div className="flex flex-1 items-center justify-center px-6 pb-12 pt-28 sm:px-8">
         <div className="w-full max-w-md space-y-8">
           {/* Logo ve başlık */}
           <div className="text-center">
@@ -113,101 +127,35 @@ export default function Register() {
           </div>
 
           {/* Kayıt formu */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    autoComplete="given-name"
-                    placeholder="Ad"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    className="h-12 border-border bg-card pl-10 text-base focus:border-primary focus:ring-primary"
-                    required
-                    disabled={submitting}
-                  />
-                </div>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    autoComplete="family-name"
-                    placeholder="Soyad"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    className="h-12 border-border bg-card pl-10 text-base focus:border-primary focus:ring-primary"
-                    required
-                    disabled={submitting}
-                  />
-                </div>
-              </div>
-              <div className="relative">
-                <Building2 className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="text"
-                  autoComplete="organization"
-                  placeholder="Firma adı"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  className="h-12 border-border bg-card pl-10 text-base focus:border-primary focus:ring-primary"
-                  required
-                  disabled={submitting}
-                />
-              </div>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="email"
-                  autoComplete="email"
-                  placeholder="ornek@firma.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 border-border bg-card pl-10 text-base focus:border-primary focus:ring-primary"
-                  required
-                  disabled={submitting}
-                />
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="new-password"
-                  placeholder="En az 8 karakter"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="h-12 border-border bg-card pl-10 pr-12 text-base focus:border-primary focus:ring-primary"
-                  required
-                  minLength={8}
-                  disabled={submitting}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-primary"
-                  tabIndex={-1}
-                  aria-label={showPassword ? 'Şifreyi gizle' : 'Şifreyi göster'}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5" />
-                  ) : (
-                    <Eye className="h-5 w-5" />
-                  )}
-                </button>
-              </div>
-            </div>
+          <form noValidate onSubmit={handleSubmit} className="space-y-5">
+            <fieldset disabled={submitting} className="space-y-4">
+              <FormFieldWrapper htmlFor="firstName" label="Ad" error={fieldErrors.firstName}>
+                <Input type="text" autoComplete="given-name" value={firstName} onChange={(event) => setFirstName(event.target.value)} disabled={submitting} aria-describedby={error ? "form-error" : undefined} aria-invalid={Boolean(error || fieldErrors.firstName)} />
+              </FormFieldWrapper>
+              <FormFieldWrapper htmlFor="lastName" label="Soyad" error={fieldErrors.lastName}>
+                <Input type="text" autoComplete="family-name" value={lastName} onChange={(event) => setLastName(event.target.value)} disabled={submitting} aria-describedby={error ? "form-error" : undefined} aria-invalid={Boolean(error || fieldErrors.lastName)} />
+              </FormFieldWrapper>
+              <FormFieldWrapper htmlFor="companyName" label="Firma adı" error={fieldErrors.companyName}>
+                <Input type="text" autoComplete="organization" value={companyName} onChange={(event) => setCompanyName(event.target.value)} disabled={submitting} aria-describedby={error ? "form-error" : undefined} aria-invalid={Boolean(error || fieldErrors.companyName)} />
+              </FormFieldWrapper>
+              <FormFieldWrapper htmlFor="email" label="E-posta" error={fieldErrors.email}>
+                <Input type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} disabled={submitting} aria-describedby={error ? "form-error" : undefined} aria-invalid={Boolean(error || fieldErrors.email)} />
+              </FormFieldWrapper>
+              <FormFieldWrapper htmlFor="password" label="Şifre" error={fieldErrors.password} hint="En az 8 karakter kullanın.">
+                <PasswordField autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} disabled={submitting} aria-describedby={error ? "form-error" : undefined} aria-invalid={Boolean(error || fieldErrors.password)} />
+              </FormFieldWrapper>
+            </fieldset>
 
             {error && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <div id="form-error" role="alert" tabIndex={-1} className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                 {error}
               </div>
             )}
 
             <Button
               type="submit"
-              disabled={!firstName || !lastName || !companyName || !email || !password || submitting}
-              className="h-12 w-full bg-primary text-base font-semibold text-white shadow-lg transition-all duration-200 hover:bg-primary/90 hover:shadow-xl"
+              disabled={submitting}
+              className="h-12 w-full bg-primary text-base font-semibold text-primary-foreground shadow-lg transition-all duration-200 hover:bg-primary/90 hover:shadow-xl"
             >
               {submitting ? (
                 'Kayıt oluşturuluyor...'
@@ -236,7 +184,7 @@ export default function Register() {
       </div>
 
       {/* Sağ taraf - Görsel panel */}
-      <div className="relative hidden flex-1 overflow-hidden bg-linear-to-br from-primary to-[#5a1414] lg:flex">
+      <div className="relative hidden flex-1 overflow-hidden bg-primary lg:flex">
         <div className="absolute inset-0 bg-black/10" />
 
         {/* Dekoratif daireler */}
@@ -252,14 +200,14 @@ export default function Register() {
               <div className="mb-5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-                    <ShieldCheck className="h-5 w-5 text-white" />
+                    <ShieldCheck className="h-5 w-5 text-primary-foreground" />
                   </div>
                   <span className="text-sm font-bold tracking-wide text-foreground">
                     NGS ACCESS
                   </span>
                 </div>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
-                  <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[hsl(var(--success-subtle))] px-2.5 py-1 text-xs font-medium text-[hsl(var(--success))]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--success))]" />
                   Çevrimiçi
                 </span>
               </div>
@@ -274,7 +222,7 @@ export default function Register() {
                 <div className="rounded-lg border border-border bg-card p-3">
                   <div className="text-xs text-muted-foreground">Aktif personel</div>
                   <div className="mt-1 text-xl font-bold text-foreground">38</div>
-                  <div className="mt-2 h-1.5 w-2/3 rounded-full bg-emerald-400" />
+                  <div className="mt-2 h-1.5 w-2/3 rounded-full bg-[hsl(var(--success))]" />
                 </div>
               </div>
 
@@ -302,10 +250,10 @@ export default function Register() {
 
         {/* Alt slogan */}
         <div className="absolute bottom-8 left-0 right-0 text-center">
-          <p className="text-sm font-medium text-white/90">
+          <p className="text-sm font-medium text-primary-foreground">
             Personel devam kontrol sistemi
           </p>
-          <p className="mt-1 text-xs text-white/60">Güvenli · Hızlı · Akıllı</p>
+          <p className="mt-1 text-xs text-primary-foreground">Güvenli · Hızlı · Akıllı</p>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   QrCode,
   Cpu,
@@ -128,6 +128,7 @@ const CATEGORIES: Category[] = [
 ];
 
 const FeaturesSection = () => {
+  const reducedMotion = useReducedMotion();
   return (
     <section id="features" className="py-20 md:py-28 bg-background">
       <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
@@ -161,13 +162,13 @@ const FeaturesSection = () => {
                 {cat.features.map((feature, idx) => (
                   <motion.div
                     key={feature.title}
-                    initial={{ opacity: 0, y: 16 }}
+                    initial={reducedMotion ? false : { opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, delay: idx * 0.1 }}
+                    transition={reducedMotion ? { duration: 0 } : { duration: 0.4, delay: idx * 0.1 }}
                     className="group rounded-2xl border bg-card p-6 hover:border-primary/40 hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
                   >
-                    <div className="rounded-xl bg-primary/10 w-12 h-12 flex items-center justify-center mb-4 group-hover:bg-primary group-hover:text-white transition-colors">
-                      <feature.icon className="h-6 w-6 text-primary group-hover:text-white transition-colors" />
+                    <div className="rounded-xl bg-primary/10 w-12 h-12 flex items-center justify-center mb-4 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                      <feature.icon className="h-6 w-6 text-primary group-hover:text-primary-foreground transition-colors" />
                     </div>
                     <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
