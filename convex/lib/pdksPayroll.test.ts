@@ -137,11 +137,11 @@ describe("pdksPayroll – computePayrollCell", () => {
     expect(r.overtimePayTRY).toBeNull();
   });
 
-  it("tek okuma → devam yok (en az 2 gerekli) → DV", () => {
+  it("tek okuma → devam var, süre için çift yok → N / 0 dakika", () => {
     const r = computePayrollCell(
       cell({ dayReadings: [reading(`${MONDAY}T06:00:00.000Z`)] }),
     );
-    expect(r.payrollCode).toBe("DV");
+    expect(r.payrollCode).toBe("N");
     expect(r.totalMinutes).toBe(0);
   });
 
@@ -149,4 +149,10 @@ describe("pdksPayroll – computePayrollCell", () => {
     const r = computePayrollCell(cell({ hasLeave: true }));
     expect(r.payrollCode).toBe("İZN");
   });
+});
+
+
+
+it("gelecek bordro günü devamsızlık üretmez", () => {
+  expect(computePayrollCell(cell({ date: "2099-01-01" }))).toMatchObject({ status: "future", payrollCode: "—" });
 });

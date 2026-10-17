@@ -1,3 +1,4 @@
+import { filterPdksReadings } from "./lib/pdksSource";
 import { paginationOptsValidator, type PaginationResult } from "convex/server";
 import { resolveProjectScope } from "./lib/projectScope";
 import { scopedCardReadingQuery } from "./lib/cardReadingList";
@@ -10,7 +11,6 @@ import {
   employeeAuthedQuery,
   employeeAuthedMutation,
 } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import {
@@ -127,8 +127,13 @@ export const getRecentByProjects = authedQuery({
   },
 });
 
+function scopedPdksShift(shift: Doc<"shifts"> | null, projectId?: Id<"projects">) {
+  return projectId && shift?.projectId !== projectId ? null : shift;
+}
+
 export const getPdksTableData = authedQuery({
   args: {
+    projectId: v.optional(v.id("projects")),
     date: v.optional(v.string()),
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
@@ -143,14 +148,18 @@ export const getPdksTableData = authedQuery({
         v.literal("late"),
         v.literal("absent"),
         v.literal("leave"),
-        v.literal("overtime")
+        v.literal("overtime"),
+        v.literal("weekend"),
+        v.literal("holiday"),
+        v.literal("future"),
+        v.literal("noData")
       )
     ),
     person: v.optional(v.string()),
     viewMode: v.optional(v.union(v.literal("single"), v.literal("matrix"))),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
 
     const today = args.date ?? trTodayKey();
     const startDate = args.startDate ?? today;
@@ -161,7 +170,7 @@ export const getPdksTableData = authedQuery({
 
     let readings;
     let employees: Doc<"employees">[];
-    if (ctx.user.role === "super_admin") {
+    if (ctx.user.role === "super_admin" && !args.projectId) {
       [readings, employees] = await Promise.all([
         ctx.db
           .query("cardReadings")
@@ -222,6 +231,8 @@ export const getPdksTableData = authedQuery({
       );
     }
 
+    readings = filterPdksReadings(readings, args.projectId);
+
     readings.sort(
       (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
     );
@@ -233,10 +244,10 @@ export const getPdksTableData = authedQuery({
     const employeeMap = buildPdksEmployeeReadingMap({ employees, readings });
 
     // Settings & holidays per project (super_admin için global = undefined)
-    const referenceProjectId =
-      ctx.user.role === "super_admin"
+    const referenceProjectId = args.projectId ?? (
+      ctx.user.role === "super_admin" && !args.projectId
         ? undefined
-        : allowedProjectIds[0] ?? undefined;
+        : allowedProjectIds[0] ?? undefined);
     const [workSettings, holidayMap, generalSettings, shiftResolver, overtimeRates] =
       await Promise.all([
         getEffectiveWorkSettings(ctx, referenceProjectId),
@@ -270,7 +281,7 @@ export const getPdksTableData = authedQuery({
     );
     for (const recs of recsByEmployee) {
       for (const r of recs) {
-        if (r.manualEntry) {
+        if (r.manualEntry && (!args.projectId || r.projectId === args.projectId)) {
           manualPdksByEmpDate.set(`${String(r.employeeId)}__${r.date}`, r);
         }
       }
@@ -282,7 +293,7 @@ export const getPdksTableData = authedQuery({
         .query("leaves")
         .withIndex("by_status", (q) => q.eq("status", "approved"))
         .collect()
-    ).filter((l) => l.startDate <= endDate && l.endDate >= startDate);
+    ).filter((l) => (!args.projectId || !l.projectId || l.projectId === args.projectId) && l.startDate <= endDate && l.endDate >= startDate);
 
     const periodDateKeys = buildPeriodDateKeys(startDate, endDate);
 
@@ -319,8 +330,10 @@ export const getPdksTableData = authedQuery({
           workingDays,
           workSettings,
           overtimeRates,
-          resolveShift: (employeeId, dateISO) =>
-            shiftResolver.resolve(employeeId, dateISO),
+          resolveShift: (employeeId, dateISO) => {
+            const shift = shiftResolver.resolve(employeeId, dateISO);
+            return args.projectId && shift?.projectId !== args.projectId ? null : shift;
+          },
           manualEditedBy: editor?.fullName ?? editor?.name ?? editor?.email ?? null,
         });
       })
@@ -338,34 +351,26 @@ export const getPdksTableData = authedQuery({
  */
 export const getPdksChartData = authedQuery({
   args: {
+    projectId: v.optional(v.id("projects")),
     startDate: v.string(),
     endDate: v.string(),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
     const { startISO, endISO } = trDayRangeISO(args.startDate, args.endDate);
 
     let readings;
-    if (ctx.user.role === "super_admin") {
+    if (ctx.user.role === "super_admin" && !args.projectId) {
       readings = await ctx.db
         .query("cardReadings")
-        .withIndex("by_access_time")
-        .filter((q) =>
-          q.and(q.gte(q.field("accessTime"), startISO), q.lte(q.field("accessTime"), endISO))
-        )
+        .withIndex("by_access_time", q => q.gte("accessTime", startISO).lte("accessTime", endISO))
         .collect();
     } else if (allowedProjectIds.length > 0) {
       const results = await Promise.all(
         allowedProjectIds.map((pid) =>
           ctx.db
             .query("cardReadings")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .filter((q) =>
-              q.and(
-                q.gte(q.field("accessTime"), startISO),
-                q.lte(q.field("accessTime"), endISO)
-              )
-            )
+            .withIndex("by_project_access_time", q => q.eq("projectId", pid).gte("accessTime", startISO).lte("accessTime", endISO))
             .collect()
         )
       );
@@ -374,18 +379,20 @@ export const getPdksChartData = authedQuery({
       return emptyPdksChartData();
     }
 
+    readings = filterPdksReadings(readings, args.projectId);
+
     readings.sort(
       (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
     );
 
-    const chartProjectId =
-      ctx.user.role === "super_admin"
+    const chartProjectId = args.projectId ?? (
+      ctx.user.role === "super_admin" && !args.projectId
         ? undefined
-        : allowedProjectIds[0] ?? undefined;
+        : allowedProjectIds[0] ?? undefined);
     const chartSettings = await getEffectiveWorkSettings(ctx, chartProjectId);
 
     const chartEmployees =
-      ctx.user.role === "super_admin"
+      ctx.user.role === "super_admin" && !args.projectId
         ? await ctx.db.query("employees").collect()
         : (
             await Promise.all(
@@ -418,8 +425,10 @@ export const getPdksChartData = authedQuery({
       endDate: args.endDate,
       chartSettings,
       employeeDepartmentByKey: empToDept,
-      resolveShift: (employeeId, dateISO) =>
-        chartShiftResolver.resolve(employeeId, dateISO),
+      resolveShift: (employeeId, dateISO) => {
+        const shift = chartShiftResolver.resolve(employeeId, dateISO);
+        return args.projectId && shift?.projectId !== args.projectId ? null : shift;
+      },
     });
   },
 });
@@ -431,31 +440,29 @@ export const getPdksChartData = authedQuery({
  */
 export const getMonthlyPayrollSheet = authedQuery({
   args: {
+    projectId: v.optional(v.id("projects")),
     year: v.number(),
     month: v.number(), // 1-12
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
 
+    if (!Number.isInteger(args.year) || args.year < 1000 || args.year > 9999 || !Number.isInteger(args.month) || args.month < 1 || args.month > 12) {
+      throw new Error("Geçerli bir yıl ve ay seçin");
+    }
     const monthStr = String(args.month).padStart(2, "0");
-    const lastDay = new Date(args.year, args.month, 0).getUTCDate();
+    const lastDay = new Date(Date.UTC(args.year, args.month, 0)).getUTCDate();
     const startDate = `${args.year}-${monthStr}-01`;
     const endDate = `${args.year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
     const { startISO, endISO } = trDayRangeISO(startDate, endDate);
 
     let readings;
     let employees: Doc<"employees">[];
-    if (ctx.user.role === "super_admin") {
+    if (ctx.user.role === "super_admin" && !args.projectId) {
       [readings, employees] = await Promise.all([
         ctx.db
           .query("cardReadings")
-          .withIndex("by_access_time")
-          .filter((q) =>
-            q.and(
-              q.gte(q.field("accessTime"), startISO),
-              q.lte(q.field("accessTime"), endISO)
-            )
-          )
+          .withIndex("by_access_time", q => q.gte("accessTime", startISO).lte("accessTime", endISO))
           .collect(),
         ctx.db
           .query("employees")
@@ -468,13 +475,7 @@ export const getMonthlyPayrollSheet = authedQuery({
           allowedProjectIds.map((pid) =>
             ctx.db
               .query("cardReadings")
-              .withIndex("by_project", (q) => q.eq("projectId", pid))
-              .filter((q) =>
-                q.and(
-                  q.gte(q.field("accessTime"), startISO),
-                  q.lte(q.field("accessTime"), endISO)
-                )
-              )
+              .withIndex("by_project_access_time", q => q.eq("projectId", pid).gte("accessTime", startISO).lte("accessTime", endISO))
               .collect()
           )
         ),
@@ -494,10 +495,12 @@ export const getMonthlyPayrollSheet = authedQuery({
       return { days: [], rows: [], year: args.year, month: args.month };
     }
 
-    const referenceProjectId =
-      ctx.user.role === "super_admin"
+    readings = filterPdksReadings(readings, args.projectId);
+
+    const referenceProjectId = args.projectId ?? (
+      ctx.user.role === "super_admin" && !args.projectId
         ? undefined
-        : allowedProjectIds[0] ?? undefined;
+        : allowedProjectIds[0] ?? undefined);
     const [workSettings, holidayMap, generalSettings, overtimeRates, payrollShiftResolver] =
       await Promise.all([
         getEffectiveWorkSettings(ctx, referenceProjectId),
@@ -537,7 +540,7 @@ export const getMonthlyPayrollSheet = authedQuery({
     const recs = allRecs.filter((r) => empIdSet.has(String(r.employeeId)));
     {
       for (const r of recs) {
-        if (r.manualEntry) manualByEmpDate.set(`${String(r.employeeId)}__${r.date}`, r);
+        if (r.manualEntry && (!args.projectId || r.projectId === args.projectId)) manualByEmpDate.set(`${String(r.employeeId)}__${r.date}`, r);
       }
     }
 
@@ -584,12 +587,13 @@ export const getMonthlyPayrollSheet = authedQuery({
             hasLeave: approvedLeaves.some(
               (l) =>
                 l.employeeId === emp._id &&
+                (!args.projectId || !l.projectId || l.projectId === args.projectId) &&
                 d >= l.startDate &&
                 d <= l.endDate
             ),
             holiday: holidayMap.get(d),
             workingDays,
-            dayShift: payrollShiftResolver.resolve(emp._id, d),
+            dayShift: scopedPdksShift(payrollShiftResolver.resolve(emp._id, d), args.projectId),
             workSettings,
             overtimeRates,
             empHourlyRate,
@@ -1275,15 +1279,16 @@ export const selfCheckIn = employeeAuthedMutation({
  */
 export const getEmployeeAttendanceDetail = authedQuery({
   args: {
+    projectId: v.optional(v.id("projects")),
     employeeId: v.id("employees"),
     startDate: v.string(),
     endDate: v.string(),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
 
     const employee = await ctx.db.get(args.employeeId);
-    if (!employee) return null;
+    if (!employee || (args.projectId && employee.projectId !== args.projectId)) return null;
 
     if (
       ctx.user.role !== "super_admin" &&
@@ -1295,7 +1300,11 @@ export const getEmployeeAttendanceDetail = authedQuery({
 
     const { startISO, endISO } = trDayRangeISO(args.startDate, args.endDate);
 
-    const readings = await ctx.db
+    let readings = args.projectId
+      ? (await ctx.db.query("cardReadings")
+          .withIndex("by_project_access_time", q => q.eq("projectId", args.projectId).gte("accessTime", startISO).lte("accessTime", endISO))
+          .collect()).filter(reading => reading.employeeId === args.employeeId)
+      : await ctx.db
       .query("cardReadings")
       .withIndex("by_employee_device_time", (q) =>
         q.eq("employeeId", args.employeeId)
@@ -1308,13 +1317,15 @@ export const getEmployeeAttendanceDetail = authedQuery({
       )
       .collect();
 
+    readings = filterPdksReadings(readings, args.projectId);
+
     readings.sort(
       (a, b) =>
         new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
     );
 
-    const referenceProjectId =
-      ctx.user.role === "super_admin" ? undefined : employee.projectId;
+    const referenceProjectId = args.projectId ?? (
+      ctx.user.role === "super_admin" && !args.projectId ? undefined : employee.projectId);
     const [workSettings, holidayMap, generalSettings, manualRecords, leaves, department, company, position, shift, detailShiftResolver] =
       await Promise.all([
         getEffectiveWorkSettings(ctx, referenceProjectId),
@@ -1352,7 +1363,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
 
     const manualByDate = new Map<string, Doc<"pdksRecords">>();
     for (const m of manualRecords) {
-      if (m.manualEntry) manualByDate.set(m.date, m);
+      if (m.manualEntry && (!args.projectId || m.projectId === args.projectId)) manualByDate.set(m.date, m);
     }
 
     const periodDateKeys = buildPeriodDateKeys(args.startDate, args.endDate);
@@ -1369,9 +1380,9 @@ export const getEmployeeAttendanceDetail = authedQuery({
         date: dk,
         dayReadings: readingsByDate.get(dk) ?? [],
         manualDay: manualByDate.get(dk),
-        leaves,
+        leaves: leaves.filter(l => !args.projectId || !l.projectId || l.projectId === args.projectId),
         holiday: holidayMap.get(dk),
-        dayShift: detailShiftResolver.resolve(employee._id, dk),
+        dayShift: scopedPdksShift(detailShiftResolver.resolve(employee._id, dk), args.projectId),
         workSettings,
         workingDays,
       })

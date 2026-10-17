@@ -1,5 +1,6 @@
 "use node";
 
+import { filterPdksReadings } from "../lib/pdksSource";
 import { v } from "convex/values";
 import type { CardReadingListPage as ReadingPage } from "../cardReadings";
 import { api } from "../_generated/api";
@@ -30,7 +31,7 @@ export const getCardReadings = authedAction({
         endDate: args.endDate ?? args.startDate ?? args.date,
         paginationOpts: { cursor, numItems: Math.min(100, 500 - loaded.length) },
       });
-      loaded.push(...result.page);
+      loaded.push(...filterPdksReadings(result.page, args.projectId));
       cursor = result.continueCursor;
       isDone = result.isDone;
     }
@@ -62,7 +63,8 @@ export const getDatabaseContext = authedAction({
       projectId: args.projectId,
       paginationOpts: { numItems: 20, cursor: null },
     });
-    const sample = result.page.slice(0, 5).map(r => ({ employee: r.employeeName, time: r.accessTime, status: r.accessStatus }));
-    return `Convex veritabanı, seçili proje: son ${result.page.length} kayıt (toplam bilinmiyor)${result.isDone ? "" : ", devamı var"}. Son kayıt örnekleri: ${JSON.stringify(sample)}. Sorgular için department ve date filtreleri kullanılabilir. Zamanları TR saatiyle (Europe/Istanbul) göster.`;
+    const readings = filterPdksReadings(result.page, args.projectId);
+    const sample = readings.slice(0, 5).map(r => ({ employee: r.employeeName, time: r.accessTime, status: r.accessStatus }));
+    return `Convex veritabanı, seçili proje: son ${readings.length} kayıt (toplam bilinmiyor)${result.isDone ? "" : ", devamı var"}. Son kayıt örnekleri: ${JSON.stringify(sample)}. Sorgular için department ve date filtreleri kullanılabilir. Zamanları TR saatiyle (Europe/Istanbul) göster.`;
   },
 });

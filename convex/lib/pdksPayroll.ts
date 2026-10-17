@@ -1,3 +1,5 @@
+// Reading inputs must already be source-filtered at the handler/loader boundary.
+import { classifyPdksDay } from "./pdksTable";
 /**
  * `cardReadings.getMonthlyPayrollSheet`'in per-gün bordro hücresi çekirdeği. ctx YOK,
  * async YOK — DB okuması + shift çözümü + haftalık mesai toplama (bucketWeeklyOvertime)
@@ -63,8 +65,7 @@ export function computePayrollCell(params: {
 
   const cls = classifyDay(d, workingDays, holiday);
   const hasAttendance =
-    (manual?.entryTime != null && manual?.exitTime != null) ||
-    dayReadings.length >= 2;
+    !!manual?.entryTime || !!manual?.exitTime || dayReadings.length > 0;
   const code = payrollCodeForDay({
     classification: cls,
     hasLeave,
@@ -119,9 +120,11 @@ export function computePayrollCell(params: {
     hourlyRate: empHourlyRate,
   });
 
+  const status = classifyPdksDay({ date: d, classification: cls, hasAttendance, hasLeave, isLate });
   return {
     date: d,
-    payrollCode: code,
+    status,
+    payrollCode: status === "future" || status === "noData" ? "—" : code,
     totalMinutes: totalMin,
     overtimeMinutes: overtimeMin,
     multiplier,

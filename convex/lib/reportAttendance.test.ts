@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Doc, Id } from "../_generated/dataModel";
-import { attendanceCalendarIssues, hasUnsupportedShiftCalendar, summarizeAttendance } from "./reportAttendance";
+import type { QueryCtx } from "../_generated/server";
+import * as pdksSource from "./pdksSource";
+import { loadAttendanceReport, attendanceCalendarIssues, hasUnsupportedShiftCalendar, summarizeAttendance } from "./reportAttendance";
 import { buildPeriodDateKeys } from "./pdksCalc";
 import { buildPdksEmployeeReadingMap, computePdksTableRow } from "./pdksTable";
 import { DEFAULT_OVERTIME_RATES, DEFAULT_WORK_SETTINGS } from "./pdksHelpers";
@@ -59,4 +61,27 @@ describe("rapor devam adaptörü / PDKS tablo tutarlılığı", () => {
     expect(hasUnsupportedShiftCalendar([{ ...assignment, weekPattern: ["SAT"] }], dates, workingDays, new Map())).toBe(true);
     expect(hasUnsupportedShiftCalendar([{ ...assignment, weekPattern: ["SAT"] }], ["2026-02-02"], workingDays, new Map())).toBe(false);
   });
+});
+
+
+afterEach(() => vi.restoreAllMocks());
+it("biyometrik okuma zamanlanmış rapor yükleyicisinde bir kez süzülür", async () => {
+  const projectId = "project" as Id<"projects">;
+  const emp = { ...employee("bio"), projectId };
+  const raw: Doc<"cardReadings">[] = [{ _id: "r" as Id<"cardReadings">, _creationTime: 0, employeeId: emp._id, projectId, cardNo: emp.cardNumber, accessStatus: "izin_verildi", accessTime: "2026-01-02T06:00:00Z", hikCurrentVerifyMode: "face" }];
+  const ctx = (readings: Doc<"cardReadings">[]) => ({ db: {
+    query: (table: string) => {
+      const rows = table === "employees" ? [emp] : table === "cardReadings" ? readings : [];
+      const chain = { withIndex: () => chain, collect: async () => rows, first: async () => null };
+      return chain;
+    },
+  } }) as unknown as QueryCtx;
+  const empty = await loadAttendanceReport(ctx([]), [projectId], 2026, 1);
+  const spy = vi.spyOn(pdksSource, "filterPdksReadings");
+  const result = await loadAttendanceReport(ctx(raw), [projectId], 2026, 1);
+  expect(result).toEqual(empty);
+  expect(result.rows[0]?.presentDays).toBe(0);
+  expect(spy).toHaveBeenCalledTimes(1);
+  const card = await loadAttendanceReport(ctx([{ ...raw[0], hikCurrentVerifyMode: "card" }]), [projectId], 2026, 1);
+  expect(card.rows[0]?.presentDays).toBe(1);
 });

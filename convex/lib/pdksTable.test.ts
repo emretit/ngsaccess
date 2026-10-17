@@ -256,6 +256,7 @@ describe("pdksTable – computePdksTableRow", () => {
         status: "present",
         isLate: false,
         lateMinutes: 0,
+        leaveType: null,
         payrollCode: "N",
         overtimeMinutes: 105,
       },
@@ -267,6 +268,7 @@ describe("pdksTable – computePdksTableRow", () => {
         status: "leave",
         isLate: false,
         lateMinutes: 0,
+        leaveType: "sick",
         payrollCode: "İZN",
         overtimeMinutes: 0,
       },
@@ -278,6 +280,7 @@ describe("pdksTable – computePdksTableRow", () => {
         status: "holiday",
         isLate: false,
         lateMinutes: 0,
+        leaveType: null,
         payrollCode: "RT",
         overtimeMinutes: 0,
       },
@@ -300,5 +303,35 @@ describe("pdksTable – filterPdksTableRows", () => {
     ];
 
     expect(filterPdksTableRows(rows, "overtime")).toHaveLength(1);
+  });
+});
+
+
+describe("C2 günlük sözleşme", () => {
+  it.each([
+    ["2026-06-23", "2026-06-22", new Map(), "future"],
+    [SATURDAY, "2026-07-01", new Map(), "weekend"],
+    [MONDAY, "2026-07-01", new Map([[MONDAY, holiday(MONDAY)]]), "holiday"],
+    [MONDAY, "2026-07-01", new Map(), "absent"],
+  ])("%s günlük ve matrix aynı sınıfı döner: %s", (date, today, holidayMap, status) => {
+    const input = rowParams({ startDate: date, periodDateKeys: [date], today, holidayMap });
+    const single = computePdksTableRow(input);
+    const matrix = computePdksTableRow({ ...input, viewMode: "matrix" });
+    expect(single.status).toBe(status);
+    expect(matrix.days[0]?.status).toBe(status);
+    if (status === "future") expect(matrix.days[0]?.payrollCode).toBe("—");
+  });
+  it("yüklenmeyen geçmiş hücre noData; yüklenmiş boş iş günü absent", () => {
+    const row = computePdksTableRow(rowParams({ availableDateKeys: new Set(), viewMode: "matrix" }));
+    expect(row.status).toBe("noData");
+    expect(row.days[0]).toMatchObject({ status: "noData", payrollCode: "—" });
+    expect(computePdksTableRow(rowParams()).status).toBe("absent");
+  });
+
+  it("kart numarası boşsa iç anahtar gösterilmez; bilinmeyen yön Giriş değildir", () => {
+    const row = computePdksTableRow(rowParams({ employee: employee({ cardNumber: "" }), empReadings: [reading(`${MONDAY}T06:00:00Z`)] }));
+    expect(row.employeeId).toBe("");
+    expect(row.cardNumber).toBe("");
+    expect(row.detailedLogs[0]).toMatchObject({ direction: "unknown", action: "Yön belirtilmemiş" });
   });
 });

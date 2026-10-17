@@ -15,7 +15,7 @@ type TableParams = Parameters<typeof computePdksTableRow>[0];
 /** Yalnız PDKS hücrelerini birleştirir; yeni gün sınıflandırma kuralı içermez. */
 export function summarizeAttendance(params: TableParams, today: string, issues: string[] = []) {
   const periodDateKeys = params.periodDateKeys.filter((date) => date < today);
-  const row = computePdksTableRow({ ...params, periodDateKeys, isSingleDay: false, viewMode: "matrix" });
+  const row = computePdksTableRow({ ...params, today, periodDateKeys, isSingleDay: false, viewMode: "matrix" });
   const workDays = row.days.filter((day) => ["N", "DV", "İZN"].includes(day.payrollCode));
   const presentDays = workDays.filter((day) => day.payrollCode === "N").length;
   const leaveDays = workDays.filter((day) => day.payrollCode === "İZN").length;

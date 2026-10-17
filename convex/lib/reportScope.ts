@@ -1,6 +1,7 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { resolveProjectScope, selectProjectScope } from "./projectScope";
+import { filterPdksReadings } from "./pdksSource";
 import { isManager } from "./auth";
 
 export function reportPeriod(year: number, month?: number) {
@@ -26,9 +27,10 @@ export async function resolveReportScope(ctx: QueryCtx, projectId?: Id<"projects
 }
 
 export async function readReportReadings(ctx: QueryCtx, projectIds: Id<"projects">[], startISO: string, endISO: string) {
-  return (await Promise.all(projectIds.map((projectId) => ctx.db.query("cardReadings")
+  const readings = (await Promise.all(projectIds.map((projectId) => ctx.db.query("cardReadings")
     .withIndex("by_project_access_time", (q) => q.eq("projectId", projectId).gte("accessTime", startISO).lte("accessTime", endISO))
     .collect()))).flat();
+  return filterPdksReadings(readings);
 }
 
 export function selectScheduleProjectIds(user: Doc<"users"> | null, allowed: Id<"projects">[], projectId?: Id<"projects">) {

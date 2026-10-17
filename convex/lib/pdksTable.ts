@@ -1,4 +1,5 @@
-import { trDateKey } from "./trDate";
+// Reading inputs must already be source-filtered at the handler/loader boundary.
+import { trTodayKey, trDateKey } from "./trDate";
 import type { Doc, Id } from "../_generated/dataModel";
 import {
   classifyDay,
@@ -24,21 +25,30 @@ import {
   resolveDayStatus,
 } from "./pdksCalc";
 
-type TableStatus = "present" | "late" | "absent" | "leave";
-type MatrixStatus =
-  | "present"
-  | "late"
-  | "absent"
-  | "leave"
-  | "weekend"
-  | "holiday";
+export type PdksDayStatus = "present" | "late" | "absent" | "leave" | "weekend" | "holiday" | "future" | "noData";
+
+/** Missing data is explicit: an empty, successfully loaded workday is absent. */
+export function classifyPdksDay(params: {
+  date: string;
+  today?: string;
+  dataAvailable?: boolean;
+  classification: "workday" | "weekend" | "holiday" | "halfDayHoliday";
+  hasAttendance: boolean;
+  hasLeave: boolean;
+  isLate: boolean;
+}): PdksDayStatus {
+  if (params.date > (params.today ?? trTodayKey())) return "future";
+  if (params.dataAvailable === false) return "noData";
+  return resolveDayStatus({ ...params, mode: "calendar", classification: params.classification === "halfDayHoliday" ? "holiday" : params.classification });
+}
 
 export type PdksTableDayCell = {
   date: string;
   firstEntry: string | null;
   lastExit: string | null;
   totalMinutes: number;
-  status: MatrixStatus;
+  status: PdksDayStatus;
+  leaveType: string | null;
   isLate: boolean;
   lateMinutes: number;
   payrollCode: string;
@@ -49,12 +59,15 @@ export type PdksTableRow = {
   id: string;
   name: string;
   employeeId: string;
+  cardNumber: string;
   payrollCode: string;
   payrollEmployeeCode: string;
   department: string;
   firstEntry: string;
   lastExit: string;
   totalHours: string;
+  totalMinutes: number;
+  overtimeMinutes: number;
   overtime: string;
   overtimeHours: number;
   overtimeMultiplier: number;
@@ -62,7 +75,7 @@ export type PdksTableRow = {
   hourlyRate: number | null;
   yearlyOvertimeLimit: number;
   leaveType: string;
-  status: TableStatus;
+  status: PdksDayStatus;
   isLate: boolean;
   isEarlyExit: boolean;
   isManual: boolean;
@@ -71,6 +84,7 @@ export type PdksTableRow = {
   detailedLogs: Array<{
     time: string;
     action: string;
+    direction: "entry" | "exit" | "unknown";
     location: string;
   }>;
   days: PdksTableDayCell[];
@@ -82,7 +96,11 @@ export type PdksTableStatusFilter =
   | "late"
   | "absent"
   | "leave"
-  | "overtime";
+  | "overtime"
+  | "weekend"
+  | "holiday"
+  | "future"
+  | "noData";
 
 const LEAVE_TYPE_LABELS: Record<string, string> = {
   annual: "Yıllık",
@@ -129,6 +147,9 @@ export function buildPdksEmployeeReadingMap(params: {
 }
 
 export function computePdksTableRow(params: {
+  today?: string;
+  /** Omit when all requested dates were successfully loaded. */
+  availableDateKeys?: ReadonlySet<string>;
   empKey: string;
   empReadings: Doc<"cardReadings">[];
   employee: Doc<"employees"> | null;
@@ -207,10 +228,12 @@ export function computePdksTableRow(params: {
     refSettings,
   );
 
-  const status = resolveDayStatus({
-    mode: "summary",
-    classification: "workday",
-    hasAttendance: !!firstEntryISO,
+  const status = classifyPdksDay({
+    date: startDate,
+    today: params.today,
+    dataAvailable: employee !== null && (params.availableDateKeys?.has(startDate) ?? true),
+    classification: isSingleDay ? classifyDay(startDate, workingDays, holidayMap.get(startDate)) : "workday",
+    hasAttendance: !!firstEntryISO || !!manualToday?.exitTime,
     hasLeave,
     isLate,
   });
@@ -313,7 +336,7 @@ export function computePdksTableRow(params: {
     hourlyRate,
   });
 
-  const payrollCode = isSingleDay
+  const payrollCode = status === "future" || status === "noData" ? "—" : isSingleDay
     ? payrollCodeForDay({
         classification: classifyDay(
           startDate,
@@ -321,7 +344,7 @@ export function computePdksTableRow(params: {
           holidayMap.get(startDate),
         ),
         hasLeave,
-        hasAttendance: !!firstEntryISO,
+        hasAttendance: !!firstEntryISO || !!manualToday?.exitTime,
       })
     : "—";
 
@@ -364,7 +387,7 @@ export function computePdksTableRow(params: {
       const dayCode = payrollCodeForDay({
         classification: cls,
         hasLeave: dayHasLeave,
-        hasAttendance: !!firstISO,
+        hasAttendance: !!firstISO || !!manualDay?.exitTime,
       });
       const dayShift = employee ? resolveShift(employee._id, dk) : null;
       const daySettings = settingsForShift(dayShift, workSettings);
@@ -375,10 +398,12 @@ export function computePdksTableRow(params: {
       );
       const lateMinutes = computeLateMinutes(firstISO, dayLate, daySettings);
 
-      const dayStatus = resolveDayStatus({
-        mode: "calendar",
+      const dayStatus = classifyPdksDay({
+        date: dk,
+        today: params.today,
+        dataAvailable: employee !== null && (params.availableDateKeys?.has(dk) ?? true),
         classification: cls,
-        hasAttendance: !!firstISO,
+        hasAttendance: !!firstISO || !!manualDay?.exitTime,
         hasLeave: dayHasLeave,
         isLate: dayLate,
       });
@@ -398,9 +423,10 @@ export function computePdksTableRow(params: {
         lastExit: lastISO ? formatIstanbulTime(lastISO) : null,
         totalMinutes: dayMinutes,
         status: dayStatus,
+        leaveType: allLeaves.find(l => l.employeeId === empId && dk >= l.startDate && dk <= l.endDate)?.leaveType ?? null,
         isLate: dayLate,
         lateMinutes,
-        payrollCode: dayCode,
+        payrollCode: dayStatus === "future" || dayStatus === "noData" ? "—" : dayCode,
         overtimeMinutes: dayOvertime,
       });
     }
@@ -411,7 +437,8 @@ export function computePdksTableRow(params: {
     name: employee
       ? `${employee.firstName} ${employee.lastName}`.trim()
       : "Bilinmiyor",
-    employeeId: employee?.cardNumber ?? empKey,
+    employeeId: employee?.cardNumber ?? "",
+    cardNumber: employee?.cardNumber ?? "",
     payrollCode,
     payrollEmployeeCode: employee?.payrollCode ?? "",
     department: params.departmentName,
@@ -421,6 +448,8 @@ export function computePdksTableRow(params: {
         ? formatIstanbulTime(lastExitISO)
         : "-",
     totalHours: formatHoursLabel(totalMinutes),
+    totalMinutes,
+    overtimeMinutes,
     overtime: overtimeMinutes > 0 ? `${overtimeMinutes}m` : "0m",
     overtimeHours: overtimeMinutes / 60,
     overtimeMultiplier: overtimePayMultiplier,
@@ -436,7 +465,8 @@ export function computePdksTableRow(params: {
     manualEditedBy: params.manualEditedBy,
     detailedLogs: empReadings.map((r) => ({
       time: formatIstanbulTime(r.accessTime),
-      action: r.accessStatus === "izin_verildi" ? "Giriş" : "Reddedildi",
+      action: r.accessStatus !== "izin_verildi" ? "Reddedildi" : r.direction === "entry" ? "Giriş" : r.direction === "exit" ? "Çıkış" : "Yön belirtilmemiş",
+      direction: r.direction ?? "unknown",
       location: "Bilinmiyor",
     })),
     days,

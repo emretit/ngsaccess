@@ -1,3 +1,4 @@
+import { filterPdksReadings } from "./lib/pdksSource";
 import { summarizeDailyReadings } from "./lib/dashboardActivity";
 import { countDashboardRows } from "./lib/dashboardCounts";
 import { trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
@@ -211,7 +212,7 @@ async function loadPdksDataset(
     ? await getEffectiveWorkSettings(ctx, settingsProjectId)
     : DEFAULT_WORK_SETTINGS;
 
-  return { employees, readings, leaves, deptNameById, shiftResolver, workSettings };
+  return { employees, readings: filterPdksReadings(readings, filters.projectId), leaves, deptNameById, shiftResolver, workSettings };
 }
 
 function computePdksCoreInMemory(
@@ -404,13 +405,14 @@ export const getAnnualOvertimeBalance = authedQuery({
   args: {
     year: v.optional(v.number()),
     employeeId: v.optional(v.id("employees")),
+    projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
     const targetYear = args.year ?? Number(trTodayKey().slice(0, 4));
     const { startISO, endISO } = trDayRangeISO(`${targetYear}-01-01`, `${targetYear}-12-31`);
 
     const { employees, readings, shiftResolver } =
-      await loadPdksDataset(ctx, startISO, endISO, {});
+      await loadPdksDataset(ctx, startISO, endISO, { projectId: args.projectId });
 
     const targetEmployees = args.employeeId
       ? employees.filter((e) => e._id === args.employeeId)
@@ -474,6 +476,7 @@ export const getRepeatLateOffenders = authedQuery({
   args: {
     daysBack: v.optional(v.number()),
     minCount: v.optional(v.number()),
+    projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
     const daysBack = args.daysBack ?? 30;
@@ -484,7 +487,7 @@ export const getRepeatLateOffenders = authedQuery({
     const { startISO, endISO } = trDayRangeISO(trDateKey(start.toISOString()), trDateKey(end.toISOString()));
 
     const { employees, readings, shiftResolver, workSettings } =
-      await loadPdksDataset(ctx, startISO, endISO, {});
+      await loadPdksDataset(ctx, startISO, endISO, { projectId: args.projectId });
 
     const empById = new Map(employees.map((e) => [String(e._id), e]));
     const firstEntryByEmpDay = new Map<string, string>();
@@ -528,13 +531,13 @@ export const getRepeatLateOffenders = authedQuery({
  * 450+ dakika olup molaya çıkmamış (cardReadings'te break aralığında giriş/çıkış yok).
  */
 export const getBreakViolations = authedQuery({
-  args: { date: v.optional(v.string()) },
+  args: { date: v.optional(v.string()), projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
     const today = args.date ?? trTodayKey();
     const { startISO, endISO } = trDayRangeISO(today, today);
 
     const { employees, readings, shiftResolver } =
-      await loadPdksDataset(ctx, startISO, endISO, {});
+      await loadPdksDataset(ctx, startISO, endISO, { projectId: args.projectId });
 
     const empById = new Map(employees.map((e) => [String(e._id), e]));
     const empReadings = new Map<string, Doc<"cardReadings">[]>();

@@ -200,3 +200,11 @@ describe("pdksDetail – summarizeAttendanceDays", () => {
     });
   });
 });
+
+
+
+it("gelecek detay günü devamsızlık üretmez ve belirsiz yön açık döner", () => {
+  expect(computeAttendanceDetailDay(day({ date: "2099-01-01" }))).toMatchObject({ status: "future", payrollCode: "—" });
+  const result = computeAttendanceDetailDay(day({ dayReadings: [{ ...reading(`${MONDAY}T06:00:00Z`), direction: undefined }] }));
+  expect(result.rawReadings[0]?.direction).toBe("unknown");
+});

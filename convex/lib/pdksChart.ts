@@ -1,3 +1,4 @@
+// Reading inputs must already be source-filtered at the handler/loader boundary.
 import { trDateKey } from "./trDate";
 import type { Doc, Id } from "../_generated/dataModel";
 import {

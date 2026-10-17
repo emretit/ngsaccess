@@ -1,6 +1,7 @@
 "use node";
 
 import { v } from "convex/values";
+import { validateManualPdksNote } from "../lib/pdksManual";
 import { action } from "../_generated/server";
 import { api } from "../_generated/api";
 
@@ -137,8 +138,9 @@ export const previewPdksCsv = action({
 });
 
 export const importPdksCsv = action({
-  args: { csvText: v.string() },
+  args: { csvText: v.string(), note: v.string() },
   handler: async (ctx, args): Promise<{ inserted: number; updated: number; errors: number }> => {
+    const note = validateManualPdksNote(args.note);
     const preview: {
       rows: MatchedRow[];
       summary: { total: number; matched: number; errors: number };
@@ -151,6 +153,7 @@ export const importPdksCsv = action({
     }
     const result: { inserted: number; updated: number; errors: { index: number; message: string }[] } =
       await ctx.runMutation(api.pdksRecords.bulkUpsertManual, {
+        note,
         rows: validRows.map((r) => ({
           employeeId: r.employeeId as never,
           date: r.date,

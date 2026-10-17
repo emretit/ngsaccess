@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { authedQuery } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
+import { resolveProjectScope } from "./lib/projectScope";
+import { filterPdksReadings } from "./lib/pdksSource";
 import { buildAphbXml, type AphbEmployeeEntry } from "./lib/sgkCodes";
 import { calculateSgkEksikGun } from "./lib/sgkEksikGun";
 import { trDateKey, trDayRangeISO } from "./lib/trDate";
@@ -17,7 +18,7 @@ export const buildAphbForMonth = authedQuery({
         !Number.isInteger(args.month) || args.month < 1 || args.month > 12) {
       throw new Error("Geçerli bir yıl ve ay seçin");
     }
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
     const targetProjectId = args.projectId ??
       (ctx.user.role === "super_admin" ? undefined : allowedProjectIds[0]);
     if (!targetProjectId) throw new Error("Proje seçin");
@@ -62,7 +63,7 @@ export const buildAphbForMonth = authedQuery({
     const empIds = new Set(projectEmployees.map((employee) => employee._id));
     const employeesWithReadings = new Set<Id<"employees">>();
     const readingsByEmpDay = new Map<Id<"employees">, Set<string>>();
-    for (const reading of readings) {
+    for (const reading of filterPdksReadings(readings, targetProjectId)) {
       if (!reading.employeeId || !empIds.has(reading.employeeId)) continue;
       employeesWithReadings.add(reading.employeeId);
       if (reading.accessStatus !== "izin_verildi") continue;

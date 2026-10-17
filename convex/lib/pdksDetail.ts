@@ -1,3 +1,5 @@
+// Reading inputs must already be source-filtered at the handler/loader boundary.
+import { classifyPdksDay } from "./pdksTable";
 /**
  * `cardReadings.getEmployeeAttendanceDetail`'in günlük hesap + özet çekirdeği. ctx YOK,
  * async YOK — tüm DB okuması ve shift çözümü çağıran handler'da kalır; bu modül yalnız
@@ -19,7 +21,6 @@ import { settingsForShift } from "./shiftResolver";
 import {
   manualOverrideMinutes,
   minutesBetweenISO,
-  resolveDayStatus,
   formatIstanbulTime,
   formatHoursLabel,
 } from "./pdksCalc";
@@ -75,7 +76,7 @@ export function computeAttendanceDetailDay(params: {
   const code = payrollCodeForDay({
     classification: cls,
     hasLeave,
-    hasAttendance: !!firstISO,
+    hasAttendance: !!firstISO || !!manualDay?.exitTime,
   });
   const daySettingsForLate = settingsForShift(dayShift, workSettings);
   const { isLate, isEarlyExit } = evaluateLateEarly(
@@ -84,10 +85,10 @@ export function computeAttendanceDetailDay(params: {
     daySettingsForLate,
   );
 
-  const status = resolveDayStatus({
-    mode: "calendar",
+  const status = classifyPdksDay({
+    date: dk,
     classification: cls,
-    hasAttendance: !!firstISO,
+    hasAttendance: !!firstISO || !!manualDay?.exitTime,
     hasLeave,
     isLate,
   });
@@ -105,7 +106,7 @@ export function computeAttendanceDetailDay(params: {
     status,
     isLate,
     isEarlyExit,
-    payrollCode: code,
+    payrollCode: status === "future" || status === "noData" ? "—" : code,
     overtimeMinutes,
     isManual: !!manualDay,
     manualNote: manualDay?.manualNote ?? null,
@@ -114,7 +115,7 @@ export function computeAttendanceDetailDay(params: {
       id: String(r._id),
       time: formatIstanbulTime(r.accessTime, true),
       accessStatus: r.accessStatus,
-      direction: r.direction,
+      direction: r.direction ?? ("unknown" as const),
       deviceId: r.deviceId ? String(r.deviceId) : null,
     })),
   };
