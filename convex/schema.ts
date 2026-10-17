@@ -361,7 +361,9 @@ export default defineSchema({
     .index("by_ehome_id", ["ehomeID"])
     .index("by_api_token", ["apiToken"])
     .index("by_ide_uuid", ["ideUuid"])
-    .index("by_admin_device", ["adminDeviceId"]),
+    .index("by_admin_device", ["adminDeviceId"])
+    .index("by_project_active", ["projectId", "isActive"])
+    .index("by_active", ["isActive"]),
 
   /**
    * Bir LAN bridge kurulumunun kimliği. Tek-yer modelinde bridge EXE'ye yalnızca
@@ -405,6 +407,7 @@ export default defineSchema({
   })
     .index("by_project", ["projectId"])
     .index("by_project_active", ["projectId", "isActive"])
+    .index("by_active", ["isActive"])
     .searchIndex("search_name", { searchField: "name", filterFields: ["projectId", "isActive"] }),
 
   groupMembers: defineTable({

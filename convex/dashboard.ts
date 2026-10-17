@@ -1,4 +1,5 @@
 import { summarizeDailyReadings } from "./lib/dashboardActivity";
+import { countDashboardRows } from "./lib/dashboardCounts";
 import { trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
 import type { QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
@@ -37,81 +38,71 @@ export const getStats = authedQuery({
     const today = trTodayKey();
     const { startISO: todayISO, endISO: todayEndISO } = trDayRangeISO(today, today);
 
-    let employees: unknown[] = [];
-    let devices: unknown[] = [];
-    let todayReadings: unknown[] = [];
-    let pendingRules: unknown[] = [];
+    let employees = 0;
+    let devices = 0;
+    let todayReadings = 0;
+    let pendingRules = 0;
 
     if (ctx.user.role === "super_admin" && !args.projectId) {
       [employees, devices, todayReadings, pendingRules] = await Promise.all([
-        ctx.db.query("employees").collect(),
-        ctx.db.query("devices").filter((q) => q.eq(q.field("isActive"), true)).collect(),
-        ctx.db
-          .query("cardReadings")
-          .withIndex("by_access_time")
-          .filter((q) =>
-            q.and(
-              q.gte(q.field("accessTime"), todayISO),
-              q.lte(q.field("accessTime"), todayEndISO)
-            )
+        countDashboardRows(ctx.db.query("employees").withIndex("by_project")),
+        countDashboardRows(
+          ctx.db.query("devices").withIndex("by_active", (q) => q.eq("isActive", true))
+        ),
+        countDashboardRows(
+          ctx.db.query("cardReadings").withIndex("by_access_time", (q) =>
+            q.gte("accessTime", todayISO).lte("accessTime", todayEndISO)
           )
-          .collect(),
-        ctx.db.query("accessRules").filter((q) => q.eq(q.field("isActive"), false)).collect(),
+        ),
+        countDashboardRows(
+          ctx.db.query("accessRules").withIndex("by_active", (q) => q.eq("isActive", false))
+        ),
       ]);
     } else if (allowedProjectIds.length > 0) {
       const [empResults, devResults, readingResults, ruleResults] = await Promise.all([
         Promise.all(
           allowedProjectIds.map((pid) =>
-            ctx.db
+            countDashboardRows(ctx.db
               .query("employees")
-              .withIndex("by_project", (q) => q.eq("projectId", pid))
-              .collect()
+              .withIndex("by_project", (q) => q.eq("projectId", pid)))
           )
         ),
         Promise.all(
           allowedProjectIds.map((pid) =>
-            ctx.db
+            countDashboardRows(ctx.db
               .query("devices")
-              .withIndex("by_project", (q) => q.eq("projectId", pid))
-              .filter((q) => q.eq(q.field("isActive"), true))
-              .collect()
+              .withIndex("by_project_active", (q) =>
+                q.eq("projectId", pid).eq("isActive", true)))
           )
         ),
         Promise.all(
           allowedProjectIds.map((pid) =>
-            ctx.db
+            countDashboardRows(ctx.db
               .query("cardReadings")
-              .withIndex("by_project", (q) => q.eq("projectId", pid))
-              .filter((q) =>
-                q.and(
-                  q.gte(q.field("accessTime"), todayISO),
-                  q.lte(q.field("accessTime"), todayEndISO)
-                )
-              )
-              .collect()
+              .withIndex("by_project_access_time", (q) =>
+                q.eq("projectId", pid).gte("accessTime", todayISO).lte("accessTime", todayEndISO)))
           )
         ),
         Promise.all(
           allowedProjectIds.map((pid) =>
-            ctx.db
+            countDashboardRows(ctx.db
               .query("accessRules")
-              .withIndex("by_project", (q) => q.eq("projectId", pid))
-              .filter((q) => q.eq(q.field("isActive"), false))
-              .collect()
+              .withIndex("by_project_active", (q) =>
+                q.eq("projectId", pid).eq("isActive", false)))
           )
         ),
       ]);
-      employees = empResults.flat();
-      devices = devResults.flat();
-      todayReadings = readingResults.flat();
-      pendingRules = ruleResults.flat();
+      employees = empResults.reduce((sum, count) => sum + count, 0);
+      devices = devResults.reduce((sum, count) => sum + count, 0);
+      todayReadings = readingResults.reduce((sum, count) => sum + count, 0);
+      pendingRules = ruleResults.reduce((sum, count) => sum + count, 0);
     }
 
     return {
-      employees: employees.length,
-      devices: devices.length,
-      cardReadings: todayReadings.length,
-      pendingRequests: pendingRules.length,
+      employees,
+      devices,
+      cardReadings: todayReadings,
+      pendingRequests: pendingRules,
     };
   },
 });
@@ -669,12 +660,8 @@ export const getCurrentlyInside = authedQuery({
     if (ctx.user.role === "super_admin") {
       readings = await ctx.db
         .query("cardReadings")
-        .withIndex("by_access_time")
-        .filter((q) =>
-          q.and(
-            q.gte(q.field("accessTime"), startISO),
-            q.lte(q.field("accessTime"), endISO)
-          )
+        .withIndex("by_access_time", (q) =>
+          q.gte("accessTime", startISO).lte("accessTime", endISO)
         )
         .collect();
     } else if (allowedProjectIds.length > 0) {
@@ -682,12 +669,8 @@ export const getCurrentlyInside = authedQuery({
         allowedProjectIds.map((pid) =>
           ctx.db
             .query("cardReadings")
-            .withIndex("by_project", (q) => q.eq("projectId", pid))
-            .filter((q) =>
-              q.and(
-                q.gte(q.field("accessTime"), startISO),
-                q.lte(q.field("accessTime"), endISO)
-              )
+            .withIndex("by_project_access_time", (q) =>
+              q.eq("projectId", pid).gte("accessTime", startISO).lte("accessTime", endISO)
             )
             .collect()
         )
