@@ -1,3 +1,4 @@
+import { visitorTime } from "../../../convex/lib/visitorStatus";
 // Ziyaretçi zaman yardımcıları.
 // accessExpiresAt ISO UTC olarak saklanır; form <input type="datetime-local"> tarayıcı
 // yerel saatiyle çalışır; gösterim daima TR saatiyle (Europe/Istanbul / UTC+3) yapılır.
@@ -18,12 +19,12 @@ function toTrInput(utcMs: number): string {
 
 /** ISO UTC → datetime-local input değeri (TR saati). */
 export function isoToLocalInput(iso: string): string {
-  return toTrInput(new Date(iso).getTime());
+  return Number.isFinite(visitorTime(iso)) ? toTrInput(visitorTime(iso)) : "";
 }
 
 /** datetime-local input değeri (TR saati) → ISO UTC. */
 export function localInputToIso(local: string): string {
-  return new Date(`${local}:00+03:00`).toISOString();
+  return new Date(visitorTime(local)).toISOString();
 }
 
 /** Varsayılan geçerlilik bitişi: şimdiden +8 saat (TR saatiyle datetime-local). */

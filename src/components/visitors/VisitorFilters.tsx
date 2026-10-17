@@ -1,97 +1,30 @@
-import { UserPlus, Search, DoorOpen, MapPin } from "lucide-react";
+import { FilterBar } from "@/components/shared/FilterBar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { isVisitorStatus, visitorStatusInfo, type VisitorStatus } from "./lib/status";
 
-export type VisitorStatusFilter = "all" | "active" | "inside" | "ended";
-
-interface VisitorFiltersProps {
-  searchQuery: string;
-  onSearchChange: (value: string) => void;
-  statusFilter: VisitorStatusFilter;
-  onStatusFilterChange: (value: VisitorStatusFilter) => void;
-  onNewVisitor: () => void;
-  onNewZone: () => void;
-}
-
-const STATUS_OPTIONS: { value: VisitorStatusFilter; label: string }[] = [
-  { value: "all", label: "Tümü" },
-  { value: "active", label: "Aktif" },
-  { value: "inside", label: "Şu an binada" },
-  { value: "ended", label: "Pasif / Süresi doldu" },
-];
-
-export function VisitorFilters({
-  searchQuery,
-  onSearchChange,
-  statusFilter,
-  onStatusFilterChange,
-  onNewVisitor,
-  onNewZone,
-}: VisitorFiltersProps) {
-  return (
-    <div className="rounded-xl border bg-card shadow-xs p-4 md:p-6">
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2 mr-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-            <DoorOpen className="h-4 w-4 text-primary" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold leading-tight">Ziyaretçiler</h2>
-            <p className="text-xs text-muted-foreground">Geçici erişim ve ziyaretçi yönetimi</p>
-          </div>
-        </div>
-
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Ad, şirket veya kart no..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-8 h-8 text-sm"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 ml-auto">
-          <Select
-            value={statusFilter}
-            onValueChange={(value) => onStatusFilterChange(value as VisitorStatusFilter)}
-          >
-            <SelectTrigger className="w-[160px] h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button
-            onClick={onNewZone}
-            size="sm"
-            variant="outline"
-            className="h-8 gap-1.5 text-xs"
-          >
-            <MapPin className="h-3.5 w-3.5" />
-            Bölge Ekle
-          </Button>
-
-          <Button onClick={onNewVisitor} size="sm" className="h-8 gap-1.5 text-xs">
-            <UserPlus className="h-3.5 w-3.5" />
-            Yeni Ziyaretçi
-          </Button>
-        </div>
+export type VisitorStatusFilter = "all" | VisitorStatus;
+export function VisitorFilters({ searchQuery, onSearchChange, statusFilter, onStatusFilterChange, onClear, onNewZone, pageSize, onPageSizeChange }: {
+  searchQuery: string; onSearchChange: (value: string) => void;
+  statusFilter: VisitorStatusFilter; onStatusFilterChange: (value: VisitorStatusFilter) => void;
+  onClear: () => void; onNewZone?: () => void; pageSize: number; onPageSizeChange: (value: number) => void;
+}) {
+  return <div className="min-w-0 space-y-2">
+    <FilterBar search={searchQuery} onSearchChange={onSearchChange} searchLabel="Ziyaretçi ara" placeholder="Ad, şirket veya kart numarası" onClear={onClear} hasFilters={statusFilter !== "all"}>
+      <div className="w-full space-y-1 min-[761px]:w-48"><Label htmlFor="visitor-status">Erişim durumu</Label>
+        <Select value={statusFilter} onValueChange={value => onStatusFilterChange(isVisitorStatus(value) ? value : "all")}>
+          <SelectTrigger id="visitor-status"><SelectValue /></SelectTrigger><SelectContent>
+            <SelectItem value="all">Tümü</SelectItem>
+            {Object.entries(visitorStatusInfo).map(([value, info]) => <SelectItem key={value} value={value}>{info.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
-    </div>
-  );
+      <div className="space-y-1"><Label htmlFor="visitor-page-size">Sayfa boyutu</Label><Select value={String(pageSize)} onValueChange={value => onPageSizeChange(Number(value))}>
+        <SelectTrigger id="visitor-page-size" className="w-24"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="25">25</SelectItem><SelectItem value="50">50</SelectItem></SelectContent>
+      </Select></div>
+      {onNewZone && <Button variant="outline" onClick={onNewZone}>Erişim bölgesi oluştur</Button>}
+    </FilterBar>
+    <p className="text-xs text-muted-foreground">Arama ve durum filtresi sunucuda yalnız alınan sayfaya uygulanır. Diğer kayıtları taramak için sonraki sayfaya geçin.</p>
+  </div>;
 }

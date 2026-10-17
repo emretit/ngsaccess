@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { visitorExpiryValidation } from "../../../../convex/lib/visitorStatus";
 
 export const visitorFormSchema = z.object({
   firstName: z.string().trim().min(1, "Ad alanı zorunludur"),
@@ -6,9 +7,16 @@ export const visitorFormSchema = z.object({
   cardNumber: z.string().trim(),
   isActive: z.boolean().optional(),
   isEditing: z.boolean().optional(),
-  presetRuleId: z.string({ error: "Ziyaretçi bölgesi seçin" }).min(1, "Ziyaretçi bölgesi seçin"),
-  accessExpiresAt: z.string().min(1, "Geçerlilik bitiş zamanı zorunludur").refine((value) => Number.isFinite(Date.parse(value)) && Date.parse(value) > Date.now(), "Geçerlilik bitişi gelecekte olmalıdır"),
+  originalExpiry: z.string().optional(),
+  wasActive: z.boolean().optional(),
+  presetRuleId: z.string().nullable(),
+  accessExpiresAt: z.string(),
 }).superRefine((data, ctx) => {
+  if (!data.isEditing && !data.presetRuleId) ctx.addIssue({ code: "custom", path: ["presetRuleId"], message: "Ziyaretçi erişim bölgesi seçin" });
+  if (!data.isEditing || data.accessExpiresAt !== data.originalExpiry || (data.isActive && !data.wasActive)) {
+    const error = visitorExpiryValidation(data.accessExpiresAt);
+    if (error) ctx.addIssue({ code: "custom", path: ["accessExpiresAt"], message: error });
+  }
   if (((!data.isEditing || data.isActive !== false) && !data.cardNumber) || data.cardNumber.startsWith("IADE:")) {
     ctx.addIssue({ code: "custom", path: ["cardNumber"], message: "Geçerli yeni bir kart numarası girin" });
   }

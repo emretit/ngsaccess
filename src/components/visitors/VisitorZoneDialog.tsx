@@ -13,14 +13,14 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { TimeSchedule } from "@/components/access-control/unified/components/TimeSchedule";
 import { ZoneDeviceTree } from "@/components/access-control/unified/components/ZoneDeviceTree";
 import { DEFAULT_WORKDAYS } from "@/components/access-control/unified/components/weekdays";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { notify } from "@/lib/notify";
 import { accessScheduleError } from "../../../convex/lib/accessRuleUx";
+import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { Loader2 } from "lucide-react";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -45,49 +45,57 @@ const emptyZone = (): ZoneFormData => ({
 interface VisitorZoneDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  onCreated?: (id: Id<"accessRules">) => void;
 }
 
 // Ziyaretçi bölgesi = targetType="visitor" bir accessRule. Kapılar (deviceIds) + günlük
 // saat penceresi tanımlanır; üye eklenmez (ziyaretçiler Ziyaretçiler listesinden bağlanır).
-export default function VisitorZoneDialog({ isOpen, onClose }: VisitorZoneDialogProps) {
+export default function VisitorZoneDialog({ isOpen, onClose, onCreated }: VisitorZoneDialogProps) {
   const { projectId } = useActiveProject();
   const [formData, setFormData] = useState<ZoneFormData>(emptyZone);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState({ name: "", targets: "" });
+  const [failed, setFailed] = useState(false);
+  const guard = useUnsavedChangesGuard(JSON.stringify(formData) !== JSON.stringify(emptyZone()));
   const createRule = useMutation(api.accessRules.createWithGroups);
 
   const save = useAsyncAction(async () => {
-    await createRule({
+    const id = await createRule({
       name: formData.name.trim(), projectId, targetType: "visitor",
       startTime: formData.start_time || undefined, endTime: formData.end_time || undefined,
       days: formData.days, accessDirection: "both",
       deviceIds: formData.selected_devices as Id<"devices">[],
       doorIds: formData.selected_doors as Id<"doors">[],
     });
+    onCreated?.(id);
   }, { success: "Ziyaretçi bölgesi oluşturuldu", error: "Bölge oluşturulamadı" });
   const isSaving = save.pending;
+  const close = () => { if (!isSaving) guard.requestClose(() => { setFormData(emptyZone()); onClose(); }); };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) { notify.error("Bölge adı girin"); return; }
-    if (!formData.selected_devices.length && !formData.selected_doors.length) { notify.error("En az bir kapı/cihaz seçin"); return; }
+    const errors = { name: formData.name.trim() ? "" : "Bölge adı girin", targets: formData.selected_devices.length || formData.selected_doors.length ? "" : "En az bir kapı/cihaz seçin" };
+    setFieldErrors(errors);
+    if (errors.name || errors.targets) return;
     const error = accessScheduleError({ days: formData.days, startTime: formData.start_time, endTime: formData.end_time });
     setScheduleError(error);
     if (error) { requestAnimationFrame(() => document.getElementById("start_time")?.focus()); return; }
-    if (await save.run()) { setFormData(emptyZone()); onClose(); }
+    setFailed(false);
+    if (await save.run()) { setFormData(emptyZone()); onClose(); } else setFailed(true);
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && !isSaving && onClose()}>
-      <DialogContent className="max-w-lg">
+    <><Dialog open={isOpen} onOpenChange={(open) => !open && close()}>
+      <DialogContent className="max-h-[90dvh] max-w-[calc(100vw-32px)] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Yeni Ziyaretçi Bölgesi</DialogTitle>
+          <DialogTitle>Ziyaretçi erişim bölgesi oluştur</DialogTitle>
           <DialogDescription>
             Ziyaretçilerin geçebileceği kapıları ve günlük saat penceresini belirleyin. Üyeler
             Ziyaretçiler listesinden eklenir.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="zone_name">Bölge Adı</Label>
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <fieldset disabled={isSaving} className="min-w-0 space-y-4">
+          <FormFieldWrapper htmlFor="zone_name" label="Bölge adı" error={fieldErrors.name}>
             <Input
               id="zone_name"
               value={formData.name}
@@ -95,15 +103,18 @@ export default function VisitorZoneDialog({ isOpen, onClose }: VisitorZoneDialog
               placeholder="örn. Ziyaretçi - Giriş / Lobi"
               required
             />
-          </div>
+          </FormFieldWrapper>
 
           <TimeSchedule formData={formData} setFormData={setFormData} />
           {scheduleError && <p role="alert" className="text-sm text-destructive">{scheduleError}</p>}
           <ZoneDeviceTree formData={formData} setFormData={setFormData} />
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
-              İptal
+          {fieldErrors.targets && <p role="alert" className="text-sm text-destructive">{fieldErrors.targets}</p>}
+          {failed && <p role="alert" className="text-sm text-destructive">Bölge oluşturulamadı. Girişleriniz korundu; tekrar deneyin.</p>}
+          </fieldset>
+          <DialogFooter className="sticky bottom-0 bg-surface pt-3">
+            <Button type="button" variant="outline" onClick={close} disabled={isSaving}>
+              Vazgeç
             </Button>
             <Button type="submit" disabled={isSaving}>
               {isSaving ? (
@@ -118,6 +129,6 @@ export default function VisitorZoneDialog({ isOpen, onClose }: VisitorZoneDialog
           </DialogFooter>
         </form>
       </DialogContent>
-    </Dialog>
+    </Dialog>{guard.dialog}</>
   );
 }

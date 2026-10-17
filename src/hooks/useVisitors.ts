@@ -1,18 +1,18 @@
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useActiveProjectScope } from "./useActiveProjectScope";
+import type { VisitorStatus } from "@/components/visitors/lib/status";
 
-export const useVisitors = () => {
+// Only VisitorManagement consumes this hook; pagination uses the raw server cursor.
+export const useVisitors = (options: { search?: string; status?: VisitorStatus; cursor?: string | null; pageSize?: number; refreshKey?: number } = {}) => {
   const { projectId, loading: projectLoading } = useActiveProjectScope();
-
-  const visitorsRaw = useQuery(
-    api.visitors.list,
-    !projectLoading && projectId ? { projectId } : "skip",
-  );
-
+  const page = useQuery(api.visitors.listPage, !projectLoading && projectId ? {
+    projectId, search: options.search, status: options.status, refreshKey: options.refreshKey,
+    paginationOpts: { numItems: options.pageSize ?? 25, cursor: options.cursor ?? null },
+  } : "skip");
   return {
-    visitors: visitorsRaw ?? [],
-    isLoading: projectLoading || (!!projectId && visitorsRaw === undefined),
+    visitors: page?.page ?? [], page,
+    isLoading: projectLoading || (!!projectId && page === undefined),
     hasProjectAccess: projectLoading || !!projectId,
   };
 };

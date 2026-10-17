@@ -42,7 +42,9 @@ export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCa
   // Kayıt ekranı açıldığı/yeniden okutulduğu an — eski okumaları ele.
   const [sinceTime, setSinceTime] = useState<string | null>(null);
   const [captured, setCaptured] = useState<string | null>(null);
+  const [timedOut, setTimedOut] = useState(false);
 
+  const previousCapture = useRef<string | null>(null);
   const session = useRef(createCardCaptureSession());
   const [replacement, setReplacement] = useState<string | null>(null);
 
@@ -69,6 +71,12 @@ export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCa
     else onCapture(card);
   }, [reading, captured, onCapture, sinceTime, currentCard]);
 
+  useEffect(() => {
+    if (!sinceTime || captured) return;
+    const timer = window.setTimeout(() => { setSinceTime(null); setTimedOut(true); }, 30000);
+    return () => window.clearTimeout(timer);
+  }, [sinceTime, captured]);
+
   const setReaderId = (id: Id<"devices"> | null) => {
     setReaderIdState(id);
     try {
@@ -82,6 +90,8 @@ export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCa
   };
 
   const rearm = () => {
+    setTimedOut(false);
+    previousCapture.current = captured === currentCard ? captured : null;
     session.current.rearm();
     setSinceTime(new Date().toISOString());
     setCaptured(null);
@@ -90,17 +100,17 @@ export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCa
   const listening = !!validReaderId && !!sinceTime && !captured;
 
   return (
-    <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
+    <div className="min-w-0 rounded-md border p-3 space-y-2" role="group" aria-label="Kart okuyucudan alma">
       <div className="flex items-center gap-2">
         <CreditCard className="h-4 w-4 text-primary" />
-        <Label className="text-sm font-medium">Karttan Oku</Label>
+        <Label htmlFor="visitor-reader" className="text-sm font-medium">Kayıt okuyucusu</Label>
       </div>
 
       <Select
         value={validReaderId ?? ""}
         onValueChange={(value) => setReaderId((value || null) as Id<"devices"> | null)}
       >
-        <SelectTrigger className="h-8 text-sm">
+        <SelectTrigger id="visitor-reader" className="h-9 text-sm">
           <SelectValue placeholder="Kayıt okuyucusu seçin" />
         </SelectTrigger>
         <SelectContent>
@@ -113,37 +123,37 @@ export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCa
       </Select>
 
       {validReaderId && (
-        <div className="flex items-center justify-between gap-2 text-sm">
-          {captured ? (
-            <StatusBadge tone="success">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          {captured && captured === currentCard && !replacement ? (
+            <StatusBadge tone="success" role="status">
               <CheckCircle2 className="h-4 w-4" />
-              Kart okundu: <span className="font-mono">{captured}</span>
+              Kart okundu: <span className="font-mono">{`•••• ${captured.slice(-4)}`}</span>
             </StatusBadge>
           ) : listening ? (
-            <span className="flex items-center gap-1.5 text-muted-foreground">
+            <span role="status" className="flex items-center gap-1.5 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Kartı okutucuya okutun…
+              Kartı seçili okuyucuya okutun. İlk okuma forma alınır.
             </span>
-          ) : <span className="text-muted-foreground">Dinleme kapalı</span>}
+          ) : <span role="status" className="text-muted-foreground">{timedOut ? "30 saniyede kart okunmadı. Okuyucuyu kontrol edin veya numarayı elle girin." : "Dinleme kapalı"}</span>}
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            onClick={rearm}
+            onClick={() => listening ? setSinceTime(null) : rearm()}
             className="h-7 gap-1 text-xs"
-            disabled={listening}
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            {captured ? "Yeniden oku" : "Okumayı başlat"}
+            {listening ? "Durdur" : timedOut ? "Yeniden dene" : captured ? "Yeniden oku" : "Okumayı başlat"}
           </Button>
         </div>
       )}
+      {!devices.length && <p className="text-xs text-muted-foreground">Bu projede kayıt okuyucusu yok. Kart numarasını elle girebilirsiniz.</p>}
       <ConfirmDestructive
         open={replacement !== null}
-        onOpenChange={(open) => { if (!open) setReplacement(null); }}
-        title="Kart değiştirilsin mi?" objectName={`${currentCard ?? ""} → ${replacement ?? ""}`}
+        onOpenChange={(open) => { if (!open) { setReplacement(null); setCaptured(previousCapture.current); } }}
+        title="Kart değiştirilsin mi?" objectName={`•••• ${currentCard?.slice(-4) ?? ""} → •••• ${replacement?.slice(-4) ?? ""}`}
         effects={["Formdaki kart numarası yeni okunan kartla değiştirilecek."]} confirmLabel="Kartı değiştir"
-        onConfirm={async () => { if (replacement) onCapture(replacement); setReplacement(null); }}
+        onConfirm={async () => { if (replacement) { previousCapture.current = replacement; onCapture(replacement); setCaptured(replacement); } setReplacement(null); }}
       />
     </div>
   );
