@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { adminQuery } from "./lib/customFunctions";
 import { paginationOptsValidator } from "convex/server";
 import { resolveProjectScope } from "./lib/projectScope";
+import { normalizeAuditSearch } from "./lib/auditSearch";
 import { AUDIT_TARGET_LABELS, auditDateRange, auditPageMatches, auditIndex } from "./lib/auditLogQuery";
 
 interface PdksAuditPayload {
@@ -89,25 +90,49 @@ export const list = adminQuery({
     const scope = await resolveProjectScope(ctx, args.allProjects ? undefined : args.projectId);
     const projectId = args.allProjects ? undefined : scope[0];
     const { startTimestamp: start, endTimestamp: end } = auditDateRange(args.startDate, args.endDate);
-    const { targetTable, userId } = args;
-    const index = auditIndex(projectId, targetTable, userId);
+    const { targetTable, userId, action } = args;
+    const search = normalizeAuditSearch(args.search);
+    const index = auditIndex(projectId, targetTable, userId, action);
     const query = ctx.db.query("auditLog");
     const indexed = projectId
-      ? index === "by_project_table_timestamp" && targetTable
+      ? index === "by_project_action_timestamp" && action
+        ? query.withIndex("by_project_action_timestamp", q => q.eq("projectId", projectId).eq("action", action).gte("timestamp", start).lte("timestamp", end))
+        : index === "by_project_table_timestamp" && targetTable
         ? query.withIndex("by_project_table_timestamp", q => q.eq("projectId", projectId).eq("targetTable", targetTable).gte("timestamp", start).lte("timestamp", end))
         : index === "by_project_user_timestamp" && userId
           ? query.withIndex("by_project_user_timestamp", q => q.eq("projectId", projectId).eq("userId", userId).gte("timestamp", start).lte("timestamp", end))
           : query.withIndex("by_project_timestamp", q => q.eq("projectId", projectId).gte("timestamp", start).lte("timestamp", end))
-      : index === "by_table_timestamp" && targetTable
+      : index === "by_action_timestamp" && action
+        ? query.withIndex("by_action_timestamp", q => q.eq("action", action).gte("timestamp", start).lte("timestamp", end))
+        : index === "by_table_timestamp" && targetTable
         ? query.withIndex("by_table_timestamp", q => q.eq("targetTable", targetTable).gte("timestamp", start).lte("timestamp", end))
         : index === "by_user_timestamp" && userId
           ? query.withIndex("by_user_timestamp", q => q.eq("userId", userId).gte("timestamp", start).lte("timestamp", end))
           : query.withIndex("by_timestamp", q => q.gte("timestamp", start).lte("timestamp", end));
-    const result = await indexed.order("desc").paginate(args.paginationOpts);
+    const result = search
+      ? await query.withSearchIndex("search_text", q => {
+          let searched = q.search("searchText", search);
+          if (projectId) searched = searched.eq("projectId", projectId);
+          if (targetTable) searched = searched.eq("targetTable", targetTable);
+          if (userId) searched = searched.eq("userId", userId);
+          if (action) searched = searched.eq("action", action);
+          return searched;
+        }).paginate(args.paginationOpts)
+      : await indexed.order("desc").paginate(args.paginationOpts);
     const userIds = [...new Set(result.page.map(row => row.userId).filter((id): id is NonNullable<typeof id> => id !== undefined))];
     const users = await Promise.all(userIds.map(async id => [id, await ctx.db.get(id)] as const));
     const names = new Map(users.map(([id, user]) => [id, user?.name ?? user?.email ?? "Bilinmeyen"]));
-    return { ...result, page: result.page.map(row => ({ ...row, userName: row.userId ? names.get(row.userId) : "Sistem" })).filter(row => auditPageMatches(row, args)) };
+    const projectIds = [...new Set(result.page.map(row => row.projectId).filter((id): id is NonNullable<typeof id> => id !== undefined))];
+    const projects = await Promise.all(projectIds.map(async id => [id, await ctx.db.get(id)] as const));
+    const projectNames = new Map(projects.map(([id, project]) => [id, project?.name ?? "Silinmiş proje"]));
+    return { ...result, page: result.page
+      .filter(row => row.timestamp >= start && row.timestamp <= end)
+      .map(row => ({ ...row,
+        userName: row.userName ?? (row.userId ? names.get(row.userId) : "Sistem"),
+        projectName: row.projectId ? projectNames.get(row.projectId) ?? "Bilinmeyen proje" : "Projesiz kayıt",
+      }))
+      .filter(row => auditPageMatches(row, { ...args, search: undefined })) };
+
   },
 });
 

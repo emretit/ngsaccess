@@ -1,5 +1,5 @@
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { Fragment, useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import type { FunctionArgs } from "convex/server";
 import { useSearchParams } from "react-router-dom";
@@ -25,20 +25,13 @@ import { Switch } from "@/components/ui/switch";
 import { DatePicker } from "@/components/ui/date-picker";
 import { parseDateString, formatDateString } from "@/lib/date";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AuditChangeDetail } from "@/components/audit/AuditChangeDetail";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 type AuditArgs = Omit<FunctionArgs<typeof api.auditLog.list>, "paginationOpts">;
@@ -62,15 +55,17 @@ function AuditRows({ args }: { args: AuditArgs }) {
       autoLoads.current = 0;
       return;
     }
-    if (status !== "CanLoadMore" || autoLoads.current >= 5 || lastAutoLoad.current === loadMore) return;
+    if (
+      status !== "CanLoadMore" ||
+      autoLoads.current >= 5 ||
+      lastAutoLoad.current === loadMore
+    )
+      return;
     lastAutoLoad.current = loadMore;
     autoLoads.current += 1;
     loadMore(50);
   }, [results.length, status, loadMore]);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
-  const secondary = Boolean(
-    args.action || args.search || (args.targetTable && args.userId),
-  );
   const filtered = Boolean(
     args.targetTable ||
     args.userId ||
@@ -88,8 +83,15 @@ function AuditRows({ args }: { args: AuditArgs }) {
         {status === "Exhausted"
           ? "Kapsamın sonuna ulaşıldı"
           : "Daha fazla kayıt var"}
-        {secondary &&
-          " · İşlem/metin ve birleşik kullanıcı filtresi yüklenen kayıtlarda uygulanır."}
+        {args.search && " · Arama sonuçları uygunluk sırasındadır."}
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Metin araması yeni kayıtların kullanıcı adı, hedef etiketi ve kayıt
+        adı alanlarında çalışır. Eski kayıtların arama metni bulunmadığından
+        metin aramasına dahil edilmez; geçmişi incelemek için aramayı temizleyin.
+        {args.search &&
+          (args.startDate || args.endDate) &&
+          " Aramada tarih aralığı yüklenen sonuçlara uygulanır; eşleşme görmüyorsanız daha fazla yükleyin."}
       </p>
       {results.length === 0 ? (
         <EmptyState
@@ -102,104 +104,127 @@ function AuditRows({ args }: { args: AuditArgs }) {
           }
           description={
             status !== "Exhausted"
-              ? "Eski kayıtları aramak için daha fazla yükleyin."
+              ? "Kapsamdaki diğer eşleşmeleri incelemek için daha fazla yükleyin."
               : "Seçili proje kapsamındaki sonuçlar gösteriliyor."
           }
         />
       ) : (
-        <div className="rounded-xl border bg-card overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10" />
-                <TableHead>Zaman (TR saati)</TableHead>
-                <TableHead>Kullanıcı</TableHead>
-                <TableHead>İşlem</TableHead>
-                <TableHead>Hedef</TableHead>
-                <TableHead>ID</TableHead>
-                <TableHead>Not</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {results.map((row) => {
-                const expanded = expandedRow === row._id;
-                return (
-                  <Fragment key={row._id}>
-                    <TableRow>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          aria-label="Kayıt detayını aç/kapat"
-                          aria-expanded={expanded}
-                          onClick={() =>
-                            setExpandedRow(expanded ? null : row._id)
-                          }
-                        >
-                          {expanded ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </TableCell>
-                      <TableCell className="text-xs whitespace-nowrap">
+        <div
+          className="space-y-3 md:space-y-0 md:rounded-xl md:border md:bg-card"
+          role="table"
+          aria-label="Denetim kayıtları"
+        >
+          <div
+            role="row"
+            className={`hidden gap-3 border-b p-3 text-sm font-medium md:grid ${args.allProjects ? "md:grid-cols-7" : "md:grid-cols-6"}`}
+          >
+            <span role="columnheader">Ayrıntı / Zaman (TR)</span>
+            {args.allProjects && <span role="columnheader">Proje</span>}
+            <span role="columnheader">Kullanıcı</span>
+            <span role="columnheader">İşlem</span>
+            <span role="columnheader">Hedef</span>
+            <span role="columnheader">Kimlik</span>
+            <span role="columnheader">Not</span>
+          </div>
+          {results.map((row) => {
+            const expanded = expandedRow === row._id;
+            const detailId = `audit-detail-${row._id}`;
+            return (
+              <div
+                key={row._id}
+                role="rowgroup"
+                className="min-w-0 rounded-xl border bg-card md:rounded-none md:border-0 md:border-b md:last:border-b-0"
+              >
+                <div
+                  role="row"
+                  className={`grid min-w-0 grid-cols-1 items-start gap-3 p-3 text-sm ${args.allProjects ? "md:grid-cols-7" : "md:grid-cols-6"}`}
+                >
+                  <div role="cell" className="min-w-0">
+                    <Button
+                      variant="ghost"
+                      className="h-auto min-h-11 w-full justify-start gap-2 whitespace-normal px-1 text-left"
+                      aria-expanded={expanded}
+                      aria-controls={detailId}
+                      aria-label={`${timestampFormat.format(row.timestamp)} tarihli ${row.userName ?? "Bilinmeyen"} kaydının ayrıntısını ${expanded ? "kapat" : "aç"}`}
+                      onClick={() => setExpandedRow(expanded ? null : row._id)}
+                    >
+                      {expanded ? (
+                        <ChevronDown
+                          className="h-4 w-4 shrink-0"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <ChevronRight
+                          className="h-4 w-4 shrink-0"
+                          aria-hidden="true"
+                        />
+                      )}
+                      <span className="text-xs">
                         {timestampFormat.format(row.timestamp)}
-                      </TableCell>
-                      <TableCell>{row.userName ?? "Bilinmeyen"}</TableCell>
-                      <TableCell>
-                        <StatusBadge
-                          tone={
-                            row.action === "delete"
-                              ? "danger"
-                              : row.action === "create"
-                                ? "success"
-                                : "info"
-                          }
-                        >
-                          {actions[row.action]}
-                        </StatusBadge>
-                      </TableCell>
-                      <TableCell>
-                        {AUDIT_TARGET_LABELS[row.targetTable] ??
-                          row.targetTable}
-                      </TableCell>
-                      <TableCell
-                        className="font-mono text-xs"
-                        title={row.targetId}
-                      >
-                        {row.targetId}
-                      </TableCell>
-                      <TableCell>{row.note ?? "—"}</TableCell>
-                    </TableRow>
+                      </span>
+                    </Button>
+                  </div>
+                  {args.allProjects && (
+                    <div role="cell" className="min-w-0 break-words">
+                      <span className="mr-2 font-medium md:hidden">Proje:</span>
+                      {row.projectName}
+                    </div>
+                  )}
+                  <div role="cell" className="min-w-0 break-words">
+                    <span className="mr-2 font-medium md:hidden">
+                      Kullanıcı:
+                    </span>
+                    {row.userName ?? "Bilinmeyen"}
+                  </div>
+                  <div role="cell">
+                    <StatusBadge
+                      tone={
+                        row.action === "delete"
+                          ? "danger"
+                          : row.action === "create"
+                            ? "success"
+                            : "info"
+                      }
+                    >
+                      {actions[row.action]}
+                    </StatusBadge>
+                  </div>
+                  <div role="cell" className="min-w-0 break-words">
+                    <span className="mr-2 font-medium md:hidden">Hedef:</span>
+                    {AUDIT_TARGET_LABELS[row.targetTable] ?? row.targetTable}
+                  </div>
+                  <div
+                    role="cell"
+                    className="min-w-0 break-all font-mono text-xs"
+                  >
+                    <span className="mr-2 font-sans font-medium md:hidden">
+                      Kimlik:
+                    </span>
+                    {row.targetId}
+                  </div>
+                  <div
+                    role="cell"
+                    className="min-w-0 whitespace-pre-wrap break-words"
+                  >
+                    <span className="mr-2 font-medium md:hidden">Not:</span>
+                    {row.note ?? "—"}
+                  </div>
+                </div>
+                <div id={detailId} role="row" hidden={!expanded}>
+                  <div role="cell" aria-colspan={args.allProjects ? 7 : 6}>
                     {expanded && (
-                      <TableRow>
-                        <TableCell colSpan={7}>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3">
-                            {[
-                              ["Eski değer", row.oldValue],
-                              ["Yeni değer", row.newValue],
-                            ].map(([label, value], index) => (
-                              <div key={index}>
-                                <h4 className="text-sm font-semibold mb-2">
-                                  {String(label)}
-                                </h4>
-                                <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-60">
-                                  {value == null
-                                    ? "—"
-                                    : JSON.stringify(value, null, 2)}
-                                </pre>
-                              </div>
-                            ))}
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                      <AuditChangeDetail
+                        targetTable={row.targetTable}
+                        targetId={row.targetId}
+                        oldValue={row.oldValue}
+                        newValue={row.newValue}
+                      />
                     )}
-                  </Fragment>
-                );
-              })}
-            </TableBody>
-          </Table>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
       {status !== "Exhausted" && (
@@ -230,7 +255,7 @@ function UserFilter({
   });
   return (
     <Select value={value || "all"} onValueChange={onChange}>
-      <SelectTrigger className="w-48" aria-label="Kullanıcı">
+      <SelectTrigger className="w-full sm:w-48" aria-label="Kullanıcı">
         <SelectValue placeholder="Kullanıcı" />
       </SelectTrigger>
       <SelectContent>
@@ -267,23 +292,29 @@ export default function AuditLog() {
     }
     if (searchText !== debouncedSearch || searchUrl === debouncedSearch) return;
     lastSearchUrl.current = debouncedSearch;
-    setParams((current) => {
-      const next = new URLSearchParams(current);
-      if (debouncedSearch) next.set("q", debouncedSearch);
-      else next.delete("q");
-      return next;
-    }, { replace: true });
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (debouncedSearch) next.set("q", debouncedSearch);
+        else next.delete("q");
+        return next;
+      },
+      { replace: true },
+    );
   }, [searchUrl, searchText, debouncedSearch, setParams]);
   const previousScope = useRef<string | null>(null);
   useEffect(() => {
     if (loading) return;
     const scope = `${projectId ?? "none"}:${allProjects}`;
     if (previousScope.current !== null && previousScope.current !== scope) {
-      setParams((current) => {
-        const next = new URLSearchParams(current);
-        next.delete("user");
-        return next;
-      }, { replace: true });
+      setParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.delete("user");
+          return next;
+        },
+        { replace: true },
+      );
     }
     previousScope.current = scope;
   }, [projectId, allProjects, loading, setParams]);
@@ -354,7 +385,7 @@ export default function AuditLog() {
             value={args.targetTable || "all"}
             onValueChange={(value) => update("target", value)}
           >
-            <SelectTrigger className="w-48" aria-label="Hedef tablo">
+            <SelectTrigger className="w-full sm:w-48" aria-label="Hedef tablo">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -382,7 +413,7 @@ export default function AuditLog() {
             value={action ?? "all"}
             onValueChange={(value) => update("action", value)}
           >
-            <SelectTrigger className="w-40" aria-label="İşlem türü">
+            <SelectTrigger className="w-full sm:w-40" aria-label="İşlem türü">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -395,26 +426,27 @@ export default function AuditLog() {
             </SelectContent>
           </Select>
           <Input
-            className="w-60"
+            className="w-full sm:w-60"
             aria-label="Denetim kayıtlarında ara"
-            placeholder="Hedef, kullanıcı veya metin ara"
+            placeholder="Kullanıcı, hedef etiketi veya not ara"
+            maxLength={500}
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
           />
-          <div aria-label="Başlangıç tarihi">
+          <div className="w-full sm:w-auto" aria-label="Başlangıç tarihi">
             <DatePicker
               date={parseDateString(startDate)}
               onSelect={(date) => update("start", formatDateString(date))}
               placeholder="Başlangıç"
-              className="w-40"
+              className="w-full sm:w-40"
             />
           </div>
-          <div aria-label="Bitiş tarihi">
+          <div className="w-full sm:w-auto" aria-label="Bitiş tarihi">
             <DatePicker
               date={parseDateString(endDate)}
               onSelect={(date) => update("end", formatDateString(date))}
               placeholder="Bitiş"
-              className="w-40"
+              className="w-full sm:w-40"
             />
           </div>
           <Button

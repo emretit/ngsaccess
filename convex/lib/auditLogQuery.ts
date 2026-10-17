@@ -35,7 +35,10 @@ export function auditIndex(
   projectId?: string,
   targetTable?: string,
   userId?: string,
+  action?: string,
 ) {
+  if (action)
+    return projectId ? "by_project_action_timestamp" : "by_action_timestamp";
   if (projectId)
     return targetTable
       ? "by_project_table_timestamp"
@@ -60,8 +63,15 @@ export function auditPageMatches(
     oldValue?: unknown;
     newValue?: unknown;
   },
-  filters: { userId?: string; action?: string; search?: string },
+  filters: {
+    userId?: string;
+    action?: string;
+    targetTable?: string;
+    search?: string;
+  },
 ) {
+  if (filters.targetTable && row.targetTable !== filters.targetTable)
+    return false;
   if (filters.userId && row.userId !== filters.userId) return false;
   if (filters.action && row.action !== filters.action) return false;
   const search = filters.search?.trim().toLocaleLowerCase("tr-TR");

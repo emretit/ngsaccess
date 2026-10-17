@@ -32,6 +32,12 @@ describe("denetim sorgusu", () => {
     expect(auditIndex(undefined, "employees")).toBe("by_table_timestamp");
     expect(auditIndex(undefined, undefined, "u")).toBe("by_user_timestamp");
     expect(auditIndex()).toBe("by_timestamp");
+    expect(auditIndex("p", "employees", "u", "delete")).toBe(
+      "by_project_action_timestamp",
+    );
+    expect(auditIndex(undefined, "employees", "u", "update")).toBe(
+      "by_action_timestamp",
+    );
   });
   it("ikinci sayfada metin/kullanıcı/işlem eşleşmesini korur", () => {
     const rows = Array.from({ length: 260 }, (_, i) => ({
