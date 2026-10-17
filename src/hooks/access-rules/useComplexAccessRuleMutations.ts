@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useMutation, useAction } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
-import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/notify";
 import { Id } from "../../../convex/_generated/dataModel";
 import { deviceSyncStore } from "./deviceSyncStore";
 import { friendlySyncError } from "@/lib/syncErrorMessages";
@@ -43,17 +43,22 @@ interface UpdateRuleWithMembersParams {
   doorIds?: Id<"doors">[];
 }
 
-type SyncResult = FunctionReturnType<typeof api.actions.hikvisionSync.syncWeekPlanToDevices>;
+type SyncResult = FunctionReturnType<
+  typeof api.actions.hikvisionSync.syncWeekPlanToDevices
+>;
 type IdeSyncResult = FunctionReturnType<
   typeof api.actions.ideGatewayDevice.syncRuleToIdePanelsAndWait
 >;
 
 export const useComplexAccessRuleMutations = () => {
-  const { toast } = useToast();
   const pendingRef = useRef(new Set<string>());
   const [pending, setPending] = useState<Set<string>>(new Set());
-  const runPending = async <T,>(key: string, operation: () => Promise<T>): Promise<T> => {
-    if (pendingRef.current.has(key)) throw new Error("İşlem zaten devam ediyor.");
+  const runPending = async <T>(
+    key: string,
+    operation: () => Promise<T>,
+  ): Promise<T> => {
+    if (pendingRef.current.has(key))
+      throw new Error("İşlem zaten devam ediyor.");
     pendingRef.current.add(key);
     setPending(new Set(pendingRef.current));
     try {
@@ -66,8 +71,12 @@ export const useComplexAccessRuleMutations = () => {
 
   const createWithGroups = useMutation(api.accessRules.createWithGroups);
   const updateWithGroups = useMutation(api.accessRules.updateWithGroups);
-  const syncWeekPlan = useAction(api.actions.hikvisionSync.syncWeekPlanToDevices);
-  const syncIdeRule = useAction(api.actions.ideGatewayDevice.syncRuleToIdePanelsAndWait);
+  const syncWeekPlan = useAction(
+    api.actions.hikvisionSync.syncWeekPlanToDevices,
+  );
+  const syncIdeRule = useAction(
+    api.actions.ideGatewayDevice.syncRuleToIdePanelsAndWait,
+  );
 
   const startBackgroundSync = (ruleId: Id<"accessRules">) => {
     const finish = deviceSyncStore.start();
@@ -76,27 +85,21 @@ export const useComplexAccessRuleMutations = () => {
     const hik = syncWeekPlan({ accessRuleId: ruleId })
       .then((syncResult: SyncResult) => {
         if (syncResult.synced > 0) {
-          toast({
-            variant: "success",
-            title: "Cihaz Senkronizasyonu",
-            description: `${syncResult.synced} cihaz için plan işi başlatıldı, ${syncResult.employeesSynced} kişi kuyruğa alındı`,
-          });
+          notify.success(
+            "Cihaz Senkronizasyonu",
+            `${syncResult.synced} cihaz için plan işi başlatıldı, ${syncResult.employeesSynced} kişi kuyruğa alındı`,
+          );
         }
         if (syncResult.failed > 0) {
-          toast({
-            variant: "destructive",
-            title: "Cihaz Senkronizasyonu",
-            description: `${syncResult.failed} cihaza gönderilemedi`,
-          });
+          notify.error(
+            "Cihaz Senkronizasyonu",
+            `${syncResult.failed} cihaza gönderilemedi`,
+          );
         }
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-        toast({
-          variant: "destructive",
-          title: "Cihaz senkronizasyon hatası",
-          description: message,
-        });
+        notify.error("Cihaz senkronizasyon hatası", message);
       });
 
     // IDE Smart: op'lar kuyruğa atılır, panel ack'i beklenir → toast (Hikvision paritesi).
@@ -107,72 +110,64 @@ export const useComplexAccessRuleMutations = () => {
         if (r.queued > 0) {
           if (r.failed > 0) {
             // Kısmi başarıyı da göster (Hikvision'ın çift-toast'ına denk bilgi).
-            toast({
-              variant: "destructive",
-              title: "IDE Panel Senkronizasyonu",
-              description: `${r.acked}/${r.queued} panele yazıldı, ${r.failed} başarısız${r.errors[0] ? `: ${friendlySyncError(r.errors[0])}` : ""}`,
-            });
+            notify.error(
+              "IDE Panel Senkronizasyonu",
+              `${r.acked}/${r.queued} panele yazıldı, ${r.failed} başarısız${r.errors[0] ? `: ${friendlySyncError(r.errors[0])}` : ""}`,
+            );
           } else if (r.pending > 0) {
-            toast({
-              title: "IDE Panel Senkronizasyonu",
-              description: `${r.acked}/${r.queued} panele yazıldı, ${r.pending} işlem panel yanıtını bekliyor`,
-            });
+            notify.info(
+              "IDE Panel Senkronizasyonu",
+              `${r.acked}/${r.queued} panele yazıldı, ${r.pending} işlem panel yanıtını bekliyor`,
+            );
           } else {
-            toast({
-              variant: "success",
-              title: "IDE Panel Senkronizasyonu",
-              description: `${r.acked} işlem panele yazıldı`,
-            });
+            notify.success(
+              "IDE Panel Senkronizasyonu",
+              `${r.acked} işlem panele yazıldı`,
+            );
           }
         }
         if (r.skipped.length > 0) {
-          toast({
-            variant: "destructive",
-            title: "IDE Panel uyarısı",
-            description: r.skipped.join("; "),
-          });
+          notify.error("IDE Panel uyarısı", r.skipped.join("; "));
         }
       })
       .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-        toast({
-          variant: "destructive",
-          title: "IDE senkronizasyon hatası",
-          description: message,
-        });
+        notify.error("IDE senkronizasyon hatası", message);
       });
 
     void Promise.allSettled([hik, ide]).finally(finish);
   };
 
   const createAccessRuleWithMembers = {
-    mutateAsync: (params: CreateRuleWithMembersParams) => runPending("create", async () => {
-      const result = await createWithGroups({
-        ...params.rule,
-        employeeIds: params.employeeIds,
-        deviceIds: params.deviceIds,
-        doorIds: params.doorIds,
-      });
-      toast({ title: "Başarılı", description: "Erişim kuralı ve üyeleri oluşturuldu." });
-      startBackgroundSync(result);
-      return result;
-    }),
+    mutateAsync: (params: CreateRuleWithMembersParams) =>
+      runPending("create", async () => {
+        const result = await createWithGroups({
+          ...params.rule,
+          employeeIds: params.employeeIds,
+          deviceIds: params.deviceIds,
+          doorIds: params.doorIds,
+        });
+        notify.success("Başarılı", "Erişim kuralı ve üyeleri oluşturuldu.");
+        startBackgroundSync(result);
+        return result;
+      }),
     isPending: pending.has("create"),
   };
 
   const updateAccessRuleWithAdditionalMembers = {
-    mutateAsync: (params: UpdateRuleWithMembersParams) => runPending(params.id, async () => {
-      const result = await updateWithGroups({
-        ruleId: params.id,
-        ...params.updates,
-        employeeIds: params.employeeIds,
-        deviceIds: params.deviceIds,
-        doorIds: params.doorIds,
-      });
-      toast({ title: "Başarılı", description: "Erişim kuralı güncellendi." });
-      startBackgroundSync(params.id);
-      return result;
-    }),
+    mutateAsync: (params: UpdateRuleWithMembersParams) =>
+      runPending(params.id, async () => {
+        const result = await updateWithGroups({
+          ruleId: params.id,
+          ...params.updates,
+          employeeIds: params.employeeIds,
+          deviceIds: params.deviceIds,
+          doorIds: params.doorIds,
+        });
+        notify.success("Başarılı", "Erişim kuralı güncellendi.");
+        startBackgroundSync(params.id);
+        return result;
+      }),
     isPending: [...pending].some((key) => key !== "create"),
   };
 

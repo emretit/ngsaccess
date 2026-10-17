@@ -54,13 +54,15 @@ export const TimeSchedule = <T extends TimeScheduleFormData,>({ formData, setFor
           size="sm"
           value={formData.days}
           onValueChange={(days) => setFormData(prev => ({ ...prev, days: sortWeekdays(days) }))}
-          className="justify-start gap-1.5"
+          aria-label="İzin verilen günler"
+          className="justify-start flex-wrap gap-1.5"
         >
           {WEEKDAYS.map((day) => (
             <ToggleGroupItem
               key={day.value}
               value={day.value}
               title={day.full}
+              aria-label={day.full}
               className="h-9 w-10 p-0 text-sm font-medium"
             >
               {day.short}

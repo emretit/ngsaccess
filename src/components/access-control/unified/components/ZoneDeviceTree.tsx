@@ -1,234 +1,298 @@
-import { useState } from 'react';
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronRight, ChevronDown, Building2, MapPin, DoorOpen } from "lucide-react";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { ChevronRight, ChevronDown } from "lucide-react";
 import { useDevices } from "@/hooks/useDevices";
 import { useZonesAndDoors } from "@/hooks/useZonesAndDoors";
 import { deviceDisplayName } from "@/lib/deviceDisplay";
-import { areAllSelected } from "./selectionHelpers";
+import {
+  effectiveDoorIds,
+  scopeSelectionState,
+  toggleDoors,
+  toggleSelection,
+  type DoorSelection,
+} from "./selectionHelpers";
 
-interface ZoneDeviceTreeFormData {
-  selected_devices: string[];
-  // IDE permission.io kaynağı: kuralın etki ettiği kapılar. Boşsa cihazın tüm kapıları varsayılır.
-  selected_doors: string[];
-}
-
-interface ZoneDeviceTreeProps<T extends ZoneDeviceTreeFormData = ZoneDeviceTreeFormData> {
+interface ZoneDeviceTreeProps<T extends DoorSelection> {
   formData: T;
   setFormData: (updater: (prev: T) => T) => void;
 }
 
-export const ZoneDeviceTree = <T extends ZoneDeviceTreeFormData,>({ formData, setFormData }: ZoneDeviceTreeProps<T>) => {
-  const [expandedZones, setExpandedZones] = useState<Set<string>>(new Set());
-  const [expandedDevices, setExpandedDevices] = useState<Set<string>>(new Set());
-  const { devices } = useDevices();
-  const { zones, doors } = useZonesAndDoors();
-
-  // Bir cihaza bağlı kapılar (ioId sıralı). IDE Smart panellerde 4 aktüatör/kapı.
-  const getDoorsForDevice = (deviceId: string) =>
-    doors
-      .filter((d) => String(d.deviceId ?? '') === deviceId)
-      .sort((a, b) => (a.ioId ?? 0) - (b.ioId ?? 0));
-
-  const getDevicesForZone = (zoneId: string) =>
-    devices.filter((device) => String(device.zoneId ?? '') === zoneId);
-
-  // Cihaz seç/kaldır → cihazın kendisi + tüm kapıları birlikte hareket eder.
-  const handleDeviceChange = (deviceId: string, checked: boolean) => {
-    const doorIds = getDoorsForDevice(deviceId).map((d) => String(d._id));
+export const ZoneDeviceTree = <T extends DoorSelection>({
+  formData,
+  setFormData,
+}: ZoneDeviceTreeProps<T>) => {
+  const prefix = useId();
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState("");
+  const { devices, isLoading } = useDevices();
+  const { zones, doors, loading } = useZonesAndDoors();
+  const availableDoors = doors.filter(
+    (door) =>
+      door.deviceId && devices.some((device) => device._id === door.deviceId),
+  );
+  const effective = effectiveDoorIds(availableDoors, formData);
+  const searchText = search.trim().toLocaleLowerCase("tr");
+  const matches = (text: string) =>
+    text.toLocaleLowerCase("tr").includes(searchText);
+  const deviceDoors = (id: string) =>
+    availableDoors.filter((door) => door.deviceId === id);
+  const doorless = devices.filter(
+    (device) => deviceDoors(device._id).length === 0,
+  );
+  const changeScope = (
+    doorIds: string[],
+    deviceIds: string[],
+    checked: boolean,
+  ) =>
     setFormData((prev) => {
-      if (checked) {
-        return {
-          ...prev,
-          selected_devices: [...new Set([...prev.selected_devices, deviceId])],
-          selected_doors: [...new Set([...prev.selected_doors, ...doorIds])],
-        };
-      }
-      const doorSet = new Set(doorIds);
+      const next = toggleDoors(availableDoors, prev, doorIds, checked);
       return {
         ...prev,
-        selected_devices: prev.selected_devices.filter((id) => id !== deviceId),
-        selected_doors: prev.selected_doors.filter((id) => !doorSet.has(id)),
+        ...next,
+        selected_devices: toggleSelection(
+          next.selected_devices,
+          deviceIds,
+          checked,
+        ),
       };
     });
-  };
-
-  // Kapı seç/kaldır → kapı seçilince cihaz da erişime girer. Son kapı da kalkınca cihazı
-  // selected_devices'tan çıkar: aksi halde cihaz seçili + selected_doors boş kalır ve backend
-  // "kapı seçimi yok → tüm kapılar" fallback'ine düşer (kullanıcı niyetinin tersi).
-  const handleDoorChange = (deviceId: string, doorId: string, checked: boolean) => {
-    const deviceDoorIds = getDoorsForDevice(deviceId).map((d) => String(d._id));
-    setFormData((prev) => {
-      if (checked) {
-        return {
-          ...prev,
-          selected_devices: [...new Set([...prev.selected_devices, deviceId])],
-          selected_doors: [...new Set([...prev.selected_doors, doorId])],
-        };
-      }
-      const nextDoors = prev.selected_doors.filter((id) => id !== doorId);
-      const stillHasDoor = deviceDoorIds.some((id) => nextDoors.includes(id));
-      return {
-        ...prev,
-        selected_devices: stillHasDoor
-          ? prev.selected_devices
-          : prev.selected_devices.filter((id) => id !== deviceId),
-        selected_doors: nextDoors,
-      };
+  const state = (doorIds: string[], deviceIds: string[]) =>
+    scopeSelectionState(
+      doorIds,
+      deviceIds,
+      effective,
+      formData.selected_devices,
+    );
+  const toggle = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
-  };
-
-  const handleZoneChange = (zoneId: string, checked: boolean) => {
-    const zoneDevices = getDevicesForZone(zoneId);
-    zoneDevices.forEach((device) => handleDeviceChange(String(device._id), checked));
-  };
-
-  const handleSelectAllDevices = () => {
-    const allSelected = areAllSelected(devices, formData.selected_devices);
-    devices.forEach((device) => handleDeviceChange(String(device._id), !allSelected));
-  };
-
-  const toggleExpansion = (
-    set: Set<string>,
-    setter: React.Dispatch<React.SetStateAction<Set<string>>>,
-    id: string,
+  const allDoorIds = availableDoors.map((door) => door._id);
+  const allDoorlessIds = doorless.map((device) => device._id);
+  const renderZone = (
+    zoneId?: string,
+    name = "Bölgesi olmayan kapılar / cihazlar",
   ) => {
-    const next = new Set(set);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setter(next);
-  };
-
-  const allDevicesSelected = areAllSelected(devices, formData.selected_devices);
-
-  // Cihazın kapı-seçim durumu: tüm / bazı / hiç → checkbox checked/indeterminate.
-  const deviceCheckState = (deviceId: string): boolean | "indeterminate" => {
-    const doorIds = getDoorsForDevice(deviceId).map((d) => String(d._id));
-    if (doorIds.length === 0) return formData.selected_devices.includes(deviceId);
-    const selectedCount = doorIds.filter((id) => formData.selected_doors.includes(id)).length;
-    if (selectedCount === 0 && !formData.selected_devices.includes(deviceId)) return false;
-    if (selectedCount === doorIds.length) return true;
-    if (selectedCount === 0) return formData.selected_devices.includes(deviceId);
-    return "indeterminate";
-  };
-
-  const renderDevice = (device: (typeof devices)[number]) => {
-    const deviceId = String(device._id);
-    const deviceDoors = getDoorsForDevice(deviceId);
-    const isExpanded = expandedDevices.has(deviceId);
+    const zoneDoors = availableDoors.filter(
+      (door) => (door.zoneId ?? undefined) === zoneId,
+    );
+    const zoneDoorless = doorless.filter(
+      (device) => (device.zoneId ?? undefined) === zoneId,
+    );
+    const zoneDeviceIds = new Set([
+      ...zoneDoors.map((door) => door.deviceId),
+      ...zoneDoorless.map((device) => device._id),
+    ]);
+    const zoneDevices = devices.filter((device) =>
+      zoneDeviceIds.has(device._id),
+    );
+    const zoneMatches = matches(name);
+    const visibleDevices = zoneDevices.filter(
+      (device) =>
+        zoneMatches ||
+        matches(deviceDisplayName(device)) ||
+        zoneDoors.some(
+          (door) => door.deviceId === device._id && matches(door.name),
+        ),
+    );
+    if (zoneDevices.length === 0 || visibleDevices.length === 0) return null;
+    const key = zoneId ?? "unassigned";
+    const id = `${prefix}-zone-${key}`;
+    const open = Boolean(searchText) || expanded.has(key);
     return (
-      <div key={`device-${deviceId}`} className="space-y-1">
-        <div className="flex items-center space-x-2" style={{ paddingLeft: '36px' }}>
-          {deviceDoors.length > 0 ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0"
-              onClick={() => toggleExpansion(expandedDevices, setExpandedDevices, deviceId)}
-            >
-              {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-            </Button>
-          ) : (
-            <span className="inline-block h-5 w-5" />
-          )}
+      <div key={key} className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            aria-label={`${name} bölgesini ${open ? "daralt" : "genişlet"}`}
+            aria-expanded={open}
+            aria-controls={`${id}-content`}
+            onClick={() => toggle(key)}
+          >
+            {open ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </Button>
           <Checkbox
-            id={`device-${deviceId}`}
-            checked={deviceCheckState(deviceId)}
-            onCheckedChange={(checked) => handleDeviceChange(deviceId, checked === true)}
+            id={id}
+            checked={state(
+              zoneDoors.map((door) => door._id),
+              zoneDoorless.map((device) => device._id),
+            )}
+            onCheckedChange={(checked) =>
+              changeScope(
+                zoneDoors.map((door) => door._id),
+                zoneDoorless.map((device) => device._id),
+                checked === true,
+              )
+            }
           />
-          <MapPin className="h-3 w-3 text-green-500" />
-          <Label htmlFor={`device-${deviceId}`} className="text-sm font-normal cursor-pointer">
-            {deviceDisplayName(device)}
-            {deviceDoors.length > 0 ? ` (${deviceDoors.length} kapı)` : ''}
+          <Label htmlFor={id} className="min-w-0 break-words">
+            {name} ({zoneDoors.length} kapı)
           </Label>
         </div>
-
-        {isExpanded && deviceDoors.length > 0 && (
-          <div className="space-y-1">
-            {deviceDoors.map((door) => {
-              const doorId = String(door._id);
-              return (
-                <div key={`door-${doorId}`} className="flex items-center space-x-2" style={{ paddingLeft: '72px' }}>
+        <div
+          id={`${id}-content`}
+          hidden={!open}
+          className="ml-3 space-y-2 border-l pl-2"
+        >
+          {visibleDevices.map((device) => {
+            const scopedDoors = zoneDoors.filter(
+              (door) => door.deviceId === device._id,
+            );
+            const deviceName = deviceDisplayName(device);
+            const deviceId = `${id}-device-${device._id}`;
+            const deviceKey = `${key}-${device._id}`;
+            const deviceOpen = Boolean(searchText) || expanded.has(deviceKey);
+            const doorIds = scopedDoors.map((door) => door._id);
+            const noDoors = scopedDoors.length === 0 ? [device._id] : [];
+            return (
+              <div key={device._id}>
+                <div className="flex items-center gap-2">
+                  {scopedDoors.length > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      aria-label={`${deviceName} kapılarını ${deviceOpen ? "daralt" : "genişlet"}`}
+                      aria-expanded={deviceOpen}
+                      aria-controls={`${deviceId}-content`}
+                      onClick={() => toggle(deviceKey)}
+                    >
+                      {deviceOpen ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                    </Button>
+                  )}
                   <Checkbox
-                    id={`door-${doorId}`}
-                    checked={formData.selected_doors.includes(doorId)}
-                    onCheckedChange={(checked) => handleDoorChange(deviceId, doorId, checked === true)}
+                    id={deviceId}
+                    checked={state(doorIds, noDoors)}
+                    onCheckedChange={(checked) =>
+                      changeScope(doorIds, noDoors, checked === true)
+                    }
                   />
-                  <DoorOpen className="h-3 w-3 text-blue-500" />
-                  <Label htmlFor={`door-${doorId}`} className="text-sm font-normal cursor-pointer">
-                    {door.name}
+                  <Label
+                    htmlFor={deviceId}
+                    className="min-w-0 break-words font-normal"
+                  >
+                    {deviceName}
+                    {scopedDoors.length > 0
+                      ? ` — bu bölgede ${scopedDoors.length} kapı`
+                      : " — tüm cihaz"}
                   </Label>
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <div
+                  id={`${deviceId}-content`}
+                  hidden={!deviceOpen}
+                  className="ml-3 space-y-2 border-l pl-2"
+                >
+                  {scopedDoors
+                    .filter(
+                      (door) =>
+                        zoneMatches ||
+                        matches(deviceName) ||
+                        matches(door.name),
+                    )
+                    .map((door) => (
+                      <div
+                        key={door._id}
+                        className="flex items-center gap-2 py-1"
+                      >
+                        <Checkbox
+                          id={`${deviceId}-${door._id}`}
+                          checked={effective.includes(door._id)}
+                          onCheckedChange={(checked) =>
+                            changeScope([door._id], [], checked === true)
+                          }
+                        />
+                        <Label
+                          htmlFor={`${deviceId}-${door._id}`}
+                          className="min-w-0 break-words font-normal"
+                        >
+                          {door.name}
+                        </Label>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
-
-  const renderZoneTree = () => {
-    return zones.map((zone) => {
-      const zoneId = String(zone._id);
-      const zoneDevices = getDevicesForZone(zoneId);
-      const isExpanded = expandedZones.has(zoneId);
-      const isSelected = areAllSelected(zoneDevices, formData.selected_devices);
-
-      return (
-        <div key={`zone-${zoneId}`} className="space-y-1">
-          <div className="flex items-center space-x-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0"
-              onClick={() => toggleExpansion(expandedZones, setExpandedZones, zoneId)}
-            >
-              {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-            </Button>
-            <Checkbox
-              id={`zone-${zoneId}`}
-              checked={isSelected}
-              onCheckedChange={(checked) => handleZoneChange(zoneId, Boolean(checked))}
-            />
-            <Building2 className="h-4 w-4 text-purple-500" />
-            <Label htmlFor={`zone-${zoneId}`} className="text-sm font-medium cursor-pointer flex-1">
-              {zone.name} ({zoneDevices.length} cihaz)
-            </Label>
-          </div>
-          {isExpanded && <div className="space-y-1">{zoneDevices.map(renderDevice)}</div>}
-        </div>
-      );
-    });
-  };
-
-  const orphanDevices = devices.filter((device) => !device.zoneId);
-
+  const renderedZones = [
+    ...zones.map((zone) => renderZone(zone._id, zone.name)),
+    renderZone(),
+  ];
+  const hasResults = renderedZones.some((zone) => zone !== null);
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <Label>Hangi Bölge ve Cihazlarda?</Label>
-        <Button type="button" variant="outline" size="sm" onClick={handleSelectAllDevices} className="text-xs">
-          {allDevicesSelected ? 'Tümünü Kaldır' : 'Tümünü Seç'}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-medium">Hangi kapılarda?</h3>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={isLoading || loading}
+          onClick={() =>
+            changeScope(
+              allDoorIds,
+              allDoorlessIds,
+              state(allDoorIds, allDoorlessIds) !== true,
+            )
+          }
+        >
+          {state(allDoorIds, allDoorlessIds) === true
+            ? "Tümünü kaldır"
+            : "Tümünü seç"}
         </Button>
       </div>
-      <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-1">
-        {renderZoneTree()}
-
-        {orphanDevices.length > 0 && (
-          <div className="mt-4 pt-4 border-t">
-            <div className="flex items-center space-x-2 mb-2">
-              <MapPin className="h-4 w-4 text-gray-500" />
-              <Label className="text-sm font-medium text-gray-700">
-                Bölgesi Olmayan Cihazlar ({orphanDevices.length})
-              </Label>
-            </div>
-            {orphanDevices.map(renderDevice)}
-          </div>
-        )}
-      </div>
+      <p className="text-xs text-muted-foreground">
+        {effective.length} kapı, {formData.selected_devices.length} cihaz
+        seçili. Bölge seçimi yalnız o bölgenin kapılarını kapsar.
+      </p>
+      <Label htmlFor={`${prefix}-search`} className="sr-only">
+        Kapı, panel veya bölge ara
+      </Label>
+      <Input
+        id={`${prefix}-search`}
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        placeholder="Kapı, panel veya bölge ara"
+      />
+      {isLoading || loading ? (
+        <SectionSkeleton rows={3} label="Kapılar yükleniyor" />
+      ) : (
+        <div className="max-h-80 overflow-y-auto rounded-lg border p-2">
+          {renderedZones}
+          {!hasResults && (
+            <EmptyState
+              title={
+                searchText
+                  ? "Aramayla eşleşen kapı veya panel yok"
+                  : "Cihaz bulunamadı"
+              }
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 };

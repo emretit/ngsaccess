@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { accessRuleSchema } from "./useAccessRuleSchema";
-import { useAccessRules } from "@/hooks/useAccessRules";
+import { useComplexAccessRuleMutations } from "@/hooks/access-rules/useComplexAccessRuleMutations";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import type { AccessRule, GroupMember, GroupDevice } from "@/types/access-control";
@@ -27,7 +27,7 @@ interface RuleFormData {
 export const useRuleForm = (editingRule: AccessRule | null | undefined, open: boolean, onClose: () => void) => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { projectId } = useActiveProject();
-  const { createAccessRuleWithMembers, updateAccessRuleWithAdditionalMembers } = useAccessRules();
+  const { createAccessRuleWithMembers, updateAccessRuleWithAdditionalMembers } = useComplexAccessRuleMutations();
 
   const [formData, setFormData] = useState<RuleFormData>({
     name: '',

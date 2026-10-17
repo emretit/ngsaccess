@@ -14,8 +14,10 @@ import {
   reconcilePanelRosterIde,
 } from "./lib/accessGraph";
 import { diffIds, staleGroupDoorIds } from "./lib/reconcileMath";
-import type { Id } from "./_generated/dataModel";
-import type { MutationCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import { paginationOptsValidator, type PaginationOptions } from "convex/server";
+import { matchesRuleStatus, panelScope, pageRuleCandidates, personSearchTerms, activeRuleCursor } from "./lib/accessRuleSummary";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 
 /**
  * Kuraldan cihaz(lar) çıkarılırken o cihazlara ait (CANLI doors.deviceId) groupDoors
@@ -120,6 +122,451 @@ export const list = authedQuery({
         };
       })
     );
+  },
+});
+
+// Özet maliyeti kart başına sınırlı; kişi belgeleri yalnız getDetails içinde okunur.
+const SUMMARY_MEMBER_LIMIT = 100;
+const SUMMARY_RELATION_LIMIT = 50;
+const SUMMARY_PANEL_LIMIT = 20;
+const SUMMARY_DOOR_LIMIT = 16;
+
+async function readRuleScope(
+  ctx: QueryCtx,
+  rule: Doc<"accessRules">,
+  detailed: boolean,
+) {
+  const deviceQuery = ctx.db
+    .query("groupDevices")
+    .withIndex("by_project_group", (q) =>
+      q.eq("projectId", rule.projectId).eq("groupId", rule._id),
+    );
+  const doorQuery = ctx.db
+    .query("groupDoors")
+    .withIndex("by_group", (q) => q.eq("groupId", rule._id));
+  const [deviceRows, doorRows] = await Promise.all([
+    detailed
+      ? deviceQuery.collect()
+      : deviceQuery.take(SUMMARY_RELATION_LIMIT + 1),
+    detailed ? doorQuery.collect() : doorQuery.take(SUMMARY_RELATION_LIMIT + 1),
+  ]);
+  const scopeTruncated =
+    !detailed &&
+    (deviceRows.length > SUMMARY_RELATION_LIMIT ||
+      doorRows.length > SUMMARY_RELATION_LIMIT);
+  // Kısmi kapı bağı okunduysa "tüm panel" çıkarımı güvenli değildir.
+  if (scopeTruncated)
+    return {
+      panels: [],
+      groupDevices: [],
+      groupDoors: [],
+      unassignedDoors: [],
+      scopeTruncated,
+    };
+  const selectedDoors = (
+    await Promise.all(doorRows.map((row) => ctx.db.get(row.doorId)))
+  )
+    .filter((door): door is NonNullable<typeof door> => door !== null)
+    .filter((door) => door.projectId === rule.projectId);
+  const deviceIds = [
+    ...new Set([
+      ...deviceRows.map((row) => row.deviceId),
+      ...selectedDoors.flatMap((door) =>
+        door.deviceId ? [door.deviceId] : [],
+      ),
+    ]),
+  ];
+  if (!detailed && deviceIds.length > SUMMARY_PANEL_LIMIT) {
+    return {
+      panels: [],
+      groupDevices: [],
+      groupDoors: [],
+      unassignedDoors: [],
+      scopeTruncated: true,
+    };
+  }
+  const devices = (await Promise.all(deviceIds.map((id) => ctx.db.get(id))))
+    .filter((device): device is NonNullable<typeof device> => device !== null)
+    .filter((device) => device.projectId === rule.projectId);
+  const panels = await Promise.all(
+    devices.map(async (device) => {
+      const query = ctx.db
+        .query("doors")
+        .withIndex("by_device", (q) => q.eq("deviceId", device._id));
+      const allDoors = detailed
+        ? await query.collect()
+        : await query.take(SUMMARY_DOOR_LIMIT + 1);
+      const validDoors = allDoors.filter(
+        (door) => door.projectId === rule.projectId,
+      );
+      const scope = panelScope(
+        device,
+        validDoors,
+        new Set(selectedDoors.map((door) => door._id)),
+        deviceRows.some((row) => row.deviceId === device._id),
+      );
+      const namedDoors = await Promise.all(
+        (detailed ? scope.doors : scope.doors.slice(0, 3)).map(async (door) => {
+          const document = validDoors.find((item) => item._id === door.doorId);
+          const zone = document?.zoneId
+            ? await ctx.db.get(document.zoneId)
+            : null;
+          return {
+            ...door,
+            zoneName:
+              zone && zone.projectId === rule.projectId ? zone.name : null,
+          };
+        }),
+      );
+      return {
+        ...scope,
+        doors: detailed ? namedDoors : namedDoors.slice(0, 3),
+        doorsTruncated: !detailed && scope.doors.length > 3,
+        scopeTruncated: !detailed && allDoors.length > SUMMARY_DOOR_LIMIT,
+      };
+    }),
+  );
+  return {
+    panels,
+    scopeTruncated: panels.some((panel) => panel.scopeTruncated),
+    unassignedDoors: selectedDoors
+      .filter((door) => !devices.some((device) => device._id === door.deviceId))
+      .map((door) => ({ doorId: door._id, name: door.name })),
+    groupDevices: deviceRows.map((row) => {
+      const device = devices.find((item) => item._id === row.deviceId);
+      return {
+        ...row,
+        devices: device
+          ? {
+              id: device._id,
+              name: device.name,
+              brand: device.brand,
+              ideUuid: device.ideUuid,
+              deviceSerial: device.deviceSerial,
+              zoneId: device.zoneId,
+              doorId: device.doorId,
+            }
+          : null,
+      };
+    }),
+    groupDoors: selectedDoors.map((door) => ({
+      doorId: door._id,
+      deviceId: door.deviceId,
+      name: door.name,
+    })),
+  };
+}
+
+async function matchingRuleIds(
+  ctx: QueryCtx,
+  projectId: Id<"projects">,
+  search: string,
+  searchBy: "person" | "door",
+) {
+  const ids = new Set<Id<"accessRules">>();
+  const limit = 100;
+  let relationsRead = 0;
+  if (searchBy === "person") {
+    const { words, lookup } = personSearchTerms(search);
+    const [firstNames, lastNames] = await Promise.all([
+      ctx.db
+        .query("employees")
+        .withSearchIndex("search_first_name", (q) =>
+          q.search("firstName", lookup).eq("projectId", projectId),
+        )
+        .take(limit + 1),
+      ctx.db
+        .query("employees")
+        .withSearchIndex("search_last_name", (q) =>
+          q.search("lastName", lookup).eq("projectId", projectId),
+        )
+        .take(limit + 1),
+    ]);
+    if (firstNames.length > limit || lastNames.length > limit) return null;
+    const employees = [
+      ...new Map(
+        [...firstNames, ...lastNames].map((employee) => [
+          employee._id,
+          employee,
+        ]),
+      ).values(),
+    ].filter(
+      (employee) =>
+        !employee.isVisitor &&
+        words.every((word) =>
+          `${employee.firstName} ${employee.lastName}`
+            .toLocaleLowerCase("tr")
+            .includes(word),
+        ),
+    );
+    for (const employee of employees) {
+      const members = await ctx.db
+        .query("groupMembers")
+        .withIndex("by_project_employee", (q) =>
+          q.eq("projectId", projectId).eq("employeeId", employee._id),
+        )
+        .take(1001 - relationsRead);
+      relationsRead += members.length;
+      if (relationsRead > 1000) return null;
+      members.forEach((member) => ids.add(member.groupId));
+    }
+  } else {
+    const doors = await ctx.db
+      .query("doors")
+      .withSearchIndex("search_name", (q) =>
+        q.search("name", search).eq("projectId", projectId),
+      )
+      .take(limit + 1);
+    if (doors.length > limit) return null;
+    const checkedPanels = new Map<string, boolean>();
+    for (const door of doors) {
+      const links = await ctx.db
+        .query("groupDoors")
+        .withIndex("by_door", (q) => q.eq("doorId", door._id))
+        .take(1001 - relationsRead);
+      relationsRead += links.length;
+      if (relationsRead > 1000) return null;
+      links.forEach((link) => ids.add(link.groupId));
+      if (!door.deviceId) continue;
+      const deviceId = door.deviceId;
+      const device = await ctx.db.get(deviceId);
+      if (!device || device.projectId !== projectId) continue;
+      const deviceLinks = await ctx.db
+        .query("groupDevices")
+        .withIndex("by_project_device", (q) =>
+          q.eq("projectId", projectId).eq("deviceId", deviceId),
+        )
+        .take(1001 - relationsRead);
+      relationsRead += deviceLinks.length;
+      if (relationsRead > 1000) return null;
+      for (const link of deviceLinks) {
+        const key = `${link.groupId}:${deviceId}`;
+        let wholePanel = checkedPanels.get(key);
+        if (wholePanel === undefined) {
+          const selections = await ctx.db
+            .query("groupDoors")
+            .withIndex("by_group", (q) => q.eq("groupId", link.groupId))
+            .take(101);
+          if (selections.length > 100) return null;
+          relationsRead += selections.length;
+          if (relationsRead > 1000) return null;
+          const liveDoors = await Promise.all(
+            selections.map((selection) => ctx.db.get(selection.doorId)),
+          );
+          wholePanel = !liveDoors.some(
+            (selected) =>
+              selected?.projectId === projectId &&
+              selected.deviceId === deviceId,
+          );
+          checkedPanels.set(key, wholePanel);
+        }
+        if (wholePanel) ids.add(link.groupId);
+      }
+    }
+  }
+  return ids;
+}
+
+async function listActiveRules(
+  ctx: QueryCtx,
+  projectId: Id<"projects">,
+  search: string,
+  paginationOpts: PaginationOptions,
+) {
+  const scope = JSON.stringify([projectId, search, "active"]);
+  const next = activeRuleCursor(paginationOpts.cursor, scope);
+  const query = (phase: "active" | "legacy") => {
+    const isActive = phase === "active" ? true : undefined;
+    return search
+      ? ctx.db
+          .query("accessRules")
+          .withSearchIndex("search_name", (q) =>
+            q
+              .search("name", search)
+              .eq("projectId", projectId)
+              .eq("isActive", isActive),
+          )
+      : ctx.db
+          .query("accessRules")
+          .withIndex("by_project_active", (q) =>
+            q.eq("projectId", projectId).eq("isActive", isActive),
+          )
+          .order("desc");
+  };
+  // Eski undefined durumunu aktif tutarken pasif kayıtlar üzerinden sayfa taramayız.
+  if (
+    next.phase === "active" &&
+    next.cursor === null &&
+    !(await query("active").first())
+  )
+    next.phase = "legacy";
+  const result = await query(next.phase).paginate({
+    ...paginationOpts,
+    cursor: next.cursor,
+  });
+  if (
+    result.isDone &&
+    next.phase === "active" &&
+    (await query("legacy").first())
+  ) {
+    return {
+      ...result,
+      isDone: false,
+      continueCursor: JSON.stringify({ scope, phase: "legacy", cursor: null }),
+    };
+  }
+  return {
+    ...result,
+    continueCursor: JSON.stringify({
+      scope,
+      phase: next.phase,
+      cursor: result.continueCursor,
+    }),
+  };
+}
+
+export const listSummaries = authedQuery({
+  args: {
+    projectId: v.id("projects"),
+    search: v.optional(v.string()),
+    searchBy: v.optional(
+      v.union(v.literal("rule"), v.literal("person"), v.literal("door")),
+    ),
+    status: v.optional(
+      v.union(v.literal("all"), v.literal("active"), v.literal("inactive")),
+    ),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    await resolveProjectScope(ctx, args.projectId);
+    const search = args.search?.trim() ?? "";
+    const searchBy = args.searchBy ?? "rule";
+    const status = args.status ?? "all";
+    const matchedIds =
+      search && searchBy !== "rule"
+        ? await matchingRuleIds(ctx, args.projectId, search, searchBy)
+        : undefined;
+    const searchLimited = matchedIds === null;
+    const paginationOpts = {
+      ...args.paginationOpts,
+      numItems: Math.min(20, Math.max(1, args.paginationOpts.numItems)),
+    };
+    const result =
+      matchedIds !== undefined
+        ? pageRuleCandidates(
+            (
+              await Promise.all(
+                [...(matchedIds ?? [])].map((id) => ctx.db.get(id)),
+              )
+            )
+              .filter((rule): rule is NonNullable<typeof rule> => rule !== null)
+              .filter(
+                (rule) =>
+                  rule.projectId === args.projectId &&
+                  matchesRuleStatus(rule.isActive, status),
+              ),
+            args.paginationOpts.cursor,
+            paginationOpts.numItems,
+            JSON.stringify([args.projectId, search, searchBy, status]),
+          )
+        : status === "active"
+          ? await listActiveRules(ctx, args.projectId, search, paginationOpts)
+          : await (
+              search && searchBy === "rule"
+                ? ctx.db
+                    .query("accessRules")
+                    .withSearchIndex("search_name", (q) => {
+                      const named = q
+                        .search("name", search)
+                        .eq("projectId", args.projectId);
+                      return status === "inactive"
+                        ? named.eq("isActive", false)
+                        : named;
+                    })
+                : status === "inactive"
+                  ? ctx.db
+                      .query("accessRules")
+                      .withIndex("by_project_active", (q) =>
+                        q.eq("projectId", args.projectId).eq("isActive", false),
+                      )
+                      .order("desc")
+                  : ctx.db
+                      .query("accessRules")
+                      .withIndex("by_project", (q) =>
+                        q.eq("projectId", args.projectId),
+                      )
+                      .order("desc")
+            ).paginate(paginationOpts);
+    const matching = searchLimited
+      ? []
+      : result.page.filter((rule) => matchesRuleStatus(rule.isActive, status));
+    const page = await Promise.all(
+      matching.map(async (rule) => {
+        const [members, scope] = await Promise.all([
+          ctx.db
+            .query("groupMembers")
+            .withIndex("by_project_group", (q) =>
+              q.eq("projectId", rule.projectId).eq("groupId", rule._id),
+            )
+            .take(SUMMARY_MEMBER_LIMIT + 1),
+          readRuleScope(ctx, rule, false),
+        ]);
+        return {
+          ...rule,
+          memberCount: Math.min(SUMMARY_MEMBER_LIMIT, members.length),
+          memberCountTruncated: members.length > SUMMARY_MEMBER_LIMIT,
+          panels: scope.panels,
+          unassignedDoors: scope.unassignedDoors,
+          scopeTruncated: scope.scopeTruncated,
+        };
+      }),
+    );
+    return {
+      ...result,
+      page,
+      isDone: searchLimited || result.isDone,
+      searchLimited,
+    };
+  },
+});
+
+export const getDetails = authedQuery({
+  args: {
+    ruleId: v.id("accessRules"),
+    projectId: v.optional(v.id("projects")),
+  },
+  handler: async (ctx, args) => {
+    const allowed = await resolveProjectScope(ctx, args.projectId);
+    const rule = await ctx.db.get(args.ruleId);
+    if (!rule || !rule.projectId || !allowed.includes(rule.projectId))
+      throw new Error("Kural bulunamadı veya bu kurala erişim yetkiniz yok");
+    const [members, scope] = await Promise.all([
+      ctx.db
+        .query("groupMembers")
+        .withIndex("by_project_group", (q) =>
+          q.eq("projectId", rule.projectId).eq("groupId", rule._id),
+        )
+        .collect(),
+      readRuleScope(ctx, rule, true),
+    ]);
+    const groupMembers = await Promise.all(
+      members.map(async (member) => {
+        const employee = await ctx.db.get(member.employeeId);
+        return {
+          ...member,
+          employees:
+            employee && employee.projectId === rule.projectId
+              ? {
+                  id: employee._id,
+                  firstName: employee.firstName,
+                  lastName: employee.lastName,
+                  email: employee.email,
+                }
+              : null,
+        };
+      }),
+    );
+    return { ...rule, ...scope, groupMembers };
   },
 });
 

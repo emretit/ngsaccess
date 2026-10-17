@@ -1,10 +1,10 @@
+import { useState } from "react";
+import AccessRulesList from "./AccessRulesList";
+import CreateRuleDialog from "./CreateRuleDialog";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
+import type { AccessRule } from "@/types/access-control";
 
-import { useState } from 'react';
-import AccessRulesList from './AccessRulesList';
-import CreateRuleDialog from './CreateRuleDialog';
-import type { AccessRule } from '@/types/access-control';
-
-const UnifiedAccessControl = () => {
+const ProjectAccessControl = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<AccessRule | null>(null);
 
@@ -30,14 +30,21 @@ const UnifiedAccessControl = () => {
         onEditRule={handleEditRule}
       />
 
-      <CreateRuleDialog
-        open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
-        editingRule={editingRule}
-        onClose={handleCloseDialog}
-      />
+      {isCreateDialogOpen && (
+        <CreateRuleDialog
+          open={isCreateDialogOpen}
+          onOpenChange={setIsCreateDialogOpen}
+          editingRule={editingRule}
+          onClose={handleCloseDialog}
+        />
+      )}
     </div>
   );
+};
+
+const UnifiedAccessControl = () => {
+  const { projectId } = useActiveProjectScope();
+  return <ProjectAccessControl key={projectId ?? "no-project"} />;
 };
 
 export default UnifiedAccessControl;

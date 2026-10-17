@@ -1,224 +1,243 @@
-import { useState } from 'react';
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ChevronRight, ChevronDown, Users, User } from "lucide-react";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { ChevronRight, ChevronDown } from "lucide-react";
 import { useEmployees } from "@/hooks/useEmployees";
-import { useDepartments, type Department } from "@/hooks/useDepartments";
-import { areAllSelected } from "./selectionHelpers";
+import { useDepartments } from "@/hooks/useDepartments";
+import {
+  departmentScope,
+  selectionState,
+  toggleSelection,
+} from "./selectionHelpers";
 
 interface DepartmentTreeFormData {
   selected_employees: string[];
 }
-
-interface DepartmentTreeProps<T extends DepartmentTreeFormData = DepartmentTreeFormData> {
+interface DepartmentTreeProps<T extends DepartmentTreeFormData> {
   formData: T;
   setFormData: (updater: (prev: T) => T) => void;
 }
 
-export const DepartmentTree = <T extends DepartmentTreeFormData,>({ formData, setFormData }: DepartmentTreeProps<T>) => {
-  const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
-  const { employees } = useEmployees();
-  const { departments } = useDepartments();
-
-  const handleEmployeeChange = (employeeId: string, checked: boolean) => {
-    setFormData(prev => {
-      const newEmployees = checked
-        ? [...prev.selected_employees, employeeId]
-        : prev.selected_employees.filter((id: string) => id !== employeeId);
-
-      return {
-        ...prev,
-        selected_employees: newEmployees
-      };
-    });
-  };
-
-  const handleSelectAll = () => {
-    const allEmployeeIds = employees.map(emp => String(emp._id));
-    const allSelected = areAllSelected(employees, formData.selected_employees);
-
-    setFormData(prev => ({
+export const DepartmentTree = <T extends DepartmentTreeFormData>({
+  formData,
+  setFormData,
+}: DepartmentTreeProps<T>) => {
+  const prefix = useId();
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [includeChildren, setIncludeChildren] = useState(true);
+  const [search, setSearch] = useState("");
+  const { employees, isLoading: employeesLoading } = useEmployees();
+  const { departments, isLoading: departmentsLoading } = useDepartments();
+  const searchText = search.trim().toLocaleLowerCase("tr");
+  const matches = (name: string) =>
+    name.toLocaleLowerCase("tr").includes(searchText);
+  const change = (ids: string[], checked: boolean) =>
+    setFormData((prev) => ({
       ...prev,
-      selected_employees: allSelected ? [] : allEmployeeIds,
+      selected_employees: toggleSelection(
+        prev.selected_employees,
+        ids,
+        checked,
+      ),
     }));
+  const renderEmployee = (employee: (typeof employees)[number]) => {
+    const id = `${prefix}-employee-${employee._id}`;
+    return (
+      <div key={employee._id} className="flex items-center gap-2 py-1 pl-3">
+        <Checkbox
+          id={id}
+          checked={formData.selected_employees.includes(employee._id)}
+          onCheckedChange={(checked) =>
+            change([employee._id], checked === true)
+          }
+        />
+        <Label htmlFor={id} className="min-w-0 break-words font-normal">
+          {employee.firstName} {employee.lastName}
+        </Label>
+      </div>
+    );
   };
-
-  const getEmployeesForDepartment = (departmentId: string) => {
-    return employees.filter(emp => String(emp.departmentId ?? '') === departmentId);
-  };
-
-  const handleDepartmentChange = (departmentId: string, checked: boolean) => {
-    const departmentEmployees = getEmployeesForDepartment(departmentId);
-    const employeeIds = departmentEmployees.map(emp => String(emp._id));
-
-    setFormData(prev => {
-      if (checked) {
-        return {
-          ...prev,
-          selected_employees: [...new Set([...prev.selected_employees, ...employeeIds])],
-        };
-      }
-      const toRemove = new Set(employeeIds);
-      return {
-        ...prev,
-        selected_employees: prev.selected_employees.filter((id: string) => !toRemove.has(id)),
-      };
-    });
-  };
-
-  const toggleDepartmentExpansion = (departmentId: string) => {
-    setExpandedDepartments(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(departmentId)) {
-        newSet.delete(departmentId);
-      } else {
-        newSet.add(departmentId);
-      }
-      return newSet;
-    });
-  };
-
-  const renderDepartmentTree = (parentId: string | null = null, level: number = 0) => {
-    const children = departments.filter((dept: Department) => {
-      const deptParentId = dept.parentId ? String(dept.parentId) : null;
-      return deptParentId === parentId;
-    });
-
-    if (!children.length) return null;
-
-    return children.map((department: Department) => {
-      const deptId = String(department._id);
-      const hasChildren = departments.some((dept: Department) => String(dept.parentId ?? '') === deptId);
-      const departmentEmployees = getEmployeesForDepartment(deptId);
-      const isExpanded = expandedDepartments.has(deptId);
-      const isSelected = areAllSelected(departmentEmployees, formData.selected_employees);
-
-      return (
-        <div key={`dept-${deptId}`} className="space-y-1">
-          <div
-            className="flex items-center space-x-2"
-            style={{ paddingLeft: `${level * 16}px` }}
+  const renderDepartment = (
+    department: (typeof departments)[number],
+    ancestors: Set<string>,
+  ) => {
+    if (ancestors.has(department._id)) return null;
+    const descendants = departmentScope(departments, department._id, true);
+    const scoped = departmentScope(
+      departments,
+      department._id,
+      includeChildren,
+    );
+    const scopedEmployees = employees.filter(
+      (employee) => employee.departmentId && scoped.has(employee.departmentId),
+    );
+    const directEmployees = employees.filter(
+      (employee) => employee.departmentId === department._id,
+    );
+    const children = departments.filter(
+      (child) => child.parentId === department._id,
+    );
+    const departmentMatches = matches(department.name);
+    const hasMatch =
+      [...descendants].some((id) =>
+        departments.some((dept) => dept._id === id && matches(dept.name)),
+      ) ||
+      employees.some(
+        (employee) =>
+          employee.departmentId &&
+          descendants.has(employee.departmentId) &&
+          matches(`${employee.firstName} ${employee.lastName}`),
+      );
+    if (searchText && !hasMatch) return null;
+    const open = Boolean(searchText) || expanded.has(department._id);
+    const contentId = `${prefix}-children-${department._id}`;
+    const id = `${prefix}-department-${department._id}`;
+    return (
+      <div key={department._id} className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 shrink-0"
+            aria-label={`${department.name} departmanını ${open ? "daralt" : "genişlet"}`}
+            aria-expanded={open}
+            aria-controls={contentId}
+            onClick={() =>
+              setExpanded((prev) => {
+                const next = new Set(prev);
+                if (next.has(department._id)) next.delete(department._id);
+                else next.add(department._id);
+                return next;
+              })
+            }
           >
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-5 w-5 p-0"
-              onClick={() => toggleDepartmentExpansion(deptId)}
-            >
-              {isExpanded ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-            </Button>
-
-            <Checkbox
-              id={`dept-${deptId}`}
-              checked={isSelected}
-              onCheckedChange={(checked) => {
-                handleDepartmentChange(deptId, Boolean(checked));
-              }}
-            />
-
-            <Users className="h-4 w-4 text-blue-500" />
-            <Label
-              htmlFor={`dept-${deptId}`}
-              className="text-sm font-medium cursor-pointer flex-1"
-            >
-              {department.name} ({departmentEmployees.length} çalışan)
-            </Label>
-          </div>
-
-          {isExpanded && (
-            <div className="space-y-1">
-              {departmentEmployees.map(employee => {
-                const empId = String(employee._id);
-                return (
-                  <div
-                    key={`emp-${empId}`}
-                    className="flex items-center space-x-2"
-                    style={{ paddingLeft: `${(level + 1) * 16 + 20}px` }}
-                  >
-                    <Checkbox
-                      id={`employee-${empId}`}
-                      checked={formData.selected_employees.includes(empId)}
-                      onCheckedChange={(checked) => {
-                        handleEmployeeChange(empId, Boolean(checked));
-                      }}
-                    />
-                    <User className="h-3 w-3 text-gray-500" />
-                    <Label
-                      htmlFor={`employee-${empId}`}
-                      className="text-sm font-normal cursor-pointer"
-                    >
-                      {employee.firstName} {employee.lastName}
-                    </Label>
-                  </div>
-                );
-              })}
-
-              {hasChildren && renderDepartmentTree(deptId, level + 1)}
-            </div>
+            {open ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </Button>
+          <Checkbox
+            id={id}
+            checked={selectionState(
+              scopedEmployees.map((employee) => employee._id),
+              formData.selected_employees,
+            )}
+            disabled={scopedEmployees.length === 0}
+            onCheckedChange={(checked) =>
+              change(
+                scopedEmployees.map((employee) => employee._id),
+                checked === true,
+              )
+            }
+          />
+          <Label htmlFor={id} className="min-w-0 break-words">
+            {department.name} ({scopedEmployees.length} kişi)
+          </Label>
+        </div>
+        <div id={contentId} hidden={!open} className="ml-3 border-l pl-2">
+          {directEmployees
+            .filter(
+              (employee) =>
+                departmentMatches ||
+                matches(`${employee.firstName} ${employee.lastName}`),
+            )
+            .map(renderEmployee)}
+          {children.map((child) =>
+            renderDepartment(child, new Set([...ancestors, department._id])),
           )}
         </div>
-      );
-    });
+      </div>
+    );
   };
-
-  const allSelected = areAllSelected(employees, formData.selected_employees);
-  const orphanEmployees = employees.filter(emp => !emp.departmentId);
-
+  const roots = departments.filter(
+    (department) =>
+      !department.parentId ||
+      !departments.some((parent) => parent._id === department.parentId),
+  );
+  const orphanEmployees = employees.filter(
+    (employee) =>
+      !employee.departmentId ||
+      !departments.some(
+        (department) => department._id === employee.departmentId,
+      ),
+  );
+  const renderedDepartments = roots.map((department) =>
+    renderDepartment(department, new Set()),
+  );
+  const visibleOrphans = orphanEmployees.filter((employee) =>
+    matches(`${employee.firstName} ${employee.lastName}`),
+  );
+  const hasResults =
+    renderedDepartments.some((department) => department !== null) ||
+    visibleOrphans.length > 0;
+  const allIds = employees.map((employee) => employee._id);
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <Label>Kim Erişebilecek?</Label>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-medium">Kim erişebilecek?</h3>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          onClick={handleSelectAll}
-          className="text-xs"
+          disabled={employeesLoading}
+          onClick={() =>
+            change(
+              allIds,
+              selectionState(allIds, formData.selected_employees) !== true,
+            )
+          }
         >
-          {allSelected ? 'Tümünü Kaldır' : 'Tümünü Seç'}
+          {selectionState(allIds, formData.selected_employees) === true
+            ? "Tümünü kaldır"
+            : "Tümünü seç"}
         </Button>
       </div>
-      <div className="border rounded-lg p-3 max-h-48 overflow-y-auto space-y-1">
-        {renderDepartmentTree()}
-
-        {orphanEmployees.length > 0 && (
-          <div className="mt-4 pt-4 border-t">
-            <div className="flex items-center space-x-2 mb-2">
-              <Users className="h-4 w-4 text-gray-500" />
-              <Label className="text-sm font-medium text-gray-700">
-                Departmanı Olmayan Çalışanlar ({orphanEmployees.length})
-              </Label>
-            </div>
-            {orphanEmployees.map(employee => {
-              const empId = String(employee._id);
-              return (
-                <div key={empId} className="flex items-center space-x-2 ml-6">
-                  <Checkbox
-                    id={`orphan-employee-${empId}`}
-                    checked={formData.selected_employees.includes(empId)}
-                    onCheckedChange={(checked) => {
-                      handleEmployeeChange(empId, Boolean(checked));
-                    }}
-                  />
-                  <User className="h-3 w-3 text-gray-500" />
-                  <Label
-                    htmlFor={`orphan-employee-${empId}`}
-                    className="text-sm font-normal cursor-pointer"
-                  >
-                    {employee.firstName} {employee.lastName}
-                  </Label>
-                </div>
-              );
-            })}
-          </div>
-        )}
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id={`${prefix}-descendants`}
+          checked={includeChildren}
+          onCheckedChange={(checked) => setIncludeChildren(checked === true)}
+        />
+        <Label htmlFor={`${prefix}-descendants`}>
+          Alt departmanları dahil et
+        </Label>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Seçim anındaki kişiler eklenir. Sonradan katılanlar otomatik eklenmez.{" "}
+        {formData.selected_employees.length} kişi seçili.
+      </p>
+      <Label htmlFor={`${prefix}-search`} className="sr-only">
+        Kişi veya departman ara
+      </Label>
+      <Input
+        id={`${prefix}-search`}
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        placeholder="Kişi veya departman ara"
+      />
+      {employeesLoading || departmentsLoading ? (
+        <SectionSkeleton rows={3} label="Kişiler yükleniyor" />
+      ) : (
+        <div className="max-h-80 overflow-y-auto rounded-lg border p-2">
+          {renderedDepartments}
+          {visibleOrphans.map(renderEmployee)}
+          {!hasResults && (
+            <EmptyState
+              title={
+                searchText
+                  ? "Aramayla eşleşen kişi veya departman yok"
+                  : "Kişi bulunamadı"
+              }
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 };
