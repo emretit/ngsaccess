@@ -1,21 +1,22 @@
+import { capabilities } from "./capabilities";
 import { Activity, CalendarClock, ClipboardList, Cpu, DoorOpen, FileText, Home, Palmtree, Settings, Shield, ShieldCheck, Users, Wrench, ScanLine, User, type LucideIcon } from "lucide-react";
 
-export interface RouteMeta { href: string; name: string; icon: LucideIcon; adminOnly?: boolean; superAdminOnly?: boolean; menu?: boolean }
+export interface RouteMeta { href: string; name: string; icon: LucideIcon; adminOnly?: boolean; superAdminOnly?: boolean; menu?: boolean; group?: "main" | "attendance" | "management" }
 export const routeMeta: RouteMeta[] = [
-  { href: "/home", name: "Ana Sayfa", icon: Home },
-  { href: "/employees", name: "Kişiler", icon: Users },
-  { href: "/devices", name: "Cihazlar", icon: Cpu },
-  { href: "/virtual-readers", name: "Sanal Okuyucular", icon: ScanLine },
-  { href: "/access-control", name: "Geçiş Kontrol", icon: Shield },
-  { href: "/visitors", name: "Ziyaretçiler", icon: DoorOpen },
-  { href: "/live-monitoring", name: "Canlı İzleme", icon: Activity },
-  { href: "/pdks-records", name: "PDKS Kayıtları", icon: FileText },
-  { href: "/shifts", name: "Vardiyalar", icon: CalendarClock },
-  { href: "/leaves", name: "İzinler", icon: Palmtree },
-  { href: "/audit-log", name: "Denetim Kaydı", icon: ClipboardList, adminOnly: true },
+  { href: "/home", group: "main", name: "Ana Sayfa", icon: Home },
+  { href: "/employees", group: "main", name: "Kişiler", icon: Users },
+  { href: "/devices", group: "main", name: "Cihazlar", icon: Cpu },
+  { href: "/virtual-readers", group: "main", name: "Sanal Okuyucular", icon: ScanLine },
+  { href: "/access-control", group: "main", name: "Geçiş Kontrol", icon: Shield },
+  { href: "/visitors", group: "main", name: "Ziyaretçiler", icon: DoorOpen },
+  { href: "/live-monitoring", group: "main", name: "Canlı İzleme", icon: Activity },
+  { href: "/pdks-records", group: "attendance", name: "PDKS Kayıtları", icon: FileText },
+  { href: "/shifts", group: "attendance", name: "Vardiyalar", icon: CalendarClock },
+  { href: "/leaves", group: "attendance", name: "İzinler", icon: Palmtree },
+  { href: "/audit-log", group: "management", name: "Denetim Kaydı", icon: ClipboardList, adminOnly: true },
   { href: "/engineering-department", name: "Mühendislik", icon: Wrench, menu: false },
-  { href: "/system-admin", name: "Admin", icon: ShieldCheck, superAdminOnly: true },
-  { href: "/settings", name: "Ayarlar", icon: Settings, adminOnly: true },
+  { href: "/system-admin", group: "management", name: "Admin", icon: ShieldCheck, superAdminOnly: true },
+  { href: "/settings", group: "management", name: "Ayarlar", icon: Settings, adminOnly: true },
   { href: "/profile", name: "Profil", icon: User, menu: false },
 ];
 
@@ -31,4 +32,11 @@ export function safeReturnPath(next: string | null | undefined): string {
     if (url.origin !== "https://app.invalid" || ["/login", "/register", "/auth", "/verify-email"].includes(new URL(decoded, "https://app.invalid").pathname)) return "/home";
     return url.pathname + url.search + url.hash;
   } catch { return "/home"; }
+}
+
+/** Shared visibility source for shell, navigation search and quick links. */
+export function visibleRoutes(role: string | undefined, includeProfile = false): RouteMeta[] {
+  const access = capabilities(role);
+  return routeMeta.filter(item => (item.menu !== false || (includeProfile && item.href === "/profile")) &&
+    (!item.adminOnly || access.admin) && (!item.superAdminOnly || access.systemAdmin));
 }

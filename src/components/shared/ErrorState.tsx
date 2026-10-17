@@ -26,10 +26,10 @@ export function ErrorState({
         className
       )}
     >
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-destructive/10">
-        <AlertCircle className="h-8 w-8 text-destructive" />
+      <div className="mb-4 flex h-8 w-8 items-center justify-center ">
+        <AlertCircle className="h-5 w-5 text-destructive" />
       </div>
-      <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+      <h3 className="text-base font-semibold text-foreground">{title}</h3>
       <p className="mt-2 max-w-sm text-sm text-muted-foreground">{description}</p>
       {onRetry && (
         <Button

@@ -1,58 +1,18 @@
+import { Link } from "react-router-dom";
+import { ChevronRight } from "lucide-react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { visibleRoutes } from "@/lib/routeMeta";
 
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { Users, Clock, AlertCircle } from 'lucide-react';
-import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
-
-const QuickLinksGrid: React.FC = () => {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <Link to="/employees" className="group">
-        <Card className="transition-all duration-300 group-hover:border-primary group-hover:shadow-md">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center text-muted-foreground group-hover:text-primary">
-              <Users className="h-5 w-5 mr-2" /> Personel Yönetimi
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Personel bilgilerini görüntüle, düzenle ve yeni personel ekle.
-            </p>
-          </CardContent>
-        </Card>
-      </Link>
-      
-      <Link to="/pdks-records" className="group">
-        <Card className="transition-all duration-300 group-hover:border-primary group-hover:shadow-md">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center text-muted-foreground group-hover:text-primary">
-              <Clock className="h-5 w-5 mr-2" /> PDKS Kayıtları
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Personel giriş çıkış kayıtlarını görüntüle ve raporla.
-            </p>
-          </CardContent>
-        </Card>
-      </Link>
-      
-      <Link to="/settings" className="group">
-        <Card className="transition-all duration-300 group-hover:border-primary group-hover:shadow-md">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center text-muted-foreground group-hover:text-primary">
-              <AlertCircle className="h-5 w-5 mr-2" /> Ayarlar
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Sistem ayarlarını yapılandır ve kuralları düzenle.
-            </p>
-          </CardContent>
-        </Card>
-      </Link>
-    </div>
-  );
-};
-
-export default QuickLinksGrid;
+const links = [
+  { href: "/employees", description: "Projedeki kişi bilgilerini görüntüleyin." },
+  { href: "/pdks-records", description: "Personel giriş çıkış kayıtlarını inceleyin." },
+  { href: "/settings", description: "Proje ayarlarını yapılandırın." },
+];
+export default function QuickLinksGrid() {
+  const { profile } = useAuth();
+  const routes = visibleRoutes(profile?.role);
+  return <section><h2 className="text-base font-semibold">Hızlı erişim</h2><div className="mt-4">{links.map(link => {
+    const route = routes.find(item => item.href === link.href);
+    return route ? <Link key={route.href} to={route.href} className="flex items-center gap-3 border-b py-[13px] hover:bg-subtle"><div><strong className="font-[550]">{route.name}</strong><p className="mt-0.5 text-xs text-muted-foreground">{link.description}</p></div><ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" /></Link> : null;
+  })}</div></section>;
+}

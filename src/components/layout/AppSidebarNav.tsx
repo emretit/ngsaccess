@@ -1,47 +1,25 @@
-import { capabilities } from "@/lib/capabilities";
 import { Link, useLocation } from "react-router-dom";
-import {
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-} from "@/components/ui/sidebar";
+import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
 import { useAuth } from "@/components/auth/AuthProvider";
-
-import { routeMeta } from "@/lib/routeMeta";
+import { visibleRoutes } from "@/lib/routeMeta";
 
 export function AppSidebarNav() {
   const location = useLocation();
   const { profile } = useAuth();
-  const { systemAdmin: isSuperAdmin, admin: isAdmin } = capabilities(profile?.role);
-
-  return (
-    <SidebarMenu>
-      {routeMeta
-        .filter((item) => (item.menu !== false) && (!item.adminOnly || isAdmin) && (!item.superAdminOnly || isSuperAdmin))
-        .map((item) => {
-        const Icon = item.icon;
-        const isActive = location.pathname === item.href;
-
-        return (
-          <SidebarMenuItem key={item.name}>
-            <SidebarMenuButton
-              asChild
-              isActive={isActive}
-              tooltip={item.name}
-              className={
-                isActive
-                  ? "bg-white/20! text-white! hover:bg-white/30! hover:text-white!"
-                  : undefined
-              }
-            >
-              <Link to={item.href} aria-current={isActive ? "page" : undefined}>
-                <Icon className="h-4 w-4" />
-                <span>{item.name}</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        );
-      })}
-    </SidebarMenu>
-  );
+  const { isMobile, setOpenMobile } = useSidebar();
+  const routes = visibleRoutes(profile?.role);
+  return <nav aria-label="Ana menü" className="space-y-4">
+    {(["main", "attendance", "management"] as const).map(group => {
+      const items = routes.filter(item => item.group === group);
+      if (!items.length) return null;
+      return <SidebarMenu key={group} className="gap-[3px]">{items.map(item => {
+        const active = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`);
+        return <SidebarMenuItem key={item.href}><SidebarMenuButton asChild isActive={active} tooltip={item.name}>
+          <Link to={item.href} aria-current={active ? "page" : undefined} onClick={() => { if (isMobile) setOpenMobile(false); }}>
+            <item.icon className="h-4 w-4 text-side-muted" aria-hidden="true" /><span>{item.name}</span>
+          </Link>
+        </SidebarMenuButton></SidebarMenuItem>;
+      })}</SidebarMenu>;
+    })}
+  </nav>;
 }

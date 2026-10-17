@@ -22,12 +22,12 @@ export function AccessDenied({
       )}
     >
       <div className="space-y-4 text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--warning-subtle))]">
-          <Lock className="h-8 w-8 text-[hsl(var(--warning))]" />
+        <div className="mx-auto flex h-8 w-8 items-center justify-center ">
+          <Lock className="h-5 w-5 text-[hsl(var(--warning))]" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-foreground">
-            Proje Erişimi Yok
+          <h3 className="text-base font-semibold text-foreground">
+            Proje erişimi yok
           </h3>
           <p className="mt-2 text-muted-foreground">{message}</p>
         </div>

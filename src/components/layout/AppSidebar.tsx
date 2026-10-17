@@ -12,15 +12,15 @@ import { AppSidebarNav } from "./AppSidebarNav";
 
 export function AppSidebar() {
   return (
-    <Sidebar collapsible="icon" side="left">
+    <Sidebar collapsible="none" side="left">
       <SidebarHeader>
         <Link
           to="/home"
           className="flex h-full w-full items-center gap-2 text-sidebar-foreground"
         >
-          <img src="/logo.svg" alt="NGS+" className="h-7 w-7 shrink-0 object-contain" />
-          <span className="truncate text-sm font-semibold group-data-[collapsible=icon]:hidden text-white">
-            PDKS
+          <span aria-hidden="true" className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-sm border border-side-text text-lg leading-none">N</span>
+          <span className="truncate text-[19px] font-semibold group-data-[collapsible=icon]:hidden text-white">
+            NGS Plus
           </span>
         </Link>
       </SidebarHeader>
@@ -33,9 +33,9 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border gap-1">
-        <p className="text-[10px] text-white/60 truncate px-2 group-data-[collapsible=icon]:hidden">
-          PDKS v1.0
+      <SidebarFooter className="gap-1 px-6 py-6">
+        <p className="text-[11px] text-side-muted truncate group-data-[collapsible=icon]:hidden">
+          Personel ve geçiş yönetimi
         </p>
       </SidebarFooter>
     </Sidebar>

@@ -7,5 +7,5 @@ export interface StatusBadgeProps extends Omit<BadgeProps, "variant"> {
 }
 
 export function StatusBadge({ tone, className, ...props }: StatusBadgeProps) {
-  return <Badge variant="outline" className={cn(statusTone(tone), className)} {...props} />;
+  return <Badge variant="outline" className={cn("gap-1.5 border-transparent before:h-1 before:w-1 before:shrink-0 before:rounded-full before:bg-current", statusTone(tone), className)} {...props} />;
 }

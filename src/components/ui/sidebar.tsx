@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -17,7 +18,7 @@ import {
 
 const SIDEBAR_COOKIE_NAME = "sidebar:state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "13rem"
+const SIDEBAR_WIDTH = "216px"
 const SIDEBAR_WIDTH_ICON = "2.75rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
@@ -27,6 +28,8 @@ type SidebarContext = {
   setOpen: (open: boolean) => void
   toggleSidebar: () => void
   isMobile: boolean
+  openMobile: boolean
+  setOpenMobile: (open: boolean) => void
 }
 
 const SidebarContext = React.createContext<SidebarContext | null>(null)
@@ -60,6 +63,14 @@ const SidebarProvider = React.forwardRef<
     },
     ref
   ) => {
+    const [isMobile, setIsMobile] = React.useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches)
+    const [openMobile, setOpenMobile] = React.useState(false)
+    React.useEffect(() => {
+      const media = window.matchMedia("(max-width: 760px)")
+      const update = () => { setIsMobile(media.matches); if (!media.matches) setOpenMobile(false) }
+      media.addEventListener("change", update)
+      return () => media.removeEventListener("change", update)
+    }, [])
     const [_open, _setOpen] = React.useState(defaultOpen)
     const open = openProp ?? _open
     const openRef = React.useRef(open)
@@ -82,8 +93,9 @@ const SidebarProvider = React.forwardRef<
     )
 
     const toggleSidebar = React.useCallback(() => {
-      setOpen((prev) => !prev)
-    }, [setOpen])
+      if (isMobile) setOpenMobile(prev => !prev)
+      else setOpen((prev) => !prev)
+    }, [setOpen, isMobile])
 
     // Adds a keyboard shortcut to toggle the sidebar.
     React.useEffect(() => {
@@ -111,9 +123,9 @@ const SidebarProvider = React.forwardRef<
         open,
         setOpen,
         toggleSidebar,
-        isMobile: false,
+        isMobile, openMobile, setOpenMobile,
       }),
-      [state, open, setOpen, toggleSidebar]
+      [state, open, setOpen, toggleSidebar, isMobile, openMobile]
     )
 
     return (
@@ -162,13 +174,26 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    const { state } = useSidebar()
+    const { state, isMobile, openMobile, setOpenMobile } = useSidebar()
+    if (isMobile) {
+      return <Sheet open={openMobile} onOpenChange={setOpenMobile}>
+        <SheetContent side={side} id="app-sidebar" data-sidebar="sidebar"
+          className="flex w-[248px] max-w-[calc(100vw-32px)] flex-col gap-0 border-0 bg-sidebar p-0 text-sidebar-foreground"
+          onCloseAutoFocus={event => {
+            event.preventDefault()
+            document.querySelector<HTMLButtonElement>('[data-sidebar="trigger"]')?.focus()
+          }}>
+          <SheetTitle className="sr-only">Ana menü</SheetTitle>
+          {children}
+        </SheetContent>
+      </Sheet>
+    }
 
     if (collapsible === "none") {
       return (
-        <div
+        <div id="app-sidebar" data-sidebar="sidebar"
           className={cn(
-            "flex h-full w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground",
+            "group flex h-svh w-(--sidebar-width) shrink-0 flex-col bg-sidebar text-sidebar-foreground",
             className
           )}
           ref={ref}
@@ -181,6 +206,7 @@ const Sidebar = React.forwardRef<
 
     return (
       <aside
+        id="app-sidebar"
         ref={ref}
         data-sidebar="sidebar"
         data-state={state}
@@ -210,15 +236,18 @@ const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
   React.ComponentProps<typeof Button>
 >(({ className, onClick, ...props }, ref) => {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, isMobile, openMobile, open } = useSidebar()
 
   return (
     <Button
       ref={ref}
       data-sidebar="trigger"
+      aria-controls="app-sidebar"
+      aria-expanded={isMobile ? openMobile : open}
+      aria-label={(isMobile ? openMobile : open) ? "Menüyü kapat" : "Menüyü aç"}
       variant="ghost"
       size="icon"
-      className={cn("h-7 w-7", className)}
+      className={cn("h-9 w-9", className)}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
@@ -226,7 +255,7 @@ const SidebarTrigger = React.forwardRef<
       {...props}
     >
       <PanelLeft />
-      <span className="sr-only">Toggle Sidebar</span>
+      <span className="sr-only">Menüyü aç/kapat</span>
     </Button>
   )
 })
@@ -242,10 +271,10 @@ const SidebarRail = React.forwardRef<
     <button
       ref={ref}
       data-sidebar="rail"
-      aria-label="Toggle Sidebar"
+      aria-label="Menüyü aç/kapat"
       tabIndex={-1}
       onClick={toggleSidebar}
-      title="Toggle Sidebar"
+      title="Menüyü aç/kapat"
       className={cn(
         "absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=left]:-right-4 group-data-[side=right]:left-0 sm:flex",
         "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",
@@ -263,10 +292,10 @@ SidebarRail.displayName = "SidebarRail"
 
 const SidebarInset = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<"main">
+  React.ComponentProps<"div">
 >(({ className, ...props }, ref) => {
   return (
-    <main
+    <div
       ref={ref}
       className={cn(
         "relative flex min-h-svh min-w-0 flex-1 flex-col bg-background",
@@ -305,7 +334,7 @@ const SidebarHeader = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="header"
-      className={cn("flex h-12 shrink-0 items-center px-3 border-b border-sidebar-border", className)}
+      className={cn("flex h-20 shrink-0 items-center px-6", className)}
       {...props}
     />
   )
@@ -459,7 +488,7 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = "SidebarMenuItem"
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md px-2 py-1 text-left text-sm outline-none ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-data-[sidebar=menu-action]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-1! [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
+  "peer/menu-button flex w-full items-center gap-3 overflow-hidden rounded-sm px-3 py-1 text-left text-sm outline-none ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-data-[sidebar=menu-action]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-1! [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
   {
     variants: {
       variant: {
@@ -468,7 +497,7 @@ const sidebarMenuButtonVariants = cva(
           "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
       },
       size: {
-        default: "h-8 text-sm",
+        default: "h-[37px] text-sm",
         sm: "h-7 text-xs",
         lg: "h-12 text-sm group-data-[collapsible=icon]:p-0!",
       },

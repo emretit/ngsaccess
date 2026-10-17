@@ -1,107 +1,40 @@
+import { Link } from "react-router-dom";
+import { useDashboardReadings } from "@/hooks/useDashboard";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { capabilities } from "@/lib/capabilities";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 
-import React from 'react';
-import { Link } from 'react-router-dom';
-import type { FunctionReturnType } from 'convex/server';
-import { api } from '../../../convex/_generated/api';
-import { EmptyState } from '@/components/shared/EmptyState';
-import { SectionSkeleton } from '@/components/shared/SectionSkeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { StatusBadge } from '@/components/shared/StatusBadge';
-type RecentReadings = FunctionReturnType<typeof api.dashboard.getRecentReadings>;
-
-const trDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' });
-const trTime = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' });
-const trDate = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'short' });
-
-function formatReadingTime(date: Date) {
-  const day = trDay.format(date) === trDay.format(new Date()) ? 'Bugün' : trDate.format(date);
-  return `${day} ${trTime.format(date)}`;
+const dateFormat = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit" });
+const timeFormat = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" });
+export default function RecentReadingsTable() {
+  const { readings, loading } = useDashboardReadings();
+  const { profile } = useAuth();
+  return <div className="overflow-hidden rounded-lg border bg-surface">
+    <div className="flex flex-wrap items-start justify-between gap-3 px-4 py-[18px] min-[761px]:px-5"><h2 className="text-base font-semibold">Son kart okumaları</h2><Link to="/live-monitoring" className="py-1 text-xs font-medium hover:underline">Canlı izlemeyi aç</Link></div>
+    {loading ? <SectionSkeleton rows={5} label="Son kart okumaları yükleniyor" className="p-4" /> : !readings.length ? <div className="pb-6">
+      <EmptyState compact title="Henüz kart okuma kaydı yok" description={capabilities(profile?.role).admin ? "Cihaz ve personel bağlantılarını kontrol edin. İlk kart okuması burada görünecek." : "Cihaz ve personel bağlantılarını yöneticinizle kontrol edin."} />
+      <div className="flex flex-wrap justify-center gap-2 px-4"><Button asChild variant="outline"><Link to="/devices">Cihazları görüntüle</Link></Button><Button asChild variant="outline"><Link to="/employees">Kişileri görüntüle</Link></Button></div>
+    </div> : <>
+      <Table className="table-fixed text-xs [&_td]:px-3 [&_th]:px-3 min-[761px]:[&_td]:px-4 min-[761px]:[&_th]:px-4" aria-label="Son kart okumaları">
+        <TableHeader><TableRow><TableHead className="w-[30%] min-[761px]:w-[24%]">Tarih / Saat</TableHead><TableHead className="w-[37%] min-[761px]:w-[28%]">Personel</TableHead><TableHead className="hidden min-[761px]:table-cell min-[761px]:w-[27%]">Cihaz</TableHead><TableHead className="w-[33%] min-[761px]:w-[21%]">Durum</TableHead></TableRow></TableHeader>
+        <TableBody>{readings.map(reading => {
+          const date = reading.accessTime ? new Date(reading.accessTime) : null;
+          const valid = date && !Number.isNaN(date.getTime());
+          const device = reading.devices?.name?.trim() || "Cihaz bilgisi yok";
+          const granted = reading.accessStatus === "izin_verildi";
+          const denied = reading.accessStatus === "reddedildi";
+          return <TableRow key={reading._id} className="max-[760px]:h-[58px]">
+            <TableCell className="tabular-nums">{valid ? <><span className="block text-muted-foreground min-[761px]:mr-2 min-[761px]:inline">{dateFormat.format(date)}</span><span>{timeFormat.format(date)}</span></> : "Tarih bilgisi yok"}</TableCell>
+            <TableCell className="break-words"><span>{reading.employeeName?.trim() || "Kişi bilgisi yok"}</span><span className="mt-1 block text-[11px] text-muted-foreground min-[761px]:hidden">{device}</span></TableCell>
+            <TableCell className="hidden break-words min-[761px]:table-cell">{device}</TableCell>
+            <TableCell><StatusBadge tone={granted ? "success" : denied ? "danger" : "neutral"} className="max-[760px]:whitespace-normal">{granted ? "İzin verildi" : denied ? "Reddedildi" : "Durum bilinmiyor"}</StatusBadge></TableCell>
+          </TableRow>;
+        })}</TableBody>
+      </Table><p className="border-t px-4 py-3 text-[11px] text-muted-foreground">Son {readings.length} kayıt · Tüm tarihler</p>
+    </>}
+  </div>;
 }
-
-interface RecentReadingsTableProps {
-  readings: RecentReadings;
-  loading: boolean;
-}
-
-const RecentReadingsTable: React.FC<RecentReadingsTableProps> = ({ readings, loading }) => {
-  const getStatusBadge = (reading: RecentReadings[number]) => {
-    // Use accessStatus for badge determination
-    const hasAccess = reading.accessStatus === 'izin_verildi';
-
-    return (
-      <StatusBadge tone={hasAccess ? 'success' : 'danger'}>
-        {hasAccess ? 'İzin Verildi' : 'Reddedildi'}
-      </StatusBadge>
-    );
-  };
-
-  return (
-    <div className="bg-card rounded-lg shadow-md">
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold">
-            Son Kart Okutmaları
-          </h2>
-          <Link 
-            to="/access-control" 
-            className="text-primary hover:text-primary/80 text-sm"
-          >
-            Tümünü Görüntüle
-          </Link>
-        </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tarih / Saat</TableHead>
-                <TableHead>Personel</TableHead>
-                <TableHead>Cihaz</TableHead>
-                <TableHead>Durum</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-4">
-                    <SectionSkeleton rows={3} label="Son okumalar yükleniyor" />
-                  </TableCell>
-                </TableRow>
-              ) : readings.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-4 text-muted-foreground">
-                    <EmptyState title="Henüz kart okutma kaydı yok" description="Personel ve cihaz kurulumunu kontrol etmek için aşağıdaki hızlı erişim bağlantılarını kullanabilirsiniz." className="py-6" />
-                  </TableCell>
-                </TableRow>
-              ) : (
-                readings.map((reading) => {
-                  const timeValue = reading.accessTime;
-                  const date = timeValue ? new Date(timeValue) : null;
-                  const isValidDate = date && !Number.isNaN(date.getTime());
-                  return (
-                  <TableRow key={reading._id}>
-                    <TableCell>
-                      {isValidDate ? formatReadingTime(date) : '-'}
-                    </TableCell>
-                    <TableCell>{reading.employeeName}</TableCell>
-                    <TableCell>{reading.devices?.name || '-'}</TableCell>
-                    <TableCell>{getStatusBadge(reading)}</TableCell>
-                  </TableRow>
-                );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default RecentReadingsTable;

@@ -123,3 +123,42 @@ await ctx.db.patch(id, toPatch(fields));
 - `const { requestClose, dialog } = useUnsavedChangesGuard(isDirty)`: modal `onOpenChange`, iptal ve kapat düğmelerinde `requestClose(() => setOpen(false))` çağırın ve `{dialog}` render edin. Başarıyla kaydetme doğrudan kapanabilir. Sekme kapatmada tarayıcı uyarısı vardır; rota değişimi için gezinme callback'ini ayrıca `requestClose` üzerinden geçirin. **API sabit:** `requestClose(close: () => void): void`.
 - `QuerySectionBoundary` sorguyu çağıran **çocuk bileşeni** sarar; kendi parent'ındaki query hatasını yakalayamaz. Opsiyonel `title`, `description`, `onRetry`, `resetKey: string | number`, `className`; yeniden deneme çocukları yeniden mount eder, `resetKey` proje/filtre değişiminde hata durumunu temizler. ErrorState içinde yeniden deneme gösterilir; kardeş bölümler ayakta kalır.
 - `EmptyState`, `ErrorState`, `AccessDenied` isteğe bağlı `compact` destekler. `StatCard` `loading` ve null/undefined değeri destekler; bilinmeyen değer sıfır yerine “—” gösterilir. Badge: mevcut varyantlara ek `danger`, `successSubtle`, `warningSubtle`, `dangerSubtle`, `infoSubtle`.
+
+## A2 bileşenleri
+
+A2 sistem fontu ve 13px gövde kullanır; 216px bordo sidebar ve 64px üst çubuk ortaktır. `bg-canvas`, `bg-surface`, `bg-subtle`, `border-line`, `border-control`, `bg-selected`, `text-success`, `bg-success-bg` (warning/info/danger eşleri) Tailwind v4 token'larıdır. Eski shadcn token'ları aynı palete bağlıdır; `--muted` geriye uyum için yüzeydir, ikincil metin `text-muted-foreground` kullanır. CSS ham renkleri HSL kanalıdır: `hsl(var(--canvas))`. Kontrol 6px, rozet 4px, dialog 8px; yalnız açılır katman `shadow-popover` kullanır.
+
+```tsx
+<PageHeader title="Kişiler" scope={`${projectName} · Tüm kişiler`}
+  primaryAction={{ label: "Kişi ekle", onClick: openCreate }}
+  secondaryMenu={<RowActions label="Sayfa işlemleri">{menuItems}</RowActions>} />
+<StatInline items={[{ label: "Toplam", value: total }, { label: "Aktif", value: active }]} loading={loading} />
+// Dashboard: variant="metrics". null/undefined → —, kesin 0 → 0.
+<FilterBar search={search} onSearchChange={setSearch} hasFilters={status !== "all"}
+  onClear={() => { setSearch(""); setStatus("all"); }}>
+  {statusSelect}
+</FilterBar>
+<BulkBar count={selectedIds.size} onClear={() => setSelectedIds(new Set())}>{bulkActions}</BulkBar>
+<Table density="compact">{tableContent}</Table>
+// Sayı/tarih hücresi: className="tabular-nums". Satır 42px, başlık 36px.
+```
+
+`FilterBar.onClear` sadece liste filtrelerini sıfırlar; aktif proje ve dönem kapsamını değiştirmez. `RowActions` çocukları mevcut `DropdownMenuItem` bileşenleridir. Eski `Table` tüketicileri varsayılan compact görünümle çalışır; `density="comfortable"` 48px satır sunar. Mevcut `StatCard`, durum bileşenleri ve ui bileşenlerinin props API'leri korunur.
+
+```tsx
+const guard = useUnsavedChangesGuard(form.formState.isDirty);
+const save = form.handleSubmit(async values => {
+  await update(values);
+  form.reset(values); // yalnız gerçek başarıdan sonra dirty kapanır
+});
+<Sheet open={open} onOpenChange={next => next ? setOpen(true) : guard.requestClose(() => setOpen(false))}>
+  <SheetContent>{/* form */}
+    <SaveBar dirty={form.formState.isDirty} saving={form.formState.isSubmitting}
+      onSave={() => void save()}
+      onCancel={() => guard.requestClose(() => { form.reset(); setOpen(false); })} />
+  </SheetContent>
+</Sheet>
+{guard.dialog}
+```
+
+Guard ve dialog `@/components/shared/UnsavedChangesDialog` içindedir. Esc, dış tıklama ve tüm kapatma yolları `requestClose` üzerinden geçer; guard sekme kapatmayı da izler, uygulama içi rota değişimini kendiliğinden engellemez. Query hata izolasyonu için sorguyu çağıran bileşeni `QuerySectionBoundary` altına yerleştirin; proje değişiminde subtree key'i ile eski kapsamı kaldırın. Menü/palet/hızlı erişim görünürlüğünün kaynağı `visibleRoutes`; yeni yetki eklemez.

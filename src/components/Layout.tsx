@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { useEffect, useRef, Suspense } from "react";
 import { Navigate, Link, useLocation, Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/AppSidebar";
@@ -19,6 +19,14 @@ export default function Layout() {
   const location = useLocation();
   const { activeProjectId } = useActiveProject();
 
+  const mainRef = useRef<HTMLElement>(null);
+  const previousPath = useRef(location.pathname);
+  useEffect(() => {
+    if (previousPath.current !== location.pathname) {
+      mainRef.current?.focus();
+      previousPath.current = location.pathname;
+    }
+  }, [location.pathname]);
   const pageTitle = routeMeta.find((item) => item.href === location.pathname)?.name ?? "";
   if (loading) return <LoadingSpinner text="Sistem hazırlanıyor..." />;
   if (!session || profile?.verified === false) {
@@ -28,13 +36,15 @@ export default function Layout() {
 
   return (
     <SidebarProvider>
+      <a href="#main" className="skip-link">İçeriğe geç</a>
       <AppSidebar />
-      <SidebarInset className="h-screen overflow-hidden bg-muted/50">
+      <SidebarInset className="h-screen overflow-hidden bg-canvas">
         <AppHeader title={pageTitle} />
+        <span className="sr-only" aria-live="polite">{pageTitle}</span>
         <ErrorBoundary fallback={() => <ErrorState compact title="Eşitleme durumu alınamadı" />}><SyncIssuesBanner /></ErrorBoundary>
-        <main className="flex-1 overflow-auto p-3 md:p-4 min-w-0 bg-muted/50">
+        <main id="main" ref={mainRef} tabIndex={-1} aria-label={pageTitle} className="flex-1 overflow-auto p-4 min-[761px]:p-8 min-w-0 bg-canvas">
           <ErrorBoundary key={`${location.pathname}|${activeProjectId ?? ""}`} fallback={(_error, reset) => <>
-            <ErrorState onRetry={reset} />
+            <ErrorState title={location.pathname === "/home" ? "Proje özeti yüklenemedi" : undefined} description={location.pathname === "/home" ? "Tekrar deneyin veya üst çubuktan başka bir proje seçin." : undefined} onRetry={reset} />
             <div className="text-center"><Button asChild variant="outline"><Link to="/home">Ana sayfaya dön</Link></Button></div>
           </>}>
             <Suspense fallback={<SectionSkeleton rows={5} label="Sayfa yükleniyor" />}><Outlet /></Suspense>
