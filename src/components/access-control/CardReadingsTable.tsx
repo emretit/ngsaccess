@@ -1,118 +1,20 @@
-import type { FunctionReturnType } from "convex/server";
-import type { api } from "../../../convex/_generated/api";
-type CardReading = FunctionReturnType<typeof api.cardReadings.list>["page"][number];
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
-
-const trTime = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
 import { Button } from "@/components/ui/button";
+import { sourceLabel, resultLabel, personLabel, trTime, type Reading } from "@/components/live-monitoring/lib/readings";
 
-interface CardReadingsTableProps {
-  readings: CardReading[];
-  emptyMessage?: string;
-  showClearFilters?: boolean;
-  onClearFilters?: () => void;
+export function CardReadingsTable({ readings, onOpen, freshIds, emptyMessage = "Henüz erişim okuması yok. İlk okuma geldiğinde burada görünecek." }: { readings: Reading[]; onOpen: (reading: Reading, trigger: HTMLElement) => void; emptyMessage?: string; freshIds?: ReadonlySet<string> }) {
+  const result = (r: Reading) => <><StatusBadge tone={r.accessStatus === "izin_verildi" ? "success" : r.accessStatus === "reddedildi" ? "danger" : "neutral"}>{resultLabel(r)}</StatusBadge>{r.accessStatus === "reddedildi" && <span className="block max-w-64 truncate text-xs text-muted-foreground" title={r.hikDenialReason}>{r.hikDenialReason || "Neden bilinmiyor"}</span>}</>;
+  const action = (r: Reading) => <Button variant="ghost" size="icon" aria-label={`${trTime(r.accessTime)} ${personLabel(r)} okuma ayrıntısı`} onClick={e => onOpen(r, e.currentTarget)}>⋯</Button>;
+  if (!readings.length) return <EmptyState title="Okuma bulunamadı" description={emptyMessage} />;
+  return <>
+    <div className="hidden min-w-0 overflow-x-auto rounded-md border border-line min-[761px]:block"><Table density="compact"><TableHeader><TableRow>{["Zaman (TR)", "Kişi / kart", "Kapı / cihaz", "Yön", "Sonuç", "Kaynak", "İşlem"].map(label => <TableHead key={label}>{label}</TableHead>)}</TableRow></TableHeader><TableBody>{readings.map(r => <TableRow key={r._id} className={freshIds?.has(r._id) ? "bg-info-bg" : undefined}>
+      <TableCell className="whitespace-nowrap tabular-nums text-xs">{freshIds?.has(r._id) && <span className="mr-1">Yeni</span>}{trTime(r.accessTime)}</TableCell>
+      <TableCell><span className="block max-w-48 truncate" title={personLabel(r)}>{personLabel(r)}</span><span className="block max-w-48 truncate text-xs text-muted-foreground tabular-nums" title={r.cardNo}>{r.cardNo}</span></TableCell>
+      <TableCell><span className="block max-w-44 truncate">{r.door?.name || "Kapı eşleşmedi"}</span><span className="block max-w-44 truncate text-xs text-muted-foreground">{r.devices?.name || (r.deviceId ? "Silinmiş cihaz" : "Cihaz bilinmiyor")}</span></TableCell>
+      <TableCell>{r.direction === "entry" ? "Giriş" : r.direction === "exit" ? "Çıkış" : "Bilinmiyor"}</TableCell><TableCell>{result(r)}</TableCell><TableCell><span className="rounded border border-line px-1.5 py-0.5 text-xs">{sourceLabel(r.source)}</span></TableCell><TableCell>{action(r)}</TableCell>
+    </TableRow>)}</TableBody></Table></div>
+    <div className="min-w-0 divide-y divide-line border-y border-line min-[761px]:hidden">{readings.map(r => <article key={r._id} className={`min-w-0 py-3 ${freshIds?.has(r._id) ? "bg-info-bg" : ""}`}><div className="flex min-w-0 items-start justify-between gap-2"><div className="min-w-0"><p className="text-xs tabular-nums text-muted-foreground">{freshIds?.has(r._id) ? "Yeni · " : ""}{trTime(r.accessTime)}</p><p className="break-words font-medium">{personLabel(r)}</p><p className="break-all text-xs tabular-nums">{r.cardNo}</p><p className="break-words text-xs">{r.door?.name || "Kapı eşleşmedi"}</p></div>{action(r)}</div><div className="mt-2 flex flex-wrap items-center gap-2 text-xs">{result(r)}<span>{sourceLabel(r.source)}</span></div></article>)}</div>
+  </>;
 }
-
-export const CardReadingsTable = ({
-  readings,
-  emptyMessage = "Görüntülenecek kart okutma kaydı bulunamadı.",
-  showClearFilters = false,
-  onClearFilters,
-}: CardReadingsTableProps) => {
-  const getStatusBadge = (reading: CardReading) => (
-    <StatusBadge tone={reading.accessStatus === "izin_verildi" ? "success" : reading.accessStatus === "reddedildi" ? "danger" : "neutral"}>
-      {reading.accessStatus === "izin_verildi" ? "İzin Verildi" : reading.accessStatus === "reddedildi" ? "Reddedildi" : "Bilinmiyor"}
-    </StatusBadge>
-  );
-  const getDirectionBadge = (reading: CardReading) => (
-    <StatusBadge tone="neutral">{reading.direction === "entry" ? "Giriş" : reading.direction === "exit" ? "Çıkış" : "Bilinmiyor"}</StatusBadge>
-  );
-
-  // Helper function to get device display name
-  const getDeviceDisplay = (reading: CardReading) => {
-    // First try to get device name from devices relation
-    if (reading.devices?.name) {
-      return reading.devices.name;
-    }
-    // If no device name, try serial number
-    if (reading.devices?.deviceSerial) {
-      return reading.devices.deviceSerial;
-    }
-    // Fallback to default
-    return reading.deviceId && !reading.devices ? "Silinmiş cihaz" : "Bilinmeyen Cihaz";
-  };
-
-  // Okuyucu/kapı: IDE Smart okumalarda hangi WIEGAND/io okudu (ideIoId → doors).
-  // Kapı tanımlıysa adını, değilse ham io index'ini, IDE dışı okumada "-" göster.
-  const getReaderDisplay = (reading: CardReading) => {
-    if (reading.door?.readerName) {
-      return reading.door.readerName;
-    }
-    if (reading.door?.name) {
-      return reading.door.name;
-    }
-    if (reading.ideIoId !== undefined) {
-      return `IO ${reading.ideIoId}`;
-    }
-    return "-";
-  };
-
-  return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Çalışan</TableHead>
-            <TableHead>Kart No</TableHead>
-            <TableHead>Zaman (TR saati)</TableHead>
-            <TableHead>Departman</TableHead>
-            <TableHead>Cihaz</TableHead>
-            <TableHead>Okuyucu / Kapı</TableHead>
-            <TableHead>Yön</TableHead>
-            <TableHead>Durum</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {readings.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-                <div className="flex flex-col items-center gap-2">
-                  <EmptyState title={emptyMessage} />
-                  {showClearFilters && onClearFilters && (
-                    <Button variant="ghost" size="sm" onClick={onClearFilters}>
-                      Filtreleri Temizle
-                    </Button>
-                  )}
-                </div>
-              </TableCell>
-            </TableRow>
-          ) : (
-            readings.map((reading) => (
-              <TableRow key={reading._id}>
-                <TableCell>{reading.employeeName || "Bilinmeyen"}</TableCell>
-                <TableCell>{reading.cardNo}</TableCell>
-                <TableCell>
-                  {Number.isFinite(Date.parse(reading.accessTime)) ? trTime.format(new Date(reading.accessTime)) : "Bilinmiyor"}
-                </TableCell>
-                <TableCell>{reading.employees?.departments?.name || "-"}</TableCell>
-                <TableCell>{getDeviceDisplay(reading)}</TableCell>
-                <TableCell>{getReaderDisplay(reading)}</TableCell>
-                <TableCell>{getDirectionBadge(reading)}</TableCell>
-                <TableCell>{getStatusBadge(reading)}</TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
-  );
-};

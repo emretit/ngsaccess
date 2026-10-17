@@ -1,58 +1,38 @@
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Search, ScanLine } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { parseDateString, toLocalDateString, todayInTurkey } from "@/lib/date";
-import type { useCardReadings } from "@/hooks/useCardReadings";
+import { useEffect } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { FilterBar } from "@/components/shared/FilterBar";
+import { Input } from "@/components/ui/input";
+import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
+import { emptyFilters, type Filters } from "@/components/live-monitoring/lib/readings";
 
-type CardReadingsFiltersProps = Pick<ReturnType<typeof useCardReadings>,
-  "searchTerm" | "setSearchTerm" | "dateFilter" | "setDateFilter" | "endDateFilter" | "setEndDateFilter" |
-  "accessFilter" | "setAccessFilter" | "deviceId" | "setDeviceId" | "devices" | "hasMore" | "isLoading"
-> & { loadedCount: number };
-
-export const CardReadingsFilters = ({ searchTerm, setSearchTerm, dateFilter, setDateFilter,
-  endDateFilter, setEndDateFilter, accessFilter, setAccessFilter, deviceId, setDeviceId,
-  devices, loadedCount, hasMore, isLoading }: CardReadingsFiltersProps) => (
-  <div className="rounded-xl border bg-card shadow-xs p-4 md:p-6 space-y-3">
-    <div className="flex items-center gap-2">
-      <ScanLine className="h-4 w-4 text-primary" aria-hidden="true" />
-      <div>
-        <h2 className="text-sm font-semibold">Kart Okutma Geçmişi</h2>
-        <p className="text-xs text-muted-foreground" aria-live="polite">
-          {isLoading ? "Kayıtlar yükleniyor…" : `${loadedCount} kayıt yüklendi${hasMore ? " · Daha eski kayıtlar var" : ""}`} · TR saati
-        </p>
-      </div>
-    </div>
-    <div className="flex items-end gap-3 flex-wrap">
-      <label className="flex-1 min-w-[200px] space-y-1 text-xs">
-        <span>Yüklenen kayıtlarda arama</span>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-          <Input type="search" placeholder="Personel veya kart no…" value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)} className="pl-8 h-8 text-sm" />
-        </div>
-      </label>
-      <label className="space-y-1 text-xs"><span>Başlangıç (TR günü)</span>
-        <Input type="date" value={dateFilter ? toLocalDateString(dateFilter) : ""}
-          onChange={e => setDateFilter(parseDateString(e.target.value))} className="h-8" />
-      </label>
-      <label className="space-y-1 text-xs"><span>Bitiş (TR günü)</span>
-        <Input type="date" value={endDateFilter ? toLocalDateString(endDateFilter) : ""}
-          onChange={e => setEndDateFilter(parseDateString(e.target.value))} className="h-8" />
-      </label>
-      <Button variant="outline" size="sm" onClick={() => { setDateFilter(parseDateString(todayInTurkey())); setEndDateFilter(undefined); }}>Bugün</Button>
-      <Select value={deviceId ?? "all"} onValueChange={value => setDeviceId(value === "all" ? undefined : value as Id<"devices">)}>
-        <SelectTrigger aria-label="Cihaz" className="w-[180px] h-8 text-xs"><SelectValue placeholder="Tüm cihazlar" /></SelectTrigger>
-        <SelectContent><SelectItem value="all">Tüm cihazlar</SelectItem>
-          {devices.map(device => <SelectItem key={device._id} value={device._id}>{device.name}</SelectItem>)}
-        </SelectContent>
-      </Select>
-      <Select value={accessFilter} onValueChange={value => { if (value === "all" || value === "granted" || value === "denied") setAccessFilter(value); }}>
-        <SelectTrigger aria-label="Geçiş sonucu" className="w-[140px] h-8 text-xs"><SelectValue placeholder="Durum" /></SelectTrigger>
-        <SelectContent><SelectItem value="all">Tüm sonuçlar</SelectItem><SelectItem value="granted">İzin Verilenler</SelectItem><SelectItem value="denied">Reddedilenler</SelectItem></SelectContent>
-      </Select>
-    </div>
-    {!endDateFilter && <p className="text-xs text-muted-foreground">Bitiş boşsa yalnız başlangıç günü</p>}
-  </div>
-);
+function Options({ projectId, filters, change }: { projectId: Id<"projects">; filters: Filters; change: (next: Partial<Filters>) => void }) {
+  const devices = useQuery(api.devices.list, { projectId });
+  const doors = useQuery(api.doors.list, { projectId });
+  const people = useQuery(api.employees.list, { projectId });
+  useEffect(() => {
+    const patch: Partial<Filters> = {};
+    if (devices && filters.device && !devices.some(d => d._id === filters.device)) patch.device = "";
+    if (people && filters.employee && !people.some(p => p._id === filters.employee)) patch.employee = "";
+    if (doors && filters.door && !doors.some(d => d._id === filters.door && (!filters.device || d.deviceId === filters.device))) patch.door = "";
+    if (Object.keys(patch).length) change(patch);
+  }, [devices, doors, people, filters.device, filters.employee, filters.door, change]);
+  const selectClass = "h-9 w-full min-w-0 rounded-md border border-control bg-surface px-2 text-xs min-[761px]:w-44";
+  return <>
+    <label className="grid min-w-0 gap-1 text-xs">Cihaz<select className={selectClass} value={filters.device} onChange={e => change({ device: e.target.value, door: "" })}><option value="">Tüm cihazlar</option>{devices?.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}</select></label>
+    <label className="grid min-w-0 gap-1 text-xs">Sonuç<select className={selectClass} value={filters.result} onChange={e => { const result = e.target.value; if (result === "all" || result === "granted" || result === "denied" || result === "unknown") change({ result }); }}><option value="all">Tüm sonuçlar</option><option value="granted">İzin verildi</option><option value="denied">Reddedildi</option><option value="unknown">Sonuç bilinmiyor</option></select></label>
+    <details className="w-full min-w-0"><summary className="cursor-pointer py-2 text-xs">Diğer filtreler · Kapı, kişi ve tarih</summary><div className="grid min-w-0 gap-3 py-3 min-[761px]:grid-cols-4">
+      <label className="grid min-w-0 gap-1 text-xs">Kapı<select className={selectClass} value={filters.door} onChange={e => { const door = doors?.find(d => d._id === e.target.value); change({ door: e.target.value, device: door?.deviceId ?? filters.device }); }}><option value="">Tüm kapılar</option>{doors?.filter(d => !filters.device || d.deviceId === filters.device).map(d => <option key={d._id} value={d._id}>{d.name}</option>)}</select></label>
+      <label className="grid min-w-0 gap-1 text-xs">Kişi<select className={selectClass} value={filters.employee} onChange={e => change({ employee: e.target.value })}><option value="">Tüm kişiler</option>{people?.map(p => <option key={p._id} value={p._id}>{p.firstName} {p.lastName}</option>)}</select></label>
+      <label className="grid min-w-0 gap-1 text-xs">Başlangıç (TR günü)<Input className="min-w-0" type="date" value={filters.start} onChange={e => change({ start: e.target.value, mode: "history" })} /></label>
+      <label className="grid min-w-0 gap-1 text-xs">Bitiş (TR günü)<Input className="min-w-0" type="date" value={filters.end} aria-describedby="reading-date-error" onChange={e => change({ end: e.target.value, mode: "history" })} /></label>
+    </div></details>
+  </>;
+}
+export function CardReadingsFilters({ projectId, filters, change }: { projectId: Id<"projects">; filters: Filters; change: (next: Partial<Filters>) => void }) {
+  return <div className="min-w-0 space-y-2">
+    <FilterBar search={filters.search} onSearchChange={search => change({ search })} searchLabel="Yüklenen kayıtlarda kişi veya kart ara" placeholder="Yüklenen kayıtlarda kişi/kart ara" hasFilters={Object.entries(filters).some(([key, value]) => key !== "mode" && value !== emptyFilters[key as keyof Filters])} onClear={() => change({ ...emptyFilters, mode: filters.mode })} />
+    <QuerySectionBoundary resetKey={projectId} description="Filtre seçenekleri yüklenemedi. Arama korunuyor."><div className="grid min-w-0 gap-3 min-[761px]:flex min-[761px]:flex-wrap min-[761px]:items-end"><Options projectId={projectId} filters={filters} change={change} /></div></QuerySectionBoundary>
+  </div>;
+}
