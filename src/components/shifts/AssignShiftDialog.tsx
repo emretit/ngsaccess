@@ -1,9 +1,5 @@
-import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
-import { schedulesOverlap, validDay } from "../../../convex/lib/shiftUx";
-import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { useEffect, useMemo, useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import {
@@ -11,387 +7,491 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { DatePicker } from "@/components/ui/date-picker";
-import { parseDateString, formatDateString } from "@/lib/date";
-import { Check, ChevronsUpDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
+import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
+import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { errorMessage } from "@/lib/notify";
 import {
-  assignmentFormSchema,
-  type AssignmentFormValues,
+  bulkAssignmentFormSchema,
+  type BulkAssignmentFormValues,
 } from "./assignmentFormSchema";
-import { findRangeConflicts } from "./lib/calendarOverlays";
-
-type Employee = FunctionReturnType<typeof api.employees.list>[number];
-type Shift = FunctionReturnType<typeof api.shifts.list>[number];
-type Assignment = FunctionReturnType<typeof api.shifts.listAssignments>[number];
-type Holiday = FunctionReturnType<typeof api.holidays.listForRange>[number];
-type Leave = FunctionReturnType<typeof api.leaves.listForRange>[number];
-
-interface AssignShiftDialogProps {
+import {
+  DAYS,
+  decisionLabels,
+  decisionTone,
+  previewSummary,
+  resultSummary,
+  istanbulToday,
+  type Apply,
+  type Employee,
+  type Shift,
+  type Preview,
+} from "./lib/planning";
+import { LEAVE_TYPE_LABEL_TR } from "./lib/calendarOverlays";
+export interface AssignShiftDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  projectId: Id<"projects">;
   employees: Employee[];
   shifts: Shift[];
-  assignments: Assignment[];
-  leaves?: Leave[];
-  holidays?: Holiday[];
-  initial?: Partial<AssignmentFormValues>;
+  initial?: { employeeIds?: string[]; startDate?: string; endDate?: string };
 }
-
-const EMPTY: AssignmentFormValues = {
-  employeeId: "",
-  shiftId: "",
-  startDate: "",
-  endDate: "",
-};
-
 export function AssignShiftDialog({
   open,
   onOpenChange,
+  projectId,
   employees,
   shifts,
-  assignments,
-  leaves: _leaves = [],
-  holidays: _holidays = [],
   initial,
 }: AssignShiftDialogProps) {
-  const { projectId } = useActiveProjectScope();
-  const { toast } = useToast();
-  const assignShift = useMutation(api.shifts.assignShift);
-  const [form, setForm] = useState<AssignmentFormValues>(EMPTY);
-  const rangeValid = validDay(form.startDate) && validDay(form.endDate) && form.startDate <= form.endDate;
-  const rangeLeaves = useQuery(api.leaves.listForRange, open && rangeValid && projectId ? { startDate: form.startDate, endDate: form.endDate, projectId } : "skip");
-  const rangeHolidays = useQuery(api.holidays.listForRange, open && rangeValid ? { startDate: form.startDate, endDate: form.endDate } : "skip");
-  const employeeProject = employees.find(e => e._id === form.employeeId)?.projectId;
-  const leaves = (rangeLeaves ?? []).filter(l => l.employeeId === form.employeeId);
-  const holidays = (rangeHolidays ?? []).filter(h => !h.projectId || h.projectId === employeeProject);
-  const calendarLoading = rangeValid && (rangeLeaves === undefined || rangeHolidays === undefined);
-  const [employeeOpen, setEmployeeOpen] = useState(false);
-  const [overlapCount, setOverlapCount] = useState<number | null>(null);
-  const [calendarApproved, setCalendarApproved] = useState(false);
-  const [calendarConflict, setCalendarConflict] = useState<{
-    leaveDays: number;
-    holidayDays: number;
-  } | null>(null);
-
-  useEffect(() => { setCalendarApproved(false); }, [form.employeeId, form.startDate, form.endDate]);
-
-  useEffect(() => {
-    if (open) {
-      setForm({ ...EMPTY, ...initial });
-      setOverlapCount(null);
-      setCalendarConflict(null);
-    }
-  }, [open, initial]);
-
-  const activeShifts = useMemo(
-    () => shifts.filter((s) => s.isActive !== false),
-    [shifts],
-  );
-
-  const localConflicts = useMemo(() => {
-    if (!form.employeeId || !form.startDate || !form.endDate) return 0;
-    const shift = shifts.find(s => s._id === form.shiftId);
-    if (!shift) return 0;
-    return assignments.filter(a => {
-      const other = shifts.find(s => s._id === a.shiftId);
-      return a.employeeId === form.employeeId && other && schedulesOverlap(form, shift, a, other);
-    }).length;
-  }, [assignments, shifts, form]);
-
-  const selectedEmployee = employees.find((e) => e._id === form.employeeId);
-
-  const { run: submit, pending: submitting } = useAsyncAction(async (forceConfirm: boolean, skipCalendarCheck: boolean = false) => {
-    if (calendarLoading) throw new Error("İzin ve tatiller kontrol ediliyor");
-    const result = assignmentFormSchema.safeParse(form);
-    if (!result.success) {
-      const first = result.error.issues[0];
-      toast({
-        title: "Hatalı form",
-        description: first?.message ?? "Alanları kontrol edin",
-        variant: "destructive",
-      });
+  const [values, setValues] = useState<BulkAssignmentFormValues>(() => ({
+    employeeIds: initial?.employeeIds ?? [],
+    shiftId: "",
+    startDate: initial?.startDate ?? istanbulToday(),
+    endDate: initial?.endDate ?? istanbulToday(),
+    specificDays: false,
+    weekPattern: [],
+  }));
+  const [baseline, setBaseline] = useState(() => JSON.stringify(values));
+  const guard = useUnsavedChangesGuard(JSON.stringify(values) !== baseline);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [serverError, setServerError] = useState("");
+  const [search, setSearch] = useState("");
+  const [previewValues, setPreviewValues] =
+    useState<BulkAssignmentFormValues | null>(null);
+  const [forceConfirm, setForceConfirm] = useState(false);
+  const [calendarConfirmed, setCalendarConfirmed] = useState(false);
+  const [result, setResult] = useState<Apply | null>(null);
+  const [pending, setPending] = useState(false);
+  const lock = useRef(false);
+  const apply = useMutation(api.shifts.bulkAssignShift);
+  const close = () => {
+    if (!lock.current) guard.requestClose(() => onOpenChange(false));
+  };
+  const change = (next: BulkAssignmentFormValues) => {
+    setValues(next);
+    setPreviewValues(null);
+    setForceConfirm(false);
+    setCalendarConfirmed(false);
+    setServerError("");
+  };
+  const prepare = () => {
+    const parsed = bulkAssignmentFormSchema.safeParse(values);
+    if (!parsed.success) {
+      const next: Record<string, string> = {};
+      for (const issue of parsed.error.issues)
+        next[String(issue.path[0])] = issue.message;
+      setErrors(next);
+      requestAnimationFrame(() =>
+        document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(),
+      );
       return;
     }
-
-    if (!skipCalendarCheck && !calendarApproved && !forceConfirm) {
-      const conflicts = findRangeConflicts(
-        result.data.employeeId,
-        result.data.startDate,
-        result.data.endDate,
-        leaves,
-        holidays,
-      );
-      if (conflicts.leaveDates.length > 0 || conflicts.holidayDates.length > 0) {
-        setCalendarConflict({
-          leaveDays: conflicts.leaveDates.length,
-          holidayDays: conflicts.holidayDates.length,
-        });
-        return;
-      }
-    }
-
+    setErrors({});
+    setPreviewValues(parsed.data);
+  };
+  const save = async () => {
+    if (!previewValues || lock.current || result) return;
+    lock.current = true;
+    setPending(true);
+    setServerError("");
     try {
-      const emp = employees.find((e) => e._id === result.data.employeeId);
-      await assignShift({
-        employeeId: result.data.employeeId as Id<"employees">,
-        shiftId: result.data.shiftId as Id<"shifts">,
-        projectId: emp?.projectId,
-        startDate: result.data.startDate,
-        endDate: result.data.endDate,
+      const response = await apply({
+        resultMode: "detailed",
+        projectId,
+        employeeIds: previewValues.employeeIds as Id<"employees">[],
+        shiftId: previewValues.shiftId as Id<"shifts">,
+        startDate: previewValues.startDate,
+        endDate: previewValues.endDate,
+        weekPattern: previewValues.specificDays
+          ? previewValues.weekPattern
+          : undefined,
         forceConfirm,
-        calendarConfirmed: skipCalendarCheck || calendarApproved,
+        calendarConfirmed,
       });
-      toast({ title: "Vardiya atandı" });
-      setOverlapCount(null);
-      onOpenChange(false);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Atama yapılamadı";
-      const overlapMatch = /OVERLAP:(\d+)/.exec(msg);
-      if (overlapMatch) {
-        setOverlapCount(Number(overlapMatch[1]));
-      } else if (msg.includes("CALENDAR:")) {
-        setCalendarConflict({ leaveDays: 0, holidayDays: 0 });
-      } else {
-        throw e;
-      }
+      setResult(response);
+      setBaseline(JSON.stringify(values));
+    } catch (error) {
+      setServerError(errorMessage(error));
+    } finally {
+      lock.current = false;
+      setPending(false);
     }
-  }, { error: "Atama yapılamadı" });
-
+  };
   return (
     <>
-      <Dialog open={open} onOpenChange={value => { if (!submitting) onOpenChange(value); }}>
-        <DialogContent className="sm:max-w-[480px]">
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) close();
+        }}
+      >
+        <DialogContent className="sm:max-w-[560px] max-h-[90dvh] overflow-y-auto min-w-0">
           <DialogHeader>
-            <DialogTitle>Vardiya Ata</DialogTitle>
+            <DialogTitle>Vardiya ata</DialogTitle>
+            <DialogDescription>
+              Bir veya birden fazla çalışan seçin. Mevcut atamalar korunur; bu
+              işlem ek atama oluşturur.
+            </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-2">
-            <div className="space-y-2">
-              <Label>Çalışan</Label>
-              <Popover open={employeeOpen} onOpenChange={setEmployeeOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={employeeOpen}
-                    className="w-full justify-between font-normal"
-                  >
-                    {selectedEmployee
-                      ? `${selectedEmployee.firstName} ${selectedEmployee.lastName}`
-                      : "Çalışan seçin"}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Çalışan ara..." />
-                    <CommandList>
-                      <CommandEmpty>Sonuç yok.</CommandEmpty>
-                      <CommandGroup>
-                        {employees.map((e) => {
-                          const label = `${e.firstName} ${e.lastName}`;
-                          return (
-                            <CommandItem
-                              key={e._id}
-                              value={label}
-                              onSelect={() => {
-                                setForm((p) => ({ ...p, employeeId: e._id }));
-                                setEmployeeOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  form.employeeId === e._id
-                                    ? "opacity-100"
-                                    : "opacity-0",
-                                )}
-                              />
-                              {label}
-                            </CommandItem>
-                          );
-                        })}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-            <div className="space-y-2">
-              <Label>Vardiya</Label>
-              <Select
-                value={form.shiftId}
-                onValueChange={(v) => setForm((p) => ({ ...p, shiftId: v }))}
-                disabled={activeShifts.length === 0}
+          {serverError && (
+            <p role="alert" className="text-danger text-sm">
+              {serverError}
+            </p>
+          )}
+          {result ? (
+            <section role="status" className="space-y-3">
+              <h3 className="font-semibold">
+                {result.insertedCount ? "Atama sonucu" : "Atama yapılamadı"}
+              </h3>
+              <p>{resultSummary(result)}</p>
+              <ul className="divide-y">
+                {result.results.map((item) => (
+                  <li key={item.employeeId} className="py-2 space-y-1">
+                    <p>
+                      {item.employeeName ||
+                        employees.find((e) => e._id === item.employeeId)
+                          ?.firstName ||
+                        "Çalışan"}
+                    </p>
+                    <StatusBadge
+                      className="max-w-full whitespace-normal text-left"
+                      tone={decisionTone(item.status)}
+                    >
+                      {decisionLabels[item.status]}
+                    </StatusBadge>
+                    <p className="text-xs">{item.reason}</p>
+                  </li>
+                ))}
+              </ul>
+              <Button
+                variant="outline"
+                disabled={!result.results.some((r) => r.status !== "assigned")}
+                onClick={() => {
+                  const skipped = result.results
+                    .filter((r) => r.status !== "assigned")
+                    .map((r) => r.employeeId);
+                  change({ ...values, employeeIds: skipped });
+                  setResult(null);
+                }}
               >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      activeShifts.length === 0
-                        ? "Aktif vardiya yok"
-                        : "Vardiya seçin"
+                Yalnız atlananları incele
+              </Button>
+              <Button onClick={() => onOpenChange(false)}>Kapat</Button>
+            </section>
+          ) : (
+            <>
+              <fieldset disabled={pending} className="space-y-4 min-w-0">
+                <FormFieldWrapper
+                  htmlFor="assignment-people"
+                  label="Çalışanlar"
+                  error={errors.employeeIds}
+                >
+                  <Input
+                    id="assignment-people"
+                    type="search"
+                    placeholder="Çalışan ara"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </FormFieldWrapper>
+                <p className="text-xs break-words">
+                  Seçilen {values.employeeIds.length} kişi:{" "}
+                  {employees
+                    .filter((e) => values.employeeIds.includes(e._id))
+                    .map((e) => `${e.firstName} ${e.lastName}`)
+                    .join(", ") || "Henüz seçim yok"}
+                </p>
+                <div className="max-h-40 overflow-y-auto border rounded-md divide-y">
+                  {employees
+                    .filter((e) =>
+                      `${e.firstName} ${e.lastName} ${e.email ?? ""}`
+                        .toLocaleLowerCase("tr-TR")
+                        .includes(search.toLocaleLowerCase("tr-TR")),
+                    )
+                    .map((e) => (
+                      <label key={e._id} className="flex gap-2 p-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={values.employeeIds.includes(e._id)}
+                          onChange={() =>
+                            change({
+                              ...values,
+                              employeeIds: values.employeeIds.includes(e._id)
+                                ? values.employeeIds.filter(
+                                    (id) => id !== e._id,
+                                  )
+                                : [...values.employeeIds, e._id],
+                            })
+                          }
+                        />
+                        <span className="min-w-0 break-words">
+                          {e.firstName} {e.lastName}
+                          <span className="block text-xs text-muted-foreground break-all">
+                            {e.email}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                </div>
+                <FormFieldWrapper
+                  htmlFor="assignment-shift"
+                  label="Vardiya"
+                  error={errors.shiftId}
+                >
+                  <select
+                    id="assignment-shift"
+                    className="w-full h-9 rounded-md border border-control bg-surface px-2"
+                    value={values.shiftId}
+                    onChange={(e) =>
+                      change({ ...values, shiftId: e.target.value })
+                    }
+                  >
+                    <option value="">Vardiya seçin</option>
+                    {shifts
+                      .filter((s) => s.isActive !== false)
+                      .map((s) => (
+                        <option key={s._id} value={s._id}>
+                          {s.name} ({s.startTime}–{s.endTime})
+                        </option>
+                      ))}
+                  </select>
+                </FormFieldWrapper>
+                <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3">
+                  {(["startDate", "endDate"] as const).map((key) => (
+                    <FormFieldWrapper
+                      key={key}
+                      htmlFor={`assignment-${key}`}
+                      label={key === "startDate" ? "Başlangıç" : "Bitiş"}
+                      error={errors[key]}
+                    >
+                      <Input
+                        id={`assignment-${key}`}
+                        type="date"
+                        value={values[key]}
+                        onChange={(e) =>
+                          change({ ...values, [key]: e.target.value })
+                        }
+                      />
+                    </FormFieldWrapper>
+                  ))}
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={values.specificDays}
+                    onChange={(e) =>
+                      change({ ...values, specificDays: e.target.checked })
                     }
                   />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeShifts.map((s) => (
-                    <SelectItem key={s._id} value={s._id}>
-                      {s.name} ({s.startTime}–{s.endTime})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Başlangıç</Label>
-                <DatePicker
-                  date={parseDateString(form.startDate)}
-                  onSelect={(d) =>
-                    setForm((p) => ({ ...p, startDate: formatDateString(d) }))
-                  }
-                />
+                  Belirli günler
+                </label>
+                {values.specificDays ? (
+                  <fieldset
+                    aria-describedby={
+                      errors.weekPattern ? "assignment-days-error" : undefined
+                    }
+                  >
+                    <legend className="text-sm mb-2">Uygulanacak günler</legend>
+                    <div className="flex flex-wrap gap-3">
+                      {DAYS.map(([code, label]) => (
+                        <label
+                          key={code}
+                          className="flex gap-1 items-center text-sm"
+                        >
+                          <input
+                            type="checkbox"
+                            aria-invalid={
+                              code === "MON" && !!errors.weekPattern
+                            }
+                            aria-describedby={
+                              errors.weekPattern
+                                ? "assignment-days-error"
+                                : undefined
+                            }
+                            checked={values.weekPattern.includes(code)}
+                            onChange={() =>
+                              change({
+                                ...values,
+                                weekPattern: values.weekPattern.includes(code)
+                                  ? values.weekPattern.filter((d) => d !== code)
+                                  : [...values.weekPattern, code],
+                              })
+                            }
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                    {errors.weekPattern && (
+                      <p
+                        role="alert"
+                        id="assignment-days-error"
+                        className="text-danger text-xs"
+                      >
+                        {errors.weekPattern}
+                      </p>
+                    )}
+                  </fieldset>
+                ) : (
+                  <p className="text-sm">Her gün uygulanır.</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {values.startDate}–{values.endDate} dahil aralık ·{" "}
+                  {values.employeeIds.length} kişi. Gece vardiyaları ertesi güne
+                  devam edebilir.
+                </p>
+              </fieldset>
+              {previewValues && (
+                <QuerySectionBoundary
+                  resetKey={JSON.stringify([
+                    previewValues,
+                    forceConfirm,
+                    calendarConfirmed,
+                  ])}
+                  title="Atama önizlemesi yüklenemedi"
+                >
+                  <PreviewPanel
+                    values={previewValues}
+                    projectId={projectId}
+                    forceConfirm={forceConfirm}
+                    calendarConfirmed={calendarConfirmed}
+                    setForceConfirm={setForceConfirm}
+                    setCalendarConfirmed={setCalendarConfirmed}
+                    pending={pending}
+                    onSave={() => void save()}
+                  />
+                </QuerySectionBoundary>
+              )}
+              <div className="sticky bottom-0 bg-surface flex flex-wrap justify-end gap-2 border-t py-3">
+                <Button variant="outline" disabled={pending} onClick={close}>
+                  Vazgeç
+                </Button>
+                <Button disabled={pending} onClick={prepare}>
+                  {previewValues ? "Önizlemeyi yenile" : "Önizle"}
+                </Button>
               </div>
-              <div className="space-y-2">
-                <Label>Bitiş</Label>
-                <DatePicker
-                  date={parseDateString(form.endDate)}
-                  onSelect={(d) =>
-                    setForm((p) => ({ ...p, endDate: formatDateString(d) }))
-                  }
-                  minDate={parseDateString(form.startDate)}
-                />
-              </div>
-            </div>
-
-            {localConflicts > 0 && (
-              <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-                Uyarı: Bu çalışana seçilen aralıkta {localConflicts} mevcut
-                atama var.
-              </div>
-            )}
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={submitting || calendarLoading}
-              >
-                İptal
-              </Button>
-              <Button onClick={() => submit(false)} disabled={submitting || calendarLoading}>
-                {submitting ? "Atanıyor..." : "Ata"}
-              </Button>
-            </div>
-          </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
-
-      <AlertDialog
-        open={overlapCount !== null}
-        onOpenChange={(o) => !o && setOverlapCount(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Çakışan atama var</AlertDialogTitle>
-            <div className="text-sm">{assignments.filter(a => a.employeeId === form.employeeId && (() => { const shift = shifts.find(s => s._id === form.shiftId); const other = shifts.find(s => s._id === a.shiftId); return shift && other && schedulesOverlap(form, shift, a, other); })()).map(a => <p key={a._id}>{shifts.find(s => s._id === a.shiftId)?.name} · {a.startDate}–{a.endDate}</p>)}</div>
-            <AlertDialogDescription>
-              Bu çalışana seçilen aralıkta {overlapCount} mevcut atama
-              bulunuyor. Mevcut atamalar korunur; çakışan ek atamaya izin vermek istiyor musunuz?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={submitting || calendarLoading}>Vazgeç</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                void submit(true, calendarApproved);
-              }}
-              disabled={submitting || calendarLoading}
-            >
-              Yine de Ata
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={calendarConflict !== null}
-        onOpenChange={(o) => !o && setCalendarConflict(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>İzin/Tatil günleri var</AlertDialogTitle>
-            <AlertDialogDescription>
-              {calendarConflict && (
-                <>
-                  Seçilen aralıkta
-                  {calendarConflict.leaveDays > 0 && (
-                    <> <b>{calendarConflict.leaveDays}</b> izin günü</>
-                  )}
-                  {calendarConflict.leaveDays > 0 &&
-                    calendarConflict.holidayDays > 0 &&
-                    " ve"}
-                  {calendarConflict.holidayDays > 0 && (
-                    <> <b>{calendarConflict.holidayDays}</b> resmi tatil</>
-                  )}
-                  {" "}var. Atamayı yine de yapmak istiyor musunuz?
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={submitting || calendarLoading}>Vazgeç</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                setCalendarApproved(true);
-                setCalendarConflict(null);
-                void submit(false, true);
-              }}
-              disabled={submitting || calendarLoading}
-            >
-              Yine de Ata
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {guard.dialog}
     </>
+  );
+}
+function PreviewPanel({
+  values,
+  projectId,
+  forceConfirm,
+  calendarConfirmed,
+  setForceConfirm,
+  setCalendarConfirmed,
+  pending,
+  onSave,
+}: {
+  values: BulkAssignmentFormValues;
+  projectId: Id<"projects">;
+  forceConfirm: boolean;
+  calendarConfirmed: boolean;
+  setForceConfirm: (value: boolean) => void;
+  setCalendarConfirmed: (value: boolean) => void;
+  pending: boolean;
+  onSave: () => void;
+}) {
+  const preview = useQuery(api.shifts.previewBulkAssign, {
+    projectId,
+    employeeIds: values.employeeIds as Id<"employees">[],
+    shiftId: values.shiftId as Id<"shifts">,
+    startDate: values.startDate,
+    endDate: values.endDate,
+    weekPattern: values.specificDays ? values.weekPattern : undefined,
+    forceConfirm,
+    calendarConfirmed,
+  });
+  if (!preview)
+    return <SectionSkeleton label="Atama önizlemesi hesaplanıyor" />;
+  return (
+    <section className="space-y-3 border-t pt-3">
+      <h3 className="font-medium">Önizleme</h3>
+      <p role="status" className="text-sm">
+        {previewSummary(preview.summary)}
+      </p>
+      <ul className="divide-y max-h-64 overflow-y-auto">
+        {preview.results.map((item) => (
+          <Decision key={item.employeeId} item={item} />
+        ))}
+      </ul>
+      {preview.results.some((r) => r.conflict) && (
+        <label className="flex gap-2 text-sm">
+          <input
+            type="checkbox"
+            disabled={pending}
+            checked={forceConfirm}
+            onChange={(e) => setForceConfirm(e.target.checked)}
+          />
+          Vardiya çakışmalarına rağmen ek atama oluşturmayı onaylıyorum.
+        </label>
+      )}
+      {preview.results.some((r) => r.leave || r.holiday) && (
+        <label className="flex gap-2 text-sm">
+          <input
+            type="checkbox"
+            disabled={pending}
+            checked={calendarConfirmed}
+            onChange={(e) => setCalendarConfirmed(e.target.checked)}
+          />
+          İzin ve tatil günlerine rağmen tüm seriyi atamayı onaylıyorum.
+        </label>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Uygulamada yeniden kontrol edilir. Uygun kişiler atanır; diğerlerinin
+        gerekçeleri sonuçta kalır.
+      </p>
+      <Button onClick={onSave} disabled={pending}>
+        {pending ? "Atanıyor…" : "Önizlenen kişilere uygula"}
+      </Button>
+    </section>
+  );
+}
+function Decision({ item }: { item: Preview["results"][number] }) {
+  return (
+    <li className="py-2 space-y-1 text-sm break-words">
+      <p className="font-medium">{item.employeeName || "Çalışan"}</p>
+      <StatusBadge
+        className="max-w-full whitespace-normal text-left"
+        tone={decisionTone(item.status)}
+      >
+        {decisionLabels[item.status]}
+      </StatusBadge>
+      <p className="text-xs">
+        {item.reason} · {item.occurrenceCount} başlangıç günü
+      </p>
+      {item.conflict && (
+        <p className="text-xs">
+          {item.conflict.shiftName} · {item.conflict.startDate}–
+          {item.conflict.endDate} · {item.conflict.startTime}–
+          {item.conflict.endTime}
+        </p>
+      )}
+      {item.leave && (
+        <p className="text-xs">
+          {item.leave.date} ·{" "}
+          {LEAVE_TYPE_LABEL_TR[item.leave.leaveType] ?? item.leave.leaveType}{" "}
+          izni
+        </p>
+      )}
+      {item.holiday && (
+        <p className="text-xs">
+          {item.holiday.date} · {item.holiday.name}
+          {item.holiday.isHalfDay ? " · Yarım gün" : ""}
+        </p>
+      )}
+    </li>
   );
 }

@@ -1,4 +1,4 @@
-import { validateShift } from "../../../../../convex/lib/shiftUx";
+import { validateShift } from "../../../../convex/lib/shiftUx";
 import { z } from "zod";
 
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -40,16 +40,24 @@ export const shiftFormSchema = z
     isActive: z.boolean(),
   })
   .superRefine((data, ctx) => {
-    try { validateShift({ ...data, breakStart: data.breakStart || undefined, breakEnd: data.breakEnd || undefined }); }
-    catch (error: unknown) { ctx.addIssue({ code: z.ZodIssueCode.custom, message: error instanceof Error ? error.message : "Geçersiz vardiya", path: ["breakEnd"] }); }
-  })
-  .refine(
-    (d) => (d.breakStart ? !!d.breakEnd : !d.breakEnd),
-    {
-      message: "Mola başlangıç ve bitiş birlikte verilmeli",
-      path: ["breakEnd"],
+    try {
+      validateShift({
+        ...data,
+        breakStart: data.breakStart || undefined,
+        breakEnd: data.breakEnd || undefined,
+      });
+    } catch (error: unknown) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: error instanceof Error ? error.message : "Geçersiz vardiya",
+        path: ["breakEnd"],
+      });
     }
-  )
+  })
+  .refine((d) => (d.breakStart ? !!d.breakEnd : !d.breakEnd), {
+    message: "Mola başlangıç ve bitiş birlikte verilmeli",
+    path: ["breakEnd"],
+  })
   .refine((d) => d.startTime !== d.endTime, {
     message: "Başlangıç ve bitiş aynı olamaz",
     path: ["endTime"],

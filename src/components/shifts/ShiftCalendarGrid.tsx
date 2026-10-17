@@ -1,146 +1,105 @@
-import { assignmentTouchesDay } from "../../../convex/lib/shiftUx";
-import { useMemo } from "react";
-import type { FunctionReturnType } from "convex/server";
-import { api } from "../../../convex/_generated/api";
 import { ShiftCalendarCell } from "./ShiftCalendarCell";
 import {
-  formatDayHeader,
-  getWeekDays,
-  isDateInRange,
-  isSameDay,
-  toISODate,
-} from "./lib/weekUtils";
-import {
-  holidayOn,
-  leaveForEmployeeOn,
-  assignmentAppliesOnDate,
-} from "./lib/calendarOverlays";
-import { cn } from "@/lib/utils";
-
-type Employee = FunctionReturnType<typeof api.employees.list>[number];
-type Shift = FunctionReturnType<typeof api.shifts.list>[number];
-type Assignment = FunctionReturnType<typeof api.shifts.listAssignments>[number];
-type Holiday = FunctionReturnType<typeof api.holidays.listForRange>[number];
-type Leave = FunctionReturnType<typeof api.leaves.listForRange>[number];
-
-interface ShiftCalendarGridProps {
-  weekStart: Date;
+  dayLabel,
+  istanbulToday,
+  type Employee,
+  type DayData,
+} from "./lib/planning";
+export interface CalendarProps {
   employees: Employee[];
-  shifts: Shift[];
-  assignments: Assignment[];
-  leaves?: Leave[];
-  holidays?: Holiday[];
-  onEmptyCellClick: (employeeId: string, date: string) => void;
-  onAssignmentClick: (assignment: Assignment) => void;
+  days: string[];
+  getData: (employee: Employee, date: string) => DayData;
+  onOpen: (employee: Employee, date: string) => void;
+  selected: Set<string>;
+  onSelect: (id: string) => void;
 }
-
 export function ShiftCalendarGrid({
-  weekStart,
   employees,
-  shifts,
-  assignments,
-  leaves = [],
-  holidays = [],
-  onEmptyCellClick,
-  onAssignmentClick,
-}: ShiftCalendarGridProps) {
-  const days = useMemo(() => getWeekDays(weekStart), [weekStart]);
-  const today = new Date();
-
-  const shiftMap = useMemo(() => {
-    const m = new Map<string, Shift>();
-    for (const s of shifts) m.set(s._id, s);
-    return m;
-  }, [shifts]);
-
-  const assignmentsByEmployee = useMemo(() => {
-    const m = new Map<string, Assignment[]>();
-    for (const a of assignments) {
-      const list = m.get(a.employeeId) ?? [];
-      list.push(a);
-      m.set(a.employeeId, list);
-    }
-    return m;
-  }, [assignments]);
-
-  if (employees.length === 0) {
-    return (
-      <div className="rounded-md border border-dashed py-12 text-center text-sm text-muted-foreground">
-        Görüntülenecek çalışan yok.
-      </div>
-    );
-  }
-
+  days,
+  getData,
+  onOpen,
+  selected,
+  onSelect,
+}: CalendarProps) {
   return (
-    <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
-      <div className="min-w-[820px]">
-        <div className="grid grid-cols-[180px_repeat(7,minmax(100px,1fr))] border-b bg-muted/40">
-          <div className="px-3 py-2 text-xs font-semibold text-muted-foreground">
-            Çalışan
-          </div>
-          {days.map((d) => {
-            const { weekday, dayMonth } = formatDayHeader(d);
-            const todayCol = isSameDay(d, today);
-            return (
-              <div
-                key={toISODate(d)}
-                className={cn(
-                  "px-2 py-2 text-center text-xs",
-                  todayCol && "bg-primary/10",
-                )}
+    <div>
+      <p className="text-xs text-muted-foreground mb-2">
+        Diğer günler için takvimi yatay kaydırın.
+      </p>
+      <div
+        role="region"
+        aria-label="Vardiya takvimi"
+        tabIndex={0}
+        className="max-w-full max-h-[65dvh] overflow-auto rounded-md border focus-visible:outline-2 focus-visible:outline-primary"
+      >
+        <table
+          className="w-full table-fixed text-sm"
+          style={{ minWidth: 216 + days.length * (days.length > 7 ? 92 : 112) }}
+        >
+          <caption className="sr-only">
+            Çalışanlara göre {days[0]} – {days[days.length - 1]} vardiya planı
+          </caption>
+          <thead className="sticky top-0 z-20 bg-subtle">
+            <tr>
+              <th
+                scope="col"
+                className="sticky left-0 z-20 bg-subtle w-[216px] p-2 text-left"
               >
-                <div className="font-semibold uppercase text-muted-foreground">
-                  {weekday}
-                </div>
-                <div className="mt-0.5 text-foreground">{dayMonth}</div>
-              </div>
-            );
-          })}
-        </div>
-
-        {employees.map((emp) => {
-          const empAssignments = assignmentsByEmployee.get(emp._id) ?? [];
-          return (
-            <div
-              key={emp._id}
-              className="grid grid-cols-[180px_repeat(7,minmax(100px,1fr))] border-b last:border-b-0"
-            >
-              <div className="sticky left-0 z-10 flex flex-col justify-center bg-background px-3 py-2 text-sm">
-                <span className="truncate font-medium leading-tight">
-                  {emp.firstName} {emp.lastName}
-                </span>
-                {emp.email && (
-                  <span className="truncate text-[11px] text-muted-foreground leading-tight">
-                    {emp.email}
-                  </span>
-                )}
-              </div>
-              {days.map((d) => {
-                const iso = toISODate(d);
-                const cellAssignments = empAssignments.filter(a => {
-                  const shift = shiftMap.get(a.shiftId);
-                  return shift ? assignmentTouchesDay(a, shift, iso) : isDateInRange(iso, a.startDate, a.endDate) && assignmentAppliesOnDate(a, iso);
-                });
-                const holiday = holidayOn(iso, holidays.filter(h => !h.projectId || h.projectId === emp.projectId));
-                const leave = leaveForEmployeeOn(iso, String(emp._id), leaves);
-                return (
-                  <div key={iso} className="p-1">
-                    <ShiftCalendarCell
-                      date={iso}
-                      isToday={isSameDay(d, today)}
-                      cellAssignments={cellAssignments}
-                      shiftMap={shiftMap}
-                      holiday={holiday}
-                      leave={leave}
-                      onEmptyClick={() => onEmptyCellClick(emp._id, iso)}
-                      onAssignmentClick={onAssignmentClick}
+                Çalışan
+              </th>
+              {days.map((day) => (
+                <th
+                  key={day}
+                  scope="col"
+                  className="p-2 text-xs font-medium border-l"
+                >
+                  {dayLabel(day)}
+                  {day === istanbulToday() && (
+                    <span className="block">Bugün</span>
+                  )}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {employees.map((employee) => (
+              <tr key={employee._id} className="border-t">
+                <th
+                  scope="row"
+                  className="sticky left-0 z-10 bg-surface p-2 text-left font-normal"
+                >
+                  <label className="flex gap-2 items-start">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(employee._id)}
+                      onChange={() => onSelect(employee._id)}
+                      aria-label={`${employee.firstName} ${employee.lastName} seç`}
+                      className="mt-1 size-4 accent-primary"
                     />
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
+                    <span className="min-w-0 break-words">
+                      <span className="font-medium">
+                        {employee.firstName} {employee.lastName}
+                      </span>
+                      <span className="block text-xs text-muted-foreground break-all">
+                        {employee.email}
+                      </span>
+                    </span>
+                  </label>
+                </th>
+                {days.map((day) => (
+                  <td key={day} className="align-top border-l p-1">
+                    <ShiftCalendarCell
+                      data={getData(employee, day)}
+                      date={day}
+                      employeeName={`${employee.firstName} ${employee.lastName}`}
+                      onOpen={() => onOpen(employee, day)}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

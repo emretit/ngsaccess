@@ -1,192 +1,439 @@
-import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "convex/react";
-import { toLocalDateString } from "@/lib/date";
-import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
-import { useMemo, useState } from "react";
-import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { StatInline } from "@/components/shared/StatInline";
+import { FilterBar } from "@/components/shared/FilterBar";
+import { BulkBar } from "@/components/shared/BulkBar";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CalendarDays, ChevronLeft, ChevronRight, Calendar, Plus, Search } from "lucide-react";
 import { ShiftCalendarGrid } from "./ShiftCalendarGrid";
+import { ShiftAgendaView } from "./ShiftAgendaView";
+import { ShiftDayDetails } from "./ShiftDayDetails";
+import { ShiftListSidebar } from "./ShiftListSidebar";
 import { AssignShiftDialog } from "./AssignShiftDialog";
 import { AssignmentEditDialog } from "./AssignmentEditDialog";
-import { formatWeekRange, getWeekStart } from "./lib/weekUtils";
-import { addDays } from "date-fns";
-
-type Employee = FunctionReturnType<typeof api.employees.list>[number];
-type Shift = FunctionReturnType<typeof api.shifts.list>[number];
-type Assignment = FunctionReturnType<typeof api.shifts.listAssignments>[number];
-type Holiday = FunctionReturnType<typeof api.holidays.listForRange>[number];
-type Leave = FunctionReturnType<typeof api.leaves.listForRange>[number];
-
-interface ShiftCalendarViewProps {
-  employees: Employee[];
-  shifts: Shift[];
-  assignments: Assignment[];
-  leaves?: Leave[];
-  holidays?: Holiday[];
-  onNavigateToDefinitions?: () => void;
-}
-
-export function ShiftCalendarView({
-  employees,
-  shifts,
-  assignments,
-  onNavigateToDefinitions,
-}: ShiftCalendarViewProps) {
-  const { projectId } = useActiveProjectScope();
-  const hasNoShifts = shifts.length === 0;
-  const [weekStart, setWeekStart] = useState<Date>(() =>
-    getWeekStart(new Date()),
+import {
+  cellData,
+  dayLabel,
+  istanbulToday,
+  nextPeriod,
+  visibleRange,
+  type Assignment,
+  type Employee,
+  type Period,
+  type Shift,
+} from "./lib/planning";
+function useCompact() {
+  const [compact, setCompact] = useState(
+    () => window.matchMedia("(max-width: 760px)").matches,
   );
-  const range = { startDate: toLocalDateString(weekStart), endDate: toLocalDateString(addDays(weekStart, 6)) };
-  const weekLeaves = useQuery(api.leaves.listForRange, projectId ? { ...range, projectId } : "skip");
-  const weekHolidays = useQuery(api.holidays.listForRange, range);
-  const leaves = weekLeaves ?? [];
-  const holidays = weekHolidays ?? [];
-  const overlaysLoading = weekLeaves === undefined || weekHolidays === undefined;
-  const [search, setSearch] = useState("");
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [assignInitial, setAssignInitial] = useState<{
-    employeeId?: string;
-    startDate?: string;
-    endDate?: string;
-  }>({});
-  const [editAssignment, setEditAssignment] = useState<Assignment | null>(null);
-
-  const filteredEmployees = useMemo(() => {
-    if (!search.trim()) return employees;
-    const q = search.toLowerCase();
-    return employees.filter((e) =>
-      `${e.firstName} ${e.lastName}`.toLowerCase().includes(q),
-    );
-  }, [employees, search]);
-
-  const employeeNameMap = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const e of employees) m.set(e._id, `${e.firstName} ${e.lastName}`);
-    return m;
-  }, [employees]);
-
-  const shiftNameMap = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const s of shifts) m.set(s._id, s.name);
-    return m;
-  }, [shifts]);
-
-  const goPrev = () => setWeekStart((w) => addDays(w, -7));
-  const goNext = () => setWeekStart((w) => addDays(w, 7));
-  const goToday = () => setWeekStart(getWeekStart(new Date()));
-
-  const handleEmptyCellClick = (employeeId: string, date: string) => {
-    if (hasNoShifts) {
-      onNavigateToDefinitions?.();
-      return;
-    }
-    setAssignInitial({ employeeId, startDate: date, endDate: date });
-    setAssignDialogOpen(true);
-  };
-
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 760px)");
+    const update = () => setCompact(query.matches);
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+  return compact;
+}
+export function ShiftCalendarView({
+  projectId,
+  projectName,
+}: {
+  projectId: Id<"projects">;
+  projectName: string;
+}) {
+  const employees = useQuery(api.employees.list, { projectId });
+  const shifts = useQuery(api.shifts.list, { projectId });
+  const [definitions, setDefinitions] = useState(false);
+  if (!employees || !shifts)
+    return <SectionSkeleton label="Çalışanlar ve vardiyalar yükleniyor" />;
   return (
-    <div className="space-y-3">
-      <div className="rounded-xl border bg-card shadow-xs p-4 md:p-6">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2 mr-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <CalendarDays className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-sm font-semibold leading-tight">Vardiya Takvimi</h2>
-              <p className="text-xs text-muted-foreground">
-                {formatWeekRange(weekStart)}
-              </p>
-            </div>
-          </div>
-
-          <div className="relative flex-1 min-w-[200px] max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Çalışan ara..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-8 text-sm"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 ml-auto">
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="sm" onClick={goPrev} className="h-8 w-8 p-0">
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={goToday} className="h-8 gap-1.5 text-xs">
-                <Calendar className="h-3.5 w-3.5" />
-                Bu Hafta
-              </Button>
-              <Button variant="outline" size="sm" onClick={goNext} className="h-8 w-8 p-0">
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-            <Button
-              size="sm"
-              className="h-8 gap-1.5 text-xs"
-              onClick={() => {
-                if (hasNoShifts) {
-                  onNavigateToDefinitions?.();
-                  return;
-                }
-                setAssignInitial({});
-                setAssignDialogOpen(true);
-              }}
-              disabled={overlaysLoading || (hasNoShifts && !onNavigateToDefinitions)}
-              title={hasNoShifts ? "Önce vardiya tanımlayın" : undefined}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              {hasNoShifts ? "Vardiya Tanımla" : "Vardiya Ata"}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {overlaysLoading ? <SectionSkeleton label="İzin ve tatiller kontrol ediliyor" /> : <ShiftCalendarGrid
-        weekStart={weekStart}
-        employees={filteredEmployees}
+    <div className="group/plan min-w-0 max-w-full space-y-5">
+      <QuerySectionBoundary
+        resetKey={projectId}
+        title="Vardiya planı yüklenemedi"
+        description="Tekrar deneyin. Vardiya tanımlarını görüntülemeye devam edebilirsiniz."
+      >
+        <Plan
+          projectId={projectId}
+          projectName={projectName}
+          employees={employees}
+          shifts={shifts}
+          openDefinitions={() => setDefinitions(true)}
+        />
+      </QuerySectionBoundary>
+      <Button
+        variant="outline"
+        className="hidden group-has-[[role=alert]]/plan:inline-flex"
+        onClick={() => setDefinitions(true)}
+      >
+        Vardiya tanımları
+      </Button>
+      <ShiftListSidebar
+        open={definitions}
+        onOpenChange={setDefinitions}
         shifts={shifts}
-        assignments={assignments}
-        leaves={leaves}
-        holidays={holidays}
-        onEmptyCellClick={handleEmptyCellClick}
-        onAssignmentClick={(a) => setEditAssignment(a)}
-      />}
-
-      <AssignShiftDialog
-        open={assignDialogOpen}
-        onOpenChange={setAssignDialogOpen}
-        employees={employees}
-        shifts={shifts}
-        assignments={assignments}
-        leaves={leaves}
-        holidays={holidays}
-        initial={assignInitial}
-      />
-
-      <AssignmentEditDialog
-        open={editAssignment !== null}
-        onOpenChange={(o) => !o && setEditAssignment(null)}
-        assignment={editAssignment}
-        shifts={shifts}
-        shiftName={
-          editAssignment
-            ? shiftNameMap.get(editAssignment.shiftId) ?? "Vardiya"
-            : ""
-        }
-        employeeName={
-          editAssignment
-            ? employeeNameMap.get(editAssignment.employeeId) ?? "Çalışan"
-            : ""
-        }
+        projectId={projectId}
       />
     </div>
+  );
+}
+function Plan({
+  projectId,
+  projectName,
+  employees,
+  shifts,
+  openDefinitions,
+}: {
+  projectId: Id<"projects">;
+  projectName: string;
+  employees: Employee[];
+  shifts: Shift[];
+  openDefinitions: () => void;
+}) {
+  const compact = useCompact();
+  const navigate = useNavigate();
+  const [day, setDay] = useState(istanbulToday);
+  const [period, setPeriod] = useState<Period>("week");
+  const effectivePeriod = compact ? "day" : period;
+  const range = visibleRange(day, effectivePeriod);
+  const [search, setSearch] = useState("");
+  const [shiftFilter, setShiftFilter] = useState("all");
+  const [page, setPage] = useState(0);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [assign, setAssign] = useState<{
+    employeeIds?: string[];
+    startDate?: string;
+    endDate?: string;
+  } | null>(null);
+  const [detail, setDetail] = useState<{
+    employee: Employee;
+    date: string;
+  } | null>(null);
+  const [edit, setEdit] = useState<Assignment | null>(null);
+  const filtered = employees.filter((e) =>
+    `${e.firstName} ${e.lastName} ${e.email ?? ""}`
+      .toLocaleLowerCase("tr-TR")
+      .includes(search.trim().toLocaleLowerCase("tr-TR")),
+  );
+  const pageCount = Math.max(1, Math.ceil(filtered.length / 50));
+  const currentPage = Math.min(page, pageCount - 1);
+  const visible = filtered.slice(currentPage * 50, (currentPage + 1) * 50);
+  const assignments = useQuery(api.shifts.listAssignments, {
+    projectId,
+    rangeStart: range.rangeStart,
+    rangeEnd: range.rangeEnd,
+    employeeIds: visible.map((e) => e._id),
+    ...(shiftFilter === "all" ? {} : { shiftId: shiftFilter as Id<"shifts"> }),
+  });
+  const leaves = useQuery(api.leaves.listForRange, {
+    projectId,
+    startDate: range.rangeStart,
+    endDate: range.rangeEnd,
+  });
+  const holidays = useQuery(api.holidays.listForRange, {
+    startDate: range.rangeStart,
+    endDate: range.rangeEnd,
+  });
+  const active = shifts.filter((s) => s.isActive !== false);
+  const loading =
+    assignments === undefined || leaves === undefined || holidays === undefined;
+  const assignmentsByEmployee = useMemo(() => {
+    const grouped = new Map<string, Assignment[]>();
+    for (const assignment of assignments ?? []) {
+      const list = grouped.get(assignment.employeeId) ?? [];
+      list.push(assignment);
+      grouped.set(assignment.employeeId, list);
+    }
+    return grouped;
+  }, [assignments]);
+  const getData = (employee: Employee, date: string) =>
+    cellData(
+      employee,
+      date,
+      assignmentsByEmployee.get(employee._id) ?? [],
+      shifts,
+      leaves ?? [],
+      holidays ?? [],
+    );
+  const clearSelection = () => setSelected(new Set());
+  const changeDay = (next: string) => {
+    if (!next) return;
+    setDay(next);
+    clearSelection();
+  };
+  const select = (id: string) =>
+    setSelected((old) => {
+      const next = new Set(old);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const calendarProps = {
+    employees: visible,
+    days: range.days,
+    getData,
+    onOpen: (employee: Employee, date: string) => setDetail({ employee, date }),
+    selected,
+    onSelect: select,
+  };
+  return (
+    <>
+      <PageHeader
+        title="Vardiyalar"
+        scope={<span className="break-all">{projectName} · Çalışma planı</span>}
+        primaryAction={{
+          label: "Vardiya ata",
+          disabled: loading,
+          onClick: () =>
+            active.length
+              ? setAssign({
+                  startDate: range.rangeStart,
+                  endDate: range.rangeEnd,
+                })
+              : openDefinitions(),
+        }}
+        secondaryMenu={
+          <Button variant="outline" onClick={openDefinitions}>
+            Vardiya tanımları
+          </Button>
+        }
+      />
+      <StatInline
+        items={[
+          { label: "Görünen çalışan", value: filtered.length },
+          { label: "Gün", value: range.days.length },
+          { label: "Proje genelinde aktif tanım", value: active.length },
+        ]}
+      />
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">Çalışan ara</p>
+        <FilterBar
+          search={search}
+          onSearchChange={(value) => {
+            setSearch(value);
+            setPage(0);
+            clearSelection();
+          }}
+          searchLabel="Çalışan ara"
+          placeholder="Ad veya e-posta ara"
+          hasFilters={shiftFilter !== "all"}
+          onClear={() => {
+            setSearch("");
+            setShiftFilter("all");
+            setPage(0);
+            clearSelection();
+          }}
+        >
+          <label className="text-xs space-y-1 min-w-0 max-w-full">
+            Vardiya
+            <select
+              className="block h-9 w-full max-w-[260px] rounded-md border border-control bg-surface px-2 text-sm"
+              value={shiftFilter}
+              onChange={(e) => {
+                setShiftFilter(e.target.value);
+                clearSelection();
+              }}
+            >
+              <option value="all">Tüm vardiyalar</option>
+              {shifts.map((s) => (
+                <option key={s._id} value={s._id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </FilterBar>
+      </div>
+      <div className="flex flex-wrap items-end gap-2">
+        <Button
+          variant="outline"
+          aria-label="Önceki dönem"
+          onClick={() => changeDay(nextPeriod(day, effectivePeriod, -1))}
+        >
+          Önceki
+        </Button>
+        <Button variant="outline" onClick={() => changeDay(istanbulToday())}>
+          Bugün
+        </Button>
+        <Button
+          variant="outline"
+          aria-label="Sonraki dönem"
+          onClick={() => changeDay(nextPeriod(day, effectivePeriod, 1))}
+        >
+          Sonraki
+        </Button>
+        <label className="text-xs">
+          Tarih
+          <Input
+            type="date"
+            value={day}
+            onChange={(e) => changeDay(e.target.value)}
+            className="w-auto max-w-full"
+          />
+        </label>
+        {!compact && (
+          <label className="text-xs">
+            Dönem
+            <select
+              value={period}
+              className="block h-9 border border-control rounded-md bg-surface px-2"
+              onChange={(e) => {
+                setPeriod(e.target.value as Period);
+                clearSelection();
+              }}
+            >
+              <option value="week">Hafta</option>
+              <option value="month">Ay</option>
+            </select>
+          </label>
+        )}
+      </div>
+      <p className="text-sm font-medium">
+        {dayLabel(range.rangeStart)}
+        {range.rangeStart !== range.rangeEnd
+          ? ` – ${dayLabel(range.rangeEnd)}`
+          : ""}
+      </p>
+      <BulkBar count={selected.size} onClear={clearSelection}>
+        <Button
+          disabled={loading || !active.length}
+          onClick={() =>
+            setAssign({
+              employeeIds: [...selected],
+              startDate: range.rangeStart,
+              endDate: range.rangeEnd,
+            })
+          }
+        >
+          Seçilenlere ata
+        </Button>
+      </BulkBar>
+      {!active.length && (
+        <EmptyState
+          title={
+            shifts.length
+              ? "Atanabilir vardiya yok"
+              : "Henüz vardiya tanımlanmamış"
+          }
+          description="Bir vardiyayı etkinleştirin veya yeni tanım ekleyin."
+          action={{ label: "Tanımları aç", onClick: openDefinitions }}
+        />
+      )}
+      {loading ? (
+        <SectionSkeleton label="Plan, izin ve tatiller kontrol ediliyor" />
+      ) : !employees.length ? (
+        <EmptyState
+          title="Bu projede çalışan yok"
+          description="Plan oluşturmak için önce çalışan ekleyin."
+          action={{
+            label: "Kişileri aç",
+            onClick: () => navigate("/employees"),
+          }}
+        />
+      ) : !filtered.length ? (
+        <EmptyState
+          title="Aramayla eşleşen çalışan yok"
+          description="Başka bir ad deneyin veya filtreleri temizleyin."
+        />
+      ) : (
+        <>
+          {assignments.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Bu dönemde atama yok. Boş bir gün seçerek plan oluşturabilirsiniz.
+            </p>
+          )}
+          {compact ? (
+            <ShiftAgendaView {...calendarProps} />
+          ) : (
+            <ShiftCalendarGrid {...calendarProps} />
+          )}
+        </>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <span>
+          {filtered.length ? currentPage * 50 + 1 : 0}–
+          {Math.min((currentPage + 1) * 50, filtered.length)} /{" "}
+          {filtered.length} çalışan · İstanbul saati
+        </span>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage === 0}
+            onClick={() => {
+              setPage(currentPage - 1);
+              clearSelection();
+            }}
+          >
+            Önceki kişiler
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={currentPage >= pageCount - 1}
+            onClick={() => {
+              setPage(currentPage + 1);
+              clearSelection();
+            }}
+          >
+            Sonraki kişiler
+          </Button>
+        </div>
+      </div>
+      {assign && (
+        <AssignShiftDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setAssign(null);
+          }}
+          projectId={projectId}
+          employees={employees}
+          shifts={shifts}
+          initial={assign}
+        />
+      )}
+      {detail && !loading && (
+        <ShiftDayDetails
+          {...detail}
+          data={getData(detail.employee, detail.date)}
+          onClose={() => setDetail(null)}
+          canAssign={!!active.length}
+          onEdit={(assignment) => {
+            setDetail(null);
+            setEdit(assignment);
+          }}
+          onAssign={() => {
+            setAssign({
+              employeeIds: [detail.employee._id],
+              startDate: detail.date,
+              endDate: detail.date,
+            });
+            setDetail(null);
+          }}
+        />
+      )}
+      <AssignmentEditDialog
+        open={edit !== null}
+        onOpenChange={(open) => {
+          if (!open) setEdit(null);
+        }}
+        assignment={edit}
+        shifts={shifts}
+        shiftName={
+          shifts.find((s) => s._id === edit?.shiftId)?.name ?? "Vardiya"
+        }
+        employeeName={employees
+          .filter((e) => e._id === edit?.employeeId)
+          .map((e) => `${e.firstName} ${e.lastName}`)
+          .join("")}
+      />
+    </>
   );
 }

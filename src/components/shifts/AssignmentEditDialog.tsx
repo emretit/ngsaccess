@@ -1,9 +1,5 @@
-import { assignmentFormSchema } from "./assignmentFormSchema";
-import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
-import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation } from "convex/react";
-import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import {
@@ -11,35 +7,20 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { DatePicker } from "@/components/ui/date-picker";
-import { parseDateString, formatDateString } from "@/lib/date";
-import { Label } from "@/components/ui/label";
-import { Trash2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-
-type Assignment = FunctionReturnType<typeof api.shifts.listAssignments>[number];
-type Shift = FunctionReturnType<typeof api.shifts.list>[number];
-
-interface AssignmentEditDialogProps {
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
+import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
+import { errorMessage, notify } from "@/lib/notify";
+import { DAYS, type Assignment, type Shift } from "./lib/planning";
+import {
+  bulkAssignmentFormSchema,
+  type BulkAssignmentFormValues,
+} from "./assignmentFormSchema";
+interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   assignment: Assignment | null;
@@ -47,205 +28,280 @@ interface AssignmentEditDialogProps {
   shiftName: string;
   employeeName: string;
 }
-
-export function AssignmentEditDialog({
+export function AssignmentEditDialog(props: Props) {
+  return props.assignment && props.open ? (
+    <EditForm
+      key={props.assignment._id}
+      {...props}
+      assignment={props.assignment}
+    />
+  ) : null;
+}
+function EditForm({
   open,
   onOpenChange,
   assignment,
   shifts,
   shiftName,
   employeeName,
-}: AssignmentEditDialogProps) {
-  const { toast } = useToast();
-  const updateAssignment = useMutation(api.shifts.updateAssignment);
-  const removeAssignment = useMutation(api.shifts.removeAssignment);
-  const [shiftId, setShiftId] = useState<string>("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [confirmSeries, setConfirmSeries] = useState(false);
-  const [calendarApproved, setCalendarApproved] = useState(false);
-  const [calendarConflict, setCalendarConflict] = useState<string | null>(null);
-  const deleteAction = useAsyncAction(async () => {
-    if (!assignment) return;
-    await removeAssignment({ assignmentId: assignment._id });
-    onOpenChange(false);
-  }, { success: "Atama silindi" });
-  const [overlapDetails, setOverlapDetails] = useState("");
-  const [overlapCount, setOverlapCount] = useState<number | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
-  useEffect(() => {
-    if (assignment && open) {
-      setShiftId(assignment.shiftId);
-      setStartDate(assignment.startDate);
-      setEndDate(assignment.endDate);
-      setOverlapCount(null);
-      setCalendarConflict(null);
-      setConfirmSeries(false);
-      setConfirmDelete(false);
-    }
-  }, [assignment, open]);
-
-  useEffect(() => { setCalendarApproved(false); }, [startDate, endDate, shiftId]);
-
-  const saveAction = useAsyncAction(async (forceConfirm: boolean, confirmCalendar: boolean = false) => {
-    if (!assignment) throw new Error("Atama bulunamadı");
-    const parsed = assignmentFormSchema.safeParse({ employeeId: assignment.employeeId, shiftId, startDate, endDate });
+}: Props & { assignment: Assignment }) {
+  const [values, setValues] = useState<BulkAssignmentFormValues>({
+    employeeIds: [assignment.employeeId],
+    shiftId: assignment.shiftId,
+    startDate: assignment.startDate,
+    endDate: assignment.endDate,
+    specificDays: !!assignment.weekPattern?.length,
+    weekPattern: DAYS.filter(([code]) =>
+      assignment.weekPattern?.includes(code),
+    ).map(([code]) => code),
+  });
+  const [baseline, setBaseline] = useState(() => JSON.stringify(values));
+  const guard = useUnsavedChangesGuard(JSON.stringify(values) !== baseline);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [serverError, setServerError] = useState("");
+  const [forceConfirm, setForceConfirm] = useState(false);
+  const [calendarConfirmed, setCalendarConfirmed] = useState(false);
+  const [confirm, setConfirm] = useState<"save" | "delete" | null>(null);
+  const [pending, setPending] = useState(false);
+  const lock = useRef(false);
+  const update = useMutation(api.shifts.updateAssignment);
+  const remove = useMutation(api.shifts.removeAssignment);
+  const close = () => {
+    if (!lock.current) guard.requestClose(() => onOpenChange(false));
+  };
+  const change = (next: BulkAssignmentFormValues) => {
+    setValues(next);
+    setForceConfirm(false);
+    setCalendarConfirmed(false);
+    setServerError("");
+  };
+  const prepare = () => {
+    const parsed = bulkAssignmentFormSchema.safeParse(values);
     if (!parsed.success) {
-      toast({ title: "Hatalı form", description: parsed.error.issues[0]?.message, variant: "destructive" });
+      const next: Record<string, string> = {};
+      for (const issue of parsed.error.issues)
+        next[String(issue.path[0])] = issue.message;
+      setErrors(next);
+      requestAnimationFrame(() =>
+        document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(),
+      );
       return;
     }
+    setErrors({});
+    setConfirm("save");
+  };
+  const commit = async () => {
+    if (lock.current) throw new Error("İşlem sürüyor");
+    lock.current = true;
+    setPending(true);
+    setServerError("");
     try {
-      await updateAssignment({
-        assignmentId: assignment._id,
-        shiftId: shiftId as Id<"shifts">,
-        startDate,
-        endDate,
-        forceConfirm,
-        calendarConfirmed: confirmCalendar || calendarApproved,
-      });
-      toast({ title: "Atama güncellendi" });
-      setOverlapCount(null);
+      if (confirm === "delete") await remove({ assignmentId: assignment._id });
+      else
+        await update({
+          assignmentId: assignment._id,
+          shiftId: values.shiftId as Id<"shifts">,
+          startDate: values.startDate,
+          endDate: values.endDate,
+          weekPattern: values.specificDays ? values.weekPattern : [],
+          forceConfirm,
+          calendarConfirmed,
+        });
+      notify.success(
+        confirm === "delete"
+          ? "Atama serisi silindi"
+          : "Atama serisi güncellendi",
+      );
+      setBaseline(JSON.stringify(values));
       onOpenChange(false);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Güncellenemedi";
-      const overlapMatch = /OVERLAP:(\d+)/.exec(msg);
-      if (overlapMatch) {
-        setOverlapCount(Number(overlapMatch[1]));
-        setOverlapDetails(msg.replace(/.*OVERLAP:\d+/, ""));
-      } else if (msg.includes("CALENDAR:")) {
-        setCalendarConflict(msg.replace("CALENDAR:", ""));
-      } else {
-        throw e;
-      }
+    } catch (error) {
+      setServerError(errorMessage(error));
+      throw error;
+    } finally {
+      lock.current = false;
+      setPending(false);
     }
-  }, { error: "Atama güncellenemedi" });
-  const saveImpl = saveAction.run;
-  const busy = saveAction.pending || deleteAction.pending;
-  if (!assignment) return null;
-
-  const handleSave = () => setConfirmSeries(true);
-
+  };
   return (
-    <Dialog open={open} onOpenChange={value => { if (!busy) onOpenChange(value); }}>
-      <DialogContent className="sm:max-w-[440px]">
-        <DialogHeader>
-          <DialogTitle>Tüm Atama Serisini Düzenle</DialogTitle>
-          <p className="text-sm text-muted-foreground">{employeeName} · {assignment.startDate}–{assignment.endDate}. Değişiklikler ve silme tüm tarih aralığına uygulanır.</p>
-        </DialogHeader>
-        <div className="grid gap-3 py-2">
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-xs text-muted-foreground">Çalışan</p>
-              <p className="font-medium">{employeeName}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Mevcut Vardiya</p>
-              <p className="font-medium">{shiftName}</p>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label className="text-xs">Vardiyayı Değiştir</Label>
-            <Select value={shiftId} onValueChange={setShiftId}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {shifts
-                  .filter((s) => s.isActive !== false)
-                  .map((s) => (
-                    <SelectItem key={s._id} value={s._id}>
-                      {s.name} ({s.startTime}–{s.endTime})
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label className="text-xs">Başlangıç</Label>
-              <DatePicker
-                date={parseDateString(startDate)}
-                onSelect={(d) => setStartDate(formatDateString(d))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">Bitiş</Label>
-              <DatePicker
-                date={parseDateString(endDate)}
-                onSelect={(d) => setEndDate(formatDateString(d))}
-                minDate={parseDateString(startDate)}
-              />
-            </div>
-          </div>
-          <div className="flex justify-between gap-2 pt-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setConfirmDelete(true)}
-              disabled={busy}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 className="mr-1 h-4 w-4" />
-              Sil
-            </Button>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={busy}
-              >
-                Kapat
-              </Button>
-              <Button type="button" size="sm" onClick={handleSave} disabled={busy}>
-                Kaydet
-              </Button>
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-
-      <AlertDialog
-        open={overlapCount !== null}
-        onOpenChange={(o) => !o && setOverlapCount(null)}
+    <>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) close();
+        }}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Çakışan atama var</AlertDialogTitle>
-            <AlertDialogDescription>
-              Yeni tarih aralığı çalışanın {overlapCount} mevcut atamasıyla
-              çakışıyor. {overlapDetails} Mevcut atamalar korunarak ek çakışmaya izin verilir. Yine de kaydetmek istiyor musunuz?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Vazgeç</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                void saveImpl(true);
-              }}
-              disabled={busy}
+        <DialogContent className="sm:max-w-[520px] max-h-[90dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Tüm atama serisini düzenle</DialogTitle>
+            <DialogDescription>
+              {employeeName} · {shiftName} · {assignment.startDate}–
+              {assignment.endDate}. Kaydetme ve silme tüm seriye uygulanır. Tek
+              gün istisnası desteklenmiyor.
+            </DialogDescription>
+          </DialogHeader>
+          {serverError && (
+            <p role="alert" className="text-sm text-danger">
+              {serverError}
+            </p>
+          )}
+          <fieldset disabled={pending} className="space-y-4">
+            <FormFieldWrapper
+              htmlFor="edit-shift"
+              label="Vardiya"
+              error={errors.shiftId}
             >
-              Yine de Kaydet
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <ConfirmDestructive open={confirmDelete} onOpenChange={setConfirmDelete} title="Tüm seri silinsin mi?"
+              <select
+                id="edit-shift"
+                className="w-full h-9 rounded-md border border-control bg-surface px-2"
+                value={values.shiftId}
+                onChange={(e) => change({ ...values, shiftId: e.target.value })}
+              >
+                {shifts
+                  .filter(
+                    (s) => s.isActive !== false || s._id === assignment.shiftId,
+                  )
+                  .map((s) => (
+                    <option key={s._id} value={s._id}>
+                      {s.name} ({s.startTime}–{s.endTime})
+                    </option>
+                  ))}
+              </select>
+            </FormFieldWrapper>
+            <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3">
+              {(["startDate", "endDate"] as const).map((key) => (
+                <FormFieldWrapper
+                  key={key}
+                  htmlFor={`edit-${key}`}
+                  label={key === "startDate" ? "Başlangıç" : "Bitiş"}
+                  error={errors[key]}
+                >
+                  <Input
+                    id={`edit-${key}`}
+                    type="date"
+                    value={values[key]}
+                    onChange={(e) =>
+                      change({ ...values, [key]: e.target.value })
+                    }
+                  />
+                </FormFieldWrapper>
+              ))}
+            </div>
+            <label className="flex gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={values.specificDays}
+                onChange={(e) =>
+                  change({ ...values, specificDays: e.target.checked })
+                }
+              />
+              Belirli günler
+            </label>
+            {values.specificDays ? (
+              <fieldset>
+                <legend className="text-sm">Uygulanacak günler</legend>
+                <div className="flex flex-wrap gap-3 mt-2">
+                  {DAYS.map(([code, label]) => (
+                    <label className="flex gap-1 text-sm" key={code}>
+                      <input
+                        type="checkbox"
+                        aria-invalid={code === "MON" && !!errors.weekPattern}
+                        aria-describedby={
+                          errors.weekPattern
+                            ? "assignment-days-error"
+                            : undefined
+                        }
+                        checked={values.weekPattern.includes(code)}
+                        onChange={() =>
+                          change({
+                            ...values,
+                            weekPattern: values.weekPattern.includes(code)
+                              ? values.weekPattern.filter((d) => d !== code)
+                              : [...values.weekPattern, code],
+                          })
+                        }
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                {errors.weekPattern && (
+                  <p
+                    role="alert"
+                    id="assignment-days-error"
+                    className="text-xs text-danger"
+                  >
+                    {errors.weekPattern}
+                  </p>
+                )}
+              </fieldset>
+            ) : (
+              <p className="text-sm">Her gün</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              {values.startDate}–{values.endDate} dahil tüm seri. Mevcut diğer
+              atamalar korunur.
+            </p>
+            {serverError.includes("OVERLAP:") && (
+              <label className="flex gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={forceConfirm}
+                  onChange={(e) => setForceConfirm(e.target.checked)}
+                />
+                Mevcut vardiyayla çakışmayı onaylıyorum.
+              </label>
+            )}
+            {serverError.includes("CALENDAR:") && (
+              <label className="flex gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={calendarConfirmed}
+                  onChange={(e) => setCalendarConfirmed(e.target.checked)}
+                />
+                İzin ve tatil çakışmasına rağmen tüm seriyi güncellemeyi
+                onaylıyorum.
+              </label>
+            )}
+          </fieldset>
+          <div className="sticky bottom-0 bg-surface flex flex-wrap gap-2 justify-between py-3">
+            <Button
+              variant="destructive"
+              disabled={pending}
+              onClick={() => setConfirm("delete")}
+            >
+              Tüm seriyi sil
+            </Button>
+            <Button variant="outline" disabled={pending} onClick={close}>
+              Vazgeç
+            </Button>
+            <Button disabled={pending} onClick={prepare}>
+              Kaydet
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <ConfirmDestructive
+        open={confirm !== null}
+        onOpenChange={(next) => {
+          if (!next) setConfirm(null);
+        }}
+        title={
+          confirm === "delete"
+            ? "Tüm seri silinsin mi?"
+            : "Tüm seri güncellensin mi?"
+        }
         objectName={`${employeeName} · ${shiftName} · ${assignment.startDate}–${assignment.endDate}`}
-        effects={["Bu atamanın tüm tarih aralığı kalıcı silinir."]} confirmLabel="Tüm seriyi sil" onConfirm={async () => { if (!await deleteAction.run()) throw new Error("Atama silinemedi"); }} />
-      <ConfirmDestructive open={confirmSeries} onOpenChange={setConfirmSeries} title="Tüm seri güncellensin mi?"
-        objectName={`${employeeName} · ${assignment.startDate}–${assignment.endDate}`}
-        effects={[`Tüm seri ${startDate}–${endDate} tarihleri ve seçili vardiyayla güncellenir.`]} confirmLabel="Tüm seriyi güncelle" onConfirm={async () => { if (!await saveImpl(false)) throw new Error("Atama güncellenemedi; form korundu"); }} />
-      <AlertDialog open={calendarConflict !== null} onOpenChange={open => { if (!open) setCalendarConflict(null); }}>
-        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>İzin veya tatil çakışması</AlertDialogTitle><AlertDialogDescription>{calendarConflict}</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel disabled={busy}>Vazgeç</AlertDialogCancel><AlertDialogAction disabled={busy} onClick={e => { e.preventDefault(); setCalendarApproved(true); setCalendarConflict(null); void saveImpl(false, true); }}>Yine de tüm seriye ata</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </Dialog>
+        effects={[
+          confirm === "delete"
+            ? "Bu atamanın tüm tarih aralığı kalıcı silinir."
+            : `Tüm seri ${values.startDate}–${values.endDate} ve seçili günlerle güncellenir.`,
+        ]}
+        confirmLabel={
+          confirm === "delete" ? "Tüm seriyi sil" : "Tüm seriyi güncelle"
+        }
+        onConfirm={commit}
+      />
+      {guard.dialog}
+    </>
   );
 }

@@ -1,227 +1,285 @@
-import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
-import { notify } from "@/lib/notify";
-import { useMemo, useState } from "react";
-import { useMutation } from "convex/react";
-import type { FunctionReturnType } from "convex/server";
+import { useState, type ReactNode } from "react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Clock, Pencil, Plus, Trash2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { getShiftColor } from "./lib/shiftColor";
+import { RowActions } from "@/components/shared/RowActions";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { notify } from "@/lib/notify";
 import {
   AddShiftDialog,
-  type EditingShift,
   type ShiftFormPayload,
-} from "@/components/settings/sections/components/AddShiftDialog";
-
-type Shift = FunctionReturnType<typeof api.shifts.list>[number];
-type Assignment = FunctionReturnType<typeof api.shifts.listAssignments>[number];
-
-interface ShiftListSidebarProps {
-  shifts: Shift[];
-  assignments: Assignment[];
-  projectId?: Id<"projects">;
-}
-
+} from "./definitions/AddShiftDialog";
+import type { Shift } from "./lib/planning";
 export function ShiftListSidebar({
+  open,
+  onOpenChange,
   shifts,
-  assignments,
   projectId,
-}: ShiftListSidebarProps) {
-  const createShift = useMutation(api.shifts.create);
-  const updateShift = useMutation(api.shifts.update);
-  const removeShift = useMutation(api.shifts.remove);
-
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingShift, setEditingShift] = useState<EditingShift | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{
-    id: Id<"shifts">;
-    name: string;
-  } | null>(null);
-
-  const assignmentCountByShift = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const a of assignments) {
-      m.set(a.shiftId, (m.get(a.shiftId) ?? 0) + 1);
-    }
-    return m;
-  }, [assignments]);
-
-  const sortedShifts = useMemo(
-    () =>
-      [...shifts].sort((a, b) => {
-        if (a.isActive !== b.isActive) {
-          return (a.isActive === false ? 1 : 0) - (b.isActive === false ? 1 : 0);
-        }
-        return a.startTime.localeCompare(b.startTime);
-      }),
-    [shifts],
-  );
-
-  const handleAdd = async (payload: ShiftFormPayload) => {
-    if (!projectId) throw new Error("Vardiya eklemek için proje seçin");
-    await createShift({ projectId, ...payload });
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  shifts: Shift[];
+  projectId: Id<"projects">;
+}) {
+  const create = useMutation(api.shifts.create);
+  const update = useMutation(api.shifts.update);
+  const [editing, setEditing] = useState<Shift | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [deleting, setDeleting] = useState<Shift | null>(null);
+  const add = async (payload: ShiftFormPayload) => {
+    await create({ ...payload, projectId });
     notify.success("Vardiya oluşturuldu");
   };
-  const handleUpdate = async (id: Id<"shifts">, payload: ShiftFormPayload) => {
-    await updateShift({ shiftId: id, ...payload,
-      breakStart: payload.breakStart || null, breakEnd: payload.breakEnd || null,
-      lateToleranceMinutes: payload.lateToleranceMinutes ?? null,
-      earlyExitToleranceMinutes: payload.earlyExitToleranceMinutes ?? null,
-      overtimeStartToleranceMinutes: payload.overtimeStartToleranceMinutes ?? null,
-    });
+  const edit = async (shiftId: Id<"shifts">, payload: ShiftFormPayload) => {
+    await update({ ...payload, shiftId });
     notify.success("Vardiya güncellendi");
   };
-
-  const handleEdit = (shift: Shift) => {
-    setEditingShift({
-      _id: shift._id,
-      name: shift.name,
-      startTime: shift.startTime,
-      endTime: shift.endTime,
-      breakStart: shift.breakStart,
-      breakEnd: shift.breakEnd,
-      lateToleranceMinutes: shift.lateToleranceMinutes,
-      earlyExitToleranceMinutes: shift.earlyExitToleranceMinutes,
-      overtimeStartToleranceMinutes: shift.overtimeStartToleranceMinutes,
-      overtimeEnabled: shift.overtimeEnabled ?? true,
-      isActive: shift.isActive ?? true,
-    });
-    setIsDialogOpen(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!deleteTarget) return;
-    const result = await removeShift({ shiftId: deleteTarget.id });
-    notify.success("Vardiya silindi", `${result.removedAssignments} bağlı atama kaldırıldı`);
-  };
-
   return (
     <>
-      <div className="h-full w-full md:w-[260px] shrink-0 bg-card rounded-xl border shadow-xs flex flex-col">
-        <div className="flex items-center justify-between gap-2 p-3 border-b">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 shrink-0">
-              <Clock className="h-3.5 w-3.5 text-primary" />
-            </div>
-            <div className="min-w-0">
-              <h3 className="text-sm font-semibold leading-tight">
-                Vardiyalar
-              </h3>
-              <p className="text-[11px] text-muted-foreground">
-                {sortedShifts.length} tanım
-              </p>
-            </div>
-          </div>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="w-full sm:max-w-[420px] overflow-y-auto min-w-0">
+          <SheetHeader>
+            <SheetTitle>Vardiya tanımları</SheetTitle>
+            <SheetDescription>
+              Çalışma saatleri burada; genel mesai ve tatil politikaları
+              Ayarlar'da yönetilir.
+            </SheetDescription>
+          </SheetHeader>
           <Button
-            size="sm"
-            variant="ghost"
+            className="my-4"
             onClick={() => {
-              setEditingShift(null);
-              setIsDialogOpen(true);
+              setEditing(null);
+              setFormOpen(true);
             }}
-            className="h-7 w-7 p-0 shrink-0"
-            aria-label="Yeni vardiya ekle"
           >
-            <Plus className="h-4 w-4" />
+            Yeni vardiya tanımla
           </Button>
-        </div>
-
-        <div className="p-2 flex-1 overflow-y-auto max-h-[calc(100vh-12rem)] space-y-1.5">
-          {sortedShifts.length === 0 ? (
-            <p className="px-2 py-6 text-center text-xs text-muted-foreground">
-              Vardiya yok
-            </p>
+          {!shifts.length ? (
+            <EmptyState
+              compact
+              title="Henüz vardiya tanımlanmamış"
+              description="Atama yapabilmek için çalışma saatlerini tanımlayın."
+            />
           ) : (
-            sortedShifts.map((s) => {
-              const count = assignmentCountByShift.get(s._id) ?? 0;
-              const isActive = s.isActive !== false;
-              const colorClass = getShiftColor(s._id);
-              return (
-                <div
-                  key={s._id}
-                  className={cn(
-                    "group rounded-lg border p-2 transition-colors hover:bg-muted/60",
-                    !isActive && "opacity-60",
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-2">
+            <ul className="divide-y">
+              {[...shifts]
+                .sort((a, b) => a.startTime.localeCompare(b.startTime))
+                .map((shift) => (
+                  <li key={shift._id} className="flex items-center gap-2 py-3">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span
-                          className={cn(
-                            "inline-block h-2 w-2 rounded-full shrink-0",
-                            colorClass,
-                          )}
-                        />
-                        <span className="text-sm font-medium truncate">
-                          {s.name}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {s.startTime}–{s.endTime}
+                      <p className="font-medium break-words">{shift.name}</p>
+                      <p className="text-xs text-muted-foreground tabular-nums">
+                        {shift.startTime}–{shift.endTime}
+                        {shift.endTime < shift.startTime ? " (+1 gün)" : ""}
                       </p>
-                      <div className="flex items-center gap-1.5 mt-1.5">
-                        {!isActive && (
-                          <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">
-                            Pasif
-                          </Badge>
-                        )}
-                        {count > 0 && (
-                          <span className="text-[11px] text-muted-foreground">
-                            {count} atama
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => handleEdit(s)}
-                        aria-label="Düzenle"
+                      <QuerySectionBoundary
+                        resetKey={shift._id}
+                        title="Kullanım sayısı yüklenemedi"
                       >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-destructive hover:text-destructive"
-                        onClick={() =>
-                          setDeleteTarget({ id: s._id, name: s.name })
-                        }
-                        aria-label="Sil"
+                        <DefinitionCount shiftId={shift._id} />
+                      </QuerySectionBoundary>
+                      <StatusBadge
+                        tone={shift.isActive === false ? "neutral" : "success"}
                       >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                        {shift.isActive === false ? "Pasif" : "Aktif"}
+                      </StatusBadge>
                     </div>
-                  </div>
-                </div>
-              );
-            })
+                    <RowActions label={`${shift.name} işlemleri`}>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setEditing(shift);
+                          setFormOpen(true);
+                        }}
+                      >
+                        Düzenle
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => setDeleting(shift)}
+                        className="text-danger"
+                      >
+                        Silme etkisini incele
+                      </DropdownMenuItem>
+                    </RowActions>
+                  </li>
+                ))}
+            </ul>
           )}
-        </div>
-      </div>
-
-      <AddShiftDialog
-        open={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        onAdd={handleAdd}
-        onUpdate={handleUpdate}
-        editingShift={editingShift}
-        onClose={() => {
-          setIsDialogOpen(false);
-          setEditingShift(null);
-        }}
-      />
-
-      <ConfirmDestructive open={deleteTarget !== null} onOpenChange={open => { if (!open) setDeleteTarget(null); }}
-        confirmLabel="Vardiyayı sil" title="Vardiya silinsin mi?" objectName={deleteTarget?.name ?? ""}
-        effects={[`Bu vardiya ve ${deleteTarget ? assignmentCountByShift.get(deleteTarget.id) ?? 0 : 0} bağlı atama kalıcı silinir.`]}
-        onConfirm={handleDeleteConfirm} />
+        </SheetContent>
+      </Sheet>
+      {formOpen && (
+        <QuerySectionBoundary
+          resetKey={editing?._id ?? "new"}
+          title="Vardiya formu yüklenemedi"
+        >
+          <AddShiftDialog
+            open
+            onOpenChange={setFormOpen}
+            onClose={() => setFormOpen(false)}
+            editingShift={
+              editing
+                ? {
+                    ...editing,
+                    overtimeEnabled: editing.overtimeEnabled ?? true,
+                    isActive: editing.isActive ?? true,
+                  }
+                : null
+            }
+            onAdd={add}
+            onUpdate={edit}
+          />
+        </QuerySectionBoundary>
+      )}
+      {deleting && (
+        <QuerySectionBoundary
+          resetKey={deleting._id}
+          title="Silme etkisi yüklenemedi"
+        >
+          <DeleteImpact shift={deleting} onClose={() => setDeleting(null)} />
+        </QuerySectionBoundary>
+      )}
     </>
+  );
+}
+function DefinitionCount({ shiftId }: { shiftId: Id<"shifts"> }) {
+  const impact = useQuery(api.shifts.assignmentDeleteImpact, { shiftId });
+  return impact ? (
+    <p className="text-xs text-muted-foreground">
+      Tüm dönemlerde {impact.countLabel.toLocaleLowerCase("tr-TR")}{" "}
+      {impact.assignmentCount} atama serisi
+      {impact.skippedAssignments > 0 && (
+        <span className="block">
+          Proje bilgisi eksik {impact.skippedAssignments} seri sayım dışında.
+        </span>
+      )}
+    </p>
+  ) : (
+    <span role="status" className="text-xs text-muted-foreground">
+      Atama sayısı yükleniyor…
+    </span>
+  );
+}
+function DeleteImpact({
+  shift,
+  onClose,
+}: {
+  shift: Shift;
+  onClose: () => void;
+}) {
+  const impact = useQuery(api.shifts.assignmentDeleteImpact, {
+    shiftId: shift._id,
+  });
+  const remove = useMutation(api.shifts.remove);
+  const [confirm, setConfirm] = useState(false);
+  return (
+    <>
+      <DialogImpact open onClose={onClose} title={`${shift.name} silme etkisi`}>
+        {!impact ? (
+          <SectionSkeleton label="Tüm dönemlerde silme etkisi yükleniyor" />
+        ) : (
+          <>
+            <p className="text-sm">
+              {impact.countLabel} {impact.assignmentCount} atama serisi ·{" "}
+              {impact.countLabel} {impact.employeeCount} kişi (tüm dönemler).
+            </p>
+            {impact.skippedAssignments > 0 && (
+              <p className="text-xs text-warning">
+                Proje bilgisi eksik {impact.skippedAssignments} seri sayım
+                dışında; bu seriler silinmeden kalacak.
+              </p>
+            )}
+            {impact.truncated && (
+              <p className="text-sm text-warning">
+                Sayılar alt sınırdır. Büyük silme için önce atama serilerini
+                küçük gruplar halinde kaldırın.
+              </p>
+            )}
+            <Button
+              variant="destructive"
+              disabled={impact.truncated}
+              onClick={() => setConfirm(true)}
+            >
+              Vardiyayı sil
+            </Button>
+          </>
+        )}
+      </DialogImpact>
+      {impact && (
+        <ConfirmDestructive
+          open={confirm}
+          onOpenChange={setConfirm}
+          title="Vardiya silinsin mi?"
+          objectName={shift.name}
+          effects={[
+            `${impact.countLabel} ${impact.assignmentCount} bağlı atama serisi ve vardiya tanımı tüm dönemlerden kalıcı silinir.`,
+            `${impact.countLabel} ${impact.employeeCount} kişi etkilenir.`,
+            ...(impact.skippedAssignments > 0
+              ? [
+                  `Proje bilgisi eksik ${impact.skippedAssignments} seri silinmeden kalacak.`,
+                ]
+              : []),
+          ]}
+          confirmLabel="Vardiyayı ve serileri sil"
+          onConfirm={async () => {
+            const result = await remove({ shiftId: shift._id });
+            notify.success(
+              "Vardiya silindi",
+              `${result.removedAssignments} seri silindi${result.skippedAssignments > 0 ? `; proje bilgisi eksik ${result.skippedAssignments} seri silinmeden kaldı` : ""}.`,
+            );
+            onClose();
+          }}
+        />
+      )}
+    </>
+  );
+}
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+function DialogImpact({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            Silmeden önce tüm dönemlerdeki bağlı kayıtları inceleyin.
+            Pasifleştirme mevcut atamaları silmez.
+          </DialogDescription>
+        </DialogHeader>
+        {children}
+      </DialogContent>
+    </Dialog>
   );
 }

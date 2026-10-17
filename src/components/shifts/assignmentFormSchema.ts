@@ -1,28 +1,47 @@
 import { validDay } from "../../../convex/lib/shiftUx";
 import { z } from "zod";
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const MAX_RANGE_DAYS = 365;
-
-export const assignmentFormSchema = z
+export const bulkAssignmentFormSchema = z
   .object({
-    employeeId: z.string().min(1, "Çalışan seçin"),
+    employeeIds: z
+      .array(z.string().min(1, "Çalışan seçin"))
+      .min(1, "En az bir çalışan seçin")
+      .max(100, "En fazla 100 çalışan seçin"),
     shiftId: z.string().min(1, "Vardiya seçin"),
-    startDate: z.string().regex(ISO_DATE, "Başlangıç tarihi seçin").refine(validDay, "Geçerli takvim günü seçin"),
-    endDate: z.string().regex(ISO_DATE, "Bitiş tarihi seçin").refine(validDay, "Geçerli takvim günü seçin"),
+    startDate: z.string().refine(validDay, "Başlangıç tarihi seçin"),
+    endDate: z.string().refine(validDay, "Bitiş tarihi seçin"),
+    specificDays: z.boolean(),
+    weekPattern: z.array(
+      z.enum(["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]),
+    ),
   })
-  .refine((v) => v.startDate <= v.endDate, {
-    path: ["endDate"],
-    message: "Bitiş tarihi başlangıçtan önce olamaz",
-  })
-  .refine(
-    (v) => {
-      const start = new Date(v.startDate).getTime();
-      const end = new Date(v.endDate).getTime();
-      const days = Math.round((end - start) / (1000 * 60 * 60 * 24));
-      return days <= MAX_RANGE_DAYS;
-    },
-    { path: ["endDate"], message: "Aralık 365 günden fazla olamaz" },
-  );
-
-export type AssignmentFormValues = z.infer<typeof assignmentFormSchema>;
+  .superRefine((value, ctx) => {
+    if (new Set(value.employeeIds).size !== value.employeeIds.length)
+      ctx.addIssue({
+        code: "custom",
+        path: ["employeeIds"],
+        message: "Aynı çalışan birden fazla seçilemez",
+      });
+    if (value.startDate > value.endDate)
+      ctx.addIssue({
+        code: "custom",
+        path: ["endDate"],
+        message: "Bitiş tarihi başlangıçtan önce olamaz",
+      });
+    if (
+      (Date.parse(value.endDate) - Date.parse(value.startDate)) / 86400000 >
+      365
+    )
+      ctx.addIssue({
+        code: "custom",
+        path: ["endDate"],
+        message: "Tarih farkı en fazla 365 gün olabilir (366 dahil gün)",
+      });
+    if (value.specificDays && !value.weekPattern.length)
+      ctx.addIssue({
+        code: "custom",
+        path: ["weekPattern"],
+        message: "En az bir gün seçin",
+      });
+  });
+export type BulkAssignmentFormValues = z.infer<typeof bulkAssignmentFormSchema>;
