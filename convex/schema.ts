@@ -118,6 +118,8 @@ export default defineSchema({
     .index("by_department", ["departmentId"])
     .index("by_photo_storage", ["photoStorageId"])
     .index("by_project_visitor", ["projectId", "isVisitor"])
+    .searchIndex("search_first_name", { searchField: "firstName", filterFields: ["projectId"] })
+    .searchIndex("search_last_name", { searchField: "lastName", filterFields: ["projectId"] })
     // Expiry cron: isVisitor=true ∧ isActive=true ∧ accessExpiresAt<=now (ISO-UTC sıralanabilir).
     .index("by_visitor_active_expiry", ["isVisitor", "isActive", "accessExpiresAt"]),
 
@@ -233,7 +235,8 @@ export default defineSchema({
   })
     .index("by_project", ["projectId"])
     .index("by_zone", ["zoneId"])
-    .index("by_device", ["deviceId"]),
+    .index("by_device", ["deviceId"])
+    .searchIndex("search_name", { searchField: "name", filterFields: ["projectId"] }),
 
   /**
    * Okuyucu (kart/yüz tarama yüzü) — kapıyla N:1. Bir kapı 1..2 okuyucu taşır
@@ -399,7 +402,10 @@ export default defineSchema({
     templateName: v.optional(v.string()),
     createdAt: v.optional(v.string()),
     updatedAt: v.optional(v.string()),
-  }).index("by_project", ["projectId"]),
+  })
+    .index("by_project", ["projectId"])
+    .index("by_project_active", ["projectId", "isActive"])
+    .searchIndex("search_name", { searchField: "name", filterFields: ["projectId", "isActive"] }),
 
   groupMembers: defineTable({
     groupId: v.id("accessRules"),
@@ -1020,8 +1026,16 @@ export default defineSchema({
     note: v.optional(v.string()),
     timestamp: v.number(),
     ipAddress: v.optional(v.string()),
+    /** Arama için yazım anında doldurulur (kullanıcı adı, hedef etiketi, ad alanları; serbest not KVKK gereği dahil değil). Eski kayıtlarda yok. */
+    searchText: v.optional(v.string()),
   })
     .index("by_project_timestamp", ["projectId", "timestamp"])
+    .index("by_project_action_timestamp", ["projectId", "action", "timestamp"])
+    .index("by_action_timestamp", ["action", "timestamp"])
+    .searchIndex("search_text", {
+      searchField: "searchText",
+      filterFields: ["projectId", "targetTable", "action", "userId"],
+    })
     .index("by_target", ["targetTable", "targetId"])
     .index("by_user_timestamp", ["userId", "timestamp"])
     .index("by_timestamp", ["timestamp"])
