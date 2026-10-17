@@ -37,7 +37,14 @@ describe("rapor proje kapsamı ve dönem", () => {
 // Exercise the real loader and public handlers; only the auth wrapper is replaced.
 // Query fixtures return already scoped rows, as the DB indexes do in production.
 
-vi.mock("./customFunctions", () => ({ authedQuery: (config: unknown) => config, employeeAuthedQuery: (config: unknown) => config, employeeAuthedMutation: (config: unknown) => config }));
+vi.mock("./customFunctions", () => {
+  const passThrough = (config: unknown) => config;
+  return {
+  authedQuery: passThrough, authedMutation: passThrough, optionalAuthQuery: passThrough, adminQuery: passThrough,
+  adminMutation: passThrough, superAdminQuery: passThrough, superAdminMutation: passThrough, authedAction: passThrough,
+  employeeAuthedQuery: passThrough, employeeAuthedMutation: passThrough,
+  };
+});
 afterEach(() => vi.restoreAllMocks());
 
 const projectId = "project" as Id<"projects">;

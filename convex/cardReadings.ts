@@ -1,13 +1,17 @@
 import { filterPdksReadings } from "./lib/pdksSource";
 import { paginationOptsValidator, type PaginationResult } from "convex/server";
 import { resolveProjectScope } from "./lib/projectScope";
-import { scopedCardReadingQuery } from "./lib/cardReadingList";
+import { cardReadingDateBounds, scopedCardReadingQuery } from "./lib/cardReadingList";
+import { assignmentPrecondition, ASSIGN_CARD_ERRORS, liveReadingWindow, matchesReadingResult } from "./lib/liveReadings";
+import { getEmployeeTargetDevices } from "./lib/peopleHikSnapshot";
+import { writeAudit } from "./lib/audit";
 import { toUtcISO, trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
 import { internalMutation } from "./_generated/server";
-import { v } from "convex/values";
-import { internal } from "./_generated/api";
+import { ConvexError, v } from "convex/values";
+import { api, internal } from "./_generated/api";
 import {
   authedQuery,
+  adminMutation,
   employeeAuthedQuery,
   employeeAuthedMutation,
 } from "./lib/customFunctions";
@@ -111,6 +115,187 @@ export const list = authedQuery({
     await resolveProjectScope(ctx, args.projectId);
     const result = await scopedCardReadingQuery(ctx, args).order("desc").paginate(args.paginationOpts);
     return { ...result, page: await enrichReadingsForList(ctx, result.page) };
+  },
+});
+
+/** Each cursor consumes at most 200 candidates; residual filters may leave an empty page. */
+export const listFiltered = authedQuery({
+  args: {
+    projectId: v.id("projects"),
+    deviceId: v.optional(v.id("devices")),
+    employeeId: v.optional(v.id("employees")),
+    doorId: v.optional(v.id("doors")),
+    result: v.optional(v.union(v.literal("granted"), v.literal("denied"), v.literal("unknown"))),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    await resolveProjectScope(ctx, args.projectId);
+    const bounds = cardReadingDateBounds(args.startDate, args.endDate);
+    const door = args.doorId ? await ctx.db.get(args.doorId) : null;
+    if (args.doorId && (!door || door.projectId !== args.projectId || !door.deviceId || door.ioId === undefined)) {
+      throw new ConvexError("Bu kapı seçili projede bir IDE okuyucusuyla eşleşmiyor");
+    }
+    if (door?.deviceId && args.deviceId && door.deviceId !== args.deviceId) {
+      throw new ConvexError("Seçili kapı bu cihaza bağlı değil");
+    }
+    const deviceId = door?.deviceId ?? args.deviceId;
+    if (deviceId) {
+      const device = await ctx.db.get(deviceId);
+      if (device?.projectId !== args.projectId) throw new ConvexError("Cihaz seçili projede bulunamadı");
+    }
+    if (args.employeeId) {
+      const employee = await ctx.db.get(args.employeeId);
+      if (employee?.projectId !== args.projectId) throw new ConvexError("Kişi seçili projede bulunamadı");
+    }
+    if (!Number.isInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1) {
+      throw new ConvexError("Sayfa boyutu pozitif bir tam sayı olmalı");
+    }
+    const status = args.result === "granted" ? "izin_verildi" : args.result === "denied" ? "reddedildi" : undefined;
+    const query = ctx.db.query("cardReadings");
+    const indexed = (() => {
+      if (door && deviceId && door.ioId !== undefined) return query.withIndex("by_device_io_time", q => {
+        const prefix = q.eq("deviceId", deviceId).eq("ideIoId", door.ioId);
+        return bounds ? prefix.gte("accessTime", bounds.startISO).lte("accessTime", bounds.endISO) : prefix;
+      });
+      if (args.employeeId && deviceId) return query.withIndex("by_project_device_employee_time", q => {
+        const prefix = q.eq("projectId", args.projectId).eq("deviceId", deviceId).eq("employeeId", args.employeeId);
+        return bounds ? prefix.gte("accessTime", bounds.startISO).lte("accessTime", bounds.endISO) : prefix;
+      });
+      if (args.employeeId) return query.withIndex("by_project_employee_time", q => {
+        const prefix = q.eq("projectId", args.projectId).eq("employeeId", args.employeeId);
+        return bounds ? prefix.gte("accessTime", bounds.startISO).lte("accessTime", bounds.endISO) : prefix;
+      });
+      if (deviceId && args.result !== undefined) return query.withIndex("by_project_device_status_time", q => {
+        const prefix = q.eq("projectId", args.projectId).eq("deviceId", deviceId).eq("accessStatus", status);
+        return bounds ? prefix.gte("accessTime", bounds.startISO).lte("accessTime", bounds.endISO) : prefix;
+      });
+      if (args.result !== undefined) return query.withIndex("by_project_status_time", q => {
+        const prefix = q.eq("projectId", args.projectId).eq("accessStatus", status);
+        return bounds ? prefix.gte("accessTime", bounds.startISO).lte("accessTime", bounds.endISO) : prefix;
+      });
+      return scopedCardReadingQuery(ctx, { ...args, deviceId });
+    })();
+    const page = await indexed.order("desc").paginate({
+      ...args.paginationOpts,
+      numItems: Math.min(args.paginationOpts.numItems, 200),
+      maximumRowsRead: 200,
+    });
+    const matching = page.page.filter(row =>
+      row.projectId === args.projectId
+      && (args.employeeId === undefined || row.employeeId === args.employeeId)
+      && matchesReadingResult(row.accessStatus, args.result),
+    );
+    return {
+      ...page,
+      page: await enrichReadingsForList(ctx, matching),
+      scannedCount: page.page.length,
+      filterScope: "candidatePage" as const,
+    };
+  },
+});
+
+/** Intake-day snapshot and bounded reconnect catch-up, independent of device event time. */
+export const listLiveSince = authedQuery({
+  args: {
+    projectId: v.id("projects"),
+    afterCreationTime: v.optional(v.number()),
+    limit: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await resolveProjectScope(ctx, args.projectId);
+    if (!Number.isInteger(args.limit) || args.limit < 1 || args.limit > 500) {
+      throw new ConvexError("Canlı kayıt sınırı 1–500 arasında tam sayı olmalı");
+    }
+    if (args.afterCreationTime !== undefined && (!Number.isFinite(args.afterCreationTime) || args.afterCreationTime < 0)) {
+      throw new ConvexError("Geçersiz canlı kayıt işaretçisi");
+    }
+    const today = trTodayKey();
+    const dayStart = Date.parse(trDayRangeISO(today, today).startISO);
+    const readings = await ctx.db.query("cardReadings")
+      // Convex appends _creationTime to every index, including by_project.
+      .withIndex("by_project", q => {
+        const prefix = q.eq("projectId", args.projectId);
+        return args.afterCreationTime === undefined
+          ? prefix.gte("_creationTime", dayStart)
+          : prefix.gt("_creationTime", args.afterCreationTime);
+      }).order("desc").take(args.limit + 1);
+    const window = liveReadingWindow(readings, args.limit, args.afterCreationTime);
+    return { ...window, rows: await enrichReadingsForList(ctx, window.rows) };
+  },
+});
+
+/** Null deliberately covers missing, unscoped and inaccessible direct links alike. */
+export const getReading = authedQuery({
+  args: { readingId: v.id("cardReadings") },
+  handler: async (ctx, args) => {
+    const reading = await ctx.db.get(args.readingId);
+    if (!reading?.projectId) return null;
+    const allowed = await resolveProjectScope(ctx);
+    if (!allowed.includes(reading.projectId)) return null;
+    const [enriched] = await enrichReadingsForList(ctx, [reading]);
+    return enriched ?? null;
+  },
+});
+
+export const assignCardFromReading = adminMutation({
+  args: {
+    readingId: v.id("cardReadings"),
+    employeeId: v.id("employees"),
+    expectedCurrentCard: v.union(v.string(), v.null()),
+  },
+  returns: v.object({ employeeId: v.id("employees"), cardNumber: v.string(), syncStatus: v.union(v.literal("pending"), v.literal("notRequested"), v.literal("noTargets")) }),
+  handler: async (ctx, args): Promise<{ employeeId: Id<"employees">; cardNumber: string; syncStatus: "pending" | "notRequested" | "noTargets" }> => {
+    const reading = await ctx.db.get(args.readingId);
+    const allowed = await resolveProjectScope(ctx);
+    if (!reading?.projectId || !allowed.includes(reading.projectId)) {
+      throw new ConvexError({ code: "READING_NOT_FOUND", message: ASSIGN_CARD_ERRORS.READING_NOT_FOUND });
+    }
+    const employee = await ctx.db.get(args.employeeId);
+    if (!employee || !employee.projectId || !allowed.includes(employee.projectId)) {
+      throw new ConvexError({ code: "EMPLOYEE_NOT_FOUND", message: ASSIGN_CARD_ERRORS.EMPLOYEE_NOT_FOUND });
+    }
+    const preconditions = {
+      reading,
+      employeeProjectId: employee.projectId,
+      employeeIsActive: employee.isActive,
+      currentCard: employee.cardNumber ?? null,
+      expectedCurrentCard: args.expectedCurrentCard,
+      duplicate: false,
+    };
+    const initialError = assignmentPrecondition(preconditions);
+    if (initialError) throw new ConvexError({ code: initialError, message: ASSIGN_CARD_ERRORS[initialError] });
+    // Same global exact-string by_card rule as employees.findDuplicateEmployee.
+    // Two candidates suffice: at most one can be this employee, any other is a conflict.
+    const cardOwners = await ctx.db.query("employees")
+      .withIndex("by_card", q => q.eq("cardNumber", reading.cardNo)).take(2);
+    const error = assignmentPrecondition({ ...preconditions, duplicate: cardOwners.some(owner => owner._id !== employee._id) });
+    if (error) throw new ConvexError({ code: error, message: ASSIGN_CARD_ERRORS[error] });
+
+    const targets = employee.cardNumber === reading.cardNo ? null : await getEmployeeTargetDevices(ctx, employee, {
+      membershipLimit: 101, linkLimit: 201, activeOnly: true,
+    });
+    const hasNoTargets = targets !== null && !targets.truncated
+      && !targets.devices.some(device => device.brand === "hikvision" || device.brand === "ide_smart");
+
+    // A mutation-to-mutation call is a subtransaction. Keep the existing old-card
+    // cleanup and Hik/IDE scheduling in employees.update, with no duplicate sync logic.
+    const employeeId: Id<"employees"> = await ctx.runMutation(api.employees.update, {
+      employeeId: employee._id,
+      cardNumber: reading.cardNo,
+    });
+    await writeAudit(ctx, {
+      user: ctx.user,
+      projectId: reading.projectId,
+      action: "update",
+      targetTable: "employees",
+      targetId: employeeId,
+      oldValue: { cardNumber: employee.cardNumber },
+      newValue: { cardNumber: reading.cardNo, readingId: reading._id },
+      note: "Canlı İzleme okumasından kart kişiye atandı; geçmiş okuma değiştirilmedi.",
+    });
+    return { employeeId, cardNumber: reading.cardNo, syncStatus: employee.cardNumber === reading.cardNo ? "notRequested" : hasNoTargets ? "noTargets" : "pending" };
   },
 });
 
