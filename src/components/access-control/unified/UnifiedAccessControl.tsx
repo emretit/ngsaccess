@@ -1,7 +1,6 @@
 import { useState } from "react";
 import AccessRulesList from "./AccessRulesList";
 import CreateRuleDialog from "./CreateRuleDialog";
-import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import type { AccessRule } from "@/types/access-control";
 
 const ProjectAccessControl = () => {
@@ -43,8 +42,7 @@ const ProjectAccessControl = () => {
 };
 
 const UnifiedAccessControl = () => {
-  const { projectId } = useActiveProjectScope();
-  return <ProjectAccessControl key={projectId ?? "no-project"} />;
+  return <ProjectAccessControl />;
 };
 
 export default UnifiedAccessControl;

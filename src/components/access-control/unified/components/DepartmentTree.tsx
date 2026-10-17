@@ -178,13 +178,14 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
     visibleOrphans.length > 0;
   const allIds = employees.map((employee) => employee._id);
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-medium">Kim erişebilecek?</h3>
         <Button
           type="button"
           variant="outline"
           size="sm"
+          className="h-auto min-h-9 max-w-full whitespace-normal"
           disabled={employeesLoading}
           onClick={() =>
             change(
@@ -194,8 +195,8 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
           }
         >
           {selectionState(allIds, formData.selected_employees) === true
-            ? "Tümünü kaldır"
-            : "Tümünü seç"}
+            ? "Projedeki tüm seçimleri kaldır"
+            : "Projedeki tüm kişileri seç"}
         </Button>
       </div>
       <div className="flex items-center gap-2">
@@ -224,7 +225,7 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
       {employeesLoading || departmentsLoading ? (
         <SectionSkeleton rows={3} label="Kişiler yükleniyor" />
       ) : (
-        <div className="max-h-80 overflow-y-auto rounded-lg border p-2">
+        <div className="rounded-md border p-2">
           {renderedDepartments}
           {visibleOrphans.map(renderEmployee)}
           {!hasResults && (

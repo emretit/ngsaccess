@@ -1,11 +1,9 @@
 import { useRef, useState } from "react";
 import { useMutation, useAction } from "convex/react";
-import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import { notify } from "@/lib/notify";
 import { Id } from "../../../convex/_generated/dataModel";
 import { deviceSyncStore } from "./deviceSyncStore";
-import { friendlySyncError } from "@/lib/syncErrorMessages";
 
 interface CreateRuleWithMembersParams {
   rule: {
@@ -43,13 +41,6 @@ interface UpdateRuleWithMembersParams {
   doorIds?: Id<"doors">[];
 }
 
-type SyncResult = FunctionReturnType<
-  typeof api.actions.hikvisionSync.syncWeekPlanToDevices
->;
-type IdeSyncResult = FunctionReturnType<
-  typeof api.actions.ideGatewayDevice.syncRuleToIdePanelsAndWait
->;
-
 export const useComplexAccessRuleMutations = () => {
   const pendingRef = useRef(new Set<string>());
   const [pending, setPending] = useState<Set<string>>(new Set());
@@ -71,71 +62,20 @@ export const useComplexAccessRuleMutations = () => {
 
   const createWithGroups = useMutation(api.accessRules.createWithGroups);
   const updateWithGroups = useMutation(api.accessRules.updateWithGroups);
-  const syncWeekPlan = useAction(
-    api.actions.hikvisionSync.syncWeekPlanToDevices,
-  );
-  const syncIdeRule = useAction(
-    api.actions.ideGatewayDevice.syncRuleToIdePanelsAndWait,
-  );
-
+  const startRuleSync = useAction(api.deviceSyncRuns.startRuleSync);
   const startBackgroundSync = (ruleId: Id<"accessRules">) => {
     const finish = deviceSyncStore.start();
-
-    // Hikvision: senkron sonuç → toast.
-    const hik = syncWeekPlan({ accessRuleId: ruleId })
-      .then((syncResult: SyncResult) => {
-        if (syncResult.synced > 0) {
-          notify.success(
-            "Cihaz Senkronizasyonu",
-            `${syncResult.synced} cihaz için plan işi başlatıldı, ${syncResult.employeesSynced} kişi kuyruğa alındı`,
-          );
-        }
-        if (syncResult.failed > 0) {
-          notify.error(
-            "Cihaz Senkronizasyonu",
-            `${syncResult.failed} cihaza gönderilemedi`,
-          );
-        }
+    void startRuleSync({ ruleId })
+      .then(() => {
+        notify.info(
+          "Cihaz gönderimi başlatıldı",
+          "Sonucu Son gönderimler bölümünden izleyebilirsiniz.",
+        );
       })
-      .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-        notify.error("Cihaz senkronizasyon hatası", message);
-      });
-
-    // IDE Smart: op'lar kuyruğa atılır, panel ack'i beklenir → toast (Hikvision paritesi).
-    const ide = syncIdeRule({ accessRuleId: ruleId })
-      .then((r: IdeSyncResult) => {
-        // Gerçekten IDE paneli yoksa (op yok + atlanan yok) sessiz kal.
-        if (r.queued === 0 && r.skipped.length === 0) return;
-        if (r.queued > 0) {
-          if (r.failed > 0) {
-            // Kısmi başarıyı da göster (Hikvision'ın çift-toast'ına denk bilgi).
-            notify.error(
-              "IDE Panel Senkronizasyonu",
-              `${r.acked}/${r.queued} panele yazıldı, ${r.failed} başarısız${r.errors[0] ? `: ${friendlySyncError(r.errors[0])}` : ""}`,
-            );
-          } else if (r.pending > 0) {
-            notify.info(
-              "IDE Panel Senkronizasyonu",
-              `${r.acked}/${r.queued} panele yazıldı, ${r.pending} işlem panel yanıtını bekliyor`,
-            );
-          } else {
-            notify.success(
-              "IDE Panel Senkronizasyonu",
-              `${r.acked} işlem panele yazıldı`,
-            );
-          }
-        }
-        if (r.skipped.length > 0) {
-          notify.error("IDE Panel uyarısı", r.skipped.join("; "));
-        }
+      .catch((error: unknown) => {
+        notify.error("Kural kaydedildi; cihaz gönderimi başlatılamadı", error);
       })
-      .catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : "Bilinmeyen hata";
-        notify.error("IDE senkronizasyon hatası", message);
-      });
-
-    void Promise.allSettled([hik, ide]).finally(finish);
+      .finally(finish);
   };
 
   const createAccessRuleWithMembers = {
@@ -147,7 +87,7 @@ export const useComplexAccessRuleMutations = () => {
           deviceIds: params.deviceIds,
           doorIds: params.doorIds,
         });
-        notify.success("Başarılı", "Erişim kuralı ve üyeleri oluşturuldu.");
+        notify.success("Kural kaydedildi", "Cihaz işlemleri ayrıca izlenir.");
         startBackgroundSync(result);
         return result;
       }),
@@ -164,7 +104,7 @@ export const useComplexAccessRuleMutations = () => {
           deviceIds: params.deviceIds,
           doorIds: params.doorIds,
         });
-        notify.success("Başarılı", "Erişim kuralı güncellendi.");
+        notify.success("Kural kaydedildi", "Cihaz işlemleri ayrıca izlenir.");
         startBackgroundSync(params.id);
         return result;
       }),

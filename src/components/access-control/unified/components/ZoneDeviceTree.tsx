@@ -243,13 +243,14 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
   ];
   const hasResults = renderedZones.some((zone) => zone !== null);
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-medium">Hangi kapılarda?</h3>
         <Button
           type="button"
           variant="outline"
           size="sm"
+          className="h-auto min-h-9 max-w-full whitespace-normal"
           disabled={isLoading || loading}
           onClick={() =>
             changeScope(
@@ -260,8 +261,8 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
           }
         >
           {state(allDoorIds, allDoorlessIds) === true
-            ? "Tümünü kaldır"
-            : "Tümünü seç"}
+            ? "Projedeki tüm seçimleri kaldır"
+            : "Projedeki tüm kapıları ve cihazları seç"}
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
@@ -280,7 +281,7 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
       {isLoading || loading ? (
         <SectionSkeleton rows={3} label="Kapılar yükleniyor" />
       ) : (
-        <div className="max-h-80 overflow-y-auto rounded-lg border p-2">
+        <div className="rounded-md border p-2">
           {renderedZones}
           {!hasResults && (
             <EmptyState

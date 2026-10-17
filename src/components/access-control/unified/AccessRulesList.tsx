@@ -1,71 +1,89 @@
-import { useEffect, useState } from "react";
-import { useAction, useConvex, useQuery } from "convex/react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useConvex, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
-import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
+import { RowActions } from "@/components/shared/RowActions";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { FilterBar } from "@/components/shared/FilterBar";
+import { StatInline } from "@/components/shared/StatInline";
+import { DeviceSyncStatusBanner } from "@/components/sync/DeviceSyncStatusBanner";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useAccessRuleMutations } from "@/hooks/access-rules/useAccessRuleMutations";
-import {
-  useDeviceSyncing,
-  deviceSyncStore,
-} from "@/hooks/access-rules/deviceSyncStore";
-import { notify } from "@/lib/notify";
-import {
-  ChevronDown,
-  Edit,
-  Plus,
-  Shield,
-  Trash2,
-  UploadCloud,
-} from "lucide-react";
 import { formatWeekdaysAbbr } from "./components/weekdays";
 import { AccessRuleDetails } from "./AccessRuleDetails";
+import { ProjectSyncButton, RecentRuns } from "./SyncRuns";
+import { ruleTypeMatches } from "./lib/presentation";
 import type { AccessRule } from "@/types/access-control";
-
 type Summary = FunctionReturnType<
   typeof api.accessRules.listSummaries
 >["page"][number];
-type SearchBy = "rule" | "person" | "door";
-type Status = "all" | "active" | "inactive";
-interface AccessRulesListProps {
+interface Props {
   onCreateRule: () => void;
   onEditRule?: (rule: AccessRule) => void;
 }
-
-function RuleCard({
+function scopeText(rule: Summary) {
+  if (rule.scopeTruncated) return "Geniş kapsam · Ayrıntıyı aç";
+  const panels = rule.panels
+    .map(
+      (panel) =>
+        `${panel.label} · ${panel.wholePanel ? "tüm kapılar" : `${panel.selectedDoors}/${panel.totalDoors} kapı`}`,
+    )
+    .join(", ");
+  return (
+    [
+      panels,
+      rule.unassignedDoors.length
+        ? "Panel bağlantısı yok; cihaza uygulanamaz"
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" · ") || "Kapı veya panel seçilmemiş"
+  );
+}
+function RuleRow({
   rule,
   projectId,
   onEditRule,
 }: {
   rule: Summary;
   projectId: Id<"projects">;
-  onEditRule?: AccessRulesListProps["onEditRule"];
+  onEditRule?: Props["onEditRule"];
 }) {
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const convex = useConvex();
+  const { isAdmin } = useActiveProject();
   const { updateAccessRule, deleteAccessRule } = useAccessRuleMutations();
   const toggle = useAsyncAction(
-    async (isActive: boolean) => {
+    async () => {
       await updateAccessRule.mutateAsync({
         id: rule._id,
-        updates: { isActive },
+        updates: { isActive: !(rule.isActive ?? true) },
       });
     },
     { error: "Kural durumu değiştirilemedi" },
@@ -81,201 +99,232 @@ function RuleCard({
     { error: "Kural ayrıntısı yüklenemedi" },
   );
   return (
-    <Collapsible open={open} onOpenChange={setOpen} asChild>
-      <Card className="min-w-0">
-        <CardHeader className="pb-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <h3 className="break-words text-lg font-semibold">{rule.name}</h3>
-              <StatusBadge
-                tone={(rule.isActive ?? true) ? "success" : "neutral"}
-              >
-                {(rule.isActive ?? true) ? "Aktif" : "Pasif"}
-              </StatusBadge>
-            </div>
-            <div className="flex flex-wrap items-center gap-1">
-              <Switch
-                aria-label={`${rule.name} kuralı aktif`}
-                checked={rule.isActive ?? true}
-                disabled={toggle.pending || deleteAccessRule.isPending}
-                onCheckedChange={(checked) => void toggle.run(checked)}
-              />
-              {onEditRule && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  aria-label={`${rule.name} kuralını düzenle`}
-                  disabled={edit.pending || deleteAccessRule.isPending}
-                  onClick={() => void edit.run()}
+    <>
+      <TableRow className="h-16 md:h-[42px] md:[&_td]:py-1">
+        <TableCell className="min-w-0">
+          <Button
+            variant="link"
+            className="h-auto max-w-full whitespace-normal break-words p-0 text-left justify-start text-foreground"
+            onClick={() => setOpen(true)}
+          >
+            {rule.name}
+          </Button>
+          <p className="md:hidden text-xs text-muted-foreground break-words">
+            {scopeText(rule)}
+          </p>
+        </TableCell>
+        <TableCell className="hidden lg:table-cell">
+          {rule.targetType === "visitor"
+            ? "Ziyaretçi şablonu"
+            : "Personel yetkisi"}
+        </TableCell>
+        <TableCell className="hidden lg:table-cell tabular-nums">
+          {rule.memberCount}
+          {rule.memberCountTruncated ? "+" : ""} kişi
+        </TableCell>
+        <TableCell className="hidden md:table-cell">
+          <p className="truncate" title={scopeText(rule)}>
+            {scopeText(rule)}
+          </p>
+        </TableCell>
+        <TableCell className="hidden xl:table-cell">
+          <p>{formatWeekdaysAbbr(rule.days ?? [])}</p>
+          <p className="text-xs text-muted-foreground">
+            {rule.startTime && rule.endTime
+              ? `${rule.startTime}–${rule.endTime}`
+              : rule.startTime || rule.endTime
+                ? "Eksik saat aralığı"
+                : "Tüm gün"}
+          </p>
+        </TableCell>
+        <TableCell className="px-2">
+          <StatusBadge tone={(rule.isActive ?? true) ? "success" : "neutral"}>
+            {(rule.isActive ?? true) ? "Aktif" : "Pasif"}
+          </StatusBadge>
+        </TableCell>
+        <TableCell className="px-1 max-md:[&_button]:h-11 max-md:[&_button]:w-11">
+          <RowActions label={`${rule.name} işlemleri`}>
+            <DropdownMenuItem onSelect={() => setOpen(true)}>
+              Ayrıntı
+            </DropdownMenuItem>
+            {isAdmin && (
+              <>
+                <DropdownMenuItem
+                  disabled={edit.pending}
+                  onSelect={() => void edit.run()}
                 >
-                  <Edit className="h-4 w-4" />
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive"
-                aria-label={`${rule.name} kuralını sil`}
-                disabled={
-                  toggle.pending || edit.pending || deleteAccessRule.isPending
-                }
-                onClick={() => setDeleting(true)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-              <CollapsibleTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  aria-label={`${rule.name} ayrıntılarını ${open ? "kapat" : "aç"}`}
+                  Düzenle
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={toggle.pending}
+                  onSelect={() => void toggle.run()}
                 >
-                  <ChevronDown
-                    className={`h-4 w-4 ${open ? "rotate-180" : ""}`}
-                  />
-                </Button>
-              </CollapsibleTrigger>
-            </div>
-          </div>
-          {rule.description && (
-            <p className="break-words text-sm text-muted-foreground">
-              {rule.description}
-            </p>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
-            <span>
-              {rule.memberCountTruncated
-                ? `${rule.memberCount}+`
-                : rule.memberCount}{" "}
-              kişi
-            </span>
-            <span>
-              {rule.startTime && rule.endTime
-                ? `${rule.startTime} – ${rule.endTime}`
-                : rule.startTime || rule.endTime
-                  ? "Eksik saat aralığı — düzenleyin"
-                  : "Tüm gün"}
-            </span>
-            <span>{formatWeekdaysAbbr(rule.days ?? [])}</span>
-          </div>
-          {rule.scopeTruncated ? (
-            <p className="text-sm text-muted-foreground">
-              Geniş kapı kapsamı; tam liste için ayrıntıyı açın.
-            </p>
-          ) : rule.panels.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Kapı veya panel seçilmemiş
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {rule.panels.map((panel) => (
-                <li key={panel.deviceId} className="min-w-0 text-sm">
-                  <p className="break-words font-medium">{panel.label}</p>
-                  <p className="break-words text-xs text-muted-foreground">
-                    {panel.doors
-                      .map(
-                        (door) =>
-                          `${door.zoneName ? `${door.zoneName} → ` : ""}${door.name}`,
-                      )
-                      .join(", ")}
-                    {panel.doorsTruncated ? " …" : ""}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-          {rule.unassignedDoors.length > 0 && (
-            <p className="text-sm text-muted-foreground">
-              Panel bağlantısı olmayan kapılar:{" "}
-              {rule.unassignedDoors.map((door) => door.name).join(", ")} — kapı
-              kapsamı cihaza uygulanamaz.
-            </p>
-          )}
-          <CollapsibleContent>
-            {open && (
-              <QuerySectionBoundary
-                title="Kural ayrıntısı yüklenemedi"
-                resetKey={rule._id}
-              >
-                <AccessRuleDetails ruleId={rule._id} projectId={projectId} />
-              </QuerySectionBoundary>
+                  {(rule.isActive ?? true) ? "Pasifleştir" : "Aktifleştir"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={deleteAccessRule.isPending}
+                  onSelect={() => setDeleting(true)}
+                >
+                  Sil
+                </DropdownMenuItem>
+              </>
             )}
-          </CollapsibleContent>
-        </CardContent>
-        <ConfirmDestructive
-          open={deleting}
-          onOpenChange={setDeleting}
-          title="Erişim kuralı silinsin mi?"
-          objectName={rule.name}
-          effects={[
-            "Kuralın kişi, cihaz ve kapı bağlantıları kaldırılır.",
-            "Cihaz erişimleri kalan kurallara göre yeniden hesaplanır.",
-          ]}
-          confirmLabel="Kuralı sil"
-          onConfirm={() => deleteAccessRule.mutateAsync(rule._id)}
-        />
-      </Card>
-    </Collapsible>
+          </RowActions>
+        </TableCell>
+      </TableRow>
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="break-words">{rule.name}</SheetTitle>
+            <SheetDescription>
+              {rule.targetType === "visitor"
+                ? "Ziyaretçi şablonu"
+                : "Personel yetkisi"}{" "}
+              · {(rule.isActive ?? true) ? "Aktif" : "Pasif"} ·{" "}
+              {formatWeekdaysAbbr(rule.days ?? [])} ·{" "}
+              {rule.startTime && rule.endTime
+                ? `${rule.startTime}–${rule.endTime}`
+                : rule.startTime || rule.endTime
+                  ? "Eksik saat aralığı · düzenleyin"
+                  : "Tüm gün"}{" "}
+              (Türkiye saati)
+            </SheetDescription>
+          </SheetHeader>
+          <p className="mt-4 break-words">{rule.description}</p>
+          {open && (
+            <QuerySectionBoundary
+              resetKey={rule._id}
+              title="Kural ayrıntısı yüklenemedi"
+            >
+              <AccessRuleDetails ruleId={rule._id} projectId={projectId} />
+            </QuerySectionBoundary>
+          )}
+        </SheetContent>
+      </Sheet>
+      <ConfirmDestructive
+        open={deleting}
+        onOpenChange={setDeleting}
+        title="Erişim kuralı silinsin mi?"
+        objectName={rule.name}
+        effects={[
+          "Kuralın kişi, cihaz ve kapı bağlantıları kaldırılır.",
+          "Cihaz erişimleri kalan kurallara göre yeniden hesaplanır.",
+        ]}
+        confirmLabel="Kuralı sil"
+        onConfirm={() => deleteAccessRule.mutateAsync(rule._id)}
+      />
+    </>
   );
 }
-
 function RulesPage({
   projectId,
   search,
   searchBy,
   status,
+  type,
   onEditRule,
-}: {
+  onCreateRule,
+  clear,
+  onCount,
+}: Props & {
   projectId: Id<"projects">;
   search: string;
-  searchBy: SearchBy;
-  status: Status;
-  onEditRule?: AccessRulesListProps["onEditRule"];
+  searchBy: "rule" | "person" | "door";
+  status: "all" | "active" | "inactive";
+  type: string;
+  clear: () => void;
+  onCount: (count: number | undefined) => void;
 }) {
   const [cursors, setCursors] = useState<(string | null)[]>([null]);
-  const cursor = cursors[cursors.length - 1] ?? null;
   const result = useQuery(api.accessRules.listSummaries, {
     projectId,
     search,
     searchBy,
     status,
-    paginationOpts: { cursor, numItems: 20 },
+    paginationOpts: {
+      cursor: cursors[cursors.length - 1] ?? null,
+      numItems: 20,
+    },
   });
+  useEffect(() => {
+    onCount(
+      result?.page.filter((rule) => ruleTypeMatches(rule.targetType, type))
+        .length,
+    );
+  }, [result, type, onCount]);
   if (!result)
     return <SectionSkeleton rows={4} label="Erişim kuralları yükleniyor" />;
+  const rows = result.page.filter((rule) =>
+    ruleTypeMatches(rule.targetType, type),
+  );
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 min-w-0">
+      {type !== "all" && (
+        <p className="text-xs text-muted-foreground">
+          Tür filtresi bu cursor sayfasındaki kayıtları daraltır. Diğer sonuçlar
+          için sonraki sayfaya geçin.
+        </p>
+      )}
       {result.searchLimited ? (
         <EmptyState
           title="Aramayı daraltın"
-          description="Çok fazla kişi, kapı veya kural eşleşti. Daha uzun bir ad yazarak yeniden arayın."
+          description="Çok fazla eşleşme var. Daha uzun bir kişi veya kapı adı yazın."
         />
-      ) : result.page.length === 0 ? (
+      ) : rows.length === 0 ? (
         <EmptyState
-          icon={Shield}
           title={
-            search || status !== "all"
-              ? "Bu sayfada eşleşen kural yok"
+            search || status !== "all" || type !== "all"
+              ? "Eşleşen kural yok"
               : "Henüz erişim kuralı yok"
           }
           description={
             !result.isDone
-              ? "Diğer sonuçları görmek için sonraki sayfaya geçin."
-              : "Arama ve durum filtrelerini değiştirebilir veya yeni kural oluşturabilirsiniz."
+              ? "Bu sayfada eşleşme yok; sonraki sayfada devam edebilirsiniz."
+              : "Kişi, kapı ve zaman seçerek kural oluşturabilirsiniz."
           }
+          action={{
+            onClick:
+              search || status !== "all" || type !== "all"
+                ? clear
+                : onCreateRule,
+            label:
+              search || status !== "all" || type !== "all"
+                ? "Filtreleri temizle"
+                : "Yeni kural",
+          }}
         />
       ) : (
-        result.page.map((rule) => (
-          <RuleCard
-            key={rule._id}
-            rule={rule}
-            projectId={projectId}
-            onEditRule={onEditRule}
-          />
-        ))
+        <div className="min-w-0 overflow-x-auto rounded-md border">
+          <Table className="w-full table-fixed">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Kural</TableHead>
+                <TableHead className="hidden lg:table-cell w-32">Tür</TableHead>
+                <TableHead className="hidden lg:table-cell w-24">Kim</TableHead>
+                <TableHead className="hidden md:table-cell w-[24%]">
+                  Nereye
+                </TableHead>
+                <TableHead className="hidden xl:table-cell w-40">
+                  Ne zaman
+                </TableHead>
+                <TableHead className="w-20">Durum</TableHead>
+                <TableHead className="w-14">
+                  <span className="sr-only">İşlemler</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((rule) => (
+                <RuleRow
+                  key={rule._id}
+                  rule={rule}
+                  projectId={projectId}
+                  onEditRule={onEditRule}
+                />
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
       <nav
         aria-label="Kural sayfaları"
@@ -288,8 +337,8 @@ function RulesPage({
         >
           Önceki
         </Button>
-        <span className="text-sm text-muted-foreground" aria-live="polite">
-          Sayfa {cursors.length} · {result.page.length} kural
+        <span className="text-xs text-muted-foreground">
+          Sayfa {cursors.length}
         </span>
         <Button
           variant="outline"
@@ -302,146 +351,178 @@ function RulesPage({
     </div>
   );
 }
-
-function ProjectRules({
-  projectId,
-  onCreateRule,
-  onEditRule,
-}: AccessRulesListProps & { projectId: Id<"projects"> }) {
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [searchBy, setSearchBy] = useState<SearchBy>("rule");
-  const [status, setStatus] = useState<Status>("all");
-  useEffect(() => {
-    const timeout = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-    return () => clearTimeout(timeout);
-  }, [search]);
-  const backfillRules = useAction(
-    api.actions.hikvisionSync.backfillAllRulesToDevices,
+export default function AccessRulesList(props: Props) {
+  const { projectId, activeProject, loading, isAdmin } = useActiveProject();
+  const [params, setParams] = useSearchParams();
+  const search = params.get("q") ?? "";
+  const searchBy =
+    params.get("by") === "person"
+      ? "person"
+      : params.get("by") === "door"
+        ? "door"
+        : "rule";
+  const status =
+    params.get("durum") === "active"
+      ? "active"
+      : params.get("durum") === "inactive"
+        ? "inactive"
+        : "all";
+  const type =
+    params.get("tur") === "visitor"
+      ? "visitor"
+      : params.get("tur") === "personnel"
+        ? "personnel"
+        : "all";
+  const change = (key: string, value: string) => {
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (value && value !== "all") next.set(key, value);
+        else next.delete(key);
+        return next;
+      },
+      { replace: true },
+    );
+  };
+  const clear = () =>
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      ["q", "by", "durum", "tur"].forEach((key) => next.delete(key));
+      return next;
+    });
+  const [pageCount, setPageCount] = useState<{
+    key: string;
+    count: number | undefined;
+  } | null>(null);
+  const queryKey = JSON.stringify([projectId, search, searchBy, status, type]);
+  const onCount = useCallback(
+    (count: number | undefined) => setPageCount({ key: queryKey, count }),
+    [queryKey, setPageCount],
   );
-  const syncing = useDeviceSyncing();
-  const backfill = useAsyncAction(
-    async () => {
-      const finish = deviceSyncStore.start();
-      try {
-        const result = await backfillRules({ projectId });
-        notify.info(
-          "Senkronizasyon kuyruğa alındı",
-          `${result.rulesProcessed} kural işlendi · ${result.synced} cihaz işlemi başlatıldı · ${result.failed} başlangıç hatası`,
-        );
-      } finally {
-        finish();
-      }
-    },
-    { error: "Senkronizasyon başlatılamadı" },
-  );
-  const queryKey = JSON.stringify([
-    projectId,
-    debouncedSearch,
-    searchBy,
-    status,
-  ]);
-  const selectClass =
-    "h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
   return (
-    <div className="space-y-4">
-      <div className="space-y-4 rounded-xl border bg-card p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold">Erişim kuralları</h2>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={syncing || backfill.pending}
-              onClick={() => void backfill.run()}
-            >
-              <UploadCloud className="mr-2 h-4 w-4" />
-              {syncing || backfill.pending
-                ? "Senkronize ediliyor…"
-                : "Cihazlara gönder"}
-            </Button>
-            <Button size="sm" onClick={onCreateRule}>
-              <Plus className="mr-2 h-4 w-4" />
-              Yeni kural
-            </Button>
-          </div>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_9rem_8rem]">
-          <div className="space-y-1">
-            <Label htmlFor="rule-search">Ara</Label>
-            <Input
-              id="rule-search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Ad yazın…"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="rule-search-by">Arama alanı</Label>
-            <select
-              id="rule-search-by"
-              className={selectClass}
-              value={searchBy}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (value === "rule" || value === "person" || value === "door")
-                  setSearchBy(value);
-              }}
-            >
-              <option value="rule">Kural adı</option>
-              <option value="person">Kişi adı</option>
-              <option value="door">Kapı adı</option>
-            </select>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="rule-status">Durum</Label>
-            <select
-              id="rule-status"
-              className={selectClass}
-              value={status}
-              onChange={(event) => {
-                const value = event.target.value;
-                if (
-                  value === "all" ||
-                  value === "active" ||
-                  value === "inactive"
-                )
-                  setStatus(value);
-              }}
-            >
-              <option value="all">Tümü</option>
-              <option value="active">Aktif</option>
-              <option value="inactive">Pasif</option>
-            </select>
-          </div>
-        </div>
-      </div>
-      <QuerySectionBoundary
-        title="Erişim kuralları yüklenemedi"
-        resetKey={queryKey}
+    <div className="space-y-4 min-w-0">
+      <PageHeader
+        title="Geçiş Kontrol"
+        scope={`${activeProject?.name ?? "Proje seçilmedi"} · Erişim kuralları`}
+        primaryAction={
+          isAdmin && projectId
+            ? { label: "Yeni kural", onClick: props.onCreateRule }
+            : undefined
+        }
       >
-        <RulesPage
-          key={queryKey}
-          projectId={projectId}
-          search={debouncedSearch}
-          searchBy={searchBy}
-          status={status}
-          onEditRule={onEditRule}
+        {isAdmin && projectId && (
+          <QuerySectionBoundary resetKey={projectId}>
+            <ProjectSyncButton projectId={projectId} />
+          </QuerySectionBoundary>
+        )}
+      </PageHeader>
+      {loading ? (
+        <SectionSkeleton label="Proje yükleniyor" />
+      ) : !projectId ? (
+        <EmptyState
+          title="Önce bir proje seçin"
+          description="Erişim kuralları seçili proje için gösterilir."
         />
-      </QuerySectionBoundary>
+      ) : (
+        <>
+          <StatInline
+            items={[
+              {
+                label: "Bu sayfada",
+                value:
+                  pageCount?.key === queryKey && pageCount.count !== undefined
+                    ? `${pageCount.count} kural`
+                    : null,
+              },
+            ]}
+          />
+          <QuerySectionBoundary resetKey={projectId}>
+            <DeviceSyncStatusBanner />
+          </QuerySectionBoundary>
+          <FilterBar
+            search={search}
+            onSearchChange={(value) => change("q", value)}
+            placeholder={
+              searchBy === "person"
+                ? "Kişi adı ara"
+                : searchBy === "door"
+                  ? "Kapı adı ara"
+                  : "Kural adı ara"
+            }
+            hasFilters={
+              status !== "all" || type !== "all" || searchBy !== "rule"
+            }
+            onClear={clear}
+          >
+            {[
+              {
+                key: "by",
+                label: "Arama alanı",
+                value: searchBy,
+                options: [
+                  ["rule", "Kural adı"],
+                  ["person", "Kişi adı"],
+                  ["door", "Kapı adı"],
+                ],
+              },
+              {
+                key: "durum",
+                label: "Durum",
+                value: status,
+                options: [
+                  ["all", "Tüm durumlar"],
+                  ["active", "Aktif"],
+                  ["inactive", "Pasif"],
+                ],
+              },
+              {
+                key: "tur",
+                label: "Tür",
+                value: type,
+                options: [
+                  ["all", "Tüm türler"],
+                  ["personnel", "Personel yetkisi"],
+                  ["visitor", "Ziyaretçi şablonu"],
+                ],
+              },
+            ].map((filter) => (
+              <label key={filter.key} className="min-w-0 text-xs">
+                <span className="sr-only">{filter.label}</span>
+                <select
+                  className="h-9 max-w-full rounded-md border border-input bg-background px-2"
+                  value={filter.value}
+                  onChange={(event) => change(filter.key, event.target.value)}
+                >
+                  {filter.options.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </FilterBar>
+          <QuerySectionBoundary
+            resetKey={queryKey}
+            title="Erişim kuralları yüklenemedi"
+          >
+            <RulesPage
+              key={queryKey}
+              projectId={projectId}
+              search={search}
+              searchBy={searchBy}
+              status={status}
+              type={type}
+              clear={clear}
+              onCount={onCount}
+              {...props}
+            />
+          </QuerySectionBoundary>
+          <QuerySectionBoundary resetKey={projectId}>
+            <RecentRuns projectId={projectId} />
+          </QuerySectionBoundary>
+        </>
+      )}
     </div>
   );
-}
-
-export default function AccessRulesList(props: AccessRulesListProps) {
-  const { projectId, loading } = useActiveProjectScope();
-  if (loading) return <SectionSkeleton label="Proje yükleniyor" />;
-  if (!projectId)
-    return (
-      <EmptyState
-        title="Önce bir proje seçin"
-        description="Erişim kuralları seçili proje için gösterilir."
-      />
-    );
-  return <ProjectRules key={projectId} projectId={projectId} {...props} />;
 }

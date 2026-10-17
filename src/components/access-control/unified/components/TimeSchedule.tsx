@@ -1,75 +1,132 @@
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { WEEKDAYS, sortWeekdays } from "./weekdays";
-
 interface TimeScheduleFormData {
   start_time: string;
   end_time: string;
   days: string[];
 }
-
-interface TimeScheduleProps<T extends TimeScheduleFormData = TimeScheduleFormData> {
+interface Props<T extends TimeScheduleFormData> {
   errors?: Record<string, string>;
   formData: T;
   setFormData: (updater: (prev: T) => T) => void;
 }
-
-export const TimeSchedule = <T extends TimeScheduleFormData,>({ formData, setFormData, errors = {} }: TimeScheduleProps<T>) => {
+export const TimeSchedule = <T extends TimeScheduleFormData>({
+  formData,
+  setFormData,
+  errors = {},
+}: Props<T>) => {
+  const [range, setRange] = useState(
+    Boolean(formData.start_time || formData.end_time),
+  );
   return (
-    <div className="grid gap-x-6 gap-y-3 md:grid-cols-2">
-      <div role="group" aria-labelledby="saat-label" className="space-y-1.5">
-        <Label id="saat-label">Saat</Label>
-        <Button type="button" variant="outline" size="sm" onClick={() => setFormData(prev => ({ ...prev, start_time: "", end_time: "" }))}>Tüm gün</Button>
-        <p className="text-xs text-muted-foreground">İki saat de boşsa tüm gün. Geceyi aşan planlar ayrı kurallar gerektirir.</p>
-        <div className="grid grid-cols-2 gap-2">
-          <Input
-            id="start_time"
-            type="time"
-            aria-label="Başlangıç saati"
-            aria-invalid={!!errors.startTime}
-            aria-describedby={errors.startTime ? "rule-time-error" : undefined}
-            value={formData.start_time}
-            onChange={(e) => setFormData(prev => ({ ...prev, start_time: e.target.value }))}
-          />
-          <Input
-            id="end_time"
-            type="time"
-            aria-label="Bitiş saati"
-            aria-invalid={!!errors.endTime}
-            aria-describedby={errors.endTime ? "rule-time-error" : undefined}
-            value={formData.end_time}
-            onChange={(e) => setFormData(prev => ({ ...prev, end_time: e.target.value }))}
-          />
+    <div className="space-y-4 border-t pt-4 min-w-0">
+      <p className="text-xs text-muted-foreground">
+        Türkiye saati (Europe/Istanbul). Geceyi aşan planlar için ayrı kurallar
+        oluşturun.
+      </p>
+      <fieldset className="space-y-2">
+        <legend className="font-medium">Saat kapsamı</legend>
+        <div className="flex flex-wrap gap-4">
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="time-mode"
+              checked={!range}
+              onChange={() => {
+                setRange(false);
+                setFormData((prev) => ({
+                  ...prev,
+                  start_time: "",
+                  end_time: "",
+                }));
+              }}
+            />
+            Tüm gün
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="time-mode"
+              checked={range}
+              onChange={() => setRange(true)}
+            />
+            Saat aralığı
+          </label>
         </div>
-        {(errors.startTime || errors.endTime) && <p id="rule-time-error" role="alert" className="text-sm text-destructive">{errors.startTime || errors.endTime}</p>}
-      </div>
-
-      <div className="space-y-1.5" id="rule-days" tabIndex={-1}>
-        <Label>Hangi Günlerde?</Label>
+        {range && (
+          <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3">
+            {[
+              {
+                key: "start_time",
+                label: "Başlangıç",
+                error: errors.startTime,
+              },
+              { key: "end_time", label: "Bitiş", error: errors.endTime },
+            ].map((field) => (
+              <div key={field.key} className="min-w-0 space-y-1">
+                <Label htmlFor={field.key}>{field.label}</Label>
+                <Input
+                  id={field.key}
+                  type="time"
+                  className="min-w-0 w-full"
+                  aria-invalid={!!field.error}
+                  aria-describedby={field.error ? "rule-time-error" : undefined}
+                  value={
+                    field.key === "start_time"
+                      ? formData.start_time
+                      : formData.end_time
+                  }
+                  onChange={(event) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      [field.key]: event.target.value,
+                    }))
+                  }
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        {(errors.startTime || errors.endTime) && (
+          <p id="rule-time-error" role="alert" className="text-xs text-danger">
+            {errors.startTime || errors.endTime}
+          </p>
+        )}
+      </fieldset>
+      <div id="rule-days" tabIndex={-1} className="space-y-2">
+        <Label>İzin verilen günler</Label>
         <ToggleGroup
           type="multiple"
           variant="outline"
           size="sm"
           value={formData.days}
-          onValueChange={(days) => setFormData(prev => ({ ...prev, days: sortWeekdays(days) }))}
+          onValueChange={(days) =>
+            setFormData((prev) => ({ ...prev, days: sortWeekdays(days) }))
+          }
           aria-label="İzin verilen günler"
+          aria-invalid={!!errors.days}
+          aria-describedby={errors.days ? "rule-days-error" : undefined}
           className="justify-start flex-wrap gap-1.5"
         >
           {WEEKDAYS.map((day) => (
             <ToggleGroupItem
               key={day.value}
               value={day.value}
-              title={day.full}
               aria-label={day.full}
-              className="h-9 w-10 p-0 text-sm font-medium"
+              className="h-11 w-10 p-0"
             >
               {day.short}
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-        {errors.days && <p role="alert" className="text-sm text-destructive">{errors.days}</p>}
+        {errors.days && (
+          <p id="rule-days-error" role="alert" className="text-xs text-danger">
+            {errors.days}
+          </p>
+        )}
       </div>
     </div>
   );
