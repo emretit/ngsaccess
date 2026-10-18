@@ -18,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/notify";
 import { usePdksSavedViews } from "@/hooks/usePdksSavedViews";
 import type { FilterValues } from "./PDKSFilterBar";
 
@@ -31,7 +31,6 @@ export function PDKSSavedViews({ filters, onApply }: PDKSSavedViewsProps) {
   const { views, save, remove, apply } = usePdksSavedViews();
   const [saveOpen, setSaveOpen] = useState(false);
   const [name, setName] = useState("");
-  const { toast } = useToast();
 
   const handleSave = () => {
     const trimmed = name.trim();
@@ -39,7 +38,7 @@ export function PDKSSavedViews({ filters, onApply }: PDKSSavedViewsProps) {
     save(trimmed, filters);
     setName("");
     setSaveOpen(false);
-    toast({ title: "Görünüm kaydedildi", description: trimmed });
+    notify.success("Görünüm kaydedildi", trimmed);
   };
 
   return (

@@ -30,7 +30,7 @@ export function EngineeringDepartmentView() {
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
           </div>
         ) : !engineeringDept ? (
-          <div className="text-red-500 p-4">Engineering departmanı sistemde kayıtlı değil</div>
+          <div className="text-destructive p-4">Engineering departmanı sistemde kayıtlı değil</div>
         ) : employees.length === 0 ? (
           <div className="text-center p-4">Engineering departmanında çalışan bulunamadı</div>
         ) : (

@@ -17,7 +17,7 @@ export default function SecurityCard() {
           <div className="flex items-center justify-between">
             <div>
               <h4 className="font-medium">Şifre Değiştir</h4>
-              <p className="text-sm text-gray-500">Uygulama içinden parola değiştirme henüz kullanılamıyor.</p>
+              <p className="text-sm text-muted-foreground">Uygulama içinden parola değiştirme henüz kullanılamıyor.</p>
             </div>
             <Button variant="outline" disabled>Henüz yok</Button>
           </div>
@@ -27,7 +27,7 @@ export default function SecurityCard() {
           <div className="flex items-center justify-between">
             <div>
               <h4 className="font-medium">İki Faktörlü Doğrulama</h4>
-              <p className="text-sm text-gray-500">Ekstra güvenlik için iki faktörlü doğrulamayı açın</p>
+              <p className="text-sm text-muted-foreground">Ekstra güvenlik için iki faktörlü doğrulamayı açın</p>
             </div>
             <Button variant="outline" disabled>Yakında</Button>
           </div>

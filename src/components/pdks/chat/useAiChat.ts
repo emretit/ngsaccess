@@ -5,13 +5,12 @@ import { useMessageHandler } from './hooks/useMessageHandler';
 import { useActiveProject } from '@/contexts/ActiveProjectContext';
 import { useState } from 'react';
 
-import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/notify";
 import { api } from "@/lib/convexApi";
 
 export function useAiChat() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const { toast } = useToast();
   const { projectId, isSuperAdmin } = useActiveProject();
   const saveConversation = useMutation(api.chatConversations.save);
 
@@ -48,19 +47,12 @@ export function useAiChat() {
         messages: convexMessages,
       });
 
-      toast({
-        title: "Sohbet kaydedildi",
-        description: "Sohbet başarıyla Convex'e kaydedildi",
-      });
+      notify.success("Sohbet kaydedildi", "Sohbet başarıyla Convex'e kaydedildi");
     } catch (error) {
       console.error('Error saving conversation:', error);
       setSaveError('Sohbet kaydedilemedi.');
 
-      toast({
-        title: "Hata",
-        description: "Sohbet kaydedilemedi.",
-        variant: "destructive"
-      });
+      notify.error("Hata", "Sohbet kaydedilemedi.");
     } finally {
       setIsSaving(false);
     }

@@ -1,13 +1,45 @@
-import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/notify";
 import { MessageData } from './types';
 import { toLocalDateString } from "@/lib/date";
 
 const COL_HEADERS = ["Ad Soyad", "Giriş Saati", "Çıkış Saati", "Departman", "Cihaz", "Konum"] as const;
 const COL_KEYS: (keyof MessageData)[] = ["name", "check_in", "check_out", "department", "device", "location"];
 
-export function useExportUtils() {
-  const { toast } = useToast();
+/** Converts the HSL channels stored in A2 CSS variables for jsPDF's RGB API. */
+export function pdfThemeColor(channels: string): [number, number, number] {
+  const [hue = 0, saturation = 0, lightness = 0] = channels.trim().split(/\s+/).map(parseFloat);
+  const s = saturation / 100;
+  const l = lightness / 100;
+  const a = s * Math.min(l, 1 - l);
+  const channel = (offset: number) => {
+    const k = (offset + hue / 30) % 12;
+    return Math.round(255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))));
+  };
+  return [channel(0), channel(8), channel(4)];
+}
 
+/** The PDF is printed on paper: read the light theme tokens even while the app is in dark mode. */
+function readPdfPalette() {
+  const root = document.documentElement;
+  const dark = root.classList.contains("dark");
+  if (dark) root.classList.remove("dark");
+  try {
+    const theme = getComputedStyle(root);
+    const color = (token: string) => pdfThemeColor(theme.getPropertyValue(token));
+    return {
+      headerFill: color("--primary"),
+      headerText: color("--primary-foreground"),
+      text: color("--foreground"),
+      alternateFill: color("--subtle"),
+      surfaceFill: color("--surface"),
+      border: color("--line"),
+    };
+  } finally {
+    if (dark) root.classList.add("dark");
+  }
+}
+
+export function useExportUtils() {
   const formatReportData = <T extends { check_in?: string | Date | null; check_out?: string | Date | null }>(data: T[]) => {
     return data.map(record => {
       const checkInDate = record.check_in ? new Date(record.check_in) : null;
@@ -23,11 +55,7 @@ export function useExportUtils() {
 
   const handleExportExcel = async (messageData: MessageData[]) => {
     if (!messageData || !Array.isArray(messageData) || messageData.length === 0) {
-      toast({
-        title: "Dışa aktarılamadı",
-        description: "Bu mesaj dışa aktarılabilir bir rapor içermiyor.",
-        variant: "destructive",
-      });
+      notify.error("Dışa aktarılamadı", "Bu mesaj dışa aktarılabilir bir rapor içermiyor.");
       return;
     }
 
@@ -59,33 +87,24 @@ export function useExportUtils() {
       link.click();
       URL.revokeObjectURL(url);
 
-      toast({
-        title: "Excel dosyası indirildi",
-        description: "Rapor başarıyla Excel formatında dışa aktarıldı.",
-      });
+      notify.success("Excel dosyası indirildi", "Rapor başarıyla Excel formatında dışa aktarıldı.");
     } catch (error) {
       console.error("Excel export error:", error);
-      toast({
-        title: "Excel oluşturma hatası",
-        description: "Excel dosyası oluşturulurken bir hata oluştu.",
-        variant: "destructive",
-      });
+      notify.error("Excel oluşturma hatası", "Excel dosyası oluşturulurken bir hata oluştu.");
     }
   };
 
   const handleExportPDF = async (messageData: MessageData[]) => {
     if (!messageData || !Array.isArray(messageData) || messageData.length === 0) {
-      toast({
-        title: "Dışa aktarılamadı",
-        description: "Bu mesaj dışa aktarılabilir bir rapor içermiyor.",
-        variant: "destructive",
-      });
+      notify.error("Dışa aktarılamadı", "Bu mesaj dışa aktarılabilir bir rapor içermiyor.");
       return;
     }
 
     try {
       const { default: jsPDF } = await import("jspdf");
       const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+
+      const { headerFill, headerText, text, alternateFill, surfaceFill, border } = readPdfPalette();
 
       // Title
       doc.setFontSize(14);
@@ -100,8 +119,8 @@ export function useExportUtils() {
       let y = 28;
 
       // Header row
-      doc.setFillColor(59, 130, 246);
-      doc.setTextColor(255, 255, 255);
+      doc.setFillColor(...headerFill);
+      doc.setTextColor(...headerText);
       doc.setFontSize(8);
       let x = startX;
       COL_HEADERS.forEach((h, i) => {
@@ -112,14 +131,14 @@ export function useExportUtils() {
       y += rowH;
 
       // Data rows
-      doc.setTextColor(30, 30, 30);
+      doc.setTextColor(...text);
       messageData.forEach((row, rowIdx) => {
         if (y > 185) {
           doc.addPage();
           y = 15;
         }
-        const fill = rowIdx % 2 === 0 ? [248, 250, 252] : [255, 255, 255];
-        doc.setFillColor(fill[0], fill[1], fill[2]);
+        const fill = rowIdx % 2 === 0 ? alternateFill : surfaceFill;
+        doc.setFillColor(...fill);
         x = startX;
         COL_KEYS.forEach((k, i) => {
           doc.rect(x, y, colWidths[i], rowH, "F");
@@ -129,24 +148,17 @@ export function useExportUtils() {
           x += colWidths[i];
         });
         // row border
-        doc.setDrawColor(220, 220, 220);
+        doc.setDrawColor(...border);
         doc.rect(startX, y, colWidths.reduce((a, b) => a + b, 0), rowH, "S");
         y += rowH;
       });
 
       doc.save(`pdks_rapor_${toLocalDateString()}.pdf`);
 
-      toast({
-        title: "PDF indirildi",
-        description: "Rapor başarıyla PDF formatında dışa aktarıldı.",
-      });
+      notify.success("PDF indirildi", "Rapor başarıyla PDF formatında dışa aktarıldı.");
     } catch (error) {
       console.error('PDF export error:', error);
-      toast({
-        title: "PDF oluşturma hatası",
-        description: `PDF dosyası oluşturulurken bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`,
-        variant: "destructive",
-      });
+      notify.error("PDF oluşturma hatası", `PDF dosyası oluşturulurken bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`);
     }
   };
 

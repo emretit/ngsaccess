@@ -9,7 +9,7 @@ interface AiInsightsCardProps {
 
 export function AiInsightsCard({ insight, isLoading = false }: AiInsightsCardProps) {
   return (
-    <Card className="bg-linear-to-br from-white to-secondary/20 dark:from-gray-800 dark:to-primary/10 border-primary/10">
+    <Card className="bg-card border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
         <CardTitle className="text-md font-medium flex items-center text-primary">
           <Sparkles className="h-4 w-4 mr-2" />
@@ -24,9 +24,9 @@ export function AiInsightsCard({ insight, isLoading = false }: AiInsightsCardPro
             <div className="w-3 h-3 bg-primary rounded-full animate-bounce animation-delay-400"></div>
           </div>
         ) : insight ? (
-          <p className="text-sm text-gray-700 dark:text-gray-300">{insight}</p>
+          <p className="text-sm text-foreground">{insight}</p>
         ) : (
-          <p className="text-sm text-gray-500">Henüz bir AI değerlendirmesi bulunmuyor.</p>
+          <p className="text-sm text-muted-foreground">Henüz bir AI değerlendirmesi bulunmuyor.</p>
         )}
       </CardContent>
     </Card>

@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { MessageSquare, Bot, Sparkles } from "lucide-react";
+import { MessageSquare, Bot, Sparkles, Rocket, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -64,7 +64,7 @@ export function PDKSAiChat() {
 
         {aiMode === 'native' && (
           <Badge variant="secondary" className="mt-2 text-xs">
-            🚀 Hızlı • Güvenli • Yerel
+            <Rocket aria-hidden="true" className="mr-1 h-3 w-3" /> Hızlı • Güvenli • Yerel
           </Badge>
         )}
       </div>
@@ -122,7 +122,7 @@ export function PDKSAiChat() {
           
           {aiMode === 'native' && (
             <p className="text-xs text-muted-foreground">
-              💡 Türkçe sorularınızı anlayabilir ve PDKS verilerinizden hızlı yanıtlar verebilirim.
+              <Lightbulb aria-hidden="true" className="mr-1 inline h-3 w-3" /> Türkçe sorularınızı anlayabilir ve PDKS verilerinizden hızlı yanıtlar verebilirim.
             </p>
           )}
         </form>

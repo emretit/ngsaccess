@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/notify";
 
 type ConsentType = "biometric_face" | "biometric_fingerprint" | "card" | "photo";
 
@@ -59,7 +59,6 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
   const consents = useQuery(api.employeeConsents.listForEmployee, { employeeId });
   const grant = useMutation(api.employeeConsents.grant);
   const revoke = useMutation(api.employeeConsents.revoke);
-  const { toast } = useToast();
 
   const [grantingType, setGrantingType] = useState<ConsentType | null>(null);
   const [notes, setNotes] = useState("");
@@ -85,18 +84,11 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
         consentType: grantingType,
         notes: notes.trim() || undefined,
       });
-      toast({
-        title: "Rıza alındı",
-        description: CONSENT_META[grantingType].label,
-      });
+      notify.success("Rıza alındı", CONSENT_META[grantingType].label);
       setGrantingType(null);
       setNotes("");
     } catch (e) {
-      toast({
-        title: "Rıza alınamadı",
-        description: e instanceof Error ? e.message : "Bilinmeyen hata",
-        variant: "destructive",
-      });
+      notify.error("Rıza alınamadı", e instanceof Error ? e.message : "Bilinmeyen hata");
     } finally {
       setSubmitting(false);
     }
@@ -105,13 +97,9 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
   const handleRevoke = async (id: Id<"employeeConsents">, label: string) => {
     try {
       await revoke({ id });
-      toast({ title: "Rıza iptal edildi", description: label });
+      notify.success("Rıza iptal edildi", label);
     } catch (e) {
-      toast({
-        title: "İptal edilemedi",
-        description: e instanceof Error ? e.message : "Bilinmeyen hata",
-        variant: "destructive",
-      });
+      notify.error("İptal edilemedi", e instanceof Error ? e.message : "Bilinmeyen hata");
     }
   };
 
@@ -144,7 +132,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium">{meta.label}</span>
                   {active ? (
-                    <Badge variant="default" className="bg-emerald-500 hover:bg-emerald-500 text-xs">
+                    <Badge variant="successSubtle" className="text-xs">
                       Aktif
                     </Badge>
                   ) : meta.required ? (

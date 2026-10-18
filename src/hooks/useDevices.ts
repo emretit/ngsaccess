@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
-import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/notify";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import type { Id } from "../../convex/_generated/dataModel";
 import type { Device } from "@/types/device";
@@ -10,7 +10,6 @@ export type { Device };
 type DeviceRow = FunctionReturnType<typeof api.devices.list>[number];
 
 export function useDevices() {
-  const { toast } = useToast();
   const { projectId, loading: projectLoading } = useActiveProject();
 
   const devicesRaw = useQuery(
@@ -49,14 +48,10 @@ export function useDevices() {
         isActive: deviceData.isActive ?? true,
         description: deviceData.description,
       });
-      toast({ title: "Cihaz eklendi" });
+      notify.success("Cihaz eklendi");
       return id;
     } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Cihaz eklenemedi",
-        variant: "destructive",
-      });
+      notify.error("Hata", (error as Error)?.message ?? "Cihaz eklenemedi");
     }
   };
 
@@ -75,26 +70,18 @@ export function useDevices() {
         description: updates.description,
         lastSeen: updates.lastSeen,
       });
-      toast({ title: "Cihaz güncellendi" });
+      notify.success("Cihaz güncellendi");
     } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Cihaz güncellenemedi",
-        variant: "destructive",
-      });
+      notify.error("Hata", (error as Error)?.message ?? "Cihaz güncellenemedi");
     }
   };
 
   const removeDevice = async (deviceId: Id<"devices">) => {
     try {
       await deleteDevice({ deviceId });
-      toast({ title: "Cihaz silindi" });
+      notify.success("Cihaz silindi");
     } catch (error: unknown) {
-      toast({
-        title: "Hata",
-        description: (error as Error)?.message ?? "Cihaz silinemedi",
-        variant: "destructive",
-      });
+      notify.error("Hata", (error as Error)?.message ?? "Cihaz silinemedi");
     }
   };
 

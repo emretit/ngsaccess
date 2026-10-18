@@ -9,7 +9,6 @@ import { ActiveProjectProvider } from '@/contexts/ActiveProjectContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import Layout from '@/components/Layout';
 import { useDarkMode } from '@/hooks/useDarkMode';
-import './App.css';
 
 const Index = lazy(() => import('@/pages/Index'));
 const Login = lazy(() => import('@/pages/Login'));

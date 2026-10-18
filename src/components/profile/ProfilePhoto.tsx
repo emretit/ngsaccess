@@ -56,7 +56,7 @@ export default function ProfilePhoto({
         <div className="relative">
           <Avatar className="w-32 h-32">
             <AvatarImage src={photoUrl || ""} alt="Profil fotoğrafı" />
-            <AvatarFallback className="bg-primary text-white text-2xl">
+            <AvatarFallback className="bg-primary text-primary-foreground text-2xl">
               {userInitials}
             </AvatarFallback>
           </Avatar>
@@ -67,7 +67,7 @@ export default function ProfilePhoto({
             aria-busy={isLoading}
             disabled={isLoading}
             onClick={() => inputRef.current?.click()}
-            className="absolute bottom-0 right-0 p-1.5 rounded-full bg-primary text-white cursor-pointer hover:bg-primary/90 transition-colors"
+            className="absolute bottom-0 right-0 p-1.5 rounded-full bg-primary text-primary-foreground cursor-pointer hover:bg-primary/90 transition-colors"
           >
             {isLoading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -86,7 +86,7 @@ export default function ProfilePhoto({
           />
         </div>
 
-        <p className="text-sm text-gray-500 mt-4">
+        <p className="text-sm text-muted-foreground mt-4">
           Önerilen: 200x200px, maksimum 2MB
         </p>
       </CardContent>

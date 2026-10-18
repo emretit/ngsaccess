@@ -64,7 +64,7 @@ export default function ProfileForm({ email, fullName, role, userId: _userId, on
               value={email}
               disabled
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               E-posta adresi değiştirilemez
             </p>
           </div>

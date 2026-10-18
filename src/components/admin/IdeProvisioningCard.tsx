@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Info, CheckCircle2, XCircle, RefreshCw, Radio, Search, ChevronDown } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { notify } from "@/lib/notify";
 
 /**
  * IDE Smart paneli LOCAL köprü servisi (scripts/ide-provision-agent.mjs) üzerinden
@@ -96,7 +96,7 @@ export function IdeProvisioningCard() {
   const handleScan = async () => {
     const s = subnet.trim();
     if (!s) {
-      toast({ title: "Hata", description: "Subnet gerekli (örn. 192.168.1)", variant: "destructive" });
+      notify.error("Hata", "Subnet gerekli (örn. 192.168.1)");
       return;
     }
     setScanning(true);
@@ -119,14 +119,14 @@ export function IdeProvisioningCard() {
       setScanProgress(100);
       setFoundPanels(panels);
       if (panels.length === 0) {
-        toast({ title: "Panel bulunamadı", description: `${s}.x ağında IDE Smart panel yok`, variant: "destructive" });
+        notify.error("Panel bulunamadı", `${s}.x ağında IDE Smart panel yok`);
       } else {
         setIp(panels[0]);
-        toast({ title: `${panels.length} panel bulundu`, description: panels.join(", ") });
+        notify.success(`${panels.length} panel bulundu`, panels.join(", "));
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Tarama başarısız";
-      toast({ title: "Hata", description: message, variant: "destructive" });
+      notify.error("Hata", message);
     } finally {
       clearInterval(timer);
       setScanning(false);
@@ -135,7 +135,7 @@ export function IdeProvisioningCard() {
 
   const handleProvision = async () => {
     if (!ip.trim()) {
-      toast({ title: "Hata", description: "Panel IP gerekli", variant: "destructive" });
+      notify.error("Hata", "Panel IP gerekli");
       return;
     }
     setProvisioning(true);
@@ -154,16 +154,14 @@ export function IdeProvisioningCard() {
       const parsed = asProvisionResult(json);
       if (!parsed) throw new Error("Köprü beklenmeyen yanıt döndü");
       setResult(parsed);
-      toast({
-        title: parsed.ok ? "Başarılı" : "Kısmi",
-        description: parsed.ok
-          ? `Panel ${parsed.uuid} broker'a alındı, reboot edildi.`
-          : "Yazma kısmen başarısız — read-back'i kontrol edin.",
-        variant: parsed.ok ? "default" : "destructive",
-      });
+      if (parsed.ok) {
+        notify.success("Başarılı", `Panel ${parsed.uuid} broker'a alındı, reboot edildi.`);
+      } else {
+        notify.error("Kısmi", "Yazma kısmen başarısız — read-back'i kontrol edin.");
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Provision başarısız";
-      toast({ title: "Hata", description: message, variant: "destructive" });
+      notify.error("Hata", message);
     } finally {
       setProvisioning(false);
     }
@@ -181,10 +179,10 @@ export function IdeProvisioningCard() {
       const readback = isRecord(json.readback) ? json.readback : {};
       setResult((prev) => (prev ? { ...prev, readback } : prev));
       const status = readback["MQTT.STATUS"];
-      toast({ title: "Panel durumu", description: `MQTT.STATUS = ${String(status ?? "?")}` });
+      notify.info("Panel durumu", `MQTT.STATUS = ${String(status ?? "?")}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Durum okunamadı";
-      toast({ title: "Hata", description: message, variant: "destructive" });
+      notify.error("Hata", message);
     } finally {
       setStatusChecking(false);
     }
@@ -203,19 +201,19 @@ export function IdeProvisioningCard() {
         <div
           className={
             health?.ok
-              ? "flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-xs"
-              : "flex items-center justify-between rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs"
+              ? "flex items-center justify-between rounded-lg border border-success/30 bg-success-bg p-3 text-xs"
+              : "flex items-center justify-between rounded-lg border border-destructive/30 bg-danger-bg p-3 text-xs"
           }
         >
           <div className="flex items-center gap-2">
             {healthChecking ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : health?.ok ? (
-              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <CheckCircle2 className="h-4 w-4 text-success" />
             ) : (
-              <XCircle className="h-4 w-4 text-red-600" />
+              <XCircle className="h-4 w-4 text-destructive" />
             )}
-            <span className={health?.ok ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}>
+            <span className={health?.ok ? "text-success" : "text-destructive"}>
               {healthChecking
                 ? "Köprü kontrol ediliyor…"
                 : health?.ok
@@ -229,20 +227,20 @@ export function IdeProvisioningCard() {
         </div>
 
         {!health?.ok && !healthChecking && (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+          <div className="rounded-lg border border-warning/30 bg-warning-bg p-3 text-xs text-warning">
             PC'de köprü servisini başlatın:
-            <code className="mt-1 block rounded bg-black/10 px-2 py-1 font-mono dark:bg-white/10">npm run ide-agent</code>
+            <code className="mt-1 block rounded bg-muted px-2 py-1 font-mono">npm run ide-agent</code>
             Köprü panelle aynı yerel ağda çalışmalı.
           </div>
         )}
 
         {health?.configError && (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-700 dark:text-red-400">
+          <div className="rounded-lg border border-destructive/30 bg-danger-bg p-3 text-xs text-destructive">
             {health.configError}
           </div>
         )}
 
-        <div className="flex items-start gap-2 rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 text-xs text-blue-700 dark:text-blue-400">
+        <div className="flex items-start gap-2 rounded-lg border border-info/30 bg-info-bg p-3 text-xs text-info">
           <Info className="h-4 w-4 shrink-0 mt-0.5" />
           <span>
             Panel fabrika broker'ından bizim Hetzner broker'ımıza alınır (L3 login → MQTT/LOGGER
@@ -352,9 +350,9 @@ export function IdeProvisioningCard() {
           <div className="space-y-2 rounded-lg border bg-muted/40 p-3 text-xs">
             <div className="flex items-center gap-2 font-medium">
               {result.ok ? (
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <CheckCircle2 className="h-4 w-4 text-success" />
               ) : (
-                <XCircle className="h-4 w-4 text-red-600" />
+                <XCircle className="h-4 w-4 text-destructive" />
               )}
               UUID {result.uuid} · level {result.level} · {result.rebooted ? "reboot edildi" : "reboot edilmedi"}
             </div>
