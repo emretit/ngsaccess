@@ -1,200 +1,72 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
-import { Copy, Eye, EyeOff, Plus, Trash2, Loader2, Router } from "lucide-react";
+import { Copy, Eye, EyeOff } from "lucide-react";
 import { api } from "../../../../../convex/_generated/api";
 import type { Id } from "../../../../../convex/_generated/dataModel";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
-import { useToast } from "@/components/ui/use-toast";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useSettingsFormState } from "../../SettingsFormState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { notify } from "@/lib/notify";
-import { Badge } from "@/components/ui/badge";
 
-/**
- * Hikvision LAN bridge token yönetimi (tek-yer modeli). Üretilen token, bridge EXE'nin
- * /__bridge ekranına bir kez girilir; bridge o token ile bu projedeki tüm localBridge
- * panellerini (IP/şifre/işler) otomatik çeker. Panel bilgileri cihaz formundan girilir.
- */
 export function BridgeIntegrationCard() {
-  const { toast } = useToast();
-  const { activeProjectId } = useActiveProject();
-  const bridges = useQuery(
-    api.hikBridge.listBridges,
-    activeProjectId ? { projectId: activeProjectId } : "skip",
-  );
+  const { projectId, isAdmin, activeProject } = useActiveProjectScope();
+  const bridges = useQuery(api.hikBridge.listBridges, projectId && isAdmin ? { projectId } : "skip");
   const createBridge = useMutation(api.hikBridge.createBridge);
   const revokeBridge = useMutation(api.hikBridge.revokeBridge);
-
-  // Hedef kapanış animasyonu boyunca korunur; diyalog yalnız revokeOpen ile kapanır.
   const [revokeTarget, setRevokeTarget] = useState<{ id: Id<"hikBridges">; label: string } | null>(null);
   const [revokeOpen, setRevokeOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [revoking, setRevoking] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [reveal, setReveal] = useState<Record<string, boolean>>({});
-
-  const handleCreate = async () => {
-    if (!activeProjectId) return;
-    setCreating(true);
-    try {
-      const result = await createBridge({ projectId: activeProjectId });
-      setReveal((m) => ({ ...m, [result.bridgeId]: true }));
-      toast({
-        title: "Bridge token oluşturuldu",
-        description: "Token'ı kopyalayıp bridge EXE'nin ayar ekranına girin.",
-      });
-    } catch (e) {
-      toast({
-        variant: "destructive",
-        title: "Token oluşturulamadı",
-        description: e instanceof Error ? e.message : "Bilinmeyen hata",
-      });
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const handleCopy = async (token: string) => {
-    try {
-      await navigator.clipboard.writeText(token);
-      toast({ title: "Kopyalandı", description: "Bridge token panoya kopyalandı." });
-    } catch {
-      toast({ variant: "destructive", title: "Kopyalanamadı", description: "Tarayıcı izin vermedi." });
-    }
-  };
-
+  const create = useAsyncAction(async () => {
+    if (!projectId) throw new Error("Önce bir proje seçin.");
+    await createBridge({ projectId });
+  }, { success: "Köprü anahtarı oluşturuldu", error: "Anahtar oluşturulamadı" });
+  const copy = useAsyncAction(async (token: string) => { await navigator.clipboard.writeText(token); },
+    { success: "Köprü anahtarı panoya kopyalandı", error: "Anahtar kopyalanamadı" });
+  useSettingsFormState("bridge", false, create.pending || revoking);
   const mask = (token: string) => `${token.slice(0, 8)}••••••••••••`;
-
-  return (
-    <Card className="max-w-2xl">
-      <CardHeader>
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500/10 to-sky-500/10 text-primary">
-              <Router className="h-5 w-5" />
-            </div>
-            <div className="space-y-1">
-              <CardTitle className="text-base">Hikvision Bridge</CardTitle>
-              <CardDescription>
-                LAN'daki Windows bridge bu token ile panelleri otomatik çeker. Panel IP/şifresi
-                cihaz formunda girilir; burada yalnız bridge'in kimliği üretilir.
-              </CardDescription>
-            </div>
+  return <section className="min-w-0 space-y-4">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0 space-y-1"><h3 className="text-base font-semibold">Hikvision köprüsü</h3>
+        <p className="text-sm text-muted-foreground">Bu projeye ait Windows köprüsünün erişim anahtarlarını yönetin.</p></div>
+      <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setDetailsOpen(true)}>Kurulum ayrıntıları</Button>
+        <Button onClick={() => void create.run()} disabled={!projectId || bridges === undefined || create.pending || revoking}>{create.pending ? "Oluşturuluyor…" : "Anahtar oluştur"}</Button></div>
+    </div>
+    {bridges === undefined ? <SectionSkeleton label="Köprü anahtarları yükleniyor" /> : bridges.length === 0 ?
+      <EmptyState compact title="Henüz köprü anahtarı oluşturulmadı" description="Windows köprüsünü kurmak için anahtar oluşturun." /> :
+      <div className="divide-y border-y">{bridges.map(bridge => {
+        const shown = reveal[bridge._id] ?? false;
+        return <div key={bridge._id} className="min-w-0 space-y-2 py-4">
+          <FormFieldWrapper htmlFor={`bridge-${bridge._id}`} label="Köprü anahtarı">
+            <Input readOnly value={shown ? bridge.token : mask(bridge.token)} className="min-w-0 font-mono text-xs" />
+          </FormFieldWrapper>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="icon" aria-label={shown ? "Anahtarı gizle" : "Anahtarı göster"} onClick={() => setReveal(previous => ({ ...previous, [bridge._id]: !shown }))}>{shown ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button>
+            <Button variant="outline" size="icon" aria-label="Anahtarı kopyala" disabled={copy.pending} onClick={() => void copy.run(bridge.token)}><Copy className="h-4 w-4" /></Button>
+            <Button variant="outline" disabled={create.pending || revoking} onClick={() => { setRevokeTarget({ id: bridge._id, label: `Anahtar ${mask(bridge.token)}` }); setRevokeOpen(true); }}>Anahtarı iptal et</Button>
           </div>
-          <Button type="button" size="sm" onClick={handleCreate} disabled={!activeProjectId || creating}>
-            {creating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-            Yeni Token
-          </Button>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-3">
-        {!activeProjectId && (
-          <p className="text-sm text-muted-foreground">
-            Token oluşturmak için önce bir proje seçin.
-          </p>
-        )}
-
-        {activeProjectId && bridges === undefined && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" /> Yükleniyor…
-          </div>
-        )}
-
-        {activeProjectId && bridges?.length === 0 && (
-          <p className="rounded-lg bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-            Henüz bridge token yok. Bir Windows bridge kuracaksanız "Yeni Token" ile oluşturun.
-          </p>
-        )}
-
-        {bridges?.map((b) => {
-          const shown = reveal[b._id] ?? false;
-          return (
-            <div
-              key={b._id}
-              className="flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2"
-            >
-              <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <Input
-                  readOnly
-                  value={shown ? b.token : mask(b.token)}
-                  className="font-mono text-xs"
-                />
-                <span className="text-xs text-muted-foreground">
-                  {b.lastSeenAt
-                    ? `Son bağlantı: ${new Date(b.lastSeenAt).toLocaleString("tr-TR")}`
-                    : "Henüz bağlanmadı"}
-                </span>
-                {b.lastClientInfo && (
-                  <span className="break-words text-xs text-muted-foreground">{b.lastClientInfo}</span>
-                )}
-              </div>
-              {!b.lastSeenAt && (
-                <Badge variant="secondary" className="shrink-0">
-                  bekliyor
-                </Badge>
-              )}
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => setReveal((m) => ({ ...m, [b._id]: !shown }))}
-                aria-label={shown ? "Token'ı gizle" : "Token'ı göster"}
-              >
-                {shown ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => handleCopy(b.token)}
-                aria-label="Token'ı kopyala"
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => {
-                  setRevokeTarget({ id: b._id, label: `Token ${mask(b.token)}` });
-                  setRevokeOpen(true);
-                }}
-                aria-label="Token'ı iptal et"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          );
-        })}
-
-        <p className="text-xs text-muted-foreground">
-          Token'ı bridge EXE'de <code className="font-mono">http://127.0.0.1:8787/__bridge</code> ekranına
-          yapıştırın. Bir bridge, projedeki tüm localBridge panellerini tek token ile yönetir.
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Köprü 15 dakikada bir yoklar; işlem olunca anında uyandırılır.
-        </p>
-        <ConfirmDestructive
-          open={revokeOpen}
-          onOpenChange={setRevokeOpen}
-          title="Bridge token iptal edilsin mi?"
-          objectName={revokeTarget?.label ?? "Bridge token"}
-          effects={["Bu token ile çalışan bridge artık bağlanamaz.", "Bağlı panellerin bridge üzerinden iletişimi kesilir."]}
-          confirmLabel="Token'ı iptal et"
-          onConfirm={async () => {
-            if (!revokeTarget) throw new Error("İptal edilecek token seçilmedi");
-            await revokeBridge({ bridgeId: revokeTarget.id });
-            notify.success("Bridge token kaldırıldı");
-          }}
-        />
-      </CardContent>
-    </Card>
-  );
+          <p className="text-xs text-muted-foreground">{bridge.lastSeenAt ? `Son görülme: ${new Date(bridge.lastSeenAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}` : "Henüz bağlanmadı"}. Bu bilgi güncel çevrimiçi durumunu göstermez.</p>
+          {bridge.lastClientInfo && <p className="break-all text-xs text-muted-foreground">{bridge.lastClientInfo}</p>}
+        </div>;
+      })}</div>}
+    <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}><DialogContent>
+      <DialogHeader><DialogTitle>Hikvision köprüsünü kurun</DialogTitle><DialogDescription>{activeProject?.name} · Windows köprüsü</DialogDescription></DialogHeader>
+      <ol className="list-decimal space-y-3 pl-5 text-sm"><li>Bu proje için köprü anahtarı oluşturun ve kopyalayın.</li><li>Windows köprüsünün yerel kurulum ekranında anahtarı girin.</li><li>Panel IP adresini ve parolasını Cihazlar sayfasında tanımlayın.</li></ol>
+      <details className="text-sm"><summary>Teknik kurulum bilgisi</summary><p className="mt-2 break-all text-muted-foreground">Yerel adres: http://127.0.0.1:8787/__bridge</p><p className="mt-2 text-muted-foreground">Bir köprü bu projedeki localBridge panellerini tek anahtarla yönetir.</p></details>
+    </DialogContent></Dialog>
+    <ConfirmDestructive open={revokeOpen} onOpenChange={setRevokeOpen} title="Köprü anahtarı iptal edilsin mi?" objectName={revokeTarget?.label ?? "Köprü anahtarı"}
+      effects={["Bu anahtarla çalışan köprü artık bağlanamaz.", "Bağlı panellerin köprü üzerinden iletişimi kesilir."]} confirmLabel="Anahtarı iptal et" onConfirm={async () => {
+        if (!revokeTarget) throw new Error("İptal edilecek anahtar seçilmedi");
+        setRevoking(true);
+        try { await revokeBridge({ bridgeId: revokeTarget.id }); notify.success("Köprü anahtarı iptal edildi"); } finally { setRevoking(false); }
+      }} />
+  </section>;
 }

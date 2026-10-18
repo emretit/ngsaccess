@@ -1,115 +1,25 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Mail, Phone, CreditCard } from "lucide-react";
-import type { FunctionReturnType } from "convex/server";
-import { api } from "../../../../../convex/_generated/api";
+import type { GeneralValues } from "./generalForm";
 
-interface CompanyInfoFormProps {
-  company: FunctionReturnType<typeof api.settings.getGeneral>;
+export function CompanyInfoForm({ values, change, errors }: {
+  values: GeneralValues; change: (fields: Partial<GeneralValues>) => void;
+  errors: Partial<Record<keyof GeneralValues, string>>;
+}) {
+  return <div className="grid min-w-0 grid-cols-1 gap-4 min-[761px]:grid-cols-2">
+    {([
+      ["companyName", "Şirket adı *", "text"], ["taxNumber", "Vergi numarası", "text"],
+      ["address", "Adres", "text"], ["email", "E-posta", "email"], ["phone", "Telefon", "tel"],
+      ["website", "Web sitesi", "text"],
+    ] as const).map(([key, label, type]) => <FormFieldWrapper key={key} htmlFor={key} label={label} error={errors[key]} className={key === "address" ? "min-[761px]:col-span-2" : undefined}>
+      {key === "address" ? <Textarea name={key} value={values[key]} onChange={e => change({ [key]: e.target.value })} /> :
+        <Input name={key} type={type} value={values[key]} required={key === "companyName"} onChange={e => change({ [key]: e.target.value })} />}
+    </FormFieldWrapper>)}
+    <FormFieldWrapper htmlFor="currency" label="Para birimi" error={errors.currency}>
+      <select name="currency" value={values.currency} onChange={e => change({ currency: e.target.value })} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+        <option value="TRY">Türk Lirası (₺)</option><option value="USD">ABD Doları ($)</option><option value="EUR">Euro (€)</option>
+      </select>
+    </FormFieldWrapper>
+  </div>;
 }
-
-export const CompanyInfoForm = ({ company }: CompanyInfoFormProps) => {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Building2 className="h-5 w-5" />
-          Şirket Bilgileri
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <Label htmlFor="companyName">Şirket Adı *</Label>
-            <Input 
-              id="companyName" 
-              name="companyName" 
-              placeholder="Şirket adını girin" 
-              defaultValue={company?.companyName || ''}
-              required 
-              className="focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="taxNumber">Vergi Numarası</Label>
-            <Input 
-              id="taxNumber" 
-              name="taxNumber" 
-              placeholder="Vergi numarasını girin"
-              defaultValue={company?.taxNumber || ''}
-              className="focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="address">Şirket Adresi</Label>
-            <Textarea 
-              id="address" 
-              name="address" 
-              placeholder="Şirket adresini girin"
-              defaultValue={company?.address || ''}
-              className="focus:ring-2 focus:ring-primary/20 min-h-[80px]"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">E-posta Adresi</Label>
-            <div className="flex items-center space-x-2">
-              <Mail className="w-4 h-4 text-muted-foreground" />
-              <Input 
-                id="email" 
-                name="email" 
-                type="email" 
-                placeholder="ornek@sirket.com"
-                defaultValue={company?.email || ''}
-                className="focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Telefon Numarası</Label>
-            <div className="flex items-center space-x-2">
-              <Phone className="w-4 h-4 text-muted-foreground" />
-              <Input 
-                id="phone" 
-                name="phone" 
-                type="tel" 
-                placeholder="+90 (555) 123 45 67"
-                defaultValue={company?.phone || ''}
-                className="focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="website">Web Sitesi</Label>
-            <Input 
-              id="website" 
-              name="website" 
-              type="text" 
-              placeholder="www.sirket.com veya https://www.sirket.com"
-              defaultValue={company?.website || ''}
-              className="focus:ring-2 focus:ring-primary/20"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="currency">Para Birimi</Label>
-            <div className="flex items-center space-x-2">
-              <CreditCard className="w-4 h-4 text-muted-foreground" />
-              <Select name="currency" defaultValue={company?.currency || "TRY"}>
-                <SelectTrigger className="focus:ring-2 focus:ring-primary/20">
-                  <SelectValue placeholder="Para birimi seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TRY">🇹🇷 Türk Lirası (₺)</SelectItem>
-                  <SelectItem value="USD">🇺🇸 US Dollar ($)</SelectItem>
-                  <SelectItem value="EUR">🇪🇺 Euro (€)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};

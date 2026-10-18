@@ -1,27 +1,23 @@
-import { useState, useEffect, useRef } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useState, useEffect } from "react";
+import { useQuery } from "convex/react";
 import { api } from "@/lib/convexApi";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
+import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { FileSpreadsheet, FileText, Mail } from "lucide-react";
+
+import { FileSpreadsheet, FileText } from "lucide-react";
 import { exportScopedExcel, exportScopedSgkPdf } from "./reports/exportReport";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { todayInTurkey } from "@/lib/date";
 
-type ReportType = "sgk" | "overtime" | "attendance" | "department";
+import { REPORT_TEMPLATES, type ReportType } from "./reports/reportTypes";
+import { ReportReminderSettings } from "./reports/ReportReminderSettings";
+import { useSettingsFormState } from "../SettingsFormState";
 
 const MONTHS = [
   { value: 1, label: "Ocak" },
@@ -38,19 +34,13 @@ const MONTHS = [
   { value: 12, label: "Aralık" },
 ];
 
-const REPORT_TEMPLATES = [
-  { id: "sgk", label: "SGK Aylık Döküm", description: "Çalışan başına gün, saat, mesai, izin" },
-  { id: "overtime", label: "Fazla Mesai Özet", description: "Aylık/yıllık mesai toplamları" },
-  { id: "attendance", label: "Devam Özet" , description: "Devam, devamsızlık, izin günleri" },
-  { id: "department", label: "Departman Maliyet", description: "Maliyet analizi" },
-];
-
+const selectStyle = "h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm";
 const currentDate = todayInTurkey();
 const currentYear = Number(currentDate.slice(0, 4));
 const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
-export function ReportsSettings() {
-  const { projectId: activeProjectId, projectIds, activeProject, isAdmin, loading: accessLoading } = useActiveProjectScope();
+function ReportDownloadSettings() {
+  const { projectId: activeProjectId, projectIds, activeProject, loading: accessLoading } = useActiveProjectScope();
   const [scopeSelection, setScopeSelection] = useState("active");
   const projectId = scopeSelection === "all" ? undefined : activeProjectId ?? undefined;
   const scopeReady = !accessLoading && (scopeSelection === "all" ? projectIds.length > 0 : !!projectId);
@@ -59,9 +49,8 @@ export function ReportsSettings() {
   const [year, setYear] = useState(currentYear);
   const [month, setMonth] = useState(Number(currentDate.slice(5, 7)));
   const [reportType, setReportType] = useState<ReportType>("sgk");
-  const [scheduledEmail, setScheduledEmail] = useState("");
-  const [scheduledEnabled, setScheduledEnabled] = useState(false);
   const [hourlyRate, setHourlyRate] = useState<number | undefined>(undefined);
+  const debouncedHourlyRate = useDebouncedValue(hourlyRate, 300);
   const [overtimePeriod, setOvertimePeriod] = useState<"month" | "year">("month");
 
   const reportData = useQuery(
@@ -86,32 +75,13 @@ export function ReportsSettings() {
       ? { year, month, projectId }
       : "skip"
   );
+  const hourlyRateError = hourlyRate !== undefined && (!Number.isFinite(hourlyRate) || hourlyRate < 0) ? "Sıfır veya pozitif bir ücret girin" : undefined;
   const departmentData = useQuery(
     api.reports.getDepartmentCostReport,
-    scopeReady && reportType === "department"
-      ? { year, month, projectId, hourlyRate }
+    scopeReady && reportType === "department" && !hourlyRateError && (debouncedHourlyRate === undefined || (Number.isFinite(debouncedHourlyRate) && debouncedHourlyRate >= 0))
+      ? { year, month, projectId, hourlyRate: debouncedHourlyRate }
       : "skip"
   );
-
-  const saveSchedule = useMutation(api.reports.saveReportSchedule);
-  const scheduleData = useQuery(api.reports.getReportSchedule, scopeReady && isAdmin ? { projectId } : "skip");
-
-  const hydratedFor = useRef<string | null>(null);
-  const scheduleScope = projectId ?? "all";
-  useEffect(() => {
-    hydratedFor.current = null;
-    setScheduledEmail("");
-    setScheduledEnabled(false);
-    setReportType("sgk");
-  }, [scheduleScope]);
-  useEffect(() => {
-    if (!scopeReady || scheduleData === undefined || hydratedFor.current === scheduleScope) return;
-    hydratedFor.current = scheduleScope;
-    setScheduledEmail(scheduleData?.email ?? "");
-    setScheduledEnabled(scheduleData?.enabled ?? false);
-    const savedType = scheduleData?.reportType;
-    if (savedType === "sgk" || savedType === "overtime" || savedType === "attendance" || savedType === "department") setReportType(savedType);
-  }, [scheduleData, scheduleScope, scopeReady]);
 
   const excelAction = useAsyncAction(async () => {
     if (reportType === "sgk" && reportData) await exportScopedExcel({ type: "sgk", data: reportData });
@@ -122,10 +92,7 @@ export function ReportsSettings() {
   const pdfAction = useAsyncAction(async () => {
     if (reportType === "sgk" && reportData) await exportScopedSgkPdf(reportData);
   }, { error: "PDF indirilemedi" });
-  const { run: handleSaveSchedule, pending: isSavingSchedule } = useAsyncAction(async () => {
-    if (scheduleData === undefined || !scopeReady) throw new Error("Rapor kapsamının yüklenmesini bekleyin");
-    await saveSchedule({ projectId, reportType, email: scheduledEmail.trim(), enabled: scheduledEnabled });
-  }, { success: "Zamanlanmış rapor ayarları kaydedildi", error: "Kaydetme başarısız" });
+  useSettingsFormState("report-download", false, excelAction.pending || pdfAction.pending);
 
   const isLoading =
     accessLoading ||
@@ -148,118 +115,40 @@ export function ReportsSettings() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold">Raporlar</h2>
-        <p className="text-muted-foreground text-sm mt-1">
-          SGK, fazla mesai, devam ve maliyet raporlarını oluşturun. Ayarlar → Raporlar bölümü.
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Rapor Şablonları</CardTitle>
-          <CardDescription>
+      <section className="min-w-0 space-y-4">
+        <div className="space-y-1">
+          <h3 className="text-base font-semibold">Rapor indir</h3>
+          <p className="text-sm text-muted-foreground">
             Rapor türünü seçin, yıl/ay belirleyin ve Excel veya PDF olarak indirin.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          </p>
+        </div>
+        <div className="space-y-4">
           <p className="text-sm font-medium" role="status">Kapsam: {currentData?.scopeLabel ?? scopeLabel}</p>
-          {projectIds.length > 1 && (
-            <div className="space-y-2">
-              <Label htmlFor="report-scope">Proje kapsamı</Label>
-              <Select value={scopeSelection} onValueChange={setScopeSelection} disabled={isSavingSchedule}>
-                <SelectTrigger id="report-scope" className="w-full max-w-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Aktif proje: {activeProject?.name ?? "Proje seçin"}</SelectItem>
-                  <SelectItem value="all">Tüm erişilebilir projeler</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          <div className="flex flex-wrap gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="report-type">Rapor Türü</Label>
-              <Select value={reportType} onValueChange={(value) => { if (value === "sgk" || value === "overtime" || value === "attendance" || value === "department") setReportType(value); }}>
-                <SelectTrigger id="report-type" className="w-[200px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {REPORT_TEMPLATES.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="report-year">Yıl</Label>
-              <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-                <SelectTrigger id="report-year" className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {YEARS.map((y) => (
-                    <SelectItem key={y} value={String(y)}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {reportType !== "overtime" || overtimePeriod === "month" ? (
-              <div className="space-y-2">
-                <Label htmlFor="report-month">Ay</Label>
-                <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
-                  <SelectTrigger id="report-month" className="w-[140px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MONTHS.map((m) => (
-                      <SelectItem key={m.value} value={String(m.value)}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : null}
-            {reportType === "overtime" && (
-              <div className="space-y-2">
-                <Label htmlFor="report-period">Dönem</Label>
-                <Select
-                  value={overtimePeriod}
-                  onValueChange={(value) => { if (value === "month" || value === "year") setOvertimePeriod(value); }}
-                >
-                  <SelectTrigger id="report-period" className="w-[120px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="month">Aylık</SelectItem>
-                    <SelectItem value="year">Yıllık</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {reportType === "department" && (
-              <div className="space-y-2">
-                <Label htmlFor="report-hourly-rate">Saatlik Ücret Fallback (₺)</Label>
-                <Input
-                  id="report-hourly-rate"
-                  type="number"
-                  min={0}
-                  value={hourlyRate ?? ""}
-                  onChange={(e) =>
-                    setHourlyRate(
-                      e.target.value === "" ? undefined : Number(e.target.value)
-                    )
-                  }
-                  placeholder="Çalışan ücreti yoksa"
-                  className="w-[160px]"
-                />
-              </div>
-            )}
-          </div>
+          <fieldset disabled={excelAction.pending || pdfAction.pending} className="grid min-w-0 grid-cols-1 gap-4 min-[761px]:grid-cols-2">
+            {projectIds.length > 1 && <FormFieldWrapper htmlFor="report-scope" label="İndirme kapsamı">
+              <select className={selectStyle} value={scopeSelection} onChange={event => setScopeSelection(event.target.value)}>
+                <option value="active">{activeProject?.name ?? "Aktif proje"}</option><option value="all">Tüm erişilebilir projeler</option>
+              </select>
+            </FormFieldWrapper>}
+            <FormFieldWrapper htmlFor="report-type" label="Rapor türü">
+              <select className={selectStyle} value={reportType} onChange={event => {
+                const value = event.target.value;
+                if (value === "sgk" || value === "overtime" || value === "attendance" || value === "department") setReportType(value);
+              }}>{REPORT_TEMPLATES.map(template => <option key={template.id} value={template.id}>{template.label}</option>)}</select>
+            </FormFieldWrapper>
+            <FormFieldWrapper htmlFor="report-year" label="Yıl">
+              <select className={selectStyle} value={year} onChange={event => setYear(Number(event.target.value))}>{YEARS.map(value => <option key={value} value={value}>{value}</option>)}</select>
+            </FormFieldWrapper>
+            {(reportType !== "overtime" || overtimePeriod === "month") && <FormFieldWrapper htmlFor="report-month" label="Ay">
+              <select className={selectStyle} value={month} onChange={event => setMonth(Number(event.target.value))}>{MONTHS.map(value => <option key={value.value} value={value.value}>{value.label}</option>)}</select>
+            </FormFieldWrapper>}
+            {reportType === "overtime" && <FormFieldWrapper htmlFor="report-period" label="Dönem">
+              <select className={selectStyle} value={overtimePeriod} onChange={event => { if (event.target.value === "month" || event.target.value === "year") setOvertimePeriod(event.target.value); }}><option value="month">Aylık</option><option value="year">Yıllık</option></select>
+            </FormFieldWrapper>}
+            {reportType === "department" && <FormFieldWrapper htmlFor="report-hourly-rate" label="Ücret bilgisi olmayanlar için saatlik ücret (₺)" error={hourlyRateError}>
+              <Input type="number" min={0} value={hourlyRate ?? ""} onChange={event => setHourlyRate(event.target.value === "" ? undefined : Number(event.target.value))} placeholder="Çalışan ücreti yoksa" />
+            </FormFieldWrapper>}
+          </fieldset>
 
           {currentData && <p className="text-sm text-muted-foreground">{currentData.reliabilityNote}</p>}
           {attendanceData && reportType === "attendance" && (
@@ -270,13 +159,15 @@ export function ReportsSettings() {
           )}
           {!accessLoading && !scopeReady ? (
             <EmptyState title="Proje seçin" description="Rapor oluşturmak için üst menüden erişebildiğiniz bir projeyi seçin." />
+          ) : hourlyRateError && reportType === "department" ? (
+            <p role="status" className="text-sm text-muted-foreground">Rapor için geçerli bir ücret girin.</p>
           ) : isLoading ? (
             <SectionSkeleton label="Rapor yükleniyor" rows={3} />
           ) : isEmpty ? (
             <EmptyState
               icon={FileText}
-              title="Veri bulunamadı"
-              description="Seçilen dönem için kayıt bulunmuyor."
+              title="Seçilen dönem için kayıt bulunamadı"
+              description="Dönemi ve proje kapsamını kontrol edin."
             />
           ) : (
             <>
@@ -303,69 +194,34 @@ export function ReportsSettings() {
                   </>
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button onClick={() => void excelAction.run()} disabled={!hasData || excelAction.pending || pdfAction.pending} variant="default">
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
                   Excel İndir
                 </Button>
-                <Button
+                {reportType === "sgk" && <Button
                   onClick={() => void pdfAction.run()}
                   disabled={!hasData || reportType !== "sgk" || pdfAction.pending || excelAction.pending}
                   variant="outline"
                 >
                   <FileText className="h-4 w-4 mr-2" />
                   PDF İndir
-                </Button>
+                </Button>}
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      {isAdmin && <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" />
-            Zamanlanmış Rapor
-          </CardTitle>
-          <CardDescription>
-            Aylık rapor hatırlatması ve kapsam bilgisi her ayın ilk günü gönderilir; rapor dosyasını bu ekrandan indirirsiniz.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm">Zamanlama kapsamı: {scopeLabel} — {REPORT_TEMPLATES.find((template) => template.id === reportType)?.label}</p>
-          <div className="flex items-center gap-4">
-            <Switch
-              id="report-schedule-enabled"
-              checked={scheduledEnabled}
-              disabled={isSavingSchedule || scheduleData === undefined}
-              onCheckedChange={setScheduledEnabled}
-            />
-            <Label htmlFor="report-schedule-enabled">Aylık rapor e-postasını al</Label>
-          </div>
-          {scheduledEnabled && (
-            <div className="space-y-2 max-w-md">
-              <Label htmlFor="report-email">E-posta adresi</Label>
-              <Input
-                id="report-email"
-                type="email"
-                placeholder="rapor@firma.com"
-                value={scheduledEmail}
-                disabled={isSavingSchedule || scheduleData === undefined}
-                onChange={(e) => setScheduledEmail(e.target.value)}
-              />
-            </div>
-          )}
-          <Button onClick={() => void handleSaveSchedule()} size="sm" disabled={isSavingSchedule || scheduleData === undefined}>
-            {isSavingSchedule ? "Kaydediliyor…" : "Kaydet"}
-          </Button>
-          {scheduleData !== undefined && (
-            <p className="text-sm text-muted-foreground" role="status">
-              Kayıtlı durum: {scheduleData?.enabled ? `Açık — ${scheduleData.email}` : "Kapalı"}
-            </p>
-          )}
-        </CardContent>
-      </Card>}
+
     </div>
   );
+}
+
+export function ReportsSettings() {
+  const { isAdmin, projectId } = useActiveProjectScope();
+  return <div className="min-w-0 space-y-8">
+    <QuerySectionBoundary resetKey={projectId} title="Raporlar yüklenemedi"><ReportDownloadSettings /></QuerySectionBoundary>
+    {isAdmin && <QuerySectionBoundary resetKey={projectId} title="Hatırlatma yüklenemedi"><ReportReminderSettings /></QuerySectionBoundary>}
+  </div>;
 }

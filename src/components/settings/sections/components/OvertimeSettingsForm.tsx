@@ -6,9 +6,10 @@ import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SettingsSaveBar } from "../../SettingsSaveBar";
+import { DraftNotice, useSettingsDraft, useSettingsFormState } from "../../SettingsFormState";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+
 
 const nonnegative = z.number({ error: "Geçerli bir sayı girin." }).min(0, "Negatif olamaz.");
 const multiplier = z.number({ error: "Geçerli bir sayı girin." }).min(1, "Çarpan en az 1 olmalıdır.");
@@ -31,26 +32,28 @@ export function OvertimeSettingsForm() {
   const work = useQuery(api.settings.getWork, !loading && projectId && isAdmin ? { projectId } : "skip");
   const rates = useQuery(api.holidays.getOvertimeRates, !loading && projectId && isAdmin ? { projectId } : "skip");
   const save = useMutation(api.settings.saveOvertime);
-  const [draft, setDraft] = useState<{ projectId: string; fields: Partial<Values> } | null>(null);
+  const [failed, setFailed] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof Values, string>>>({});
-  const values: Values = {
+  const draft = useSettingsDraft<Values>({
     annualOvertimeLimitHours: work?.annualOvertimeLimitHours ?? 270,
     overtimeStartToleranceMinutes: work?.overtimeStartToleranceMinutes ?? 15, monthlyHoursBase: work?.monthlyHoursBase ?? 225,
     weekdayMultiplier: rates?.weekdayMultiplier ?? 1.5, weekendMultiplier: rates?.weekendMultiplier ?? 2,
     holidayMultiplier: rates?.holidayMultiplier ?? 2, nightShiftMultiplier: rates?.nightShiftMultiplier ?? 1.5,
     nightShiftStart: rates?.nightShiftStart ?? "22:00", nightShiftEnd: rates?.nightShiftEnd ?? "06:00",
-    ...(draft && draft.projectId === projectId ? draft.fields : {}),
-  };
-  const change = (fields: Partial<Values>) => {
-    if (projectId) setDraft(previous => ({ projectId, fields: { ...(previous?.projectId === projectId ? previous.fields : {}), ...fields } }));
-  };
+  });
+  const { values, change } = draft;
   const { run, pending } = useAsyncAction(async (payload: Values) => {
     if (!projectId || loading || !isAdmin || work === undefined || rates === undefined) throw new Error("Ayarlar yüklenmeden kaydedilemez.");
     await save({ projectId, ...payload });
-    setDraft(null);
+    draft.reset();
   }, { success: "Mesai ayarları ve çarpanlar kaydedildi" });
+  useSettingsFormState("overtime", draft.dirty, pending);
+  const parsed = schema.safeParse(values);
+  const visibleErrors: Partial<Record<keyof Values, string>> = {};
+  if ((draft.dirty || Object.keys(errors).length > 0) && !parsed.success) for (const issue of parsed.error.issues) visibleErrors[issue.path[0] as keyof Values] = issue.message;
   if (loading || work === undefined || rates === undefined) return <SectionSkeleton label="Mesai ayarları yükleniyor" />;
-  return <Card><CardHeader><CardTitle>Mesai Ayarları</CardTitle></CardHeader><CardContent>
+  return <section className="space-y-4"><h3 className="text-base font-semibold">Mesai politikası</h3>
+    <DraftNotice remoteChanged={draft.remoteChanged} failed={failed} />
     <form noValidate className="space-y-4" onSubmit={async event => {
       event.preventDefault();
       const result = schema.safeParse(values);
@@ -65,17 +68,17 @@ export function OvertimeSettingsForm() {
         return;
       }
       setErrors({});
-      await run(result.data);
+      setFailed(!await run(result.data));
     }}>
-      <fieldset disabled={pending} className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {numbers.map(([key, label, min]) => <FormFieldWrapper key={key} htmlFor={key} label={label} error={errors[key]}>
+      <fieldset disabled={pending} className="grid grid-cols-1 gap-4 min-[761px]:grid-cols-2">
+        {numbers.map(([key, label, min]) => <FormFieldWrapper key={key} htmlFor={key} label={label} error={visibleErrors[key]}>
           <Input id={key} type="number" min={min} step="any" value={Number.isNaN(values[key]) ? "" : values[key]} onChange={event => change({ [key]: event.target.value === "" ? NaN : Number(event.target.value) })} />
         </FormFieldWrapper>)}
-        {(["nightShiftStart", "nightShiftEnd"] as const).map(key => <FormFieldWrapper key={key} htmlFor={key} label={key === "nightShiftStart" ? "Gece başlangıcı" : "Gece bitişi"} error={errors[key]}>
+        {(["nightShiftStart", "nightShiftEnd"] as const).map(key => <FormFieldWrapper key={key} htmlFor={key} label={key === "nightShiftStart" ? "Gece başlangıcı" : "Gece bitişi"} error={visibleErrors[key]}>
           <Input id={key} type="time" value={values[key]} onChange={event => change({ [key]: event.target.value })} />
         </FormFieldWrapper>)}
       </fieldset>
-      <Button type="submit" disabled={pending || !projectId}>{pending ? "Kaydediliyor…" : "Değişiklikleri Kaydet"}</Button>
+      <SettingsSaveBar dirty={draft.dirty} saving={pending} valid={parsed.success} label="Mesai ayarlarını kaydet" onCancel={() => { draft.reset(); setErrors({}); setFailed(false); }} />
     </form>
-  </CardContent></Card>;
+  </section>;
 }

@@ -1,96 +1,41 @@
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { capabilities, type SettingsTab } from "@/lib/capabilities";
-import {
-  Settings,
-  Bell,
-  Mail,
-  Users,
-  FileBarChart,
-  CalendarClock,
-  Plug,
-} from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface SettingsSidebarProps {
-  selected: string;
-  onSelect: (val: string) => void;
-}
-
-const sidebarItems = [
-  {
-    key: "general",
-    label: "Genel",
-    icon: Settings,
-  },
-  {
-    key: "users",
-    label: "Kullanıcı Yönetimi",
-    icon: Users,
-  },
-  {
-    key: "work-payroll",
-    label: "Mesai & Tatil",
-    icon: CalendarClock,
-  },
-  {
-    key: "reports",
-    label: "Raporlar",
-    icon: FileBarChart,
-  },
-  {
-    key: "integrations",
-    label: "Entegrasyonlar",
-    icon: Plug,
-  },
-  {
-    key: "mail",
-    label: "Mail Ayarları",
-    icon: Mail,
-  },
-  {
-    key: "notifications",
-    label: "Bildirimler",
-    icon: Bell,
-  },
+export const SETTINGS_SECTIONS: { key: SettingsTab; label: string; scope: string }[] = [
+  { key: "general", label: "Genel", scope: "Seçili projenin şirket bilgileri ve varsayılanları." },
+  { key: "users", label: "Kullanıcılar ve davetler", scope: "Yetkiniz kapsamındaki kullanıcılar. Davette hedef proje ayrıca seçilir." },
+  { key: "work-payroll", label: "Mesai ve tatil", scope: "Seçili projenin mesai politikası ve tatil takvimi." },
+  { key: "reports", label: "Raporlar", scope: "Proje kapsamına göre indirme ve kişisel e-posta hatırlatması." },
+  { key: "integrations", label: "Entegrasyonlar", scope: "Seçili projenin köprü anahtarları ve entegrasyon bilgileri." },
+  { key: "mail", label: "E-posta gönderimi", scope: "Sistem genelindeki gönderim sağlayıcısı; proje seçimi sağlayıcıyı değiştirmez." },
+  { key: "notifications", label: "Bildirimler", scope: "Seçili projenin bildirim tercihleri." },
 ];
-
-export function SettingsSidebar({ selected, onSelect }: SettingsSidebarProps) {
+export function SettingsSidebar({ selected, onSelect, disabled = false }: {
+  selected: SettingsTab; onSelect: (tab: SettingsTab) => void; disabled?: boolean;
+}) {
   const { profile } = useAuth();
-  const allowed = capabilities(profile?.role).settingsTabs;
-  return (
-    <div className="h-full w-full md:w-[220px] shrink-0 bg-card rounded-xl border shadow-xs">
-      <div className="p-4 border-b border-border">
-        <div className="flex items-center gap-2">
-          <Settings className="h-4 w-4 text-primary" />
-          <h2 className="text-base font-semibold text-primary">Ayarlar</h2>
-        </div>
-        <p className="text-xs text-muted-foreground mt-1">Menü</p>
-      </div>
-      <nav className="p-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
-        <ul className="space-y-0.5">
-          {sidebarItems.filter(item => allowed.includes(item.key as SettingsTab)).map((item) => {
-            const Icon = item.icon;
-            const isSelected = selected === item.key;
-            return (
-              <li key={item.key}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(item.key)}
-                  className={cn(
-                    "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] font-medium transition-colors",
-                    isSelected
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {item.label}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+  const [params] = useSearchParams();
+  const items = SETTINGS_SECTIONS.filter(item => capabilities(profile?.role).settingsTabs.includes(item.key));
+  return <div className="w-full min-w-0 shrink-0 min-[761px]:w-[184px]">
+    <div className="space-y-1 min-[761px]:hidden">
+      <label htmlFor="settings-section" className="text-sm font-medium">Ayar bölümü</label>
+      <select id="settings-section" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={selected} disabled={disabled}
+        onChange={event => { const item = items.find(item => item.key === event.target.value); if (item) onSelect(item.key); }}>
+        {items.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
+      </select>
     </div>
-  );
+    <nav aria-label="Ayar bölümleri" className="hidden space-y-1 min-[761px]:block">
+      {items.map(item => {
+        const next = new URLSearchParams(params);
+        if (item.key === "general") next.delete("tab"); else next.set("tab", item.key);
+        return <a key={item.key} href={`/settings${next.size ? `?${next}` : ""}`} aria-current={selected === item.key ? "page" : undefined} aria-disabled={disabled}
+          onClick={event => { if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); if (!disabled) onSelect(item.key); }}
+          className={cn("block rounded px-3 py-2 text-sm hover:bg-subtle", selected === item.key && "bg-selected font-medium text-primary", disabled && "opacity-60")}>
+          {item.label}
+        </a>;
+      })}
+    </nav>
+  </div>;
 }

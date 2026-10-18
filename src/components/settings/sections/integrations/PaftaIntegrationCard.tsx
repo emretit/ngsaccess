@@ -1,29 +1,7 @@
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
+import { StatusBadge } from "@/components/shared/StatusBadge";
 export function PaftaIntegrationCard() {
-  return (
-    <Card className="max-w-2xl">
-      <CardHeader>
-        <div className="flex items-center justify-between gap-4">
-          <CardTitle className="text-base">Pafta</CardTitle>
-          <Badge variant="secondary">Bağlı değil</Badge>
-        </div>
-        <CardDescription>
-          Pafta entegrasyonu geliştiriliyor — henüz bağlı değil.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          Henüz veri aktarımı veya senkronizasyon yapılmıyor. Entegrasyon kullanıma
-          hazır olduğunda bağlantı ayarları burada yer alacak.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" disabled>Bağlantıyı Test Et</Button>
-          <Button type="button" disabled>Bağlan</Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
+  return <section className="space-y-2 border-t pt-6">
+    <div className="flex flex-wrap items-center gap-3"><h3 className="text-base font-semibold">Pafta</h3><StatusBadge tone="neutral">Geliştiriliyor</StatusBadge></div>
+    <p className="text-sm text-muted-foreground">Pafta entegrasyonu henüz kullanılamıyor. Bu ekrandan veri aktarımı yapılmaz.</p>
+  </section>;
 }

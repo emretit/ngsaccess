@@ -1,282 +1,126 @@
-import { AdminDataBoundary } from "@/components/admin/components/AdminDataBoundary";
+import { useEffect, useState } from "react";
+import { z } from "zod";
+import { useMutation, useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
+import { api } from "../../../../../convex/_generated/api";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { notify } from "@/lib/notify";
+import { todayInTurkey } from "@/lib/date";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
-import { useAsyncAction } from "@/hooks/useAsyncAction";
-import type { FunctionReturnType } from "convex/server";
-import { useState } from "react";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "../../../../../convex/_generated/api";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
-import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
+import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Trash2, CalendarPlus, Sparkles, Loader2 } from "lucide-react";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
-import { z } from "zod";
-import { DatePicker } from "@/components/ui/date-picker";
-import { parseDateString, formatDateString } from "@/lib/date";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Trash2 } from "lucide-react";
+import { DraftNotice, useSettingsFormState } from "../../SettingsFormState";
 
-const holidaySchema = z.object({
-  date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Tarih YYYY-MM-DD formatında olmalı"),
-  name: z
-    .string()
-    .trim()
-    .min(1, "Tatil adı zorunlu")
-    .max(100, "Tatil adı en fazla 100 karakter"),
+export const holidaySchema = z.object({
+  date: z.iso.date("Geçerli bir tarih seçin"),
+  name: z.string().trim().min(1, "Tatil adı zorunlu").max(100, "Tatil adı en fazla 100 karakter"),
   isHalfDay: z.boolean(),
 });
+type HolidayValues = z.infer<typeof holidaySchema>;
+const empty: HolidayValues = { date: "", name: "", isHalfDay: false };
 
 function HolidayCalendarContent() {
-  const { projectId, loading: projectLoading } = useActiveProject();
-  const { toast } = useToast();
-
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [date, setDate] = useState("");
-  const [name, setName] = useState("");
-  const [isHalfDay, setIsHalfDay] = useState(false);
-  const [deleteHoliday, setDeleteHoliday] = useState<
-    FunctionReturnType<typeof api.holidays.list>[number] | null
-  >(null);
+  const { projectId, loading, isAdmin } = useActiveProjectScope();
+  const [year, setYear] = useState(Number(todayInTurkey().slice(0, 4)));
+  const [yearText, setYearText] = useState(String(year));
+  useEffect(() => { setYearText(String(year)); }, [year]);
+  const [values, setValues] = useState(empty);
+  const [open, setOpen] = useState(false);
+  const [errors, setErrors] = useState<Partial<Record<keyof HolidayValues, string>>>({});
+  const [failed, setFailed] = useState(false);
+  const [focusDate, setFocusDate] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteHoliday, setDeleteHoliday] = useState<FunctionReturnType<typeof api.holidays.list>[number] | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-
-  const holidays = useQuery(
-    api.holidays.list,
-    !projectLoading && projectId ? { projectId, year } : "skip",
-  );
+  const dirty = open && (values.date !== "" || values.name !== "" || values.isHalfDay);
+  const guard = useUnsavedChangesGuard(dirty);
+  const holidays = useQuery(api.holidays.list, !loading && projectId && isAdmin ? { projectId, year } : "skip");
   const create = useMutation(api.holidays.create);
   const remove = useMutation(api.holidays.remove);
   const seed = useMutation(api.holidays.seedTurkishHolidays);
-
-  const { run: handleAdd, pending: adding } = useAsyncAction(
-    async () => {
-      if (!projectId) throw new Error("Önce bir proje seçin.");
-      const parsed = holidaySchema.safeParse({ date, name, isHalfDay });
-      if (!parsed.success)
-        throw new Error(
-          parsed.error.issues[0]?.message ?? "Form bilgileri geçersiz",
-        );
-      await create({ projectId, ...parsed.data });
-      setDate("");
-      setName("");
-      setIsHalfDay(false);
-      toast({ title: "Tatil eklendi" });
-    },
-    { error: "Tatil eklenemedi" },
-  );
-
-  const { run: handleSeed, pending: seeding } = useAsyncAction(
-    async () => {
-      if (!projectId) throw new Error("Önce bir proje seçin.");
-      const result = await seed({ projectId, years: [year] });
-      const missing = result.missingReligiousYears ?? [];
-      toast({
-        title: `${year} TR resmi tatilleri yüklendi`,
-        description: `${result.inserted} yeni eklendi, ${result.skipped} mevcut.${missing.length ? ` (${missing.join(", ")} için dini tatil tablosu yok — manuel girin)` : ""}`,
-      });
-    },
-    { error: "Tatiller yüklenemedi" },
-  );
-
-  const sortedHolidays = [...(holidays ?? [])].sort((a, b) =>
-    a.date.localeCompare(b.date),
-  );
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between py-3">
-        <CardTitle className="text-base">Resmi Tatil Takvimi</CardTitle>
-        <div className="flex gap-1.5 items-center">
-          <Label htmlFor="year-filter" className="text-xs">
-            Yıl
-          </Label>
-          <Input
-            id="year-filter"
-            type="number"
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="w-20 h-8 text-xs"
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void handleSeed()}
-            disabled={seeding || !projectId}
-            className="h-8 text-xs"
-          >
-            {seeding ? (
-              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-            )}
-            {year} Otomatik Doldur
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex flex-wrap items-end gap-2 p-2 border rounded-md bg-muted/30">
-          <div className="space-y-1">
-            <Label htmlFor="hol-date" className="text-xs">
-              Tarih
-            </Label>
-            <DatePicker
-              date={parseDateString(date)}
-              onSelect={(d) => setDate(formatDateString(d))}
-              className="w-40"
-            />
-          </div>
-          <div className="space-y-1 flex-1 min-w-[180px]">
-            <Label htmlFor="hol-name" className="text-xs">
-              İsim
-            </Label>
-            <Input
-              id="hol-name"
-              placeholder="Cumhuriyet Bayramı"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="h-8 text-xs"
-            />
-          </div>
-          <div className="flex items-center gap-1.5 h-8">
-            <Checkbox
-              id="hol-half"
-              checked={isHalfDay}
-              onCheckedChange={(v) => setIsHalfDay(!!v)}
-              className="h-3.5 w-3.5"
-            />
-            <Label htmlFor="hol-half" className="text-xs">
-              Yarım gün
-            </Label>
-          </div>
-          <Button
-            size="sm"
-            onClick={() => void handleAdd()}
-            disabled={adding || !projectId}
-            className="h-8 text-xs"
-          >
-            {adding ? (
-              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
-            )}
-            Tatil Ekle
-          </Button>
-        </div>
-
-        {projectLoading || (projectId && holidays === undefined) ? (
-          <SectionSkeleton label="Tatiller yükleniyor" />
-        ) : !projectId ? (
-          <EmptyState
-            title="Proje seçin"
-            description="Tatil takvimini görüntülemek için aktif bir proje seçin."
-          />
-        ) : sortedHolidays.length === 0 ? (
-          <EmptyState
-            title={`${year} yılı için tanımlı tatil yok`}
-            description="Bir tatil ekleyin veya resmi tatilleri yükleyin."
-          />
-        ) : (
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="h-8 px-3 py-1 text-xs">Tarih</TableHead>
-                  <TableHead className="h-8 px-3 py-1 text-xs">Gün</TableHead>
-                  <TableHead className="h-8 px-3 py-1 text-xs">İsim</TableHead>
-                  <TableHead className="h-8 px-3 py-1 text-xs">Tip</TableHead>
-                  <TableHead className="h-8 px-3 py-1 text-xs w-10"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedHolidays.map((h) => (
-                  <TableRow key={h._id} className="h-8">
-                    <TableCell className="px-3 py-1 font-mono text-xs">
-                      {format(new Date(`${h.date}T00:00:00`), "dd MMM yyyy", {
-                        locale: tr,
-                      })}
-                    </TableCell>
-                    <TableCell className="px-3 py-1 text-xs">
-                      {format(new Date(`${h.date}T00:00:00`), "EEEE", {
-                        locale: tr,
-                      })}
-                    </TableCell>
-                    <TableCell className="px-3 py-1 text-xs">
-                      {h.name}
-                    </TableCell>
-                    <TableCell className="px-3 py-1">
-                      {h.isHalfDay ? (
-                        <Badge
-                          variant="secondary"
-                          className="text-[10px] px-1.5 py-0 h-5"
-                        >
-                          Yarım gün
-                        </Badge>
-                      ) : (
-                        <Badge className="text-[10px] px-1.5 py-0 h-5">
-                          Tam gün
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="px-3 py-0.5">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 w-6 p-0"
-                        aria-label={`${h.name} tatilini sil`}
-                        onClick={() => {
-                          setDeleteHoliday(h);
-                          setDeleteOpen(true);
-                        }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-        <ConfirmDestructive
-          confirmLabel="Tatili sil"
-          open={deleteOpen}
-          onOpenChange={setDeleteOpen}
-          title="Tatil silinsin mi?"
-          objectName={deleteHoliday?.name ?? "Tatil"}
-          effects={[
-            `${deleteHoliday?.date ?? "Seçili gün"} için tatil tanımı kaldırılır.`,
-          ]}
-          onConfirm={async () => {
-            if (!deleteHoliday) throw new Error("Tatil seçilmedi");
-            await remove({ id: deleteHoliday._id });
-            toast({ title: "Tatil silindi" });
-          }}
-        />
-      </CardContent>
-    </Card>
-  );
+  const add = useAsyncAction(async (payload: HolidayValues) => {
+    if (!projectId) throw new Error("Önce bir proje seçin.");
+    await create({ projectId, ...payload });
+    setYear(Number(payload.date.slice(0, 4))); setFocusDate(payload.date); setValues(empty); setOpen(false);
+  }, { success: "Tatil eklendi", error: "Tatil eklenemedi" });
+  const seedAction = useAsyncAction(async () => {
+    if (!projectId) throw new Error("Önce bir proje seçin.");
+    const result = await seed({ projectId, years: [year] });
+    const missing = result.missingReligiousYears ?? [];
+    notify.success(`${year} resmi tatilleri yüklendi`, `${result.inserted} yeni eklendi, ${result.skipped} mevcut.${missing.length ? ` ${missing.join(", ")} için dini tatilleri ayrıca ekleyin.` : ""}`);
+  }, { error: "Tatiller yüklenemedi" });
+  const pending = add.pending || seedAction.pending || deleting;
+  useSettingsFormState("holidays", dirty, pending);
+  useEffect(() => {
+    if (focusDate && holidays?.some(holiday => holiday.date === focusDate)) {
+      document.getElementById(`holiday-${focusDate}`)?.focus(); setFocusDate(null);
+    }
+  }, [holidays, focusDate]);
+  const close = () => { if (!pending) guard.requestClose(() => { setOpen(false); setValues(empty); setErrors({}); setFailed(false); }); };
+  return <section className="min-w-0 space-y-4 border-t pt-6">
+    <h3 className="text-base font-semibold">Tatil takvimi</h3>
+    <div className="flex flex-wrap items-end gap-3">
+      <FormFieldWrapper htmlFor="holiday-year" label="Yıl">
+        <Input type="number" min={1900} max={2100} value={yearText} disabled={pending} className="w-24" onChange={event => {
+          const text = event.target.value; setYearText(text);
+          const next = Number(text); if (/^\d{4}$/.test(text) && next >= 1900 && next <= 2100) setYear(next);
+        }} onBlur={() => setYearText(String(year))} />
+      </FormFieldWrapper>
+      <Button variant="outline" disabled={pending || !projectId || holidays === undefined} onClick={() => void seedAction.run()}>{seedAction.pending ? "Yükleniyor…" : "Resmi tatilleri yükle"}</Button>
+      <Button variant="outline" disabled={pending || !projectId} onClick={() => setOpen(true)}>Tatil ekle</Button>
+    </div>
+    {loading || holidays === undefined ? <SectionSkeleton label="Tatiller yükleniyor" /> : holidays.length === 0 ?
+      <EmptyState title={`${year} yılı için tanımlı tatil yok`} description="Bir tatil ekleyin veya resmi tatilleri yükleyin." /> :
+      <div className="min-w-0 overflow-x-auto rounded-md border"><Table density="compact">
+        <TableHeader><TableRow><TableHead>Tarih</TableHead><TableHead>Tatil adı</TableHead><TableHead><span className="sr-only">İşlemler</span></TableHead></TableRow></TableHeader>
+        <TableBody>{[...holidays].sort((a, b) => a.date.localeCompare(b.date)).map(holiday => <TableRow key={holiday._id} id={`holiday-${holiday.date}`} tabIndex={-1} className="h-[42px]">
+          <TableCell className="tabular-nums whitespace-nowrap">{new Date(`${holiday.date}T12:00:00`).toLocaleDateString("tr-TR")}<span className="block text-xs text-muted-foreground">{new Date(`${holiday.date}T12:00:00`).toLocaleDateString("tr-TR", { weekday: "long" })}</span></TableCell>
+          <TableCell className="break-words whitespace-normal">{holiday.name}<span className="block text-xs text-muted-foreground">{holiday.isHalfDay ? "Yarım gün" : "Tam gün"}</span></TableCell>
+          <TableCell className="w-12"><Button variant="ghost" size="icon" className="h-9 w-9" aria-label={`${holiday.name} tatilini sil`} disabled={pending} onClick={() => { setDeleteHoliday(holiday); setDeleteOpen(true); }}><Trash2 className="h-4 w-4" /></Button></TableCell>
+        </TableRow>)}</TableBody>
+      </Table></div>}
+    <Dialog open={open} onOpenChange={next => { if (!next) close(); }}>
+      <DialogContent onCloseAutoFocus={event => { if (focusDate) { event.preventDefault(); document.getElementById(`holiday-${focusDate}`)?.focus(); } }}>
+        <DialogHeader><DialogTitle>Tatil ekle</DialogTitle><DialogDescription>Tatil seçili projenin takvimine eklenir. Yıldızlı alanlar zorunludur.</DialogDescription></DialogHeader>
+        <form className="space-y-4" noValidate onSubmit={async event => {
+          event.preventDefault(); const parsed = holidaySchema.safeParse(values);
+          if (!parsed.success) {
+            const next: Partial<Record<keyof HolidayValues, string>> = {};
+            for (const issue of parsed.error.issues) next[issue.path[0] as keyof HolidayValues] = issue.message;
+            setErrors(next); document.getElementById(`holiday-${String(parsed.error.issues[0]?.path[0])}`)?.focus(); return;
+          }
+          setErrors({}); setFailed(!await add.run(parsed.data));
+        }}>
+          <DraftNotice failed={failed} />
+          <fieldset disabled={pending} className="space-y-4">
+            <FormFieldWrapper htmlFor="holiday-date" label="Tarih *" error={errors.date}><Input type="date" required value={values.date} onChange={event => setValues({ ...values, date: event.target.value })} /></FormFieldWrapper>
+            <FormFieldWrapper htmlFor="holiday-name" label="Tatil adı *" error={errors.name}><Input required maxLength={100} value={values.name} onChange={event => setValues({ ...values, name: event.target.value })} /></FormFieldWrapper>
+            <FormFieldWrapper htmlFor="holiday-half" label="Yarım gün"><Checkbox checked={values.isHalfDay} onCheckedChange={checked => setValues({ ...values, isHalfDay: checked === true })} /></FormFieldWrapper>
+          </fieldset>
+          <div className="flex flex-wrap justify-end gap-3"><Button type="button" variant="outline" disabled={pending} onClick={close}>Vazgeç</Button><Button type="submit" disabled={pending}>{add.pending ? "Ekleniyor…" : "Tatili ekle"}</Button></div>
+        </form>
+      </DialogContent>
+    </Dialog>
+    {guard.dialog}
+    <ConfirmDestructive open={deleteOpen} onOpenChange={setDeleteOpen} title="Tatil silinsin mi?" objectName={deleteHoliday?.name ?? "Tatil"}
+      effects={[`${deleteHoliday?.date ?? "Seçili gün"} için tatil tanımı kaldırılır.`]} confirmLabel="Tatili sil" onConfirm={async () => {
+        if (!deleteHoliday) throw new Error("Tatil seçilmedi");
+        setDeleting(true);
+        try { await remove({ id: deleteHoliday._id }); notify.success("Tatil silindi"); } finally { setDeleting(false); }
+      }} />
+  </section>;
 }
-
 export function HolidayCalendarManager() {
-  const { projectId } = useActiveProject();
-  return (
-    <AdminDataBoundary key={projectId} label="Tatil takvimi">
-      <HolidayCalendarContent />
-    </AdminDataBoundary>
-  );
+  const { projectId } = useActiveProjectScope();
+  return <QuerySectionBoundary resetKey={projectId} title="Tatil takvimi yüklenemedi"><HolidayCalendarContent /></QuerySectionBoundary>;
 }

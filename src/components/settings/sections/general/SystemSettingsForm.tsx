@@ -1,134 +1,18 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
+import { Link } from "react-router-dom";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Clock, Globe, Calendar, Sun } from "lucide-react";
-import type { FunctionReturnType } from "convex/server";
-import { api } from "../../../../../convex/_generated/api";
+import type { GeneralValues } from "./generalForm";
 
-interface SystemSettingsFormProps {
-  settings: FunctionReturnType<typeof api.settings.getGeneral>;
-  isDarkMode: boolean;
-  onDarkModeChange: (enabled: boolean) => void;
+export function SystemSettingsForm({ values, change }: { values: GeneralValues; change: (fields: Partial<GeneralValues>) => void }) {
+  return <section className="space-y-4 border-t pt-6">
+    <h3 className="text-base font-semibold">Sistem tercihleri</h3>
+    <p className="text-sm text-muted-foreground">Arayüz Türkçe, işlem zamanı İstanbul’dur. Çalışma saatleri ve atamalar Vardiyalar sayfasında yönetilir.</p>
+    <FormFieldWrapper htmlFor="darkMode" label="Karanlık mod · Proje varsayılanı" hint="Tema değişikliği bu ekranda önizlenir; Kaydet ile proje varsayılanına yazılır.">
+      <Switch name="darkMode" checked={values.darkMode} onCheckedChange={darkMode => change({ darkMode })} />
+    </FormFieldWrapper>
+    <FormFieldWrapper htmlFor="notifications" label="Genel sistem bildirimleri" hint="Bu kayıt Bildirimler bölümündeki tercihlerden ayrıdır; gönderim testi değildir.">
+      <Switch name="notifications" checked={values.notifications} onCheckedChange={notifications => change({ notifications })} />
+    </FormFieldWrapper>
+    <div className="flex flex-wrap gap-4 text-sm"><Link className="underline" to="/shifts">Vardiyaları aç</Link><Link className="underline" to="/profile">Profilimi aç</Link></div>
+  </section>;
 }
-
-export const SystemSettingsForm = ({ settings, isDarkMode, onDarkModeChange }: SystemSettingsFormProps) => {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Globe className="h-5 w-5" />
-          Sistem Ayarları
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-2">
-            <Label htmlFor="language">Sistem Dili</Label>
-            <Select name="language" defaultValue={settings?.systemLanguage || "tr"}>
-              <SelectTrigger className="focus:ring-2 focus:ring-primary/20">
-                <SelectValue placeholder="Dil seçin" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tr">🇹🇷 Türkçe</SelectItem>
-                <SelectItem value="en">🇺🇸 English</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="timezone">Saat Dilimi</Label>
-            <div className="flex items-center space-x-2">
-              <Clock className="w-4 h-4 text-muted-foreground" />
-              <Select name="timezone" defaultValue={settings?.timezone || "Europe/Istanbul"}>
-                <SelectTrigger className="focus:ring-2 focus:ring-primary/20">
-                  <SelectValue placeholder="Saat dilimi seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Europe/Istanbul">🇹🇷 İstanbul (UTC+3)</SelectItem>
-                  <SelectItem value="Europe/London">🇬🇧 Londra (UTC+0)</SelectItem>
-                  <SelectItem value="America/New_York">🇺🇸 New York (UTC-5)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="dateFormat">Tarih Formatı</Label>
-            <div className="flex items-center space-x-2">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              <Select name="dateFormat" defaultValue={settings?.dateFormat || "DD.MM.YYYY"}>
-                <SelectTrigger className="focus:ring-2 focus:ring-primary/20">
-                  <SelectValue placeholder="Tarih formatı seçin" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="DD.MM.YYYY">📅 DD.MM.YYYY (07.01.2025)</SelectItem>
-                  <SelectItem value="MM/DD/YYYY">📅 MM/DD/YYYY (01/07/2025)</SelectItem>
-                  <SelectItem value="YYYY-MM-DD">📅 YYYY-MM-DD (2025-01-07)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="workingHoursStart">Çalışma Saatleri</Label>
-            <div className="flex items-center space-x-2">
-              <Input
-                id="workingHoursStart"
-                name="workingHoursStart"
-                type="time"
-                defaultValue={settings?.workingHoursStart || "09:00"}
-                className="focus:ring-2 focus:ring-primary/20"
-              />
-              <span className="text-muted-foreground font-medium">-</span>
-              <Input
-                id="workingHoursEnd"
-                name="workingHoursEnd"
-                type="time"
-                defaultValue={settings?.workingHoursEnd || "18:00"}
-                className="focus:ring-2 focus:ring-primary/20"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="darkMode">
-                <div className="flex items-center gap-2">
-                  <Sun className="h-4 w-4" />
-                  Karanlık Mod
-                </div>
-              </Label>
-              <div className="text-sm text-muted-foreground">
-                Sistem arayüzünü karanlık temada görüntüle
-              </div>
-            </div>
-            <Switch 
-              id="darkMode" 
-              name="darkMode" 
-              checked={isDarkMode}
-              onCheckedChange={onDarkModeChange}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="notifications">Sistem Bildirimleri</Label>
-              <div className="text-sm text-muted-foreground">
-                Önemli sistem bildirimlerini göster
-              </div>
-            </div>
-            <Switch 
-              id="notifications" 
-              name="notifications" 
-              defaultChecked={settings?.notificationsEnabled ?? true}
-            />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
