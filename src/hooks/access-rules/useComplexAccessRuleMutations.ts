@@ -1,3 +1,4 @@
+import type { FunctionArgs } from "convex/server";
 import { useRef, useState } from "react";
 import { useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -36,12 +37,14 @@ interface UpdateRuleWithMembersParams {
     projectId?: Id<"projects">;
     isActive?: boolean;
   };
+  relationDiff?: FunctionArgs<typeof api.accessRules.updateWithGroups>["relationDiff"];
   employeeIds?: Id<"employees">[];
   deviceIds?: Id<"devices">[];
   doorIds?: Id<"doors">[];
 }
 
-export const useComplexAccessRuleMutations = () => {
+export type RuleSaveResult = { ruleId: Id<"accessRules">; runId: Id<"deviceSyncRuns"> | null };
+export const useComplexAccessRuleMutations = (onDiffSaved?: (result: RuleSaveResult) => void) => {
   const pendingRef = useRef(new Set<string>());
   const [pending, setPending] = useState<Set<string>>(new Set());
   const runPending = async <T>(
@@ -62,6 +65,7 @@ export const useComplexAccessRuleMutations = () => {
 
   const createWithGroups = useMutation(api.accessRules.createWithGroups);
   const updateWithGroups = useMutation(api.accessRules.updateWithGroups);
+  const updateWithGroupsTracked = useMutation(api.accessRules.updateWithGroupsTracked);
   const startRuleSync = useAction(api.deviceSyncRuns.startRuleSync);
   const startBackgroundSync = (ruleId: Id<"accessRules">) => {
     const finish = deviceSyncStore.start();
@@ -97,13 +101,23 @@ export const useComplexAccessRuleMutations = () => {
   const updateAccessRuleWithAdditionalMembers = {
     mutateAsync: (params: UpdateRuleWithMembersParams) =>
       runPending(params.id, async () => {
-        const result = await updateWithGroups({
+        const payload = {
           ruleId: params.id,
           ...params.updates,
+          relationDiff: params.relationDiff,
           employeeIds: params.employeeIds,
           deviceIds: params.deviceIds,
           doorIds: params.doorIds,
-        });
+        };
+        if (params.relationDiff) {
+          const result = await updateWithGroupsTracked(payload);
+          notify.success("Kural kaydedildi", result.runId
+            ? "Gönderim sonucunu aç bağlantısından cihaz durumlarını izleyebilirsiniz."
+            : "Değişiklik yok. Yeniden denemek için Cihazlara gönder seçeneğini kullanın.");
+          onDiffSaved?.(result);
+          return result.ruleId;
+        }
+        const result = await updateWithGroups(payload);
         notify.success("Kural kaydedildi", "Cihaz işlemleri ayrıca izlenir.");
         startBackgroundSync(params.id);
         return result;

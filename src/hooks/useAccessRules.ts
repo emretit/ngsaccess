@@ -1,13 +1,11 @@
 
-import { useAccessRulesQuery } from "./access-rules/useAccessRulesQuery";
 import { useAccessRuleMutations } from "./access-rules/useAccessRuleMutations";
 import { useGroupMemberMutations } from "./access-rules/useGroupMemberMutations";
 import { useGroupDeviceMutations } from "./access-rules/useGroupDeviceMutations";
 import { useComplexAccessRuleMutations } from "./access-rules/useComplexAccessRuleMutations";
 import type { Id } from "../../convex/_generated/dataModel";
 
-export const useAccessRules = (projectId?: Id<"projects">) => {
-  const { data: accessRules, isLoading, error } = useAccessRulesQuery(projectId);
+export const useAccessRules = (_projectId?: Id<"projects">) => {
   
   const {
     createAccessRule,
@@ -31,10 +29,6 @@ export const useAccessRules = (projectId?: Id<"projects">) => {
   } = useComplexAccessRuleMutations();
 
   return {
-    accessRules,
-    rules: accessRules || [], // Legacy alias
-    isLoading,
-    error,
     createAccessRule,
     createAccessRuleWithMembers,
     createRule: createAccessRule, // Legacy alias

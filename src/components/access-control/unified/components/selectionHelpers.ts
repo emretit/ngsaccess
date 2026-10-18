@@ -83,15 +83,22 @@ export function toggleDoors(
   ids: readonly string[],
   checked: boolean,
 ): DoorSelection {
+  const affected = new Set(
+    doors.filter((door) => ids.includes(door._id)).map((door) => door.deviceId),
+  );
+  // Materialize whole-panel fallback only for panels the user actually changed.
+  // Explicit selections absent from the candidate tree must survive untouched.
+  const affectedDoors = doors.filter(door => affected.has(door.deviceId));
+  const affectedDoorIds = new Set(affectedDoors.map(door => door._id));
   const selectedDoors = toggleSelection(
-    effectiveDoorIds(doors, selection),
+    [
+      ...selection.selected_doors.filter(id => !affectedDoorIds.has(id)),
+      ...effectiveDoorIds(affectedDoors, selection),
+    ],
     ids,
     checked,
   );
   const nextDevices = new Set(selection.selected_devices);
-  const affected = new Set(
-    doors.filter((door) => ids.includes(door._id)).map((door) => door.deviceId),
-  );
   for (const deviceId of affected) {
     if (!deviceId) continue;
     if (

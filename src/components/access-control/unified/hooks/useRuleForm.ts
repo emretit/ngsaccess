@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { accessRuleSchema } from "./useAccessRuleSchema";
-import { useComplexAccessRuleMutations } from "@/hooks/access-rules/useComplexAccessRuleMutations";
+import { useComplexAccessRuleMutations, type RuleSaveResult } from "@/hooks/access-rules/useComplexAccessRuleMutations";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import type {
@@ -10,6 +10,8 @@ import type {
   GroupDevice,
 } from "@/types/access-control";
 import { DEFAULT_WORKDAYS } from "../components/weekdays";
+
+import { buildRelationDiff } from "../../../../../convex/lib/accessRuleDiff";
 
 interface RuleFormData {
   name: string;
@@ -31,12 +33,13 @@ export const useRuleForm = (
   editingRule: AccessRule | null | undefined,
   open: boolean,
   onClose: () => void,
+  onDiffSaved?: (result: RuleSaveResult) => void,
 ) => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const { projectId: activeProjectId } = useActiveProject();
   const [projectId] = useState(editingRule?.projectId ?? activeProjectId);
   const { createAccessRuleWithMembers, updateAccessRuleWithAdditionalMembers } =
-    useComplexAccessRuleMutations();
+    useComplexAccessRuleMutations(onDiffSaved);
 
   const [formData, setFormData] = useState<RuleFormData>({
     name: "",
@@ -53,6 +56,8 @@ export const useRuleForm = (
   });
 
   const [initialData, setInitialData] = useState(JSON.stringify(formData));
+  const openingForm = useRef(formData);
+  const openingSelection = useRef({ employees: [] as Id<"employees">[], devices: [] as Id<"devices">[], doors: [] as Id<"doors">[] });
 
   // Reset form when dialog opens/closes or editing rule changes
   useEffect(() => {
@@ -73,6 +78,11 @@ export const useRuleForm = (
             ?.map((gd) => String(gd.doorId || ""))
             .filter(Boolean) ?? [];
 
+        openingSelection.current = {
+          employees: employeeIds as Id<"employees">[],
+          devices: deviceIds as Id<"devices">[],
+          doors: doorIds as Id<"doors">[],
+        };
         const initial: RuleFormData = {
           name: editingRule.name || "",
           description: editingRule.description || "",
@@ -95,6 +105,7 @@ export const useRuleForm = (
               | undefined) ?? "both",
           priority: editingRule.priority ?? 100,
         };
+        openingForm.current = initial;
         setInitialData(JSON.stringify(initial));
         setFormData(initial);
       } else {
@@ -111,6 +122,7 @@ export const useRuleForm = (
           access_direction: "both",
           priority: 100,
         };
+        openingForm.current = initial;
         setInitialData(JSON.stringify(initial));
         setFormData(initial);
       }
@@ -149,16 +161,23 @@ export const useRuleForm = (
         await updateAccessRuleWithAdditionalMembers.mutateAsync({
           id: editingRule._id as Id<"accessRules">,
           updates: {
-            ...ruleData,
-            startTime: formData.start_time || null,
-            endTime: formData.end_time || null,
+            projectId,
+            name: formData.name !== openingForm.current.name ? parsed.data.name : undefined,
+            description: formData.description !== openingForm.current.description ? formData.description : undefined,
+            targetType: formData.target_type !== openingForm.current.target_type ? formData.target_type : undefined,
+            days: JSON.stringify(formData.days) !== JSON.stringify(openingForm.current.days) ? formData.days : undefined,
+            accessDirection: formData.access_direction !== openingForm.current.access_direction ? formData.access_direction : undefined,
+            priority: formData.priority !== openingForm.current.priority ? formData.priority : undefined,
+            startTime: formData.start_time !== openingForm.current.start_time ? formData.start_time || null : undefined,
+            endTime: formData.end_time !== openingForm.current.end_time ? formData.end_time || null : undefined,
           },
-          employeeIds:
-            formData.target_type === "visitor"
-              ? undefined
-              : (formData.selected_employees as Id<"employees">[]),
-          deviceIds,
-          doorIds,
+          relationDiff: {
+            employees: formData.target_type === "visitor"
+              ? { added: [], removed: [] }
+              : buildRelationDiff(openingSelection.current.employees, formData.selected_employees as Id<"employees">[]),
+            devices: buildRelationDiff(openingSelection.current.devices, deviceIds),
+            doors: buildRelationDiff(openingSelection.current.doors, doorIds),
+          },
         });
       } else {
         await createAccessRuleWithMembers.mutateAsync({

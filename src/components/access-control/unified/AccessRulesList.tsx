@@ -37,6 +37,7 @@ import { useAccessRuleMutations } from "@/hooks/access-rules/useAccessRuleMutati
 import { formatWeekdaysAbbr } from "./components/weekdays";
 import { AccessRuleDetails } from "./AccessRuleDetails";
 import { ProjectSyncButton, RecentRuns } from "./SyncRuns";
+import { loadRuleEditor } from "./lib/loadRuleEditor";
 import { ruleTypeMatches } from "./lib/presentation";
 import type { AccessRule } from "@/types/access-control";
 type Summary = FunctionReturnType<
@@ -90,10 +91,7 @@ function RuleRow({
   );
   const edit = useAsyncAction(
     async () => {
-      const details = await convex.query(api.accessRules.getDetails, {
-        ruleId: rule._id,
-        projectId,
-      });
+      const details = await loadRuleEditor(convex, rule._id, projectId);
       onEditRule?.(details);
     },
     { error: "Kural ayrıntısı yüklenemedi" },

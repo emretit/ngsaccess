@@ -1,9 +1,12 @@
 import { useState } from "react";
 import AccessRulesList from "./AccessRulesList";
 import CreateRuleDialog from "./CreateRuleDialog";
+import { RuleSaveNotice } from "./SyncRuns";
+import type { RuleSaveResult } from "@/hooks/access-rules/useComplexAccessRuleMutations";
 import type { AccessRule } from "@/types/access-control";
 
 const ProjectAccessControl = () => {
+  const [saved, setSaved] = useState<RuleSaveResult | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<AccessRule | null>(null);
 
@@ -24,6 +27,7 @@ const ProjectAccessControl = () => {
 
   return (
     <div className="space-y-6">
+      {saved && <RuleSaveNotice result={saved} onDismiss={() => setSaved(null)} />}
       <AccessRulesList
         onCreateRule={handleCreateRule}
         onEditRule={handleEditRule}
@@ -35,6 +39,7 @@ const ProjectAccessControl = () => {
           onOpenChange={setIsCreateDialogOpen}
           editingRule={editingRule}
           onClose={handleCloseDialog}
+          onDiffSaved={setSaved}
         />
       )}
     </div>

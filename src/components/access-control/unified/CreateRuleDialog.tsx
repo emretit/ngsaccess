@@ -17,11 +17,13 @@ import { DepartmentTree } from "./components/DepartmentTree";
 import { ZoneDeviceTree } from "./components/ZoneDeviceTree";
 import { TimeSchedule } from "./components/TimeSchedule";
 import type { AccessRule } from "@/types/access-control";
+import type { RuleSaveResult } from "@/hooks/access-rules/useComplexAccessRuleMutations";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   editingRule?: AccessRule | null;
   onClose: () => void;
+  onDiffSaved?: (result: RuleSaveResult) => void;
 }
 const FORM_ID = "access-rule-form";
 export default function CreateRuleDialog({
@@ -29,6 +31,7 @@ export default function CreateRuleDialog({
   onOpenChange,
   editingRule,
   onClose,
+  onDiffSaved,
 }: Props) {
   const {
     formData,
@@ -38,7 +41,7 @@ export default function CreateRuleDialog({
     errors,
     isDirty,
     projectId,
-  } = useRuleForm(editingRule, open, onClose);
+  } = useRuleForm(editingRule, open, onClose, onDiffSaved);
   const [step, setStep] = useState(0);
   const [stepError, setStepError] = useState("");
   const guard = useUnsavedChangesGuard(isDirty);
@@ -128,8 +131,9 @@ export default function CreateRuleDialog({
               {editingRule ? "Kuralı düzenle" : "Yeni kural"}
             </DialogTitle>
             <DialogDescription>
-              Kayıt başarılı olduğunda cihaz gönderimi ayrıca başlatılır ve
-              izlenir.
+              {editingRule
+                ? "Yalnız değiştirdiğiniz ilişkiler kaydedilir. Cihaz işlemleri arka planda yürütülür; kayıt, cihazda teslim onayı değildir."
+                : "Kayıt başarılı olduğunda cihaz gönderimi ayrıca başlatılır ve izlenir."}
             </DialogDescription>
           </DialogHeader>
           <nav

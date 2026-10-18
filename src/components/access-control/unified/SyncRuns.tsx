@@ -1,3 +1,5 @@
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import type { RuleSaveResult } from "@/hooks/access-rules/useComplexAccessRuleMutations";
 import { useState } from "react";
 import { useAction, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -191,5 +193,33 @@ export function ProjectSyncButton({
       />
       <SyncRunSheet runId={runId} onClose={() => setRunId(null)} />
     </>
+  );
+}
+
+
+/** Persistent save feedback links to this exact run, including a full-send retry for no-op saves. */
+export function RuleSaveNotice({ result, onDismiss }: { result: RuleSaveResult; onDismiss: () => void }) {
+  const [selected, setSelected] = useState<Id<"deviceSyncRuns"> | null>(null);
+  const start = useAction(api.deviceSyncRuns.startRuleSync);
+  const retry = useAsyncAction(async () => {
+    const run = await start({ ruleId: result.ruleId });
+    setSelected(run.runId);
+  }, { error: "Cihaz gönderimi başlatılamadı" });
+  return (
+    <section aria-label="Kural kayıt sonucu" className="flex flex-wrap items-center gap-3 border-b pb-3">
+      <p role="status" className="flex-1 min-w-0">
+        {result.runId ? "Kural kaydedildi. Cihaz gönderiminin sonucu ayrıca izlenir."
+          : "Değişiklik yok; cihazlara yeni işlem gönderilmedi. Yeniden gönderebilirsiniz."}
+      </p>
+      {result.runId ? (
+        <Button variant="outline" onClick={() => setSelected(result.runId)}>Gönderim sonucunu aç</Button>
+      ) : (
+        <Button variant="outline" disabled={retry.pending} onClick={() => { void retry.run(); }}>
+          {retry.pending ? "Başlatılıyor…" : "Cihazlara gönder"}
+        </Button>
+      )}
+      <Button variant="ghost" disabled={retry.pending} onClick={onDismiss}>Kapat</Button>
+      <SyncRunSheet runId={selected} onClose={() => setSelected(null)} />
+    </section>
   );
 }

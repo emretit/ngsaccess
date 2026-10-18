@@ -1,10 +1,9 @@
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { useToast } from "@/hooks/use-toast";
+import { notify } from "@/lib/notify";
 import { Id } from "../../../convex/_generated/dataModel";
 
 export const useGroupDeviceMutations = () => {
-  const { toast } = useToast();
 
   const addGroupDeviceMut = useMutation(api.accessRules.addGroupDevice);
   const removeGroupDeviceMut = useMutation(api.accessRules.removeGroupDevice);
@@ -20,14 +19,14 @@ export const useGroupDeviceMutations = () => {
       projectId?: Id<"projects">;
     }) => {
       const result = await addGroupDeviceMut({ groupId, deviceId, projectId });
-      toast({ title: "Başarılı", description: "Cihaz gruba eklendi." });
+      notify.success("Başarılı", "Cihaz gruba eklendi.");
       return result;
     },
     mutate: (args: { groupId: Id<"accessRules">; deviceId: Id<"devices">; projectId?: Id<"projects"> }) => {
       addGroupDeviceMut(args)
-        .then(() => toast({ title: "Başarılı", description: "Cihaz gruba eklendi." }))
+        .then(() => notify.success("Başarılı", "Cihaz gruba eklendi."))
         .catch(() =>
-          toast({ variant: "destructive", title: "Hata", description: "Cihaz gruba eklenemedi." })
+          notify.error("Hata", "Cihaz gruba eklenemedi.")
         );
     },
     isPending: false,
@@ -36,13 +35,13 @@ export const useGroupDeviceMutations = () => {
   const removeGroupDevice = {
     mutateAsync: async (groupDeviceId: Id<"groupDevices">) => {
       await removeGroupDeviceMut({ groupDeviceId });
-      toast({ title: "Başarılı", description: "Cihaz gruptan çıkarıldı." });
+      notify.success("Başarılı", "Cihaz gruptan çıkarıldı.");
     },
     mutate: (groupDeviceId: Id<"groupDevices">) => {
       removeGroupDeviceMut({ groupDeviceId })
-        .then(() => toast({ title: "Başarılı", description: "Cihaz gruptan çıkarıldı." }))
+        .then(() => notify.success("Başarılı", "Cihaz gruptan çıkarıldı."))
         .catch(() =>
-          toast({ variant: "destructive", title: "Hata", description: "Cihaz gruptan çıkarılamadı." })
+          notify.error("Hata", "Cihaz gruptan çıkarılamadı.")
         );
     },
     isPending: false,

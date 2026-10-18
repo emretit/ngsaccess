@@ -83,3 +83,16 @@ describe("erişim seçimi", () => {
     );
   });
 });
+
+describe("diff editor candidate visibility", () => {
+  it("does not delete explicit door selections missing from the candidate list", () => {
+    expect(toggleDoors([{ _id: "visible", deviceId: "panel" }], {
+      selected_devices: ["panel", "unseen-panel"], selected_doors: ["visible", "unseen-door"],
+    }, ["visible"], false)).toEqual({ selected_devices: ["unseen-panel"], selected_doors: ["unseen-door"] });
+  });
+  it("does not materialize untouched whole-panel fallback as a partial explicit selection", () => {
+    expect(toggleDoors([{ _id: "one", deviceId: "a" }, { _id: "two", deviceId: "b" }], {
+      selected_devices: ["a", "b"], selected_doors: [],
+    }, ["one"], false)).toEqual({ selected_devices: ["b"], selected_doors: [] });
+  });
+});
