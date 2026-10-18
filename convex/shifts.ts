@@ -77,8 +77,9 @@ async function validateAssignment(ctx: MutationCtx, employee: Doc<"employees">, 
   assertPeopleProject(employee.projectId, shift.projectId, "Çalışan ve vardiya");
   const decision = await assignmentDecision(ctx, employee, shift, range, newReadState(), force, calendarConfirmed, excludeId);
   if (decision.status === "on_leave" || decision.status === "holiday") {
-    throw new Error(`CALENDAR: ${decision.reason}. İzin/tatil günlerinde atama için açık onay verin.`);
+    throw new ConvexError({ code: "SHIFT_CALENDAR_CONFLICT", message: `CALENDAR: ${decision.reason}. İzin/tatil günlerinde atama için açık onay verin.`, status: decision.status });
   }
+  if (decision.status === "conflict") throw new ConvexError({ code: "SHIFT_OVERLAP", message: decision.reason });
   if (decision.status !== "will_assign") throw new Error(decision.reason);
 }
 
@@ -275,7 +276,7 @@ export const bulkAssignShift = authedMutation({
     const decisions = await prepareBulk(ctx, args);
     const legacyOverlapCount = decisions.filter(decision => decision.status === "conflict").length;
     if (!args.resultMode && !args.forceConfirm && legacyOverlapCount > 0 && !decisions.some(decision => decision.status === "will_assign")) {
-      throw new Error(`OVERLAP:${legacyOverlapCount}`);
+      throw new ConvexError({ code: "SHIFT_OVERLAP", message: `OVERLAP:${legacyOverlapCount}`, overlapCount: legacyOverlapCount });
     }
     const shift = await ctx.db.get(args.shiftId);
     if (!shift) throw new ConvexError("Vardiya bulunamadı");

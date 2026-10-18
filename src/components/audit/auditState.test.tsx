@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import type { Id } from '../../../convex/_generated/dataModel';
 import { auditDateRange } from '../../../convex/lib/auditLogQuery';
-import { auditArgs, auditRangeError, clearAuditFilters } from './auditState';
+import { auditArgs, auditRangeError, auditScopeHandoff, auditScopeParams, clearAuditFilters } from './auditState';
 import { auditFieldDisplayValue } from './auditLabels';
 import { AuditChangeDetail } from './AuditChangeDetail';
 import AuditLog from '@/pages/AuditLog';
@@ -18,6 +18,15 @@ describe('audit filter and display contracts', () => {
     const params = new URLSearchParams('allProjects=true&project=keep&q=foo&user=system&target=employees&start=2026-10-01&end=2026-10-02&action=delete&other=keep');
     expect(clearAuditFilters(params).toString()).toBe('allProjects=true&project=keep&other=keep');
     expect(params.get('user')).toBe('system');
+  });
+  it('preserves deep-linked users on a new visit and clears only an in-page scope transition', () => {
+    const params = new URLSearchParams('user=historical&q=ali&action=update');
+    expect(auditScopeParams(params, 'project-a', 'project-b').has('user')).toBe(false);
+    // Leaving and reopening the page starts a new scope lifetime.
+    expect(auditScopeParams(params, undefined, 'project-c').get('user')).toBe('historical');
+    expect(auditScopeParams(params, 'project-c', 'project-c').get('user')).toBe('historical');
+    expect(auditScopeParams(params, 'project-a', 'project-b').get('q')).toBe('ali');
+    expect(params.get('user')).toBe('historical');
   });
   it('sends the system discriminator without a fabricated user ID', () => {
     const args = auditArgs(new URLSearchParams('user=system'), project, false);
@@ -65,5 +74,25 @@ describe('audit filter and display contracts', () => {
     expect(html).toContain('Denetim kaydını görüntüleme yetkiniz yok.');
     expect(mocks.query).not.toHaveBeenCalled();
     expect(mocks.paginated).not.toHaveBeenCalled();
+  });
+});
+
+describe('audit scope handoff', () => {
+  it('survives the project-change remount but not leaving the page', () => {
+    vi.useFakeTimers();
+    try {
+      const release = auditScopeHandoff.hold('project-a');
+      release();
+      // Remount in the same commit: the new page reads the old scope, then holds it again.
+      expect(auditScopeHandoff.read()).toBe('project-a');
+      const releaseNext = auditScopeHandoff.hold('project-a');
+      vi.runAllTimers();
+      expect(auditScopeHandoff.read()).toBe('project-a');
+      releaseNext();
+      vi.runAllTimers();
+      expect(auditScopeHandoff.read()).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

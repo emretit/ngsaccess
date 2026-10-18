@@ -28,3 +28,25 @@ export function auditRangeError(start?: string, end?: string) {
   try { auditDateRange(start, end); return undefined; }
   catch (error: unknown) { return `${error instanceof Error ? error.message : 'Tarih aralığı geçersiz'}.`; }
 }
+
+/** A fresh page has no previous scope; deep links retain their actor filter. */
+let handoffScope: string | undefined;
+let handoffRelease: ReturnType<typeof setTimeout> | undefined;
+/**
+ * Layout remounts the page when the project changes, so the scope whose filters are in the URL is handed to the
+ * next mount. It is dropped one tick after the page unmounts, so a later deep link keeps its user filter.
+ */
+export const auditScopeHandoff = {
+  read: () => handoffScope,
+  hold(scope: string | undefined) {
+    clearTimeout(handoffRelease);
+    handoffScope = scope;
+    return () => { handoffRelease = setTimeout(() => { handoffScope = undefined; }, 0); };
+  },
+};
+
+export function auditScopeParams(params: URLSearchParams, previousScope: string | undefined, scope: string): URLSearchParams {
+  const next = new URLSearchParams(params);
+  if (previousScope !== undefined && previousScope !== scope) next.delete('user');
+  return next;
+}

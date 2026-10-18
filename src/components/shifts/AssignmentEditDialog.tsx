@@ -1,3 +1,4 @@
+import { shiftError } from "./lib/shiftError";
 import { useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -9,17 +10,17 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
-import { errorMessage, notify } from "@/lib/notify";
+import { notify } from "@/lib/notify";
 import { DAYS, type Assignment, type Shift } from "./lib/planning";
 import {
   bulkAssignmentFormSchema,
   type BulkAssignmentFormValues,
 } from "./assignmentFormSchema";
+import { DateInput } from "@/components/ui/date-picker";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -58,7 +59,7 @@ function EditForm({
   const [baseline, setBaseline] = useState(() => JSON.stringify(values));
   const guard = useUnsavedChangesGuard(JSON.stringify(values) !== baseline);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [serverError, setServerError] = useState("");
+  const [serverError, setServerError] = useState<ReturnType<typeof shiftError>>();
   const [forceConfirm, setForceConfirm] = useState(false);
   const [calendarConfirmed, setCalendarConfirmed] = useState(false);
   const [confirm, setConfirm] = useState<"save" | "delete" | null>(null);
@@ -73,7 +74,7 @@ function EditForm({
     setValues(next);
     setForceConfirm(false);
     setCalendarConfirmed(false);
-    setServerError("");
+    setServerError(undefined);
   };
   const prepare = () => {
     const parsed = bulkAssignmentFormSchema.safeParse(values);
@@ -94,7 +95,7 @@ function EditForm({
     if (lock.current) throw new Error("İşlem sürüyor");
     lock.current = true;
     setPending(true);
-    setServerError("");
+    setServerError(undefined);
     try {
       if (confirm === "delete") await remove({ assignmentId: assignment._id });
       else
@@ -115,7 +116,7 @@ function EditForm({
       setBaseline(JSON.stringify(values));
       onOpenChange(false);
     } catch (error) {
-      setServerError(errorMessage(error));
+      setServerError(shiftError(error));
       throw error;
     } finally {
       lock.current = false;
@@ -141,7 +142,7 @@ function EditForm({
           </DialogHeader>
           {serverError && (
             <p role="alert" className="text-sm text-danger">
-              {serverError}
+              {serverError.message}
             </p>
           )}
           <fieldset disabled={pending} className="space-y-4">
@@ -175,13 +176,10 @@ function EditForm({
                   label={key === "startDate" ? "Başlangıç" : "Bitiş"}
                   error={errors[key]}
                 >
-                  <Input
+                  <DateInput
                     id={`edit-${key}`}
-                    type="date"
                     value={values[key]}
-                    onChange={(e) =>
-                      change({ ...values, [key]: e.target.value })
-                    }
+                    onChange={(value) => change({ ...values, [key]: value })}
                   />
                 </FormFieldWrapper>
               ))}
@@ -241,7 +239,7 @@ function EditForm({
               {values.startDate}–{values.endDate} dahil tüm seri. Mevcut diğer
               atamalar korunur.
             </p>
-            {serverError.includes("OVERLAP:") && (
+            {serverError?.code === "SHIFT_OVERLAP" && (
               <label className="flex gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -251,7 +249,7 @@ function EditForm({
                 Mevcut vardiyayla çakışmayı onaylıyorum.
               </label>
             )}
-            {serverError.includes("CALENDAR:") && (
+            {serverError?.code === "SHIFT_CALENDAR_CONFLICT" && (
               <label className="flex gap-2 text-sm">
                 <input
                   type="checkbox"

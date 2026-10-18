@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { ShiftCalendarCell } from "./ShiftCalendarCell";
 import {
   dayLabel,
@@ -21,12 +22,25 @@ export function ShiftCalendarGrid({
   selected,
   onSelect,
 }: CalendarProps) {
+  const viewport = useRef<HTMLDivElement>(null);
+  const [overflowing, setOverflowing] = useState(false);
+  useEffect(() => {
+    const node = viewport.current;
+    if (!node) return;
+    const measure = () => setOverflowing(node.scrollWidth > node.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    if (node.firstElementChild) observer.observe(node.firstElementChild);
+    return () => observer.disconnect();
+  }, [days.length]);
   return (
     <div>
-      <p className="text-xs text-muted-foreground mb-2">
+      <p className={`text-xs text-muted-foreground mb-2 ${overflowing ? "" : "md:hidden"}`}>
         Diğer günler için takvimi yatay kaydırın.
       </p>
       <div
+        ref={viewport}
         role="region"
         aria-label="Vardiya takvimi"
         tabIndex={0}

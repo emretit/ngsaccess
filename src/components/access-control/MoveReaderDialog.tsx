@@ -109,9 +109,9 @@ export function MoveReaderDialog({
                 <SelectValue placeholder="Kapı seçin" />
               </SelectTrigger>
               <SelectContent>
-                {availableTargets.map((door) => (
-                  <SelectItem key={door.id} value={door.id}>
-                    {door.name} ({door.readerCount}/{door.maxReaders})
+                {targetDoors.filter((door) => door.id !== currentDoorId).map((door) => (
+                  <SelectItem key={door.id} value={door.id} disabled={door.readerCount >= door.maxReaders}>
+                    {door.name} ({door.readerCount}/{door.maxReaders}){door.readerCount >= door.maxReaders ? " · Dolu" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -138,7 +138,7 @@ export function MoveReaderDialog({
             <Button type="button" variant="outline" disabled={isSubmitting} onClick={close}>
               İptal
             </Button>
-            <Button type="submit" disabled={isSubmitting || !targetDoorId || conflict}>
+            <Button type="submit" disabled={isSubmitting || !selectedTarget || conflict}>
               {isSubmitting ? "Taşınıyor..." : "Taşı"}
             </Button>
           </DialogFooter>

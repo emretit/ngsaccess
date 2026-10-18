@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { clearAuditFilters } from './auditState';
-
-// Layout remounts pages on project changes; retain the last mounted scope.
-let lastAuditScope: string | undefined;
+import { auditScopeHandoff, auditScopeParams, clearAuditFilters } from './auditState';
 
 export function useAuditUrlState(scope: string, ready: boolean) {
   const [params, setParams] = useSearchParams();
@@ -12,14 +9,15 @@ export function useAuditUrlState(scope: string, ready: boolean) {
   const [search, setSearch] = useState(searchUrl);
   const debounced = useDebouncedValue(search, 300);
   const synced = useRef(searchUrl);
-  const [previousScope, setPreviousScope] = useState(lastAuditScope ?? scope);
-  const changingScope = previousScope !== scope;
+  const [previousScope, setPreviousScope] = useState<string | undefined>(() => auditScopeHandoff.read() ?? (ready ? scope : undefined));
+  useEffect(() => auditScopeHandoff.hold(previousScope), [previousScope]);
+  const changingScope = previousScope !== undefined && previousScope !== scope;
   useEffect(() => {
     if (!ready) return;
-    lastAuditScope = scope;
+    if (previousScope === undefined) { setPreviousScope(scope); return; }
     if (previousScope !== scope) {
       if (params.has('user')) {
-        setParams(current => { const next = new URLSearchParams(current); next.delete('user'); return next; }, { replace: true });
+        setParams(current => auditScopeParams(current, previousScope, scope), { replace: true });
       } else setPreviousScope(scope);
     }
   }, [scope, ready, previousScope, params, setParams]);

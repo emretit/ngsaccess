@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-picker";
 import { ShiftCalendarGrid } from "./ShiftCalendarGrid";
 import { ShiftAgendaView } from "./ShiftAgendaView";
 import { ShiftDayDetails } from "./ShiftDayDetails";
@@ -213,7 +213,6 @@ function Plan({
         ]}
       />
       <div className="space-y-2">
-        <p className="text-xs text-muted-foreground">Çalışan ara</p>
         <FilterBar
           search={search}
           onSearchChange={(value) => {
@@ -222,7 +221,7 @@ function Plan({
             clearSelection();
           }}
           searchLabel="Çalışan ara"
-          placeholder="Ad veya e-posta ara"
+          placeholder="Çalışan ara · Ad veya e-posta"
           hasFilters={shiftFilter !== "all"}
           onClear={() => {
             setSearch("");
@@ -271,10 +270,10 @@ function Plan({
         </Button>
         <label className="text-xs">
           Tarih
-          <Input
-            type="date"
+          <DateInput
+            required
             value={day}
-            onChange={(e) => changeDay(e.target.value)}
+            onChange={changeDay}
             className="w-auto max-w-full"
           />
         </label>

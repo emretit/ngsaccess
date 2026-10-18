@@ -4,10 +4,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Input } from "@/components/ui/input";
-import {
-  FormFieldWrapper,
-  type FieldControlProps,
-} from "@/components/shared/FormFieldWrapper";
+import type { FieldControlProps } from "@/components/shared/FormFieldWrapper";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 
 export const selectClass =
@@ -33,14 +30,14 @@ export function EmployeePicker({
   });
   return (
     <div className="min-w-0 space-y-2">
-      <FormFieldWrapper htmlFor={`${control.id}-search`} label="Kişi ara">
-        <Input
-          value={search}
-          disabled={disabled}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Ad veya departman"
-        />
-      </FormFieldWrapper>
+      <Input
+        id={`${control.id}-search`}
+        aria-label="Kişi ara"
+        value={search}
+        disabled={disabled}
+        onChange={(event) => setSearch(event.target.value)}
+        placeholder="Ad veya departman"
+      />
       {data === undefined ? (
         <SectionSkeleton rows={1} label="Kişiler yükleniyor." />
       ) : (

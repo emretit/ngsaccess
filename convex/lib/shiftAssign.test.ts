@@ -163,7 +163,13 @@ describe("vardiya endpoint sözleşmeleri", () => {
     const fresh = seedMemory({ leaves: [{ ...leave, employeeId }] });
     expect(await handlers.assignShift(fresh.mutationCtx, { projectId, employeeId, shiftId, ...range })).toBe("new-1");
     const denied = seedMemory({ leaves: [{ ...leave, employeeId, startDate: range.startDate, endDate: range.startDate }] });
-    await expect(handlers.assignShift(denied.mutationCtx, { projectId, employeeId, shiftId, ...range })).rejects.toThrow("CALENDAR:");
+    await expect(handlers.assignShift(denied.mutationCtx, { projectId, employeeId, shiftId, ...range })).rejects.toMatchObject({ data: { code: "SHIFT_CALENDAR_CONFLICT", message: expect.stringContaining("CALENDAR:") } });
+  });
+  it("tekli atama çakışmasını yapılandırılmış kod ve eski mesajla döner", async () => {
+    const memory = seedMemory({ shiftAssignments: [assignmentRow] });
+    await expect(handlers.assignShift(memory.mutationCtx, { projectId, employeeId, shiftId, ...range }))
+      .rejects.toMatchObject({ data: { code: "SHIFT_OVERLAP", message: expect.stringMatching(/^OVERLAP:1 /) } });
+    expect(memory.writes()).toBe(0);
   });
   it("preview bitiş verilmezse başlangıç gününü kullanır; global tatili de okur", async () => {
     const memory = seedMemory({ holidays: [{ ...holiday, date: bulkInput.startDate }] });
@@ -249,9 +255,9 @@ describe("vardiya endpoint sözleşmeleri", () => {
 
 
 describe("api-fix eski istemci ve eski kayıt uyumu", () => {
-  it("eski istemciye tam OVERLAP:n hatası verir; detailed kişi sonucunu, onay atamayı döner", async () => {
+  it("yapılandırılmış kodda eski OVERLAP:n mesajını korur; detailed kişi sonucunu, onay atamayı döner", async () => {
     const memory = seedMemory({ shiftAssignments: [assignmentRow] });
-    await expect(handlers.bulkAssignShift(memory.mutationCtx, bulkInput)).rejects.toThrow(/^OVERLAP:1$/);
+    await expect(handlers.bulkAssignShift(memory.mutationCtx, bulkInput)).rejects.toMatchObject({ data: { code: "SHIFT_OVERLAP", message: "OVERLAP:1", overlapCount: 1 } });
     expect(memory.writes()).toBe(0);
     expect(await handlers.bulkAssignShift(memory.mutationCtx, { ...bulkInput, resultMode: "detailed" })).toMatchObject({
       insertedCount: 0, overlapCount: 1, results: [{ status: "skipped_conflict" }],

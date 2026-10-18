@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { useActiveProject, useProjectChangeGuard } from "@/contexts/ActiveProjectContext";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { DeviceForm } from "./DeviceForm";
@@ -17,7 +17,7 @@ import { BRAND_LABELS, type DeviceBrand } from "./hooks/useDeviceFormSchema";
 
 interface DeviceDetailsPanelProps { open: boolean; onClose: () => void; selectedDevice: ServerDevice | null; onSuccess: () => void; projectId: Id<"projects"> | undefined; }
 export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess, projectId: draftProjectId }: DeviceDetailsPanelProps) {
-  const { projectId, setActiveProjectId } = useActiveProject();
+  const { projectId } = useActiveProject();
   const projectChanged = open && projectId !== draftProjectId;
   const projects = useQuery(api.projects.list, open ? {} : "skip");
   const [commandPending, setCommandPending] = useState(false);
@@ -39,19 +39,10 @@ export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess, p
   const pending = commandPending || Object.values(formStates).some(state => state?.pending);
   const dirty = Object.values(formStates).some(state => state?.dirty);
   const guard = useUnsavedChangesGuard(open && dirty);
-  const { requestClose } = guard;
+  useProjectChangeGuard(open && (dirty || pending), pending ? () => {} : guard.requestClose);
   useEffect(() => {
-    if (!projectChanged) return;
-    const nextProjectId = projectId;
-    if (draftProjectId && (dirty || pending)) {
-      setActiveProjectId(draftProjectId);
-      if (!pending) requestClose(() => {
-        setFormStates({});
-        onClose();
-        if (nextProjectId) setActiveProjectId(nextProjectId);
-      });
-    } else onClose();
-  }, [projectChanged, projectId, draftProjectId, dirty, pending, setActiveProjectId, requestClose, onClose]);
+    if (projectChanged) onClose();
+  }, [projectChanged, onClose]);
   const close = () => { if (!pending) guard.requestClose(onClose); };
   const pickBrand = (value: DeviceBrand) => { setBrand(value); setDraftBrands(current => current.includes(value) ? current : [...current, value]); setStep("form"); };
   return <>

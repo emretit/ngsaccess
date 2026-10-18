@@ -27,6 +27,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
+import { DateInput } from "@/components/ui/date-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { EmployeePicker, selectClass } from "./EmployeePicker";
@@ -324,11 +325,16 @@ export function LeaveForm({
             label="Başlangıç tarihi"
             error={form.formState.errors.startDate?.message}
           >
-            <Input
+            <DateInput
               className="min-w-0 max-w-full"
-              type="date"
               required
-              {...form.register("startDate")}
+              value={startDate}
+              onChange={(value) =>
+                form.setValue("startDate", value, {
+                  shouldDirty: true,
+                  shouldValidate: form.formState.isSubmitted,
+                })
+              }
             />
           </FormFieldWrapper>
           <FormFieldWrapper
@@ -336,11 +342,16 @@ export function LeaveForm({
             label="Bitiş tarihi"
             error={form.formState.errors.endDate?.message}
           >
-            <Input
+            <DateInput
               className="min-w-0 max-w-full"
-              type="date"
               required
-              {...form.register("endDate")}
+              value={endDate}
+              onChange={(value) =>
+                form.setValue("endDate", value, {
+                  shouldDirty: true,
+                  shouldValidate: form.formState.isSubmitted,
+                })
+              }
             />
           </FormFieldWrapper>
           {row && (days === null || days > 366) && (

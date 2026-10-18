@@ -6,7 +6,7 @@ export class DeviceListErrorBoundary extends Component<{ children: ReactNode }, 
   static getDerivedStateFromError() { return { failed: true }; }
   render() {
     return this.state.failed
-      ? <ErrorState title="Cihazlar yüklenemedi" description="Bağlantınızı kontrol edip yeniden deneyin." onRetry={() => window.location.reload()} />
+      ? <ErrorState title="Cihazlar yüklenemedi" description="Bağlantınızı kontrol edip yeniden deneyin." onRetry={() => this.setState({ failed: false })} />
       : this.props.children;
   }
 }

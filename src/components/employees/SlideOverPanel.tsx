@@ -7,7 +7,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
+import { useActiveProject, useProjectChangeGuard } from "@/contexts/ActiveProjectContext";
 import type { Employee } from "@/types/employee";
 import EmployeeForm from "./EmployeeForm";
 import EmployeeDetails from "./EmployeeDetails";
@@ -27,7 +27,7 @@ export default function SlideOverPanel({
 }: Props) {
   const [dirty, setDirty] = useState(false);
   const [pending, setPending] = useState(false);
-  const { projectId, setActiveProjectId } = useActiveProject();
+  const { projectId } = useActiveProject();
   const previousProject = useRef(projectId);
   const guard = useUnsavedChangesGuard(!viewMode && dirty && isOpen);
   const close = () => {
@@ -40,23 +40,12 @@ export default function SlideOverPanel({
       previousProject.current = projectId;
     }
   }, [isOpen, projectId]);
+  useProjectChangeGuard(isOpen && (dirty || pending), pending ? () => {} : guard.requestClose);
   useEffect(() => {
     if (!isOpen || previousProject.current === projectId) return;
-    const previous = previousProject.current;
-    const next = projectId;
-    if (previous && (dirty || pending)) {
-      setActiveProjectId(previous);
-      if (!pending)
-        guard.requestClose(() => {
-          setDirty(false);
-          onClose();
-          if (next) setActiveProjectId(next);
-        });
-    } else {
-      previousProject.current = projectId;
-      onClose();
-    }
-  }, [projectId, isOpen, dirty, pending, setActiveProjectId, guard, onClose]);
+    previousProject.current = projectId;
+    onClose();
+  }, [projectId, isOpen, onClose]);
   return (
     <>
       <Sheet
