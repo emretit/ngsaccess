@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
+  SheetDescription,
 } from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAdminFormGuard } from "./hooks/useAdminFormGuard";
+import { errorMessage } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,13 +61,15 @@ export function AdminDeviceDialog({
   open,
   onClose,
   onSuccess,
-  device,
+  device: openingDevice,
 }: AdminDeviceDialogProps) {
   const registerDevice = useMutation(api.adminDevices.register);
   const claimDevice = useMutation(api.devices.claimDevice);
   const reassignDevice = useMutation(api.devices.reassignDevice);
   const projects = useQuery(api.projects.list, open ? {} : "skip");
 
+  const [device, setDevice] = useState(openingDevice);
+  const wasOpen = useRef(false);
   const isEdit = !!device;
 
   const [ideUuid, setIdeUuid] = useState("");
@@ -77,23 +81,29 @@ export function AdminDeviceDialog({
     null,
   );
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string>();
   const [identityError, setIdentityError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (open) {
-      setIdeUuid(device?.ideUuid ?? "");
-      setName(device?.name ?? "");
-      setProjectId(device?.assignedProjectId ?? NO_PROJECT);
+    if (open && !wasOpen.current) {
+      // Keep assignment and claim/reassign decisions tied to the opening snapshot.
+      setDevice(openingDevice ? { ...openingDevice } : openingDevice);
+      setIdeUuid(openingDevice?.ideUuid ?? "");
+      setName(openingDevice?.name ?? "");
+      setProjectId(openingDevice?.assignedProjectId ?? NO_PROJECT);
       setEditing(false);
       setConfirmOpen(false);
       setRegisteredId(null);
       setAssignmentError(null);
       setIdentityError(null);
+      setSubmitError(undefined);
     }
-  }, [open, device]);
+    wasOpen.current = open;
+  }, [open, openingDevice]);
 
   const { run: handleCreate, pending: creating } = useAsyncAction(
     async () => {
+      setSubmitError(undefined);
       const parsed = identitySchema.safeParse(ideUuid);
       if (!parsed.success) {
         const message =
@@ -122,6 +132,7 @@ export function AdminDeviceDialog({
               : (adminDeviceId) =>
                   claimDevice({
                     adminDeviceId,
+                    expectedAssignedProjectId: null,
                     projectId: projectId as Id<"projects">,
                     name: name.trim() || undefined,
                   }),
@@ -134,6 +145,7 @@ export function AdminDeviceDialog({
         );
         onSuccess();
       } catch (error) {
+        setSubmitError(errorMessage(error));
         if (savedId && projectId !== NO_PROJECT)
           setAssignmentError(
             error instanceof Error ? error.message : "Atama tamamlanamadı",
@@ -147,15 +159,32 @@ export function AdminDeviceDialog({
   const saveEdit = async () => {
     if (!device) throw new Error("Düzenlenecek cihaz seçilmedi");
     setEditing(true);
+    setSubmitError(undefined);
     try {
-      await reassignDevice({
-        adminDeviceId: device._id,
-        projectId:
-          projectId === NO_PROJECT ? undefined : (projectId as Id<"projects">),
-        name: name.trim() || undefined,
-      });
+      const target =
+        projectId === NO_PROJECT ? undefined : (projectId as Id<"projects">);
+      if (!device.assignedDeviceId && target) {
+        await claimDevice({
+          adminDeviceId: device._id,
+          expectedAssignedProjectId: device.assignedProjectId ?? null,
+          projectId: target,
+          name: name.trim() || undefined,
+        });
+      } else
+        await reassignDevice({
+          adminDeviceId: device._id,
+          expectedAssignedProjectId: device.assignedProjectId ?? null,
+          projectId:
+            projectId === NO_PROJECT
+              ? undefined
+              : (projectId as Id<"projects">),
+          name: name.trim() || undefined,
+        });
       notify.success("Cihaz güncellendi");
       onSuccess();
+    } catch (error) {
+      setSubmitError(errorMessage(error));
+      throw error;
     } finally {
       setEditing(false);
     }
@@ -165,6 +194,15 @@ export function AdminDeviceDialog({
   });
 
   const submitting = creating || editing;
+  const dirty =
+    open && !registeredId &&
+    (ideUuid !== (device?.ideUuid ?? "") ||
+      name !== (device?.name ?? "") ||
+      projectId !== (device?.assignedProjectId ?? NO_PROJECT));
+  const guard = useAdminFormGuard("admin-device", dirty, open && submitting);
+  const close = () => {
+    if (!submitting) guard.requestClose(onClose);
+  };
 
   const handleEdit = () => {
     if (!device) return;
@@ -181,30 +219,41 @@ export function AdminDeviceDialog({
 
   return (
     <>
-      <Sheet
-        open={open}
-        onOpenChange={(isOpen) => !isOpen && !submitting && onClose()}
-      >
-        <SheetContent size="lg" className="p-0">
+      <Sheet open={open} onOpenChange={(isOpen) => !isOpen && close()}>
+        <SheetContent
+          size="lg"
+          className="flex w-full flex-col p-0 sm:max-w-[560px] md:max-w-[560px]"
+        >
           <div className="p-6 border-b">
             <SheetHeader>
               <SheetTitle>
-                {isEdit ? "Cihazı Düzenle" : "Envantere Cihaz Ekle"}
+                {isEdit ? "Cihazı düzenle" : "Cihaz kaydet"}
               </SheetTitle>
-            </SheetHeader>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <SheetDescription className="mt-1 text-sm text-muted-foreground">
               {isEdit
                 ? "İsmi ve proje atamasını değiştirin. Proje değişimi atanmış cihazda kapıları siler; okuma geçmişi korunur."
                 : "Cihaz envantere eklendikten sonra Cihazlar sayfasından projeye atanabilir."}
-            </p>
+            </SheetDescription>
+            </SheetHeader>
           </div>
 
-          <ScrollArea className="h-[calc(100vh-140px)]">
-            <div className="p-6 space-y-4">
+          <form
+            className="flex min-h-0 flex-1 flex-col"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (isEdit) handleEdit();
+              else void handleCreate();
+            }}
+          >
+            <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-4">
               <div className="space-y-2">
                 <FormFieldWrapper
                   htmlFor="admin-device-uuid"
-                  label="Panel UUID"
+                  label={
+                    isEdit && !device?.ideUuid && device?.deviceSerial
+                      ? "Seri numarası"
+                      : "Panel UUID"
+                  }
                   error={identityError ?? undefined}
                 >
                   <Input
@@ -213,9 +262,15 @@ export function AdminDeviceDialog({
                     aria-describedby="admin-device-identity-help"
                     autoFocus={!isEdit}
                     disabled={isEdit || registeredId !== null || submitting}
-                    value={ideUuid}
+                    readOnly={isEdit}
+                    inputMode="numeric"
+                    value={
+                      isEdit && !device?.ideUuid
+                        ? (device?.deviceSerial ?? "Kimlik bilgisi yok")
+                        : ideUuid
+                    }
                     onChange={(e) => setIdeUuid(e.target.value)}
-                    placeholder="ör. 289833329732592 (panelin SYSTEM.UUID'i — src-id)"
+                    placeholder="15 rakamlı panel UUID"
                   />
                 </FormFieldWrapper>
                 <p
@@ -224,7 +279,7 @@ export function AdminDeviceDialog({
                 >
                   {isEdit
                     ? "Panel kimliği değiştirilemez."
-                    : "Panelin gerçek MQTT kimliği (15 haneli). Seri no DEĞİL."}
+                    : "Panel UUID’sini 15 rakam olarak girin."}
                 </p>
               </div>
 
@@ -232,7 +287,7 @@ export function AdminDeviceDialog({
                 <div role="status" className="rounded-md border p-3 text-sm">
                   <p>
                     {assignmentError
-                      ? "Cihaz kaydedildi, projeye atama başarısız — Tekrar ata"
+                      ? "Cihaz kaydedildi, projeye atanamadı. Cihaz havuzda tutuluyor."
                       : "Cihaz envantere kaydedildi."}
                   </p>
                   {assignmentError && (
@@ -280,19 +335,32 @@ export function AdminDeviceDialog({
                   kalır.
                 </p>
               </div>
-
-              <div className="flex justify-end gap-2 pt-2">
+            </div>
+            <div className="shrink-0 border-t p-4 space-y-3">
+              {submitError && (
+                <p
+                  role="alert"
+                  className="break-words text-sm text-destructive"
+                >
+                  {submitError}
+                </p>
+              )}
+              <div className="flex flex-wrap justify-end gap-2">
                 <Button
                   variant="outline"
-                  onClick={onClose}
+                  type="button"
+                  onClick={close}
                   disabled={submitting}
                 >
-                  İptal
+                  {registeredId ? "Havuzda bırak" : "Vazgeç"}
                 </Button>
                 <Button
-                  onClick={isEdit ? handleEdit : () => void handleCreate()}
+                  type="submit"
                   disabled={
                     submitting ||
+                    (isEdit &&
+                      projectId !== NO_PROJECT &&
+                      projects === undefined) ||
                     (!isEdit &&
                       (!ideUuid.trim() ||
                         (projectId !== NO_PROJECT && projects === undefined)))
@@ -307,21 +375,23 @@ export function AdminDeviceDialog({
                       ? projectId === NO_PROJECT
                         ? "Havuzda bırak"
                         : "Tekrar ata"
-                      : "Envantere Ekle"}
+                      : "Cihaz kaydet"}
                 </Button>
               </div>
             </div>
-          </ScrollArea>
+          </form>
         </SheetContent>
       </Sheet>
       <ConfirmDestructive
         open={open && confirmOpen}
         onOpenChange={setConfirmOpen}
         title="Cihazın proje ataması değiştirilsin mi?"
-        objectName={device?.name ?? "Cihaz"}
+        objectName={`${device?.name ?? "Cihaz"} · ${device?.ideUuid ?? device?.deviceSerial ?? ""}`}
         effects={[
           `Cihaz ${device?.assignedProjectName ?? "mevcut proje"} kapsamından çıkarılır.`,
-          "Mevcut kapıları silinir; kart okuma geçmişi korunur.",
+          "Mevcut kapılar, okuyucular, grup cihaz bağlantıları ve bekleyen köprü işleri kaldırılır; bölge ve kart okuma geçmişi korunur.",
+          "Hedefte kapı ve bölge kurulum akışı çalışır.",
+          ...(submitError ? [submitError] : []),
           projectId === NO_PROJECT
             ? "Cihaz atanmamış olarak envanterde kalır."
             : `Cihaz ${projects?.find((project) => project._id === projectId)?.name ?? "seçilen proje"} projesine atanır.`,
@@ -329,6 +399,7 @@ export function AdminDeviceDialog({
         confirmLabel="Atamayı değiştir"
         onConfirm={saveEdit}
       />
+      {guard.dialog}
     </>
   );
 }

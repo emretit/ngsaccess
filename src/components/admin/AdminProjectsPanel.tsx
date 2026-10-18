@@ -1,337 +1,570 @@
-import { roleLabel } from "@/lib/roleLabels";
-import React, { useState } from "react";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useAdminPrimaryAction } from "./hooks/useAdminPrimaryAction";
+import { useState } from "react";
+import { z } from "zod";
 import { ConvexError } from "convex/values";
-import { toast as notify } from "sonner";
 import { useQuery, useMutation } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
-
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { StatInline } from "@/components/shared/StatInline";
+import { FilterBar } from "@/components/shared/FilterBar";
 import {
-  AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
-  AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Edit, Plus, Trash2, Hash, Users, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
-import { format } from "date-fns";
-import { useToast } from "@/components/ui/use-toast";
+  AdminEmptyState as EmptyState,
+  focusAdminHeading,
+} from "./components/AdminListParts";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { RowActions } from "@/components/shared/RowActions";
+import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { errorMessage, notify } from "@/lib/notify";
+import { AdminDataBoundary } from "./components/AdminDataBoundary";
+import {
+  AdminSelect,
+  AdminPageSize,
+  AdminPagination,
+  adminDate,
+  useAdminPagination,
+} from "./components/AdminListParts";
+import { useAdminFormGuard } from "./hooks/useAdminFormGuard";
 
-interface ProjectForm {
-  name: string;
-  description: string;
-  isActive: boolean;
-}
-
-const ROLE_BADGE: Record<string, { label: string; variant: "destructive" | "info" | "success" }> = {
-  super_admin:   { label: roleLabel("super_admin"),       variant: "destructive" },
-  project_admin: { label: roleLabel("project_admin"),  variant: "info" },
-  project_user:  { label: roleLabel("project_user"),          variant: "success" },
-};
-
-const AdminProjectsPanel = () => {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [isSavingProject, setIsSavingProject] = useState(false);
-  const [isDeletingProject, setIsDeletingProject] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [currentProjectId, setCurrentProjectId] = useState<Id<"projects"> | null>(null);
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
-  const [formData, setFormData] = useState<ProjectForm>({ name: "", description: "", isActive: true });
-  const { toast } = useToast();
-
-  const projectsData = useQuery(api.projects.list);
-  const allUsersData = useQuery(api.users.list);
-  const allUserProjectsData = useQuery(api.userProjects.getAll);
-  const isLoading =
-    projectsData === undefined ||
-    allUsersData === undefined ||
-    allUserProjectsData === undefined;
-  const projects = projectsData ?? [];
-  const allUsers = allUsersData ?? [];
-  const allUserProjects = allUserProjectsData ?? [];
-
-  const createProject = useMutation(api.projects.create);
-  const updateProject = useMutation(api.projects.update);
-  const removeProject = useMutation(api.projects.remove);
-
-  const toggleProjectExpansion = (projectId: string) => {
-    const newExpanded = new Set(expandedProjects);
-    if (newExpanded.has(projectId)) {
-      newExpanded.delete(projectId);
-    } else {
-      newExpanded.add(projectId);
+type Project = FunctionReturnType<
+  typeof api.projects.adminList
+>["page"][number];
+const projectSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Proje adını girin.")
+    .max(100, "Proje adı en fazla 100 karakter olabilir."),
+  description: z.string(),
+  isActive: z.boolean(),
+});
+type ProjectForm = z.infer<typeof projectSchema>;
+function ProjectEditor({
+  project,
+  onClose,
+}: {
+  project: Project | null;
+  onClose: () => void;
+}) {
+  const [baseline] = useState<ProjectForm>(() => ({
+    name: project?.name ?? "",
+    description: project?.description ?? "",
+    isActive: project?.isActive ?? true,
+  }));
+  const [form, setForm] = useState(baseline);
+  const [nameError, setNameError] = useState<string>();
+  const [error, setError] = useState<string>();
+  const create = useMutation(api.projects.create);
+  const update = useMutation(api.projects.update);
+  const { run, pending } = useAsyncAction(async () => {
+    setError(undefined);
+    setNameError(undefined);
+    const parsed = projectSchema.safeParse(form);
+    if (!parsed.success) {
+      setNameError(parsed.error.issues[0]?.message);
+      return false;
     }
-    setExpandedProjects(newExpanded);
-  };
-
-  const getProjectUsers = (projectId: Id<"projects">) => {
-    const userIds = allUserProjects.filter((up: { projectId: Id<"projects"> }) => up.projectId === projectId).map((up: { userId: Id<"users"> }) => up.userId);
-    return allUsers.filter((u: { _id: Id<"users"> }) => userIds.includes(u._id));
-  };
-
-  const getRoleDisplay = (role: string) => {
-    const meta = ROLE_BADGE[role] ?? { label: "Bilinmiyor", variant: "secondary" as const };
-    return <Badge variant={meta.variant}>{meta.label}</Badge>;
-  };
-
-  const handleCreateProject = () => {
-    setCurrentProjectId(null);
-    setFormData({ name: "", description: "", isActive: true });
-    setIsDialogOpen(true);
-  };
-
-  const handleEditProject = (project: { _id: Id<"projects">; name: string; description?: string; isActive?: boolean }) => {
-    setCurrentProjectId(project._id);
-    setFormData({ name: project.name, description: project.description ?? "", isActive: project.isActive ?? true });
-    setIsDialogOpen(true);
-  };
-
-  const handleDeleteClick = (projectId: Id<"projects">) => {
-    setCurrentProjectId(projectId);
-    setDeleteError(null);
-    setIsDeleteDialogOpen(true);
-  };
-
-  const handleSaveProject = async () => {
-    if (!formData.name) {
-      toast({ variant: "destructive", title: "Hata", description: "Proje adı zorunludur" });
-      return;
-    }
-    setIsSavingProject(true);
     try {
-      if (currentProjectId) {
-        await updateProject({ id: currentProjectId, name: formData.name, description: formData.description, isActive: formData.isActive });
-        toast({ title: "Proje güncellendi", description: "Proje bilgileri başarıyla güncellendi" });
-      } else {
-        await createProject({ name: formData.name, description: formData.description });
-        toast({ title: "Proje oluşturuldu", description: "Yeni proje başarıyla oluşturuldu" });
-      }
-      setIsDialogOpen(false);
-    } catch (error: unknown) {
-      toast({ variant: "destructive", title: "Hata", description: (error as Error)?.message ?? "Proje kaydedilirken bir hata oluştu" });
-    } finally {
-      setIsSavingProject(false);
+      if (project) await update({ id: project._id, ...parsed.data });
+      else await create(parsed.data);
+      notify.success(project ? "Proje güncellendi" : "Proje oluşturuldu");
+      onClose();
+    } catch (cause) {
+      if (
+        cause instanceof ConvexError &&
+        typeof cause.data === "object" &&
+        cause.data !== null &&
+        "code" in cause.data &&
+        (cause.data.code === "PROJECT_NAME_REQUIRED" ||
+          cause.data.code === "PROJECT_NAME_TOO_LONG")
+      )
+        setNameError(errorMessage(cause));
+      else setError(errorMessage(cause));
+      throw cause;
     }
+  });
+  const guard = useAdminFormGuard(
+    "admin-project",
+    JSON.stringify(form) !== JSON.stringify(baseline),
+    pending,
+  );
+  const close = () => {
+    if (!pending) guard.requestClose(onClose);
   };
-
-  const handleDeleteProject = async () => {
-    if (!currentProjectId || isDeletingProject) return;
-    setIsDeletingProject(true);
-    setDeleteError(null);
-    try {
-      await removeProject({ id: currentProjectId });
-      toast({ title: "Proje silindi", description: "Proje başarıyla silindi" });
-      setIsDeleteDialogOpen(false);
-    } catch (error: unknown) {
-      const message = error instanceof ConvexError && typeof error.data === "string"
-        ? error.data : error instanceof Error ? error.message : "Proje silinirken bir hata oluştu";
-      setDeleteError(message);
-      notify.error(message);
-    } finally {
-      setIsDeletingProject(false);
-    }
-  };
-
-  const currentProject = currentProjectId ? projects.find((p: { _id: Id<"projects"> }) => p._id === currentProjectId) : null;
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-foreground">Proje Yönetimi</h3>
-          <p className="text-sm text-muted-foreground">Sistemdeki tüm projeleri ve kullanıcıları yönetin</p>
-        </div>
-        <Button onClick={handleCreateProject}>
-          <Plus className="h-4 w-4 mr-2" />
-          Yeni Proje
-        </Button>
-      </div>
-
-      <div className="rounded-lg border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead><div className="flex items-center gap-1.5"><Hash className="w-4 h-4" /><span>ID</span></div></TableHead>
-              <TableHead>Proje Adı</TableHead>
-              <TableHead>Açıklama</TableHead>
-              <TableHead>Oluşturma Tarihi</TableHead>
-              <TableHead>Durum</TableHead>
-              <TableHead>Kullanıcılar</TableHead>
-              <TableHead className="text-right">İşlemler</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
-                  <div className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Yükleniyor...</span>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : projects.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
-                  Henüz proje bulunmamaktadır
-                </TableCell>
-              </TableRow>
-            ) : (
-              projects.map((project: { _id: Id<"projects">; name: string; description?: string; isActive?: boolean; _creationTime?: number }) => {
-                const projectUsersList = getProjectUsers(project._id);
-                const isExpanded = expandedProjects.has(project._id);
-                return (
-                  <React.Fragment key={project._id}>
-                    <TableRow>
-                      <TableCell className="font-mono text-xs text-muted-foreground">
-                        {project._id.slice(-6)}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {project.name}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {project.description
-                          ? project.description.length > 100
-                            ? `${project.description.substring(0, 100)}...`
-                            : project.description
-                          : <span className="text-muted-foreground italic">Açıklama yok</span>}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {project._creationTime ? format(new Date(project._creationTime), "dd.MM.yyyy HH:mm") : "-"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={project.isActive ? "success" : "secondary"}>
-                          {project.isActive ? "Aktif" : "Pasif"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm" onClick={() => toggleProjectExpansion(project._id)} className="flex items-center gap-1.5">
-                          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                          <Users className="h-4 w-4" />
-                          <span>({projectUsersList.length})</span>
-                        </Button>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" aria-label="Projeyi düzenle" onClick={() => handleEditProject(project)}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" aria-label="Projeyi sil" className="text-destructive hover:text-destructive" onClick={() => handleDeleteClick(project._id)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    {isExpanded && (
-                      <TableRow>
-                        <TableCell colSpan={7} className="p-0">
-                          <div className="bg-muted/40 border-t p-4">
-                            <h4 className="text-sm font-medium mb-3 flex items-center gap-1.5">
-                              <Users className="h-4 w-4" /><span>Proje Kullanıcıları</span>
-                            </h4>
-                            {projectUsersList.length === 0 ? (
-                              <p className="text-muted-foreground text-sm italic">Bu projeye atanmış kullanıcı bulunmamaktadır</p>
-                            ) : (
-                              <div className="grid gap-2">
-                                {projectUsersList.map((user: { _id: Id<"users">; email?: string; role?: string }) => (
-                                  <div key={user._id} className="flex items-center justify-between rounded-lg border bg-background p-3">
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
-                                        <Users className="h-4 w-4 text-muted-foreground" />
-                                      </div>
-                                      <div>
-                                        <p className="font-medium">{user.email}</p>
-                                        <p className="text-muted-foreground text-xs">ID: {user._id.slice(-6)}</p>
-                                      </div>
-                                    </div>
-                                    <div>{getRoleDisplay(user.role ?? "project_user")}</div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </React.Fragment>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
+    <>
       <Dialog
-        open={isDialogOpen}
+        open
         onOpenChange={(open) => {
-          setIsDialogOpen(open);
-          if (!open) {
-            setCurrentProjectId(null);
-            setFormData({ name: "", description: "", isActive: true });
-          }
+          if (!open) close();
         }}
       >
-        <DialogContent>
+        <DialogContent
+          className="max-h-[90dvh] overflow-y-auto"
+          aria-busy={pending}
+        >
           <DialogHeader>
-            <DialogTitle>{currentProjectId ? "Proje Düzenle" : "Yeni Proje"}</DialogTitle>
+            <DialogTitle>
+              {project ? "Projeyi düzenle" : "Yeni proje"}
+            </DialogTitle>
             <DialogDescription>
-              {currentProjectId ? "Proje bilgilerini güncelleyin" : "Yeni bir proje ekleyin"}
+              Proje bilgilerini ve seçicideki görünürlüğünü yönetin.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">Proje Adı*</Label>
-              <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="col-span-3" />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="description" className="text-right">Açıklama</Label>
-              <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="col-span-3" rows={3} />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>İptal</Button>
-            <Button onClick={handleSaveProject} disabled={isSavingProject}>
-              {isSavingProject ? (
-                <><Loader2 className="mr-2 h-3 w-3 animate-spin" />Kaydediliyor</>
-              ) : (
-                currentProjectId ? "Güncelle" : "Oluştur"
+          <form
+            noValidate
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void run();
+            }}
+          >
+            <FormFieldWrapper
+              htmlFor="admin-project-name"
+              label="Ad (zorunlu)"
+              error={nameError}
+            >
+              <Input
+                value={form.name}
+                disabled={pending}
+                onChange={(event) =>
+                  setForm({ ...form, name: event.target.value })
+                }
+              />
+            </FormFieldWrapper>
+            <FormFieldWrapper
+              htmlFor="admin-project-description"
+              label="Açıklama (opsiyonel)"
+            >
+              <Textarea
+                value={form.description}
+                disabled={pending}
+                onChange={(event) =>
+                  setForm({ ...form, description: event.target.value })
+                }
+              />
+            </FormFieldWrapper>
+            <FormFieldWrapper
+              htmlFor="admin-project-status"
+              label="Durum"
+              hint="Pasif proje, aktif proje seçicisinde listelenmez. Veriler ve mevcut erişimler korunur."
+            >
+              <select
+                disabled={pending}
+                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                value={form.isActive ? "active" : "inactive"}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    isActive: event.target.value === "active",
+                  })
+                }
+              >
+                <option value="active">Aktif</option>
+                <option value="inactive">Pasif</option>
+              </select>
+            </FormFieldWrapper>
+            {error && (
+              <p role="alert" className="break-words text-sm text-destructive">
+                {error}
+              </p>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={pending}
+                onClick={close}
+              >
+                Vazgeç
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? "İşlem sürüyor…" : "Kaydet"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {guard.dialog}
+    </>
+  );
+}
+
+function ProjectDeletion({
+  project,
+  onClose,
+  onEdit,
+}: {
+  project: Project;
+  onClose: () => void;
+  onEdit: () => void;
+}) {
+  const impact = useQuery(api.projects.getDeletionImpact, {
+    projectId: project._id,
+  });
+  const remove = useMutation(api.projects.remove);
+  const [confirm, setConfirm] = useState(false);
+  const [error, setError] = useState<string>();
+  const [pending, setPending] = useState(false);
+  useAdminFormGuard("admin-project-delete", false, pending);
+  const counts = (items: NonNullable<typeof impact>["cleanup"]) =>
+    items.map(
+      (item) => `${item.label}: ${item.count}${item.capped ? "+" : ""}`,
+    );
+  return (
+    <>
+      <Dialog
+        open={!confirm}
+        onOpenChange={(open) => {
+          if (!open) onClose();
+        }}
+      >
+        <DialogContent className="max-h-[90dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Proje silme etkileri</DialogTitle>
+            <DialogDescription className="break-words">
+              {project.name}
+            </DialogDescription>
+          </DialogHeader>
+          {!impact ? (
+            <SectionSkeleton label="Silme etkileri yükleniyor" />
+          ) : (
+            <div className="space-y-3 text-sm">
+              {!impact.canDelete && (
+                <>
+                  <p role="alert">
+                    Bu projeye bağlı iş verileri var; önce bunları taşıyın veya
+                    silin. Geçmiş kayıtlarını korumak için projeyi pasife
+                    alabilirsiniz.
+                  </p>
+                  <ul className="list-disc space-y-1 pl-5">
+                    {counts(impact.blockers).map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                </>
               )}
+              <p className="font-medium">
+                {impact.canDelete
+                  ? "Silinecek bağlı kayıtlar"
+                  : "Engeller kaldırıldığında silinecek bağlı kayıtlar"}
+              </p>
+              {impact.cleanup.length ? (
+                <ul className="list-disc space-y-1 pl-5">
+                  {counts(impact.cleanup).map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>Silinecek bağlı kayıt bulunmadı.</p>
+              )}
+              <p>Denetim geçmişi korunur. Silme işlemi geri alınamaz.</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>
+              Vazgeç
+            </Button>
+            <Button variant="outline" onClick={onEdit}>
+              Proje durumunu düzenle
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={!impact?.canDelete}
+              onClick={() => setConfirm(true)}
+            >
+              Silmeyi onayla
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDestructive
+        open={confirm}
+        onOpenChange={(open) => {
+          setConfirm(open);
+        }}
+        title="Proje silinsin mi?"
+        objectName={project.name}
+        effects={[
+          "İş verisi varsa proje silinemez.",
+          ...(impact ? counts(impact.cleanup) : []),
+          "Ayarlar, kullanıcı üyelikleri, davetler ve sohbetler silinir; denetim geçmişi korunur.",
+          "Bu işlem geri alınamaz.",
+          ...(error
+            ? [
+                error,
+                "Vazgeç ile etki dökümüne dönüp proje durumunu düzenleyebilirsiniz.",
+              ]
+            : []),
+        ]}
+        confirmLabel="Projeyi sil"
+        onConfirm={async () => {
+          if (!impact?.canDelete)
+            throw new Error("Projeye bağlı iş verileri var.");
+          setPending(true);
+          setError(undefined);
+          try {
+            await remove({ id: project._id });
+            notify.success("Proje silindi");
+            focusAdminHeading("admin-projects-heading");
+            onClose();
+          } catch (cause) {
+            setError(errorMessage(cause));
+            throw cause;
+          } finally {
+            setPending(false);
+          }
+        }}
+      />
+    </>
+  );
+}
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={(open) => { if (!isDeletingProject) setIsDeleteDialogOpen(open); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Proje Silme</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bu işlem geri alınamaz. "{currentProject?.name}" projesini silmek istediğinize emin misiniz?
-              Personel, cihaz veya diğer iş verileri olan projeler silinemez.
-              Ayarlar, kullanıcı üyelikleri, davetler ve sohbetler projeyle birlikte silinir; denetim geçmişi korunur.
-              İş verilerini korumak için projeyi pasife alabilirsiniz.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {deleteError && <p role="alert" className="text-sm text-destructive">{deleteError}</p>}
-          <AlertDialogFooter>
-            <Button variant="outline" disabled={isDeletingProject} onClick={() => setIsDeleteDialogOpen(false)}>İptal</Button>
-            <Button variant="destructive" disabled={isDeletingProject} onClick={handleDeleteProject}>
-              {isDeletingProject ? "Siliniyor…" : "Sil"}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+function AdminProjectsContent() {
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<"active" | "inactive" | undefined>();
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const paging = useAdminPagination(JSON.stringify({ search: debouncedSearch, status }));
+  const result = useQuery(api.projects.adminList, {
+    search: debouncedSearch,
+    status,
+    paginationOpts: { numItems: paging.size, cursor: paging.cursor },
+  });
+  const [editing, setEditing] = useState<{ project: Project | null } | null>(
+    null,
+  );
+  const primaryInHeader = useAdminPrimaryAction("Yeni proje", () =>
+    setEditing({ project: null }),
+  );
+  const [deleting, setDeleting] = useState<Project | null>(null);
+  const clear = () => {
+    setSearch("");
+    setStatus(undefined);
+  };
+  const actions = (project: Project) => (
+    <RowActions label={`${project.name} proje işlemleri`}>
+      <DropdownMenuItem onSelect={() => setEditing({ project })}>
+        Düzenle
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        className="text-destructive"
+        onSelect={() => setDeleting(project)}
+      >
+        Projeyi sil
+      </DropdownMenuItem>
+    </RowActions>
+  );
+  const badge = (project: Project) => (
+    <StatusBadge tone={project.isActive ? "success" : "neutral"}>
+      {project.isActive ? "Aktif" : "Pasif"}
+    </StatusBadge>
+  );
+  const members = (project: Project) =>
+    `${project.memberCount}${project.memberCountCapped ? "+" : ""}`;
+  const filtered = Boolean(search || status);
+  return (
+    <div className="min-w-0 space-y-5">
+      <h2 id="admin-projects-heading" tabIndex={-1} className="sr-only">
+        Projeler
+      </h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <StatInline
+          loading={!result}
+          items={[
+            { label: "Bu sayfada", value: result?.page.length },
+            {
+              label: "Aktif (bu sayfa)",
+              value: result?.page.filter((project) => project.isActive).length,
+            },
+            {
+              label: "Pasif (bu sayfa)",
+              value: result?.page.filter((project) => !project.isActive).length,
+            },
+          ]}
+        />
+        {!primaryInHeader && (
+          <Button onClick={() => setEditing({ project: null })}>
+            Yeni proje
+          </Button>
+        )}
+      </div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Ad veya açıklama ara"
+        searchLabel="Proje ara"
+        hasFilters={filtered}
+        onClear={clear}
+        end={
+          <AdminPageSize
+            max={25}
+            size={paging.size}
+            onChange={paging.setSize}
+          />
+        }
+      >
+        <AdminSelect
+          label="Durum"
+          value={status ?? "all"}
+          onChange={(value) =>
+            setStatus(
+              value === "active" || value === "inactive" ? value : undefined,
+            )
+          }
+        >
+          <option value="all">Tümü</option>
+          <option value="active">Aktif</option>
+          <option value="inactive">Pasif</option>
+        </AdminSelect>
+      </FilterBar>
+      {!result ? (
+        <SectionSkeleton label="Projeler yükleniyor" />
+      ) : result.page.length === 0 && !result.isDone ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Bu sayfada eşleşme yok. Tarama devam ediyor; sonraki sayfaya geçin.
+        </p>
+      ) : result.page.length === 0 && paging.page > 1 ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Bu sayfada kayıt yok. Önceki sayfaya dönebilir veya filtreleri
+          değiştirebilirsiniz.
+        </p>
+      ) : result.page.length === 0 ? (
+        <EmptyState
+          title={filtered ? "Filtrelere uygun kayıt yok" : "Henüz proje yok"}
+          description={
+            filtered
+              ? "Aramayı veya filtreleri değiştirin."
+              : "Kullanıcı ve cihaz atamak için önce bir proje oluşturun."
+          }
+          action={{
+            label: filtered ? "Filtreleri temizle" : "Yeni proje",
+            onClick: filtered ? clear : () => setEditing({ project: null }),
+          }}
+        />
+      ) : (
+        <>
+          <div className="hidden min-w-0 overflow-x-auto rounded-md border min-[761px]:block">
+            <Table className="table-fixed">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[32%]">Ad</TableHead>
+                  <TableHead>Durum</TableHead>
+                  <TableHead>Üyeler</TableHead>
+                  <TableHead className="w-[20%]">Oluşturulma</TableHead>
+                  <TableHead className="w-14">
+                    <span className="sr-only">İşlemler</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {result.page.map((project) => (
+                  <TableRow key={project._id}>
+                    <TableCell>
+                      <button
+                        className="text-left font-medium underline-offset-4 hover:underline break-words"
+                        onClick={() => setEditing({ project })}
+                      >
+                        {project.name}
+                      </button>
+                    </TableCell>
+                    <TableCell>{badge(project)}</TableCell>
+                    <TableCell className="tabular-nums">
+                      {members(project)}
+                    </TableCell>
+                    <TableCell className="tabular-nums">
+                      {adminDate(project.createdAt)}
+                    </TableCell>
+                    <TableCell className="px-1">{actions(project)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <ul
+            aria-label="Projeler"
+            className="divide-y rounded-md border min-[761px]:hidden"
+          >
+            {result.page.map((project) => (
+              <li key={project._id} className="flex min-w-0 gap-2 p-3">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <button
+                    className="break-words text-left text-sm font-medium"
+                    onClick={() => setEditing({ project })}
+                  >
+                    {project.name}
+                  </button>
+                  <div>{badge(project)}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {members(project)} üye
+                  </p>
+                  <p className="text-xs tabular-nums text-muted-foreground">
+                    {adminDate(project.createdAt)}
+                  </p>
+                </div>
+                {actions(project)}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <AdminPagination
+        page={paging.page}
+        count={result?.page.length ?? 0}
+        done={result?.isDone ?? false}
+        loading={!result}
+        onPrevious={paging.previous}
+        onNext={() => {
+          if (result && !result.isDone) paging.next(result.continueCursor);
+        }}
+      />
+      {editing && (
+        <ProjectEditor
+          project={editing.project}
+          onClose={() => setEditing(null)}
+        />
+      )}
+      {deleting && (
+        <AdminDataBoundary label="Silme etkileri">
+          <ProjectDeletion
+            project={deleting}
+            onClose={() => setDeleting(null)}
+            onEdit={() => {
+              setEditing({ project: deleting });
+              setDeleting(null);
+            }}
+          />
+        </AdminDataBoundary>
+      )}
     </div>
   );
-};
-
-export default AdminProjectsPanel;
+}
+export default function AdminProjectsPanel() {
+  return (
+    <AdminDataBoundary label="Projeler">
+      <AdminProjectsContent />
+    </AdminDataBoundary>
+  );
+}

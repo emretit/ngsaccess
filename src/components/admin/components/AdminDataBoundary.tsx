@@ -11,10 +11,11 @@ export function AdminDataBoundary({
 }) {
   return (
     <ErrorBoundary
-      fallback={() => (
+      fallback={(_error, reset) => (
         <ErrorState
           title={`${label} yüklenemedi`}
-          description="Veriler alınırken bir hata oluştu. Filtreleri veya proje seçimini kontrol edin."
+          description="Tekrar deneyin; diğer yönetim bölümlerini kullanabilirsiniz."
+          onRetry={reset}
         />
       )}
     >

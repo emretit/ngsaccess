@@ -1,49 +1,69 @@
-import { AccessDenied } from "@/components/shared/AccessDenied";
-import { capabilities } from "@/lib/capabilities";
-import { roleLabel } from "@/lib/roleLabels";
+import {
+  AdminPrimaryActionContext,
+  type AdminPrimaryAction,
+} from "@/components/admin/hooks/useAdminPrimaryAction";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
-import { AdminDashboard } from "@/components/settings/sections/AdminDashboard";
-import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
+import { AccessDenied } from "@/components/shared/AccessDenied";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { capabilities } from "@/lib/capabilities";
+import AdminUsersPanel from "@/components/admin/AdminUsersPanel";
+import AdminProjectsPanel from "@/components/admin/AdminProjectsPanel";
+import { AdminDevicesPanel } from "@/components/admin/AdminDevicesPanel";
 
 export default function SystemAdmin() {
-  const { checkUserRole, loading, user, profile } = useAuth();
+  const { loading, user, profile } = useAuth();
   const navigate = useNavigate();
-
+  const [primaryAction, setPrimaryAction] = useState<AdminPrimaryAction>();
+  const [params, setParams] = useSearchParams();
+  const requested = params.get("tab");
+  const tab =
+    requested === "projects" || requested === "devices" ? requested : "users";
   useEffect(() => {
-    if (loading) return;
-    if (!user) {
-      navigate("/login");
-      return;
-    }
-    if (!profile) return;
-
-  }, [checkUserRole, loading, navigate, profile, user]);
-
-  if (loading || (user && !profile)) {
+    if (!loading && !user) navigate("/login");
+  }, [loading, user, navigate]);
+  if (loading || (user && !profile))
+    return <SectionSkeleton label="Yetkiler yükleniyor" />;
+  if (!user || !capabilities(profile?.role).systemAdmin)
     return (
-      <div className="flex items-center justify-center py-20 text-muted-foreground">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-        <span>Yükleniyor...</span>
-      </div>
+      <AccessDenied message="Bu sayfa için süper admin yetkisi gerekli." />
     );
-  }
-
-  if (!user || !capabilities(profile?.role).systemAdmin) {
-    return <AccessDenied message="Bu sayfa için süper admin yetkisi gerekli." />;
-  }
-
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-muted-foreground">
-          Projeleri, kullanıcıları ve cihazları merkezi olarak yönetin
-        </p>
-        <Badge variant="secondary">{roleLabel("super_admin")}</Badge>
+    <AdminPrimaryActionContext.Provider value={setPrimaryAction}>
+      <div className="min-w-0 space-y-6">
+        <PageHeader
+          title="Admin"
+          primaryAction={primaryAction}
+          scope="Global kapsam · Tüm kullanıcılar, projeler ve cihazlar. Üst çubuktaki proje seçimi bu listeleri daraltmaz."
+        />
+        <Tabs
+          value={tab}
+          onValueChange={(value) => {
+            const next = new URLSearchParams(params);
+            next.set("tab", value);
+            setParams(next);
+          }}
+          className="min-w-0"
+        >
+          <TabsList className="h-auto max-w-full flex-wrap justify-start">
+            <TabsTrigger value="users">Kullanıcılar</TabsTrigger>
+            <TabsTrigger value="projects">Projeler</TabsTrigger>
+            <TabsTrigger value="devices">Cihaz havuzu</TabsTrigger>
+          </TabsList>
+          <TabsContent value="users" className="mt-6 min-w-0">
+            <AdminUsersPanel />
+          </TabsContent>
+          <TabsContent value="projects" className="mt-6 min-w-0">
+            <AdminProjectsPanel />
+          </TabsContent>
+          <TabsContent value="devices" className="mt-6 min-w-0">
+            <AdminDevicesPanel />
+          </TabsContent>
+        </Tabs>
       </div>
-      <AdminDashboard />
-    </div>
+    </AdminPrimaryActionContext.Provider>
   );
 }
