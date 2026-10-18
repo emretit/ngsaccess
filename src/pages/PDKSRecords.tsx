@@ -52,6 +52,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Id } from "../../convex/_generated/dataModel";
+import { DateInput } from "@/components/ui/date-picker";
 const DEFAULT_FILTERS: FilterValues = {
   dateRange: { from: undefined, to: undefined },
   reportType: "daily",
@@ -429,9 +430,9 @@ function PDKSContent({
               </legend>
               <label className="block text-xs">
                 Başlangıç
-                <input
-                  type="date"
-                  className="mt-1 block h-9 w-full rounded-md border bg-background px-3"
+                <DateInput
+                  required
+                  className="mt-1"
                   value={
                     filters.dateRange.from
                       ? toLocalDateString(filters.dateRange.from)
@@ -442,9 +443,9 @@ function PDKSContent({
                       ? toLocalDateString(filters.dateRange.to)
                       : undefined
                   }
-                  onChange={(e) => {
-                    if (!e.target.value) return;
-                    const from = new Date(`${e.target.value}T12:00:00`);
+                  onChange={(value) => {
+                    if (!value) return;
+                    const from = new Date(`${value}T12:00:00`);
                     const to =
                       filters.dateRange.to ?? new Date(`${endDate}T12:00:00`);
                     if (from > to) {
@@ -462,9 +463,9 @@ function PDKSContent({
               </label>
               <label className="block text-xs">
                 Bitiş
-                <input
-                  type="date"
-                  className="mt-1 block h-9 w-full rounded-md border bg-background px-3"
+                <DateInput
+                  required
+                  className="mt-1"
                   value={
                     filters.dateRange.to
                       ? toLocalDateString(filters.dateRange.to)
@@ -475,12 +476,12 @@ function PDKSContent({
                       ? toLocalDateString(filters.dateRange.from)
                       : undefined
                   }
-                  onChange={(e) => {
-                    if (!e.target.value) return;
+                  onChange={(value) => {
+                    if (!value) return;
                     const from =
                       filters.dateRange.from ??
                       new Date(`${startDate}T12:00:00`);
-                    const to = new Date(`${e.target.value}T12:00:00`);
+                    const to = new Date(`${value}T12:00:00`);
                     if (from > to) {
                       setRangeError("Bitiş tarihi başlangıçtan önce olamaz.");
                       return;

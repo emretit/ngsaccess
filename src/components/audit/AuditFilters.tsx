@@ -5,10 +5,10 @@ import { AUDIT_TARGET_LABELS } from '../../../convex/lib/auditLogQuery';
 import { FilterBar } from '@/components/shared/FilterBar';
 import { QuerySectionBoundary } from '@/components/shared/QuerySectionBoundary';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { actionLabels, type AuditArgs } from './auditState';
 import type { useAuditUrlState } from './useAuditUrlState';
+import { DateInput } from '@/components/ui/date-picker';
 
 function ActorFilter({ args, value, onChange }: { args: AuditArgs; value: string; onChange: (value: string) => void }) {
   // Seçenek taraması ağır (2000 olay) ve her yeni kayıtta yeniden çalışır: yalnız seçici açılınca veya seçili aktör varken yükle.
@@ -41,7 +41,7 @@ export function AuditFilters({ state, args, ready, rangeError }: { state: Return
           <div className="min-w-0 space-y-1"><label id="audit-action-label" className="text-xs text-muted-foreground">Eylem</label><Select value={args.action || 'all'} onValueChange={value => state.update('action', value)}><SelectTrigger aria-labelledby="audit-action-label"><SelectValue /></SelectTrigger><SelectContent className="max-w-[calc(100vw-32px)]"><SelectItem value="all">Tüm eylemler</SelectItem>{Object.entries(actionLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
           <div className="min-w-0 space-y-1"><label id="audit-target-label" className="text-xs text-muted-foreground">Varlık</label><Select value={args.targetTable || 'all'} onValueChange={value => state.update('target', value)}><SelectTrigger aria-labelledby="audit-target-label"><SelectValue /></SelectTrigger><SelectContent className="max-w-[calc(100vw-32px)]"><SelectItem value="all">Tüm varlıklar</SelectItem>{Object.entries(AUDIT_TARGET_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
         </div>
-        <div className="hidden w-full md:block" aria-hidden="true" /><div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 md:w-[420px]">{[['start', 'Başlangıç'], ['end', 'Bitiş']].map(([key, label]) => <div key={key} className="min-w-0 space-y-1"><label htmlFor={`audit-${key}`} className="text-xs text-muted-foreground">{label}</label><Input id={`audit-${key}`} type="date" className="min-w-0 w-full" value={state.params.get(key) || ''} onChange={event => state.update(key, event.target.value)} aria-invalid={Boolean(rangeError)} aria-describedby={rangeError ? 'audit-range-error' : undefined} /></div>)}</div>
+        <div className="hidden w-full md:block" aria-hidden="true" /><div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 md:w-[420px]">{[['start', 'Başlangıç'], ['end', 'Bitiş']].map(([key, label]) => <div key={key} className="min-w-0 space-y-1"><label htmlFor={`audit-${key}`} className="text-xs text-muted-foreground">{label}</label><DateInput id={`audit-${key}`} className="min-w-0 w-full" value={state.params.get(key) || ''} onChange={value => state.update(key, value)} aria-invalid={Boolean(rangeError)} aria-describedby={rangeError ? 'audit-range-error' : undefined} /></div>)}</div>
         {rangeError && <p id="audit-range-error" role="alert" className="text-sm text-destructive">{rangeError}</p>}
       </div>
     </FilterBar>

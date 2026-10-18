@@ -5,6 +5,7 @@ import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 
 import { cn } from "@/lib/utils";
+import { formatDateString, parseDateString } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
@@ -17,7 +18,24 @@ interface DatePickerProps {
   className?: string;
   disabled?: boolean | ((date: Date) => boolean);
   minDate?: Date;
+  maxDate?: Date;
+  /** Seçili güne yeniden tıklamak tarihi temizlemez (zorunlu alanlar). */
+  required?: boolean;
+  /** Varsayılan tetikleyici buton yerine kendi tetikleyicin (ör. kompakt dönem etiketi). */
+  trigger?: React.ReactNode;
+  /** Varsayılan butona geçer — `<Label htmlFor>` eşleşmesi için; `trigger` verilince yoksayılır. */
+  id?: string;
+  "aria-invalid"?: boolean;
+  "aria-describedby"?: string;
 }
+
+const TRIGGER_CLASS = cn(
+  "h-9 w-full justify-between text-left text-xs font-normal",
+  "border-input hover:border-primary/50 hover:bg-accent/30",
+  "transition-all duration-200"
+);
+const POPOVER_CONTENT_CLASS =
+  "pointer-events-auto z-[9999] w-auto rounded-md border-input bg-popover shadow-popover";
 
 const START_YEAR = 1940;
 const END_YEAR = 2050;
@@ -95,6 +113,7 @@ function MonthYearSelector({
       <button
         type="button"
         onClick={handlePrevMonth}
+        aria-label="Önceki ay"
         className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-all duration-200 hover:bg-accent/80 hover:text-foreground "
       >
         <ChevronLeft className="h-4 w-4" />
@@ -191,6 +210,7 @@ function MonthYearSelector({
       <button
         type="button"
         onClick={handleNextMonth}
+        aria-label="Sonraki ay"
         className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-all duration-200 hover:bg-accent/80 hover:text-foreground "
       >
         <ChevronRight className="h-4 w-4" />
@@ -238,7 +258,7 @@ function EnhancedCalendar({
         classNames={{
           months: "flex flex-col",
           month: "space-y-2",
-          caption: "hidden",
+          month_caption: "hidden",
           caption_label: "hidden",
           nav: "hidden",
           month_grid: "w-full border-collapse",
@@ -295,57 +315,69 @@ export function DatePicker({
   className,
   disabled,
   minDate,
+  maxDate,
+  required,
+  trigger,
+  id,
+  "aria-invalid": ariaInvalid,
+  "aria-describedby": ariaDescribedBy,
 }: DatePickerProps) {
   const isButtonDisabled = typeof disabled === "boolean" ? disabled : false;
   const userDisabled = typeof disabled === "function" ? disabled : undefined;
   const minTime = minDate ? startOfDay(minDate).getTime() : undefined;
+  const maxTime = maxDate ? startOfDay(maxDate).getTime() : undefined;
 
   const calendarDisabled = React.useMemo<((date: Date) => boolean) | undefined>(() => {
-    if (minTime === undefined && !userDisabled) return undefined;
+    if (minTime === undefined && maxTime === undefined && !userDisabled) return undefined;
     return (d: Date) => {
-      if (minTime !== undefined && startOfDay(d).getTime() < minTime) return true;
+      const day = startOfDay(d).getTime();
+      if (minTime !== undefined && day < minTime) return true;
+      if (maxTime !== undefined && day > maxTime) return true;
       if (userDisabled?.(d)) return true;
       return false;
     };
-  }, [minTime, userDisabled]);
+  }, [minTime, maxTime, userDisabled]);
 
   const [open, setOpen] = React.useState(false);
 
   const handleDateSelect = (selectedDate: Date | undefined) => {
+    if (!selectedDate && required) {
+      setOpen(false);
+      return;
+    }
     onSelect?.(selectedDate);
     if (selectedDate) setOpen(false);
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={isButtonDisabled ? false : open}
+      onOpenChange={(nextOpen) => {
+        // Özel `trigger` disabled prop'unu almaz; açılmayı burada merkezi olarak engelle.
+        if (isButtonDisabled) return;
+        setOpen(nextOpen);
+      }}
+    >
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className={cn(
-            "h-9 w-full justify-between text-left text-xs font-normal",
-            "border-input hover:border-primary/50 hover:bg-accent/30",
-            "transition-all duration-200",
-            "group",
-            !date && "text-muted-foreground",
-            className
-          )}
-          disabled={isButtonDisabled}
-        >
-          <span className="flex-1 truncate text-left">
-            {date ? format(date, "dd MMMM yyyy", { locale: tr }) : placeholder}
-          </span>
-          <CalendarIcon className="ml-2 h-4 w-4 shrink-0 opacity-50 transition-opacity group-hover:opacity-80" />
-        </Button>
+        {trigger ?? (
+          <Button
+            id={id}
+            type="button"
+            variant="outline"
+            aria-invalid={ariaInvalid}
+            aria-describedby={ariaDescribedBy}
+            className={cn(TRIGGER_CLASS, "group", !date && "text-muted-foreground", className)}
+            disabled={isButtonDisabled}
+          >
+            <span className="flex-1 truncate text-left">
+              {date ? format(date, "dd MMMM yyyy", { locale: tr }) : placeholder}
+            </span>
+            <CalendarIcon className="ml-2 h-4 w-4 shrink-0 opacity-50 transition-opacity group-hover:opacity-80" />
+          </Button>
+        )}
       </PopoverTrigger>
       <PopoverContent
-        className={cn(
-          "w-auto p-0",
-          "bg-popover ",
-          "border-input",
-          "shadow-popover",
-          "pointer-events-auto z-[9999]",
-          "rounded-md"
-        )}
+        className={cn(POPOVER_CONTENT_CLASS, "p-0")}
         align="start"
         sideOffset={8}
       >
@@ -360,3 +392,92 @@ export function DatePicker({
 }
 
 DatePicker.displayName = "DatePicker";
+
+interface DateInputProps
+  extends Omit<DatePickerProps, "date" | "onSelect" | "minDate" | "maxDate"> {
+  /** Yerel gün, "yyyy-MM-dd" ya da boş. */
+  value: string;
+  onChange: (value: string) => void;
+  min?: string;
+  max?: string;
+}
+
+/** `<Input type="date">` yerine geçer: aynı "yyyy-MM-dd" string sözleşmesiyle DatePicker. */
+export function DateInput({ value, onChange, min, max, ...props }: DateInputProps) {
+  return (
+    <DatePicker
+      {...props}
+      date={parseDateString(value)}
+      minDate={parseDateString(min)}
+      maxDate={parseDateString(max)}
+      onSelect={(d) => onChange(formatDateString(d))}
+    />
+  );
+}
+
+interface MonthPickerProps {
+  /** Ayın herhangi bir günü — yalnız ay+yıl kullanılır. */
+  date?: Date;
+  onSelect: (date: Date) => void;
+  placeholder?: string;
+  className?: string;
+  disabled?: boolean;
+  id?: string;
+}
+
+/** Gün ızgarası olmadan ay+yıl seçimi — DatePicker'ın ay/yıl başlığını tek başına sunar. */
+export function MonthPicker({
+  date,
+  onSelect,
+  placeholder = "Ay seçin",
+  className,
+  disabled,
+  id,
+}: MonthPickerProps) {
+  const [open, setOpen] = React.useState(false);
+  const [viewMonth, setViewMonth] = React.useState<Date>(date ?? new Date());
+
+  React.useEffect(() => {
+    if (date) setViewMonth(date);
+  }, [date]);
+
+  return (
+    <Popover
+      open={disabled ? false : open}
+      onOpenChange={(nextOpen) => {
+        if (disabled) return;
+        setOpen(nextOpen);
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          disabled={disabled}
+          className={cn(TRIGGER_CLASS, !date && "text-muted-foreground", className)}
+        >
+          <span className="flex-1 truncate text-left">
+            {date ? format(date, "LLLL yyyy", { locale: tr }) : placeholder}
+          </span>
+          <CalendarIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        className={cn(POPOVER_CONTENT_CLASS, "p-2")}
+        align="start"
+        sideOffset={8}
+      >
+        <MonthYearSelector
+          currentMonth={viewMonth}
+          onMonthChange={(nextMonth) => {
+            setViewMonth(nextMonth);
+            onSelect(nextMonth);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+MonthPicker.displayName = "MonthPicker";

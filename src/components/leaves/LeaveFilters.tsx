@@ -6,7 +6,8 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
-import { Input } from "@/components/ui/input";
+import { DateInput, MonthPicker } from "@/components/ui/date-picker";
+import { formatDateString, parseDateString } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -185,17 +186,13 @@ export function LeaveFilters({
           </Button>
         ) : (
           <FormFieldWrapper htmlFor="leave-month" label="Ay">
-            <Input
-              type="month"
+            <MonthPicker
               className="w-full min-w-0 md:w-[160px]"
-              value={filters.period}
-              onChange={(event) => {
-                if (monthRange(event.target.value))
-                  onChange({
-                    period: event.target.value,
-                    from: undefined,
-                    to: undefined,
-                  });
+              date={parseDateString(`${filters.period}-01`)}
+              onSelect={(date) => {
+                const period = formatDateString(date).slice(0, 7);
+                if (monthRange(period))
+                  onChange({ period, from: undefined, to: undefined });
               }}
             />
           </FormFieldWrapper>
@@ -229,13 +226,10 @@ export function LeaveFilters({
               htmlFor="leave-range-start"
               label="Başlangıç tarihi"
             >
-              <Input
-                type="date"
+              <DateInput
                 className="min-w-0 max-w-full"
                 value={range.start}
-                onChange={(event) =>
-                  setRange((value) => ({ ...value, start: event.target.value }))
-                }
+                onChange={(start) => setRange((value) => ({ ...value, start }))}
               />
             </FormFieldWrapper>
             <FormFieldWrapper
@@ -243,13 +237,10 @@ export function LeaveFilters({
               label="Bitiş tarihi"
               error={error}
             >
-              <Input
-                type="date"
+              <DateInput
                 className="min-w-0 max-w-full"
                 value={range.end}
-                onChange={(event) =>
-                  setRange((value) => ({ ...value, end: event.target.value }))
-                }
+                onChange={(end) => setRange((value) => ({ ...value, end }))}
               />
             </FormFieldWrapper>
             <div className="flex justify-end gap-2">

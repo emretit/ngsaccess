@@ -3,9 +3,9 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { FilterBar } from "@/components/shared/FilterBar";
-import { Input } from "@/components/ui/input";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { emptyFilters, type Filters } from "@/components/live-monitoring/lib/readings";
+import { DateInput } from "@/components/ui/date-picker";
 
 function Options({ projectId, filters, change }: { projectId: Id<"projects">; filters: Filters; change: (next: Partial<Filters>) => void }) {
   const devices = useQuery(api.devices.list, { projectId });
@@ -25,8 +25,8 @@ function Options({ projectId, filters, change }: { projectId: Id<"projects">; fi
     <details className="w-full min-w-0"><summary className="cursor-pointer py-2 text-xs">Diğer filtreler · Kapı, kişi ve tarih</summary><div className="grid min-w-0 gap-3 py-3 min-[761px]:grid-cols-4">
       <label className="grid min-w-0 gap-1 text-xs">Kapı<select className={selectClass} value={filters.door} onChange={e => { const door = doors?.find(d => d._id === e.target.value); change({ door: e.target.value, device: door?.deviceId ?? filters.device }); }}><option value="">Tüm kapılar</option>{doors?.filter(d => !filters.device || d.deviceId === filters.device).map(d => <option key={d._id} value={d._id}>{d.name}</option>)}</select></label>
       <label className="grid min-w-0 gap-1 text-xs">Kişi<select className={selectClass} value={filters.employee} onChange={e => change({ employee: e.target.value })}><option value="">Tüm kişiler</option>{people?.map(p => <option key={p._id} value={p._id}>{p.firstName} {p.lastName}</option>)}</select></label>
-      <label className="grid min-w-0 gap-1 text-xs">Başlangıç (TR günü)<Input className="min-w-0" type="date" value={filters.start} onChange={e => change({ start: e.target.value, mode: "history" })} /></label>
-      <label className="grid min-w-0 gap-1 text-xs">Bitiş (TR günü)<Input className="min-w-0" type="date" value={filters.end} aria-describedby="reading-date-error" onChange={e => change({ end: e.target.value, mode: "history" })} /></label>
+      <label className="grid min-w-0 gap-1 text-xs">Başlangıç (TR günü)<DateInput className="min-w-0" value={filters.start} onChange={start => change({ start, mode: "history" })} /></label>
+      <label className="grid min-w-0 gap-1 text-xs">Bitiş (TR günü)<DateInput className="min-w-0" value={filters.end} aria-describedby="reading-date-error" onChange={end => change({ end, mode: "history" })} /></label>
     </div></details>
   </>;
 }

@@ -9,6 +9,7 @@ import type { VisitorFormData } from "./hooks/useVisitorFormData";
 import VisitorCardCapture from "./VisitorCardCapture";
 import { formatVisitorTime } from "./visitorTime";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { DateInput } from "@/components/ui/date-picker";
 
 export default function VisitorFormFields({ formData, setFormData, presetRules, hostEmployees, isEditing, kvkkConsentAt, errors = {}, onNewZone }: {
   formData: VisitorFormData; setFormData: (data: VisitorFormData) => void;
@@ -29,7 +30,7 @@ export default function VisitorFormFields({ formData, setFormData, presetRules, 
       <VisitorCombobox id="v_zone" label="Ziyaretçi erişim bölgesi" value={formData.presetRuleId} options={presetRules} disabled={isEditing} error={errors.presetRuleId} onChange={value => change("presetRuleId", value as Id<"accessRules"> | null)} />
     </FormFieldWrapper>
     {!isEditing && <div className="space-y-1">{!presetRules.length && <p className="text-sm text-muted-foreground">Henüz ziyaretçi erişim bölgesi yok.</p>}<Button variant="outline" type="button" onClick={onNewZone}>Erişim bölgesi oluştur</Button></div>}
-    <FormFieldWrapper htmlFor="v_expires" label="Geçerlilik bitişi *" error={errors.accessExpiresAt} hint="Türkiye saati. Sürenin dolması fiziksel çıkış kaydı oluşturmaz; cihaz işlemlerini proje senkronizasyon şeridinden izleyin."><Input id="v_expires" type="datetime-local" value={formData.accessExpiresAt} onChange={e => change("accessExpiresAt", e.target.value)} /></FormFieldWrapper>
+    <FormFieldWrapper htmlFor="v_expires" label="Geçerlilik bitişi *" error={errors.accessExpiresAt} hint="Türkiye saati. Sürenin dolması fiziksel çıkış kaydı oluşturmaz; cihaz işlemlerini proje senkronizasyon şeridinden izleyin.">{control => <div className="flex min-w-0 gap-2"><DateInput {...control} required className="min-w-0 flex-1" value={formData.accessExpiresAt.slice(0, 10)} onChange={date => change("accessExpiresAt", `${date}T${formData.accessExpiresAt.slice(11, 16) || "00:00"}`)} /><Input id={`${control.id}-time`} type="time" className="w-28 shrink-0" aria-label="Geçerlilik bitiş saati" aria-invalid={control["aria-invalid"]} value={formData.accessExpiresAt.slice(11, 16)} onChange={e => change("accessExpiresAt", `${formData.accessExpiresAt.slice(0, 10)}T${e.target.value}`)} /></div>}</FormFieldWrapper>
     <FormFieldWrapper htmlFor="v_card" label="Kart numarası *" error={errors.cardNumber}><Input id="v_card" value={formData.cardNumber} onChange={e => change("cardNumber", e.target.value)} placeholder="Okuyucudan alın veya elle girin" /></FormFieldWrapper>
     <VisitorCardCapture currentCard={formData.cardNumber} onCapture={card => change("cardNumber", card)} />
     <div className="flex items-center gap-2"><Checkbox id="v_active" checked={formData.isActive} onCheckedChange={checked => change("isActive", checked === true)} /><Label htmlFor="v_active">Erişim izni ver</Label></div><p className="text-xs text-muted-foreground">Erişim geçerlilik bitişiyle sınırlıdır; süresi dolan kayıt aktif sayılmaz.</p>

@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Trash2 } from "lucide-react";
 import { DraftNotice, useSettingsFormState } from "../../SettingsFormState";
+import { DateInput } from "@/components/ui/date-picker";
 
 export const holidaySchema = z.object({
   date: z.iso.date("Geçerli bir tarih seçin"),
@@ -103,7 +104,7 @@ function HolidayCalendarContent() {
         }}>
           <DraftNotice failed={failed} />
           <fieldset disabled={pending} className="space-y-4">
-            <FormFieldWrapper htmlFor="holiday-date" label="Tarih *" error={errors.date}><Input type="date" required value={values.date} onChange={event => setValues({ ...values, date: event.target.value })} /></FormFieldWrapper>
+            <FormFieldWrapper htmlFor="holiday-date" label="Tarih *" error={errors.date}><DateInput required value={values.date} onChange={date => setValues({ ...values, date })} /></FormFieldWrapper>
             <FormFieldWrapper htmlFor="holiday-name" label="Tatil adı *" error={errors.name}><Input required maxLength={100} value={values.name} onChange={event => setValues({ ...values, name: event.target.value })} /></FormFieldWrapper>
             <FormFieldWrapper htmlFor="holiday-half" label="Yarım gün"><Checkbox checked={values.isHalfDay} onCheckedChange={checked => setValues({ ...values, isHalfDay: checked === true })} /></FormFieldWrapper>
           </fieldset>

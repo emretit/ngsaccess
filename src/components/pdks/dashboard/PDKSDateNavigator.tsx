@@ -10,12 +10,7 @@ import {
 } from "date-fns";
 import { tr } from "date-fns/locale";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Button } from "@/components/ui/button";
 import type { FilterValues } from "./PDKSFilterBar";
 
@@ -69,8 +64,13 @@ export function PDKSDateNavigator({
       {values.reportType === "custom" ? (
         <span aria-live="polite">{label}</span>
       ) : (
-        <Popover>
-          <PopoverTrigger asChild>
+        <DatePicker
+          date={anchor}
+          required
+          onSelect={(date) => {
+            if (date) onChange({ ...values, anchorDate: date });
+          }}
+          trigger={
             <Button
               variant="outline"
               size="sm"
@@ -79,19 +79,8 @@ export function PDKSDateNavigator({
             >
               {label}
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={anchor}
-              onSelect={(date) => {
-                if (date) onChange({ ...values, anchorDate: date });
-              }}
-              locale={tr}
-              initialFocus
-            />
-          </PopoverContent>
-        </Popover>
+          }
+        />
       )}
       {values.reportType !== "custom" && (
         <Button

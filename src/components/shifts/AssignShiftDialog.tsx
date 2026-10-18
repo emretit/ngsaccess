@@ -34,6 +34,7 @@ import {
   type Preview,
 } from "./lib/planning";
 import { LEAVE_TYPE_LABEL_TR } from "./lib/calendarOverlays";
+import { DateInput } from "@/components/ui/date-picker";
 export interface AssignShiftDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -271,13 +272,10 @@ export function AssignShiftDialog({
                       label={key === "startDate" ? "Başlangıç" : "Bitiş"}
                       error={errors[key]}
                     >
-                      <Input
+                      <DateInput
                         id={`assignment-${key}`}
-                        type="date"
                         value={values[key]}
-                        onChange={(e) =>
-                          change({ ...values, [key]: e.target.value })
-                        }
+                        onChange={(value) => change({ ...values, [key]: value })}
                       />
                     </FormFieldWrapper>
                   ))}
