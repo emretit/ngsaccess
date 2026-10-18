@@ -983,7 +983,10 @@ export default defineSchema({
     .index("by_employee", ["employeeId"])
     .index("by_project", ["projectId"])
     .index("by_status", ["status"])
-    .index("by_dates", ["startDate", "endDate"]),
+    .index("by_dates", ["startDate", "endDate"])
+    .index("by_project_start", ["projectId", "startDate"])
+    .index("by_project_end", ["projectId", "endDate"])
+    .index("by_employee_start", ["employeeId", "startDate"]),
 
   leaveBalances: defineTable({
     employeeId: v.id("employees"),
