@@ -3,7 +3,9 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -19,6 +21,13 @@ interface ProjectSummary {
   name: string;
 }
 
+/**
+ * Proje değişiminden önce çağrılır. `true` dönerse değişim durur; guard kullanıcı onayından sonra
+ * `proceed()` çağırarak değişimi tamamlar. Layout sayfayı proje değişince yeniden kurduğu için
+ * kirli taslaklar bu kayıt olmadan sessizce kaybolur.
+ */
+export type ProjectChangeGuard = (proceed: () => void) => boolean;
+
 interface ActiveProjectContextValue {
   projectIds: Id<"projects">[];
   projects: ProjectSummary[];
@@ -26,6 +35,8 @@ interface ActiveProjectContextValue {
   projectId: Id<"projects"> | undefined;
   activeProject: ProjectSummary | null;
   setActiveProjectId: (id: Id<"projects">) => void;
+  /** Kayıt sırasıyla sorulur; ilk `true` dönen guard değişimi durdurur. Dönen fonksiyon kaydı siler. */
+  registerProjectChangeGuard: (guard: ProjectChangeGuard) => () => void;
   isSuperAdmin: boolean;
   /** super_admin VEYA project_admin — cihaz claim/release gibi yönetimsel aksiyonlar için. */
   isAdmin: boolean;
@@ -104,12 +115,34 @@ export function ActiveProjectProvider({ children }: { children: ReactNode }) {
     }
   }, [projectIds, activeProjectId, projectsResolved]);
 
-  const setActiveProjectId = useCallback((id: Id<"projects">) => {
+  const commitProjectId = useCallback((id: Id<"projects">) => {
     setActiveProjectIdState((prev) => {
       if (prev === id) return prev;
       writeStoredId(id);
       return id;
     });
+  }, []);
+
+  const guards = useRef(new Set<ProjectChangeGuard>());
+  const currentProjectId = useRef(activeProjectId);
+  useLayoutEffect(() => {
+    currentProjectId.current = activeProjectId;
+  }, [activeProjectId]);
+
+  const setActiveProjectId = useCallback((id: Id<"projects">) => {
+    if (currentProjectId.current === id) return;
+    const proceed = () => commitProjectId(id);
+    for (const guard of guards.current) {
+      if (guard(proceed)) return;
+    }
+    proceed();
+  }, [commitProjectId]);
+
+  const registerProjectChangeGuard = useCallback((guard: ProjectChangeGuard) => {
+    guards.current.add(guard);
+    return () => {
+      guards.current.delete(guard);
+    };
   }, []);
 
   const activeProject = useMemo(
@@ -134,11 +167,12 @@ export function ActiveProjectProvider({ children }: { children: ReactNode }) {
       projectId: activeProject?._id,
       activeProject,
       setActiveProjectId,
+      registerProjectChangeGuard,
       isSuperAdmin: !!isSuperAdmin,
       isAdmin: !!isAdmin,
       loading,
     }),
-    [projectIds, projects, activeProjectId, activeProject, setActiveProjectId, isSuperAdmin, isAdmin, loading]
+    [projectIds, projects, activeProjectId, activeProject, setActiveProjectId, registerProjectChangeGuard, isSuperAdmin, isAdmin, loading]
   );
 
   return (
@@ -154,4 +188,21 @@ export function useActiveProject(): ActiveProjectContextValue {
     throw new Error("useActiveProject must be used within ActiveProjectProvider");
   }
   return ctx;
+}
+
+/**
+ * `blocked` iken proje değişimini durdurur ve `intercept(proceed)` çağırır (ör. `useUnsavedChangesGuard().requestClose`).
+ * Kaydetme sürerken onay sormadan durdurmak için `intercept` boş bir fonksiyon olabilir.
+ */
+export function useProjectChangeGuard(blocked: boolean, intercept: (proceed: () => void) => void) {
+  const { registerProjectChangeGuard } = useActiveProject();
+  const latest = useRef({ blocked, intercept });
+  useLayoutEffect(() => {
+    latest.current = { blocked, intercept };
+  }, [blocked, intercept]);
+  useEffect(() => registerProjectChangeGuard((proceed) => {
+    if (!latest.current.blocked) return false;
+    latest.current.intercept(proceed);
+    return true;
+  }), [registerProjectChangeGuard]);
 }
