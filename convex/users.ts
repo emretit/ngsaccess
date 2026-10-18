@@ -1,9 +1,13 @@
+import { paginationOptsValidator } from "convex/server";
+import { stream } from "convex-helpers/server/stream";
+import schema from "./schema";
+import { adminPaginationOptions, adminSearch, adminUserRow } from "./lib/adminLists";
 import { profileName } from "./lib/settingsUx";
 import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { optionalAuthQuery, authedMutation, adminQuery, superAdminMutation } from "./lib/customFunctions";
+import { optionalAuthQuery, authedMutation, adminQuery, superAdminQuery, superAdminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, verifyUser } from "./lib/auth";
 import { userProtectionError } from "./lib/adminGuards";
 
@@ -354,5 +358,49 @@ export const adminFindByEmail = internalQuery({
       .first();
     if (!u) return null;
     return { _id: u._id, email: u.email, role: u.role };
+  },
+});
+
+/** Safe admin directory: filtering happens before cursor pagination. */
+export const adminList = superAdminQuery({
+  args: {
+    search: v.optional(v.string()),
+    role: v.optional(v.union(v.literal("super_admin"), v.literal("project_admin"), v.literal("project_user"))),
+    project: v.optional(v.union(v.id("projects"), v.literal("none"))),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const pagination = adminPaginationOptions(args.paginationOpts);
+    const projectCache = new Map<Id<"projects">, Promise<Doc<"projects"> | null>>();
+    const membershipCache = new Map<Id<"users">, Promise<{ _id: Id<"projects">; name: string; isActive: boolean }[]>>();
+    const memberships = (userId: Id<"users">) => {
+      const cached = membershipCache.get(userId);
+      if (cached) return cached;
+      const loading = (async () => {
+        const rows = await ctx.db.query("userProjects").withIndex("by_user", q => q.eq("userId", userId)).collect();
+        const projects = await Promise.all([...new Set(rows.map(row => row.projectId))].map(id => {
+          let project = projectCache.get(id);
+          if (!project) { project = ctx.db.get(id); projectCache.set(id, project); }
+          return project;
+        }));
+        return projects.filter((p): p is NonNullable<typeof p> => p !== null)
+          .map(p => ({ _id: p._id, name: p.name, isActive: p.isActive === true }));
+      })();
+      membershipCache.set(userId, loading);
+      return loading;
+    };
+    let totalScanned = 0;
+    const result = await stream(ctx.db, schema).query("users").order("desc").filterWith(async user => {
+      totalScanned++;
+      if (args.role && user.role !== args.role) return false;
+      if (!adminSearch(args.search, user.fullName, user.name, user.email)) return false;
+      if (!args.project) return true;
+      const projects = await memberships(user._id);
+      return args.project === "none" ? projects.length === 0 : projects.some(p => p._id === args.project);
+    }).paginate(pagination);
+    return {
+      ...result, page: await Promise.all(result.page.map(async user => adminUserRow(user, ctx.user._id, await memberships(user._id)))),
+      filterScope: "server" as const, totalScanned,
+    };
   },
 });

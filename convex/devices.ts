@@ -1,5 +1,5 @@
 import { internalMutation, internalQuery, type MutationCtx } from "./_generated/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import {
   authedQuery,
@@ -868,6 +868,7 @@ export const registerUnassignedPanel = superAdminMutation({
 export const claimDevice = adminMutation({
   args: {
     adminDeviceId: v.id("adminDevices"),
+    expectedAssignedProjectId: v.optional(v.union(v.id("projects"), v.null())),
     projectId: v.id("projects"),
     zoneId: v.optional(v.id("zones")),
     newZoneName: v.optional(v.string()),
@@ -889,6 +890,10 @@ export const claimDevice = adminMutation({
     }
     const adminDevice = await ctx.db.get(args.adminDeviceId);
     if (!adminDevice) throw new Error("Cihaz bulunamadı");
+    if (args.expectedAssignedProjectId !== undefined &&
+        (adminDevice.assignedProjectId ?? null) !== args.expectedAssignedProjectId) {
+      throw new ConvexError({ code: "DEVICE_ASSIGNMENT_CHANGED", message: "Cihazın ataması başka bir oturumda değişti. Listeyi yenileyip tekrar deneyin." });
+    }
     if (adminDevice.assignedDeviceId) {
       throw new Error("Bu cihaz zaten bir projeye atanmış");
     }
@@ -922,6 +927,7 @@ export const claimDevice = adminMutation({
 export const reassignDevice = adminMutation({
   args: {
     adminDeviceId: v.id("adminDevices"),
+    expectedAssignedProjectId: v.optional(v.union(v.id("projects"), v.null())),
     projectId: v.optional(v.id("projects")),
     name: v.optional(v.string()),
   },
@@ -929,6 +935,10 @@ export const reassignDevice = adminMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const adminDevice = await ctx.db.get(args.adminDeviceId);
     if (!adminDevice) throw new Error("Cihaz bulunamadı");
+    if (args.expectedAssignedProjectId !== undefined &&
+        (adminDevice.assignedProjectId ?? null) !== args.expectedAssignedProjectId) {
+      throw new ConvexError({ code: "DEVICE_ASSIGNMENT_CHANGED", message: "Cihazın ataması başka bir oturumda değişti. Listeyi yenileyip tekrar deneyin." });
+    }
 
     if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
       throw new Error("Bu projeye erişim yetkiniz yok");

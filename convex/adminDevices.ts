@@ -1,3 +1,9 @@
+import { paginationOptsValidator } from "convex/server";
+import { stream } from "convex-helpers/server/stream";
+import schema from "./schema";
+import type { Doc, Id } from "./_generated/dataModel";
+import { adminDeviceRow, adminPaginationOptions, adminSearch } from "./lib/adminLists";
+import { deviceConnection } from "./lib/deviceConnection";
 import { deviceIdentityError } from "./lib/deviceIdentity";
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
@@ -203,5 +209,42 @@ export const markReleased = internalMutation({
       assignedProjectId: undefined,
       updatedAt: new Date().toISOString(),
     });
+  },
+});
+
+/** Inventory search with the existing five-minute connection policy. */
+export const adminListPage = superAdminQuery({
+  args: {
+    search: v.optional(v.string()),
+    assignment: v.optional(v.union(v.literal("pool"), v.literal("assigned"), v.id("projects"))),
+    connection: v.optional(v.union(v.literal("online"), v.literal("offline"), v.literal("never"))),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const projects = new Map<Id<"projects">, Promise<Doc<"projects"> | null>>();
+    const projectFor = (id: Id<"projects"> | undefined) => {
+      if (!id) return Promise.resolve(null);
+      let project = projects.get(id);
+      if (!project) { project = ctx.db.get(id); projects.set(id, project); }
+      return project;
+    };
+    let totalScanned = 0;
+    const result = await stream(ctx.db, schema).query("adminDevices").order("desc").filterWith(async device => {
+      totalScanned++;
+      if (args.assignment === "pool" && device.assignedDeviceId) return false;
+      if (args.assignment === "assigned" && !device.assignedDeviceId) return false;
+      if (args.assignment && args.assignment !== "pool" && args.assignment !== "assigned" && device.assignedProjectId !== args.assignment) return false;
+      if (args.connection && deviceConnection(device, now) !== args.connection) return false;
+      if (!args.search?.trim()) return true;
+      const project = await projectFor(device.assignedProjectId);
+      return adminSearch(args.search, device.name, device.ideUuid, device.deviceSerial, device.brand, project?.name);
+    }).paginate(adminPaginationOptions(args.paginationOpts));
+    return { ...result, filterScope: "server" as const, totalScanned, evaluatedAt: now,
+      page: await Promise.all(result.page.map(async device => ({
+        ...adminDeviceRow(device, (await projectFor(device.assignedProjectId))?.name ?? null),
+        connectionStatus: deviceConnection(device, now),
+      }))),
+    };
   },
 });

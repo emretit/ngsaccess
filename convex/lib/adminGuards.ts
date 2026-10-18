@@ -1,3 +1,5 @@
+import type { QueryCtx } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 export function userProtectionError({
   isSelf, isSuperAdmin, removesSuperAdmin, adminCount, deleting,
 }: {
@@ -75,4 +77,59 @@ export function reportSchedulePayload(reportType: string, email: string, enabled
   const trimmedEmail = email.trim();
   if (enabled && !trimmedEmail) throw new Error("E-posta adresi girin");
   return { reportType, email: trimmedEmail, enabled };
+}
+
+/** Shared bounded blocker read, also rerun by remove inside its transaction. */
+export async function projectDeletionCounts(ctx: Pick<QueryCtx, "db">, projectId: Id<"projects">) {
+  const counts = await Promise.all(projectDeletionBlockingTables.map(async entry => {
+    const rows = entry.index === "by_project"
+      ? await ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId)).take(101)
+      : entry.index === "by_project_employee"
+        ? await ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId)).take(101)
+        : entry.index === "by_project_device"
+          ? await ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId)).take(101)
+          : await ctx.db.query(entry.table).withIndex(entry.index, q => q.eq("projectId", projectId)).take(101);
+    return [entry.table, rows.length] as const;
+  }));
+  return Object.fromEntries(counts);
+}
+
+const cleanupLabels: Record<typeof projectDeletionCleanupTables[number], string> = {
+  userProjects: "Kullanıcı proje üyelikleri", generalSettings: "Genel ayarlar",
+  mailSettings: "E-posta ayarları", notificationSettings: "Bildirim ayarları",
+  workSettings: "Çalışma ayarları", overtimeRates: "Fazla mesai oranları",
+  holidays: "Tatiller", reportScheduleSettings: "Rapor zamanlamaları",
+  leaveBalances: "İzin bakiyeleri", chatConversations: "Sohbetler", invites: "Davetler",
+};
+
+export function projectDeletionImpactRows(counts: Readonly<Partial<Record<string, number>>>) {
+  const row = (table: string, label: string) => ({
+    table, label, count: Math.min(counts[table] ?? 0, 100), capped: (counts[table] ?? 0) > 100,
+  });
+  const blockers = projectDeletionBlockingTables.filter(entry => (counts[entry.table] ?? 0) > 0)
+    .map(entry => row(entry.table, entry.label));
+  const cleanup = projectDeletionCleanupTables.filter(table => (counts[table] ?? 0) > 0)
+    .map(table => row(table, cleanupLabels[table]));
+  return { canDelete: blockers.length === 0, blockers, cleanup };
+}
+
+export async function projectDeletionImpact(ctx: Pick<QueryCtx, "db">, projectId: Id<"projects">) {
+  const counts = await projectDeletionCounts(ctx, projectId);
+  for (const table of projectDeletionCleanupTables) {
+    // Same cleanup predicate as remove; invites has no project index.
+    const rows = await projectDeletionCleanupQuery(ctx, table, projectId).take(101);
+    counts[table] = rows.length;
+  }
+  return projectDeletionImpactRows(counts);
+}
+
+/** Keep preview and transactional cleanup on exactly the same table predicates. */
+export function projectDeletionCleanupQuery(
+  ctx: Pick<QueryCtx, "db">,
+  table: typeof projectDeletionCleanupTables[number],
+  projectId: Id<"projects">,
+) {
+  return table === "invites"
+    ? ctx.db.query(table).filter(q => q.eq(q.field("projectId"), projectId))
+    : ctx.db.query(table).withIndex("by_project", q => q.eq("projectId", projectId));
 }
