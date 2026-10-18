@@ -31,7 +31,7 @@ export const useGeneralSettings = () => {
     notificationsEnabled?: boolean;
   }) => {
     if (!isAdmin || !projectId || projectLoading || settings === undefined) throw new Error("Ayarlar yüklenmeden kaydedilemez. Önce bir proje seçin.");
-    await upsertGeneral({ ...data, projectId, companyName: data.companyName ?? settings?.companyName ?? "NGS Access" });
+    await upsertGeneral({ ...data, projectId });
   }, { success: "Genel ayarlar kaydedildi", error: "Genel ayarlar kaydedilemedi" });
 
   return {

@@ -1,5 +1,16 @@
 import type { QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
+/** Compare stored membership sets; ordering and legacy duplicate rows are irrelevant. */
+export function membershipChanged(
+  liveProjectIds: readonly Id<"projects">[],
+  expectedProjectIds: readonly Id<"projects">[] | undefined,
+): boolean {
+  if (expectedProjectIds === undefined) return false;
+  const live = new Set(liveProjectIds);
+  const expected = new Set(expectedProjectIds);
+  return live.size !== expected.size || [...expected].some(id => !live.has(id));
+}
+
 export function userProtectionError({
   isSelf, isSuperAdmin, removesSuperAdmin, adminCount, deleting,
 }: {

@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
-import { linkedCountLabel, projectDeletionBlockingTables, projectDeletionBlockers, projectDeletionCleanupTables, projectDeletionError, reportSchedulePayload, userProtectionError } from "./lib/adminGuards";
+import { describe, expect, it, vi } from "vitest";
+import type { FunctionArgs, FunctionReturnType } from "convex/server";
+import type { MutationCtx } from "./_generated/server";
+import { updateRole } from "./users";
+import { upsertGeneral } from "./settings";
+import { api } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
+import { toPatch } from "./lib/nullablePatch";
+import { membershipChanged, linkedCountLabel, projectDeletionBlockingTables, projectDeletionBlockers, projectDeletionCleanupTables, projectDeletionError, reportSchedulePayload, userProtectionError } from "./lib/adminGuards";
 
 const change = { isSelf: false, isSuperAdmin: true, removesSuperAdmin: true, adminCount: 2, deleting: false };
 
@@ -66,5 +73,78 @@ describe("ADM-11 rapor zamanlaması", () => {
   it("açarken e-posta ister ve adresi temizler", () => {
     expect(() => reportSchedulePayload("sgk", "  ", true)).toThrow("E-posta adresi girin");
     expect(reportSchedulePayload("sgk", " rapor@firma.com ", true).email).toBe("rapor@firma.com");
+  });
+});
+
+describe("C3 membership snapshot", () => {
+  const a = "project-a" as Id<"projects">;
+  const b = "project-b" as Id<"projects">;
+  it("accepts reordered and duplicated membership sets", () => {
+    expect(membershipChanged([a, b, a], [b, a])).toBe(false);
+    expect(membershipChanged([], [])).toBe(false);
+  });
+  it("rejects additions, removals and substitutions", () => {
+    expect(membershipChanged([a, b], [a])).toBe(true);
+    expect(membershipChanged([a], [a, b])).toBe(true);
+    expect(membershipChanged([b], [a])).toBe(true);
+    expect(membershipChanged([a], [])).toBe(true);
+    expect(membershipChanged([], [a])).toBe(true);
+  });
+  it("preserves legacy behavior when no snapshot was supplied", () => {
+    expect(membershipChanged([a, b], undefined)).toBe(false);
+  });
+});
+
+describe("C3 general settings partial patch", () => {
+  it("preserves remote fields and interprets null as an explicit clear", () => {
+    const live = { companyName: "Uzak şirket", email: "remote@example.com", phone: "old", darkMode: true };
+    const patch = toPatch({ phone: "new", email: undefined });
+    expect({ ...live, ...patch }).toEqual({ ...live, phone: "new" });
+    expect(toPatch({ phone: null, darkMode: false })).toEqual({ phone: undefined, darkMode: false });
+  });
+  it("keeps all fields supplied by a legacy full payload", () => {
+    expect(toPatch({ companyName: "Şirket", email: null, phone: "123", notificationsEnabled: false }))
+      .toEqual({ companyName: "Şirket", email: undefined, phone: "123", notificationsEnabled: false });
+  });
+});
+
+// Exercise the actual transaction handlers without external auth or database writes.
+vi.mock("./lib/customFunctions", () => {
+  const register = (definition: { handler: unknown }) => ({ _handler: definition.handler });
+  return { superAdminMutation: register, adminMutation: register, authedMutation: register,
+    optionalAuthQuery: register, authedQuery: register, adminQuery: register, superAdminQuery: register };
+});
+vi.mock("./lib/projectScope", () => ({ resolveProjectScope: async () => ["project-a"] }));
+
+const roleHandler = (updateRole as unknown as {
+  _handler: (ctx: MutationCtx, args: FunctionArgs<typeof api.users.updateRole>) => Promise<null>;
+})._handler;
+const generalHandler = (upsertGeneral as unknown as {
+  _handler: (ctx: MutationCtx, args: FunctionArgs<typeof api.settings.upsertGeneral>) => Promise<FunctionReturnType<typeof api.settings.upsertGeneral>>;
+})._handler;
+
+describe("C3 transaction contracts", () => {
+  it("rejects stale membership snapshots before any role or membership write", async () => {
+    const patch = vi.fn(); const insert = vi.fn(); const remove = vi.fn();
+    const query = { withIndex: () => query, collect: async () => [{ projectId: "project-b" }] };
+    const ctx = { user: { _id: "actor" }, db: {
+      get: async () => ({ role: "project_user" }), query: () => query,
+      patch, insert, delete: remove,
+    } } as unknown as MutationCtx;
+    await expect(roleHandler(ctx, { userId: "target" as Id<"users">, role: "project_admin",
+      projectIds: [], expectedProjectIds: ["project-a" as Id<"projects">] }))
+      .rejects.toMatchObject({ data: { code: "MEMBERSHIP_CHANGED" } });
+    expect(patch).not.toHaveBeenCalled(); expect(insert).not.toHaveBeenCalled(); expect(remove).not.toHaveBeenCalled();
+    await expect(roleHandler(ctx, { userId: "target" as Id<"users">, role: "project_admin" })).resolves.toBeNull();
+    expect(patch).toHaveBeenCalledOnce();
+  });
+  it("does not reintroduce companyName on a phone-only settings update", async () => {
+    const patch = vi.fn();
+    const query = { withIndex: () => query, first: async () => ({ _id: "settings" }) };
+    const ctx = { db: { query: () => query, patch } } as unknown as MutationCtx;
+    await generalHandler(ctx, { projectId: "project-a" as Id<"projects">, phone: "456" });
+    expect(patch).toHaveBeenCalledWith("settings", { projectId: "project-a", phone: "456", updatedAt: expect.any(String) });
+    await generalHandler(ctx, { projectId: "project-a" as Id<"projects">, phone: null, companyName: " Şirket " });
+    expect(patch).toHaveBeenLastCalledWith("settings", { projectId: "project-a", phone: undefined, companyName: "Şirket", updatedAt: expect.any(String) });
   });
 });

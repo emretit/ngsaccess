@@ -64,6 +64,17 @@ describe("settings draft and payload contracts", () => {
     expect(generalSchema.safeParse({ ...values, companyName: "  " }).success).toBe(false);
     expect(generalSchema.safeParse({ ...values, email: "yanlış" }).success).toBe(false);
   });
+  it("writes only edited fields and preserves concurrent remote changes", () => {
+    const baseline = generalSchema.parse({ companyName: "Şirket", taxNumber: "", address: "Adres", email: "old@example.com", phone: "123", website: "", currency: "TRY", darkMode: true, notifications: true });
+    const live = { ...generalPayload(baseline), companyName: "Uzak şirket", email: "remote@example.com" };
+    const patch = generalPayload({ ...baseline, phone: "456" }, baseline);
+    expect(patch).toEqual({ phone: "456" });
+    expect({ ...live, ...patch }).toEqual({ ...live, phone: "456" });
+    expect(generalPayload({ ...baseline, phone: "", darkMode: false, notifications: false }, baseline))
+      .toEqual({ phone: null, darkMode: false, notificationsEnabled: false });
+    expect(generalPayload({ ...baseline, companyName: " Şirket " }, baseline)).toEqual({});
+    expect(generalPayload(baseline, baseline)).toEqual({});
+  });
   it("validates actual calendar dates and trimmed holiday names", () => {
     expect(holidaySchema.safeParse({ date: "2026-02-30", name: "Tatil", isHalfDay: false }).success).toBe(false);
     expect(holidaySchema.safeParse({ date: "2026-10-29", name: "  ", isHalfDay: false }).success).toBe(false);

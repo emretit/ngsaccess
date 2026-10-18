@@ -9,7 +9,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { optionalAuthQuery, authedMutation, adminQuery, superAdminQuery, superAdminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, verifyUser } from "./lib/auth";
-import { userProtectionError } from "./lib/adminGuards";
+import { membershipChanged, userProtectionError } from "./lib/adminGuards";
 
 /** Kurulum sayfası için: Sistemde super_admin var mı? (Public - auth gerekmez) */
 export const hasSuperAdmin = query({
@@ -63,6 +63,7 @@ export const updateRole = superAdminMutation({
   args: {
     userId: v.id("users"),
     projectIds: v.optional(v.array(v.id("projects"))),
+    expectedProjectIds: v.optional(v.array(v.id("projects"))),
     role: v.union(
       v.literal("super_admin"),
       v.literal("project_admin"),
@@ -82,12 +83,20 @@ export const updateRole = superAdminMutation({
       removesSuperAdmin, adminCount: admins.length, deleting: false,
     });
     if (protectionError) throw new ConvexError(protectionError);
+    const memberships = args.projectIds !== undefined || args.expectedProjectIds !== undefined
+      ? await ctx.db.query("userProjects").withIndex("by_user", q => q.eq("userId", args.userId)).collect()
+      : [];
+    if (membershipChanged(memberships.map(row => row.projectId), args.expectedProjectIds)) {
+      throw new ConvexError({
+        code: "MEMBERSHIP_CHANGED",
+        message: "Kullanıcının proje üyelikleri başka bir oturumda değişti. Formu kapatıp yeniden açın.",
+      });
+    }
     if (args.projectIds !== undefined) {
       const projectIds = [...new Set(args.projectIds)];
       for (const projectId of projectIds) {
         if (!(await ctx.db.get(projectId))) throw new ConvexError("Proje bulunamadı");
       }
-      const memberships = await ctx.db.query("userProjects").withIndex("by_user", q => q.eq("userId", args.userId)).collect();
       for (const row of memberships) {
         if (!projectIds.includes(row.projectId)) await ctx.db.delete(row._id);
       }

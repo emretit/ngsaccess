@@ -27,7 +27,7 @@ export function GeneralSettings() {
   return <form noValidate className="space-y-6" onSubmit={async event => {
     event.preventDefault(); setTouched(true);
     if (!parsed.success) { document.getElementById(String(parsed.error.issues[0]?.path[0]))?.focus(); return; }
-    const success = await saveSettings(generalPayload(parsed.data));
+    const success = await saveSettings(generalPayload(parsed.data, settings ? draft.baseline : undefined));
     setFailed(!success);
     if (success) { savedTheme.current = parsed.data.darkMode; draft.reset(); setTouched(false); }
   }}>

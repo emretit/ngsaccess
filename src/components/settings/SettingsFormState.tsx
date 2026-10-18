@@ -21,6 +21,8 @@ export function useSettingsDraft<T extends object>(source: T) {
   const values = dirty && draft ? draft.values : source;
   return {
     values,
+    /** Snapshot the draft started from; lets a form send only the fields the user changed. */
+    baseline: dirty && draft ? draft.base : source,
     dirty,
     remoteChanged: dirty && draft !== null && !sameValues(draft.base, source),
     change: (fields: Partial<T>) => setDraft(previous => {

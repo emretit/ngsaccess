@@ -65,6 +65,7 @@ export const useUserManagement = () => {
           userId: currentUser._id,
           role: formData.role,
           projectIds: formData.projectIds,
+          expectedProjectIds: baseline.projectIds,
         });
       } else {
         const parsed = userFormSchema.parse(formData);

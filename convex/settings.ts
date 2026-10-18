@@ -44,7 +44,7 @@ export const getGeneral = authedQuery({
 export const upsertGeneral = adminMutation({
   args: {
     projectId: v.optional(v.id("projects")),
-    companyName: v.string(),
+    companyName: v.optional(v.string()),
     address: v.optional(v.union(v.null(), v.string())),
     email: v.optional(v.union(v.null(), v.string())),
     phone: v.optional(v.union(v.null(), v.string())),
@@ -62,8 +62,10 @@ export const upsertGeneral = adminMutation({
     notificationsEnabled: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    if (!args.companyName.trim()) throw new Error("Şirket adı boş bırakılamaz.");
-    args.companyName = args.companyName.trim();
+    if (args.companyName !== undefined) {
+      if (!args.companyName.trim()) throw new Error("Şirket adı boş bırakılamaz.");
+      args.companyName = args.companyName.trim();
+    }
     const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
     const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
     if (!projectId) throw new Error("Bu projeye erişim yetkiniz yok");
@@ -79,7 +81,7 @@ export const upsertGeneral = adminMutation({
     }
     return await ctx.db.insert("generalSettings", {
       ...toPatch(args),
-      companyName: args.companyName.trim(),
+      companyName: args.companyName ?? "NGS Access",
       projectId,
       createdAt: now,
       updatedAt: now,
