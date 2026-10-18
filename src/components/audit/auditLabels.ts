@@ -169,3 +169,24 @@ export function redactAuditValue(value: unknown): unknown {
     ]),
   );
 }
+
+const auditEnumLabels: Record<string, string> = {
+  biometric_face: 'Yüz biyometrisi', biometric_fingerprint: 'Parmak izi biyometrisi',
+  explicit_consent: 'Açık rıza', granted: 'Onaylandı', revoked: 'İptal edildi',
+};
+/** Format only recognized field/value combinations; unknown data remains inspectable. */
+export function auditFieldDisplayValue(field: string, value: unknown): string {
+  if (value === undefined || value === null) return 'Kaydedilmedi';
+  const key = field.split('.').pop() ?? field;
+  if (typeof value === 'string') {
+    if ((key === 'consentType' || key === 'status') && auditEnumLabels[value]) return auditEnumLabels[value];
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:/.test(value) && !Number.isNaN(Date.parse(value))) {
+      return new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', dateStyle: 'short', timeStyle: 'medium' }).format(new Date(value));
+    }
+    if (key === 'date' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value.split('-').reverse().join('.');
+  }
+  if (typeof value === 'number' && ['timestamp', 'grantedAt', 'revokedAt', 'createdAt', 'updatedAt'].includes(key) && Number.isFinite(value) && Math.abs(value) < 8.64e15) {
+    return new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', dateStyle: 'short', timeStyle: 'medium' }).format(value);
+  }
+  return auditDisplayValue(value);
+}
