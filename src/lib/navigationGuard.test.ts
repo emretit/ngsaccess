@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Navigator } from "react-router-dom";
-import { installNavigationGuard } from "./navigationGuard";
+import { installNavigationGuard, installPopstateInterceptor } from "./navigationGuard";
 
 function setup(allowRequest = true) {
   const push = vi.fn();
@@ -11,13 +11,12 @@ function setup(allowRequest = true) {
   const history = { state: { idx: 3 }, go } as unknown as History;
   const browser: Pick<
     Window,
-    "history" | "addEventListener" | "removeEventListener"
+    "history" | "addEventListener"
   > = {
     history,
     addEventListener: vi.fn((_name, callback) => {
       listener = callback as (event: PopStateEvent) => void;
     }),
-    removeEventListener: vi.fn(),
   };
   let proceed: (() => void) | undefined;
   const request = vi.fn((next: () => void) => {
@@ -96,7 +95,7 @@ it.each([false, true])("restores originals when stacked guards are removed in ei
   else { state.cleanup(); removeSecond(); }
   expect(state.navigator.push).toBe(state.push);
   expect(state.navigator.replace).toBe(state.replace);
-  expect(state.browser.removeEventListener).toHaveBeenCalledOnce();
+  expect(state.pop(2)).not.toHaveBeenCalled();
   state.navigator.push("/home");
   expect(state.push).toHaveBeenCalledExactlyOnceWith("/home");
 });
@@ -146,4 +145,30 @@ it("blocks a second back traversal after an approved traversal", () => {
   state.pop(2);
   expect(state.request).toHaveBeenCalledTimes(2);
   state.cleanup();
+});
+
+it("forwards popstate through one early listener so it runs before the router's own listener", () => {
+  const order: string[] = [];
+  const listeners: Array<(event: PopStateEvent) => void> = [];
+  const go = vi.fn();
+  const browser = {
+    history: { state: { idx: 1 }, go } as unknown as History,
+    addEventListener: vi.fn((_name: string, callback: (event: PopStateEvent) => void) => { listeners.push(callback); }),
+  } as unknown as Parameters<typeof installPopstateInterceptor>[0];
+  installPopstateInterceptor(browser);
+  installPopstateInterceptor(browser);
+  // Router subscribes after the interceptor, as BrowserRouter does on mount.
+  listeners.push(() => order.push("router"));
+  const navigator: Navigator = { createHref: () => "/", go, push: vi.fn(), replace: vi.fn() };
+  const cleanup = installNavigationGuard(navigator, vi.fn(), browser);
+  expect(listeners).toHaveLength(2);
+  let stopped = false;
+  const event = { state: { idx: 0 }, stopImmediatePropagation: () => { stopped = true; } } as unknown as PopStateEvent;
+  for (const listener of listeners) { if (stopped) break; listener(event); }
+  expect(order).toEqual([]);
+  expect(go).toHaveBeenCalledWith(1);
+  cleanup();
+  stopped = false;
+  for (const listener of listeners) { if (stopped) break; listener(event); }
+  expect(order).toEqual(["router"]);
 });

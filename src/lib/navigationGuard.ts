@@ -1,9 +1,22 @@
 import type { Navigator } from "react-router-dom";
 
-type Browser = Pick<Window, "history" | "addEventListener" | "removeEventListener">;
+type Browser = Pick<Window, "history" | "addEventListener">;
 type Request = (proceed: () => void) => void;
 // One adapter per router, shared by every mounted form regardless of cleanup order.
 const registry = new WeakMap<Navigator, { guards: Map<Request, boolean>; dispose: () => void }>();
+const popHandlers = new WeakMap<Browser, (event: PopStateEvent) => void>();
+const intercepted = new WeakSet<Browser>();
+
+/**
+ * popstate fires only on window and listeners run in registration order (capture does not reorder them),
+ * so BrowserRouter's own listener would navigate before a guard registered later could stop it.
+ * main.tsx calls this before the router mounts; the listener then forwards to the active guard, if any.
+ */
+export function installPopstateInterceptor(browser: Browser = window) {
+  if (intercepted.has(browser)) return;
+  intercepted.add(browser);
+  browser.addEventListener("popstate", event => popHandlers.get(browser)?.(event), true);
+}
 
 export function installNavigationGuard(navigator: Navigator, request: Request, browser: Browser = window, blocked = false) {
   let entry = registry.get(navigator);
@@ -47,12 +60,13 @@ export function installNavigationGuard(navigator: Navigator, request: Request, b
         browser.history.go(delta);
       }
     };
-    browser.addEventListener("popstate", onPop, true);
+    installPopstateInterceptor(browser);
+    popHandlers.set(browser, onPop);
     entry = { guards, dispose: () => {
       revision++;
       navigator.push = push;
       navigator.replace = replace;
-      browser.removeEventListener("popstate", onPop, true);
+      if (popHandlers.get(browser) === onPop) popHandlers.delete(browser);
       registry.delete(navigator);
     } };
     registry.set(navigator, entry);
