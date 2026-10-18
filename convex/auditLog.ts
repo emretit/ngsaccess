@@ -3,7 +3,9 @@ import { adminQuery } from "./lib/customFunctions";
 import { paginationOptsValidator } from "convex/server";
 import { resolveProjectScope } from "./lib/projectScope";
 import { normalizeAuditSearch } from "./lib/auditSearch";
-import { AUDIT_TARGET_LABELS, auditDateRange, auditPageMatches, auditIndex } from "./lib/auditLogQuery";
+import { AUDIT_TARGET_LABELS, auditDateRange, auditPageMatches } from "./lib/auditLogQuery";
+
+import { AUDIT_ACTOR_SCAN_LIMIT, auditActorIndex, mergeAuditActors } from "./lib/auditActors";
 
 interface PdksAuditPayload {
   date?: string;
@@ -78,6 +80,7 @@ export const list = adminQuery({
     allProjects: v.optional(v.boolean()),
     targetTable: v.optional(v.string()),
     userId: v.optional(v.id("users")),
+    actor: v.optional(v.literal("system")),
     action: v.optional(v.union(v.literal("create"), v.literal("update"), v.literal("delete"))),
     search: v.optional(v.string()),
     startDate: v.optional(v.string()),
@@ -92,21 +95,21 @@ export const list = adminQuery({
     const { startTimestamp: start, endTimestamp: end } = auditDateRange(args.startDate, args.endDate);
     const { targetTable, userId, action } = args;
     const search = normalizeAuditSearch(args.search);
-    const index = auditIndex(projectId, targetTable, userId, action);
+    const index = auditActorIndex(projectId, targetTable, userId, action, args.actor);
     const query = ctx.db.query("auditLog");
     const indexed = projectId
       ? index === "by_project_action_timestamp" && action
         ? query.withIndex("by_project_action_timestamp", q => q.eq("projectId", projectId).eq("action", action).gte("timestamp", start).lte("timestamp", end))
         : index === "by_project_table_timestamp" && targetTable
         ? query.withIndex("by_project_table_timestamp", q => q.eq("projectId", projectId).eq("targetTable", targetTable).gte("timestamp", start).lte("timestamp", end))
-        : index === "by_project_user_timestamp" && userId
+        : index === "by_project_user_timestamp" && (userId || args.actor)
           ? query.withIndex("by_project_user_timestamp", q => q.eq("projectId", projectId).eq("userId", userId).gte("timestamp", start).lte("timestamp", end))
           : query.withIndex("by_project_timestamp", q => q.eq("projectId", projectId).gte("timestamp", start).lte("timestamp", end))
       : index === "by_action_timestamp" && action
         ? query.withIndex("by_action_timestamp", q => q.eq("action", action).gte("timestamp", start).lte("timestamp", end))
         : index === "by_table_timestamp" && targetTable
         ? query.withIndex("by_table_timestamp", q => q.eq("targetTable", targetTable).gte("timestamp", start).lte("timestamp", end))
-        : index === "by_user_timestamp" && userId
+        : index === "by_user_timestamp" && (userId || args.actor)
           ? query.withIndex("by_user_timestamp", q => q.eq("userId", userId).gte("timestamp", start).lte("timestamp", end))
           : query.withIndex("by_timestamp", q => q.gte("timestamp", start).lte("timestamp", end));
     const result = search
@@ -114,7 +117,7 @@ export const list = adminQuery({
           let searched = q.search("searchText", search);
           if (projectId) searched = searched.eq("projectId", projectId);
           if (targetTable) searched = searched.eq("targetTable", targetTable);
-          if (userId) searched = searched.eq("userId", userId);
+          if (userId || args.actor) searched = searched.eq("userId", userId);
           if (action) searched = searched.eq("action", action);
           return searched;
         }).paginate(args.paginationOpts)
@@ -125,8 +128,9 @@ export const list = adminQuery({
     const projectIds = [...new Set(result.page.map(row => row.projectId).filter((id): id is NonNullable<typeof id> => id !== undefined))];
     const projects = await Promise.all(projectIds.map(async id => [id, await ctx.db.get(id)] as const));
     const projectNames = new Map(projects.map(([id, project]) => [id, project?.name ?? "Silinmiş proje"]));
-    return { ...result, page: result.page
+    return { ...result, ...(args.actor ? { actorFilterScope: "index" as const } : {}), page: result.page
       .filter(row => row.timestamp >= start && row.timestamp <= end)
+      .filter(row => !args.actor || row.userId === undefined)
       .map(row => ({ ...row,
         userName: row.userName ?? (row.userId ? names.get(row.userId) : "Sistem"),
         projectName: row.projectId ? projectNames.get(row.projectId) ?? "Bilinmeyen proje" : "Projesiz kayıt",
@@ -154,5 +158,50 @@ export const filterUsers = adminQuery({
     const members = await ctx.db.query("userProjects").withIndex("by_project", q => q.eq("projectId", projectId)).collect();
     const users = await Promise.all([...new Set([...members.map(member => member.userId), ctx.user._id])].map(id => ctx.db.get(id)));
     return users.filter((user): user is NonNullable<typeof user> => user !== null).map(user => ({ _id: user._id, name: user.name ?? user.email ?? "Bilinmeyen" }));
+  },
+});
+
+/** Bounded recent-history picker, not a cursor-paginated query. */
+export const actorOptions = adminQuery({
+  args: {
+    projectId: v.optional(v.id("projects")),
+    allProjects: v.optional(v.boolean()),
+    search: v.optional(v.string()),
+    paginationOpts: v.optional(paginationOptsValidator),
+  },
+  handler: async (ctx, args) => {
+    if (args.allProjects && ctx.user.role !== "super_admin") throw new Error("Tüm projeler görünümü süper admin gerektirir; bir proje seçin");
+    if (!args.allProjects && !args.projectId) throw new Error("Denetim kaydı için bir proje seçin");
+    const scope = await resolveProjectScope(ctx, args.allProjects ? undefined : args.projectId);
+    const projectId = args.allProjects ? undefined : scope[0];
+    // Accepted for caller compatibility; no cursor contract is advertised by this picker.
+    if (args.paginationOpts?.cursor) throw new Error("Aktör seçenekleri cursor ile sayfalanmaz");
+    const requested = args.paginationOpts?.numItems ?? AUDIT_ACTOR_SCAN_LIMIT;
+    if (!Number.isInteger(requested) || requested < 1) throw new Error("Aktör tarama sınırı pozitif tam sayı olmalı");
+    const limit = Math.min(requested, AUDIT_ACTOR_SCAN_LIMIT);
+    const events = await (projectId
+      ? ctx.db.query("auditLog").withIndex("by_project_timestamp", q => q.eq("projectId", projectId))
+      : ctx.db.query("auditLog").withIndex("by_timestamp"))
+      .order("desc").paginate({ numItems: limit, cursor: null, maximumRowsRead: limit, maximumBytesRead: 4 * 1024 * 1024 });
+    const members = await (projectId
+      ? ctx.db.query("userProjects").withIndex("by_project", q => q.eq("projectId", projectId))
+      : ctx.db.query("userProjects"))
+      .take(AUDIT_ACTOR_SCAN_LIMIT + 1);
+    const boundedEvents = events.page;
+    const memberIds = members.slice(0, AUDIT_ACTOR_SCAN_LIMIT).map(member => member.userId);
+    const userIds = [...new Set([
+      ...boundedEvents.flatMap(event => event.userId ? [event.userId] : []),
+      ...memberIds, ctx.user._id,
+    ])];
+    const users = await Promise.all(userIds.map(id => ctx.db.get(id)));
+    return {
+      ...mergeAuditActors({
+        events: boundedEvents,
+        users: users.filter((user): user is NonNullable<typeof user> => user !== null),
+        memberIds, callerId: ctx.user._id, allProjects: args.allProjects, search: args.search,
+        membershipComplete: members.length <= AUDIT_ACTOR_SCAN_LIMIT,
+      }),
+      truncated: !events.isDone || members.length > AUDIT_ACTOR_SCAN_LIMIT,
+    };
   },
 });
