@@ -228,6 +228,7 @@ export const deleteEmployeeFromIdePanels = internalAction({
 export const deleteIdeUserFromPanels = internalAction({
   args: {
     cardNumber: v.string(),
+    runId: v.optional(v.id("deviceSyncRuns")),
     deviceIds: v.array(v.id("devices")),
     projectId: v.optional(v.id("projects")),
   },
@@ -243,6 +244,7 @@ export const deleteIdeUserFromPanels = internalAction({
       if (!panel || panel.brand !== "ide_smart" || !panel.ideUuid) continue;
       await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
         deviceId,
+        runId: args.runId,
         projectId: panel.projectId ?? args.projectId,
         opType: "deleteUser",
         payload: { ideUserId: cardNo },

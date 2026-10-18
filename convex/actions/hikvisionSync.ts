@@ -89,6 +89,8 @@ function allDoorRights(device: HikDeviceRef): number[] {
 export const syncEmployeeToDevicesInternal = internalAction({
   args: {
     employeeId: v.id("employees"),
+    runId: v.optional(v.id("deviceSyncRuns")),
+    targetDeviceIds: v.optional(v.array(v.id("devices"))),
     allowedProjectIds: v.optional(v.array(v.id("projects"))),
   },
   handler: async (
@@ -110,9 +112,18 @@ export const syncEmployeeToDevicesInternal = internalAction({
     // Pasif çalışan cihazlardan silinmeli — cihazda kalırsa erişim 24/7 geçerli kalır
     // (Valid.enable cihazda true olarak yazılıydı). isActive: false olunca delete tetiklenir.
     if (data.employee.isActive === false) {
+      if (args.runId) {
+        const result = await ctx.runAction(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
+          employeeId: args.employeeId, allowedProjectIds: args.allowedProjectIds,
+          runId: args.runId, targetDeviceIds: args.targetDeviceIds,
+        });
+        return { synced: result.removed, failed: result.failed, errors: result.errors };
+      }
       await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
         employeeId: args.employeeId,
         allowedProjectIds: args.allowedProjectIds,
+        runId: args.runId,
+        targetDeviceIds: args.targetDeviceIds,
       });
       return { synced: 0, failed: 0, errors: [] };
     }
@@ -124,7 +135,7 @@ export const syncEmployeeToDevicesInternal = internalAction({
     type Task = { kind: "skip" | "sync"; device: typeof deviceRules[number]["device"]; rule: typeof deviceRules[number]["rule"]; reason?: string };
     const tasks: Task[] = [];
     // Non-Hikvision cihazlar (QR, vs.) bu pipeline'a hiç girmez — silent skip.
-    const hikRules = deviceRules.filter((dr) => dr.device.brand === "hikvision");
+    const hikRules = deviceRules.filter((dr) => dr.device.brand === "hikvision" && (!args.targetDeviceIds || args.targetDeviceIds.includes(dr.device._id)));
     for (const { device, rule } of hikRules) {
       if (!isAllowed(device.projectId)) {
         tasks.push({ kind: "skip", device, rule, reason: "erişim yetkiniz yok" });
@@ -193,7 +204,7 @@ export const syncEmployeeToDevicesInternal = internalAction({
             weekPlanNo: planNo,
             templateName: t.rule.name ?? `Rule ${planNo}`,
             schedule,
-          });
+          }, args.runId);
           await enqueueLocalBridgeOp(ctx, t.device, "addPerson", {
             employeeId: args.employeeId,
             employeeNo: employee.cardNumber,
@@ -202,7 +213,7 @@ export const syncEmployeeToDevicesInternal = internalAction({
             planTemplateNo: planNo,
             doorCount: doorCountFor(t.device),
             doorRights: allDoorRights(t.device),
-          });
+          }, args.runId);
           return { ok: true as const, device: t.device };
         }
         if (!t.device.hikDevIndex) {
@@ -213,18 +224,20 @@ export const syncEmployeeToDevicesInternal = internalAction({
             error: `${t.device.name}: gateway'e kayıtlı değil`,
           };
         }
-        const wpRes = await setWeekPlanOnDevice(t.device.hikDevIndex!, planNo, schedule);
+        const wpRes = await setWeekPlanOnDevice(t.device.hikDevIndex, planNo, schedule);
         if (wpRes.ok) {
-          await setPlanTemplate(t.device.hikDevIndex!, planNo, {
+          const templateResult = await setPlanTemplate(t.device.hikDevIndex, planNo, {
             weekPlanNo: planNo,
             templateName: t.rule.name ?? `Rule ${planNo}`,
           });
+          if (args.runId && !templateResult.ok) return { ok: false, device: t.device, operation: "syncWeekPlan" as const, error: templateResult.error ?? "Plan şablonu gönderilemedi" };
         }
 
+        if (args.runId && !wpRes.ok) return { ok: false, device: t.device, operation: "syncWeekPlan" as const, error: wpRes.error ?? "Hafta planı gönderilemedi" };
         console.log(
           `[hik-sync] Kişi → ${employee.cardNumber} → device(${t.device.name})`,
         );
-        const personResult = await upsertPersonToDevice(t.device.hikDevIndex!, {
+        const personResult = await upsertPersonToDevice(t.device.hikDevIndex, {
           employeeNo: employee.cardNumber,
           name: `${employee.firstName} ${employee.lastName}`,
           planTemplateNo: planNo,
@@ -238,7 +251,7 @@ export const syncEmployeeToDevicesInternal = internalAction({
             error: `${t.device.name} (person): ${personResult.error ?? "?"}`,
           };
         }
-        const cardResult = await addCardToDevice(t.device.hikDevIndex!, {
+        const cardResult = await addCardToDevice(t.device.hikDevIndex, {
           employeeNo: employee.cardNumber,
           cardNo: employee.cardNumber,
           cardType: "normalCard",
@@ -249,6 +262,7 @@ export const syncEmployeeToDevicesInternal = internalAction({
             `[hik-sync] kart eklerken uyarı (${t.device.name}): ${cardResult.error}`,
           );
         }
+        if (args.runId && !cardResult.ok && !cardResult.alreadyExists) return { ok: false, device: t.device, operation: "addCard" as const, error: cardResult.error ?? "Kart gönderilemedi" };
         return { ok: true as const, device: t.device };
       }),
     );
@@ -349,6 +363,8 @@ function resolveSuccesses(
 export const deleteEmployeeFromDevicesInternal = internalAction({
   args: {
     employeeId: v.id("employees"),
+    runId: v.optional(v.id("deviceSyncRuns")),
+    targetDeviceIds: v.optional(v.array(v.id("devices"))),
     snapshot: v.optional(v.object({
       cardNumber: v.string(),
       projectId: v.optional(v.id("projects")),
@@ -384,7 +400,7 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
     const targets: DelTarget[] = [];
     const skipped: { device: typeof data.deviceRules[number]["device"]; reason: string }[] = [];
     const hikDeviceRules = data.deviceRules.filter(
-      (dr) => dr.device.brand === "hikvision",
+      (dr) => dr.device.brand === "hikvision" && (!args.targetDeviceIds || args.targetDeviceIds.includes(dr.device._id)),
     );
     for (const { device } of hikDeviceRules) {
       if (!isAllowed(device.projectId)) {
@@ -406,7 +422,7 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
           await enqueueLocalBridgeOp(ctx, t.device, "deleteCard", {
             employeeId: args.employeeId,
             cardNumber: data.employee.cardNumber,
-          });
+          }, args.runId);
           return { ok: true as const, target: t };
         }
         if (!t.devIndex) {
@@ -474,6 +490,7 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
 export const syncWeekPlanToDevicesInternal = internalAction({
   args: {
     accessRuleId: v.id("accessRules"),
+    targetEmployeeIds: v.optional(v.array(v.id("employees"))),
     runId: v.optional(v.id("deviceSyncRuns")),
     targetDeviceIds: v.optional(v.array(v.id("devices"))),
     allowedProjectIds: v.optional(v.array(v.id("projects"))),
@@ -609,7 +626,7 @@ export const syncWeekPlanToDevicesInternal = internalAction({
     // Gruptaki çalışanları güncel plan ile sync et — device x employee matrisi paralel
     const employeeSyncs = await Promise.all(
       allowedDevices.flatMap((d) =>
-        employees.map(async (emp) => {
+        employees.filter(emp => !args.targetEmployeeIds || args.targetEmployeeIds.includes(emp._id)).map(async (emp) => {
           if (isLocalBridgeDevice(d)) {
             await enqueueLocalBridgeOp(ctx, d, "addPerson", {
               accessRuleId: args.accessRuleId,

@@ -4,8 +4,11 @@ import { validateAccessRelations, validateRuleAccessRelations } from "./lib/acce
 import { toPatch } from "./lib/nullablePatch";
 import { assertAccessSchedule, assertAccessScheduleUpdate } from "./lib/accessRuleUx";
 
+import { createRuleDiffRun } from "./deviceSyncRuns";
+
 import { internal } from "./_generated/api";
-import { v } from "convex/values";
+import { ConvexError, v, type Infer } from "convex/values";
+import { retainedDiffDoorIds, applyRelationDiff, assertLegacyRuleReplacement, ruleDiffSyncPlan, RULE_DETAILS_MEMBER_LIMIT, RULE_DETAILS_RELATION_LIMIT } from "./lib/accessRuleDiff";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import {
@@ -145,15 +148,12 @@ async function readRuleScope(
     .query("groupDoors")
     .withIndex("by_group", (q) => q.eq("groupId", rule._id));
   const [deviceRows, doorRows] = await Promise.all([
-    detailed
-      ? deviceQuery.collect()
-      : deviceQuery.take(SUMMARY_RELATION_LIMIT + 1),
-    detailed ? doorQuery.collect() : doorQuery.take(SUMMARY_RELATION_LIMIT + 1),
+    deviceQuery.take(RULE_DETAILS_RELATION_LIMIT + 1),
+    doorQuery.take(RULE_DETAILS_RELATION_LIMIT + 1),
   ]);
   const scopeTruncated =
-    !detailed &&
-    (deviceRows.length > SUMMARY_RELATION_LIMIT ||
-      doorRows.length > SUMMARY_RELATION_LIMIT);
+    deviceRows.length > SUMMARY_RELATION_LIMIT ||
+    doorRows.length > SUMMARY_RELATION_LIMIT;
   // Kısmi kapı bağı okunduysa "tüm panel" çıkarımı güvenli değildir.
   if (scopeTruncated)
     return {
@@ -162,6 +162,8 @@ async function readRuleScope(
       groupDoors: [],
       unassignedDoors: [],
       scopeTruncated,
+      devicesTruncated: deviceRows.length > SUMMARY_RELATION_LIMIT,
+      doorsTruncated: doorRows.length > SUMMARY_RELATION_LIMIT,
     };
   const selectedDoors = (
     await Promise.all(doorRows.map((row) => ctx.db.get(row.doorId)))
@@ -183,6 +185,8 @@ async function readRuleScope(
       groupDoors: [],
       unassignedDoors: [],
       scopeTruncated: true,
+      devicesTruncated: false,
+      doorsTruncated: false,
     };
   }
   const devices = (await Promise.all(deviceIds.map((id) => ctx.db.get(id))))
@@ -193,9 +197,7 @@ async function readRuleScope(
       const query = ctx.db
         .query("doors")
         .withIndex("by_device", (q) => q.eq("deviceId", device._id));
-      const allDoors = detailed
-        ? await query.collect()
-        : await query.take(SUMMARY_DOOR_LIMIT + 1);
+      const allDoors = await query.take(SUMMARY_DOOR_LIMIT + 1);
       const validDoors = allDoors.filter(
         (door) => door.projectId === rule.projectId,
       );
@@ -221,14 +223,16 @@ async function readRuleScope(
       return {
         ...scope,
         doors: detailed ? namedDoors : namedDoors.slice(0, 3),
-        doorsTruncated: !detailed && scope.doors.length > 3,
-        scopeTruncated: !detailed && allDoors.length > SUMMARY_DOOR_LIMIT,
+        doorsTruncated: allDoors.length > SUMMARY_DOOR_LIMIT || (!detailed && scope.doors.length > 3),
+        scopeTruncated: allDoors.length > SUMMARY_DOOR_LIMIT,
       };
     }),
   );
   return {
     panels,
     scopeTruncated: panels.some((panel) => panel.scopeTruncated),
+    devicesTruncated: false,
+    doorsTruncated: false,
     unassignedDoors: selectedDoors
       .filter((door) => !devices.some((device) => device._id === door.deviceId))
       .map((door) => ({ doorId: door._id, name: door.name })),
@@ -546,11 +550,11 @@ export const getDetails = authedQuery({
         .withIndex("by_project_group", (q) =>
           q.eq("projectId", rule.projectId).eq("groupId", rule._id),
         )
-        .collect(),
+        .take(RULE_DETAILS_MEMBER_LIMIT + 1),
       readRuleScope(ctx, rule, true),
     ]);
     const groupMembers = await Promise.all(
-      members.map(async (member) => {
+      members.slice(0, RULE_DETAILS_MEMBER_LIMIT).map(async (member) => {
         const employee = await ctx.db.get(member.employeeId);
         return {
           ...member,
@@ -566,11 +570,11 @@ export const getDetails = authedQuery({
         };
       }),
     );
-    return { ...rule, ...scope, groupMembers };
+    return { ...rule, ...scope, groupMembers, membersTruncated: members.length > RULE_DETAILS_MEMBER_LIMIT };
   },
 });
 
-/** Each cursor belongs to one rule and kind; exhaust all three before editing membership. */
+/** Each cursor belongs to one rule and kind; editors save explicit relation diffs. */
 export const listRuleMembers = authedQuery({
   args: {
     ruleId: v.id("accessRules"),
@@ -888,8 +892,7 @@ export const createWithGroups = authedMutation({
   },
 });
 
-export const updateWithGroups = authedMutation({
-  args: {
+const updateWithGroupsArgs = {
     ruleId: v.id("accessRules"),
     name: v.optional(v.string()),
     targetType: v.optional(v.string()),
@@ -904,8 +907,18 @@ export const updateWithGroups = authedMutation({
     deviceIds: v.optional(v.array(v.id("devices"))),
     doorIds: v.optional(v.array(v.id("doors"))),
     projectId: v.optional(v.id("projects")),
-  },
-  handler: async (ctx, args) => {
+    relationDiff: v.optional(v.object({
+      employees: v.object({ added: v.array(v.id("employees")), removed: v.array(v.id("employees")) }),
+      devices: v.object({ added: v.array(v.id("devices")), removed: v.array(v.id("devices")) }),
+      doors: v.object({ added: v.array(v.id("doors")), removed: v.array(v.id("doors")) }),
+    })),
+};
+const updateWithGroupsValidator = v.object(updateWithGroupsArgs);
+type UpdateWithGroupsArgs = Infer<typeof updateWithGroupsValidator>;
+async function saveWithGroups(
+  ctx: MutationCtx & { user: Doc<"users"> },
+  args: UpdateWithGroupsArgs,
+): Promise<{ ruleId: Id<"accessRules">; runId: Id<"deviceSyncRuns"> | null }> {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const rule = await ctx.db.get(args.ruleId);
     if (!rule) throw new Error("Kural bulunamadı");
@@ -918,30 +931,49 @@ export const updateWithGroups = authedMutation({
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
     assertAccessProjectUnchanged(rule.projectId, args.projectId);
-    await validateRuleAccessRelations(ctx, rule, args);
-    const { ruleId, employeeIds, deviceIds, doorIds, projectId: _ignoredProjectId, ...updates } = args;
+    const { ruleId, relationDiff, employeeIds: replacementEmployees, deviceIds: replacementDevices, doorIds: replacementDoors, projectId: _ignoredProjectId, ...updates } = args;
+    const hasReplacement = replacementEmployees !== undefined || replacementDevices !== undefined || replacementDoors !== undefined;
+    if (relationDiff && hasReplacement) {
+      throw new ConvexError({ code: "RULE_DIFF_MIXED_MODE", message: "Tam liste ve ilişki farkı aynı istekte gönderilemez." });
+    }
+    // Guard legacy clients BEFORE validation scans, patches or relationship deletion.
+    if (hasReplacement) {
+      const [members, devices, doors] = await Promise.all([
+        ctx.db.query("groupMembers").withIndex("by_project_group", q => q.eq("projectId", rule.projectId).eq("groupId", ruleId)).take(RULE_DETAILS_MEMBER_LIMIT + 1),
+        ctx.db.query("groupDevices").withIndex("by_project_group", q => q.eq("projectId", rule.projectId).eq("groupId", ruleId)).take(RULE_DETAILS_RELATION_LIMIT + 1),
+        ctx.db.query("groupDoors").withIndex("by_group", q => q.eq("groupId", ruleId)).take(RULE_DETAILS_RELATION_LIMIT + 1),
+      ]);
+      assertLegacyRuleReplacement({ members: members.length, devices: devices.length, doors: doors.length });
+    }
+    const [oldMembers, oldDevices, oldDoors] = await Promise.all([
+      ctx.db.query("groupMembers").withIndex("by_project_group", q => q.eq("projectId", rule.projectId).eq("groupId", ruleId)).collect(),
+      ctx.db.query("groupDevices").withIndex("by_project_group", q => q.eq("projectId", rule.projectId).eq("groupId", ruleId)).collect(),
+      ctx.db.query("groupDoors").withIndex("by_group", q => q.eq("groupId", ruleId)).collect(),
+    ]);
+    const oldEmployeeIds = oldMembers.map(m => m.employeeId);
+    const employeeIds = relationDiff
+      ? (rule.targetType === "visitor" ? undefined : applyRelationDiff(oldEmployeeIds, relationDiff.employees))
+      : replacementEmployees;
+    const deviceIds = relationDiff ? applyRelationDiff(oldDevices.map(d => d.deviceId), relationDiff.devices) : replacementDevices;
+    let doorIds = relationDiff ? applyRelationDiff(oldDoors.map(d => d.doorId), relationDiff.doors) : replacementDoors;
+    if (relationDiff && doorIds) {
+      const removedDevices = new Set(relationDiff.devices.removed);
+      const doors = await Promise.all(doorIds.map(id => ctx.db.get(id)));
+      const doorDeviceById = new Map(doors.filter((d): d is NonNullable<typeof d> => d !== null).map(d => [d._id, d.deviceId]));
+      doorIds = retainedDiffDoorIds(doorIds, doorDeviceById, removedDevices, new Set(relationDiff.doors.added));
+    }
+    await validateRuleAccessRelations(ctx, rule, { employeeIds, deviceIds, doorIds });
     const now = new Date().toISOString();
-    const clean = { ...toPatch(updates), updatedAt: new Date().toISOString() };
     assertAccessScheduleUpdate(rule, updates);
     if (updates.name !== undefined && !updates.name.trim()) throw new Error("Kural adı zorunludur");
-    await ctx.db.patch(ruleId, clean);
-
-    // Düzenleme-ÖNCESİ durumu yakala: çıkarılan üye/cihazların erişim kaybettiği panelleri
-    // reconcile için SİLMEDEN önce çöz (resolver'lar groupMembers/groupDevices üstünden yürür;
-    // satırlar silinince zincir kopar).
-    const oldMembers = await ctx.db
-      .query("groupMembers")
-      .withIndex("by_project_group", (q) =>
-        q.eq("projectId", rule.projectId).eq("groupId", ruleId),
-      )
-      .collect();
-    const oldEmployeeIds = oldMembers.map((m) => m.employeeId);
+    await ctx.db.patch(ruleId, { ...toPatch(updates), updatedAt: now });
     const ruleIdePanelsBefore = await resolveRuleIdeDeviceIds(ctx, ruleId, rule.projectId);
 
     if (employeeIds !== undefined && rule.targetType !== "visitor") {
-      await Promise.all(oldMembers.map((m) => ctx.db.delete(m._id)));
+      const changed = diffIds(oldEmployeeIds, employeeIds);
+      await Promise.all(oldMembers.filter(m => changed.removed.includes(m.employeeId)).map((m) => ctx.db.delete(m._id)));
       await Promise.all(
-        employeeIds.map((empId) =>
+        changed.added.map((empId) =>
           ctx.db.insert("groupMembers", {
             groupId: ruleId,
             employeeId: empId,
@@ -954,15 +986,10 @@ export const updateWithGroups = authedMutation({
 
     const removedIdePanels: Id<"devices">[] = [];
     if (deviceIds !== undefined) {
-      const oldDevices = await ctx.db
-        .query("groupDevices")
-        .withIndex("by_project_group", (q) =>
-          q.eq("projectId", rule.projectId).eq("groupId", ruleId),
-        )
-        .collect();
-      await Promise.all(oldDevices.map((d) => ctx.db.delete(d._id)));
+      const changed = diffIds(oldDevices.map(d => d.deviceId), deviceIds);
+      await Promise.all(oldDevices.filter(d => changed.removed.includes(d.deviceId)).map((d) => ctx.db.delete(d._id)));
       await Promise.all(
-        deviceIds.map((devId) =>
+        changed.added.map((devId) =>
           ctx.db.insert("groupDevices", {
             groupId: ruleId,
             deviceId: devId,
@@ -982,22 +1009,19 @@ export const updateWithGroups = authedMutation({
         }
       }
       // Yalnız deviceIds verilen (API) çağrıda çıkarılan cihazların kapı bağlarını da
-      // temizle. UI her zaman doorIds da gönderir → aşağıdaki full-replace tek sahip.
+      // temizle. Diff yolu kapıları da açık farkla yönetir; eşzamanlı eklenen kapı korunur.
       if (doorIds === undefined && removedDeviceIds.length > 0) {
         await deleteStaleGroupDoors(ctx, ruleId, new Set(removedDeviceIds));
       }
     }
 
-    // Kural bazlı kapı seçimi (IDE permission.io kaynağı). Tam değişim: eski sil, yeni yaz.
+    // Kural bazlı kapı seçimi (IDE permission.io kaynağı): yalnız değişen bağları yaz.
     // io güncellemesi aşağıdaki syncPermissionToIdePanels ile panele yansır.
     if (doorIds !== undefined) {
-      const oldDoors = await ctx.db
-        .query("groupDoors")
-        .withIndex("by_group", (q) => q.eq("groupId", ruleId))
-        .collect();
-      await Promise.all(oldDoors.map((d) => ctx.db.delete(d._id)));
+      const changed = diffIds(oldDoors.map(d => d.doorId), doorIds);
+      await Promise.all(oldDoors.filter(d => changed.removed.includes(d.doorId)).map((d) => ctx.db.delete(d._id)));
       await Promise.all(
-        doorIds.map(async (doorId) => {
+        changed.added.map(async (doorId) => {
           const door = await ctx.db.get(doorId);
           await ctx.db.insert("groupDoors", {
             groupId: ruleId,
@@ -1016,14 +1040,33 @@ export const updateWithGroups = authedMutation({
     const removedEmployeeIds =
       employeeIds !== undefined && rule.targetType !== "visitor" ? diffIds(oldEmployeeIds, employeeIds).removed : [];
 
-    const syncJobs: Promise<unknown>[] = [
-      ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, {
-        accessRuleId: ruleId,
-      }),
-      ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncPermissionToIdePanels, {
-        accessRuleId: ruleId,
-      }),
-    ];
+    const deviceChanges = diffIds(oldDevices.map(d => d.deviceId), deviceIds ?? oldDevices.map(d => d.deviceId));
+    const doorChanges = diffIds(oldDoors.map(d => d.doorId), doorIds ?? oldDoors.map(d => d.doorId));
+    const diffPlan = ruleDiffSyncPlan({
+      live: oldEmployeeIds,
+      next: survivingMemberIds,
+      scopeChanged: deviceChanges.added.length + deviceChanges.removed.length + doorChanges.added.length + doorChanges.removed.length > 0,
+      settingsChanged: Object.entries(updates).some(([key, value]) => value !== undefined && JSON.stringify(value ?? undefined) !== JSON.stringify(rule[key as keyof typeof rule])),
+      activeChanged: updates.isActive !== undefined && updates.isActive !== rule.isActive,
+      missingWeekPlan: !rule.hikWeekPlanNo,
+    });
+    if (relationDiff) {
+      const oldDoorDocs = await Promise.all(oldDoors.map(d => ctx.db.get(d.doorId)));
+      const beforeDeviceIds = [...new Set([...oldDevices.map(d => d.deviceId),
+        ...oldDoorDocs.flatMap(d => d?.deviceId ? [d.deviceId] : [])])];
+      const runId = await createRuleDiffRun(ctx, {
+        ruleId, projectId: rule.projectId, startedBy: ctx.user._id,
+        beforeDeviceIds, plan: diffPlan,
+      });
+      return { ruleId, runId };
+    }
+    const syncJobs: Promise<unknown>[] = [];
+    if (!relationDiff || diffPlan.syncRule) {
+      syncJobs.push(
+        ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, { accessRuleId: ruleId }),
+        ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncPermissionToIdePanels, { accessRuleId: ruleId }),
+      );
+    }
 
     // Çıkarılan üyeler: kuralın eski panellerinden orphan kart sökülür, başka kuralla erişilen
     // panellerde permissions[] AZALTILIR (kişi silinmez).
@@ -1043,8 +1086,8 @@ export const updateWithGroups = authedMutation({
     // Kalan üyeler: güncel kuralla yeniden sync + (varsa) çıkarılan cihazlardan orphan reconcile.
     // Yalnız üye listesi değiştiğinde veya bir IDE paneli çıkarıldığında gerek var (sadece
     // saat/gün değişiminde syncPermissionToIdePanels yeterli).
-    if (employeeIds !== undefined || removedIdePanels.length > 0) {
-      for (const empId of survivingMemberIds) {
+    if (relationDiff || employeeIds !== undefined || removedIdePanels.length > 0) {
+      for (const empId of relationDiff ? diffPlan.syncMembers : survivingMemberIds) {
         syncJobs.push(
           ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
             employeeId: empId,
@@ -1052,7 +1095,7 @@ export const updateWithGroups = authedMutation({
           reconcileRemovedEmployeeIde(ctx, {
             employeeId: empId,
             projectId: rule.projectId,
-            candidatePanels: removedIdePanels,
+            candidatePanels: relationDiff && diffPlan.reconcileRoster ? ruleIdePanelsBefore : removedIdePanels,
           }),
         );
       }
@@ -1064,6 +1107,7 @@ export const updateWithGroups = authedMutation({
     // üyeleri IDE panellerine geri push et. Döngünün çalıştığı durumlarda zaten reconcileRemoved
     // EmployeeIde → syncEmployeeToIdePanels schedule ettiğinden burada tekrar etme.
     if (
+      !relationDiff &&
       updates.isActive === true &&
       employeeIds === undefined &&
       removedIdePanels.length === 0
@@ -1081,7 +1125,7 @@ export const updateWithGroups = authedMutation({
     // kartları sök (isActive-only API çağrısında atlanırsa pasif kuralın kartları
     // panelde kalırdı — update() mutation'daki muadiliyle simetrik). Salt isim/saat/gün
     // güncellemelerinde (roster değişmez) atla.
-    const rosterChanged =
+    const rosterChanged = relationDiff ? diffPlan.reconcileRoster :
       employeeIds !== undefined ||
       deviceIds !== undefined ||
       doorIds !== undefined ||
@@ -1102,7 +1146,21 @@ export const updateWithGroups = authedMutation({
 
     await Promise.all(syncJobs);
 
-    return ruleId;
+    return { ruleId, runId: null };
+}
+
+/** Old clients keep the Id return shape. Diff saves still get durable tracking. */
+export const updateWithGroups = authedMutation({
+  args: updateWithGroupsValidator.fields,
+  handler: async (ctx, args): Promise<Id<"accessRules">> => (await saveWithGroups(ctx, args)).ruleId,
+});
+
+/** Same transaction, with the run reference for the editor's result link. */
+export const updateWithGroupsTracked = authedMutation({
+  args: updateWithGroupsValidator.fields,
+  handler: async (ctx, args): Promise<{ ruleId: Id<"accessRules">; runId: Id<"deviceSyncRuns"> | null }> => {
+    if (!args.relationDiff) throw new ConvexError("İzlenen kayıt için ilişki farkı gerekli");
+    return await saveWithGroups(ctx, args);
   },
 });
 

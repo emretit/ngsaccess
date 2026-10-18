@@ -179,7 +179,7 @@ export const getAccessRuleWithDevices = internalQuery({
       .collect();
 
     const employees: {
-      _id: string;
+      _id: Id<"employees">;
       firstName: string;
       lastName: string;
       cardNumber: string;
@@ -200,6 +200,7 @@ export const getAccessRuleWithDevices = internalQuery({
       rule: {
         _id: rule._id,
         name: rule.name,
+        isActive: rule.isActive,
         startTime: rule.startTime,
         endTime: rule.endTime,
         days: rule.days,

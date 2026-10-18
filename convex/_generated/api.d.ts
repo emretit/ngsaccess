@@ -130,6 +130,7 @@ import type * as lib_peopleRelations from "../lib/peopleRelations.js";
 import type * as lib_peopleScope from "../lib/peopleScope.js";
 import type * as lib_projectScope from "../lib/projectScope.js";
 import type * as lib_rateLimit from "../lib/rateLimit.js";
+import type * as lib_accessRuleDiff from "../lib/accessRuleDiff.js";
 import type * as lib_reconcileMath from "../lib/reconcileMath.js";
 import type * as lib_reportAttendance from "../lib/reportAttendance.js";
 import type * as lib_reportScope from "../lib/reportScope.js";
@@ -298,6 +299,7 @@ declare const fullApi: ApiFromModules<{
   "lib/peopleScope": typeof lib_peopleScope;
   "lib/projectScope": typeof lib_projectScope;
   "lib/rateLimit": typeof lib_rateLimit;
+  "lib/accessRuleDiff": typeof lib_accessRuleDiff;
   "lib/reconcileMath": typeof lib_reconcileMath;
   "lib/reportAttendance": typeof lib_reportAttendance;
   "lib/reportScope": typeof lib_reportScope;
