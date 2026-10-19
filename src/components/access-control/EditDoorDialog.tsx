@@ -458,7 +458,7 @@ export function EditDoorDialog({
                     {result.key === "status" ? "Kapı durum planı" : "Doğrulama planı"}
                     {result.ok ? ": Cihaza uygulandı" : ": Cihaza uygulanamadı"}
                   </StatusBadge>
-                  {!result.ok && <p className="text-sm">{result.error || "Cihazdan başarılı sonuç alınamadı; cihazdaki durum doğrulanamadı."}</p>}
+                  {!result.ok && <p className="text-sm">{errorMessage(result.error || "Cihazdan başarılı sonuç alınamadı; cihazdaki durum doğrulanamadı.")}</p>}
                 </div>
               ))}
               {isSubmitting && <p className="text-sm">Planlar cihaza gönderiliyor…</p>}

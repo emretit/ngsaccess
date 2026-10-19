@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/notify";
 import { z } from "zod";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../../convex/_generated/api";
@@ -195,7 +196,7 @@ export function leaveError(error: unknown): {
     code === "LEAVE_STALE"
       ? "Kayıt başka bir yerde değişti; yenileyip tekrar deneyin."
       : "message" in data && typeof data.message === "string"
-        ? data.message
+        ? errorMessage(data.message)
         : "İzin kaydedilemedi. Bilgileriniz korunuyor; tekrar deneyin.";
   const conflict =
     "conflictLeaveId" in data &&

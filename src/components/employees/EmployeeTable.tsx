@@ -75,7 +75,7 @@ export default function EmployeeTable({
       setFailedSyncIds(result.failed > 0 ? [empId] : []);
       setSyncReport([
         `${employee.firstName} ${employee.lastName}: ${result.synced} başarılı, ${result.failed} başarısız`,
-        ...result.errors,
+        ...result.errors.map(errorMessage),
       ]);
       if (result.failed > 0) {
         notify.error(
@@ -169,7 +169,7 @@ export default function EmployeeTable({
         allErrors.push(
           ...result.errors.map(
             (error) =>
-              `${employees.find((emp) => emp._id === empId)?.firstName ?? empId}: ${error}`,
+              `${employees.find((emp) => emp._id === empId)?.firstName ?? empId}: ${errorMessage(error)}`,
           ),
         );
       } catch (err) {

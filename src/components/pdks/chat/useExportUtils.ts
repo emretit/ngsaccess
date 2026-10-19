@@ -1,4 +1,4 @@
-import { notify } from "@/lib/notify";
+import { errorMessage, notify } from "@/lib/notify";
 import { MessageData } from './types';
 import { toLocalDateString } from "@/lib/date";
 
@@ -158,7 +158,7 @@ export function useExportUtils() {
       notify.success("PDF indirildi", "Rapor başarıyla PDF formatında dışa aktarıldı.");
     } catch (error) {
       console.error('PDF export error:', error);
-      notify.error("PDF oluşturma hatası", `PDF dosyası oluşturulurken bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`);
+      notify.error("PDF oluşturma hatası", `PDF dosyası oluşturulurken bir hata oluştu: ${errorMessage(error)}`);
     }
   };
 

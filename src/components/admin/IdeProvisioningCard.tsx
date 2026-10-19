@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Info, CheckCircle2, XCircle, RefreshCw, Radio, Search, ChevronDown } from "lucide-react";
-import { notify } from "@/lib/notify";
+import { errorMessage, notify } from "@/lib/notify";
 
 /**
  * IDE Smart paneli LOCAL köprü servisi (scripts/ide-provision-agent.mjs) üzerinden
@@ -125,7 +125,7 @@ export function IdeProvisioningCard() {
         notify.success(`${panels.length} panel bulundu`, panels.join(", "));
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Tarama başarısız";
+      const message = errorMessage(error);
       notify.error("Hata", message);
     } finally {
       clearInterval(timer);
@@ -160,7 +160,7 @@ export function IdeProvisioningCard() {
         notify.error("Kısmi", "Yazma kısmen başarısız — read-back'i kontrol edin.");
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Provision başarısız";
+      const message = errorMessage(error);
       notify.error("Hata", message);
     } finally {
       setProvisioning(false);
@@ -181,7 +181,7 @@ export function IdeProvisioningCard() {
       const status = readback["MQTT.STATUS"];
       notify.info("Panel durumu", `MQTT.STATUS = ${String(status ?? "?")}`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Durum okunamadı";
+      const message = errorMessage(error);
       notify.error("Hata", message);
     } finally {
       setStatusChecking(false);

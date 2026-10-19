@@ -148,7 +148,7 @@ export function AdminDeviceDialog({
         setSubmitError(errorMessage(error));
         if (savedId && projectId !== NO_PROJECT)
           setAssignmentError(
-            error instanceof Error ? error.message : "Atama tamamlanamadı",
+            errorMessage(error),
           );
         throw error;
       }

@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/notify";
 import type { FunctionArgs, FunctionReturnType } from 'convex/server';
 import type { Id } from '../../../convex/_generated/dataModel';
 import { api } from '../../../convex/_generated/api';
@@ -26,7 +27,7 @@ export function auditArgs(params: URLSearchParams, projectId: Id<'projects'> | u
 }
 export function auditRangeError(start?: string, end?: string) {
   try { auditDateRange(start, end); return undefined; }
-  catch (error: unknown) { return `${error instanceof Error ? error.message : 'Tarih aralığı geçersiz'}.`; }
+  catch (error: unknown) { return `${errorMessage(error)}.`; }
 }
 
 /** A fresh page has no previous scope; deep links retain their actor filter. */

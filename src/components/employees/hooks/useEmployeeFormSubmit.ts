@@ -128,10 +128,10 @@ export const useEmployeeFormSubmit = (
         append(
           `Cihaz gönderimi: ${result.synced} başarılı, ${result.failed} başarısız. Cihaz teslimi henüz doğrulanmadı.`,
         );
-        for (const error of result.errors) append(error);
+        for (const error of result.errors) append(errorMessage(error));
       } catch (error: unknown) {
         append(
-          `Cihaz gönderimi tamamlanamadı: ${error instanceof Error ? error.message : "Yeniden deneyin."}`,
+          `Cihaz gönderimi tamamlanamadı: ${errorMessage(error)}`,
         );
       }
     },

@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/notify";
 import { validateShift } from "../../../../convex/lib/shiftUx";
 import { z } from "zod";
 
@@ -49,7 +50,7 @@ export const shiftFormSchema = z
     } catch (error: unknown) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: error instanceof Error ? error.message : "Geçersiz vardiya",
+        message: errorMessage(error),
         path: ["breakEnd"],
       });
     }

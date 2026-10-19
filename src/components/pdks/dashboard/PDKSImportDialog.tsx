@@ -128,7 +128,7 @@ function ImportForm({ onOpenChange }: Props) {
                     <span className="ml-2 text-muted-foreground">
                       {row.date} · {row.entryTime || "—"}–{row.exitTime || "—"}
                     </span>
-                    {row.error && <p className="mt-1 text-danger">{row.error}</p>}
+                    {row.error && <p className="mt-1 text-danger">{errorMessage(row.error)}</p>}
                   </li>
                 ))}
               </ul>
@@ -155,7 +155,7 @@ function ImportForm({ onOpenChange }: Props) {
               </p>
               {rowErrors.length > 0 && (
                 <ul aria-label="İçe aktarma hataları" className="max-h-60 space-y-2 overflow-y-auto text-sm text-danger">
-                  {rowErrors.map((error) => <li key={error.index}>Satır {error.index}: {error.message}</li>)}
+                  {rowErrors.map((error) => <li key={error.index}>Satır {error.index}: {errorMessage(error.message)}</li>)}
                 </ul>
               )}
             </div>

@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/notify";
 import { parseQuery } from './parsers/queryParser';
 import {
   fetchCardReadings,
@@ -60,7 +61,7 @@ export async function sendChatMessage(
       } catch (error) {
         console.error("Error processing natural language query:", error);
         return {
-          content: `Doğal dil sorgunuzu işlerken bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`,
+          content: `Doğal dil sorgunuzu işlerken bir hata oluştu: ${errorMessage(error)}`,
           source: 'error'
         };
       }
@@ -77,17 +78,17 @@ export async function sendChatMessage(
       console.error("Chat service error:", error);
       
       // More detailed error messages
-      let errorMessage = "Sorry, there was an error connecting to OpenAI.";
+      let message = "Sorry, there was an error connecting to OpenAI.";
       
       if (error instanceof DOMException && error.name === "AbortError") {
-        errorMessage = "Connection timed out. OpenAI did not respond.";
+        message = "Connection timed out. OpenAI did not respond.";
       } else if (error instanceof Error) {
-        errorMessage = error.message;
+        message = errorMessage(error);
         
       }
       
       return {
-        content: errorMessage,
+        content: message,
         source: 'error'
       };
     }
@@ -95,7 +96,7 @@ export async function sendChatMessage(
     console.error("Chat service error:", error);
     
     return {
-      content: `Bir hata oluştu: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`,
+      content: `Bir hata oluştu: ${errorMessage(error)}`,
       source: 'error'
     };
   }

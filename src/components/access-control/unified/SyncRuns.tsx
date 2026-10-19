@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/notify";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import type { RuleSaveResult } from "@/hooks/access-rules/useComplexAccessRuleMutations";
 import { useState } from "react";
@@ -45,7 +46,7 @@ function RunResult({ runId }: { runId: Id<"deviceSyncRuns"> }) {
             </StatusBadge>
             {target.reason && (
               <p className="break-words text-xs text-muted-foreground">
-                {target.reason}
+                {errorMessage(target.reason)}
               </p>
             )}
           </li>

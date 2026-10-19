@@ -124,7 +124,7 @@ function BiometricDestructionForm({ projectId }: { projectId: Id<"projects"> }) 
       <p className="break-words">{destructionSummary(latestRun)}</p>
       {latestRun.pendingDeviceChecks > 0 && <p>Cihaz sonuçları tek kontrol zincirinde izleniyor. Çevrimdışı veya uzun süredir bağlantı kurmayan cihazlar doğrulanamadı olarak kaydedilir. Bağlı cihazlarda en fazla 24 saat beklenir.</p>}
       {latestRun.skippedChanged > 0 && <p>İşlem sırasında değiştiği için atlanan şablon: {latestRun.skippedChanged}. Yeni sayım yapın.</p>}
-      {latestRun.error && <p role="alert" className="text-destructive">{latestRun.error}</p>}
+      {latestRun.error && <p role="alert" className="text-destructive">{errorMessage(latestRun.error)}</p>}
       <p className="break-words">Gerekçe: {latestRun.reason}</p>
       <p className="break-words text-muted-foreground">Başlatan: {latestRun.userName} · Başlangıç: {new Date(latestRun.startedAt).toLocaleString("tr-TR")}{latestRun.finishedAt ? ` · Bitiş: ${new Date(latestRun.finishedAt).toLocaleString("tr-TR")}` : ""}</p>
     </div>}

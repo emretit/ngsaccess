@@ -17,7 +17,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { deviceConnection, commandResultMessage, capabilityLabel } from "@/lib/deviceStatus";
-import { notify } from "@/lib/notify";
+import { errorMessage, notify } from "@/lib/notify";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { api } from "../../../convex/_generated/api";
@@ -518,7 +518,7 @@ export function DeviceCommandCenter({ device, onUpdated, onPendingChange }: Devi
                 </div>
                 <div className="text-xs text-muted-foreground">
                   Son tarama: {formatDateTime(overview.capabilities.updatedAt)}
-                  <details className="mt-2"><summary>Tüm özellikler ve sorgu sonuçları</summary><ul className="space-y-1">{overview.capabilities.probes.map((probe) => <li key={probe.key}>{probe.label}: {capabilityLabel(probe)}{!probe.ok && probe.error ? ` — ${probe.error}` : ""}</li>)}</ul></details>
+                  <details className="mt-2"><summary>Tüm özellikler ve sorgu sonuçları</summary><ul className="space-y-1">{overview.capabilities.probes.map((probe) => <li key={probe.key}>{probe.label}: {capabilityLabel(probe)}{!probe.ok && probe.error ? ` — ${errorMessage(probe.error)}` : ""}</li>)}</ul></details>
                 </div>
               </div>
             ) : (

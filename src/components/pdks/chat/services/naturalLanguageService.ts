@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/notify";
 
 import { TurkishNlpParser, type NaturalLanguageQuery } from "./parsers/turkishNlpParser";
 import { MessageData } from "../types";
@@ -91,7 +92,7 @@ export class NaturalLanguageService {
     } catch (error) {
       console.error("Doğal dil işleme hatası:", error);
       return {
-        content: `Sorgunuzu işlerken bir hata oluştu: ${error instanceof Error ? error.message : "Bilinmeyen hata"}`,
+        content: `Sorgunuzu işlerken bir hata oluştu: ${errorMessage(error)}`,
         source: "error",
       };
     }

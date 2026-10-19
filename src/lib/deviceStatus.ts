@@ -1,3 +1,4 @@
+import { errorMessage } from "@/lib/notify";
 /** Cihaz "online" sayılır: son 5 dakika içinde lastSeen güncellenmiş. */
 export const DEVICE_ONLINE_WINDOW_MS = 5 * 60 * 1000;
 
@@ -19,7 +20,7 @@ export function computeDeviceStatus(
 export { deviceConnection } from "../../convex/lib/deviceConnection";
 
 export function commandResultMessage(result: { ok: boolean; queued?: boolean; error?: string }): string {
-  if (!result.ok) return result.error ?? "İşlem başarısız";
+  if (!result.ok) return errorMessage(result.error ?? "İşlem başarısız");
   return result.queued ? "Sıraya alındı — cihaz onayı henüz alınmadı" : "İşlem sonucu alındı";
 }
 

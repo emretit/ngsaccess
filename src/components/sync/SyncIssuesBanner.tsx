@@ -11,7 +11,7 @@ import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
-import { notify } from "@/lib/notify";
+import { errorMessage, notify } from "@/lib/notify";
 import { friendlySyncError } from "@/lib/syncErrorMessages";
 
 type HikIssue = FunctionReturnType<typeof api.hikvisionSync.listSyncIssues>["items"][number];
@@ -85,7 +85,7 @@ function SyncIssueRow({ item, canManage }: { item: UnifiedItem; canManage: boole
       }).format(item.issue.createdAt)} (TR saati)</p>
       {item.issue.lastError && <details className="text-xs text-muted-foreground">
         <summary className="cursor-pointer">Teknik ayrıntı</summary>
-        <p className="break-all">{item.issue.lastError}</p>
+        <p className="break-all">{errorMessage(item.issue.lastError)}</p>
       </details>}
       {canManage && item.issue.canRetry && <Button size="sm" variant="outline" disabled={dismiss.pending}
         onClick={() => setRetryConfirm(true)}>Tekrar dene</Button>}
@@ -162,7 +162,7 @@ export function SyncIssuesBanner() {
         ]);
         const count = results.reduce((sum, result) => sum + (result.status === "fulfilled" ? result.value.count : 0), 0);
         const failure = results.find((result) => result.status === "rejected");
-        if (failure?.status === "rejected") throw new Error(`${count} uyarı kapatıldı; kalan uyarılar kapatılamadı. ${failure.reason instanceof Error ? failure.reason.message : "Lütfen yeniden deneyin."}`);
+        if (failure?.status === "rejected") throw new Error(`${count} uyarı kapatıldı; kalan uyarılar kapatılamadı. ${errorMessage(failure.reason)}`);
         notify.success(`${count} uyarı kapatıldı`, results.some((result) => result.status === "fulfilled" && result.value.hasMore) ? "Kapsamda başka uyarılar var." : undefined);
       }} />
   </div>;

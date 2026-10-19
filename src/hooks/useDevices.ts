@@ -51,7 +51,7 @@ export function useDevices() {
       notify.success("Cihaz eklendi");
       return id;
     } catch (error: unknown) {
-      notify.error("Hata", (error as Error)?.message ?? "Cihaz eklenemedi");
+      notify.error("Hata", error);
     }
   };
 
@@ -72,7 +72,7 @@ export function useDevices() {
       });
       notify.success("Cihaz güncellendi");
     } catch (error: unknown) {
-      notify.error("Hata", (error as Error)?.message ?? "Cihaz güncellenemedi");
+      notify.error("Hata", error);
     }
   };
 
@@ -81,7 +81,7 @@ export function useDevices() {
       await deleteDevice({ deviceId });
       notify.success("Cihaz silindi");
     } catch (error: unknown) {
-      notify.error("Hata", (error as Error)?.message ?? "Cihaz silinemedi");
+      notify.error("Hata", error);
     }
   };
 
