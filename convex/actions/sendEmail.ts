@@ -160,7 +160,7 @@ export const sendEmployeeSetupEmail = authedAction({
     const setupToken = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    const existing = await ctx.runQuery(api.employeeAuth.getByEmployee, {
+    const existing = await ctx.runQuery(internal.employeeAuth.getByEmployee, {
       employeeId: args.employeeId,
     });
 

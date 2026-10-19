@@ -1,4 +1,4 @@
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { employeeAuthedQuery } from "./lib/customFunctions";
 import { verifyEmployeePassword } from "./lib/employeeAuth";
@@ -13,7 +13,7 @@ function generateSessionToken(): string {
     .join("");
 }
 
-export const getByEmployee = query({
+export const getByEmployee = internalQuery({
   args: { employeeId: v.id("employees") },
   handler: async (ctx, args) => {
     return await ctx.db
@@ -24,6 +24,26 @@ export const getByEmployee = query({
 });
 
 export const getByToken = query({
+  args: { token: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      tokenExpiresAt: v.optional(v.string()),
+      email: v.optional(v.string()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const authRecord = await ctx.db
+      .query("employeeAuth")
+      .withIndex("by_token", (q) => q.eq("setupToken", args.token))
+      .first();
+    return authRecord
+      ? { tokenExpiresAt: authRecord.tokenExpiresAt, email: authRecord.email }
+      : null;
+  },
+});
+
+export const getByTokenInternal = internalQuery({
   args: { token: v.string() },
   handler: async (ctx, args) => {
     return await ctx.db

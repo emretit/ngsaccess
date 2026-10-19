@@ -2,7 +2,7 @@
 
 import bcrypt from "bcryptjs";
 import { action, internalAction } from "../_generated/server";
-import { api, internal } from "../_generated/api";
+import { internal } from "../_generated/api";
 import { v } from "convex/values";
 
 const BCRYPT_COST = 10;
@@ -18,7 +18,7 @@ export const setEmployeePassword = action({
       return { success: false, error: `Şifre en az ${MIN_PASSWORD_LENGTH} karakter olmalı` };
     }
 
-    const authRecord = await ctx.runQuery(api.employeeAuth.getByToken, {
+    const authRecord = await ctx.runQuery(internal.employeeAuth.getByTokenInternal, {
       token: args.token,
     });
 
