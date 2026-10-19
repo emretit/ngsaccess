@@ -1,6 +1,5 @@
-import 'dart:async';
-
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/widgets.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:ngsplusapp/config/convex_config.dart';
 import 'package:ngsplusapp/core/errors.dart';
@@ -24,27 +23,29 @@ void main() {
   });
 
   Future<void> signInUser() async {
-    when(() => authRepo.signIn(
-          email: any(named: 'email'),
-          password: any(named: 'password'),
-        )).thenAnswer((_) async => SignInResult(
-          token: 'tok',
-          expiresAt: null,
-          user: const AuthUser(
-            id: 'u1',
-            email: 'a@b.c',
-            firstName: 'A',
-            lastName: 'B',
-            cardNumber: '1',
-          ),
-        ));
+    when(
+      () => authRepo.signIn(
+        email: any(named: 'email'),
+        password: any(named: 'password'),
+      ),
+    ).thenAnswer(
+      (_) async => SignInResult(
+        token: 'tok',
+        expiresAt: null,
+        user: const AuthUser(
+          id: 'u1',
+          email: 'a@b.c',
+          firstName: 'A',
+          lastName: 'B',
+          cardNumber: '1',
+        ),
+      ),
+    );
     await auth.signIn('a@b.c', 'p');
   }
 
   ConvexSubscriptionHandle fakeSubHandle() {
-    // İlk yangında zaten cancel edileceği için 1 saatlik dummy timer yeterli.
-    final timer = Timer(const Duration(hours: 1), () {});
-    return ConvexSubscriptionHandle(timer);
+    return ConvexSubscriptionHandle(() {});
   }
 
   setUp(() async {
@@ -56,11 +57,64 @@ void main() {
     provider = AttendanceProvider(repository: attRepo);
 
     // Default subscribe mock — setAuthProvider çağrıldığında side effect'i sustur.
-    when(() => attRepo.subscribe(
-          onUpdate: any(named: 'onUpdate'),
-          onError: any(named: 'onError'),
-          limit: any(named: 'limit'),
-        )).thenAnswer((_) async => fakeSubHandle());
+    when(
+      () => attRepo.subscribe(
+        onUpdate: any(named: 'onUpdate'),
+        onError: any(named: 'onError'),
+        limit: any(named: 'limit'),
+      ),
+    ).thenAnswer((_) async => fakeSubHandle());
+  });
+
+  tearDown(() {
+    provider.dispose();
+    auth.dispose();
+  });
+
+  group('polling lifecycle', () {
+    test(
+      'uygulama arka plandayken polling durur ve dönüşte yeniden başlar',
+      () async {
+        var cancellationCount = 0;
+        when(
+          () => attRepo.subscribe(
+            onUpdate: any(named: 'onUpdate'),
+            onError: any(named: 'onError'),
+            limit: any(named: 'limit'),
+          ),
+        ).thenAnswer(
+          (_) async => ConvexSubscriptionHandle(() => cancellationCount++),
+        );
+
+        provider.didChangeAppLifecycleState(AppLifecycleState.resumed);
+        await signInUser();
+        provider.setAuthProvider(auth);
+        await Future<void>.delayed(Duration.zero);
+
+        verify(
+          () => attRepo.subscribe(
+            onUpdate: any(named: 'onUpdate'),
+            onError: any(named: 'onError'),
+            limit: any(named: 'limit'),
+          ),
+        ).called(1);
+
+        provider.didChangeAppLifecycleState(AppLifecycleState.paused);
+        await Future<void>.delayed(Duration.zero);
+        expect(cancellationCount, 1);
+
+        provider.didChangeAppLifecycleState(AppLifecycleState.resumed);
+        await Future<void>.delayed(Duration.zero);
+
+        verify(
+          () => attRepo.subscribe(
+            onUpdate: any(named: 'onUpdate'),
+            onError: any(named: 'onError'),
+            limit: any(named: 'limit'),
+          ),
+        ).called(1);
+      },
+    );
   });
 
   group('loadAttendanceRecords', () {
@@ -83,8 +137,9 @@ void main() {
         accessTime: DateTime(2026, 1, 1, 9, 0),
         granted: true,
       );
-      when(() => attRepo.list(limit: any(named: 'limit')))
-          .thenAnswer((_) async => [attendance]);
+      when(
+        () => attRepo.list(limit: any(named: 'limit')),
+      ).thenAnswer((_) async => [attendance]);
 
       await provider.loadAttendanceRecords();
 
@@ -97,8 +152,9 @@ void main() {
       await signInUser();
       provider.setAuthProvider(auth);
 
-      when(() => attRepo.list(limit: any(named: 'limit')))
-          .thenThrow(const NetworkError('offline'));
+      when(
+        () => attRepo.list(limit: any(named: 'limit')),
+      ).thenThrow(const NetworkError('offline'));
 
       await provider.loadAttendanceRecords();
 
@@ -111,8 +167,9 @@ void main() {
       provider.setAuthProvider(auth);
       expect(auth.isAuthenticated, isTrue);
 
-      when(() => attRepo.list(limit: any(named: 'limit')))
-          .thenThrow(const AuthExpiredError('expired'));
+      when(
+        () => attRepo.list(limit: any(named: 'limit')),
+      ).thenThrow(const AuthExpiredError('expired'));
 
       await provider.loadAttendanceRecords();
 
@@ -143,18 +200,19 @@ void main() {
       await signInUser();
       provider.setAuthProvider(auth);
 
-      when(() => attRepo.list(limit: any(named: 'limit')))
-          .thenAnswer((_) async => [
-                Attendance(
-                  id: 'a',
-                  employeeId: 'u1',
-                  deviceId: 'd',
-                  cardNo: '1',
-                  employeeName: 'U',
-                  accessTime: DateTime.now(),
-                  granted: false,
-                )
-              ]);
+      when(() => attRepo.list(limit: any(named: 'limit'))).thenAnswer(
+        (_) async => [
+          Attendance(
+            id: 'a',
+            employeeId: 'u1',
+            deviceId: 'd',
+            cardNo: '1',
+            employeeName: 'U',
+            accessTime: DateTime.now(),
+            granted: false,
+          ),
+        ],
+      );
 
       await provider.loadAttendanceRecords();
 

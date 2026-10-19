@@ -11,10 +11,9 @@ class AttendanceRepository {
   final HttpConvexClient _client;
 
   Future<List<Attendance>> list({int limit = 50}) async {
-    final raw = await _client.employeeQuery(
-      'cardReadings:listForEmployee',
-      {'limit': limit},
-    );
+    final raw = await _client.employeeQuery('cardReadings:listForEmployee', {
+      'limit': limit,
+    });
     return Attendance.listFromConvexJson(raw);
   }
 
@@ -38,8 +37,8 @@ class AttendanceRepository {
     return decoded is Map<String, dynamic> && decoded['granted'] == true;
   }
 
-  /// Periyodik polling ile attendance listesi günceller. Her güncellemede
-  /// [onUpdate] çağrılır; hata olursa [onError] çağrılır (subscription devam eder).
+  /// Düşük frekanslı polling ile attendance listesi günceller. Her güncellemede
+  /// [onUpdate] çağrılır; geçici hata olursa polling geri çekilerek devam eder.
   Future<ConvexSubscriptionHandle> subscribe({
     required void Function(List<Attendance>) onUpdate,
     required void Function(AppError) onError,

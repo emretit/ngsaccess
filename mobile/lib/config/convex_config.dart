@@ -39,12 +39,15 @@ class ConvexConfig {
 HttpConvexClient get convex => ConvexConfig.client;
 
 class ConvexSubscriptionHandle {
-  ConvexSubscriptionHandle(this._timer);
+  ConvexSubscriptionHandle(this._onCancel);
 
-  final Timer _timer;
+  final void Function() _onCancel;
+  bool _isCancelled = false;
 
   void cancel() {
-    _timer.cancel();
+    if (_isCancelled) return;
+    _isCancelled = true;
+    _onCancel();
   }
 }
 
@@ -58,10 +61,10 @@ class HttpConvexClient {
     Duration requestTimeout = const Duration(seconds: 15),
     int maxRetries = 3,
     http.Client? httpClient,
-  })  : _deploymentUrl = deploymentUrl.replaceFirst(RegExp(r'/$'), ''),
-        _timeout = requestTimeout,
-        _maxRetries = maxRetries,
-        _http = httpClient ?? http.Client();
+  }) : _deploymentUrl = deploymentUrl.replaceFirst(RegExp(r'/$'), ''),
+       _timeout = requestTimeout,
+       _maxRetries = maxRetries,
+       _http = httpClient ?? http.Client();
 
   final String _deploymentUrl;
   final Duration _timeout;
@@ -149,22 +152,74 @@ class HttpConvexClient {
     required Map<String, dynamic> args,
     required void Function(String) onUpdate,
     required void Function(AppError) onError,
+    Duration pollingInterval = const Duration(minutes: 1),
+    Duration maxPollingInterval = const Duration(minutes: 5),
   }) async {
-    Future<void> refresh() async {
-      try {
-        onUpdate(await employeeQuery(name, args));
-      } catch (error, stack) {
-        final mapped = AppError.fromException(error, stack);
-        onError(mapped);
-      }
+    if (pollingInterval <= Duration.zero) {
+      throw ArgumentError.value(
+        pollingInterval,
+        'pollingInterval',
+        'must be greater than zero',
+      );
+    }
+    if (maxPollingInterval < pollingInterval) {
+      throw ArgumentError.value(
+        maxPollingInterval,
+        'maxPollingInterval',
+        'must be at least pollingInterval',
+      );
     }
 
-    await refresh();
-    return ConvexSubscriptionHandle(
-      Timer.periodic(const Duration(seconds: 3), (_) {
+    Timer? timer;
+    var isCancelled = false;
+    var consecutiveFailures = 0;
+
+    Duration nextPollingInterval() {
+      final exponent = math.min(consecutiveFailures, 10);
+      final multiplier = 1 << exponent;
+      final candidateMilliseconds = pollingInterval.inMilliseconds * multiplier;
+      return Duration(
+        milliseconds: math.min(
+          candidateMilliseconds,
+          maxPollingInterval.inMilliseconds,
+        ),
+      );
+    }
+
+    late final Future<void> Function() refresh;
+
+    void scheduleNextRefresh() {
+      if (isCancelled) return;
+      timer = Timer(nextPollingInterval(), () {
         unawaited(refresh());
-      }),
-    );
+      });
+    }
+
+    refresh = () async {
+      if (isCancelled) return;
+      try {
+        final result = await employeeQuery(name, args);
+        if (isCancelled) return;
+        consecutiveFailures = 0;
+        onUpdate(result);
+      } catch (error, stack) {
+        if (isCancelled) return;
+        final mapped = AppError.fromException(error, stack);
+        consecutiveFailures++;
+        onError(mapped);
+        if (mapped is AuthExpiredError) {
+          isCancelled = true;
+        }
+      } finally {
+        scheduleNextRefresh();
+      }
+    };
+
+    await refresh();
+    return ConvexSubscriptionHandle(() {
+      isCancelled = true;
+      timer?.cancel();
+    });
   }
 
   Future<String> _call({
@@ -267,8 +322,7 @@ class HttpConvexClient {
       return jsonEncode(_jsonToConvex(decoded['value']));
     }
 
-    final errorMessage =
-        decoded['errorMessage'] as String? ?? response.body;
+    final errorMessage = decoded['errorMessage'] as String? ?? response.body;
 
     if (_isAuthExpiryMessage(errorMessage)) {
       throw AuthExpiredError(errorMessage);

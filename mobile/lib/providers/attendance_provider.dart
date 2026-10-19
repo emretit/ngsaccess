@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../config/convex_config.dart';
 import '../core/errors.dart';
@@ -9,9 +10,14 @@ import '../models/qr_code_model.dart';
 import '../repositories/attendance_repository.dart';
 import 'auth_provider.dart';
 
-class AttendanceProvider extends ChangeNotifier {
+class AttendanceProvider extends ChangeNotifier with WidgetsBindingObserver {
   AttendanceProvider({required AttendanceRepository repository})
-    : _repo = repository;
+    : _repo = repository {
+    final lifecycleState = WidgetsBinding.instance.lifecycleState;
+    _isAppActive =
+        lifecycleState == null || lifecycleState == AppLifecycleState.resumed;
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   final AttendanceRepository _repo;
 
@@ -28,6 +34,8 @@ class AttendanceProvider extends ChangeNotifier {
 
   ConvexSubscriptionHandle? _subscription;
   String? _subscribedUserId;
+  bool _isAppActive = true;
+  int _subscriptionGeneration = 0;
 
   List<Attendance> get attendanceRecords => _attendanceRecords;
   bool get isLoading => _isLoading;
@@ -128,9 +136,11 @@ class AttendanceProvider extends ChangeNotifier {
     if (newId != null) {
       _currentLimit = _pageSize;
       _hasMore = true;
-      _ensureSubscription();
+      if (_isAppActive) {
+        unawaited(_ensureSubscription());
+      }
     } else {
-      _cancelSubscription();
+      unawaited(_cancelSubscription());
       _attendanceRecords = [];
       _currentLimit = _pageSize;
       _hasMore = true;
@@ -139,18 +149,33 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   Future<void> _ensureSubscription() async {
-    await _cancelSubscription();
+    final generation = ++_subscriptionGeneration;
+    final previous = _subscription;
+    _subscription = null;
+    previous?.cancel();
+
+    if (!_isAppActive || _subscribedUserId == null) return;
+
     try {
-      _subscription = await _repo.subscribe(
+      final subscription = await _repo.subscribe(
         limit: _currentLimit,
         onUpdate: (records) {
+          if (generation != _subscriptionGeneration || !_isAppActive) return;
           _attendanceRecords = records;
           _hasMore = records.length >= _currentLimit;
           _errorMessage = null;
           notifyListeners();
         },
-        onError: _handleSubscriptionError,
+        onError: (error) {
+          if (generation != _subscriptionGeneration || !_isAppActive) return;
+          _handleSubscriptionError(error);
+        },
       );
+      if (generation != _subscriptionGeneration || !_isAppActive) {
+        subscription.cancel();
+        return;
+      }
+      _subscription = subscription;
     } on AppError catch (e) {
       _handleSubscriptionError(e);
     } catch (error, stack) {
@@ -192,6 +217,7 @@ class AttendanceProvider extends ChangeNotifier {
   }
 
   Future<void> _cancelSubscription() async {
+    _subscriptionGeneration++;
     final sub = _subscription;
     _subscription = null;
     if (sub == null) return;
@@ -211,6 +237,19 @@ class AttendanceProvider extends ChangeNotifier {
       notifyListeners();
     } catch (_) {
       // Sessiz başarısızlık — polling bir sonraki turda yine deneyecek.
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final isActive = state == AppLifecycleState.resumed;
+    if (_isAppActive == isActive) return;
+
+    _isAppActive = isActive;
+    if (isActive && _subscribedUserId != null) {
+      unawaited(_ensureSubscription());
+    } else {
+      unawaited(_cancelSubscription());
     }
   }
 
@@ -367,7 +406,8 @@ class AttendanceProvider extends ChangeNotifier {
 
   @override
   void dispose() {
-    _cancelSubscription();
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(_cancelSubscription());
     super.dispose();
   }
 }
