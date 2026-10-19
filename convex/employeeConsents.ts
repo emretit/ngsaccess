@@ -1,6 +1,6 @@
 import { assertBiometricAllowed } from "./lib/biometricGate";
 import { v } from "convex/values";
-import { authedQuery, authedMutation } from "./lib/customFunctions";
+import { authedQuery, adminMutation } from "./lib/customFunctions";
 import { writeAudit } from "./lib/audit";
 import { requireEmployeeAccess } from "./lib/auth";
 
@@ -45,7 +45,7 @@ export const hasActiveConsent = authedQuery({
   },
 });
 
-export const grant = authedMutation({
+export const grant = adminMutation({
   args: {
     employeeId: v.id("employees"),
     consentType: v.union(
@@ -96,7 +96,7 @@ export const grant = authedMutation({
   },
 });
 
-export const revoke = authedMutation({
+export const revoke = adminMutation({
   args: { id: v.id("employeeConsents") },
   handler: async (ctx, args) => {
     const existing = await ctx.db.get(args.id);

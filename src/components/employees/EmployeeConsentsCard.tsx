@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { capabilities } from "@/lib/capabilities";
 import { notify } from "@/lib/notify";
 
 type ConsentType = "biometric_face" | "biometric_fingerprint" | "card" | "photo";
@@ -59,6 +61,8 @@ interface PDKSEmployeeConsentsCardProps {
 }
 
 export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardProps) {
+  const { profile } = useAuth();
+  const canManageConsents = capabilities(profile?.role).admin;
   const consents = useQuery(api.employeeConsents.listForEmployee, { employeeId });
   const biometricModule = useQuery(api.privacyBiometric.getEmployeeBiometricModule, { employeeId });
   const notesId = useId();
@@ -82,7 +86,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
   }
 
   const handleGrant = async () => {
-    if (!grantingType || (grantingType.startsWith("biometric_") && biometricModule?.enabled !== true)) return;
+    if (!canManageConsents || !grantingType || (grantingType.startsWith("biometric_") && biometricModule?.enabled !== true)) return;
     setSubmitting(true);
     try {
       await grant({
@@ -163,7 +167,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                   </div>
                 )}
               </div>
-              <div className="shrink-0">
+              {canManageConsents && <div className="shrink-0">
                 {active ? (
                   <Button
                     size="sm"
@@ -187,65 +191,69 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                     Rıza Al
                   </Button>
                 )}
-              </div>
+              </div>}
             </div>
           );
         })}
       </div>
 
-      <Dialog
-        open={grantingType !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setGrantingType(null);
-            setNotes("");
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {grantingType ? CONSENT_META[grantingType].label : ""} — Rıza Kaydı
-            </DialogTitle>
-            <DialogDescription>
-              Bu işlem çalışanın ayrı alınmış açık rıza beyanını kaydeder. Biyometri yalnız erişim kontrolü içindir.
-              Çalışan istediği zaman geri alabilir.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <label htmlFor={notesId} className="text-xs font-medium">Not (opsiyonel)</label>
-            <Textarea id={notesId}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Örn: Çalışan imzalı form arşivde, ref #1234"
-              rows={3}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
+      {canManageConsents && (
+        <>
+          <Dialog
+            open={grantingType !== null}
+            onOpenChange={(open) => {
+              if (!open) {
                 setGrantingType(null);
                 setNotes("");
-              }}
-              disabled={submitting}
-            >
-              İptal
-            </Button>
-            <Button onClick={handleGrant} disabled={submitting || (grantingType?.startsWith("biometric_") === true && biometricModule?.enabled !== true)}>
-              {submitting ? "Kaydediliyor..." : "Rıza Al"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <ConfirmDestructive open={revokeTarget !== null} onOpenChange={open => { if (!open) setRevokeTarget(null); }}
-        title="Rıza iptal edilsin mi?" objectName={revokeTarget?.label ?? "Rıza"}
-        effects={["Rıza kaydı geri alınmış olarak işaretlenir. Mevcut biyometrik şablonlar bu işlemle silinmez."]}
-        confirmLabel="Rızayı iptal et" onConfirm={async () => {
-          if (!revokeTarget) return;
-          await revoke({ id: revokeTarget.id });
-          notify.success("Rıza iptal edildi", revokeTarget.label);
-        }} />
+              }
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {grantingType ? CONSENT_META[grantingType].label : ""} — Rıza Kaydı
+                </DialogTitle>
+                <DialogDescription>
+                  Bu işlem çalışanın ayrı alınmış açık rıza beyanını kaydeder. Biyometri yalnız erişim kontrolü içindir.
+                  Çalışan istediği zaman geri alabilir.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2">
+                <label htmlFor={notesId} className="text-xs font-medium">Not (opsiyonel)</label>
+                <Textarea id={notesId}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Örn: Çalışan imzalı form arşivde, ref #1234"
+                  rows={3}
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setGrantingType(null);
+                    setNotes("");
+                  }}
+                  disabled={submitting}
+                >
+                  İptal
+                </Button>
+                <Button onClick={handleGrant} disabled={submitting || (grantingType?.startsWith("biometric_") === true && biometricModule?.enabled !== true)}>
+                  {submitting ? "Kaydediliyor..." : "Rıza Al"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <ConfirmDestructive open={revokeTarget !== null} onOpenChange={open => { if (!open) setRevokeTarget(null); }}
+            title="Rıza iptal edilsin mi?" objectName={revokeTarget?.label ?? "Rıza"}
+            effects={["Rıza kaydı geri alınmış olarak işaretlenir. Mevcut biyometrik şablonlar bu işlemle silinmez."]}
+            confirmLabel="Rızayı iptal et" onConfirm={async () => {
+              if (!canManageConsents || !revokeTarget) return;
+              await revoke({ id: revokeTarget.id });
+              notify.success("Rıza iptal edildi", revokeTarget.label);
+            }} />
+        </>
+      )}
     </section>
   );
 }

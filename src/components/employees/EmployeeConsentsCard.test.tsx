@@ -8,11 +8,13 @@ import type { ConfirmDestructiveProps } from "@/components/shared/ConfirmDestruc
 import { EmployeeConsentsCard } from "./EmployeeConsentsCard";
 
 const mocks = vi.hoisted(() => ({
+  role: "project_admin" as string | undefined,
   enabled: false, consents: [] as { _id: string; consentType: string; grantedAt: string }[],
   states: [] as unknown[], cursor: 0, buttons: [] as { onClick?: () => unknown; disabled?: boolean; "aria-label"?: string; children?: unknown }[],
   confirm: null as ConfirmDestructiveProps | null,
   grant: vi.fn(), revoke: vi.fn(), error: vi.fn(), success: vi.fn(),
 }));
+vi.mock("@/components/auth/AuthProvider", () => ({ useAuth: () => ({ profile: { role: mocks.role } }) }));
 vi.mock("react", async importOriginal => {
   const actual = await importOriginal<typeof import("react")>();
   return { ...actual, useState: (initial: unknown) => {
@@ -40,10 +42,36 @@ function render() {
   return renderToStaticMarkup(<EmployeeConsentsCard employeeId={employeeId} />);
 }
 beforeEach(() => {
-  vi.clearAllMocks(); mocks.enabled = false; mocks.consents = []; mocks.states = []; mocks.confirm = null;
+  vi.clearAllMocks(); mocks.role = "project_admin"; mocks.enabled = false; mocks.consents = []; mocks.states = []; mocks.confirm = null;
 });
 
 describe("çalışan rıza kartı", () => {
+  it.each(["project_user", undefined])("%s için liste görünür, yönetim düğmeleri ve akışları render edilmez", (role) => {
+    mocks.role = role;
+    mocks.consents = [{ _id: "consent-a", consentType: "biometric_face", grantedAt: "2026-10-19T06:00:00Z" }];
+    // Rol değişse bile önceden açılmış diyalog/onay arayüzde kalmamalı.
+    mocks.states = [{ id: "consent-a", label: "Yüz Tanıma" }, "photo", "eski not", false];
+    const html = render();
+    expect(html).toContain("KVKK Rızalar");
+    expect(html).toContain("Yüz Tanıma");
+    expect(html).toContain("Aktif");
+    expect(html).toContain("Alındı:");
+    expect(html).not.toContain("Rıza Kaydı");
+    expect(html).not.toContain("Rıza Al");
+    expect(html).not.toContain("İptal");
+    expect(mocks.buttons.filter(button => button["aria-label"]?.includes("rızası"))).toHaveLength(0);
+    expect(mocks.confirm).toBeNull();
+    expect(mocks.grant).not.toHaveBeenCalled();
+    expect(mocks.revoke).not.toHaveBeenCalled();
+  });
+  it.each(["super_admin", "project_admin"])("%s için rıza alma ve iptal düğmeleri görünür", (role) => {
+    mocks.role = role;
+    mocks.consents = [{ _id: "consent-a", consentType: "biometric_face", grantedAt: "2026-10-19T06:00:00Z" }];
+    render();
+    expect(mocks.buttons.some(button => button["aria-label"] === "Yüz Tanıma rızasını iptal et")).toBe(true);
+    expect(mocks.buttons.some(button => button["aria-label"] === "Fotoğraf rızası al")).toBe(true);
+    expect(mocks.confirm).not.toBeNull();
+  });
   it("kapalı modülde yalnız biyometrik rıza düğmelerini pasifleştirir", () => {
     const html = render();
     expect(html).toContain("Biyometri modülü kapalı");
