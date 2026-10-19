@@ -125,6 +125,7 @@ import type * as lib_leaveValidation from "../lib/leaveValidation.js";
 import type * as lib_liveReadings from "../lib/liveReadings.js";
 import type * as lib_nullablePatch from "../lib/nullablePatch.js";
 import type * as lib_overtimeCalc from "../lib/overtimeCalc.js";
+import type * as lib_payVisibility from "../lib/payVisibility.js";
 import type * as lib_pdksCalc from "../lib/pdksCalc.js";
 import type * as lib_pdksChart from "../lib/pdksChart.js";
 import type * as lib_pdksDetail from "../lib/pdksDetail.js";
@@ -307,6 +308,7 @@ declare const fullApi: ApiFromModules<{
   "lib/liveReadings": typeof lib_liveReadings;
   "lib/nullablePatch": typeof lib_nullablePatch;
   "lib/overtimeCalc": typeof lib_overtimeCalc;
+  "lib/payVisibility": typeof lib_payVisibility;
   "lib/pdksCalc": typeof lib_pdksCalc;
   "lib/pdksChart": typeof lib_pdksChart;
   "lib/pdksDetail": typeof lib_pdksDetail;
