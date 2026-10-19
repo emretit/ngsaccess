@@ -1,5 +1,5 @@
-import { filterPdksReadings } from "./lib/pdksSource";
-import { splitPdksEligible, toReportTransactionRow } from "./lib/reportAttendance";
+import { classifyReadingSource, filterPdksReadings } from "./lib/pdksSource";
+import { matchesReadingSources, splitPdksEligible, toReportTransactionRow } from "./lib/reportAttendance";
 import { paginationOptsValidator, type PaginationResult } from "convex/server";
 import { resolveProjectScope } from "./lib/projectScope";
 import { cardReadingDateBounds, scopedCardReadingQuery } from "./lib/cardReadingList";
@@ -343,6 +343,7 @@ export const getPdksTableData = authedQuery({
     ),
     person: v.optional(v.string()),
     viewMode: v.optional(v.union(v.literal("single"), v.literal("matrix"))),
+    includePunches: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
@@ -510,6 +511,7 @@ export const getPdksTableData = authedQuery({
           startDate,
           isSingleDay,
           viewMode,
+          includePunches: args.includePunches,
           manualPdksByEmpDate,
           allLeaves,
           holidayMap,
@@ -1476,10 +1478,10 @@ export const getEmployeeAttendanceDetail = authedQuery({
     const employee = await ctx.db.get(args.employeeId);
     if (!employee || (args.projectId && employee.projectId !== args.projectId)) return null;
 
+    // Projesiz (orphan) çalışan yalnız super_admin'e açıktır.
     if (
       ctx.user.role !== "super_admin" &&
-      employee.projectId &&
-      !allowedProjectIds.includes(employee.projectId)
+      (!employee.projectId || !allowedProjectIds.includes(employee.projectId))
     ) {
       return null;
     }
@@ -1752,6 +1754,7 @@ export const listReportTransactions = authedQuery({
     endDate: v.optional(v.string()),
     employeeId: v.optional(v.id("employees")),
     result: v.optional(v.union(v.literal("granted"), v.literal("denied"), v.literal("unknown"))),
+    sources: v.optional(v.array(v.union(v.literal("card"), v.literal("pin"), v.literal("qr"), v.literal("mobile"), v.literal("manual"), v.literal("unknown")))),
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
@@ -1779,8 +1782,8 @@ export const listReportTransactions = authedQuery({
     })();
     const page = await indexed.order("desc").paginate({
       ...args.paginationOpts,
-      numItems: Math.min(args.paginationOpts.numItems, 200),
-      maximumRowsRead: 200,
+      numItems: args.sources?.length ? 1000 : Math.min(args.paginationOpts.numItems, 200),
+      maximumRowsRead: args.sources?.length ? 1000 : 200,
     });
     const matching = page.page.filter(row =>
       row.projectId === args.projectId
@@ -1788,7 +1791,8 @@ export const listReportTransactions = authedQuery({
       && matchesReadingResult(row.accessStatus, args.result),
     );
     const { eligible, hiddenBiometricCount } = splitPdksEligible(matching);
-    const enriched = await enrichReadingsForList(ctx, eligible);
+    const sourceMatching = eligible.filter(row => matchesReadingSources(classifyReadingSource(row), args.sources));
+    const enriched = await enrichReadingsForList(ctx, sourceMatching);
     return {
       ...page,
       page: enriched.map(toReportTransactionRow),

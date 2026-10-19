@@ -16,6 +16,7 @@ import {
 } from "./pdksHelpers";
 import { settingsForShift } from "./shiftResolver";
 import {
+  computeBreakViolation,
   computeEarlyExitMinutes,
   computeLateMinutes,
   formatHoursLabel,
@@ -54,6 +55,10 @@ export type PdksDayDetail = {
   earlyExitMinutes: number;
   readingCount: number;
   isManual: boolean;
+  punches: Array<{ time: string; direction: "entry" | "exit" | "unknown" }>;
+  plannedBreakStart: string | null;
+  plannedBreakEnd: string | null;
+  breakViolation: boolean;
 };
 
 export type PdksTableDayCell = {
@@ -174,6 +179,7 @@ export function computePdksTableRow(params: {
   startDate: string;
   isSingleDay: boolean;
   viewMode: "single" | "matrix";
+  includePunches?: boolean;
   manualPdksByEmpDate: ReadonlyMap<string, Doc<"pdksRecords">>;
   allLeaves: Doc<"leaves">[];
   holidayMap: ReadonlyMap<string, Doc<"holidays">>;
@@ -453,6 +459,17 @@ export function computePdksTableRow(params: {
           earlyExitMinutes: computeEarlyExitMinutes(lastISO, dayEarly, daySettings),
           readingCount: dayReadings.length,
           isManual: !!manualDay,
+          punches: params.includePunches ? dayReadings.slice(0, 24).map((reading) => ({
+            time: formatIstanbulTime(reading.accessTime),
+            direction: reading.direction ?? "unknown",
+          })) : [],
+          plannedBreakStart: dayShift?.breakStart ?? null,
+          plannedBreakEnd: dayShift?.breakEnd ?? null,
+          breakViolation: manualDay?.entryTime && manualDay?.exitTime ? false : computeBreakViolation({
+            punchTimes: dayReadings.map((reading) => reading.accessTime),
+            breakStart: dayShift?.breakStart,
+            breakEnd: dayShift?.breakEnd,
+          }),
         },
       });
     }

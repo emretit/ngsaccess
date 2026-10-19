@@ -125,6 +125,13 @@ export async function loadAttendanceReport(ctx: QueryCtx, projectIds: Id<"projec
 
 export type ReportTransactionResult = "granted" | "denied" | "unknown";
 
+export function matchesReadingSources(
+  source: PdksReadingSource,
+  sources: readonly PdksReadingSource[] | undefined,
+): boolean {
+  return !sources?.length || sources.includes(source);
+}
+
 export type ReportTransactionRow = {
   _id: Id<"cardReadings">;
   accessTime: string;

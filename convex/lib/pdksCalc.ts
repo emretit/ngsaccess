@@ -96,6 +96,27 @@ export function computeEarlyExitMinutes(
   return Math.max(0, threshold - isoTimeToTRMinutes(lastISO));
 }
 
+/** Dashboard mola kuralı; gece yarısını aşan mola pencereleri desteklenmez. */
+export function computeBreakViolation(params: {
+  punchTimes: readonly string[];
+  breakStart?: string | null;
+  breakEnd?: string | null;
+}): boolean {
+  const { punchTimes, breakStart, breakEnd } = params;
+  if (punchTimes.length < 2 || !breakStart || !breakEnd) return false;
+  const start = parseHHMM(breakStart);
+  const end = parseHHMM(breakEnd);
+  if (start > end) return false;
+  const timestamps = punchTimes.map((time) => new Date(time).getTime());
+  const first = Math.min(...timestamps);
+  const last = Math.max(...timestamps);
+  if (Math.floor((last - first) / 60000) < 450) return false;
+  return !punchTimes.some((time) => {
+    const minute = isoTimeToTRMinutes(time);
+    return minute >= start && minute <= end;
+  });
+}
+
 /** summary modu yalnız bu 4 değeri üretir (hafta sonu/tatil yok). */
 export type SummaryDayStatus = "present" | "late" | "absent" | "leave";
 

@@ -16,9 +16,9 @@ import type { ReportRow } from '@/lib/reports/rows';
 
 export interface ReportPageProps {
   definition: ReportDefinition; rows: readonly ReportRow[]; days?: readonly string[];
-  meta: Omit<ReportExportMeta, 'columns'>; loading?: boolean; loadedCount?: number; children?: ReactNode;
+  meta: Omit<ReportExportMeta, 'columns'>; loading?: boolean; hasMoreTransactions?: boolean; loadedCount?: number; children?: ReactNode;
 }
-export function ReportPage({ definition, rows, days, meta, loading = false, loadedCount, children }: ReportPageProps) {
+export function ReportPage({ definition, rows, days, meta, loading = false, hasMoreTransactions = false, loadedCount, children }: ReportPageProps) {
   const columns = reportColumns(definition, days);
   const [hidden, setHidden] = useState(() => readHiddenColumns(definition.slug));
   const [page, setPage] = useState(1);
@@ -51,9 +51,9 @@ export function ReportPage({ definition, rows, days, meta, loading = false, load
       </div>
     </div>
     {pdfOverLimit && definition.formats.includes('pdf') && <p className="text-xs text-muted-foreground">{PDF_ROW_LIMIT_MESSAGE}</p>}
-    {loading ? <SectionSkeleton rows={5} label="Rapor yükleniyor…" /> : rows.length === 0 ? <EmptyState title="Kayıt bulunamadı" description="Bu dönem ve filtrelerle eşleşen kayıt yok. Filtreleri değiştirebilirsiniz." /> : <div className="min-w-0 overflow-hidden rounded-md border border-line bg-surface">
+    {loading ? <SectionSkeleton rows={5} label="Rapor yükleniyor…" /> : rows.length === 0 ? hasMoreTransactions ? <p role="status" className="rounded-md border border-line p-6 text-sm text-muted-foreground">Taranan kayıtlarda eşleşme yok. Daha eski kayıtlar için “Daha fazla yükle”.</p> : <EmptyState title="Kayıt bulunamadı" description="Bu dönem ve filtrelerle eşleşen kayıt yok. Filtreleri değiştirebilirsiniz." /> : <div className="min-w-0 overflow-hidden rounded-md border border-line bg-surface">
       <Table aria-label={definition.title}><TableHeader><TableRow>{visible.map(column => <TableHead scope="col" key={column.key} className={`whitespace-nowrap ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}>{column.label}</TableHead>)}</TableRow></TableHeader>
-        <TableBody>{rows.slice((currentPage - 1) * 50, currentPage * 50).map(row => <TableRow key={row.id}>{visible.map(column => <TableCell key={column.key} className={`whitespace-nowrap tabular-nums ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}>
+        <TableBody>{rows.slice((currentPage - 1) * 50, currentPage * 50).map(row => <TableRow key={row.id}>{visible.map(column => <TableCell key={column.key} className={`${column.key === 'punches' ? 'min-w-64 max-w-lg whitespace-normal break-words' : 'whitespace-nowrap'} tabular-nums ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}>
           {column.key === 'status' && row.kind === 'daily' ? <StatusBadge tone={STATUS_META[row.cell.status].tone}>{STATUS_META[row.cell.status].label}</StatusBadge> : column.key === 'result' && row.kind === 'transaction' ? <StatusBadge tone={row.transaction.result === 'granted' ? 'success' : row.transaction.result === 'denied' ? 'danger' : 'neutral'}>{column.value(row) ?? '—'}</StatusBadge> : column.value(row) ?? '—'}
         </TableCell>)}</TableRow>)}</TableBody></Table>
       <PaginationBar summary={`${pageRange(rows.length, currentPage, 50)} / ${rows.length} kayıt`} page={currentPage} pageCount={pageCount} onPrevious={() => setPage(Math.max(1, currentPage - 1))} onNext={() => setPage(Math.min(pageCount, currentPage + 1))} />

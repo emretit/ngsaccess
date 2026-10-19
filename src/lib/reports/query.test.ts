@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Id } from '../../../convex/_generated/dataModel';
 import { REPORTS } from './registry';
-import { monthlyReportArgs, reportQueryKey, type ReportQueryFilters } from './query';
+import { dailyReportArgs, monthlyReportArgs, transactionReportArgs, reportQueryKey, type ReportQueryFilters } from './query';
 import { transactionReducer, transactionSnapshot } from './transactions';
 import { buildTransactionRows } from './rows';
 import { transactionPage } from './testFixtures';
@@ -13,6 +13,25 @@ function definition(source: 'transactions' | 'monthlyPayroll' | 'pdksMatrix') {
   return report;
 }
 describe('server query identity', () => {
+  it('requests punches only for the time card and break reports and keys the server argument', () => {
+    for (const report of REPORTS.filter(item => item.dataSource === 'pdksMatrix')) {
+      const needsPunches = ['okutma-karti', 'mola-ihlalleri'].includes(report.slug);
+      const args = dailyReportArgs(filters, report);
+      if (needsPunches) {
+        expect(args).toHaveProperty('includePunches', true);
+        expect(reportQueryKey(report, filters, 0)).not.toBe(reportQueryKey({ ...report, includePunches: false }, filters, 0));
+      } else expect(args).not.toHaveProperty('includePunches');
+    }
+    expect(dailyReportArgs(filters)).not.toHaveProperty('includePunches');
+  });
+  it('passes mobile and QR sources to the server and includes them in query identity', () => {
+    const mobile = REPORTS.find(report => report.slug === 'mobil-okutmalar');
+    if (!mobile) throw new Error('Missing mobile report');
+    expect(transactionReportArgs(filters, mobile).sources).toEqual(['mobile', 'qr']);
+    expect(transactionReportArgs(filters, definition('transactions'))).not.toHaveProperty('sources');
+    expect(reportQueryKey(mobile, filters, 0)).not.toBe(reportQueryKey({ ...mobile, transactionSources: ['card'] }, filters, 0));
+    expect(reportQueryKey(mobile, { ...filters, person: 'Ayşe' }, 0)).toBe(reportQueryKey(mobile, filters, 0));
+  });
   it('preserves two loaded transaction pages while person and department filters change', () => {
     const report = definition('transactions');
     const first = transactionPage('first', 2);

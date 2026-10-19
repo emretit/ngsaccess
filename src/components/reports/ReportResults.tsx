@@ -4,7 +4,7 @@ import { api } from '../../../convex/_generated/api';
 import type { Id } from '../../../convex/_generated/dataModel';
 import { Button } from '@/components/ui/button';
 import { ReportPage } from './ReportPage';
-import { buildMonthlyStatusRows, buildTransactionRows, dailyRowsForReport } from '@/lib/reports/rows';
+import { monthlyRowsForReport, buildTransactionRows, dailyRowsForReport } from '@/lib/reports/rows';
 import { dailyReportArgs, monthlyReportArgs, transactionReportArgs } from '@/lib/reports/query';
 import { transactionReducer, transactionSnapshot } from '@/lib/reports/transactions';
 import type { ReportDefinition } from '@/lib/reports/registry';
@@ -19,20 +19,22 @@ function meta(props: ReportResultsProps): Omit<ReportExportMeta, 'columns'> {
   return { from: props.from, to: props.to, projectName: props.projectName };
 }
 function DailyResults(props: ReportResultsProps) {
-  const data = useQuery(api.cardReadings.getPdksTableData, dailyReportArgs(props));
-  return <ReportPage definition={props.definition} rows={dailyRowsForReport(data ?? [], props.definition.slug)} loading={data === undefined} meta={meta(props)} />;
+  const data = useQuery(api.cardReadings.getPdksTableData, dailyReportArgs(props, props.definition));
+  return <ReportPage definition={props.definition} rows={dailyRowsForReport(data ?? [], props.definition.slug)} loading={data === undefined} meta={meta(props)}>
+    {props.definition.group === 'kayitlar' && <p className="text-xs text-muted-foreground">Biyometrik doğrulamalı geçişler KVKK gereği PDKS raporlarında gösterilmez.</p>}
+  </ReportPage>;
 }
 function MonthlyResults(props: ReportResultsProps) {
   const sheet = useQuery(api.cardReadings.getMonthlyPayrollSheet, monthlyReportArgs(props));
-  const rows = useMemo(() => sheet ? buildMonthlyStatusRows(sheet).filter(row => (!props.departmentName || row.department === props.departmentName) && row.name.toLocaleLowerCase('tr-TR').includes(props.person.toLocaleLowerCase('tr-TR'))) : [], [sheet, props.departmentName, props.person]);
+  const rows = useMemo(() => sheet ? monthlyRowsForReport(sheet, props.definition.monthlyRows, props.person, props.departmentName) : [], [sheet, props.definition.monthlyRows, props.departmentName, props.person]);
   return <ReportPage definition={props.definition} rows={rows} days={sheet?.days} loading={sheet === undefined} meta={meta(props)}>
-    <p className="text-xs text-muted-foreground">Kodlar: N normal · DV devamsız · İZN izinli · HT hafta tatili · RT resmî tatil · — henüz gelmedi / veri yok.</p>
+    {props.definition.monthlyDays === 'code' && <p className="text-xs text-muted-foreground">Kodlar: N normal · DV devamsız · İZN izinli · HT hafta tatili · RT resmî tatil · — henüz gelmedi / veri yok.</p>}
   </ReportPage>;
 }
 function TransactionResults(props: ReportResultsProps) {
   const [snapshots, dispatch] = useReducer(transactionReducer, { pages: {} });
   const [cursor, setCursor] = useState<string | null>(null);
-  const current = useQuery(api.cardReadings.listReportTransactions, { ...transactionReportArgs(props), paginationOpts: { numItems: 50, cursor } });
+  const current = useQuery(api.cardReadings.listReportTransactions, { ...transactionReportArgs(props, props.definition), paginationOpts: { numItems: 50, cursor } });
   const snapshot = useMemo(() => transactionSnapshot(snapshots, cursor, current), [snapshots, cursor, current]);
   const rows = useMemo(() => buildTransactionRows(snapshot.rows, props.person, props.departmentName), [snapshot.rows, props.departmentName, props.person]);
   const loadMore = () => {
@@ -40,10 +42,10 @@ function TransactionResults(props: ReportResultsProps) {
     dispatch({ type: 'page', cursor, page: current });
     setCursor(current.continueCursor);
   };
-  return <ReportPage definition={props.definition} rows={rows} loading={current === undefined && cursor === null} loadedCount={snapshot.rows.length} meta={meta(props)}>
+  return <ReportPage definition={props.definition} rows={rows} loading={current === undefined && cursor === null} hasMoreTransactions={!snapshot.isDone} loadedCount={snapshot.rows.length} meta={meta(props)}>
     <div className="space-y-2 text-xs text-muted-foreground">
       <p>Biyometrik doğrulamalı geçişler KVKK gereği PDKS raporlarında gösterilmez.</p>
-      {snapshot.hiddenBiometricCount > 0 && <p role="status">Yüklenen sayfalarda {snapshot.hiddenBiometricCount} biyometrik kayıt gizlendi (kişi/departman filtresinden bağımsız).</p>}
+      {!props.definition.transactionSources && snapshot.hiddenBiometricCount > 0 && <p role="status">Yüklenen sayfalarda {snapshot.hiddenBiometricCount} biyometrik kayıt gizlendi (kişi/departman filtresinden bağımsız).</p>}
       <p>Yalnız yüklenen kayıtlar dışa aktarılır. Kişi ve departman filtreleri yüklenen kayıtlara uygulanır.</p>
       {!snapshot.isDone && <p>Bu sayfada eşleşme bulunmasa da daha fazla kayıt yükleyebilirsiniz.</p>}
       <p>Yenile ile güncel kayıtları getir.</p>

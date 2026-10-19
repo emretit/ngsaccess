@@ -6,19 +6,19 @@ import { ReportPage } from './ReportPage';
 import { ReportResults } from './ReportResults';
 import type { Id } from '../../../convex/_generated/dataModel';
 import { toggleHiddenColumn } from '@/lib/reports/columns';
-import { dailyCell, dailySource, transactionPage } from '@/lib/reports/testFixtures';
+import { dailyCell, dailySource, monthlySheet, transactionPage } from '@/lib/reports/testFixtures';
 import { flattenDailyRows } from '@/lib/reports/rows';
 import { REPORTS, type ReportDefinition } from '@/lib/reports/registry';
 import Reports from '@/pages/Reports';
-const mocks = vi.hoisted(() => ({ role: 'project_user', query: vi.fn() }));
+const mocks = vi.hoisted(() => ({ role: 'project_user', scoped: false, query: vi.fn() }));
 vi.mock('@/components/auth/AuthProvider', () => ({ useAuth: () => ({ profile: { role: mocks.role } }) }));
-vi.mock('@/hooks/useActiveProjectScope', () => ({ useActiveProjectScope: () => ({ loading: false, projectId: null }) }));
+vi.mock('@/hooks/useActiveProjectScope', () => ({ useActiveProjectScope: () => ({ loading: false, projectId: mocks.scoped ? 'project-a' : null }) }));
 vi.mock('convex/react', () => ({ useQuery: mocks.query }));
 const definition: ReportDefinition = { slug: 'example', group: 'gunluk', title: 'Örnek rapor', description: 'Örnek', dataSource: 'pdksMatrix', filters: [], formats: ['csv'], columns: [
   { key: 'name', label: 'Ad Soyad', defaultVisible: true, value: row => row.kind === 'daily' ? row.name : null },
   { key: 'department', label: 'Departman', defaultVisible: true, value: row => row.kind === 'daily' ? row.department : null },
 ] };
-afterEach(() => { vi.unstubAllGlobals(); mocks.role = 'project_user'; mocks.query.mockReset(); });
+afterEach(() => { vi.unstubAllGlobals(); mocks.role = 'project_user'; mocks.scoped = false; mocks.query.mockReset(); });
 describe('generic report display', () => {
   it('honors saved column hiding for both the header and data', () => {
     const hidden = toggleHiddenColumn([], 'department');
@@ -56,20 +56,64 @@ describe('generic report display', () => {
     expect(html).toContain('Filtreye uyan 0');
     expect(html).not.toContain('Ayşe Yılmaz');
   });
+  it('offers more loading for an empty scanned page and the final empty state only when done', () => {
+    const report = REPORTS.find(item => item.slug === 'mobil-okutmalar');
+    if (!report) throw new Error('Missing mobile report');
+    for (const isDone of [false, true]) {
+      mocks.query.mockReturnValue({ ...transactionPage('empty', 12, isDone), page: [] });
+      const html = renderToStaticMarkup(<ReportResults definition={report} projectId={'project-a' as Id<'projects'>} from="2026-10-01" to="2026-10-31" person="" year={2026} month={10} />);
+      expect(html.includes('Kayıt bulunamadı')).toBe(isDone);
+      expect(html.includes('Taranan kayıtlarda eşleşme yok.')).toBe(!isDone);
+      expect(html).toContain(isDone ? 'Tüm kayıtlar yüklendi' : '>Daha fazla yükle</button>');
+      expect(html).not.toContain('biyometrik kayıt gizlendi');
+      expect(html).toContain('Biyometrik doğrulamalı geçişler KVKK gereği');
+    }
+  });
   it('renders only 50 rows on the first page', () => {
     const source = flattenDailyRows([dailySource([dailyCell()])])[0];
     const rows = Array.from({ length: 51 }, (_, i) => ({ ...source, id: String(i), name: `Kişi-${i}` }));
     const html = renderToStaticMarkup(<ReportPage definition={definition} rows={rows} meta={{ from: '2026-10-19', to: '2026-10-19' }} />);
     expect(html).toContain('Kişi-49'); expect(html).not.toContain('Kişi-50'); expect(html).toContain('1 / 2');
   });
+  it('uses the monthly source for department summaries and ignores a stale person search', () => {
+    const report = REPORTS.find(item => item.slug === 'departman-bazli-devam');
+    if (!report) throw new Error('Missing department report');
+    mocks.query.mockReturnValue(monthlySheet());
+    const html = renderToStaticMarkup(<ReportResults definition={report} projectId={'project-a' as Id<'projects'>} from="2026-10-01" to="2026-10-31" person="Mehmet" year={2026} month={10} departmentName="Üretim" />);
+    expect(html).toContain('Üretim'); expect(html).toContain('Çalışılan kişi-gün'); expect(html).toContain('>100<');
+    expect(html).not.toContain('Ayşe Yılmaz'); expect(html).not.toContain('Kodlar:');
+    expect(mocks.query.mock.calls[0]?.[1]).toEqual({ projectId: 'project-a', year: 2026, month: 10 });
+  });
+  it('requests mobile and QR sources and displays punches using the daily matrix route', () => {
+    const mobile = REPORTS.find(item => item.slug === 'mobil-okutmalar');
+    const card = REPORTS.find(item => item.slug === 'okutma-karti');
+    if (!mobile || !card) throw new Error('Missing record reports');
+    const props = { projectId: 'project-a' as Id<'projects'>, from: '2026-10-01', to: '2026-10-31', person: '', year: 2026, month: 10 };
+    mocks.query.mockReturnValue(transactionPage());
+    renderToStaticMarkup(<ReportResults definition={mobile} {...props} />);
+    expect(mocks.query.mock.calls[0]?.[1]).toMatchObject({ sources: ['mobile', 'qr'], paginationOpts: { numItems: 50, cursor: null } });
+    const cell = dailyCell();
+    if (!cell.detail) throw new Error('Missing detail');
+    cell.detail.punches = [{ time: '08:58', direction: 'entry' }];
+    mocks.query.mockReturnValue([dailySource([cell])]);
+    const html = renderToStaticMarkup(<ReportResults definition={card} {...props} />);
+    expect(html).toContain('08:58 Giriş'); expect(html).toContain('whitespace-normal'); expect(html).toContain('Biyometrik doğrulamalı');
+    expect(mocks.query.mock.calls[1]?.[1]).toMatchObject({ viewMode: 'matrix', startDate: props.from, endDate: props.to, includePunches: true });
+  });
 });
 function route(path: string) { return renderToStaticMarkup(<MemoryRouter initialEntries={[path]}><Routes><Route path="/reports/:group?/:slug?" element={<Reports />} /></Routes></MemoryRouter>); }
 describe('report routes', () => {
-  it('renders the four groups and six reports in the hub', () => { const html = route('/reports'); expect(html).toContain('Kayıtlar'); expect(html).toContain('Resmi'); expect(html).toContain('Ham Okutmalar'); expect(html).toContain('Aylık Durum'); });
+  it('hides person search on department attendance and retains it on person attendance', () => {
+    mocks.scoped = true;
+    mocks.query.mockImplementation((_query, args: unknown) => args && typeof args === 'object' && 'year' in args ? monthlySheet() : []);
+    expect(route('/reports/aylik/departman-bazli-devam?q=Ayşe')).not.toContain('type="search"');
+    expect(route('/reports/aylik/kisi-bazli-devam')).toContain('type="search"');
+  });
+  it('renders the four groups and sixteen reports in the hub', () => { const html = route('/reports'); expect(html).toContain('Kayıtlar'); expect(html).toContain('Resmi'); for (const report of REPORTS) expect(html).toContain(`/reports/${report.group}/${report.slug}`); });
   it('provides recovery for unknown groups, mismatched slugs and official slugs', () => { for (const path of ['/reports/invalid', '/reports/gunluk/ham-okutmalar', '/reports/resmi/sgk']) expect(route(path)).toContain('Rapor bulunamadı'); });
   it('gates official settings links and skips all queries when no project is selected', () => {
     expect(route('/reports/resmi')).toContain('Bu raporlar yöneticiler içindir.'); mocks.role = 'project_admin';
     expect(route('/reports/resmi')).toContain('/settings?tab=reports');
-    expect(route('/reports/gunluk/gunluk-puantaj')).toContain('Bir proje seçin'); expect(mocks.query).not.toHaveBeenCalled();
+    for (const report of REPORTS) expect(route(`/reports/${report.group}/${report.slug}`)).toContain('Bir proje seçin'); expect(mocks.query).not.toHaveBeenCalled();
   });
 });

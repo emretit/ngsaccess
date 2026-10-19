@@ -1,4 +1,5 @@
 import {
+  matchesReadingSources,
   readingResult,
   READING_SOURCE_LABELS,
   splitPdksEligible,
@@ -210,5 +211,23 @@ describe("report transaction rows", () => {
     expect(toReportTransactionRow(reading({ cardNo: "", hikMajorEventType: 3 })))
       .toMatchObject({ source: "unknown", sourceLabel: "Bilinmiyor" });
     expect(READING_SOURCE_LABELS.biometric).toBe("Biyometrik");
+  });
+});
+
+
+describe("matchesReadingSources", () => {
+  it("includes every source when omitted or empty", () => {
+    expect(matchesReadingSources("card", undefined)).toBe(true);
+    expect(matchesReadingSources("unknown", [])).toBe(true);
+  });
+  it("matches only selected sources", () => {
+    expect(matchesReadingSources("qr", ["card", "qr"])).toBe(true);
+    expect(matchesReadingSources("pin", ["card", "qr"])).toBe(false);
+  });
+  it("preserves the hidden biometric count when filtering eligible rows", () => {
+    const split = splitPdksEligible([{ hikCurrentVerifyMode: "face" }, { hikCurrentVerifyMode: "card" }, { hikCurrentVerifyMode: "password" }]);
+    expect(split.eligible.filter(row => matchesReadingSources(pdksSource.classifyReadingSource(row), ["pin"])))
+      .toEqual([{ hikCurrentVerifyMode: "password" }]);
+    expect(split.hiddenBiometricCount).toBe(1);
   });
 });

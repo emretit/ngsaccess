@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { useQuery } from 'convex/react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../../../convex/_generated/api';
@@ -22,11 +22,15 @@ import { DateInput } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ReportResults } from './ReportResults';
 
+function DepartmentFilters({ children, onClear, hasFilters }: ComponentProps<typeof FilterBar>) {
+  return <div role="search" aria-label="Rapor filtreleri" className="flex flex-wrap items-end gap-3">{children}<Button type="button" variant="ghost" disabled={!hasFilters} onClick={onClear}>Filtreleri temizle</Button></div>;
+}
 function ScopedReport({ definition, projectId, projectName }: { definition: ReportDefinition; projectId: Id<'projects'>; projectName?: string }) {
   const [params, setParams] = useSearchParams();
   const [revision, setRevision] = useState(0);
   const departments = useQuery(api.departments.list, { projectId });
-  const person = useDebouncedValue((params.get('q') ?? '').trim());
+  const person = useDebouncedValue(definition.filters.includes('person') ? (params.get('q') ?? '').trim() : '');
+  const Filters = definition.filters.includes('person') ? FilterBar : DepartmentFilters;
   const period = periodFromParams(params);
   const monthly = definition.dataSource === 'monthlyPayroll';
   const monthValue = params.get('month') ?? todayInTurkey().slice(0, 7);
@@ -53,13 +57,13 @@ function ScopedReport({ definition, projectId, projectName }: { definition: Repo
   const clear = () => setParams(previous => { const next = new URLSearchParams(previous); ['dept', 'q', 'result'].forEach(key => next.delete(key)); return next; }, { replace: true });
   const queryKey = reportQueryKey(definition, { projectId, from, to, departmentId: department?._id, person, result, year: month?.year ?? 2000, month: month?.month ?? 1 }, revision);
   return <div className="min-w-0 space-y-4">
-    <FilterBar search={params.get('q') ?? ''} onSearchChange={value => update('q', value.slice(0, 200))} searchLabel="Kişi ara" placeholder="Ad soyad ara" onClear={clear} hasFilters={Boolean(params.get('dept') || result)}>
+    <Filters search={params.get('q') ?? ''} onSearchChange={value => update('q', value.slice(0, 200))} searchLabel="Kişi ara" placeholder="Ad soyad ara" onClear={clear} hasFilters={Boolean(params.get('dept') || result)}>
       <FormFieldWrapper htmlFor="report-period" label={monthly ? 'Ay' : 'Dönem'} className="w-full sm:w-44">
         {monthly ? <Input id="report-period" type="month" min="1000-01" max="9999-12" value={monthValue} onChange={event => update('month', event.target.value)} aria-invalid={Boolean(rangeError)} aria-describedby={rangeError ? 'report-range-error' : undefined} /> : <Select value={period.preset} onValueChange={changePreset}><SelectTrigger id="report-period"><SelectValue /></SelectTrigger><SelectContent>{REPORT_PRESETS.map(key => <SelectItem key={key} value={key}>{REPORT_PRESET_LABELS[key]}</SelectItem>)}</SelectContent></Select>}
       </FormFieldWrapper>
       <FormFieldWrapper htmlFor="report-department" label="Departman" className="w-full sm:w-48"><Select value={params.get('dept') || 'all'} onValueChange={value => update('dept', value)}><SelectTrigger id="report-department"><SelectValue placeholder="Departmanlar yükleniyor…" /></SelectTrigger><SelectContent><SelectItem value="all">Tüm departmanlar</SelectItem>{departments?.map(item => <SelectItem key={item._id} value={item._id}>{item.name}</SelectItem>)}{params.get('dept') && !department && <SelectItem value={params.get('dept') ?? ''}>Seçili departman bulunamadı</SelectItem>}</SelectContent></Select></FormFieldWrapper>
       {definition.dataSource === 'transactions' && <FormFieldWrapper htmlFor="report-result" label="Sonuç" className="w-full sm:w-40"><Select value={result ?? 'all'} onValueChange={value => update('result', value)}><SelectTrigger id="report-result"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">Tüm sonuçlar</SelectItem><SelectItem value="granted">İzin verildi</SelectItem><SelectItem value="denied">Reddedildi</SelectItem><SelectItem value="unknown">Bilinmiyor</SelectItem></SelectContent></Select></FormFieldWrapper>}
-    </FilterBar>
+    </Filters>
     {!monthly && period.preset === 'custom' && <div className="grid min-w-0 gap-3 sm:max-w-lg sm:grid-cols-2"><FormFieldWrapper htmlFor="report-from" label="Başlangıç"><DateInput id="report-from" value={period.from} onChange={value => update('from', value)} aria-invalid={Boolean(rangeError)} aria-describedby={rangeError ? 'report-range-error' : undefined} /></FormFieldWrapper><FormFieldWrapper htmlFor="report-to" label="Bitiş"><DateInput id="report-to" value={period.to} onChange={value => update('to', value)} aria-invalid={Boolean(rangeError)} aria-describedby={rangeError ? 'report-range-error' : undefined} /></FormFieldWrapper></div>}
     {rangeError && <p id="report-range-error" role="alert" className="text-sm text-destructive">{rangeError}</p>}
     {unknownDepartment && <p role="alert" className="text-sm text-destructive">Seçili departman bu projede bulunamadı. Departman filtresini temizleyin.</p>}

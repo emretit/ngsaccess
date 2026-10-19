@@ -266,6 +266,10 @@ describe("pdksTable – computePdksTableRow", () => {
           plannedEnd: "18:00",
           isEarlyExit: false,
           earlyExitMinutes: 0,
+          punches: [],
+          plannedBreakStart: null,
+          plannedBreakEnd: null,
+          breakViolation: false,
           readingCount: 0,
           isManual: true,
         },
@@ -288,6 +292,10 @@ describe("pdksTable – computePdksTableRow", () => {
           plannedEnd: "18:00",
           isEarlyExit: false,
           earlyExitMinutes: 0,
+          punches: [],
+          plannedBreakStart: null,
+          plannedBreakEnd: null,
+          breakViolation: false,
           readingCount: 0,
           isManual: false,
         },
@@ -310,6 +318,10 @@ describe("pdksTable – computePdksTableRow", () => {
           plannedEnd: "18:00",
           isEarlyExit: false,
           earlyExitMinutes: 0,
+          punches: [],
+          plannedBreakStart: null,
+          plannedBreakEnd: null,
+          breakViolation: false,
           readingCount: 0,
           isManual: false,
         },
@@ -414,5 +426,51 @@ describe("C2 günlük sözleşme", () => {
     expect(row.employeeId).toBe("");
     expect(row.cardNumber).toBe("");
     expect(row.detailedLogs[0]).toMatchObject({ direction: "unknown", action: "Yön belirtilmemiş" });
+  });
+});
+
+
+describe("pdksTable – punches and breaks", () => {
+  const shift = { name: "Gündüz", startTime: "09:00", endTime: "18:00", breakStart: "12:00", breakEnd: "13:00" } as Doc<"shifts">;
+  const matrix = (overrides: Partial<RowParams> = {}) => computePdksTableRow(rowParams({
+    viewMode: "matrix", isSingleDay: false, includePunches: true, resolveShift: () => shift, ...overrides,
+  })).days[0]?.detail;
+
+  it("keeps sorted real granted punches even on manually overridden days", () => {
+    const detail = matrix({
+      empReadings: [
+        reading(`${MONDAY}T15:00:00Z`, { direction: "exit" }),
+        reading(`${MONDAY}T09:30:00Z`, { accessStatus: "reddedildi" }),
+        reading(`${MONDAY}T06:00:00Z`, { direction: "entry" }),
+        reading(`${TUESDAY}T06:00:00Z`),
+      ],
+      manualPdksByEmpDate: new Map([[`${EMP_ID}__${MONDAY}`, manual(MONDAY, "10:00", "15:00")]]),
+    });
+    expect(detail).toMatchObject({
+      punches: [{ time: "09:00", direction: "entry" }, { time: "18:00", direction: "exit" }],
+      plannedBreakStart: "12:00", plannedBreakEnd: "13:00", breakViolation: false, isManual: true,
+    });
+  });
+
+  it.each([undefined, false, true])("only includes punches when requested (%s) while preserving other detail", (includePunches) => {
+    const detail = matrix({ includePunches, empReadings: [reading(`${MONDAY}T06:00:00Z`), reading(`${MONDAY}T15:00:00Z`)] });
+    expect(detail).toMatchObject({ readingCount: 2, breakViolation: true, plannedBreakStart: "12:00", plannedBreakEnd: "13:00" });
+    expect(detail?.punches).toHaveLength(includePunches ? 2 : 0);
+  });
+
+  it("uses Istanbul minutes for break punches and falls back to unknown direction", () => {
+    expect(matrix({ empReadings: [reading(`${MONDAY}T06:00:00Z`), reading(`${MONDAY}T09:00:00Z`), reading(`${MONDAY}T15:00:00Z`)] }))
+      .toMatchObject({ breakViolation: false, punches: [{ time: "09:00", direction: "unknown" }, { time: "12:00", direction: "unknown" }, { time: "18:00", direction: "unknown" }] });
+    expect(matrix({ resolveShift: () => null })).toMatchObject({ punches: [], plannedBreakStart: null, plannedBreakEnd: null, breakViolation: false });
+  });
+
+  it("caps the payload at the first 24 punches but checks the complete day for breaks", () => {
+    const early = Array.from({ length: 25 }, (_, minute) => reading(`${MONDAY}T06:${String(minute).padStart(2, "0")}:00Z`));
+    const detail = matrix({ empReadings: [reading(`${MONDAY}T15:00:00Z`), reading(`${MONDAY}T09:30:00Z`), ...early.reverse()] });
+    expect(detail?.punches).toHaveLength(24);
+    expect(detail?.punches[0]?.time).toBe("09:00");
+    expect(detail?.punches[23]?.time).toBe("09:23");
+    expect(detail?.readingCount).toBe(27);
+    expect(detail?.breakViolation).toBe(false);
   });
 });

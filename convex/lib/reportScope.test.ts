@@ -3,6 +3,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { selectProjectScope } from "./projectScope";
 import type { QueryCtx } from "../_generated/server";
 import * as pdksSource from "./pdksSource";
+import * as projectScope from "./projectScope";
 import { getPdksTableData, getPdksChartData, getMonthlyPayrollSheet, getEmployeeAttendanceDetail } from "../cardReadings";
 import { readReportReadings, reportPeriod, selectScheduleProjectIds } from "./reportScope";
 
@@ -107,5 +108,23 @@ describe("PDKS source filtering at loader/handler boundaries", () => {
     spy.mockClear();
     expect(await invoke(fn, readingContext([...reportReadings, ...cards]), args)).toEqual(cardOnly);
     expect(spy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("çalışan katılım detayı erişimi", () => {
+  const orphan = { ...reportEmployee, projectId: undefined } as Doc<"employees">;
+  function orphanContext(role: string) {
+    const chain = { withIndex: () => chain, filter: () => chain, collect: async () => [], first: async () => null };
+    return {
+      user: { _id: "user", role },
+      db: { query: () => chain, get: async (id: string) => id === employeeId ? orphan : null },
+    } as unknown as QueryCtx;
+  }
+  it("projesiz çalışanı yalnız super_admin görür", async () => {
+    vi.spyOn(projectScope, "resolveProjectScope").mockResolvedValue([projectId]);
+    const args = { employeeId, startDate: "2026-06-22", endDate: "2026-06-22" };
+    expect(await invoke(getEmployeeAttendanceDetail, orphanContext("project_admin"), args)).toBeNull();
+    expect(await invoke(getEmployeeAttendanceDetail, orphanContext("project_user"), args)).toBeNull();
+    expect(await invoke(getEmployeeAttendanceDetail, orphanContext("super_admin"), args)).not.toBeNull();
   });
 });

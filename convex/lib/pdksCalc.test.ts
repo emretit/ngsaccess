@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  computeBreakViolation,
   buildPeriodDateKeys,
   manualOverrideMinutes,
   minutesBetweenISO,
@@ -268,5 +269,31 @@ describe("pdksCalc – formatHoursLabel", () => {
 
   it("0 dk → 0h 0m", () => {
     expect(formatHoursLabel(0)).toBe("0h 0m");
+  });
+});
+
+
+describe("pdksCalc – computeBreakViolation", () => {
+  const times = (...minutes: number[]) => minutes.map((minute) => `2026-06-22T${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}:00+03:00`);
+  const planned = { breakStart: "12:00", breakEnd: "13:00" };
+  it("requires a 450-minute span and at least two punches", () => {
+    expect(computeBreakViolation({ ...planned, punchTimes: times(540, 989) })).toBe(false);
+    expect(computeBreakViolation({ ...planned, punchTimes: times(990, 540) })).toBe(true);
+    expect(computeBreakViolation({ ...planned, punchTimes: times(540) })).toBe(false);
+    expect(computeBreakViolation({ ...planned, punchTimes: times() })).toBe(false);
+  });
+  it.each([720, 750, 780])("counts a punch at %i inside the inclusive window", (minute) => {
+    expect(computeBreakViolation({ ...planned, punchTimes: times(540, minute, 1080) })).toBe(false);
+  });
+  it("floors the elapsed ISO duration before applying the 450-minute threshold", () => {
+    expect(computeBreakViolation({ ...planned, punchTimes: ["2026-06-22T08:00:59+03:00", "2026-06-22T15:30:00+03:00"] })).toBe(false);
+  });
+  it("requires both planned break times", () => {
+    for (const missing of [{}, { breakStart: "12:00" }, { breakEnd: "13:00" }, { breakStart: null, breakEnd: null }]) {
+      expect(computeBreakViolation({ ...missing, punchTimes: times(540, 1080) })).toBe(false);
+    }
+  });
+  it("does not classify unsupported midnight-crossing break windows as violations", () => {
+    expect(computeBreakViolation({ breakStart: "23:30", breakEnd: "00:30", punchTimes: times(540, 1080) })).toBe(false);
   });
 });
