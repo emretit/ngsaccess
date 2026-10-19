@@ -4,7 +4,7 @@ import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import { internalAction, type ActionCtx } from "../_generated/server";
 import { authedAction } from "../lib/customFunctions";
-import { isProjectAllowed } from "../lib/auth";
+import { canAccessEmployeeProject, isProjectAllowed } from "../lib/auth";
 import { deriveHikReaderNoFromDoorNo } from "../lib/hikReaderNumbers";
 import { withDeviceToken } from "../lib/cardReaderAuth";
 import type { Id } from "../_generated/dataModel";
@@ -970,7 +970,7 @@ export const captureFaceFromDevice = authedAction({
       if (!employee) {
         return { ok: false, error: "Çalışan bulunamadı" };
       }
-      if (employee.projectId && !isProjectAllowed(allowedProjectIds, employee.projectId)) {
+      if (!canAccessEmployeeProject(ctx.user.role, allowedProjectIds, employee.projectId)) {
         return { ok: false, error: "Bu çalışana erişim yetkiniz yok" };
       }
       employeeNo = employee.cardNumber?.trim() ?? undefined;

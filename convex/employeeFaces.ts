@@ -18,7 +18,6 @@ export const getByEmployee = authedQuery({
     const employee = await ctx.db.get(args.employeeId);
     if (!employee) return null;
     if (
-      employee.projectId &&
       ctx.user.role !== "super_admin" &&
       !isProjectAllowed(allowedProjectIds, employee.projectId)
     ) {
@@ -58,7 +57,6 @@ export const addFace = authedMutation({
     const employee = await ctx.db.get(args.employeeId);
     if (!employee) throw new Error("Çalışan bulunamadı");
     if (
-      employee.projectId &&
       ctx.user.role !== "super_admin" &&
       !isProjectAllowed(allowedProjectIds, employee.projectId)
     ) {
@@ -113,7 +111,6 @@ export const removeFace = authedMutation({
     const employee = await ctx.db.get(args.employeeId);
     if (!employee) return;
     if (
-      employee.projectId &&
       ctx.user.role !== "super_admin" &&
       !isProjectAllowed(allowedProjectIds, employee.projectId)
     ) {

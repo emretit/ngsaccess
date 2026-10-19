@@ -128,6 +128,18 @@ export function isProjectAllowed(
 }
 
 /**
+ * Çalışanın projesine erişim kararı (action'larda ctx.db yok → requireEmployeeAccess kullanılamaz).
+ * requireEmployeeAccess ile aynı kural: projesiz (orphan) çalışana yalnız super_admin erişir.
+ */
+export function canAccessEmployeeProject(
+  role: Doc<"users">["role"],
+  allowed: ReadonlyArray<Id<"projects">>,
+  projectId: Id<"projects"> | undefined,
+): boolean {
+  return role === "super_admin" || isProjectAllowed(allowed, projectId);
+}
+
+/**
  * Bir employeeId'ye erişim kontrolü. super_admin tüm employee'lere erişebilir;
  * diğer roller (project_admin, project_user) sadece üyesi oldukları projelerdeki employee'lere.
  * Projesiz (orphan) employee'ye yalnız super_admin erişir. Erişim yoksa hata fırlatır.
