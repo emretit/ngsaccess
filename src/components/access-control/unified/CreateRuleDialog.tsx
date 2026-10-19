@@ -296,8 +296,10 @@ export default function CreateRuleDialog({
                 Geri
               </Button>
             )}
+            {/* Ayrı key: aynı DOM düğmesi tıklama sırasında type="submit"e dönüp formu göndermesin. */}
             {step < 2 ? (
               <Button
+                key="next"
                 type="button"
                 disabled={isSubmitting || projectChanged}
                 onClick={advance}
@@ -306,6 +308,7 @@ export default function CreateRuleDialog({
               </Button>
             ) : (
               <Button
+                key="submit"
                 type="submit"
                 form={FORM_ID}
                 disabled={isSubmitting || projectChanged}
