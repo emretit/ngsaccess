@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import NumberFlow from "@number-flow/react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useDashboardActivity, useDashboardStats } from "@/hooks/useDashboard";
+import { useDashboardActivity, useDashboardStats, useDashboardTimeline } from "@/hooks/useDashboard";
 import { cn } from "@/lib/utils";
 
 function Metric({ label, value, suffix, tone, loading, children }: {
@@ -36,13 +36,15 @@ function Metric({ label, value, suffix, tone, loading, children }: {
 export default function TodayStrip() {
   const { stats, loading: statsLoading } = useDashboardStats();
   const { summary, loading: activityLoading } = useDashboardActivity();
+  // Bugünkü okuma sayısı saatlik grafikle aynı sorgudan gelir; getStats okumaları taramaz.
+  const { timeline, loading: timelineLoading } = useDashboardTimeline();
   const loading = statsLoading || activityLoading;
   const employees = stats?.employees ?? 0;
   const present = summary?.presentToday ?? 0;
   const rate = employees > 0 ? Math.min(100, Math.round((present / employees) * 100)) : 0;
   return (
     <>
-      <dl aria-label="Bugünün özeti" aria-busy={loading} className="grid grid-cols-2 overflow-hidden rounded-lg border bg-surface min-[1000px]:grid-cols-4 max-[999px]:[&>div:nth-child(-n+2)]:border-b max-[999px]:[&>div:nth-child(odd)]:border-r min-[1000px]:[&>div:not(:last-child)]:border-r">
+      <dl aria-label="Bugünün özeti" aria-busy={loading || timelineLoading} className="grid grid-cols-2 overflow-hidden rounded-lg border bg-surface min-[1000px]:grid-cols-4 max-[999px]:[&>div:nth-child(-n+2)]:border-b max-[999px]:[&>div:nth-child(odd)]:border-r min-[1000px]:[&>div:not(:last-child)]:border-r">
         <Metric label="Bugün gelen" value={present} suffix={`/ ${employees.toLocaleString("tr-TR")}`} loading={loading}>
           <span className="flex items-center gap-2">
             <span
@@ -64,7 +66,7 @@ export default function TodayStrip() {
         <Metric label="Geç kalan" value={summary?.lateArrivals ?? 0} tone="warning" loading={loading}>
           {summary?.workHours ? `Mesai ${summary.workHours}` : "Mesai saati okumayla görünür"}
         </Metric>
-        <Metric label="Kart okuması" value={stats?.cardReadings ?? 0} loading={loading}>
+        <Metric label="Kart okuması" value={timeline?.total ?? 0} loading={timelineLoading}>
           İzin verilen + reddedilen
         </Metric>
       </dl>

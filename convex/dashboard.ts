@@ -34,11 +34,16 @@ type AuthedCtx = QueryCtx & { user: Doc<"users"> };
 export const getStats = authedQuery({
   args: {
     projectId: v.optional(v.id("projects")),
+    // Ana sayfa bugünkü okuma sayısını getTodayTimeline.total'dan alır; false verince okumalar
+    // ikinci kez taranmaz ve sorgu her kart okumasında yeniden çalışmaz. Varsayılan true: 61cd264
+    // öncesi/canlı eski web paketi cardReadings'i hâlâ okuyor; tüm paketler geçince alan kaldırılabilir.
+    includeTodayReadings: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
     const today = trTodayKey();
     const { startISO: todayISO, endISO: todayEndISO } = trDayRangeISO(today, today);
+    const includeTodayReadings = args.includeTodayReadings ?? true;
 
     let employees = 0;
     let devices = 0;
@@ -51,11 +56,13 @@ export const getStats = authedQuery({
         countDashboardRows(
           ctx.db.query("devices").withIndex("by_active", (q) => q.eq("isActive", true))
         ),
-        countDashboardRows(
-          ctx.db.query("cardReadings").withIndex("by_access_time", (q) =>
-            q.gte("accessTime", todayISO).lte("accessTime", todayEndISO)
-          )
-        ),
+        includeTodayReadings
+          ? countDashboardRows(
+              ctx.db.query("cardReadings").withIndex("by_access_time", (q) =>
+                q.gte("accessTime", todayISO).lte("accessTime", todayEndISO)
+              )
+            )
+          : 0,
         countDashboardRows(
           ctx.db.query("accessRules").withIndex("by_active", (q) => q.eq("isActive", false))
         ),
@@ -78,7 +85,7 @@ export const getStats = authedQuery({
           )
         ),
         Promise.all(
-          allowedProjectIds.map((pid) =>
+          (includeTodayReadings ? allowedProjectIds : []).map((pid) =>
             countDashboardRows(ctx.db
               .query("cardReadings")
               .withIndex("by_project_access_time", (q) =>
@@ -103,7 +110,8 @@ export const getStats = authedQuery({
     return {
       employees,
       devices,
-      cardReadings: todayReadings,
+      // Sayılmadıysa 0 değil undefined: "bugün okuma yok" ile karışmasın.
+      cardReadings: includeTodayReadings ? todayReadings : undefined,
       pendingRequests: pendingRules,
     };
   },

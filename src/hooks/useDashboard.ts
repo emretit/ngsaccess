@@ -10,7 +10,7 @@ function useDashboardScope() {
 }
 export function useDashboardStats() {
   const scope = useDashboardScope();
-  const stats = useQuery(api.dashboard.getStats, scope.enabled ? { projectId: scope.projectId } : "skip");
+  const stats = useQuery(api.dashboard.getStats, scope.enabled ? { projectId: scope.projectId, includeTodayReadings: false } : "skip");
   return { stats, loading: scope.loading || (scope.enabled && stats === undefined) };
 }
 export function useDashboardActivity() {
