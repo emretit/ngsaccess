@@ -19,6 +19,11 @@ import {
   filterAndSortEmployees,
   safeSearchParam,
 } from "@/components/employees/lib/employeeList";
+import { Button } from "@/components/ui/button";
+import { EmployeeImportDialog } from "@/components/employees/import/EmployeeImportDialog";
+import { EmployeeExportDialog } from "@/components/employees/import/EmployeeExportDialog";
+import { EMPLOYEE_EXPORT_MAX_ROWS } from "@/lib/employees/exportEmployeesXlsx";
+import { downloadEmployeeImportTemplate } from "@/lib/employees/importTemplate";
 export default function Employees() {
   const { projectId } = useActiveProjectScope();
   return (
@@ -38,6 +43,9 @@ function EmployeePage() {
     loading: projectLoading,
   } = useActiveProjectScope();
   const { activeProject } = useActiveProject();
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const { employees, isLoading, refetch, hasProjectAccess } = useEmployees();
   const [params, setParams] = useSearchParams();
   const [privateQuery, setPrivateQuery] = useState<string | null>(null);
@@ -124,6 +132,7 @@ function EmployeePage() {
   if (!projectId)
     return <EmptyState title="Personelleri görmek için proje seçin." />;
   const hasFilters = !!q || !!department || status !== "all";
+  const exportTooLarge = filtered.length > EMPLOYEE_EXPORT_MAX_ROWS;
   const activeCount = employees.filter((employee) => employee.isActive).length;
   const statusCounts = {
     all: employees.length,
@@ -165,6 +174,12 @@ function EmployeePage() {
               update({ q: "", department: "", status: "" });
             }}
           />
+          {isAdmin && <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" onClick={() => setImportDialogOpen(true)}>İçe aktar</Button>
+            <Button variant="outline" disabled={exportTooLarge} title={exportTooLarge ? `Dışa aktarma en fazla ${EMPLOYEE_EXPORT_MAX_ROWS} kişi içerebilir.` : undefined} onClick={() => { setExportError(null); setExportDialogOpen(true); }}>Dışa aktar</Button>
+            <Button variant="ghost" onClick={() => void downloadEmployeeImportTemplate().catch((cause: unknown) => setExportError(cause instanceof Error ? cause.message : "Şablon indirilemedi."))}>Şablon indir</Button>
+            {exportError && <span role="alert" className="text-sm text-destructive">{exportError}</span>}
+          </div>}
           {isLoading ? (
             <SectionSkeleton label="Personel bilgileri yükleniyor…" />
           ) : employees.length === 0 ? (
@@ -222,6 +237,8 @@ function EmployeePage() {
           }
         }}
       />
+      {importDialogOpen && isAdmin && <EmployeeImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} projectId={projectId} />}
+      {exportDialogOpen && isAdmin && <EmployeeExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} projectId={projectId} employees={filtered} onError={setExportError} />}
     </div>
   );
 }

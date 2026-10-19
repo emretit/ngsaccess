@@ -24,6 +24,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useEmployeeTable } from "@/hooks/useEmployeeTable";
 import { EmployeeBulkActions } from "./EmployeeBulkActions";
+import { BatchCardAssignDialog } from "./import/BatchCardAssignDialog";
 import { EmployeeDeleteDialog } from "./EmployeeDeleteDialog";
 import { EmployeePasswordResetDialog } from "./EmployeePasswordResetDialog";
 import { RowActions } from "@/components/shared/RowActions";
@@ -53,6 +54,8 @@ export default function EmployeeTable({
   const [syncRequest, setSyncRequest] = useState<{ employees: Employee[]; retry?: boolean } | null>(null);
   const [failedSyncIds, setFailedSyncIds] = useState<Id<"employees">[]>([]);
   const [syncReport, setSyncReport] = useState<string[]>([]);
+  // Diyalog açıldığı andaki seçim; canlı filtre her render'da yeni dizi üretip diyalogun efektini sıfırlar.
+  const [cardAssignEmployees, setCardAssignEmployees] = useState<Employee[] | null>(null);
   const [selectedEmployeeForReset, setSelectedEmployeeForReset] =
     useState<Employee | null>(null);
   const [showPasswordResetDialog, setShowPasswordResetDialog] = useState(false);
@@ -257,6 +260,7 @@ export default function EmployeeTable({
           onSyncToDevices={() => {
             setSyncRequest({ employees: employees.filter(emp => selectedEmployees.includes(emp._id)) });
           }}
+          onAssignCards={() => setCardAssignEmployees(employees.filter((emp) => selectedEmployees.includes(emp._id)))}
           isSyncing={isBulkSyncing || syncAction.pending}
           pending={departmentPending || isBulkSyncing || syncAction.pending}
         />
@@ -475,6 +479,17 @@ export default function EmployeeTable({
         else void handleBulkSyncToDevices(syncRequest.retry ?? false);
         setSyncRequest(null);
       }} />}
+
+      {cardAssignEmployees && isAdmin && projectId && (
+        <BatchCardAssignDialog
+          open
+          onOpenChange={(next) => {
+            if (!next) setCardAssignEmployees(null);
+          }}
+          projectId={projectId}
+          employees={cardAssignEmployees}
+        />
+      )}
 
       <EmployeePasswordResetDialog
         isOpen={showPasswordResetDialog}

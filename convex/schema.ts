@@ -545,14 +545,31 @@ export default defineSchema({
     hikFrontSerialNo: v.optional(v.number()),
     hikEventState: v.optional(v.string()),
     ideUuid: v.optional(v.string()),
+    // Alarm merkezi: yönetici onayı (P1). category alarm/exception + severity warning/critical olaylar alarm sayılır.
+    ackedAt: v.optional(v.string()),
+    ackedBy: v.optional(v.id("users")),
+    ackNote: v.optional(v.string()),
+    // E-posta bildirimi gerçekten planlandıysa damga (debounce "gönderim"e bakar, olay varlığına değil; P1 düzeltme).
+    alarmNotifiedAt: v.optional(v.string()),
     createdAt: v.string(),
     updatedAt: v.string(),
   })
     .index("by_project", ["projectId"])
     .index("by_device", ["deviceId"])
     .index("by_project_and_event_time", ["projectId", "eventTime"])
+    .index("by_project_category_event_time", ["projectId", "category", "eventTime"])
     .index("by_device_and_event_time", ["deviceId", "eventTime"])
     .index("by_device_and_hik_serial", ["deviceId", "hikSerialNo"]),
+
+  // Alarm e-posta bildirimi ayarı (proje başına tek satır; P1).
+  alarmSettings: defineTable({
+    projectId: v.id("projects"),
+    emailEnabled: v.boolean(),
+    recipients: v.array(v.string()),
+    minSeverity: v.union(v.literal("warning"), v.literal("critical")),
+    updatedBy: v.optional(v.id("users")),
+    updatedAt: v.string(),
+  }).index("by_project", ["projectId"]),
 
   // Cihaz offline iken biriken Convex -> cihaz komutları kuyruğu.
   // Gateway cihazlarda worker failed kayıtları retry eder; localBridge cihazlarda
@@ -986,6 +1003,9 @@ export default defineSchema({
     ),
     approvedBy: v.optional(v.id("users")),
     notes: v.optional(v.string()),
+    // Başvuru-onay akışı (P3): kaydı kim açtı. Boşsa yönetici (eski kayıtlar).
+    // Geri çekme: bekleyen talep silinir (status birliğine yeni değer eklenmez).
+    source: v.optional(v.union(v.literal("admin"), v.literal("employee"))),
     createdAt: v.string(),
     updatedAt: v.string(),
   })
@@ -999,6 +1019,31 @@ export default defineSchema({
     .index("by_project_employee_end", ["projectId", "employeeId", "endDate"])
     .index("by_project_employee_type_end", ["projectId", "employeeId", "leaveType", "endDate"])
     .index("by_employee_start", ["employeeId", "startDate"]),
+
+  // PDKS düzeltme talebi (P3): çalışan ister, yönetici onaylar; onayda pdksRecords'a manuel kayıt yazılır.
+  attendanceCorrections: defineTable({
+    employeeId: v.id("employees"),
+    projectId: v.optional(v.id("projects")),
+    date: v.string(), // YYYY-MM-DD (TR günü)
+    correctionType: v.union(v.literal("checkIn"), v.literal("checkOut"), v.literal("both")),
+    requestedCheckIn: v.optional(v.string()), // HH:mm
+    requestedCheckOut: v.optional(v.string()), // HH:mm
+    reason: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+      v.literal("withdrawn")
+    ),
+    decidedBy: v.optional(v.id("users")),
+    decidedAt: v.optional(v.string()),
+    decisionNote: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  })
+    .index("by_employee", ["employeeId"])
+    .index("by_project_status", ["projectId", "status"])
+    .index("by_employee_date", ["employeeId", "date"]),
 
   leaveBalances: defineTable({
     employeeId: v.id("employees"),

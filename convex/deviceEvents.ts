@@ -4,6 +4,7 @@ import { authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { classifyHikEvent } from "./lib/hikEventCatalog";
 import { toUtcISO } from "./lib/trDate";
+import { notifyAlarmIfNeeded } from "./lib/alarmNotify";
 
 const SOURCE_VALIDATOR = v.union(
   v.literal("hikvision"),
@@ -40,7 +41,7 @@ export const recordSystemOperation = authedMutation({
     }
 
     const now = new Date().toISOString();
-    await ctx.db.insert("deviceEvents", {
+    const eventId = await ctx.db.insert("deviceEvents", {
       projectId: device.projectId,
       deviceId: args.deviceId,
       source: "system",
@@ -57,6 +58,7 @@ export const recordSystemOperation = authedMutation({
       createdAt: now,
       updatedAt: now,
     });
+    await notifyAlarmIfNeeded(ctx, eventId);
 
     return { inserted: true };
   },
@@ -132,7 +134,7 @@ export const recordHikDeviceEvent = internalMutation({
     const event = classifyHikEvent(args.major, args.minor);
     const now = new Date().toISOString();
 
-    await ctx.db.insert("deviceEvents", {
+    const eventId = await ctx.db.insert("deviceEvents", {
       projectId,
       deviceId,
       source: args.source ?? "hikvision",
@@ -155,6 +157,8 @@ export const recordHikDeviceEvent = internalMutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    await notifyAlarmIfNeeded(ctx, eventId);
 
     return { inserted: true };
   },

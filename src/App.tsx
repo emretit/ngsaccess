@@ -24,6 +24,7 @@ const Leaves = lazy(() => import('@/pages/Leaves'));
 const CheckIn = lazy(() => import('@/pages/CheckIn'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const AuditLog = lazy(() => import('@/pages/AuditLog'));
+const Alarms = lazy(() => import('@/pages/Alarms'));
 const Reports = lazy(() => import('@/pages/Reports'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const SystemAdmin = lazy(() => import('@/pages/SystemAdmin'));
@@ -77,6 +78,7 @@ function AppContent() {
           <Route path="/leaves" element={<Leaves />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/audit-log" element={<AuditLog />} />
+          <Route path="/alarms" element={<Alarms />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/reports/:group" element={<Reports />} />
           <Route path="/reports/:group/:slug" element={<Reports />} />

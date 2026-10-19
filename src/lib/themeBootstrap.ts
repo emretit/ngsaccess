@@ -6,7 +6,7 @@ export const THEME_CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 // Keep the tiny pre-CSS copy in index.html in sync; themeBootstrap.test.ts checks both.
 export const APP_THEME_PREFIXES = [
   '/home', '/employees', '/devices', '/virtual-readers', '/access-control', '/visitors',
-  '/live-monitoring', '/pdks-records', '/shifts', '/leaves', '/reports', '/audit-log',
+  '/live-monitoring', '/pdks-records', '/shifts', '/leaves', '/reports', '/audit-log', '/alarms',
   '/engineering-department', '/system-admin', '/settings', '/profile',
 ] as const;
 

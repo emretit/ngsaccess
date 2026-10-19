@@ -30,6 +30,7 @@ interface EmployeeBulkActionsProps {
   onUpdateDepartment: () => void;
   onDelete: () => void;
   onSyncToDevices?: () => void;
+  onAssignCards?: () => void;
   isSyncing?: boolean;
   pending?: boolean;
 }
@@ -44,6 +45,7 @@ export function EmployeeBulkActions({
   onUpdateDepartment,
   onDelete,
   onSyncToDevices,
+  onAssignCards,
   isSyncing,
   pending,
 }: EmployeeBulkActionsProps) {
@@ -88,6 +90,11 @@ export function EmployeeBulkActions({
             <Upload className="h-4 w-4 mr-2" />
           )}
           Cihazlara gönder
+        </Button>
+      )}
+      {onAssignCards && (
+        <Button variant="outline" onClick={onAssignCards} disabled={isSyncing || pending}>
+          Toplu kart ata
         </Button>
       )}
       <Button
