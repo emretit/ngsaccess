@@ -6,9 +6,8 @@ import { useConvexAuth, useQuery, useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import { notify } from '@/lib/notify';
-import { safeReturnPath } from '@/lib/routeMeta';
+import { routeMeta, safeReturnPath } from '@/lib/routeMeta';
 import { checkUserRole } from '@/services/authService';
-import { routeMeta } from '@/lib/routeMeta';
 
 type UserRole = "super_admin" | "project_admin" | "project_user";
 type UserProfile = NonNullable<FunctionReturnType<typeof api.users.currentUser>>;
