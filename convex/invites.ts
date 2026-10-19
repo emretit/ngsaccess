@@ -1,19 +1,20 @@
 import { ConvexError, v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internalMutation, mutation, query } from "./_generated/server";
-import { authedMutation, superAdminMutation, superAdminQuery } from "./lib/customFunctions";
+import { superAdminMutation, superAdminQuery } from "./lib/customFunctions";
 import { limiter } from "./lib/rateLimit";
 import { verifyUser } from "./lib/auth";
 
 /**
  * Yetkili kullanıcı (super_admin / proje sahibi / proje admin) bir kullanıcıyı
- * projeye davet eder. Dönen token ile /user-setup?token=xxx linki oluşturulur.
+ * projeye davet eder. Token yalnız e-posta action'ında kalır, istemciye dönmez.
  *
  * type === "reset" → mevcut kullanıcıya şifre sıfırlama maili (henüz Convex
  * Auth password reset entegrasyonu yok; bu field gelecek PR için hazırlık).
  */
-export const create = authedMutation({
+export const create = internalMutation({
   args: {
+    callerId: v.id("users"),
     email: v.string(),
     projectId: v.id("projects"),
     role: v.union(v.literal("project_admin"), v.literal("project_user")),
@@ -21,17 +22,21 @@ export const create = authedMutation({
   },
   returns: v.string(),
   handler: async (ctx, args) => {
+    const caller = await ctx.db.get(args.callerId);
+    if (!caller || caller.verified === false) {
+      throw new Error("Giriş yapmanız gerekiyor");
+    }
     // Yetki: super_admin veya projenin owner'ı veya o projeye admin olarak atanmış
     const project = await ctx.db.get(args.projectId);
     if (!project) throw new Error("Proje bulunamadı");
 
-    const isSuperAdmin = ctx.user.role === "super_admin";
-    const isOwner = project.ownerId === ctx.user._id;
+    const isSuperAdmin = caller.role === "super_admin";
+    const isOwner = project.ownerId === caller._id;
     let isProjectAdmin = false;
-    if (!isSuperAdmin && !isOwner && ctx.user.role === "project_admin") {
+    if (!isSuperAdmin && !isOwner && caller.role === "project_admin") {
       const membership = await ctx.db
         .query("userProjects")
-        .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
+        .withIndex("by_user", (q) => q.eq("userId", caller._id))
         .filter((q) => q.eq(q.field("projectId"), args.projectId))
         .first();
       isProjectAdmin = membership !== null;
@@ -41,7 +46,7 @@ export const create = authedMutation({
     }
 
     await limiter.limit(ctx, "inviteCreate", {
-      key: ctx.user._id,
+      key: args.callerId,
       throws: true,
     });
 
@@ -60,7 +65,7 @@ export const create = authedMutation({
       projectId: args.projectId,
       role: args.role,
       type: args.type ?? "invite",
-      createdBy: ctx.user._id,
+      createdBy: args.callerId,
       expiresAt,
       used: false,
       createdAt: new Date().toISOString(),

@@ -10,7 +10,7 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 interface ResendResponse {
   id?: string;
-  error?: { message: string };
+  error?: { message: string; name?: string };
 }
 
 async function sendResendEmail(params: {
@@ -50,7 +50,10 @@ async function sendResendEmail(params: {
 
   const data = (await response.json()) as ResendResponse;
   if (!response.ok || data.error) {
-    return { success: false, error: data.error?.message ?? "Email gönderilemedi" };
+    // Provider hata metni request içeriğini (CTA token URL'si dahil) yansıtabilir:
+    // istemciye sabit metin döner; log'a da mesaj değil yalnız durum + hata adı yazılır.
+    console.error("Resend hatası:", response.status, data.error?.name);
+    return { success: false, error: "Email gönderilemedi" };
   }
   return { success: true };
 }
@@ -200,8 +203,9 @@ export const sendEmployeeSetupEmail = authedAction({
 
 /**
  * Yetkili kullanıcı (super_admin / proje sahibi / proje admin) bir kullanıcıyı
- * projeye davet eder. invites.create ile token üretilir, kullanıcıya pafta tarzı
- * kart maili gider; link /user-setup?token=xxx üzerinden şifre belirletir.
+ * projeye davet eder. Internal invites.create token üretir; token yalnız mail içindir.
+ * Kullanıcıya pafta tarzı kart maili gider; link /user-setup?token=xxx üzerinden
+ * şifre belirletir.
  *
  * type === "reset" parametresi gelecek için hazır (mevcut kullanıcıya şifre
  * sıfırlama maili) — şu an UI'dan tetiklenmiyor.
@@ -221,9 +225,9 @@ export const sendUserInviteEmail = authedAction({
   handler: async (ctx, args): Promise<{ success: boolean; error?: string }> => {
     const inviteType = args.type ?? "invite";
 
-    // invites.create kendi içinde yetki kontrolü yapar (super_admin/owner/project_admin),
-    // ama bu action artık authedAction olduğundan anonim caller buraya hiç ulaşamaz.
-    const token: string = await ctx.runMutation(api.invites.create, {
+    // Internal mutation yetkiyi ve caller doğrulamasını yeniden denetler.
+    const token: string = await ctx.runMutation(internal.invites.create, {
+      callerId: ctx.user._id,
       email: args.email,
       projectId: args.projectId,
       role: args.role,

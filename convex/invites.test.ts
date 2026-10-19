@@ -3,7 +3,10 @@ import type { FunctionArgs } from 'convex/server';
 import type { MutationCtx } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
 import type { api } from './_generated/api';
-import { consume } from './invites';
+import { consume, create } from './invites';
+import { limiter } from './lib/rateLimit';
+
+vi.mock('./lib/rateLimit', () => ({ limiter: { limit: vi.fn(async () => undefined) } }));
 
 // Use the registered production handler, real getAuthUserId and real verifyUser.
 // Only the database and server-provided identity are in-memory fixtures, following
@@ -165,5 +168,108 @@ describe('invites.consume authorization and global role protection', () => {
     await expect(handler(f.ctx, args)).rejects.toMatchObject({ data: { code: 'INVITE_INVALID' } });
     expect(f.patch).toHaveBeenCalledTimes(patchCount);
     expect(f.insert).toHaveBeenCalledOnce();
+  });
+});
+
+type CreateArgs = {
+  callerId: Id<'users'>;
+  email: string;
+  projectId: Id<'projects'>;
+  role: 'project_admin' | 'project_user';
+  type?: 'invite' | 'reset';
+};
+const registeredCreate = create as unknown as {
+  _handler: (ctx: MutationCtx, args: CreateArgs) => Promise<string>;
+  isInternal: boolean;
+  isPublic?: boolean;
+};
+const createHandler = registeredCreate._handler;
+
+function createFixture(options: {
+  caller?: Partial<Doc<'users'>> | null;
+  owner?: Id<'users'>;
+  memberships?: Id<'projects'>[];
+  existingEmails?: string[];
+} = {}) {
+  const callerId = attackerId;
+  const caller = options.caller === null ? null : {
+    _id: callerId, _creationTime: 1, email: 'inviter@example.test', role: 'super_admin' as const, verified: true,
+    ...options.caller,
+  };
+  const memberships: Record<string, unknown>[] = (options.memberships ?? []).map((membershipProjectId) => ({ userId: callerId, projectId: membershipProjectId }));
+  const invites: Record<string, unknown>[] = (options.existingEmails ?? []).map((email, index) => ({
+    _id: `old-${index}` as Id<'invites'>, email, used: false,
+  }));
+  const inserted: Record<string, unknown>[] = [];
+  const patched: Record<string, unknown>[] = [];
+  const project = { _id: projectId, _creationTime: 1, ownerId: options.owner ?? userId };
+  const query = (table: string) => {
+    const criteria: Record<string, unknown> = {};
+    let extraCriterion: { field: string; value: unknown } | undefined;
+    const indexBuilder: IndexBuilder = { eq: (field, value) => { criteria[field] = value; return indexBuilder; } };
+    const rows = () => (table === 'userProjects' ? memberships : table === 'invites' ? invites : [])
+      .filter((row) => Object.entries(criteria).every(([key, value]) => row[key] === value))
+      .filter((row) => !extraCriterion || row[extraCriterion.field] === extraCriterion.value);
+    const result = {
+      withIndex: (_name: string, apply: (q: IndexBuilder) => unknown) => { apply(indexBuilder); return result; },
+      filter: (apply: (q: { field: (name: string) => string; eq: (field: string, value: unknown) => { field: string; value: unknown } }) => { field: string; value: unknown }) => {
+        extraCriterion = apply({ field: (name) => name, eq: (field, value) => ({ field, value }) });
+        return result;
+      },
+      first: async () => rows()[0] ?? null,
+      async *[Symbol.asyncIterator]() { yield* rows(); },
+    };
+    return result;
+  };
+  const ctx = { db: {
+    get: async (id: Id<'users'> | Id<'projects'>) => id === callerId ? caller : id === projectId ? project : null,
+    query,
+    patch: async (id: Id<'invites'>, changes: Record<string, unknown>) => { patched.push({ id, ...changes }); },
+    insert: async (_table: string, value: Record<string, unknown>) => { inserted.push(value); return 'new-invite'; },
+  } } as unknown as MutationCtx;
+  return { ctx, callerId, inserted, patched };
+}
+
+describe('invites.create internal authorization', () => {
+  const input = (callerId: Id<'users'>) => ({ callerId, email: 'New.User@example.test', projectId, role: 'project_user' as const });
+
+  it('is internal only', () => {
+    expect(registeredCreate.isInternal).toBe(true);
+    expect(registeredCreate.isPublic).not.toBe(true);
+  });
+  it('allows super_admin and lowercases the inserted email', async () => {
+    const f = createFixture();
+    await expect(createHandler(f.ctx, input(f.callerId))).resolves.toEqual(expect.any(String));
+    expect(f.inserted[0]).toMatchObject({ email: 'new.user@example.test', createdBy: f.callerId });
+    expect(limiter.limit).toHaveBeenCalledWith(f.ctx, 'inviteCreate', { key: f.callerId, throws: true });
+  });
+  it('allows the project owner', async () => {
+    const f = createFixture({ caller: { role: 'project_user' }, owner: attackerId });
+    await expect(createHandler(f.ctx, input(f.callerId))).resolves.toEqual(expect.any(String));
+  });
+  it('allows a project_admin who belongs to the project', async () => {
+    const f = createFixture({ caller: { role: 'project_admin' }, memberships: [projectId] });
+    await expect(createHandler(f.ctx, input(f.callerId))).resolves.toEqual(expect.any(String));
+  });
+  it('rejects a project_admin outside the project without inserting', async () => {
+    const f = createFixture({ caller: { role: 'project_admin' } });
+    await expect(createHandler(f.ctx, input(f.callerId))).rejects.toThrow('yetkin yok');
+    expect(f.inserted).toHaveLength(0);
+  });
+  it('rejects project_user without inserting', async () => {
+    const f = createFixture({ caller: { role: 'project_user' } });
+    await expect(createHandler(f.ctx, input(f.callerId))).rejects.toThrow('yetkin yok');
+    expect(f.inserted).toHaveLength(0);
+  });
+  it.each([{ caller: null }, { caller: { verified: false } }])('rejects absent or unverified caller: %j', async (options) => {
+    const f = createFixture(options);
+    await expect(createHandler(f.ctx, input(f.callerId))).rejects.toThrow('Giriş yapmanız gerekiyor');
+    expect(f.inserted).toHaveLength(0);
+  });
+  it('marks all previous unused invitations for the email as used', async () => {
+    const f = createFixture({ existingEmails: ['new.user@example.test', 'new.user@example.test'] });
+    await createHandler(f.ctx, input(f.callerId));
+    expect(f.patched).toHaveLength(2);
+    expect(f.patched.every((patch) => patch.used === true)).toBe(true);
   });
 });
