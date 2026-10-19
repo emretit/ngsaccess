@@ -1,0 +1,16 @@
+src/pages/SystemAdmin.tsx:7:import { AdminDashboard } from "@/components/settings/sections/AdminDashboard";
+src/pages/SystemAdmin.tsx:46:      <AdminDashboard />
+src/components/settings/SettingsTabs.tsx:9:interface SettingsTabsProps {
+src/components/settings/SettingsTabs.tsx:14:export function SettingsTabs({ activeTab, onTabChange }: SettingsTabsProps) {
+src/components/settings/StepNavigation.tsx:5:interface StepNavigationProps {
+src/components/settings/StepNavigation.tsx:12:export function StepNavigation({ currentStep, steps, onStepChange, canProceed = true }: StepNavigationProps) {
+src/components/settings/OnboardingProgress.tsx:12:interface OnboardingProgressProps {
+src/components/settings/OnboardingProgress.tsx:17:export function OnboardingProgress({ steps, currentStep }: OnboardingProgressProps) {
+src/components/settings/sections/AdminDashboard.tsx:11:function AdminDashboardContent() {
+src/components/settings/sections/AdminDashboard.tsx:60:export function AdminDashboard() {
+src/components/settings/sections/AdminDashboard.tsx:61:  return <AdminDataBoundary label="Yönetim özeti"><AdminDashboardContent /></AdminDataBoundary>;
+src/components/settings/sections/CompanySettings.tsx:8:export function CompanySettings() {
+src/components/settings/sections/general/index.ts:3:export * from './FormSubmitButton';
+src/components/settings/sections/WorkScheduleSettings.tsx:7:export function WorkScheduleSettings() {
+src/components/settings/sections/general/FormSubmitButton.tsx:3:interface FormSubmitButtonProps {
+src/components/settings/sections/general/FormSubmitButton.tsx:7:export const FormSubmitButton = ({ saving }: FormSubmitButtonProps) => {

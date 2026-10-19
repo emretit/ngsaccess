@@ -1,0 +1,275 @@
+{
+  "results": [
+    {
+      "section": "general",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "section": "users",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "section": "work-payroll",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "section": "reports",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "section": "integrations",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "section": "mail",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "section": "notifications",
+      "width": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "section": "general",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "section": "users",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "section": "work-payroll",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "section": "reports",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "section": "integrations",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "section": "mail",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "section": "notifications",
+      "width": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "role": "super_admin",
+      "state": "ready",
+      "width": 1440,
+      "scroll": 1440
+    },
+    {
+      "role": "super_admin",
+      "state": "loading",
+      "width": 1440,
+      "scroll": 1440
+    },
+    {
+      "role": "super_admin",
+      "state": "error",
+      "width": 1440,
+      "scroll": 1440
+    },
+    {
+      "role": "super_admin",
+      "state": "empty",
+      "width": 1440,
+      "scroll": 1440
+    },
+    {
+      "role": "super_admin",
+      "state": "no-project",
+      "width": 1440,
+      "scroll": 1440
+    },
+    {
+      "role": "project_admin",
+      "state": "ready",
+      "width": 1440,
+      "scroll": 1440
+    },
+    {
+      "role": "project_admin",
+      "state": "loading",
+      "width": 1440,
+      "scroll": 1440
+    },
+    {
+      "role": "project_admin",
+      "state": "error",
+      "width": 1440,
+      "scroll": 1440
+    },
+    {
+      "role": "project_admin",
+      "state": "empty",
+      "width": 1440,
+      "scroll": 1440
+    },
+    {
+      "role": "project_admin",
+      "state": "no-project",
+      "width": 1440,
+      "scroll": 1440
+    },
+    {
+      "role": "project_user",
+      "state": "ready",
+      "width": 1440,
+      "scroll": 1440
+    },
+    {
+      "role": "project_user",
+      "state": "loading",
+      "width": 1440,
+      "scroll": 1440
+    },
+    {
+      "role": "project_user",
+      "state": "error",
+      "width": 1440,
+      "scroll": 1440
+    },
+    {
+      "role": "project_user",
+      "state": "empty",
+      "width": 1440,
+      "scroll": 1440
+    },
+    {
+      "role": "project_user",
+      "state": "no-project",
+      "width": 1440,
+      "scroll": 1440
+    },
+    {
+      "role": "super_admin",
+      "state": "ready",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "role": "super_admin",
+      "state": "loading",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "role": "super_admin",
+      "state": "error",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "role": "super_admin",
+      "state": "empty",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "role": "super_admin",
+      "state": "no-project",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "role": "project_admin",
+      "state": "ready",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "role": "project_admin",
+      "state": "loading",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "role": "project_admin",
+      "state": "error",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "role": "project_admin",
+      "state": "empty",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "role": "project_admin",
+      "state": "no-project",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "role": "project_user",
+      "state": "ready",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "role": "project_user",
+      "state": "loading",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "role": "project_user",
+      "state": "error",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "role": "project_user",
+      "state": "empty",
+      "width": 390,
+      "scroll": 390
+    },
+    {
+      "role": "project_user",
+      "state": "no-project",
+      "width": 390,
+      "scroll": 390
+    }
+  ],
+  "errors": [],
+  "externalRequests": [],
+  "htmlParser": {
+    "balanced": true,
+    "uniqueIds": 111,
+    "errors": []
+  }
+}

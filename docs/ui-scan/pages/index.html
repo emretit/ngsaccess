@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NGS Plus — A2 mockup galerisi</title>
+<style>
+  :root { --canvas:#fcfcfc; --surface:#ffffff; --line:#e2e2e0; --text:#252523; --muted:#646461; --primary:#7a1f1f; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--canvas); color:var(--text); font:13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; }
+  header { padding:32px 32px 16px; border-bottom:1px solid var(--line); }
+  h1 { margin:0; font-size:26px; font-weight:600; }
+  header p { margin:4px 0 0; color:var(--muted); }
+  ul { list-style:none; margin:0; padding:24px 32px 48px; display:grid; gap:24px; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); }
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .shot { display:block; aspect-ratio:16/10; overflow:hidden; border-bottom:1px solid var(--line); }
+  .shot img { width:100%; display:block; }
+  .meta { padding:12px 16px 16px; }
+  h2 { margin:0; font-size:16px; font-weight:600; }
+  .num { color:var(--muted); font-variant-numeric:tabular-nums; margin-right:4px; }
+  .meta p { margin:4px 0 0; color:var(--muted); }
+  .links a { color:var(--primary); margin-right:12px; }
+  a:focus-visible { outline:2px solid var(--primary); outline-offset:3px; }
+  @media (max-width: 420px) { header, ul { padding-left:16px; padding-right:16px; } ul { grid-template-columns:1fr; } h1 { font-size:24px; } }
+</style>
+</head>
+<body>
+  <header>
+    <h1>A2 mockup galerisi</h1>
+    <p>13 sayfa · 247 bulgu · Tasarım dili: sade nötr + bordo sidebar · Sentez: 00_OZET.md · Plan: PLAN.md</p>
+  </header>
+  <ul>
+    <li class="card">
+      <a class="shot" href="01-ana-sayfa/mockup.html"><img src="01-ana-sayfa/desktop.png" alt="Ana Sayfa + kabuk yeni tasarım önizlemesi" loading="lazy"></a>
+      <div class="meta">
+        <h2><span class="num">01</span> Ana Sayfa + kabuk</h2>
+        <p>21 bulgu · Dalga C1</p>
+        <p class="links"><a href="01-ana-sayfa/mockup.html">Mockup</a> <a href="01-ana-sayfa/REPORT.md">Rapor</a> <a href="../current/01-ana-sayfa.png">Mevcut ekran</a></p>
+      </div>
+    </li>
+    <li class="card">
+      <a class="shot" href="02-kisiler/mockup.html"><img src="02-kisiler/desktop-1440.png" alt="Kişiler yeni tasarım önizlemesi" loading="lazy"></a>
+      <div class="meta">
+        <h2><span class="num">02</span> Kişiler</h2>
+        <p>18 bulgu · Dalga C2a</p>
+        <p class="links"><a href="02-kisiler/mockup.html">Mockup</a> <a href="02-kisiler/REPORT.md">Rapor</a> <a href="../current/02-kisiler.png">Mevcut ekran</a></p>
+      </div>
+    </li>
+    <li class="card">
+      <a class="shot" href="03-cihazlar/mockup.html"><img src="03-cihazlar/desktop.png" alt="Cihazlar yeni tasarım önizlemesi" loading="lazy"></a>
+      <div class="meta">
+        <h2><span class="num">03</span> Cihazlar</h2>
+        <p>18 bulgu · Dalga C2a</p>
+        <p class="links"><a href="03-cihazlar/mockup.html">Mockup</a> <a href="03-cihazlar/REPORT.md">Rapor</a> <a href="../current/03-cihazlar.png">Mevcut ekran</a></p>
+      </div>
+    </li>
+    <li class="card">
+      <a class="shot" href="04-sanal-okuyucular/mockup.html"><img src="04-sanal-okuyucular/desktop.png" alt="Sanal Okuyucular yeni tasarım önizlemesi" loading="lazy"></a>
+      <div class="meta">
+        <h2><span class="num">04</span> Sanal Okuyucular</h2>
+        <p>16 bulgu · Dalga C2a</p>
+        <p class="links"><a href="04-sanal-okuyucular/mockup.html">Mockup</a> <a href="04-sanal-okuyucular/REPORT.md">Rapor</a> <a href="../current/04-sanal-okuyucular.png">Mevcut ekran</a></p>
+      </div>
+    </li>
+    <li class="card">
+      <a class="shot" href="05-gecis-kontrol/mockup.html"><img src="05-gecis-kontrol/desktop-1440.png" alt="Geçiş Kontrol yeni tasarım önizlemesi" loading="lazy"></a>
+      <div class="meta">
+        <h2><span class="num">05</span> Geçiş Kontrol</h2>
+        <p>18 bulgu · Dalga C2b</p>
+        <p class="links"><a href="05-gecis-kontrol/mockup.html">Mockup</a> <a href="05-gecis-kontrol/REPORT.md">Rapor</a> <a href="../current/05-gecis-kontrol.png">Mevcut ekran</a></p>
+      </div>
+    </li>
+    <li class="card">
+      <a class="shot" href="06-ziyaretciler/mockup.html"><img src="06-ziyaretciler/desktop.png" alt="Ziyaretçiler yeni tasarım önizlemesi" loading="lazy"></a>
+      <div class="meta">
+        <h2><span class="num">06</span> Ziyaretçiler</h2>
+        <p>20 bulgu · Dalga C2b</p>
+        <p class="links"><a href="06-ziyaretciler/mockup.html">Mockup</a> <a href="06-ziyaretciler/REPORT.md">Rapor</a> <a href="../current/06-ziyaretciler.png">Mevcut ekran</a></p>
+      </div>
+    </li>
+    <li class="card">
+      <a class="shot" href="07-canli-izleme/mockup.html"><img src="07-canli-izleme/preview-1440.png" alt="Canlı İzleme yeni tasarım önizlemesi" loading="lazy"></a>
+      <div class="meta">
+        <h2><span class="num">07</span> Canlı İzleme</h2>
+        <p>17 bulgu · Dalga C2b</p>
+        <p class="links"><a href="07-canli-izleme/mockup.html">Mockup</a> <a href="07-canli-izleme/REPORT.md">Rapor</a> <a href="../current/07-canli-izleme.png">Mevcut ekran</a></p>
+      </div>
+    </li>
+    <li class="card">
+      <a class="shot" href="08-pdks-kayitlari/mockup.html"><img src="08-pdks-kayitlari/check-1440.png" alt="PDKS Kayıtları yeni tasarım önizlemesi" loading="lazy"></a>
+      <div class="meta">
+        <h2><span class="num">08</span> PDKS Kayıtları</h2>
+        <p>21 bulgu · Dalga C2a</p>
+        <p class="links"><a href="08-pdks-kayitlari/mockup.html">Mockup</a> <a href="08-pdks-kayitlari/REPORT.md">Rapor</a> <a href="../current/08-pdks-kayitlari.png">Mevcut ekran</a></p>
+      </div>
+    </li>
+    <li class="card">
+      <a class="shot" href="09-vardiyalar/mockup.html"><img src="09-vardiyalar/desktop.png" alt="Vardiyalar yeni tasarım önizlemesi" loading="lazy"></a>
+      <div class="meta">
+        <h2><span class="num">09</span> Vardiyalar</h2>
+        <p>20 bulgu · Dalga C2b</p>
+        <p class="links"><a href="09-vardiyalar/mockup.html">Mockup</a> <a href="09-vardiyalar/REPORT.md">Rapor</a> <a href="../current/09-vardiyalar.png">Mevcut ekran</a></p>
+      </div>
+    </li>
+    <li class="card">
+      <a class="shot" href="10-izinler/mockup.html"><img src="10-izinler/check-1440.png" alt="İzinler yeni tasarım önizlemesi" loading="lazy"></a>
+      <div class="meta">
+        <h2><span class="num">10</span> İzinler</h2>
+        <p>17 bulgu · Dalga C2c</p>
+        <p class="links"><a href="10-izinler/mockup.html">Mockup</a> <a href="10-izinler/REPORT.md">Rapor</a> <a href="../current/10-izinler.png">Mevcut ekran</a></p>
+      </div>
+    </li>
+    <li class="card">
+      <a class="shot" href="11-denetim-kaydi/mockup.html"><img src="11-denetim-kaydi/desktop.png" alt="Denetim Kaydı yeni tasarım önizlemesi" loading="lazy"></a>
+      <div class="meta">
+        <h2><span class="num">11</span> Denetim Kaydı</h2>
+        <p>18 bulgu · Dalga C2c</p>
+        <p class="links"><a href="11-denetim-kaydi/mockup.html">Mockup</a> <a href="11-denetim-kaydi/REPORT.md">Rapor</a> <a href="../current/11-denetim-kaydi.png">Mevcut ekran</a></p>
+      </div>
+    </li>
+    <li class="card">
+      <a class="shot" href="12-admin/mockup.html"><img src="12-admin/users-1440.png" alt="Admin yeni tasarım önizlemesi" loading="lazy"></a>
+      <div class="meta">
+        <h2><span class="num">12</span> Admin</h2>
+        <p>22 bulgu · Dalga C2c</p>
+        <p class="links"><a href="12-admin/mockup.html">Mockup</a> <a href="12-admin/REPORT.md">Rapor</a> <a href="../current/12-admin.png">Mevcut ekran</a></p>
+      </div>
+    </li>
+    <li class="card">
+      <a class="shot" href="13-ayarlar/mockup.html"><img src="13-ayarlar/desktop.png" alt="Ayarlar yeni tasarım önizlemesi" loading="lazy"></a>
+      <div class="meta">
+        <h2><span class="num">13</span> Ayarlar</h2>
+        <p>21 bulgu · Dalga C2c</p>
+        <p class="links"><a href="13-ayarlar/mockup.html">Mockup</a> <a href="13-ayarlar/REPORT.md">Rapor</a> <a href="../current/13-ayarlar.png">Mevcut ekran</a></p>
+      </div>
+    </li>
+  </ul>
+</body>
+</html>

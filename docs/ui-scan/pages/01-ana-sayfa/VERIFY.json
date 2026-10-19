@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-17",
+  "protocol": "file://",
+  "browser": "Installed Chrome via Playwright",
+  "htmlParser": "balanced, unique IDs",
+  "scenarios": 54,
+  "viewports": [
+    1440,
+    390
+  ],
+  "consoleErrors": [],
+  "externalRequests": [],
+  "interactionChecks": [
+    "role-filtered navigation and quicklinks",
+    "project search empty state",
+    "project switching changes scope, counts and list",
+    "account menu Escape and focus return",
+    "Ctrl+K and Turkish search",
+    "palette arrow-key navigation",
+    "mobile menu focus trap and Escape",
+    "section retry preserves other sections"
+  ],
+  "screenshots": [
+    "desktop.png",
+    "mobile.png",
+    "mobile-menu.png",
+    "project-menu.png"
+  ]
+}

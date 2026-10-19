@@ -1,0 +1,44 @@
+convex/settings.ts:55:    darkMode: v.optional(v.boolean()),
+convex/settings.ts:56:    dateFormat: v.optional(v.string()),
+convex/settings.ts:57:    timezone: v.optional(v.string()),
+convex/settings.ts:58:    systemLanguage: v.optional(v.string()),
+convex/settings.ts:60:    workingHoursStart: v.optional(v.string()),
+convex/settings.ts:61:    workingHoursEnd: v.optional(v.string()),
+convex/settings.ts:249:    return settings?.darkMode ?? false;
+src/lib/date.ts:2: * Returns YYYY-MM-DD in the local timezone.
+src/hooks/useDarkMode.ts:11:  const darkMode = useQuery(
+src/hooks/useDarkMode.ts:17:    if (darkMode === true) {
+src/hooks/useDarkMode.ts:19:    } else if (darkMode === false) {
+src/hooks/useDarkMode.ts:22:  }, [darkMode]);
+src/hooks/useDarkMode.ts:24:  return { isDarkMode: darkMode ?? false };
+convex/schema.ts:865:    darkMode: v.optional(v.boolean()),
+convex/schema.ts:866:    dateFormat: v.optional(v.string()),
+convex/schema.ts:867:    timezone: v.optional(v.string()),
+convex/schema.ts:868:    systemLanguage: v.optional(v.string()),
+convex/schema.ts:870:    workingHoursStart: v.optional(v.string()),
+convex/schema.ts:871:    workingHoursEnd: v.optional(v.string()),
+src/components/visitors/visitors.test.tsx:43:  it("uses Turkish wall time for validation and submission independent of browser timezone", () => {
+convex/lib/gateway/devices.ts:182:  opts: { timezone?: string } = {},
+convex/lib/gateway/devices.ts:184:  const tz = opts.timezone ?? "CST-3:00:00";
+src/components/settings/sections/GeneralSettings.tsx:14:    darkMode: settings?.darkMode ?? false, notifications: settings?.notificationsEnabled ?? true,
+src/components/settings/sections/GeneralSettings.tsx:23:  useEffect(() => { if (!loading) savedTheme.current = settings?.darkMode ?? false; }, [settings?.darkMode, loading]);
+src/components/settings/sections/GeneralSettings.tsx:24:  useEffect(() => { if (!loading) document.documentElement.classList.toggle("dark", draft.values.darkMode); }, [draft.values.darkMode, loading]);
+src/components/settings/sections/GeneralSettings.tsx:32:    if (success) { savedTheme.current = parsed.data.darkMode; draft.reset(); setTouched(false); }
+src/components/settings/sections/hooks/useGeneralSettings.ts:24:    darkMode?: boolean;
+src/components/settings/sections/hooks/useGeneralSettings.ts:25:    dateFormat?: string;
+src/components/settings/sections/hooks/useGeneralSettings.ts:26:    timezone?: string;
+src/components/settings/sections/hooks/useGeneralSettings.ts:27:    systemLanguage?: string;
+src/components/settings/sections/hooks/useGeneralSettings.ts:29:    workingHoursStart?: string;
+src/components/settings/sections/hooks/useGeneralSettings.ts:30:    workingHoursEnd?: string;
+src/components/settings/sections/general/generalForm.ts:7:  darkMode: z.boolean(), notifications: z.boolean(),
+src/components/settings/sections/general/generalForm.ts:14:    currency: values.currency || null, darkMode: values.darkMode, notificationsEnabled: values.notifications };
+src/components/settings/sections/general/SystemSettingsForm.tsx:10:    <FormFieldWrapper htmlFor="darkMode" label="Karanlık mod · Proje varsayılanı" hint="Tema değişikliği bu ekranda önizlenir; Kaydet ile proje varsayılanına yazılır.">
+src/components/settings/sections/general/SystemSettingsForm.tsx:11:      <Switch name="darkMode" checked={values.darkMode} onCheckedChange={darkMode => change({ darkMode })} />
+src/components/settings/sections/types/generalSettings.ts:10:  timezone?: string;
+src/components/settings/sections/types/generalSettings.ts:41:  timezone: string;
+src/components/settings/sections/types/generalSettings.ts:42:  dateFormat: string;
+src/components/settings/sections/types/generalSettings.ts:44:  darkMode: boolean;
+src/components/settings/sections/types/generalSettings.ts:46:  workingHoursStart: string;
+src/components/settings/sections/types/generalSettings.ts:47:  workingHoursEnd: string;
+src/components/dashboard/RecentReadingsTable.tsx:11:const dateFormat = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit" });
+src/components/dashboard/RecentReadingsTable.tsx:31:            <TableCell className="tabular-nums">{valid ? <><span className="block text-muted-foreground min-[761px]:mr-2 min-[761px]:inline">{dateFormat.format(date)}</span><span>{timeFormat.format(date)}</span></> : "Tarih bilgisi yok"}</TableCell>

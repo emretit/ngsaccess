@@ -1,0 +1,1196 @@
+{
+ "9": {
+  "request": {
+   "page": 1,
+   "pageSize": 20,
+   "language": "en",
+   "reportTypeId": 9,
+   "columnIdList": [],
+   "filterList": [
+    {
+     "columnName": "fullName",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "personCode",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "groupId",
+     "operation": "IN",
+     "value": ""
+    },
+    {
+     "columnName": "clockStamp",
+     "operation": "BETWEEN",
+     "value": "2026-10-01T00:00:00+03:00,2026-10-31T23:59:59+03:00"
+    }
+   ]
+  },
+  "responseColumnList": [
+   "firstName",
+   "lastName",
+   "fullName",
+   "personCode",
+   "fullPath",
+   "clockDate",
+   "clockTime",
+   "week",
+   "location",
+   "attachment",
+   "remark",
+   "clockStamp",
+   "checkInStamp",
+   "checkOutStamp",
+   "clockInStamp",
+   "clockOutStamp",
+   "briefAddress",
+   "detailAddress",
+   "longitude",
+   "latitude",
+   "id"
+  ],
+  "responseTopKeys": [
+   "columnList",
+   "nextPageExists",
+   "page",
+   "pageSize",
+   "reportDataList"
+  ],
+  "rowKeys": {},
+  "rowsSeen": 0
+ },
+ "2": {
+  "request": {
+   "page": 1,
+   "pageSize": 20,
+   "language": "en",
+   "reportTypeId": 2,
+   "columnIdList": [],
+   "filterList": [
+    {
+     "columnName": "fullName",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "personCode",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "groupId",
+     "operation": "IN",
+     "value": ""
+    },
+    {
+     "columnName": "date",
+     "operation": "BETWEEN",
+     "value": "2026-10-18T00:00:00+03:00,2026-10-18T23:59:59+03:00"
+    }
+   ]
+  },
+  "responseColumnList": [
+   "firstName",
+   "lastName",
+   "fullName",
+   "personCode",
+   "fullPath",
+   "date",
+   "week",
+   "timetableName",
+   "checkInDate",
+   "checkInTime",
+   "checkOutDate",
+   "checkOutTime",
+   "clockInDate",
+   "clockInTime",
+   "clockInSource",
+   "clockInDevice",
+   "clockInArea",
+   "clockOutDate",
+   "clockOutTime",
+   "clockOutSource",
+   "clockOutDevice",
+   "clockOutArea",
+   "attendanceStatus",
+   "workDuration",
+   "absenceDuration",
+   "lateDuration",
+   "earlyDuration",
+   "breakDuration",
+   "leaveDuration",
+   "overtimeDuration",
+   "workdayOvertimeDuration",
+   "weekendOvertimeDuration",
+   "leaveTypes",
+   "clockStamp",
+   "checkInStamp",
+   "checkOutStamp",
+   "clockInStamp",
+   "clockOutStamp",
+   "clockInId",
+   "clockOutId",
+   "personId",
+   "timetableId"
+  ],
+  "responseTopKeys": [
+   "columnList",
+   "nextPageExists",
+   "page",
+   "pageSize",
+   "reportDataList"
+  ],
+  "rowKeys": {},
+  "rowsSeen": 0
+ },
+ "1": {
+  "request": {
+   "page": 1,
+   "pageSize": 20,
+   "language": "en",
+   "reportTypeId": 1,
+   "columnIdList": [],
+   "filterList": [
+    {
+     "columnName": "fullName",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "personCode",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "groupId",
+     "operation": "IN",
+     "value": ""
+    },
+    {
+     "columnName": "clockStamp",
+     "operation": "BETWEEN",
+     "value": "2026-10-01T00:00:00+03:00,2026-10-31T23:59:59+03:00"
+    },
+    {
+     "columnName": "deviceId",
+     "operation": "IN",
+     "value": ""
+    }
+   ]
+  },
+  "responseColumnList": [
+   "firstName",
+   "lastName",
+   "fullName",
+   "personCode",
+   "fullPath",
+   "clockDate",
+   "clockTime",
+   "week",
+   "dataSource",
+   "deviceName",
+   "deviceSerial",
+   "handleType",
+   "location",
+   "remark",
+   "clockStamp",
+   "checkInStamp",
+   "checkOutStamp",
+   "clockInStamp",
+   "clockOutStamp",
+   "deviceId",
+   "briefAddress",
+   "detailAddress",
+   "longitude",
+   "latitude"
+  ],
+  "responseTopKeys": [
+   "columnList",
+   "nextPageExists",
+   "page",
+   "pageSize",
+   "reportDataList"
+  ],
+  "rowKeys": {
+   "week": "str",
+   "dataSource": "str",
+   "handleType": "str",
+   "clockDate": "str",
+   "clockTime": "str",
+   "deviceId": "str",
+   "deviceSerial": "str",
+   "firstName": "str",
+   "fullName": "str",
+   "fullPath": "str",
+   "lastName": "str",
+   "personCode": "str",
+   "deviceName": "str",
+   "location": {}
+  },
+  "rowsSeen": 20
+ },
+ "13": {
+  "request": {
+   "page": 1,
+   "pageSize": 20,
+   "language": "en",
+   "reportTypeId": 13,
+   "columnIdList": [],
+   "filterList": [
+    {
+     "columnName": "fullName",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "personCode",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "groupId",
+     "operation": "IN",
+     "value": ""
+    },
+    {
+     "columnName": "date",
+     "operation": "BETWEEN",
+     "value": "2026-10-01T00:00:00+03:00,2026-10-31T23:59:59+03:00"
+    }
+   ]
+  },
+  "responseColumnList": [
+   "firstName",
+   "lastName",
+   "fullName",
+   "personCode",
+   "fullPath",
+   "dateRange",
+   "requiredCheckInTimes",
+   "actualCheckInTimes",
+   "normalTimes",
+   "absenceTimes",
+   "lateTimes",
+   "earlyTimes",
+   "lateAndEarlyTimes",
+   "leaveTimes",
+   "leaveDuration",
+   "overtimeDuration",
+   "weekendOvertimeDuration",
+   "workdayOvertimeDuration",
+   "clockStamp",
+   "checkInStamp",
+   "checkOutStamp",
+   "clockInStamp",
+   "clockOutStamp"
+  ],
+  "responseTopKeys": [
+   "columnList",
+   "nextPageExists",
+   "page",
+   "pageSize",
+   "reportDataList"
+  ],
+  "rowKeys": {
+   "firstName": "str",
+   "fullName": "str",
+   "fullPath": "str",
+   "lastName": "str",
+   "personCode": "str",
+   "personId": "str",
+   "requiredCheckInTimes": "int",
+   "actualCheckInTimes": "int",
+   "normalTimes": "int",
+   "absenceTimes": "int",
+   "lateTimes": "int",
+   "earlyTimes": "int",
+   "lateAndEarlyTimes": "int",
+   "leaveTimes": "int",
+   "leaveDuration": "str",
+   "overtimeDuration": "str",
+   "weekendOvertimeDuration": "str",
+   "workdayOvertimeDuration": "str",
+   "2026-10-01": "str",
+   "2026-10-02": "str",
+   "2026-10-03": "str",
+   "2026-10-04": "str",
+   "2026-10-05": "str",
+   "2026-10-06": "str",
+   "2026-10-07": "str",
+   "2026-10-08": "str",
+   "2026-10-09": "str",
+   "2026-10-10": "str",
+   "2026-10-11": "str",
+   "2026-10-12": "str",
+   "2026-10-13": "str",
+   "2026-10-14": "str",
+   "2026-10-15": "str",
+   "2026-10-16": "str",
+   "2026-10-17": "str",
+   "2026-10-18": "str",
+   "2026-10-19": "str",
+   "2026-10-20": "str",
+   "2026-10-21": "str",
+   "2026-10-22": "str",
+   "2026-10-23": "str",
+   "2026-10-24": "str",
+   "2026-10-25": "str",
+   "2026-10-26": "str",
+   "2026-10-27": "str",
+   "2026-10-28": "str",
+   "2026-10-29": "str",
+   "2026-10-30": "str",
+   "2026-10-31": "str"
+  },
+  "rowsSeen": 10
+ },
+ "14": {
+  "request": {
+   "page": 1,
+   "pageSize": 20,
+   "language": "en",
+   "reportTypeId": 14,
+   "columnIdList": [],
+   "filterList": [
+    {
+     "columnName": "groupId",
+     "operation": "IN",
+     "value": ""
+    },
+    {
+     "columnName": "date",
+     "operation": "BETWEEN",
+     "value": "2026-10-01T00:00:00+03:00,2026-10-31T23:59:59+03:00"
+    }
+   ]
+  },
+  "responseColumnList": [
+   "fullPath",
+   "personNum",
+   "requiredCheckInTimes",
+   "actualCheckInTimes",
+   "normalTimes",
+   "absenceTimes",
+   "lateTimes",
+   "earlyTimes",
+   "lateAndEarlyTimes",
+   "leaveTimes",
+   "leaveDuration",
+   "overtimeDuration",
+   "weekendOvertimeDuration",
+   "workdayOvertimeDuration",
+   "clockStamp",
+   "checkInStamp",
+   "checkOutStamp",
+   "clockInStamp",
+   "clockOutStamp"
+  ],
+  "responseTopKeys": [
+   "columnList",
+   "nextPageExists",
+   "page",
+   "pageSize",
+   "reportDataList"
+  ],
+  "rowKeys": {
+   "absenceTimes": "int",
+   "actualCheckInTimes": "int",
+   "earlyTimes": "int",
+   "fullPath": "str",
+   "lateAndEarlyTimes": "int",
+   "lateTimes": "int",
+   "leaveDuration": "str",
+   "leaveTimes": "int",
+   "normalTimes": "int",
+   "overtimeDuration": "str",
+   "personNum": "int",
+   "requiredCheckInTimes": "int",
+   "weekendOvertimeDuration": "str",
+   "workdayOvertimeDuration": "str"
+  },
+  "rowsSeen": 1
+ },
+ "12": {
+  "request": {
+   "page": 1,
+   "pageSize": 20,
+   "language": "en",
+   "reportTypeId": 12,
+   "columnIdList": [],
+   "filterList": [
+    {
+     "columnName": "fullName",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "personCode",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "groupId",
+     "operation": "IN",
+     "value": ""
+    },
+    {
+     "columnName": "date",
+     "operation": "BETWEEN",
+     "value": "2026-10-01T00:00:00+03:00,2026-10-31T23:59:59+03:00"
+    }
+   ]
+  },
+  "responseColumnList": [
+   "firstName",
+   "lastName",
+   "fullName",
+   "personCode",
+   "fullPath",
+   "dateRange",
+   "normalTimes",
+   "absenceTimes",
+   "lateTimes",
+   "earlyTimes",
+   "lateAndEarlyTimes",
+   "leaveTimes",
+   "clockStamp",
+   "checkInStamp",
+   "checkOutStamp",
+   "clockInStamp",
+   "clockOutStamp"
+  ],
+  "responseTopKeys": [
+   "columnList",
+   "nextPageExists",
+   "page",
+   "pageSize",
+   "reportDataList"
+  ],
+  "rowKeys": {
+   "firstName": "str",
+   "fullName": "str",
+   "fullPath": "str",
+   "lastName": "str",
+   "personCode": "str",
+   "personId": "str",
+   "normalTimes": "int",
+   "absenceTimes": "int",
+   "lateTimes": "int",
+   "earlyTimes": "int",
+   "lateAndEarlyTimes": "int",
+   "leaveTimes": "int",
+   "2026-10-01": "str",
+   "2026-10-02": "str",
+   "2026-10-03": "str",
+   "2026-10-04": "str",
+   "2026-10-05": "str",
+   "2026-10-06": "str",
+   "2026-10-07": "str",
+   "2026-10-08": "str",
+   "2026-10-09": "str",
+   "2026-10-10": "str",
+   "2026-10-11": "str",
+   "2026-10-12": "str",
+   "2026-10-13": "str",
+   "2026-10-14": "str",
+   "2026-10-15": "str",
+   "2026-10-16": "str",
+   "2026-10-17": "str",
+   "2026-10-18": "str",
+   "2026-10-19": "str",
+   "2026-10-20": "str",
+   "2026-10-21": "str",
+   "2026-10-22": "str",
+   "2026-10-23": "str",
+   "2026-10-24": "str",
+   "2026-10-25": "str",
+   "2026-10-26": "str",
+   "2026-10-27": "str",
+   "2026-10-28": "str",
+   "2026-10-29": "str",
+   "2026-10-30": "str",
+   "2026-10-31": "str"
+  },
+  "rowsSeen": 10
+ },
+ "6": {
+  "request": {
+   "page": 1,
+   "pageSize": 20,
+   "language": "en",
+   "reportTypeId": 6,
+   "columnIdList": [],
+   "filterList": [
+    {
+     "columnName": "fullName",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "personCode",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "groupId",
+     "operation": "IN",
+     "value": ""
+    },
+    {
+     "columnName": "date",
+     "operation": "BETWEEN",
+     "value": "2026-10-18T00:00:00+03:00,2026-10-18T23:59:59+03:00"
+    }
+   ]
+  },
+  "responseColumnList": [
+   "firstName",
+   "lastName",
+   "fullName",
+   "personCode",
+   "fullPath",
+   "date",
+   "week",
+   "timetableName",
+   "checkInDate",
+   "checkInTime",
+   "checkOutDate",
+   "checkOutTime",
+   "clockInDate",
+   "clockInTime",
+   "clockOutDate",
+   "clockOutTime",
+   "workDuration",
+   "absenceDuration",
+   "clockStamp",
+   "checkInStamp",
+   "checkOutStamp",
+   "clockInStamp",
+   "clockOutStamp"
+  ],
+  "responseTopKeys": [
+   "columnList",
+   "nextPageExists",
+   "page",
+   "pageSize",
+   "reportDataList"
+  ],
+  "rowKeys": {},
+  "rowsSeen": 0
+ },
+ "17": {
+  "request": {
+   "page": 1,
+   "pageSize": 20,
+   "language": "en",
+   "reportTypeId": 17,
+   "columnIdList": [],
+   "filterList": [
+    {
+     "columnName": "fullName",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "personCode",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "groupId",
+     "operation": "IN",
+     "value": ""
+    },
+    {
+     "columnName": "date",
+     "operation": "BETWEEN",
+     "value": "2026-10-18T00:00:00+03:00,2026-10-18T23:59:59+03:00"
+    }
+   ]
+  },
+  "responseColumnList": [
+   "firstName",
+   "lastName",
+   "fullName",
+   "personCode",
+   "fullPath",
+   "date",
+   "week",
+   "timetableName",
+   "checkInDate",
+   "checkInTime",
+   "checkOutDate",
+   "checkOutTime",
+   "breakRecords",
+   "breakDuration",
+   "clockStamp",
+   "checkInStamp",
+   "checkOutStamp",
+   "clockInStamp",
+   "clockOutStamp",
+   "personId",
+   "timetableId"
+  ],
+  "responseTopKeys": [
+   "columnList",
+   "nextPageExists",
+   "page",
+   "pageSize",
+   "reportDataList"
+  ],
+  "rowKeys": {},
+  "rowsSeen": 0
+ },
+ "8": {
+  "request": {
+   "page": 1,
+   "pageSize": 20,
+   "language": "en",
+   "reportTypeId": 8,
+   "columnIdList": [],
+   "filterList": [
+    {
+     "columnName": "fullName",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "personCode",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "groupId",
+     "operation": "IN",
+     "value": ""
+    },
+    {
+     "columnName": "date",
+     "operation": "BETWEEN",
+     "value": "2026-10-18T00:00:00+03:00,2026-10-18T23:59:59+03:00"
+    }
+   ]
+  },
+  "responseColumnList": [
+   "firstName",
+   "lastName",
+   "fullName",
+   "personCode",
+   "fullPath",
+   "date",
+   "week",
+   "workdayOvertimeDuration",
+   "weekendOvertimeDuration",
+   "clockStamp",
+   "checkInStamp",
+   "checkOutStamp",
+   "clockInStamp",
+   "clockOutStamp"
+  ],
+  "responseTopKeys": [
+   "columnList",
+   "nextPageExists",
+   "page",
+   "pageSize",
+   "reportDataList"
+  ],
+  "rowKeys": {},
+  "rowsSeen": 0
+ },
+ "11": {
+  "request": {
+   "page": 1,
+   "pageSize": 20,
+   "language": "en",
+   "reportTypeId": 11,
+   "columnIdList": [],
+   "filterList": [
+    {
+     "columnName": "fullName",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "personCode",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "groupId",
+     "operation": "IN",
+     "value": ""
+    },
+    {
+     "columnName": "date",
+     "operation": "BETWEEN",
+     "value": "2026-10-01T00:00:00+03:00,2026-10-31T23:59:59+03:00"
+    }
+   ]
+  },
+  "responseColumnList": [
+   "firstName",
+   "lastName",
+   "fullName",
+   "personCode",
+   "fullPath",
+   "dateRange",
+   "workDuration",
+   "absenceDuration",
+   "lateDuration",
+   "earlyDuration",
+   "breakDuration",
+   "leaveDuration",
+   "overtimeDuration",
+   "weekendOvertimeDuration",
+   "workdayOvertimeDuration",
+   "clockStamp",
+   "checkInStamp",
+   "checkOutStamp",
+   "clockInStamp",
+   "clockOutStamp"
+  ],
+  "responseTopKeys": [
+   "columnList",
+   "nextPageExists",
+   "page",
+   "pageSize",
+   "reportDataList"
+  ],
+  "rowKeys": {
+   "firstName": "str",
+   "fullName": "str",
+   "fullPath": "str",
+   "lastName": "str",
+   "personCode": "str",
+   "personId": "str",
+   "workDuration": "str",
+   "absenceDuration": "str",
+   "lateDuration": "str",
+   "earlyDuration": "str",
+   "leaveDuration": "str",
+   "breakDuration": "str",
+   "overtimeDuration": "str",
+   "weekendOvertimeDuration": "str",
+   "workdayOvertimeDuration": "str",
+   "2026-10-01": "str",
+   "2026-10-02": "str",
+   "2026-10-03": "str",
+   "2026-10-04": "str",
+   "2026-10-05": "str",
+   "2026-10-06": "str",
+   "2026-10-07": "str",
+   "2026-10-08": "str",
+   "2026-10-09": "str",
+   "2026-10-10": "str",
+   "2026-10-11": "str",
+   "2026-10-12": "str",
+   "2026-10-13": "str",
+   "2026-10-14": "str",
+   "2026-10-15": "str",
+   "2026-10-16": "str",
+   "2026-10-17": "str",
+   "2026-10-18": "str",
+   "2026-10-19": "str",
+   "2026-10-20": "str",
+   "2026-10-21": "str",
+   "2026-10-22": "str",
+   "2026-10-23": "str",
+   "2026-10-24": "str",
+   "2026-10-25": "str",
+   "2026-10-26": "str",
+   "2026-10-27": "str",
+   "2026-10-28": "str",
+   "2026-10-29": "str",
+   "2026-10-30": "str",
+   "2026-10-31": "str"
+  },
+  "rowsSeen": 10
+ },
+ "5": {
+  "request": {
+   "page": 1,
+   "pageSize": 20,
+   "language": "en",
+   "reportTypeId": 5,
+   "columnIdList": [],
+   "filterList": [
+    {
+     "columnName": "fullName",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "personCode",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "groupId",
+     "operation": "IN",
+     "value": ""
+    },
+    {
+     "columnName": "date",
+     "operation": "BETWEEN",
+     "value": "2026-10-18T00:00:00+03:00,2026-10-18T23:59:59+03:00"
+    }
+   ]
+  },
+  "responseColumnList": [
+   "firstName",
+   "lastName",
+   "fullName",
+   "personCode",
+   "fullPath",
+   "date",
+   "week",
+   "timetableName",
+   "checkInDate",
+   "checkInTime",
+   "checkOutDate",
+   "checkOutTime",
+   "clockInDate",
+   "clockInTime",
+   "clockOutDate",
+   "clockOutTime",
+   "workDuration",
+   "earlyDuration",
+   "clockStamp",
+   "checkInStamp",
+   "checkOutStamp",
+   "clockInStamp",
+   "clockOutStamp"
+  ],
+  "responseTopKeys": [
+   "columnList",
+   "nextPageExists",
+   "page",
+   "pageSize",
+   "reportDataList"
+  ],
+  "rowKeys": {},
+  "rowsSeen": 0
+ },
+ "3": {
+  "request": {
+   "page": 1,
+   "pageSize": 20,
+   "language": "en",
+   "reportTypeId": 3,
+   "columnIdList": [],
+   "filterList": [
+    {
+     "columnName": "fullName",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "personCode",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "groupId",
+     "operation": "IN",
+     "value": ""
+    },
+    {
+     "columnName": "date",
+     "operation": "BETWEEN",
+     "value": "2026-10-18T00:00:00+03:00,2026-10-18T23:59:59+03:00"
+    }
+   ]
+  },
+  "responseColumnList": [
+   "firstName",
+   "lastName",
+   "fullName",
+   "personCode",
+   "fullPath",
+   "date",
+   "week",
+   "workDuration",
+   "absenceDuration",
+   "lateDuration",
+   "earlyDuration",
+   "breakDuration",
+   "leaveDuration",
+   "overtimeDuration",
+   "workdayOvertimeDuration",
+   "weekendOvertimeDuration",
+   "clockStamp",
+   "checkInStamp",
+   "checkOutStamp",
+   "clockInStamp",
+   "clockOutStamp"
+  ],
+  "responseTopKeys": [
+   "columnList",
+   "nextPageExists",
+   "page",
+   "pageSize",
+   "reportDataList"
+  ],
+  "rowKeys": {},
+  "rowsSeen": 0
+ },
+ "18": {
+  "request": {
+   "page": 1,
+   "pageSize": 20,
+   "language": "en",
+   "reportTypeId": 18,
+   "columnIdList": [],
+   "filterList": [
+    {
+     "columnName": "fullName",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "personCode",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "groupId",
+     "operation": "IN",
+     "value": ""
+    },
+    {
+     "columnName": "clockStamp",
+     "operation": "BETWEEN",
+     "value": "2026-10-01T00:00:00+03:00,2026-10-31T23:59:59+03:00"
+    }
+   ]
+  },
+  "responseColumnList": [
+   "firstName",
+   "lastName",
+   "fullName",
+   "personCode",
+   "fullPath",
+   "clockDate",
+   "week",
+   "records",
+   "clockStamp",
+   "checkInStamp",
+   "checkOutStamp",
+   "clockInStamp",
+   "clockOutStamp"
+  ],
+  "responseTopKeys": [
+   "columnList",
+   "nextPageExists",
+   "page",
+   "pageSize",
+   "reportDataList"
+  ],
+  "rowKeys": {
+   "week": "str",
+   "clockDate": "str",
+   "firstName": "str",
+   "fullName": "str",
+   "fullPath": "str",
+   "lastName": "str",
+   "personCode": "str",
+   "personId": "str",
+   "records": "str"
+  },
+  "rowsSeen": 20
+ },
+ "4": {
+  "request": {
+   "page": 1,
+   "pageSize": 20,
+   "language": "en",
+   "reportTypeId": 4,
+   "columnIdList": [],
+   "filterList": [
+    {
+     "columnName": "fullName",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "personCode",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "groupId",
+     "operation": "IN",
+     "value": ""
+    },
+    {
+     "columnName": "date",
+     "operation": "BETWEEN",
+     "value": "2026-10-18T00:00:00+03:00,2026-10-18T23:59:59+03:00"
+    }
+   ]
+  },
+  "responseColumnList": [
+   "firstName",
+   "lastName",
+   "fullName",
+   "personCode",
+   "fullPath",
+   "date",
+   "week",
+   "timetableName",
+   "checkInDate",
+   "checkInTime",
+   "checkOutDate",
+   "checkOutTime",
+   "clockInDate",
+   "clockInTime",
+   "clockOutDate",
+   "clockOutTime",
+   "workDuration",
+   "lateDuration",
+   "clockStamp",
+   "checkInStamp",
+   "checkOutStamp",
+   "clockInStamp",
+   "clockOutStamp"
+  ],
+  "responseTopKeys": [
+   "columnList",
+   "nextPageExists",
+   "page",
+   "pageSize",
+   "reportDataList"
+  ],
+  "rowKeys": {},
+  "rowsSeen": 0
+ },
+ "19": {
+  "request": {
+   "page": 1,
+   "pageSize": 20,
+   "language": "en",
+   "reportTypeId": 19,
+   "columnIdList": [],
+   "filterList": [
+    {
+     "columnName": "fullName",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "personCode",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "groupId",
+     "operation": "IN",
+     "value": ""
+    },
+    {
+     "columnName": "date",
+     "operation": "BETWEEN",
+     "value": "2026-10-18T00:00:00+03:00,2026-10-18T23:59:59+03:00"
+    }
+   ]
+  },
+  "responseColumnList": [
+   "firstName",
+   "lastName",
+   "fullName",
+   "personCode",
+   "fullPath",
+   "date",
+   "week",
+   "timetableName",
+   "checkInDate",
+   "checkInTime",
+   "checkOutDate",
+   "checkOutTime",
+   "firstCheckIn",
+   "lastCheckOut",
+   "workDuration",
+   "clockStamp",
+   "checkInStamp",
+   "checkOutStamp",
+   "clockInStamp",
+   "clockOutStamp"
+  ],
+  "responseTopKeys": [
+   "columnList",
+   "nextPageExists",
+   "page",
+   "pageSize",
+   "reportDataList"
+  ],
+  "rowKeys": {},
+  "rowsSeen": 0
+ },
+ "7": {
+  "request": {
+   "page": 1,
+   "pageSize": 20,
+   "language": "en",
+   "reportTypeId": 7,
+   "columnIdList": [],
+   "filterList": [
+    {
+     "columnName": "fullName",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "personCode",
+     "operation": "LIKE",
+     "value": ""
+    },
+    {
+     "columnName": "groupId",
+     "operation": "IN",
+     "value": ""
+    },
+    {
+     "columnName": "date",
+     "operation": "BETWEEN",
+     "value": "2026-10-18T00:00:00+03:00,2026-10-18T23:59:59+03:00"
+    }
+   ]
+  },
+  "responseColumnList": [
+   "firstName",
+   "lastName",
+   "fullName",
+   "personCode",
+   "fullPath",
+   "date",
+   "week",
+   "timetableName",
+   "checkInDate",
+   "checkInTime",
+   "checkOutDate",
+   "checkOutTime",
+   "clockInDate",
+   "clockInTime",
+   "clockOutDate",
+   "clockOutTime",
+   "attendanceStatus",
+   "clockStamp",
+   "checkInStamp",
+   "checkOutStamp",
+   "clockInStamp",
+   "clockOutStamp"
+  ],
+  "responseTopKeys": [
+   "columnList",
+   "nextPageExists",
+   "page",
+   "pageSize",
+   "reportDataList"
+  ],
+  "rowKeys": {},
+  "rowsSeen": 0
+ }
+}

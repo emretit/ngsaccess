@@ -1,0 +1,145 @@
+{
+  "results": [
+    {
+      "width": 1440,
+      "state": "ready",
+      "viewport": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "width": 1440,
+      "state": "loading",
+      "viewport": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "width": 1440,
+      "state": "empty",
+      "viewport": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "width": 1440,
+      "state": "no-definitions",
+      "viewport": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "width": 1440,
+      "state": "inactive",
+      "viewport": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "width": 1440,
+      "state": "no-assignments",
+      "viewport": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "width": 1440,
+      "state": "error",
+      "viewport": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "width": 1440,
+      "state": "overlay-error",
+      "viewport": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "width": 1440,
+      "state": "no-project",
+      "viewport": 1440,
+      "scroll": 1440,
+      "body": 1440
+    },
+    {
+      "width": 390,
+      "state": "ready",
+      "viewport": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "width": 390,
+      "state": "loading",
+      "viewport": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "width": 390,
+      "state": "empty",
+      "viewport": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "width": 390,
+      "state": "no-definitions",
+      "viewport": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "width": 390,
+      "state": "inactive",
+      "viewport": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "width": 390,
+      "state": "no-assignments",
+      "viewport": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "width": 390,
+      "state": "error",
+      "viewport": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "width": 390,
+      "state": "overlay-error",
+      "viewport": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "width": 390,
+      "state": "no-project",
+      "viewport": 390,
+      "scroll": 390,
+      "body": 390
+    },
+    {
+      "month": {
+        "viewport": 1440,
+        "scroll": 1440,
+        "table": 3068
+      }
+    },
+    {
+      "mobileDialog": {
+        "width": 356,
+        "scroll": 356
+      }
+    }
+  ],
+  "errors": [],
+  "externalRequests": []
+}

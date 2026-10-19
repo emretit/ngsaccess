@@ -1,0 +1,10 @@
+# Raporlar D2 API — tamamlandı
+- `convex/lib/pdksTable.ts:55,458`: PdksDayDetail ek alanları `punches: Array<{ time: string; direction: "entry" | "exit" | "unknown" }>; plannedBreakStart: string | null; plannedBreakEnd: string | null; breakViolation: boolean`; mevcut alanlar ve computePdksTableRow imzası aynı.
+- `convex/lib/pdksCalc.ts:100`: `export function computeBreakViolation(params: { punchMinutes: readonly number[]; breakStart?: string | null; breakEnd?: string | null }): boolean`; ≥2 izinli okuma, ≥450 dk, dahil mola penceresi, gece yarısını aşan pencere false.
+- `convex/lib/reportAttendance.ts:128`: `export function matchesReadingSources(source: PdksReadingSource, sources: readonly PdksReadingSource[] | undefined): boolean`; undefined/boş tüm kaynaklar.
+- `convex/cardReadings.ts:1755,1792`: listReportTransactions mevcut args/dönüşü korunur; ek opsiyonel arg `sources?: Array<"card" | "pin" | "qr" | "mobile" | "manual" | "unknown">`; biyometrik ayrımı sonrası/enrich öncesi filtre, hiddenBiometricCount ve ≤200 okuma sınırı aynı.
+- `convex/lib/{pdksCalc.test.ts:276,pdksTable.test.ts:433,reportAttendance.test.ts:218}`: 449/450, dahil sınırlar, tek/eksik mola/gece yarısı; sıralama, reddedilen kayıt, manuel gün, 24 sınırı ve tüm gün mola hesabı; kaynak eşleşmesi testli.
+- Kapılar: app tsc + convex tsc 0 hata; sahip olunan dosyalarda eslint 0; git diff --check temiz; backend 79 + mevcut rapor yardımcıları 28 = 107 test / 9 dosya başarılı.
+- Fixture notu: src/lib/reports/testFixtures.ts dailyCell içinde detail varsayılanı mevcut değil; eski ayrıntısız hücre testi bunu gerektiriyor. Dosyada nihai değişiklik yok; yeni zorunlu alanlardan kaynaklanan TS hatası yok.
+- Tarayıcıda D2 UI bağlanınca: Günlük Puantaj gün ayrıntısında gerçek okutmalar/manuel gün/mola planı; mola içi okutmayla ihlal kalkması; Ham Okutmalar kaynak seçimi ve boş filtreyle eski davranış kontrol edilmeli.
+- Ertelenen: frontend ayrı worker; dashboard refaktörü ve gece yarısı mola desteği kapsam dışı. Commit/push/deploy/migration/DB erişimi veya npx convex yapılmadı.

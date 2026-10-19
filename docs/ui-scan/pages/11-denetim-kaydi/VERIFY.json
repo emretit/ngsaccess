@@ -1,0 +1,320 @@
+{
+  "browser": "Installed Playwright + Chrome, file://",
+  "combinations": 42,
+  "results": [
+    {
+      "width": 1440,
+      "role": "super_admin",
+      "state": "ready",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "super_admin",
+      "state": "loading",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "super_admin",
+      "state": "empty",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "super_admin",
+      "state": "partial",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "super_admin",
+      "state": "error",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "super_admin",
+      "state": "more-error",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "super_admin",
+      "state": "no-project",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "project_admin",
+      "state": "ready",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "project_admin",
+      "state": "loading",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "project_admin",
+      "state": "empty",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "project_admin",
+      "state": "partial",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "project_admin",
+      "state": "error",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "project_admin",
+      "state": "more-error",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "project_admin",
+      "state": "no-project",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "project_user",
+      "state": "ready",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "project_user",
+      "state": "loading",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "project_user",
+      "state": "empty",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "project_user",
+      "state": "partial",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "project_user",
+      "state": "error",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "project_user",
+      "state": "more-error",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 1440,
+      "role": "project_user",
+      "state": "no-project",
+      "viewport": 1440,
+      "doc": 1440
+    },
+    {
+      "width": 390,
+      "role": "super_admin",
+      "state": "ready",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "super_admin",
+      "state": "loading",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "super_admin",
+      "state": "empty",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "super_admin",
+      "state": "partial",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "super_admin",
+      "state": "error",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "super_admin",
+      "state": "more-error",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "super_admin",
+      "state": "no-project",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "project_admin",
+      "state": "ready",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "project_admin",
+      "state": "loading",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "project_admin",
+      "state": "empty",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "project_admin",
+      "state": "partial",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "project_admin",
+      "state": "error",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "project_admin",
+      "state": "more-error",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "project_admin",
+      "state": "no-project",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "project_user",
+      "state": "ready",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "project_user",
+      "state": "loading",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "project_user",
+      "state": "empty",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "project_user",
+      "state": "partial",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "project_user",
+      "state": "error",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "project_user",
+      "state": "more-error",
+      "viewport": 390,
+      "doc": 390
+    },
+    {
+      "width": 390,
+      "role": "project_user",
+      "state": "no-project",
+      "viewport": 390,
+      "doc": 390
+    }
+  ],
+  "consoleErrors": [],
+  "externalRequests": [],
+  "interactions": [
+    "action filter",
+    "scope preserving reset",
+    "filtered empty/reset",
+    "invalid date range",
+    "detail and raw JSON",
+    "dialog internal overflow and Tab trap",
+    "Escape focus return",
+    "cursor append/exhausted",
+    "retry",
+    "command palette keyboard",
+    "mobile navigation",
+    "project change"
+  ],
+  "html": {
+    "balanced": true,
+    "uniqueIds": 51
+  }
+}

@@ -1,0 +1,559 @@
+{
+ "2": {
+  "st": 200,
+  "err": "0",
+  "rows": 20,
+  "next": true,
+  "keys": {
+   "week": {
+    "t": "string",
+    "ex": "Thursday"
+   },
+   "attendanceStatus": {
+    "t": "string",
+    "ex": "Absent"
+   },
+   "absenceDuration": {
+    "t": "string",
+    "ex": "08:00"
+   },
+   "breakDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "checkInDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "checkInTime": {
+    "t": "string",
+    "ex": "05:00"
+   },
+   "checkOutDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "checkOutTime": {
+    "t": "string",
+    "ex": "22:00"
+   },
+   "date": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "earlyDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "firstName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "fullName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "fullPath": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "lastName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "lateDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "leaveDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "overtimeDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "personCode": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "personId": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "timetableId": {
+    "t": "number",
+    "ex": "<masked>"
+   },
+   "timetableName": {
+    "t": "string",
+    "ex": "<masked>"
+   },
+   "weekendOvertimeDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "workDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "workdayOvertimeDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "clockInSource": {
+    "t": "string",
+    "ex": "Device"
+   },
+   "clockOutSource": {
+    "t": "string",
+    "ex": "Device"
+   },
+   "clockInDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "clockInTime": {
+    "t": "string",
+    "ex": "08:37"
+   },
+   "clockOutDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "clockOutTime": {
+    "t": "string",
+    "ex": "12:21"
+   },
+   "clockInDevice": {
+    "t": "string",
+    "ex": "<masked>"
+   },
+   "clockInArea": {
+    "t": "string",
+    "ex": ""
+   },
+   "clockOutDevice": {
+    "t": "string",
+    "ex": "<masked>"
+   },
+   "clockOutArea": {
+    "t": "string",
+    "ex": ""
+   }
+  }
+ },
+ "3": {
+  "st": 200,
+  "err": "0",
+  "rows": 20,
+  "next": true,
+  "keys": {
+   "week": {
+    "t": "string",
+    "ex": "Thursday"
+   },
+   "absenceDuration": {
+    "t": "string",
+    "ex": "08:00"
+   },
+   "breakDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "date": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "earlyDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "firstName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "fullName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "fullPath": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "lastName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "lateDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "leaveDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "overtimeDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "personCode": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "weekendOvertimeDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "workDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "workdayOvertimeDuration": {
+    "t": "string",
+    "ex": "00:00"
+   }
+  }
+ },
+ "4": {
+  "st": 200,
+  "err": "0",
+  "rows": 0,
+  "next": false,
+  "keys": {}
+ },
+ "5": {
+  "st": 200,
+  "err": "0",
+  "rows": 0,
+  "next": false,
+  "keys": {}
+ },
+ "6": {
+  "st": 200,
+  "err": "0",
+  "rows": 20,
+  "next": true,
+  "keys": {
+   "week": {
+    "t": "string",
+    "ex": "Thursday"
+   },
+   "absenceDuration": {
+    "t": "string",
+    "ex": "08:00"
+   },
+   "checkInDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "checkInTime": {
+    "t": "string",
+    "ex": "05:00"
+   },
+   "checkOutDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "checkOutTime": {
+    "t": "string",
+    "ex": "22:00"
+   },
+   "date": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "firstName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "fullName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "fullPath": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "lastName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "personCode": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "timetableName": {
+    "t": "string",
+    "ex": "<masked>"
+   },
+   "workDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "clockInDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "clockInTime": {
+    "t": "string",
+    "ex": "08:37"
+   },
+   "clockOutDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "clockOutTime": {
+    "t": "string",
+    "ex": "12:21"
+   }
+  }
+ },
+ "7": {
+  "st": 200,
+  "err": "0",
+  "rows": 20,
+  "next": true,
+  "keys": {
+   "week": {
+    "t": "string",
+    "ex": "Thursday"
+   },
+   "attendanceStatus": {
+    "t": "string",
+    "ex": "Absent"
+   },
+   "checkInDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "checkInTime": {
+    "t": "string",
+    "ex": "05:00"
+   },
+   "checkOutDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "checkOutTime": {
+    "t": "string",
+    "ex": "22:00"
+   },
+   "date": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "firstName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "fullName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "fullPath": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "lastName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "personCode": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "timetableName": {
+    "t": "string",
+    "ex": "<masked>"
+   },
+   "clockInDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "clockInTime": {
+    "t": "string",
+    "ex": "08:37"
+   },
+   "clockOutDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "clockOutTime": {
+    "t": "string",
+    "ex": "12:21"
+   }
+  }
+ },
+ "8": {
+  "st": 200,
+  "err": "0",
+  "rows": 0,
+  "next": false,
+  "keys": {}
+ },
+ "17": {
+  "st": 200,
+  "err": "0",
+  "rows": 20,
+  "next": true,
+  "keys": {
+   "week": {
+    "t": "string",
+    "ex": "Thursday"
+   },
+   "breakDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "checkInDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "checkInTime": {
+    "t": "string",
+    "ex": "05:00"
+   },
+   "checkOutDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "checkOutTime": {
+    "t": "string",
+    "ex": "22:00"
+   },
+   "date": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "firstName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "fullName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "fullPath": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "lastName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "personCode": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "timetableName": {
+    "t": "string",
+    "ex": "<masked>"
+   },
+   "breakRecords": {
+    "t": "string",
+    "ex": ""
+   },
+   "clockInDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "clockInTime": {
+    "t": "string",
+    "ex": "08:37"
+   },
+   "clockOutDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "clockOutTime": {
+    "t": "string",
+    "ex": "12:21"
+   }
+  }
+ },
+ "19": {
+  "st": 200,
+  "err": "0",
+  "rows": 20,
+  "next": true,
+  "keys": {
+   "week": {
+    "t": "string",
+    "ex": "Thursday"
+   },
+   "checkInDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "checkInTime": {
+    "t": "string",
+    "ex": "05:00"
+   },
+   "checkOutDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "checkOutTime": {
+    "t": "string",
+    "ex": "22:00"
+   },
+   "date": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "firstName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "fullName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "fullPath": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "lastName": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "personCode": {
+    "t": "string",
+    "ex": "<pii>"
+   },
+   "timetableName": {
+    "t": "string",
+    "ex": "<masked>"
+   },
+   "workDuration": {
+    "t": "string",
+    "ex": "00:00"
+   },
+   "firstCheckIn": {
+    "t": "string",
+    "ex": ""
+   },
+   "lastCheckOut": {
+    "t": "string",
+    "ex": ""
+   },
+   "clockInDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "clockInTime": {
+    "t": "string",
+    "ex": "08:37"
+   },
+   "clockOutDate": {
+    "t": "string",
+    "ex": "2026-10-01"
+   },
+   "clockOutTime": {
+    "t": "string",
+    "ex": "12:21"
+   }
+  }
+ }
+}
