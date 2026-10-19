@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { Infer } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 
 /** Profil/dizin yanıtlarında güvenli alanlar (izinli liste): yeni users alanları varsayılan olarak dışarıda kalır. */
@@ -23,39 +24,16 @@ export const publicUserValidator = v.object({
   updatedAt: v.optional(v.string()),
 });
 
-export type PublicUser = Pick<
-  Doc<"users">,
-  | "_id"
-  | "_creationTime"
-  | "name"
-  | "email"
-  | "image"
-  | "emailVerificationTime"
-  | "phone"
-  | "phoneVerificationTime"
-  | "isAnonymous"
-  | "fullName"
-  | "photoUrl"
-  | "role"
-  | "verified"
-  | "updatedAt"
->;
+export type PublicUser = Infer<typeof publicUserValidator>;
 
 export function toPublicUser(user: Doc<"users">): PublicUser {
-  return {
-    _id: user._id,
-    _creationTime: user._creationTime,
-    ...(user.name !== undefined ? { name: user.name } : {}),
-    ...(user.email !== undefined ? { email: user.email } : {}),
-    ...(user.image !== undefined ? { image: user.image } : {}),
-    ...(user.emailVerificationTime !== undefined ? { emailVerificationTime: user.emailVerificationTime } : {}),
-    ...(user.phone !== undefined ? { phone: user.phone } : {}),
-    ...(user.phoneVerificationTime !== undefined ? { phoneVerificationTime: user.phoneVerificationTime } : {}),
-    ...(user.isAnonymous !== undefined ? { isAnonymous: user.isAnonymous } : {}),
-    ...(user.fullName !== undefined ? { fullName: user.fullName } : {}),
-    ...(user.photoUrl !== undefined ? { photoUrl: user.photoUrl } : {}),
-    ...(user.role !== undefined ? { role: user.role } : {}),
-    ...(user.verified !== undefined ? { verified: user.verified } : {}),
-    ...(user.updatedAt !== undefined ? { updatedAt: user.updatedAt } : {}),
-  };
+  const result: Partial<PublicUser> = {};
+  for (const field of Object.keys(publicUserValidator.fields) as (keyof PublicUser)[]) {
+    const value = user[field];
+    if (value !== undefined) {
+      Object.assign(result, { [field]: value });
+    }
+  }
+  // Döngü yalnız validator anahtarlarını kopyalar; zorunlu alanlar (_id, _creationTime) her users belgesinde var.
+  return result as PublicUser;
 }
