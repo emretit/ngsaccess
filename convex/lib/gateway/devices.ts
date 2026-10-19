@@ -148,27 +148,43 @@ export async function pingGateway(): Promise<{
   };
 }
 
+const asRecord = (value: unknown): Record<string, unknown> | undefined =>
+  typeof value === "object" && value !== null ? (value as Record<string, unknown>) : undefined;
+
+const asString = (value: unknown): string | undefined =>
+  typeof value === "string" && value ? value : undefined;
+
+/**
+ * deviceList yanıtı (gateway V1.8.0.4, canlı doğrulandı 2026-10-19):
+ * `SearchResult.MatchList[].Device{devIndex, devName, devMode, devStatus, EhomeParams.EhomeID, ipAddress?}`.
+ */
+export function parseGatewayDeviceList(data: unknown): GatewayDeviceStatus[] {
+  const matches = asRecord(data)?.SearchResult;
+  const list = asRecord(matches)?.MatchList;
+  if (!Array.isArray(list)) return [];
+  return list.flatMap((item) => {
+    const device = asRecord(asRecord(item)?.Device);
+    if (!device) return [];
+    return [{
+      devIndex: asString(device.devIndex) ?? "",
+      devName: asString(device.devName),
+      ehomeID: asString(asRecord(device.EhomeParams)?.EhomeID),
+      online: device.devStatus === "online",
+      ipAddress: asString(device.ipAddress),
+      model: asString(device.devMode),
+      raw: device,
+    }];
+  });
+}
+
 export async function listGatewayDevices(): Promise<GatewayDeviceStatus[]> {
   const result = await gatewayApiCall(
     "/ISAPI/ContentMgmt/DeviceMgmt/deviceList",
     "POST",
-    { searchID: "1", searchResultPosition: 0, maxResults: 200 },
+    { SearchDescription: { position: 0, maxResult: 200 } },
   );
   if (result.status !== 200) return [];
-  const data = result.data as Record<string, unknown> | undefined;
-  const list = (data?.DeviceList as Array<Record<string, unknown>>) ?? [];
-  return list.map((item) => {
-    const info = (item.DeviceInfo as Record<string, unknown>) ?? item;
-    return {
-      devIndex: String(info.devIndex ?? ""),
-      devName: info.devName as string | undefined,
-      ehomeID: info.ehomeID as string | undefined,
-      online: info.devStatus === "online" || info.online === true,
-      ipAddress: info.ipAddress as string | undefined,
-      model: info.devType as string | undefined,
-      raw: info,
-    };
-  });
+  return parseGatewayDeviceList(result.data);
 }
 
 /**
