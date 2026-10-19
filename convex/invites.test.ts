@@ -1,12 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { FunctionArgs } from 'convex/server';
-import type { MutationCtx } from './_generated/server';
+import type { FunctionArgs, FunctionReturnType } from 'convex/server';
+import type { MutationCtx, QueryCtx } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
 import type { api } from './_generated/api';
-import { consume, create } from './invites';
+import { consume, create, list } from './invites';
 import { limiter } from './lib/rateLimit';
 
 vi.mock('./lib/rateLimit', () => ({ limiter: { limit: vi.fn(async () => undefined) } }));
+vi.mock('./lib/customFunctions', () => {
+  const register = (definition: { handler: unknown }) => ({ _handler: definition.handler });
+  return { superAdminQuery: register };
+});
 
 // Use the registered production handler, real getAuthUserId and real verifyUser.
 // Only the database and server-provided identity are in-memory fixtures, following
@@ -21,6 +25,31 @@ const otherProjectId = 'existing-project' as Id<'projects'>;
 const args = { token: 'invite-token', email: 'recipient@example.test' };
 
 type IndexBuilder = { eq: (field: string, value: unknown) => IndexBuilder };
+type FilterBuilder = {
+  field: (name: string) => string;
+  eq: (field: string, value: unknown) => { field: string; value: unknown };
+};
+function makeQuery(records: Record<string, unknown>[]) {
+  const criteria: Record<string, unknown> = {};
+  let extraCriterion: { field: string; value: unknown } | undefined;
+  const indexBuilder: IndexBuilder = { eq: (field, value) => { criteria[field] = value; return indexBuilder; } };
+  const rows = () => records
+    .filter((row) => Object.entries(criteria).every(([key, value]) => row[key] === value))
+    .filter((row) => !extraCriterion || row[extraCriterion.field] === extraCriterion.value);
+  const result = {
+    withIndex: (_name: string, apply: (q: IndexBuilder) => unknown) => { apply(indexBuilder); return result; },
+    filter: (apply: (q: FilterBuilder) => { field: string; value: unknown }) => {
+      extraCriterion = apply({ field: (name) => name, eq: (field, value) => ({ field, value }) });
+      return result;
+    },
+    first: async () => rows()[0] ?? null,
+    take: async (limit: number) => rows().slice(0, limit),
+    collect: async () => rows(),
+    async *[Symbol.asyncIterator]() { yield* rows(); },
+  };
+  return result;
+}
+
 function fixture(options: {
   user?: Partial<Doc<'users'>>;
   invite?: Partial<Doc<'invites'>>;
@@ -56,22 +85,8 @@ function fixture(options: {
     memberships.push(value);
     return 'new-membership';
   });
-  const query = (table: string) => {
-    const criteria: Record<string, unknown> = {};
-    const builder: IndexBuilder = { eq: (field, value) => { criteria[field] = value; return builder; } };
-    const rows = (): Record<string, unknown>[] => {
-      const records = table === 'invites' ? (options.missingInvite ? [] : [invite])
-        : table === 'userProjects' ? memberships : [];
-      return records.filter((row: Record<string, unknown>) =>
-        Object.entries(criteria).every(([field, value]) => row[field] === value));
-    };
-    const result = {
-      withIndex: (_name: string, apply: (q: IndexBuilder) => unknown) => { apply(builder); return result; },
-      first: async () => rows()[0] ?? null,
-      async *[Symbol.asyncIterator]() { yield* rows(); },
-    };
-    return result;
-  };
+  const query = (table: string) => makeQuery(
+    table === 'invites' ? (options.missingInvite ? [] : [invite]) : table === 'userProjects' ? memberships : []);
   const ctx = {
     auth: { getUserIdentity: async () => identity === null ? null : {
       subject: `${identity}|session`, issuer: 'https://auth.example.test', tokenIdentifier: `auth|${identity}`,
@@ -181,9 +196,11 @@ type CreateArgs = {
 const registeredCreate = create as unknown as {
   _handler: (ctx: MutationCtx, args: CreateArgs) => Promise<string>;
   isInternal: boolean;
-  isPublic?: boolean;
 };
 const createHandler = registeredCreate._handler;
+const listHandler = (list as unknown as {
+  _handler: (ctx: QueryCtx, args: FunctionArgs<typeof api.invites.list>) => Promise<FunctionReturnType<typeof api.invites.list>>;
+})._handler;
 
 function createFixture(options: {
   caller?: Partial<Doc<'users'>> | null;
@@ -203,24 +220,7 @@ function createFixture(options: {
   const inserted: Record<string, unknown>[] = [];
   const patched: Record<string, unknown>[] = [];
   const project = { _id: projectId, _creationTime: 1, ownerId: options.owner ?? userId };
-  const query = (table: string) => {
-    const criteria: Record<string, unknown> = {};
-    let extraCriterion: { field: string; value: unknown } | undefined;
-    const indexBuilder: IndexBuilder = { eq: (field, value) => { criteria[field] = value; return indexBuilder; } };
-    const rows = () => (table === 'userProjects' ? memberships : table === 'invites' ? invites : [])
-      .filter((row) => Object.entries(criteria).every(([key, value]) => row[key] === value))
-      .filter((row) => !extraCriterion || row[extraCriterion.field] === extraCriterion.value);
-    const result = {
-      withIndex: (_name: string, apply: (q: IndexBuilder) => unknown) => { apply(indexBuilder); return result; },
-      filter: (apply: (q: { field: (name: string) => string; eq: (field: string, value: unknown) => { field: string; value: unknown } }) => { field: string; value: unknown }) => {
-        extraCriterion = apply({ field: (name) => name, eq: (field, value) => ({ field, value }) });
-        return result;
-      },
-      first: async () => rows()[0] ?? null,
-      async *[Symbol.asyncIterator]() { yield* rows(); },
-    };
-    return result;
-  };
+  const query = (table: string) => makeQuery(table === 'userProjects' ? memberships : table === 'invites' ? invites : []);
   const ctx = { db: {
     get: async (id: Id<'users'> | Id<'projects'>) => id === callerId ? caller : id === projectId ? project : null,
     query,
@@ -235,7 +235,6 @@ describe('invites.create internal authorization', () => {
 
   it('is internal only', () => {
     expect(registeredCreate.isInternal).toBe(true);
-    expect(registeredCreate.isPublic).not.toBe(true);
   });
   it('allows super_admin and lowercases the inserted email', async () => {
     const f = createFixture();
@@ -271,5 +270,19 @@ describe('invites.create internal authorization', () => {
     await createHandler(f.ctx, input(f.callerId));
     expect(f.patched).toHaveLength(2);
     expect(f.patched.every((patch) => patch.used === true)).toBe(true);
+  });
+});
+
+describe('invites.list response contract', () => {
+  it('omits private fields and filters by project', async () => {
+    const rows = [
+      { _id: 'invite-a' as Id<'invites'>, _creationTime: 1, email: 'a@example.test', token: 'secret-a', projectId, role: 'project_user' as const, type: 'invite', createdBy: attackerId, expiresAt: '2030-01-01', used: false, createdAt: '2026-01-01' },
+      { _id: 'invite-b' as Id<'invites'>, _creationTime: 2, email: 'b@example.test', token: 'secret-b', projectId: otherProjectId, role: 'project_admin' as const, type: 'reset', createdBy: attackerId, expiresAt: '2030-01-02', used: true, createdAt: '2026-01-02' },
+    ];
+    const ctx = { db: { query: () => makeQuery(rows) } } as unknown as QueryCtx;
+    const result = await listHandler(ctx, { projectId });
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ _id: 'invite-a', email: 'a@example.test', projectId, role: 'project_user' });
+    for (const key of ['token', 'type', 'createdBy', '_creationTime']) expect(result[0]).not.toHaveProperty(key);
   });
 });

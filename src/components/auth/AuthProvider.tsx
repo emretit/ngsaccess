@@ -25,7 +25,7 @@ interface AuthContextType {
     companyName: string,
   ) => Promise<{ error: unknown | null; accountCreated?: boolean; verificationQueued?: boolean }>;
   verificationEmail: string | null;
-  runSetup: (action: () => Promise<void>) => Promise<void>;
+  runSetup: (action: () => Promise<void>, options?: { signOutOnError?: boolean }) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   checkUserRole: (requiredRole: UserRole) => boolean;
@@ -167,14 +167,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const runSetup = async (action: () => Promise<void>) => {
+  const runSetup = async (action: () => Promise<void>, options: { signOutOnError?: boolean } = {}) => {
     setupActiveRef.current = true;
     setSetupPhase("working");
     try {
       await action();
       setSetupPhase("completed");
     } catch (error: unknown) {
-      try { await convexSignOut(); } catch { /* Backend doğrulama kontrolü sürer. */ }
+      if (options.signOutOnError ?? true) {
+        try { await convexSignOut(); } catch { /* Backend doğrulama kontrolü sürer. */ }
+      }
       setupActiveRef.current = false;
       setSetupPhase("idle");
       throw error;

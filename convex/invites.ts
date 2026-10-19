@@ -1,7 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internalMutation, mutation, query } from "./_generated/server";
-import { superAdminMutation, superAdminQuery } from "./lib/customFunctions";
+import { superAdminQuery } from "./lib/customFunctions";
 import { limiter } from "./lib/rateLimit";
 import { verifyUser } from "./lib/auth";
 
@@ -225,7 +225,7 @@ export const listExpired = superAdminQuery({
   },
 });
 
-export const list = superAdminMutation({
+export const list = superAdminQuery({
   args: { projectId: v.optional(v.id("projects")) },
   returns: v.array(
     v.object({
@@ -239,13 +239,15 @@ export const list = superAdminMutation({
     })
   ),
   handler: async (ctx, args) => {
-    if (args.projectId) {
-      return await ctx.db
-        .query("invites")
-        .filter((q) => q.eq(q.field("projectId"), args.projectId))
-        .collect();
-    }
-    return await ctx.db.query("invites").collect();
+    // invites'ta projectId index'i yok: süzme sorguda (take'ten önce), sonuç 500 satırla sınırlı.
+    const all = ctx.db.query("invites");
+    const rows = await (args.projectId
+      ? all.filter((q) => q.eq(q.field("projectId"), args.projectId))
+      : all
+    ).take(500);
+    return rows.map(({ _id, email, projectId, role, expiresAt, used, createdAt }) => ({
+      _id, email, projectId, role, expiresAt, used, createdAt,
+    }));
   },
 });
 

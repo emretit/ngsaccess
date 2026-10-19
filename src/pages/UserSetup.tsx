@@ -63,21 +63,23 @@ export default function UserSetup() {
 
   useEffect(() => {
     if (!authWaiter) return;
+    const reject = () => authWaiter.reject(new ConvexError({ code: 'INVITE_AUTH_TIMEOUT' }));
+    const timer = window.setTimeout(reject, 15_000);
+    // Temizlikte reject: waiter değişince/unmount'ta bekleyen promise asılı kalmaz (çözülmüşse no-op).
+    return () => {
+      window.clearTimeout(timer);
+      reject();
+    };
+  }, [authWaiter]);
+
+  useEffect(() => {
+    if (!authWaiter) return;
     // signIn dönüşü transport'un hazır olduğunu garanti etmez. Profil eşleşmesi
     // önceki başka bir hesabın hazır oturumunu da yanlışlıkla kullanmayı önler.
     if (isAuthenticated && user?.email?.toLowerCase() === email.toLowerCase()) {
       authWaiter.resolve();
-      return;
     }
-    const timer = window.setTimeout(() => {
-      authWaiter.reject(new ConvexError({ code: 'INVITE_AUTH_TIMEOUT' }));
-    }, 15_000);
-    return () => window.clearTimeout(timer);
   }, [authWaiter, isAuthenticated, user?.email, email]);
-
-  useEffect(() => () => {
-    authWaiter?.reject(new ConvexError({ code: 'INVITE_AUTH_TIMEOUT' }));
-  }, [authWaiter]);
 
   // Davet emailini otomatik doldur
   useEffect(() => {
@@ -104,6 +106,7 @@ export default function UserSetup() {
       fail('Şifre gereksinimlerini ve şifre tekrarını kontrol edin.');
     }
     try {
+      // Mevcut hesapta davet hatası oturumu kapatmaz (doğrulanmamışsa AuthProvider guard'ı kapatır).
       await runSetup(async () => {
         await signIn('password', { email, password, flow: existingAccount ? 'signIn' : 'signUp' });
         try {
@@ -112,7 +115,7 @@ export default function UserSetup() {
           setAuthWaiter(null);
         }
         await consumeInvite({ token, email });
-      });
+      }, { signOutOnError: !existingAccount });
     } catch (error: unknown) {
       fail(inviteSetupError(error));
     }
