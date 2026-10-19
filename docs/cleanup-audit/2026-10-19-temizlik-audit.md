@@ -8,12 +8,13 @@
 - [x] Çift sistem / eski kalıntı kontrolü
 - [x] Rapor
 
-### Faz 1 — Güvenli silme (A katmanı) — 2026-10-19 21:00 UYGULANDI (commit yok, unstaged)
+### Faz 1 — Güvenli silme (A katmanı) — 2026-10-19 BİTTİ: commit `b8fce5b` + `0cc8d44`, Convex CANLI (push yok)
 - [x] 58 dosya silindi: 56 frontend (ölü UI/hook/util + PDKS eski sohbet kopyaları + Radix toast) + `convex/chatConversations.ts` + `convex/migrations/projectIdBackfill.ts`
 - [x] 21 paket kaldırıldı (`collapsible` Ziyaretçiler worker'ı kullanmaya başladığı için geri geldi)
 - [x] 43 public Convex fonksiyonu silindi (canlı web `dfd3b4e` + mobil/köprü geçmişinde çağrı yok), kullanılmayan import'lar temizlendi
 - [x] Kapılar: tsc 0 · eslint 0 hata / 0 any · vitest 1988/1991 (3 kırmızı = UI audit worker'ının yeni `DeviceCommandCenter.audit.test.tsx`'i, bu temizlikle ilgisi yok) · build OK
-- [ ] Convex deploy (`npx convex dev --once`) — ayrı onay; o zamana kadar silinen fonksiyonlar canlıda duruyor
+- [x] Convex deploy 2026-10-19 21:11:48 TR — temiz worktree `b8fce5b`'den `convex dev --once` (Emre onayı); canlı 442 → 399 fonksiyon, web/mobil kritik fonksiyonlar yerinde. Yan etki: çalışma ağacından yapılan `codegen` (startPush) ile hazırlanmış 5 commit'lenmemiş index (accessRules ×3, employees ×2) düştü; canlı kod kullanmıyordu, ilgili dalga yayınlanınca yeniden kurulur
+- [x] `0cc8d44`: api.d.ts commit'lenmemiş modül referanslarından arındırıldı
 - [x] Commit — yalnız temizlik dosyaları + 05 worker'ının 5 ölü erişim-kontrol silmesi; temiz HEAD worktree'de tsc 0 · vitest 1838/1838 · build OK · sonner toast tarayıcıda doğrulandı
 
 ### Faz 1 dışında bırakılanlar (bilerek)
