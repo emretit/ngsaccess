@@ -8,9 +8,8 @@
  * @module
  */
 
-import type * as biometricDestruction from "../biometricDestruction.js";
-import type * as actions_biometricDestruction from "../actions/biometricDestruction.js";
 import type * as accessRules from "../accessRules.js";
+import type * as actions_biometricDestruction from "../actions/biometricDestruction.js";
 import type * as actions_getChatData from "../actions/getChatData.js";
 import type * as actions_hikBridgeWake from "../actions/hikBridgeWake.js";
 import type * as actions_hikDebug from "../actions/hikDebug.js";
@@ -26,6 +25,7 @@ import type * as actions_setPassword from "../actions/setPassword.js";
 import type * as adminDevices from "../adminDevices.js";
 import type * as auditLog from "../auditLog.js";
 import type * as auth from "../auth.js";
+import type * as biometricDestruction from "../biometricDestruction.js";
 import type * as cardReadings from "../cardReadings.js";
 import type * as chatConversations from "../chatConversations.js";
 import type * as companies from "../companies.js";
@@ -69,12 +69,17 @@ import type * as lib_auditActors from "../lib/auditActors.js";
 import type * as lib_auditLogQuery from "../lib/auditLogQuery.js";
 import type * as lib_auditSearch from "../lib/auditSearch.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_biometricDestruction from "../lib/biometricDestruction.js";
+import type * as lib_biometricDestructionState from "../lib/biometricDestructionState.js";
+import type * as lib_biometricGate from "../lib/biometricGate.js";
 import type * as lib_breakDeduction from "../lib/breakDeduction.js";
 import type * as lib_cardReaderAuth from "../lib/cardReaderAuth.js";
 import type * as lib_cardReaderParse from "../lib/cardReaderParse.js";
 import type * as lib_cardReadingAudit from "../lib/cardReadingAudit.js";
 import type * as lib_cardReadingList from "../lib/cardReadingList.js";
 import type * as lib_cardReadingProcess from "../lib/cardReadingProcess.js";
+import type * as lib_cardReadingRetention from "../lib/cardReadingRetention.js";
+import type * as lib_chatMasking from "../lib/chatMasking.js";
 import type * as lib_checkInUx from "../lib/checkInUx.js";
 import type * as lib_customFunctions from "../lib/customFunctions.js";
 import type * as lib_dashboardActivity from "../lib/dashboardActivity.js";
@@ -131,6 +136,7 @@ import type * as lib_peopleHikSnapshot from "../lib/peopleHikSnapshot.js";
 import type * as lib_peoplePhoto from "../lib/peoplePhoto.js";
 import type * as lib_peopleRelations from "../lib/peopleRelations.js";
 import type * as lib_peopleScope from "../lib/peopleScope.js";
+import type * as lib_privacySettings from "../lib/privacySettings.js";
 import type * as lib_projectScope from "../lib/projectScope.js";
 import type * as lib_rateLimit from "../lib/rateLimit.js";
 import type * as lib_reconcileMath from "../lib/reconcileMath.js";
@@ -181,9 +187,8 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  biometricDestruction: typeof biometricDestruction;
-  "actions/biometricDestruction": typeof actions_biometricDestruction;
   accessRules: typeof accessRules;
+  "actions/biometricDestruction": typeof actions_biometricDestruction;
   "actions/getChatData": typeof actions_getChatData;
   "actions/hikBridgeWake": typeof actions_hikBridgeWake;
   "actions/hikDebug": typeof actions_hikDebug;
@@ -199,6 +204,7 @@ declare const fullApi: ApiFromModules<{
   adminDevices: typeof adminDevices;
   auditLog: typeof auditLog;
   auth: typeof auth;
+  biometricDestruction: typeof biometricDestruction;
   cardReadings: typeof cardReadings;
   chatConversations: typeof chatConversations;
   companies: typeof companies;
@@ -242,12 +248,17 @@ declare const fullApi: ApiFromModules<{
   "lib/auditLogQuery": typeof lib_auditLogQuery;
   "lib/auditSearch": typeof lib_auditSearch;
   "lib/auth": typeof lib_auth;
+  "lib/biometricDestruction": typeof lib_biometricDestruction;
+  "lib/biometricDestructionState": typeof lib_biometricDestructionState;
+  "lib/biometricGate": typeof lib_biometricGate;
   "lib/breakDeduction": typeof lib_breakDeduction;
   "lib/cardReaderAuth": typeof lib_cardReaderAuth;
   "lib/cardReaderParse": typeof lib_cardReaderParse;
   "lib/cardReadingAudit": typeof lib_cardReadingAudit;
   "lib/cardReadingList": typeof lib_cardReadingList;
   "lib/cardReadingProcess": typeof lib_cardReadingProcess;
+  "lib/cardReadingRetention": typeof lib_cardReadingRetention;
+  "lib/chatMasking": typeof lib_chatMasking;
   "lib/checkInUx": typeof lib_checkInUx;
   "lib/customFunctions": typeof lib_customFunctions;
   "lib/dashboardActivity": typeof lib_dashboardActivity;
@@ -304,6 +315,7 @@ declare const fullApi: ApiFromModules<{
   "lib/peoplePhoto": typeof lib_peoplePhoto;
   "lib/peopleRelations": typeof lib_peopleRelations;
   "lib/peopleScope": typeof lib_peopleScope;
+  "lib/privacySettings": typeof lib_privacySettings;
   "lib/projectScope": typeof lib_projectScope;
   "lib/rateLimit": typeof lib_rateLimit;
   "lib/reconcileMath": typeof lib_reconcileMath;
