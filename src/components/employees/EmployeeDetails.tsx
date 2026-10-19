@@ -127,7 +127,9 @@ export default function EmployeeDetails({
           Fotoğraf personel profilinde kullanılır.
         </p>
       </section>
+      {/* key: çalışan değişince açık rıza/iptal formu önceki çalışanda kalmasın. */}
       <EmployeeActivityBoundary
+        key={employee._id}
         employeeId={employee._id}
         projectId={projectId}
         title="KVKK Rızalar"

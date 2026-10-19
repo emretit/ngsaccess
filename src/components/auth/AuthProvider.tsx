@@ -54,6 +54,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // verified=false kullanıcıyı bir kez signOut etmek için (effect döngüsünü önler)
   const blockedRef = useRef(false);
   const orphanedRef = useRef(false);
+  // Bilinçli çıkış (kullanıcı ya da doğrulanmamış hesap) sürerken sunucu oturumu siler ve
+  // currentUser null döner; token silinene kadarki bu an silinmiş oturum sayılmasın.
+  const signingOutRef = useRef(false);
   // ensureProject'i bir kez çağırmak için (idempotent ama gereksiz çağrıyı önler)
   const ensuredRef = useRef(false);
   // signUp sürerken effect'in /home'a yönlendirmesini engelle (dashboard flash'ı).
@@ -80,6 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (profile.verified === false) {
         if (!blockedRef.current) {
           blockedRef.current = true;
+          signingOutRef.current = true;
           setVerificationEmail(profile.email ?? null);
           void convexSignOut()
             .then(() => {
@@ -90,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .catch(() => {
               // signOut başarısız olursa tekrar denenebilsin.
               blockedRef.current = false;
+              signingOutRef.current = false;
             });
         }
         return;
@@ -116,7 +121,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    if (shouldSignOutOrphanedSession({ isLoading, isAuthenticated, user, deferred }) && !orphanedRef.current) {
+    if (
+      shouldSignOutOrphanedSession({ isLoading, isAuthenticated, user, deferred, signingOut: signingOutRef.current }) &&
+      !orphanedRef.current
+    ) {
       orphanedRef.current = true;
       const isProtectedRoute = routeMeta.some(({ href }) =>
         location.pathname === href || location.pathname.startsWith(`${href}/`),
@@ -141,6 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!isAuthenticated) {
       blockedRef.current = false;
       orphanedRef.current = false;
+      signingOutRef.current = false;
       ensuredRef.current = false;
     }
   }, [isAuthenticated, isLoading, profile, user, location.pathname, location.search, location.hash, navigate, convexSignOut, ensureProject, signupPending, setupPhase]);
@@ -211,7 +220,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    await convexSignOut();
+    signingOutRef.current = true;
+    try {
+      await convexSignOut();
+    } catch (error: unknown) {
+      signingOutRef.current = false;
+      throw error;
+    }
     notify.success("Çıkış yapıldı", "Başarıyla çıkış yaptınız");
     navigate('/');
   };

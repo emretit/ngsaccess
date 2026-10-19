@@ -31,7 +31,7 @@ describe('hesap kayıt sonucu', () => {
 });
 
 describe('silinmiş oturum kararı', () => {
-  const authenticated = { isLoading: false, isAuthenticated: true, user: null, deferred: false };
+  const authenticated = { isLoading: false, isAuthenticated: true, user: null, deferred: false, signingOut: false };
 
   it('yükleme ve profil sorgusu sürerken bekler', () => {
     expect(shouldSignOutOrphanedSession({ ...authenticated, isLoading: true })).toBe(false);
@@ -45,5 +45,9 @@ describe('silinmiş oturum kararı', () => {
   it('kayıt/kurulum koruması erteler ve oturum kapalıyken tetiklemez', () => {
     expect(shouldSignOutOrphanedSession({ ...authenticated, deferred: true })).toBe(false);
     expect(shouldSignOutOrphanedSession({ ...authenticated, isAuthenticated: false })).toBe(false);
+  });
+
+  it('bilinçli çıkış sürerken silinmiş oturum sayılmaz', () => {
+    expect(shouldSignOutOrphanedSession({ ...authenticated, signingOut: true })).toBe(false);
   });
 });

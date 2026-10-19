@@ -34,6 +34,8 @@ export function shouldSignOutOrphanedSession(input: {
   isAuthenticated: boolean;
   user: unknown | null | undefined;
   deferred: boolean;
+  /** Bilinçli çıkış sürüyor: sunucu oturumu sildi, istemci token'ı henüz silmedi. */
+  signingOut: boolean;
 }): boolean {
-  return !input.isLoading && input.isAuthenticated && input.user === null && !input.deferred;
+  return !input.isLoading && input.isAuthenticated && input.user === null && !input.deferred && !input.signingOut;
 }
