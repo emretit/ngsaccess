@@ -1,3 +1,4 @@
+import { assertBiometricAllowed } from "./lib/biometricGate";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
@@ -63,6 +64,8 @@ export const addFace = authedMutation({
     ) {
       throw new Error("Bu çalışana erişim yetkiniz yok");
     }
+
+    await assertBiometricAllowed(ctx, employee.projectId);
 
     // KVKK 6698 — özel nitelikli (biyometrik) veri için açık rıza zorunlu
     const consents = await ctx.db

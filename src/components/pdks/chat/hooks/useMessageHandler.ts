@@ -45,7 +45,7 @@ export function useMessageHandler() {
           return result.readings;
         },
         fetchDatabaseContext: () => getDatabaseContext({ projectId }),
-        processOpenAI: (params: { input: string; dbContext: string }) => processOpenAI({ ...params, dbContext: `${params.dbContext}\n${scopeNote}` }),
+        processOpenAI: (params: { input: string; dbContext: string }) => processOpenAI({ ...params, projectId, dbContext: `${params.dbContext}\n${scopeNote}` }),
       };
       const response = await sendChatMessage(content, fetchers);
       

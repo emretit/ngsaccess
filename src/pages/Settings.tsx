@@ -8,6 +8,7 @@ import { ReportsSettings } from "@/components/settings/sections/ReportsSettings"
 import { NotificationSettings } from "@/components/settings/sections/NotificationSettings";
 import { MailSettings } from "@/components/settings/sections/MailSettings";
 import { IntegrationsSettings } from "@/components/settings/sections/IntegrationsSettings";
+import { PrivacySettings } from "@/components/settings/sections/PrivacySettings";
 import AdminUsersPanel from "@/components/admin/AdminUsersPanel";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -73,6 +74,7 @@ export default function Settings() {
       case "work-payroll": return <WorkAndPayrollSettings />;
       case "reports": return <ReportsSettings />;
       case "integrations": return <IntegrationsSettings />;
+      case "privacy": return <PrivacySettings />;
       case "mail": return <MailSettings />;
       case "notifications": return <NotificationSettings />;
     }

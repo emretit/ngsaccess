@@ -1,3 +1,4 @@
+import { assertBiometricAllowed } from "./lib/biometricGate";
 import { v } from "convex/values";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { writeAudit } from "./lib/audit";
@@ -58,6 +59,9 @@ export const grant = authedMutation({
   },
   handler: async (ctx, args) => {
     const employee = await requireEmployeeAccess(ctx, args.employeeId);
+    if (args.consentType === "biometric_face" || args.consentType === "biometric_fingerprint") {
+      await assertBiometricAllowed(ctx, employee.projectId);
+    }
 
     const existing = await ctx.db
       .query("employeeConsents")

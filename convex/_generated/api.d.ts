@@ -8,6 +8,8 @@
  * @module
  */
 
+import type * as biometricDestruction from "../biometricDestruction.js";
+import type * as actions_biometricDestruction from "../actions/biometricDestruction.js";
 import type * as accessRules from "../accessRules.js";
 import type * as actions_getChatData from "../actions/getChatData.js";
 import type * as actions_hikBridgeWake from "../actions/hikBridgeWake.js";
@@ -154,6 +156,8 @@ import type * as onboarding from "../onboarding.js";
 import type * as pdksRecords from "../pdksRecords.js";
 import type * as peopleActivity from "../peopleActivity.js";
 import type * as positions from "../positions.js";
+import type * as privacyBiometric from "../privacyBiometric.js";
+import type * as privacyRetention from "../privacyRetention.js";
 import type * as projects from "../projects.js";
 import type * as readers from "../readers.js";
 import type * as reports from "../reports.js";
@@ -177,6 +181,8 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  biometricDestruction: typeof biometricDestruction;
+  "actions/biometricDestruction": typeof actions_biometricDestruction;
   accessRules: typeof accessRules;
   "actions/getChatData": typeof actions_getChatData;
   "actions/hikBridgeWake": typeof actions_hikBridgeWake;
@@ -323,6 +329,8 @@ declare const fullApi: ApiFromModules<{
   pdksRecords: typeof pdksRecords;
   peopleActivity: typeof peopleActivity;
   positions: typeof positions;
+  privacyBiometric: typeof privacyBiometric;
+  privacyRetention: typeof privacyRetention;
   projects: typeof projects;
   readers: typeof readers;
   reports: typeof reports;

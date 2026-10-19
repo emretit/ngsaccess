@@ -1135,6 +1135,21 @@ export default defineSchema({
     .index("by_project", ["projectId"])
     .index("by_user_project", ["userId", "projectId"]),
 
+  // KVKK Faz 1: proje bazlı gizlilik ayarları (biyometri modülü, okuma saklama
+  // süresi, asistan isim maskeleme). Satır YOKSA eski davranış (bkz.
+  // convex/lib/privacySettings.ts DEFAULT_PRIVACY): biyometri açık, saklama süresiz,
+  // asistan isimleri maskeli. Yeni projeler biyometri KAPALI başlar.
+  projectPrivacySettings: defineTable({
+    projectId: v.id("projects"),
+    biometricEnabled: v.optional(v.boolean()),
+    biometricReason: v.optional(v.string()),
+    biometricChangedAt: v.optional(v.string()),
+    biometricChangedBy: v.optional(v.id("users")),
+    cardReadingRetentionDays: v.optional(v.number()),
+    aiMaskNames: v.optional(v.boolean()),
+    updatedAt: v.string(),
+  }).index("by_project", ["projectId"]),
+
   // Kullanıcı davet sistemi - yetkili kullanıcılar projeye davet eder veya
   // mevcut kullanıcıya şifre sıfırlama maili gönderir (type === "reset")
   invites: defineTable({

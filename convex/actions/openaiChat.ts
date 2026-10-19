@@ -1,6 +1,7 @@
 "use node";
 
 import { v } from "convex/values";
+import { internal } from "../_generated/api";
 import { authedAction } from "../lib/customFunctions";
 
 const OPENAI_API_ENDPOINT = "https://api.openai.com/v1/chat/completions";
@@ -50,12 +51,22 @@ export const processMessage = authedAction({
   args: {
     input: v.string(),
     dbContext: v.string(),
+    projectId: v.optional(v.id("projects")),
   },
   returns: v.object({
     content: v.string(),
     source: v.union(v.literal("openai"), v.literal("error")),
   }),
-  handler: async (_ctx, args) => {
+  handler: async (ctx, args) => {
+    let projectId = args.projectId;
+    const legacyClient = projectId === undefined;
+    if (!projectId) {
+      const projects = await ctx.runQuery(internal.users.listProjectIdsForCurrentUser, {});
+      if (projects.length !== 1) {
+        return { content: "Hangi proje için sorduğunuzu belirlemek üzere sayfayı yenileyin", source: "error" as const };
+      }
+      projectId = projects[0];
+    }
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return {
@@ -64,6 +75,8 @@ export const processMessage = authedAction({
       };
     }
 
+    // İstemci bağlamı güven sınırı değildir; güncel proje ayarıyla yeniden üret.
+    const dbContext: string = await ctx.runQuery(internal.privacyRetention.getAssistantContext, { projectId, ...(legacyClient ? { forceMaskNames: true } : {}) });
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
     try {
@@ -80,7 +93,7 @@ export const processMessage = authedAction({
               role: "system",
               content:
                 "Sen NGSPlus PDKS asistanısın. Türkçe, kısa ve uygulanabilir yanıt ver. Kullanıcıya yalnız verilen PDKS bağlamına dayanarak cevap ver.\n\n" +
-                args.dbContext,
+                dbContext,
             },
             { role: "user", content: args.input },
           ],

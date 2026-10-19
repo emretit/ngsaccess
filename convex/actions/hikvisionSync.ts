@@ -754,6 +754,7 @@ export const syncEmployeeFaceToDevicesInternal = internalAction({
     ctx,
     args,
   ): Promise<{ synced: number; failed: number; errors: string[] }> => {
+    await ctx.runQuery(internal.hikvisionSync.assertBiometricSyncAllowed, { employeeId: args.employeeId });
     const inScope = makeProjectGuard(args.allowedProjectIds);
     const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, {
       employeeId: args.employeeId,
@@ -784,6 +785,7 @@ export const syncEmployeeFaceToDevicesInternal = internalAction({
     const employeeNo = data.employee.cardNumber;
     const results = await Promise.all(
       targets.map(async (t) => {
+        await ctx.runQuery(internal.hikvisionSync.assertBiometricSyncAllowed, { employeeId: args.employeeId, deviceId: t.device._id });
         const r = await addFaceToDevice(t.device.hikDevIndex!, employeeNo, jpegBytes, {
           name: `${data.employee.firstName} ${data.employee.lastName}`,
         });
@@ -892,6 +894,7 @@ export const syncEmployeeFingerprintToDevicesInternal = internalAction({
     ctx,
     args,
   ): Promise<{ synced: number; failed: number; errors: string[] }> => {
+    await ctx.runQuery(internal.hikvisionSync.assertBiometricSyncAllowed, { employeeId: args.employeeId });
     const inScope = makeProjectGuard(args.allowedProjectIds);
     const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, {
       employeeId: args.employeeId,
@@ -919,6 +922,7 @@ export const syncEmployeeFingerprintToDevicesInternal = internalAction({
     const employeeNo = data.employee.cardNumber;
     const results = await Promise.all(
       targets.map(async (t) => {
+        await ctx.runQuery(internal.hikvisionSync.assertBiometricSyncAllowed, { employeeId: args.employeeId, deviceId: t.device._id });
         const r = await addFingerprintToDevice(t.device.hikDevIndex!, {
           employeeNo,
           fingerPrintID: args.fingerPrintID,

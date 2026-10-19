@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { BIOMETRIC_NOTICE_TEMPLATE } from "@/lib/consentNotice";
+import { useId, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { format } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -17,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { notify } from "@/lib/notify";
 
 type ConsentType = "biometric_face" | "biometric_fingerprint" | "card" | "photo";
@@ -27,13 +29,13 @@ const CONSENT_META: Record<
 > = {
   biometric_face: {
     label: "Yüz Tanıma",
-    description: "Özel nitelikli — KVKK 6/3 açık rıza zorunlu",
+    description: "Yalnız erişim kontrolü — ayrı açık rıza kaydı",
     icon: ScanFace,
     required: true,
   },
   biometric_fingerprint: {
     label: "Parmak İzi",
-    description: "Özel nitelikli — KVKK 6/3 açık rıza zorunlu",
+    description: "Yalnız erişim kontrolü — ayrı açık rıza kaydı",
     icon: Fingerprint,
     required: true,
   },
@@ -57,6 +59,9 @@ interface PDKSEmployeeConsentsCardProps {
 
 export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardProps) {
   const consents = useQuery(api.employeeConsents.listForEmployee, { employeeId });
+  const biometricModule = useQuery(api.privacyBiometric.getEmployeeBiometricModule, { employeeId });
+  const notesId = useId();
+  const [revokeTarget, setRevokeTarget] = useState<{ id: Id<"employeeConsents">; label: string } | null>(null);
   const grant = useMutation(api.employeeConsents.grant);
   const revoke = useMutation(api.employeeConsents.revoke);
 
@@ -76,7 +81,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
   }
 
   const handleGrant = async () => {
-    if (!grantingType) return;
+    if (!grantingType || (grantingType.startsWith("biometric_") && biometricModule?.enabled !== true)) return;
     setSubmitting(true);
     try {
       await grant({
@@ -88,18 +93,9 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
       setGrantingType(null);
       setNotes("");
     } catch (e) {
-      notify.error("Rıza alınamadı", e instanceof Error ? e.message : "Bilinmeyen hata");
+      notify.error("Rıza alınamadı", e);
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleRevoke = async (id: Id<"employeeConsents">, label: string) => {
-    try {
-      await revoke({ id });
-      notify.success("Rıza iptal edildi", label);
-    } catch (e) {
-      notify.error("İptal edilemedi", e instanceof Error ? e.message : "Bilinmeyen hata");
     }
   };
 
@@ -114,8 +110,17 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
         <h4 className="text-sm font-medium">KVKK Rızalar</h4>
       </div>
       <p className="text-xs text-muted-foreground">
-        Biyometrik veri için açık rıza zorunludur. Rıza yoksa yüz/parmak izi kaydı eklenemez.
+        Biyometri yalnız erişim kontrolü için değerlendirilir. Rıza yoksa yüz/parmak izi kaydı eklenemez. Yasal danışmanınıza doğrulatın.
       </p>
+      <details className="text-xs">
+        <summary className="cursor-pointer font-medium">Aydınlatma metni şablonu</summary>
+        <pre className="mt-3 whitespace-pre-wrap break-words font-sans text-muted-foreground">{BIOMETRIC_NOTICE_TEMPLATE}</pre>
+        <Button type="button" variant="outline" size="sm" className="mt-3" onClick={async () => {
+          try { await navigator.clipboard.writeText(BIOMETRIC_NOTICE_TEMPLATE); notify.success("Şablon kopyalandı"); }
+          catch (error: unknown) { notify.error("Şablon kopyalanamadı", error); }
+        }}>Şablonu kopyala</Button>
+      </details>
+      {biometricModule?.enabled === false && <p className="text-xs text-muted-foreground">Biyometri modülü kapalı; yüz ve parmak izi rızası eklenemez. Mevcut rızalar iptal edilebilir.</p>}
       <Separator />
       <div className="space-y-2">
         {(Object.keys(CONSENT_META) as ConsentType[]).map((type) => {
@@ -160,7 +165,8 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => handleRevoke(active.id, meta.label)}
+                    aria-label={`${meta.label} rızasını iptal et`}
+                    onClick={() => setRevokeTarget({ id: active.id, label: meta.label })}
                     className="gap-1.5"
                   >
                     <ShieldX className="h-3.5 w-3.5" />
@@ -169,6 +175,8 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                 ) : (
                   <Button
                     size="sm"
+                    aria-label={`${meta.label} rızası al`}
+                    disabled={type.startsWith("biometric_") && biometricModule?.enabled !== true}
                     onClick={() => setGrantingType(type)}
                     className="gap-1.5"
                   >
@@ -197,13 +205,13 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
               {grantingType ? CONSENT_META[grantingType].label : ""} — Rıza Kaydı
             </DialogTitle>
             <DialogDescription>
-              Bu işlem KVKK 6698 sayılı kanun kapsamında açık rıza beyanı olarak kaydedilir.
+              Bu işlem çalışanın ayrı alınmış açık rıza beyanını kaydeder. Biyometri yalnız erişim kontrolü içindir.
               Çalışan istediği zaman geri alabilir.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <label className="text-xs font-medium">Not (opsiyonel)</label>
-            <Textarea
+            <label htmlFor={notesId} className="text-xs font-medium">Not (opsiyonel)</label>
+            <Textarea id={notesId}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Örn: Çalışan imzalı form arşivde, ref #1234"
@@ -221,12 +229,20 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
             >
               İptal
             </Button>
-            <Button onClick={handleGrant} disabled={submitting}>
+            <Button onClick={handleGrant} disabled={submitting || (grantingType?.startsWith("biometric_") === true && biometricModule?.enabled !== true)}>
               {submitting ? "Kaydediliyor..." : "Rıza Al"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ConfirmDestructive open={revokeTarget !== null} onOpenChange={open => { if (!open) setRevokeTarget(null); }}
+        title="Rıza iptal edilsin mi?" objectName={revokeTarget?.label ?? "Rıza"}
+        effects={["Rıza kaydı geri alınmış olarak işaretlenir. Mevcut biyometrik şablonlar bu işlemle silinmez."]}
+        confirmLabel="Rızayı iptal et" onConfirm={async () => {
+          if (!revokeTarget) return;
+          await revoke({ id: revokeTarget.id });
+          notify.success("Rıza iptal edildi", revokeTarget.label);
+        }} />
     </div>
   );
 }

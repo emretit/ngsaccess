@@ -158,6 +158,15 @@ async function executeOperation(
       if (!employeeNo || !fingerPrintID || !fp) {
         return { ok: false, error: "Fingerprint verileri eksik" };
       }
+      const employeeId = payload.employeeId;
+      if (typeof employeeId !== "string") return { ok: false, error: "Çalışan kimliği eksik" };
+      try {
+        await ctx.runQuery(internal.hikvisionSync.assertBiometricSyncAllowed, {
+          employeeId: employeeId as Id<"employees">, deviceId: c.device._id,
+        });
+      } catch {
+        return { ok: false, error: "Biyometri izni doğrulanamadı; parmak izi gönderilmedi." };
+      }
       return await addFingerprintToDevice(devIndex, {
         employeeNo,
         fingerPrintID,

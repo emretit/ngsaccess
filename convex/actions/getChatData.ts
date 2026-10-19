@@ -3,7 +3,7 @@
 import { filterPdksReadings } from "../lib/pdksSource";
 import { v } from "convex/values";
 import type { CardReadingListPage as ReadingPage } from "../cardReadings";
-import { api } from "../_generated/api";
+import { api, internal } from "../_generated/api";
 import { authedAction } from "../lib/customFunctions";
 
 
@@ -59,12 +59,6 @@ export const getCardReadings = authedAction({
 export const getDatabaseContext = authedAction({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args): Promise<string> => {
-    const result: ReadingPage = await ctx.runQuery(api.cardReadings.list, {
-      projectId: args.projectId,
-      paginationOpts: { numItems: 20, cursor: null },
-    });
-    const readings = filterPdksReadings(result.page, args.projectId);
-    const sample = readings.slice(0, 5).map(r => ({ employee: r.employeeName, time: r.accessTime, status: r.accessStatus }));
-    return `Convex veritabanı, seçili proje: son ${readings.length} kayıt (toplam bilinmiyor)${result.isDone ? "" : ", devamı var"}. Son kayıt örnekleri: ${JSON.stringify(sample)}. Sorgular için department ve date filtreleri kullanılabilir. Zamanları TR saatiyle (Europe/Istanbul) göster.`;
+    return await ctx.runQuery(internal.privacyRetention.getAssistantContext, { projectId: args.projectId });
   },
 });

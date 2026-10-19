@@ -2,6 +2,8 @@ import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { authedMutation } from "./lib/customFunctions";
 import { requireSetupSecret } from "./lib/auth";
+import { upsertPrivacySettings } from "./lib/privacySettings";
+import { writeAudit } from "./lib/audit";
 
 /**
  * Yeni kayıt olan kullanıcı için otomatik proje oluşturur.
@@ -50,6 +52,10 @@ export const ensureProjectForNewUser = authedMutation({
       createdAt: now,
       updatedAt: now,
     });
+
+    await upsertPrivacySettings(ctx, projectId, { biometricEnabled: false });
+    await writeAudit(ctx, { user, projectId, action: "create", targetTable: "projectPrivacySettings",
+      targetId: projectId, newValue: { biometricEnabled: false } });
 
     // 2. Kullanıcıya project_admin rolü ata
     await ctx.db.patch(user._id, {
@@ -136,6 +142,10 @@ export const assignProjectsToExistingUsers = mutation({
           createdAt: now,
           updatedAt: now,
         });
+
+        await upsertPrivacySettings(ctx, projectId, { biometricEnabled: false });
+        await writeAudit(ctx, { user: null, projectId, action: "create", targetTable: "projectPrivacySettings",
+          targetId: projectId, newValue: { biometricEnabled: false } });
 
         await ctx.db.patch(user._id, {
           role: "project_admin",

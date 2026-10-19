@@ -83,4 +83,7 @@ crons.cron(
   {},
 );
 
+// KVKK Faz 1: yalnız açıkça saklama süresi tanımlanan projelerde kademeli temizlik.
+crons.interval("purge-expired-card-readings", { hours: 24 }, internal.privacyRetention.purgeExpiredCardReadings, {});
+
 export default crons;

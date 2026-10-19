@@ -1,6 +1,11 @@
 import { trDayRangeISO } from "./trDate";
 
 export const AUDIT_TARGET_LABELS: Record<string, string> = {
+  biometricDestructionRun: "Biyometrik İmha Durumu",
+  biometricDestruction: "Biyometrik İmha Tutanağı",
+  biometricDestructionCheck: "Biyometrik Cihaz Kontrolü",
+  biometricDestructionDeviceCheck: "Biyometrik Cihaz Kontrolü",
+  biometricDestructionDevice: "Biyometrik Cihaz İmhası",
   pdksRecords: "PDKS Kaydı",
   holidays: "Tatil",
   overtimeRates: "Mesai Oranı",

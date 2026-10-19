@@ -950,6 +950,7 @@ export const captureFaceFromDevice = authedAction({
     if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
       return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
     }
+    await ctx.runQuery(internal.privacyBiometric.assertBiometricDeviceAllowed, { deviceId: args.deviceId });
     if (device.hikTransport !== "gateway") {
       return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
     }

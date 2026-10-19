@@ -111,7 +111,8 @@ export function isProjectAllowed(
 
 /**
  * Bir employeeId'ye erişim kontrolü. super_admin tüm employee'lere erişebilir;
- * project_admin sadece kendi projesindeki employee'lere. Erişim yoksa hata fırlatır.
+ * diğer roller (project_admin, project_user) sadece üyesi oldukları projelerdeki employee'lere.
+ * Projesiz (orphan) employee'ye yalnız super_admin erişir. Erişim yoksa hata fırlatır.
  * Çağıran handler `authedMutation`/`authedQuery` ctx'i kullanmalı (ctx.user mevcut).
  */
 export async function requireEmployeeAccess(
@@ -120,12 +121,12 @@ export async function requireEmployeeAccess(
 ): Promise<Doc<"employees">> {
   const employee = await ctx.db.get(employeeId);
   if (!employee) throw new Error("Çalışan bulunamadı");
-  if (ctx.user.role === "project_admin" && employee.projectId) {
+  if (ctx.user.role !== "super_admin") {
     const userProjects = await ctx.db
       .query("userProjects")
       .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
       .collect();
-    if (!userProjects.some((up) => up.projectId === employee.projectId)) {
+    if (!isProjectAllowed(userProjects.map((up) => up.projectId), employee.projectId)) {
       throw new Error("Bu çalışanın projesine erişim yetkiniz yok");
     }
   }

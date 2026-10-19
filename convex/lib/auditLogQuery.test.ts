@@ -63,6 +63,11 @@ describe("denetim sorgusu", () => {
   });
   it("hedef sözlüğü audit yazıcılarının desteklediği tabloları sunar", () => {
     expect(Object.keys(AUDIT_TARGET_LABELS).sort()).toEqual([
+      "biometricDestruction",
+      "biometricDestructionCheck",
+      "biometricDestructionDevice",
+      "biometricDestructionDeviceCheck",
+      "biometricDestructionRun",
       "employeeConsents",
       "employees",
       "holidays",

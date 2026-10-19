@@ -1,3 +1,5 @@
+import { assertBiometricAllowed, biometricPayloadProject, isBiometricAddition } from "./lib/biometricGate";
+import { isBiometricEnabled } from "./lib/privacySettings";
 import { v } from "convex/values";
 import { scheduleBridgeWakeForProject } from "./hikBridge";
 import { internalQuery, internalMutation } from "./_generated/server";
@@ -414,6 +416,10 @@ export const enqueueLocalBridgeOperation = internalMutation({
     if (device.hikTransport !== "localBridge") {
       throw new Error("Cihaz localBridge transport kullanmıyor");
     }
+    if (isBiometricAddition(args.operation)) {
+      await assertBiometricAllowed(ctx, device.projectId);
+      await assertBiometricAllowed(ctx, await biometricPayloadProject(ctx, args.payload));
+    }
     const now = Date.now();
     const newKey = localBridgeOperationKey(args.deviceId, args.operation, args.payload);
     for (const status of ["pending", "processing", "failed"] as const) {
@@ -546,9 +552,19 @@ export const claimLocalBridgeOperations = internalMutation({
         q.eq("deviceId", device._id).eq("status", "pending"),
       )
       .take(max * 2);
-    const due = pending
-      .filter((op) => (op.nextRetryAt ?? 0) <= now)
-      .slice(0, max);
+    const biometricEnabled = await isBiometricEnabled(ctx, device.projectId);
+    const due: typeof pending = [];
+    for (const op of pending) {
+      if ((op.nextRetryAt ?? 0) > now) continue;
+      if (isBiometricAddition(op.operation) && (!biometricEnabled ||
+          !(await isBiometricEnabled(ctx, await biometricPayloadProject(ctx, op.payload))))) {
+        // Move blocked additions out of the pending window so removals can progress.
+        await ctx.db.patch(op._id, { status: "failed", attemptCount: 5, lastError: "Biyometri modülü kapalı; işlem gönderilmedi." });
+        continue;
+      }
+      due.push(op);
+      if (due.length >= max) break;
+    }
 
     await Promise.all(
       due.map((op) =>
@@ -724,6 +740,7 @@ export const listRetryCandidates = internalQuery({
           if (!device || device.brand !== "hikvision" || !device.hikDevIndex) {
             return null;
           }
+          if (isBiometricAddition(f.operation) && !(await isBiometricEnabled(ctx, device.projectId))) return null;
           // Online değil → bu tick'te atla, bir sonraki tick'te kontrol edilecek.
           if (!device.hikLastSeenAt || device.hikLastSeenAt < onlineCutoff) {
             return null;
@@ -732,6 +749,7 @@ export const listRetryCandidates = internalQuery({
           const payload = (f.payload ?? {}) as Record<string, unknown>;
           const employeeId = payload.employeeId as Id<"employees"> | undefined;
           const employee = employeeId ? await ctx.db.get(employeeId) : null;
+          if (isBiometricAddition(f.operation) && !(await isBiometricEnabled(ctx, employee?.projectId))) return null;
 
           let accessRule: { hikWeekPlanNo?: number; startTime?: string; endTime?: string; days?: string[] } | null = null;
           const accessRuleId = payload.accessRuleId as Id<"accessRules"> | undefined;
@@ -960,6 +978,10 @@ export const retrySyncIssue = adminMutation({
     const op = await ctx.db.get(args.issueId);
     if (!op) throw new Error("İşlem bulunamadı");
     const device = await assertSyncScope(ctx, projectIds, op);
+    if (isBiometricAddition(op.operation)) {
+      await assertBiometricAllowed(ctx, device?.projectId);
+      await assertBiometricAllowed(ctx, await biometricPayloadProject(ctx, op.payload));
+    }
     if (!canRetrySync(op.status)) return { queued: false };
     if (!device || device.brand !== "hikvision" || device.hikTransport !== "localBridge") throw new Error("Bu cihaz için tek işlem yeniden denemesi desteklenmiyor; cihaz sayfasını kullanın");
     await ctx.db.patch(op._id, {
@@ -969,5 +991,22 @@ export const retrySyncIssue = adminMutation({
     });
     await scheduleBridgeWakeForProject(ctx, device.projectId);
     return { queued: true };
+  },
+});
+
+/** Recheck at the action boundary, including operations scheduled before disabling. */
+export const assertBiometricSyncAllowed = internalQuery({
+  args: { employeeId: v.id("employees"), deviceId: v.optional(v.id("devices")) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const employee = await ctx.db.get(args.employeeId);
+    if (!employee) throw new Error("Çalışan bulunamadı");
+    await assertBiometricAllowed(ctx, employee.projectId);
+    if (args.deviceId) {
+      const device = await ctx.db.get(args.deviceId);
+      if (!device) throw new Error("Cihaz bulunamadı");
+      await assertBiometricAllowed(ctx, device.projectId);
+    }
+    return null;
   },
 });

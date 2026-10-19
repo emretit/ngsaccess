@@ -66,6 +66,7 @@ export const projectDeletionCleanupTables = [
   "reportScheduleSettings",
   "leaveBalances",
   "chatConversations",
+  "projectPrivacySettings",
   "invites",
 ] as const;
 
@@ -110,7 +111,8 @@ const cleanupLabels: Record<typeof projectDeletionCleanupTables[number], string>
   mailSettings: "E-posta ayarları", notificationSettings: "Bildirim ayarları",
   workSettings: "Çalışma ayarları", overtimeRates: "Fazla mesai oranları",
   holidays: "Tatiller", reportScheduleSettings: "Rapor zamanlamaları",
-  leaveBalances: "İzin bakiyeleri", chatConversations: "Sohbetler", invites: "Davetler",
+  leaveBalances: "İzin bakiyeleri", chatConversations: "Sohbetler",
+  projectPrivacySettings: "Gizlilik ayarları", invites: "Davetler",
 };
 
 export function projectDeletionImpactRows(counts: Readonly<Partial<Record<string, number>>>) {

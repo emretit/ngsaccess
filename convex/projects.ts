@@ -1,3 +1,5 @@
+import { writeAudit } from "./lib/audit";
+import { upsertPrivacySettings } from "./lib/privacySettings";
 import { paginationOptsValidator } from "convex/server";
 import { stream } from "convex-helpers/server/stream";
 import schema from "./schema";
@@ -58,7 +60,7 @@ export const create = superAdminMutation({
   returns: v.id("projects"),
   handler: async (ctx, args) => {
     const now = new Date().toISOString();
-    return await ctx.db.insert("projects", {
+    const id = await ctx.db.insert("projects", {
       name: projectName(args.name),
       description: args.description,
       ownerId: ctx.user._id,
@@ -66,6 +68,10 @@ export const create = superAdminMutation({
       createdAt: now,
       updatedAt: now,
     });
+    await upsertPrivacySettings(ctx, id, { biometricEnabled: false });
+    await writeAudit(ctx, { user: ctx.user, projectId: id, action: "create",
+      targetTable: "projectPrivacySettings", targetId: id, newValue: { biometricEnabled: false } });
+    return id;
   },
 });
 
