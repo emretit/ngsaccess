@@ -67,10 +67,10 @@ export const exportReportsToExcel = {
     month: number;
     hourlyRate: number | null;
     overtimeMultiplier: number;
-    rows: { department: string; overtimeHours: number; employeeCount: number; cost: number }[];
+    rows: { department: string; overtimeHours: number; employeeCount: number; cost: number | null }[];
   }) => {
     const headers = ["Departman", "Fazla Mesai (Saat)", "Çalışan Sayısı", "Tahmini Maliyet (₺)"];
-    const rows = data.rows.map((r) => [r.department, r.overtimeHours, r.employeeCount, r.cost]);
+    const rows = data.rows.map((r) => [r.department, r.overtimeHours, r.employeeCount, r.cost ?? "—"]);
     const { default: ExcelJS } = await import("exceljs");
     const workbook = new ExcelJS.Workbook();
     const ws = workbook.addWorksheet("Maliyet");

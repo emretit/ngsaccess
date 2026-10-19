@@ -182,6 +182,7 @@ function ReportDownloadSettings() {
                       Toplam fazla mesai: {overtimeData.totalOvertimeHours} saat
                     </p>
                     {"totalOvertimePayTRY" in overtimeData &&
+                      overtimeData.totalOvertimePayTRY !== null &&
                       overtimeData.totalOvertimePayTRY > 0 && (
                         <p className="text-sm font-medium">
                           Toplam mesai ücreti:{" "}

@@ -1,3 +1,4 @@
+import { canSeePay, maskPay } from "./lib/payVisibility";
 import { claimEmployeePhoto } from "./lib/peoplePhoto";
 import { snapshotEmployeeHikDevices } from "./lib/peopleHikSnapshot";
 import { employeeRelationsToValidate, validateEmployeeRelations } from "./lib/peopleRelations";
@@ -92,6 +93,8 @@ export const list = authedQuery({
           : null;
         return {
           ...emp,
+          hourlyRate: maskPay(emp.hourlyRate, canSeePay(ctx.user)),
+          monthlySalary: maskPay(emp.monthlySalary, canSeePay(ctx.user)),
           departments: department
             ? { _id: department._id, name: department.name }
             : null,
@@ -147,7 +150,11 @@ export const getById = authedQuery({
     if (!emp.projectId && ctx.user.role !== "super_admin") {
       return null;
     }
-    return emp;
+    return {
+      ...emp,
+      hourlyRate: maskPay(emp.hourlyRate, canSeePay(ctx.user)),
+      monthlySalary: maskPay(emp.monthlySalary, canSeePay(ctx.user)),
+    };
   },
 });
 

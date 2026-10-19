@@ -22,7 +22,7 @@ export function reportExportTable(report: Report) {
       break;
     case "overtime":
       headers = ["Çalışan", "Departman", "Fazla Mesai (Saat)", "Mesai Ücreti (₺)"];
-      rows = report.data.rows.map((r) => [r.name, r.department, r.overtimeHours, r.overtimePayTRY]);
+      rows = report.data.rows.map((r) => [r.name, r.department, r.overtimeHours, r.overtimePayTRY ?? "—"]);
       metadata.push(`Toplam fazla mesai: ${report.data.totalOvertimeHours} saat`);
       break;
     case "attendance":
@@ -32,7 +32,7 @@ export function reportExportTable(report: Report) {
       break;
     case "department":
       headers = ["Departman", "Fazla Mesai (Saat)", "Çalışan Sayısı", "Tahmini Maliyet (₺)"];
-      rows = report.data.rows.map((r) => [r.department, r.overtimeHours, r.employeeCount, r.cost]);
+      rows = report.data.rows.map((r) => [r.department, r.overtimeHours, r.employeeCount, r.cost ?? "—"]);
       break;
   }
   const fileName = `${titles[report.type]}_${period}_${data.scopeLabel}`.replace(/[<>:"/\\|?*]/g, "_").split("").map((char) => char.charCodeAt(0) < 32 ? "_" : char).join("").slice(0, 180);

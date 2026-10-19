@@ -1,3 +1,4 @@
+import { canSeePay } from "./lib/payVisibility";
 import { classifyReadingSource, filterPdksReadings } from "./lib/pdksSource";
 import { matchesReadingSources, splitPdksEligible, toReportTransactionRow } from "./lib/reportAttendance";
 import { paginationOptsValidator, type PaginationResult } from "convex/server";
@@ -346,6 +347,7 @@ export const getPdksTableData = authedQuery({
     includePunches: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const payVisible = canSeePay(ctx.user);
     const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
 
     const today = args.date ?? trTodayKey();
@@ -505,7 +507,12 @@ export const getPdksTableData = authedQuery({
         return computePdksTableRow({
           empKey,
           empReadings,
-          employee,
+          // Stored pay fields are optional numbers; absent inputs resolve to null pay.
+          employee: employee ? {
+            ...employee,
+            hourlyRate: payVisible ? employee.hourlyRate : undefined,
+            monthlySalary: payVisible ? employee.monthlySalary : undefined,
+          } : null,
           departmentName: department?.name ?? "-",
           periodDateKeys,
           startDate,
@@ -633,6 +640,7 @@ export const getMonthlyPayrollSheet = authedQuery({
     month: v.number(), // 1-12
   },
   handler: async (ctx, args) => {
+    const payVisible = canSeePay(ctx.user);
     const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
 
     if (!Number.isInteger(args.year) || args.year < 1000 || args.year > 9999 || !Number.isInteger(args.month) || args.month < 1 || args.month > 12) {
@@ -761,11 +769,11 @@ export const getMonthlyPayrollSheet = authedQuery({
           ? deptById.get(String(emp.departmentId)) ?? null
           : null;
 
-        const empHourlyRate = resolveHourlyRate({
+        const empHourlyRate = payVisible ? resolveHourlyRate({
           hourlyRate: emp.hourlyRate,
           monthlySalary: emp.monthlySalary,
           monthlyHoursBase: workSettings.monthlyHoursBase,
-        });
+        }) : null;
 
         const cells = days.map((d) =>
           computePayrollCell({

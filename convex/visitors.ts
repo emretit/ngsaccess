@@ -1,3 +1,4 @@
+import { canSeePay, maskPay } from "./lib/payVisibility";
 import { paginationOptsValidator } from "convex/server";
 import { visitorTimeISO, visitorSensitiveFields, maskedVisitorCard, visitorMatchesSearch, visitorStatus, visitorTime, visitorExpiryValidation, visitorUpdateExpiryError } from "./lib/visitorStatus";
 import { resolveProjectScope } from "./lib/projectScope";
@@ -122,6 +123,8 @@ export const list = authedQuery({
         const activeConsent = consents.find((c) => !c.revokedAt) ?? null;
         return {
           ...vz,
+          hourlyRate: maskPay(vz.hourlyRate, canSeePay(ctx.user)),
+          monthlySalary: maskPay(vz.monthlySalary, canSeePay(ctx.user)),
           status: visitorStatus(vz),
           host: host?.projectId === vz.projectId && host
             ? { _id: host._id, firstName: host.firstName, lastName: host.lastName }

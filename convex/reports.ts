@@ -1,3 +1,4 @@
+import { canSeePay, maskPay } from "./lib/payVisibility";
 import { trDateKey, trDayRangeISO } from "./lib/trDate";
 import { v } from "convex/values";
 import { internalQuery, internalMutation } from "./_generated/server";
@@ -148,6 +149,7 @@ export const getOvertimeSummaryReport = authedQuery({
     month: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const payVisible = canSeePay(ctx.user);
     const { projectIds, scopeLabel } = await resolveReportScope(ctx, args.projectId);
     reportPeriod(args.year, args.month);
     const year = args.year;
@@ -221,7 +223,7 @@ export const getOvertimeSummaryReport = authedQuery({
       const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
       totalOvertimeHours += overtimeHours;
 
-      const empHourlyRate = employee
+      const empHourlyRate = payVisible && employee
         ? resolveHourlyRate({
             hourlyRate: employee.hourlyRate,
             monthlySalary: employee.monthlySalary,
@@ -253,7 +255,7 @@ export const getOvertimeSummaryReport = authedQuery({
       startDate,
       endDate,
       totalOvertimeHours: Math.round(totalOvertimeHours * 10) / 10,
-      totalOvertimePayTRY: Math.round(totalOvertimePayTRY * 100) / 100,
+      totalOvertimePayTRY: maskPay(Math.round(totalOvertimePayTRY * 100) / 100, payVisible),
       overtimeMultiplier: null,
       rows: rows.filter((r) => r.overtimeHours > 0).sort((a, b) => b.overtimeHours - a.overtimeHours),
     };
@@ -286,6 +288,7 @@ export const getDepartmentCostReport = authedQuery({
     hourlyRate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    const payVisible = canSeePay(ctx.user);
     const { projectIds, scopeLabel } = await resolveReportScope(ctx, args.projectId);
     reportPeriod(args.year, args.month);
     const startDate = `${args.year}-${String(args.month).padStart(2, "0")}-01`;
@@ -347,14 +350,14 @@ export const getDepartmentCostReport = authedQuery({
       const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
 
       if (overtimeHours > 0) {
-        const empRate =
+        const empRate = payVisible ? (
           (employee
             ? resolveHourlyRate({
                 hourlyRate: employee.hourlyRate,
                 monthlySalary: employee.monthlySalary,
                 monthlyHoursBase: workSettings.monthlyHoursBase,
               })
-            : null) ?? fallbackRate ?? null;
+            : null) ?? fallbackRate ?? null) : null;
         const payTRY = overtimePayTRY({
           overtimeMinutes,
           multiplier: workSettings.overtimeMultiplier,
@@ -382,9 +385,11 @@ export const getDepartmentCostReport = authedQuery({
       reliabilityNote: "Güvenilirlik sınırı: Bu rapor okuma kayıtlarından üretilir; sıfır okumalı personel ve PDKS vardiya/haftalık mesai hesabı bu eski özet hesabına dahil değildir. Bordro doğrulaması yerine kullanılmamalıdır.",
       year: args.year,
       month: args.month,
-      hourlyRate: fallbackRate ?? null,
+      hourlyRate: maskPay(fallbackRate ?? null, payVisible),
       overtimeMultiplier: null,
-      rows: rows.sort((a, b) => b.cost - a.cost),
+      rows: rows
+        .sort((a, b) => payVisible ? b.cost - a.cost : a.department.localeCompare(b.department, "tr"))
+        .map((row) => ({ ...row, cost: maskPay(row.cost, payVisible) })),
     };
   },
 });
