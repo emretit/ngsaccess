@@ -4,6 +4,7 @@ import { employeeAuthedQuery } from "./lib/customFunctions";
 import { verifyEmployeePassword } from "./lib/employeeAuth";
 
 const SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+const DUMMY_PASSWORD_HASH = "$2b$10$Jv3Xc1iFpPrOXqYPSpBzk.D/Xoqy1q3awkqS3sXEplBuTT5dYe.jW";
 
 function generateSessionToken(): string {
   const bytes = new Uint8Array(32);
@@ -95,6 +96,33 @@ export const update = internalMutation({
   },
 });
 
+export const consumeSetupToken = internalMutation({
+  args: { token: v.string(), passwordHash: v.string() },
+  returns: v.union(
+    v.object({ status: v.literal("invalid") }),
+    v.object({ status: v.literal("expired") }),
+    v.object({ status: v.literal("ok") }),
+  ),
+  handler: async (ctx, args) => {
+    const auth = await ctx.db
+      .query("employeeAuth")
+      .withIndex("by_token", (q) => q.eq("setupToken", args.token))
+      .first();
+    if (!auth) return { status: "invalid" as const };
+    if (auth.tokenExpiresAt && new Date(auth.tokenExpiresAt) < new Date()) {
+      return { status: "expired" as const };
+    }
+
+    await ctx.db.patch(auth._id, {
+      passwordHash: args.passwordHash,
+      setupToken: undefined,
+      tokenExpiresAt: undefined,
+      updatedAt: new Date().toISOString(),
+    });
+    return { status: "ok" as const };
+  },
+});
+
 /**
  * Mobil giriş. `users` tablosuna ve Convex Auth'a tamamen bağımsızdır.
  * Email + şifre `employees` + `employeeAuth.passwordHash` üzerinden doğrulanır.
@@ -126,6 +154,7 @@ export const signIn = mutation({
       .first();
 
     if (!employee || employee.isActive === false) {
+      await verifyEmployeePassword(args.password, DUMMY_PASSWORD_HASH);
       throw new Error("E-posta veya şifre hatalı");
     }
 
@@ -135,9 +164,8 @@ export const signIn = mutation({
       .first();
 
     if (!auth || !auth.passwordHash) {
-      throw new Error(
-        "Mobil şifreniz henüz kurulmamış. Yöneticinizden kurulum bağlantısı isteyin."
-      );
+      await verifyEmployeePassword(args.password, DUMMY_PASSWORD_HASH);
+      throw new Error("E-posta veya şifre hatalı");
     }
 
     const ok = await verifyEmployeePassword(args.password, auth.passwordHash);

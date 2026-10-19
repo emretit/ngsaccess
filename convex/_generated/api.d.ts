@@ -69,6 +69,7 @@ import type * as lib_auditActors from "../lib/auditActors.js";
 import type * as lib_auditLogQuery from "../lib/auditLogQuery.js";
 import type * as lib_auditSearch from "../lib/auditSearch.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_authEmail from "../lib/authEmail.js";
 import type * as lib_biometricDestruction from "../lib/biometricDestruction.js";
 import type * as lib_biometricDestructionState from "../lib/biometricDestructionState.js";
 import type * as lib_biometricGate from "../lib/biometricGate.js";
@@ -250,6 +251,7 @@ declare const fullApi: ApiFromModules<{
   "lib/auditLogQuery": typeof lib_auditLogQuery;
   "lib/auditSearch": typeof lib_auditSearch;
   "lib/auth": typeof lib_auth;
+  "lib/authEmail": typeof lib_authEmail;
   "lib/biometricDestruction": typeof lib_biometricDestruction;
   "lib/biometricDestructionState": typeof lib_biometricDestructionState;
   "lib/biometricGate": typeof lib_biometricGate;

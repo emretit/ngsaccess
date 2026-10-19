@@ -1,4 +1,4 @@
-import { deferAuthGuard, registerAccount } from './registrationFlow';
+import { deferAuthGuard, registerAccount, shouldSignOutOrphanedSession } from './registrationFlow';
 import React, { createContext, useContext, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthActions } from "@convex-dev/auth/react";
@@ -8,6 +8,7 @@ import { api } from "../../../convex/_generated/api";
 import { notify } from '@/lib/notify';
 import { safeReturnPath } from '@/lib/routeMeta';
 import { checkUserRole } from '@/services/authService';
+import { routeMeta } from '@/lib/routeMeta';
 
 type UserRole = "super_admin" | "project_admin" | "project_user";
 type UserProfile = NonNullable<FunctionReturnType<typeof api.users.currentUser>>;
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // verified=false kullanıcıyı bir kez signOut etmek için (effect döngüsünü önler)
   const blockedRef = useRef(false);
+  const orphanedRef = useRef(false);
   // ensureProject'i bir kez çağırmak için (idempotent ama gereksiz çağrıyı önler)
   const ensuredRef = useRef(false);
   // signUp sürerken effect'in /home'a yönlendirmesini engelle (dashboard flash'ı).
@@ -64,13 +66,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // signUp devam ediyor: oturum geçici olarak açık ama hemen kapatılacak.
     // Bu pencerede hiçbir yönlendirme/proje oluşturma yapma (dashboard flash'ı önlenir).
-    if (deferAuthGuard(location.pathname, signingUpRef.current, setupActiveRef.current)) return;
+    const deferred = deferAuthGuard(location.pathname, signingUpRef.current, setupActiveRef.current);
+    if (deferred) return;
     if (setupActiveRef.current) {
       setupActiveRef.current = false;
       setSetupPhase("idle");
     }
 
     if (isAuthenticated && profile) {
+      orphanedRef.current = false;
       // Doğrulanmamış self-signup kullanıcısı içeri giremez.
       // Eski kullanıcılar verified=undefined → engellenmez (yalnızca === false).
       if (profile.verified === false) {
@@ -112,11 +116,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    if (shouldSignOutOrphanedSession({ isLoading, isAuthenticated, user, deferred }) && !orphanedRef.current) {
+      orphanedRef.current = true;
+      const isProtectedRoute = routeMeta.some(({ href }) =>
+        location.pathname === href || location.pathname.startsWith(`${href}/`),
+      );
+      void convexSignOut()
+        .then(() => {
+          if (isProtectedRoute) {
+            notify.info("Oturumunuz sona erdi");
+            const next = location.pathname === '/login'
+              ? new URLSearchParams(location.search).get('next')
+              : location.pathname + location.search + location.hash;
+            navigate(`/login?next=${encodeURIComponent(safeReturnPath(next))}`, { replace: true });
+          }
+        })
+        .catch(() => {
+          // Başarısız çıkış sonraki effect tetiklemesinde yeniden denenebilir.
+          orphanedRef.current = false;
+        });
+      return;
+    }
+
     if (!isAuthenticated) {
       blockedRef.current = false;
+      orphanedRef.current = false;
       ensuredRef.current = false;
     }
-  }, [isAuthenticated, isLoading, profile, location.pathname, location.search, location.hash, navigate, convexSignOut, ensureProject, signupPending, setupPhase]);
+  }, [isAuthenticated, isLoading, profile, user, location.pathname, location.search, location.hash, navigate, convexSignOut, ensureProject, signupPending, setupPhase]);
 
   const signIn = async (email: string, password: string) => {
     try {

@@ -1,5 +1,6 @@
 import { Password } from "@convex-dev/auth/providers/Password";
 import { convexAuth } from "@convex-dev/auth/server";
+import { normalizeAuthEmail } from "./lib/authEmail";
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
@@ -23,6 +24,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       // NOT: "emailVerified" alan adı KULLANILAMAZ — Convex Auth onu profile()'dan
       // ayıklar (users.js: `{ emailVerified, ...profile }`) ve users'a yazmaz.
       profile(params) {
+        const email = normalizeAuthEmail(params.email);
         const companyName =
           typeof params.companyName === "string"
             ? params.companyName.trim()
@@ -34,7 +36,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
           verified: boolean;
           firstCompanyName?: string;
         } = {
-          email: params.email as string,
+          email,
           verified: false,
         };
         if (typeof params.name === "string" && params.name.length > 0) {

@@ -18,26 +18,27 @@ export const setEmployeePassword = action({
       return { success: false, error: `Şifre en az ${MIN_PASSWORD_LENGTH} karakter olmalı` };
     }
 
+    // Ucuz ön kontrol: geçersiz token bcrypt maliyeti yaratmasın. Nihai karar
+    // consumeSetupToken'da (oku + tüket tek mutation'da, atomik).
     const authRecord = await ctx.runQuery(internal.employeeAuth.getByTokenInternal, {
       token: args.token,
     });
-
     if (!authRecord) {
       return { success: false, error: "Geçersiz veya süresi dolmuş token" };
     }
 
-    if (authRecord.tokenExpiresAt && new Date(authRecord.tokenExpiresAt) < new Date()) {
+    const passwordHash = await bcrypt.hash(args.password, BCRYPT_COST);
+    const result = await ctx.runMutation(internal.employeeAuth.consumeSetupToken, {
+      token: args.token,
+      passwordHash,
+    });
+
+    if (result.status === "invalid") {
+      return { success: false, error: "Geçersiz veya süresi dolmuş token" };
+    }
+    if (result.status === "expired") {
       return { success: false, error: "Token süresi dolmuş" };
     }
-
-    const passwordHash = await bcrypt.hash(args.password, BCRYPT_COST);
-
-    await ctx.runMutation(internal.employeeAuth.update, {
-      authId: authRecord._id,
-      passwordHash,
-      setupToken: null,
-      tokenExpiresAt: null,
-    });
 
     return { success: true };
   },

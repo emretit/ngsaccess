@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { deferAuthGuard, registerAccount } from './registrationFlow';
+import { deferAuthGuard, registerAccount, shouldSignOutOrphanedSession } from './registrationFlow';
 
 describe('hesap kayıt sonucu', () => {
   it('mail hatasında mevcut hesapla devam eder ve oturumu kapatır', async () => {
@@ -27,5 +27,23 @@ describe('hesap kayıt sonucu', () => {
     expect(deferAuthGuard('/login', false)).toBe(false);
     expect(deferAuthGuard('/home', false, true)).toBe(false);
     expect(deferAuthGuard('/user-setup', false, false)).toBe(false);
+  });
+});
+
+describe('silinmiş oturum kararı', () => {
+  const authenticated = { isLoading: false, isAuthenticated: true, user: null, deferred: false };
+
+  it('yükleme ve profil sorgusu sürerken bekler', () => {
+    expect(shouldSignOutOrphanedSession({ ...authenticated, isLoading: true })).toBe(false);
+    expect(shouldSignOutOrphanedSession({ ...authenticated, user: undefined })).toBe(false);
+  });
+
+  it('oturum açık ama profil yoksa çıkar', () => {
+    expect(shouldSignOutOrphanedSession(authenticated)).toBe(true);
+  });
+
+  it('kayıt/kurulum koruması erteler ve oturum kapalıyken tetiklemez', () => {
+    expect(shouldSignOutOrphanedSession({ ...authenticated, deferred: true })).toBe(false);
+    expect(shouldSignOutOrphanedSession({ ...authenticated, isAuthenticated: false })).toBe(false);
   });
 });

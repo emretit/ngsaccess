@@ -28,3 +28,12 @@ export async function registerAccount(steps: {
 export function deferAuthGuard(pathname: string, signupPending: boolean, setupActive = false) {
   return signupPending || (setupActive && (pathname === '/user-setup' || pathname === '/admin-setup'));
 }
+
+export function shouldSignOutOrphanedSession(input: {
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  user: unknown | null | undefined;
+  deferred: boolean;
+}): boolean {
+  return !input.isLoading && input.isAuthenticated && input.user === null && !input.deferred;
+}

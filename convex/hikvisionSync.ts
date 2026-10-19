@@ -2,9 +2,10 @@ import { assertBiometricAllowed, biometricPayloadProject, isBiometricAddition } 
 import { isBiometricEnabled } from "./lib/privacySettings";
 import { v } from "convex/values";
 import { scheduleBridgeWakeForProject } from "./hikBridge";
-import { internalQuery, internalMutation } from "./_generated/server";
+import { internalQuery, internalMutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { adminQuery, authedQuery, authedMutation, adminMutation } from "./lib/customFunctions";
+import { adminQuery, authedMutation, adminMutation } from "./lib/customFunctions";
+import { getCurrentUser, getValidAuthUserId } from "./lib/auth";
 import { resolveProjectScope } from "./lib/projectScope";
 import { scanHikSync, assertSyncScope } from "./lib/syncStatusScope";
 import { canRetrySync, syncDismissPatch } from "./lib/syncStatusLogic";
@@ -671,9 +672,11 @@ export const requeueStaleLocalBridgeOperations = internalMutation({
  * payload field'ı UI'ya **döndürülmez** (PII leak vektörünü kapatmak için).
  * Detay gerekiyorsa adminQuery yazılmalı.
  */
-export const listSyncIssues = authedQuery({
+export const listSyncIssues = query({
   args: { projectId: v.optional(v.id("projects")), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
+    if (!(await getValidAuthUserId(ctx))) return { items: [], hasMore: false, unknown: false };
+    await getCurrentUser(ctx);
     const projectIds = await resolveProjectScope(ctx, args.projectId);
     const scan = await scanHikSync(ctx, projectIds, ["failed"], true);
     const max = Math.min(100, Math.max(1, Math.floor(args.limit ?? 50)));

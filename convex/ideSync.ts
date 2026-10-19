@@ -1,8 +1,9 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { authedQuery, authedMutation, adminMutation } from "./lib/customFunctions";
+import { authedMutation, adminMutation } from "./lib/customFunctions";
+import { getCurrentUser, getValidAuthUserId } from "./lib/auth";
 import { resolveProjectScope } from "./lib/projectScope";
 import { scanIdeSync, assertSyncScope } from "./lib/syncStatusScope";
 import { canRetrySync, syncDismissPatch } from "./lib/syncStatusLogic";
@@ -544,9 +545,11 @@ export const getRuleIoIdsForPanel = internalQuery({
 });
 
 /** UI: çözülmemiş IDE komut sorunları (failed op'lar). RBAC: kullanıcının projeleri. */
-export const listSyncIssues = authedQuery({
+export const listSyncIssues = query({
   args: { projectId: v.optional(v.id("projects")), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
+    if (!(await getValidAuthUserId(ctx))) return { items: [], hasMore: false, unknown: false };
+    await getCurrentUser(ctx);
     const projectIds = await resolveProjectScope(ctx, args.projectId);
     const scan = await scanIdeSync(ctx, projectIds, ["failed"], true);
     const max = Math.min(100, Math.max(1, Math.floor(args.limit ?? 50)));

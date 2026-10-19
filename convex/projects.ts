@@ -7,6 +7,8 @@ import { adminPaginationOptions, adminSearch, ADMIN_COUNT_LIMIT, projectName } f
 import { projectDeletionCounts, projectDeletionImpact, projectDeletionCleanupQuery } from "./lib/adminGuards";
 import { ConvexError, v } from "convex/values";
 import { projectDeletionBlockers, projectDeletionCleanupTables, projectDeletionError } from "./lib/adminGuards";
+import { query } from "./_generated/server";
+import { getCurrentUser, getValidAuthUserId } from "./lib/auth";
 import { authedMutation, authedQuery, superAdminQuery, superAdminMutation } from "./lib/customFunctions";
 
 export const list = authedQuery({
@@ -25,14 +27,16 @@ export const list = authedQuery({
   },
 });
 
-export const listActive = authedQuery({
+export const listActive = query({
   args: {},
   handler: async (ctx) => {
-    if (ctx.user.role === "super_admin") {
+    if (!(await getValidAuthUserId(ctx))) return [];
+    const user = await getCurrentUser(ctx);
+    if (user.role === "super_admin") {
       const projects = await ctx.db.query("projects").collect();
       return projects.filter(p => p.isActive === true);
     }
-    const rows = await ctx.db.query("userProjects").withIndex("by_user", q => q.eq("userId", ctx.user._id)).collect();
+    const rows = await ctx.db.query("userProjects").withIndex("by_user", q => q.eq("userId", user._id)).collect();
     const projects = await Promise.all([...new Set(rows.map(r => r.projectId))].map(id => ctx.db.get(id)));
     return projects.filter((p): p is NonNullable<typeof p> => p !== null && p.isActive === true);
   },
