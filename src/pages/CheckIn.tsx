@@ -1,36 +1,61 @@
-import { optionalLocationWithin } from "../../convex/lib/checkInUx";
-import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { useMutation } from "convex/react";
-import { api } from "@/lib/convexApi";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle2, XCircle, Loader2, MapPin } from "lucide-react";
+import { optionalLocationWithin } from '../../convex/lib/checkInUx';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useMutation } from 'convex/react';
+import { api } from '@/lib/convexApi';
+import { StatusScreen } from '@/components/public/StatusScreen';
+import { usePageTitle } from '@/hooks/usePageTitle';
+
+type CheckInResult = {
+  success: boolean;
+  error?: string;
+  locationRecorded?: boolean;
+  employeeName?: string;
+  accessTime?: string | number;
+};
+
+export function checkInPresentation(result: CheckInResult) {
+  if (result.success) {
+    return {
+      status: 'success' as const,
+      usedLocation: result.locationRecorded === true,
+      record: { name: result.employeeName ?? '', accessTime: result.accessTime },
+    };
+  }
+  const tokenErrors = ['Geçersiz veya süresi dolmuş kod', 'Kodun süresi doldu'];
+  return {
+    status: 'error' as const,
+    failure: tokenErrors.includes(result.error ?? '') ? ('invalid' as const) : ('rejected' as const),
+  };
+}
 
 export default function CheckIn() {
+  usePageTitle('QR ile giriş');
   const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
+  const token = searchParams.get('token');
   const checkIn = useMutation(api.employeeCheckIn.checkInWithToken);
   const running = useRef<string | null>(null);
-  const [phase, setPhase] = useState("Konum bilgisi bekleniyor...");
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
-  const [message, setMessage] = useState("");
-  const [locationNotice, setLocationNotice] = useState("");
+  const [phase, setPhase] = useState('Konum bilgisi bekleniyor…');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [failure, setFailure] = useState<'invalid' | 'rejected' | 'unknown'>('invalid');
+  const [record, setRecord] = useState<{ name: string; accessTime?: string | number } | null>(null);
+  const [locationNotice, setLocationNotice] = useState('');
   const [usedLocation, setUsedLocation] = useState(false);
 
   useEffect(() => {
     if (!token) {
       running.current = null;
-      setStatus("error");
-      setMessage("Geçersiz check-in linki");
+      setStatus('error');
+      setFailure('invalid');
       return;
     }
 
     if (running.current === token) return;
     running.current = token;
     setUsedLocation(false);
-    setPhase("Konum bilgisi bekleniyor...");
-    setLocationNotice("");
-    setStatus("loading");
+    setPhase('Konum bilgisi bekleniyor…');
+    setLocationNotice('');
+    setStatus('loading');
 
     const doCheckIn = async () => {
       try {
@@ -38,80 +63,138 @@ export default function CheckIn() {
         let lng: number | undefined;
 
         if (navigator.geolocation) {
-          const pos = await optionalLocationWithin(() => new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000, maximumAge: 60000 });
-          }), 3000);
+          const pos = await optionalLocationWithin(
+            () =>
+              new Promise<GeolocationPosition>((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                  timeout: 3000,
+                  maximumAge: 60000,
+                });
+              }),
+            3000,
+          );
           if (pos) {
             lat = pos.coords.latitude;
             lng = pos.coords.longitude;
           } else {
-            setLocationNotice("Konum alınamadı; giriş kaydı konum eklenmeden oluşturuluyor.");
+            setLocationNotice('Konum alınamadı; giriş kaydı konum eklenmeden oluşturuluyor.');
           }
         } else {
-          setLocationNotice("Bu tarayıcı konum bilgisi sağlayamıyor; konum eklenmeden devam ediliyor.");
+          setLocationNotice('Bu tarayıcı konum bilgisi sağlayamıyor; konum eklenmeden devam ediliyor.');
         }
 
         if (running.current !== token) return;
-        setPhase("Giriş kaydediliyor...");
+        setPhase('Giriş kaydediliyor…');
         const result = await checkIn({
           token,
           ...(lat != null && lng != null && { latitude: lat, longitude: lng }),
         });
 
         if (running.current !== token) return;
-        if (result.success) {
-          setUsedLocation(result.locationRecorded === true);
-          setStatus("success");
-          setMessage(`${result.employeeName} — Giriş kaydedildi: ${result.accessTime ? new Intl.DateTimeFormat("tr-TR", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Istanbul" }).format(new Date(result.accessTime)) : ""}`);
+        const presentation = checkInPresentation(result);
+        if (presentation.status === 'success') {
+          setUsedLocation(presentation.usedLocation);
+          setStatus('success');
+          setRecord(presentation.record);
         } else {
-          setStatus("error");
-          setMessage(result.error ?? "Check-in başarısız");
+          setStatus('error');
+          setFailure(presentation.failure);
         }
       } catch {
         if (running.current !== token) return;
-        setStatus("error");
-        setMessage("Giriş sonucu alınamadı. Yeni kod taramadan önce mobil uygulamadaki kaydı kontrol edin.");
+        setStatus('error');
+        setFailure('unknown');
       }
     };
 
     doCheckIn();
   }, [token, checkIn]);
 
+  if (status === 'loading')
+    return (
+      <StatusScreen iconSize="large" tone="loading" title="Girişiniz kaydediliyor." description={phase}>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Konum alınamazsa kayıt, konum eklenmeden oluşturulur.
+        </p>
+        {locationNotice && (
+          <p role="status" className="mt-4 text-sm text-muted-foreground">
+            {locationNotice}
+          </p>
+        )}
+      </StatusScreen>
+    );
+  if (status === 'success') {
+    const time = record?.accessTime ? new Date(record.accessTime) : null;
+    const validTime = time && !Number.isNaN(time.getTime());
+    return (
+      <StatusScreen
+        iconSize="large"
+        tone="success"
+        title="Girişiniz kaydedildi."
+        description="Bu sayfayı kapatabilirsiniz."
+      >
+        <dl className="mb-6 space-y-3 border-y border-line py-4 text-sm [&>div]:flex [&>div]:justify-between [&>div]:gap-4 [&_dt]:text-muted-foreground [&_dd]:text-right">
+          {record?.name && (
+            <div>
+              <dt>Personel</dt>
+              <dd className="font-semibold">{record.name}</dd>
+            </div>
+          )}
+          {validTime && (
+            <>
+              <div>
+                <dt>Tarih</dt>
+                <dd>
+                  {new Intl.DateTimeFormat('tr-TR', {
+                    dateStyle: 'medium',
+                    timeZone: 'Europe/Istanbul',
+                  }).format(time)}
+                </dd>
+              </div>
+              <div>
+                <dt>Saat</dt>
+                <dd>
+                  {new Intl.DateTimeFormat('tr-TR', {
+                    timeStyle: 'short',
+                    timeZone: 'Europe/Istanbul',
+                  }).format(time)}{' '}
+                  · İstanbul
+                </dd>
+              </div>
+            </>
+          )}
+        </dl>
+        <p className="text-xs text-muted-foreground">
+          {usedLocation ? 'Konum bilgisi kayda eklendi.' : 'Konum bilgisi eklenemedi.'}
+        </p>
+      </StatusScreen>
+    );
+  }
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-center">QR Check-In</CardTitle>
-        </CardHeader>
-        <CardContent aria-live="polite" className="flex flex-col items-center gap-4">
-          {locationNotice && <p className="text-center text-sm text-muted-foreground">{status === "success" ? "Konum bilgisi eklenemedi." : locationNotice}</p>}
-          {status === "loading" && (
-            <>
-              <Loader2 className="h-16 w-16 animate-spin text-primary" />
-              <p className="text-muted-foreground">{phase}</p>
-            </>
-          )}
-          {status === "success" && (
-            <>
-              <CheckCircle2 className="h-16 w-16 text-primary" />
-              <p className="text-center font-medium text-foreground">{message}</p>
-              {usedLocation && (
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <MapPin className="h-4 w-4" />
-                  Konum bilgisi kayda eklendi
-                </p>
-              )}
-            </>
-          )}
-          {status === "error" && (
-            <>
-              <XCircle className="h-16 w-16 text-destructive" />
-              <p className="text-center font-medium text-destructive">{message}</p>
-              <p className="text-center text-sm text-muted-foreground">Mobil uygulamada yeni bir QR kodu açıp tekrar tarayın.</p>
-            </>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    <StatusScreen
+      iconSize="large"
+      tone="error"
+      title={
+        failure === 'unknown'
+          ? 'Giriş sonucu alınamadı.'
+          : failure === 'invalid'
+            ? 'Giriş bağlantısı geçersiz.'
+            : 'Girişiniz kaydedilemedi.'
+      }
+      description={
+        failure === 'unknown'
+          ? 'Yeni kod taramadan önce yöneticinizden giriş kaydınızı kontrol etmesini isteyin.'
+          : failure === 'invalid'
+            ? 'İşyerinizdeki güncel QR giriş bağlantısını kullanın. Yardım için yöneticinize başvurun.'
+            : 'Giriş bağlantısını yöneticinizle kontrol edin.'
+      }
+      secondaryAction={{ label: 'Destek: info@ngsplus.app', href: 'mailto:info@ngsplus.app' }}
+    >
+      {failure === 'invalid' && (
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          İşyerinizde yeni QR kodu açıp tekrar tarayın.
+        </p>
+      )}
+    </StatusScreen>
   );
 }

@@ -21,5 +21,8 @@ export function useDarkMode() {
     }
   }, [darkMode]);
 
+  // Koyu tema yalnız uygulama kabuğunda; kabuktan çıkınca public sayfalar açık temada açılır.
+  useEffect(() => () => document.documentElement.classList.remove("dark"), []);
+
   return { isDarkMode: darkMode ?? false };
 }

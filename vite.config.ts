@@ -17,29 +17,6 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return;
-          if (id.includes('@radix-ui/')) return 'radix';
-          if (id.includes('/recharts/') || id.includes('/d3-')) return 'charts';
-          if (id.includes('/exceljs/') || id.includes('/jspdf/')) return 'excel-pdf';
-          if (id.includes('/html2canvas/')) return 'html2canvas';
-          if (
-            id.includes('/convex/') ||
-            id.includes('/convex-helpers/') ||
-            id.includes('/@convex-dev/')
-          ) return 'convex-vendor';
-          if (
-            id.includes('/react/') ||
-            id.includes('/react-dom/') ||
-            id.includes('/react-router/') ||
-            id.includes('/react-router-dom/') ||
-            id.includes('/scheduler/')
-          ) return 'react-vendor';
-        },
-      },
-    },
-  },
+  // Let route and dynamic-import boundaries split bundles. Manual vendor groups
+  // can pull shared React/preload helpers into otherwise deferred heavy chunks.
 }));

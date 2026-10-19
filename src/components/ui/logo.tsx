@@ -1,69 +1,26 @@
-import React from 'react';
-
 interface LogoProps {
-  size?: 'sm' | 'md' | 'lg';
-  variant?: 'full' | 'compact' | 'icon';
+  size?: 'md';
+  variant?: 'compact';
   tone?: 'light' | 'dark';
   className?: string;
 }
-
 const sizeMap = {
-  sm: { logo: 'h-8 w-8', text: 'text-lg' },
-  md: { logo: 'h-10 w-10', text: 'text-xl' },
-  lg: { logo: 'h-12 w-12', text: 'text-2xl' },
+  md: { logo: 'h-8 w-8 min-[601px]:h-9 min-[601px]:w-9', text: 'text-[20px] min-[601px]:text-[22px]' },
 };
-
-const Logo: React.FC<LogoProps> = ({
-  size = 'md',
-  variant = 'full',
-  tone = 'light',
-  className = '',
-}) => {
-  const currentSize = sizeMap[size];
-  const ngsClass = tone === 'light' ? 'text-white' : 'text-primary';
-  const plusClass = tone === 'light' ? 'text-yellow-300' : 'text-yellow-500';
-
-  if (variant === 'icon') {
-    return (
-      <div className={`flex items-center justify-center ${className}`}>
-        <img
-          src="/logo.svg"
-          alt="NGS Plus"
-          className={`${currentSize.logo} object-contain`}
-        />
-      </div>
-    );
-  }
-
-  if (variant === 'compact') {
-    return (
-      <div className={`flex items-center gap-2 ${className}`}>
-        <img
-          src="/logo.svg"
-          alt="NGS Plus"
-          className={`${currentSize.logo} object-contain`}
-        />
-        <div className={`font-bold ${currentSize.text}`}>
-          <span className={ngsClass}>NGS</span>
-          <span className={`${plusClass} ml-0.5`}>Plus</span>
-        </div>
-      </div>
-    );
-  }
-
+export default function Logo({ size = 'md', tone = 'light', className = '' }: LogoProps) {
+  const current = sizeMap[size];
   return (
-    <div className={`flex items-center gap-3 ${className}`}>
+    <div
+      className={`inline-flex items-center gap-[10px] whitespace-nowrap leading-none ${tone === 'light' ? 'text-side-text' : 'text-primary'} ${className}`}
+    >
       <img
         src="/logo.svg"
-        alt="NGS Plus"
-        className={`${currentSize.logo} object-contain`}
+        alt=""
+        width={36}
+        height={36}
+        className={`${current.logo} object-contain ${tone === 'light' ? 'brightness-0 invert' : ''}`}
       />
-      <div className={`font-bold ${currentSize.text}`}>
-        <span className={ngsClass}>NGS</span>
-        <span className={`${plusClass} ml-1`}>Plus</span>
-      </div>
+      <span className={`font-bold tracking-[-.8px] ${current.text}`}>NGS Plus</span>
     </div>
   );
-};
-
-export default Logo;
+}

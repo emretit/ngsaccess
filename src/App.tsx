@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react';
-import { BrowserRouter as Router, Navigate, Routes, Route } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter as Router, Navigate, Routes, Route, useLocation, useNavigationType } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -8,7 +8,6 @@ import { AuthProvider } from '@/components/auth/AuthProvider';
 import { ActiveProjectProvider } from '@/contexts/ActiveProjectContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import Layout from '@/components/Layout';
-import { useDarkMode } from '@/hooks/useDarkMode';
 
 const Index = lazy(() => import('@/pages/Index'));
 const Login = lazy(() => import('@/pages/Login'));
@@ -33,7 +32,6 @@ const UserSetup = lazy(() => import('@/pages/UserSetup'));
 const EmployeeSetup = lazy(() => import('@/pages/EmployeeSetup'));
 const AdminSetup = lazy(() => import('@/pages/AdminSetup'));
 const LandingPage = lazy(() => import('@/pages/LandingPage'));
-const DemoRequest = lazy(() => import('@/pages/DemoRequest'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
 function PageFallback() {
@@ -45,7 +43,12 @@ function PageFallback() {
 }
 
 function AppContent() {
-  useDarkMode();
+  const { pathname, hash } = useLocation();
+  const navigationType = useNavigationType();
+  // Rota değişince sayfa başından açılır (bölüm bağlantıları ve geri/ileri hariç); uygulama kabuğu kendi kaydırmasını yönetir.
+  useEffect(() => {
+    if (!hash && navigationType !== 'POP') window.scrollTo(0, 0);
+  }, [pathname, hash, navigationType]);
 
   return (
     <Suspense fallback={<PageFallback />}>
@@ -56,7 +59,7 @@ function AppContent() {
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/auth" element={<Navigate to="/login" replace />} />
         <Route path="/check-in" element={<CheckIn />} />
-        <Route path="/demo-request" element={<DemoRequest />} />
+        <Route path="/demo-request" element={<Navigate to="/register" replace />} />
         <Route path="/user-setup" element={<UserSetup />} />
         <Route path="/admin-setup" element={<AdminSetup />} />
         <Route path="/employee-setup" element={<EmployeeSetup />} />

@@ -1,41 +1,39 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import LandingHeader from '@/components/landing/LandingHeader';
+import PublicHeader from '@/components/public/PublicHeader';
+import PublicFooter from '@/components/public/PublicFooter';
 import HeroSection from '@/components/landing/HeroSection';
 import FeaturesSection from '@/components/landing/FeaturesSection';
 import HowItWorksSection from '@/components/landing/HowItWorksSection';
-import MobileAppSection from '@/components/landing/MobileAppSection';
+import SecuritySection from '@/components/landing/SecuritySection';
 import PricingSection from '@/components/landing/PricingSection';
-import TestimonialsSection from '@/components/landing/TestimonialsSection';
 import FAQSection from '@/components/landing/FAQSection';
 import FinalCTASection from '@/components/landing/FinalCTASection';
-import LandingFooter from '@/components/landing/LandingFooter';
+import { usePageTitle } from '@/hooks/usePageTitle';
+import { usePublicTheme } from '@/hooks/usePublicTheme';
 
-const LandingPage = () => {
-  const { hash } = useLocation();
+export default function LandingPage() {
+  usePageTitle('Personel ve geçiş yönetimi');
+  usePublicTheme();
+  const { hash, key } = useLocation();
   useEffect(() => {
     if (!hash) return;
-    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth' });
-  }, [hash]);
-
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
+  }, [hash, key]);
   return (
-    <div className="min-h-screen bg-background">
-      <LandingHeader />
+    <div className="pub-page">
+      <PublicHeader tone="burgundy" />
       <main id="main" tabIndex={-1}>
         <HeroSection />
         <FeaturesSection />
         <HowItWorksSection />
-        <MobileAppSection />
+        <SecuritySection />
         <PricingSection />
-        <TestimonialsSection />
         <FAQSection />
         <FinalCTASection />
       </main>
-      <div>
-        <LandingFooter />
-      </div>
+      <PublicFooter />
     </div>
   );
-};
-
-export default LandingPage;
+}

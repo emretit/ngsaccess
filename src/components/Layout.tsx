@@ -13,11 +13,13 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { Button } from "@/components/ui/button";
+import { useDarkMode } from "@/hooks/useDarkMode";
 
 export default function Layout() {
   const { loading, session, profile } = useAuth();
   const location = useLocation();
   const { activeProjectId } = useActiveProject();
+  useDarkMode();
 
   const mainRef = useRef<HTMLElement>(null);
   const previousPath = useRef(location.pathname);

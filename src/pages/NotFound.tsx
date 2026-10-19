@@ -1,10 +1,15 @@
-import { Link } from 'react-router-dom';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { Button } from '@/components/ui/button';
+import { StatusScreen } from '@/components/public/StatusScreen';
+import { usePageTitle } from '@/hooks/usePageTitle';
 
 export default function NotFound() {
-  const { user } = useAuth();
-  return <main className="min-h-screen flex items-center justify-center bg-background p-4 text-foreground">
-    <div className="space-y-4 text-center"><h1 className="text-4xl font-bold">404</h1><p className="text-xl text-muted-foreground">Sayfa bulunamadı</p><Button asChild><Link to={user && user.verified !== false ? '/home' : '/'}>Ana sayfaya dön</Link></Button></div>
-  </main>;
+  usePageTitle('Sayfa bulunamadı');
+  return (
+    <StatusScreen
+      tone="info"
+      title="Bu sayfayı bulamadık."
+      description="Bağlantı değişmiş veya adres yanlış yazılmış olabilir. Ana sayfadan devam edebilirsiniz."
+      primaryAction={{ label: 'Ana sayfaya dön', href: '/' }}
+      secondaryAction={{ label: 'Hesabınıza giriş yapın', href: '/login' }}
+    />
+  );
 }
