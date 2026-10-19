@@ -2,9 +2,8 @@ import { FilterBar } from "@/components/shared/FilterBar";
 interface Props {
   searchQuery: string;
   onSearchChange: (value: string) => void;
-  itemsPerPage: number;
-  onItemsPerPageChange: (value: number) => void;
   status: string;
+  statusCounts: { all: number; active: number; inactive: number };
   onStatusChange: (value: string) => void;
   sort: string;
   onSortChange: (value: string) => void;
@@ -22,21 +21,6 @@ export function EmployeeFilters(p: Props) {
       placeholder="Ad, e-posta, kart veya bordro…"
       onClear={p.onClear}
       hasFilters={p.hasFilters}
-      end={
-        <label className="flex items-center gap-2 text-xs">
-          Sayfa boyutu
-          <select
-            aria-label="Sayfa boyutu"
-            className={selectClass}
-            value={p.itemsPerPage}
-            onChange={(e) => p.onItemsPerPageChange(Number(e.target.value))}
-          >
-            {[10, 25, 50, 100].map((n) => (
-              <option key={n}>{n}</option>
-            ))}
-          </select>
-        </label>
-      }
     >
       <select
         aria-label="Personel durumu"
@@ -44,9 +28,9 @@ export function EmployeeFilters(p: Props) {
         value={p.status}
         onChange={(e) => p.onStatusChange(e.target.value)}
       >
-        <option value="all">Tüm durumlar</option>
-        <option value="active">Aktif</option>
-        <option value="inactive">Pasif</option>
+        <option value="all">Tüm durumlar ({p.statusCounts.all})</option>
+        <option value="active">Aktif ({p.statusCounts.active})</option>
+        <option value="inactive">Pasif ({p.statusCounts.inactive})</option>
       </select>
       <select
         aria-label="Personel sıralaması"

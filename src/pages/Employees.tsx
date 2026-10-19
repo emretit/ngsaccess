@@ -6,13 +6,11 @@ import DepartmentTree from "@/components/departments/DepartmentTree";
 import SlideOverPanel from "@/components/employees/SlideOverPanel";
 import type { Employee } from "@/types/employee";
 import EmployeeTable from "@/components/employees/EmployeeTable";
-import { EmployeeStats } from "@/components/employees/EmployeeStats";
 import { EmployeeFilters } from "@/components/employees/EmployeeFilters";
-import { EmployeePagination } from "@/components/employees/EmployeePagination";
+import { PaginationBar, pageRange } from "@/components/shared/PaginationBar";
 import { useEmployees } from "@/hooks/useEmployees";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { AccessDenied } from "@/components/shared/AccessDenied";
-import { DeviceSyncStatusBanner } from "@/components/sync/DeviceSyncStatusBanner";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
@@ -126,23 +124,23 @@ function EmployeePage() {
   if (!projectId)
     return <EmptyState title="Personelleri görmek için proje seçin." />;
   const hasFilters = !!q || !!department || status !== "all";
+  const activeCount = employees.filter((employee) => employee.isActive).length;
+  const statusCounts = {
+    all: employees.length,
+    active: activeCount,
+    inactive: employees.length - activeCount,
+  };
   return (
     <div className="min-w-0 space-y-6">
       <PageHeader
         title="Kişiler"
-        scope={activeProject?.name}
         primaryAction={
           isAdmin
             ? { label: "Personel ekle", onClick: () => open(null, false) }
             : undefined
         }
       />
-      <EmployeeStats
-        loading={isLoading || projectLoading}
-        employees={employees}
-      />
-      <DeviceSyncStatusBanner />
-      <div className="flex min-w-0 flex-col gap-6 min-[1100px]:flex-row min-[1100px]:gap-12">
+      <div className="flex min-w-0 flex-col gap-6 min-[1100px]:flex-row min-[1100px]:gap-5">
         <DepartmentTree
           selectedValue={department}
           onSelectUnassigned={() => update({ department: "unassigned" })}
@@ -155,9 +153,8 @@ function EmployeePage() {
               setPrivateQuery(safeSearchParam(value) !== value ? value : null);
               update({ q: safeSearchParam(value) });
             }}
-            itemsPerPage={size}
-            onItemsPerPageChange={(value) => update({ size: String(value) })}
             status={status}
+            statusCounts={statusCounts}
             onStatusChange={(value) => update({ status: value })}
             sort={sort}
             onSortChange={(value) => update({ sort: value })}
@@ -167,11 +164,6 @@ function EmployeePage() {
               update({ q: "", department: "", status: "" });
             }}
           />
-          <p className="text-xs text-muted-foreground">
-            {isLoading
-              ? "Personel bilgileri yükleniyor…"
-              : `${filtered.length} sonuç · Seçim yalnız bu sayfayı kapsar.`}
-          </p>
           {isLoading ? (
             <SectionSkeleton label="Personel bilgileri yükleniyor…" />
           ) : employees.length === 0 ? (
@@ -196,6 +188,7 @@ function EmployeePage() {
               key={`${projectId}/${q}/${department}/${status}/${sort}/${page}/${size}`}
               sort={sort}
               onSortChange={(value) => update({ sort: value })}
+              showDepartment={!department}
               employees={filtered.slice((page - 1) * size, page * size)}
               onEdit={(employee) => open(employee, false)}
               onDelete={() => undefined}
@@ -203,10 +196,16 @@ function EmployeePage() {
               onRefresh={refetch}
             />
           )}
-          <EmployeePagination
-            currentPage={page}
-            totalPages={Math.ceil(filtered.length / size)}
-            onPageChange={(value) => update({ page: String(value) }, false)}
+          <PaginationBar
+            summary={`${employees.length} personelden ${filtered.length} sonuç · ${pageRange(filtered.length, page, size)} gösteriliyor`}
+            page={page}
+            pageCount={Math.max(1, Math.ceil(filtered.length / size))}
+            onPrevious={() => update({ page: String(page - 1) }, false)}
+            onNext={() => update({ page: String(page + 1) }, false)}
+            pageSize={size}
+            pageSizes={[10, 25, 50, 100]}
+            onPageSizeChange={(value) => update({ size: String(value) })}
+            pageSizeLabel="Sayfadaki personel sayısı"
           />
         </div>
       </div>

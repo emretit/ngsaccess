@@ -7,7 +7,6 @@ import { AccessDenied } from "@/components/shared/AccessDenied";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
-import { Button } from "@/components/ui/button";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { DeviceSyncStatusBanner } from "@/components/sync/DeviceSyncStatusBanner";
 import { VisitorFilters, type VisitorStatusFilter } from "./VisitorFilters";
@@ -17,6 +16,7 @@ import VisitorTable from "./VisitorTable";
 import VisitorSlideOverPanel from "./VisitorSlideOverPanel";
 import VisitorZoneDialog from "./VisitorZoneDialog";
 import { useStableQuery } from "./hooks/useStableQuery";
+import { PaginationBar } from "@/components/shared/PaginationBar";
 
 export default function VisitorManagement() {
   const { projectId, loading, isAdmin, isSuperAdmin, activeProject } = useActiveProject();
@@ -49,9 +49,9 @@ export default function VisitorManagement() {
     {loading ? <SectionSkeleton rows={6} label="Ziyaretçiler yükleniyor" /> : !projectId ? !isSuperAdmin ? <AccessDenied compact /> : <EmptyState title="Proje seçin" description="Ziyaretçileri görmek için erişiminiz olan aktif bir proje seçin." /> : <>
       <QuerySectionBoundary title="Ziyaretçi özeti yüklenemedi" resetKey={projectId}><VisitorStats refreshKey={refreshKey} /></QuerySectionBoundary>
       <QuerySectionBoundary title="Cihaz durumu yüklenemedi" resetKey={projectId}><div id="visitor-sync-status" tabIndex={-1} aria-label="Proje cihaz senkronizasyon durumu"><DeviceSyncStatusBanner /></div></QuerySectionBoundary>
-      <VisitorFilters searchQuery={search} onSearchChange={q => filter(q, status, true)} statusFilter={status} onStatusFilterChange={value => filter(search, value)} onClear={clear} onNewZone={isAdmin ? () => setZoneOpen(true) : undefined} pageSize={pageSize} onPageSizeChange={setPageSize} />
+      <VisitorFilters searchQuery={search} onSearchChange={q => filter(q, status, true)} statusFilter={status} onStatusFilterChange={value => filter(search, value)} onClear={clear} onNewZone={isAdmin ? () => setZoneOpen(true) : undefined} />
       <QuerySectionBoundary title="Ziyaretçiler yüklenemedi" description="Bağlantınızı kontrol edip tekrar deneyin." resetKey={resetKey}>
-        <VisitorList key={resetKey} search={search} status={status} pageSize={pageSize} refreshKey={refreshKey} onOpen={visitor => setPanel({ visitor, projectId })} onClear={clear} onCreate={isAdmin ? () => setPanel({ visitor: null, projectId }) : undefined} />
+        <VisitorList key={resetKey} search={search} status={status} pageSize={pageSize} onPageSizeChange={setPageSize} refreshKey={refreshKey} onOpen={visitor => setPanel({ visitor, projectId })} onClear={clear} onCreate={isAdmin ? () => setPanel({ visitor: null, projectId }) : undefined} />
       </QuerySectionBoundary>
       {panel && panel.projectId === projectId && <VisitorSlideOverPanel key={`${projectId}:${panel.visitor?._id ?? "new"}`} isOpen onClose={() => setPanel(null)} visitor={panel.visitor} onSave={() => setPanel(null)} refreshKey={refreshKey} canManage={isAdmin} />}
       {zoneOpen && <QuerySectionBoundary title="Erişim bölgeleri yüklenemedi" resetKey={projectId}><VisitorZoneDialog isOpen onClose={() => setZoneOpen(false)} /></QuerySectionBoundary>}
@@ -59,8 +59,8 @@ export default function VisitorManagement() {
   </div>;
 }
 
-function VisitorList({ search, status, pageSize, refreshKey, onOpen, onClear, onCreate }: {
-  search: string; status: VisitorStatusFilter; pageSize: number; refreshKey: number;
+function VisitorList({ search, status, pageSize, onPageSizeChange, refreshKey, onOpen, onClear, onCreate }: {
+  search: string; status: VisitorStatusFilter; pageSize: number; onPageSizeChange: (value: number) => void; refreshKey: number;
   onOpen: (visitor: Visitor) => void; onClear: () => void; onCreate?: () => void;
 }) {
   const [cursors, setCursors] = useState<(string | null)[]>([null]);
@@ -76,10 +76,8 @@ function VisitorList({ search, status, pageSize, refreshKey, onOpen, onClear, on
       title={filtered ? "Bu sayfada eşleşen ziyaretçi yok" : cursors.length === 1 && page.isDone ? "Henüz ziyaretçi kaydı yok" : "Bu sayfada ziyaretçi kaydı yok"}
       description={filtered ? "Aramayı veya durum filtrelerini değiştirin. Diğer sayfalarda eşleşen kayıtlar olabilir." : "Bu projede geçici erişim verilen ziyaretçiler burada görünür."}
       action={filtered ? { label: "Filtreleri temizle", onClick: onClear } : onCreate ? { label: "Ziyaretçi kaydet", onClick: onCreate } : undefined} />}
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3">
-      <p className="text-xs text-muted-foreground" role="status">Sayfa {cursors.length} · {page.scannedCount} kayıt tarandı · {visitors.length} kayıt gösteriliyor</p>
-      <div className="flex gap-2"><Button variant="outline" disabled={cursors.length === 1} onClick={() => setCursors(previous => previous.slice(0, -1))}>Önceki</Button>
-        <Button variant="outline" disabled={page.isDone} onClick={() => setCursors(previous => [...previous, page.continueCursor])}>Sonraki</Button></div>
-    </div>
+    <PaginationBar summary={`Sayfa ${cursors.length} · ${page.scannedCount} kayıt tarandı · ${visitors.length} kayıt gösteriliyor`} page={cursors.length}
+      onPrevious={() => setCursors(previous => previous.slice(0, -1))} onNext={() => setCursors(previous => [...previous, page.continueCursor])} nextDisabled={page.isDone}
+      pageSize={pageSize} pageSizes={[25, 50]} onPageSizeChange={onPageSizeChange} pageSizeLabel="Sayfadaki ziyaretçi sayısı" />
   </div>;
 }

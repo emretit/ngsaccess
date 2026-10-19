@@ -1,4 +1,5 @@
 
+import type { ReactNode } from "react";
 import { DeviceSyncStatusBanner } from "@/components/sync/DeviceSyncStatusBanner";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -7,14 +8,12 @@ import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { Device } from "@/types/device";
 import { DeviceList } from "@/components/devices/DeviceList";
 import { DeviceFilters } from "@/components/devices/DeviceFilters";
-import { DeviceStats } from "@/components/devices/DeviceStats";
 import { Zone } from "@/hooks/useZonesAndDoors";
 import { useDeviceFilters } from "@/hooks/useDeviceFilters";
 
 interface DevicesContentProps {
-  onOpenLocation?: () => void;
-  onClearLocation?: () => void;
-  locationLabel?: string;
+  /** Sol filtre paneli (Bölge → Kapı). */
+  sidebar?: ReactNode;
   devices: Device[];
   isLoading: boolean;
   zones: Zone[];
@@ -35,7 +34,7 @@ interface DevicesContentProps {
 
 export function DevicesContent({
   devices,
-  onOpenLocation, onClearLocation, locationLabel,
+  sidebar,
   isLoading,
   zones,
   selectedZoneId,
@@ -65,16 +64,22 @@ export function DevicesContent({
 
   return (
     <div className="min-w-0 space-y-5">
-      <PageHeader title="Cihazlar" scope={`${activeProject?.name ?? "Proje"} · Cihaz envanteri`}>
+      <PageHeader title="Cihazlar">
         {canManage && <DeviceAddMenu onAddNew={onAddNew} onAddFromCloud={onAddFromCloud} />}
       </PageHeader>
-      <DeviceStats devices={devices} loading={isLoading} />
+      <div className="flex min-w-0 flex-col gap-4 min-[1100px]:flex-row min-[1100px]:gap-5">
+      {sidebar}
+      <div className="min-w-0 flex-1 space-y-4">
       <QuerySectionBoundary resetKey={activeProject?._id ?? "none"}><DeviceSyncStatusBanner /></QuerySectionBoundary>
       <DeviceFilters
         onClearFilters={clearFilters}
-        locationLabel={locationLabel}
-        onOpenLocation={onOpenLocation}
-        onClearLocation={onClearLocation}
+        locationActive={Boolean(selectedZoneId || selectedDoorId)}
+        statusCounts={{
+          all: devices.length,
+          online: devices.filter(d => d.connectionStatus === "online").length,
+          offline: devices.filter(d => d.connectionStatus === "offline").length,
+          never: devices.filter(d => d.connectionStatus === "never").length,
+        }}
         search={search}
         onSearchChange={setSearch}
         statusFilter={statusFilter}
@@ -105,7 +110,10 @@ export function DevicesContent({
           onEditDevice={onEditDevice}
           onQRClick={onQRClick}
           onReleaseDevice={onReleaseDevice}
+          hideZoneColumn={Boolean(selectedZoneId || selectedDoorId)}
         />
+      </div>
+      </div>
       </div>
     </div>
   );

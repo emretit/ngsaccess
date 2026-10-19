@@ -36,7 +36,7 @@ export function FormFieldWrapper({ htmlFor, label, error, hint, className, child
       "aria-describedby": [child.props["aria-describedby"], control["aria-describedby"]].filter(Boolean).join(" ") || undefined,
     });
   });
-  return <div className={cn("space-y-1", className)}>
+  return <div className={cn("space-y-1.5", className)}>
     <Label htmlFor={htmlFor}>{label}</Label>
     {typeof children === "function" ? children(control) : enhance(children)}
     {hint && <p id={hintId} className="text-xs text-muted-foreground">{hint}</p>}

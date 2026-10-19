@@ -21,6 +21,7 @@ interface DeviceTableRowProps {
   projectName?: string;
   /** Admin görünümü: bölge kolonunu ve "Konum Ata" aksiyonunu gizler. */
   hideLocation?: boolean;
+  hideZoneColumn?: boolean;
   onDeleteDevice: (deviceId: string) => Promise<void> | void;
   onAssignLocation?: (device: Device) => void;
   onEditDevice: (device: Device) => void;
@@ -37,6 +38,7 @@ export function DeviceTableRow({
   showProject,
   projectName,
   hideLocation,
+  hideZoneColumn,
   onDeleteDevice,
   onAssignLocation,
   onEditDevice,
@@ -68,7 +70,7 @@ export function DeviceTableRow({
       <TableCell className="min-w-0 overflow-hidden whitespace-normal break-words px-2 md:px-4 font-medium"><button type="button" onClick={() => onEditDevice(device)} title={deviceDisplayName(device)} className="min-h-11 md:min-h-0 max-w-full break-words text-left md:block md:truncate md:whitespace-nowrap rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{deviceDisplayName(device)}</button></TableCell>
       <TableCell title={deviceModel(device)} className="hidden md:table-cell truncate whitespace-nowrap"><span>{deviceModel(device) || "Belirtilmedi"}</span></TableCell>
       <TableCell title={device.ideUuid || device.deviceSerial} className="hidden xl:table-cell tabular-nums truncate whitespace-nowrap">{device.brand === "ide_smart" ? device.ideUuid || "—" : device.deviceSerial || "—"}</TableCell>
-      {!hideLocation && <TableCell title={zoneName} className="hidden lg:table-cell truncate whitespace-nowrap">{zoneName || "—"}</TableCell>}
+      {!(hideLocation || hideZoneColumn) && <TableCell title={zoneName} className="hidden lg:table-cell truncate whitespace-nowrap">{zoneName || "—"}</TableCell>}
       <TableCell className="px-1 whitespace-normal [&_span]:whitespace-normal">{getStatusBadge()}</TableCell>
       <TableCell className="px-0 py-0 text-right md:px-1" onClick={(e) => e.stopPropagation()}>
         <RowActions label={`${deviceDisplayName(device)} işlemleri`}>

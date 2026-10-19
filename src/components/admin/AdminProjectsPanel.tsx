@@ -42,7 +42,6 @@ import { errorMessage, notify } from "@/lib/notify";
 import { AdminDataBoundary } from "./components/AdminDataBoundary";
 import {
   AdminSelect,
-  AdminPageSize,
   AdminPagination,
   adminDate,
   useAdminPagination,
@@ -418,13 +417,6 @@ function AdminProjectsContent() {
         searchLabel="Proje ara"
         hasFilters={filtered}
         onClear={clear}
-        end={
-          <AdminPageSize
-            max={25}
-            size={paging.size}
-            onChange={paging.setSize}
-          />
-        }
       >
         <AdminSelect
           label="Durum"
@@ -539,6 +531,9 @@ function AdminProjectsContent() {
         onNext={() => {
           if (result && !result.isDone) paging.next(result.continueCursor);
         }}
+        size={paging.size}
+        sizes={[10, 25]}
+        onSizeChange={paging.setSize}
       />
       {editing && (
         <ProjectEditor

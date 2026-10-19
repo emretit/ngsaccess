@@ -40,6 +40,7 @@ import { ProjectSyncButton, RecentRuns } from "./SyncRuns";
 import { loadRuleEditor } from "./lib/loadRuleEditor";
 import { ruleTypeMatches } from "./lib/presentation";
 import type { AccessRule } from "@/types/access-control";
+import { PaginationBar } from "@/components/shared/PaginationBar";
 type Summary = FunctionReturnType<
   typeof api.accessRules.listSummaries
 >["page"][number];
@@ -324,28 +325,13 @@ function RulesPage({
           </Table>
         </div>
       )}
-      <nav
-        aria-label="Kural sayfaları"
-        className="flex flex-wrap items-center justify-between gap-2"
-      >
-        <Button
-          variant="outline"
-          disabled={cursors.length === 1}
-          onClick={() => setCursors((prev) => prev.slice(0, -1))}
-        >
-          Önceki
-        </Button>
-        <span className="text-xs text-muted-foreground">
-          Sayfa {cursors.length}
-        </span>
-        <Button
-          variant="outline"
-          disabled={result.isDone}
-          onClick={() => setCursors((prev) => [...prev, result.continueCursor])}
-        >
-          Sonraki
-        </Button>
-      </nav>
+      <PaginationBar
+        summary={`Sayfa ${cursors.length} · ${rows.length} kural gösteriliyor`}
+        page={cursors.length}
+        onPrevious={() => setCursors((prev) => prev.slice(0, -1))}
+        onNext={() => setCursors((prev) => [...prev, result.continueCursor])}
+        nextDisabled={result.isDone}
+      />
     </div>
   );
 }

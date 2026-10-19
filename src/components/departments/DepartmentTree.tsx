@@ -1,14 +1,16 @@
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { useState, useEffect } from "react";
-import { useQuery } from "convex/react";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
+import { Users, UserX } from "lucide-react";
 import { DepartmentTreeItem } from "./DepartmentTreeItem";
 import { AddDepartmentDialog } from "./AddDepartmentDialog";
-import { DepartmentProjectHeader } from "./DepartmentProjectHeader";
+import {
+  TreePanel,
+  TreePanelHeader,
+  treeFixedItemClass,
+} from "@/components/shared/TreePanel";
 import { useDepartments } from "@/hooks/useDepartments";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 
@@ -30,16 +32,10 @@ export default function DepartmentTree({
     deleteDepartment,
     renameDepartment,
   } = useDepartments();
-  const {
-    activeProject,
-    isSuperAdmin,
-    projectId,
-    loading: projectLoading,
-  } = useActiveProject();
+  const { projectId } = useActiveProject();
   const [renameTarget, setRenameTarget] = useState<
     (typeof departments)[number] | null
   >(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [selectedDepartment, setSelectedDepartment] =
     useState<Id<"departments"> | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<
@@ -54,19 +50,10 @@ export default function DepartmentTree({
     setSelectedDepartment(null);
     setDeleteTarget(null);
     setRenameTarget(null);
-    setMobileOpen(false);
     setShowAddDialog(false);
     setShowAddTopLevelDialog(false);
     setAddingToParentId(null);
   }, [projectId]);
-
-  const generalSettings = useQuery(
-    api.settings.getGeneral,
-    !projectLoading && projectId ? { projectId } : "skip",
-  );
-  const companyName = isSuperAdmin
-    ? (activeProject?.name ?? "Proje seç")
-    : (generalSettings?.companyName ?? activeProject?.name ?? "Ana Proje");
 
   const handleProjectHeaderClick = () => {
     setSelectedDepartment(null);
@@ -129,59 +116,62 @@ export default function DepartmentTree({
   };
 
   return (
-    <div className="w-full min-w-0 shrink-0 min-[1100px]:w-[220px]">
-      <button
-        type="button"
-        className="block min-h-11 w-full min-w-0 truncate rounded-md border px-3 text-left text-sm min-[1100px]:hidden"
-        aria-expanded={mobileOpen}
-        aria-controls="employee-departments"
-        onClick={() => setMobileOpen(!mobileOpen)}
-      >
-        Departmanlar ·{" "}
-        {selectedValue === "unassigned"
-          ? "Atanmamış"
-          : (departments.find((d) => d._id === selectedValue)?.name ??
-            "Tüm personel")}
-      </button>
-      <div
+    <>
+      <TreePanel
         id="employee-departments"
-        className={mobileOpen ? "block" : "hidden min-[1100px]:block"}
+        label="Departmanlar"
+        summary={
+          selectedValue === "unassigned"
+            ? "Atanmamış"
+            : (departments.find((d) => d._id === selectedValue)?.name ??
+              "Tüm personel")
+        }
+        header={
+          <TreePanelHeader
+            title="Departmanlar"
+            addLabel="Departman ekle"
+            onAddClick={() => setShowAddTopLevelDialog(true)}
+          />
+        }
+        footer="Departman seçildiğinde yalnız doğrudan bağlı kişiler gösterilir."
       >
-        <DepartmentProjectHeader
-          projectName={companyName}
-          onProjectClick={handleProjectHeaderClick}
-          onAddClick={() => setShowAddTopLevelDialog(true)}
-        />
-
-        <div className="py-2 max-h-[calc(100vh-12rem)] overflow-y-auto">
-          <button
-            className="min-h-11 w-full rounded-md px-3 text-left text-sm aria-pressed:bg-selected aria-pressed:text-primary"
-            aria-pressed={!(selectedValue ?? selectedDepartment)}
-            onClick={handleProjectHeaderClick}
-          >
-            Tüm personel
-          </button>
-          {onSelectUnassigned && (
-            <button
-              className="min-h-11 w-full rounded-md px-3 text-left text-sm aria-pressed:bg-selected aria-pressed:text-primary"
-              aria-pressed={selectedValue === "unassigned"}
-              onClick={onSelectUnassigned}
-            >
-              Atanmamış
-            </button>
-          )}
-          <p className="px-3 py-2 text-xs text-muted-foreground">
-            Yalnız doğrudan bağlı kişiler gösterilir.
-          </p>
+          <ul className="space-y-0.5">
+            <li>
+              <button
+                type="button"
+                className={treeFixedItemClass}
+                aria-pressed={!(selectedValue ?? selectedDepartment)}
+                onClick={handleProjectHeaderClick}
+              >
+                <Users aria-hidden="true" className="mx-[3px] h-3.5 w-3.5 shrink-0" />
+                Tüm personel
+              </button>
+            </li>
+            {onSelectUnassigned && (
+              <li>
+                <button
+                  type="button"
+                  className={treeFixedItemClass}
+                  aria-pressed={selectedValue === "unassigned"}
+                  onClick={onSelectUnassigned}
+                >
+                  <UserX aria-hidden="true" className="mx-[3px] h-3.5 w-3.5 shrink-0" />
+                  Atanmamış
+                </button>
+              </li>
+            )}
+          </ul>
+          <div role="presentation" className="border-t" />
           {isLoading ? (
             <SectionSkeleton label="Departmanlar yükleniyor" />
           ) : departments.length === 0 ? (
-            <EmptyState title="Departman yok" />
+            <p className="px-2 py-3 text-xs text-muted-foreground">
+              Henüz departman yok. Eklemek için + düğmesini kullanın.
+            </p>
           ) : (
             <ul className="space-y-0.5">{renderDepartmentTree()}</ul>
           )}
-        </div>
-      </div>
+      </TreePanel>
       <AddDepartmentDialog
         isOpen={renameTarget !== null}
         onOpenChange={(open) => {
@@ -222,7 +212,7 @@ export default function DepartmentTree({
         onOpenChange={setShowAddDialog}
         onAdd={handleAddDepartment}
         title="Yeni Departman Ekle"
-        description={`${companyName} · ${departments.find((d) => d._id === addingToParentId)?.name ?? "Üst seviye"}: departman adını girin`}
+        description={`${departments.find((d) => d._id === addingToParentId)?.name ?? "Üst seviye"} altına eklenecek departmanın adını girin`}
       />
 
       <AddDepartmentDialog
@@ -233,6 +223,6 @@ export default function DepartmentTree({
         title="Yeni Departman Ekle"
         description="Üst seviye departmanın adını girin"
       />
-    </div>
+    </>
   );
 }

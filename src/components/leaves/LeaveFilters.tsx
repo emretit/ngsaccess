@@ -108,18 +108,6 @@ export function LeaveFilters({
           setSearch("");
           onClear();
         }}
-        end={
-          <FormFieldWrapper htmlFor="leave-size" label="Sayfa boyutu">
-            <select
-              className={selectClass}
-              value={filters.pageSize}
-              onChange={(event) => onChange({ size: event.target.value })}
-            >
-              <option value="25">25</option>
-              <option value="50">50</option>
-            </select>
-          </FormFieldWrapper>
-        }
       >
         <QuerySectionBoundary
           title="Kişi seçenekleri yüklenemedi."

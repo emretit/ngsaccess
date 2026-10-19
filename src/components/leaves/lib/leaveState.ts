@@ -212,3 +212,46 @@ export function leaveError(error: unknown): {
       : undefined;
   return { code, message, conflict };
 }
+
+/**
+ * Sayfa sınırı: önceki sayfanın son kayıtlarının kimlikleri (en yakından uzağa).
+ * Sıra numarası yerine kimlikle tutulur; canlı listede kayıt eklenince/silinince
+ * sayfalar kaymaz. `fallback` yalnız hiçbir kimlik bulunamazsa kullanılır.
+ */
+export type LeavePageBoundary = { after: string[]; fallback: number };
+
+const BOUNDARY_ANCHORS = 3;
+
+export function boundaryFor(rows: readonly { _id: string }[]): LeavePageBoundary {
+  return {
+    after: rows.slice(-BOUNDARY_ANCHORS).reverse().map((row) => row._id),
+    fallback: rows.length,
+  };
+}
+
+/** Sınırdan sonraki ilk kaydın sırası; bulunan en yakın kimliğe göre. */
+export function boundaryIndex(
+  rows: readonly { _id: string }[],
+  boundary: LeavePageBoundary,
+): number {
+  for (const id of boundary.after) {
+    const found = rows.findIndex((row) => row._id === id);
+    if (found >= 0) return found + 1;
+  }
+  return Math.min(boundary.fallback, rows.length);
+}
+
+/**
+ * `index`. sayfanın kayıtları. `boundaries[i]` i. sayfanın sonudur; son sayfa için
+ * henüz kaydedilmemiş sınır `pending` ile verilir (sonraki sayfa yüklenirken).
+ */
+export function pageSlice<T extends { _id: string }>(
+  rows: readonly T[],
+  boundaries: readonly LeavePageBoundary[],
+  index: number,
+  pending?: LeavePageBoundary | null,
+): T[] {
+  const start = index === 0 ? 0 : boundaryIndex(rows, boundaries[index - 1]);
+  const end = boundaries[index] ?? pending;
+  return rows.slice(start, end ? boundaryIndex(rows, end) : undefined);
+}

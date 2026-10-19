@@ -18,7 +18,10 @@ export function AppSidebar() {
           to="/home"
           className="flex h-full w-full items-center gap-2 text-sidebar-foreground"
         >
-          <span aria-hidden="true" className="grid h-[26px] w-[26px] shrink-0 place-items-center rounded-sm border border-side-text text-lg leading-none">N</span>
+          {/* Logo kırmızı; koyu bordo kenar çubuğunda görünmesi için beyaz zemin üzerinde. */}
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-white p-[3px]">
+            <img src="/logo.svg" alt="" className="h-full w-full object-contain" />
+          </span>
           <span className="truncate text-[19px] font-semibold group-data-[collapsible=icon]:hidden text-white">
             NGS Plus
           </span>

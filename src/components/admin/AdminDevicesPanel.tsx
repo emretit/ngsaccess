@@ -33,7 +33,6 @@ import { AdminDeviceDialog } from "./AdminDeviceDialog";
 import { IdeProvisioningCard } from "./IdeProvisioningCard";
 import {
   AdminSelect,
-  AdminPageSize,
   AdminPagination,
   adminDate,
   useAdminPagination,
@@ -159,7 +158,6 @@ function AdminDevicesContent() {
         placeholder="Ad veya kimlik ara"
         hasFilters={filtered}
         onClear={() => setFilters({})}
-        end={<AdminPageSize size={paging.size} onChange={paging.setSize} />}
       >
         <AdminSelect
           label="Proje"
@@ -312,6 +310,9 @@ function AdminDevicesContent() {
         onNext={() => {
           if (result && !result.isDone) paging.next(result.continueCursor);
         }}
+        size={paging.size}
+        sizes={[10, 25, 50]}
+        onSizeChange={paging.setSize}
       />
       <div className="flex flex-wrap gap-2 border-t pt-4">
         <Button

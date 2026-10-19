@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import {
   Table,
@@ -21,6 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
+import { PaginationBar, pageRange } from "@/components/shared/PaginationBar";
 
 interface DeviceListProps {
   filterKey?: string;
@@ -39,6 +38,8 @@ interface DeviceListProps {
   showProject?: boolean;
   /** Admin görünümü: bölge kolonunu ve "Konum Ata" aksiyonunu gizler. */
   hideLocation?: boolean;
+  /** Bölge/kapı filtresi aktifken sütun her satırda aynı değeri tekrarlar; gizlenir. */
+  hideZoneColumn?: boolean;
   getProjectName?: (device: Device) => string | undefined;
 }
 
@@ -57,6 +58,7 @@ export function DeviceList({
   onReleaseDevice,
   showProject,
   hideLocation,
+  hideZoneColumn,
   getProjectName
 }: DeviceListProps) {
   const [pageSize, setPageSize] = useState(25);
@@ -84,7 +86,7 @@ export function DeviceList({
   }
 
   // Seçim, ad, model, seri, bağlantı ve işlemler; proje ve konum isteğe bağlı.
-  const colCount = 6 + (showProject ? 1 : 0) + (hideLocation ? 0 : 1);
+  const colCount = 6 + (showProject ? 1 : 0) + (hideLocation || hideZoneColumn ? 0 : 1);
 
   return (
     <div className="min-w-0 overflow-hidden rounded-md border border-line bg-surface">
@@ -111,7 +113,7 @@ export function DeviceList({
               <TableHead className="px-2 md:px-4">Cihaz adı</TableHead>
               <TableHead className="hidden md:table-cell w-[180px]">Marka / model</TableHead>
               <TableHead className="hidden xl:table-cell w-[170px]">Seri no / UUID</TableHead>
-              {!hideLocation && <TableHead className="hidden lg:table-cell w-[140px]">Bölge</TableHead>}
+              {!(hideLocation || hideZoneColumn) && <TableHead className="hidden lg:table-cell w-[140px]">Bölge</TableHead>}
               <TableHead className="w-[112px] px-1 md:w-[132px] md:px-3">Bağlantı</TableHead>
               <TableHead className="w-10 px-1 md:w-11"><span className="sr-only">İşlemler</span></TableHead>
             </TableRow>
@@ -132,6 +134,7 @@ export function DeviceList({
                   zoneName={getZoneName(device)}
                   showProject={showProject}
                   hideLocation={hideLocation}
+                  hideZoneColumn={hideZoneColumn}
                   projectName={getProjectName?.(device)}
                   onDeleteDevice={onDeleteDevice}
                   onAssignLocation={onAssignLocation}
@@ -156,18 +159,17 @@ export function DeviceList({
         </Table>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-3 py-2 text-xs text-muted-foreground">
-        <span role="status">{devices.length} cihazdan {filteredDevices.length} sonuç · {filteredDevices.length ? (currentPage - 1) * pageSize + 1 : 0}–{Math.min(currentPage * pageSize, filteredDevices.length)} gösteriliyor</span>
-        <div className="flex flex-wrap items-center gap-2">
-          <Select value={String(pageSize)} onValueChange={value => { setPageSize(Number(value)); setPage(1); }}>
-            <SelectTrigger aria-label="Sayfadaki cihaz sayısı" className="w-36"><SelectValue /></SelectTrigger>
-            <SelectContent>{[25, 50, 100].map(size => <SelectItem key={size} value={String(size)}>{size} / sayfa</SelectItem>)}</SelectContent>
-          </Select>
-          <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Önceki</Button>
-          <span className="tabular-nums">{currentPage} / {pageCount}</span>
-          <Button variant="outline" size="sm" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>Sonraki</Button>
-        </div>
-      </div>
+      <PaginationBar
+        summary={<>{devices.length} cihazdan {filteredDevices.length} sonuç · {pageRange(filteredDevices.length, currentPage, pageSize)} gösteriliyor</>}
+        page={currentPage}
+        pageCount={pageCount}
+        onPrevious={() => setPage(currentPage - 1)}
+        onNext={() => setPage(currentPage + 1)}
+        pageSize={pageSize}
+        pageSizes={[25, 50, 100]}
+        onPageSizeChange={size => { setPageSize(size); setPage(1); }}
+        pageSizeLabel="Sayfadaki cihaz sayısı"
+      />
       <DeviceDeleteDialog
         isOpen={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}

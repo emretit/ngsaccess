@@ -25,7 +25,6 @@ import { useUserManagement } from "./hooks/useUserManagement";
 import { AdminDataBoundary } from "./components/AdminDataBoundary";
 import {
   AdminSelect,
-  AdminPageSize,
   AdminPagination,
   adminDate,
   useAdminPagination,
@@ -174,11 +173,6 @@ function AdminUsersContent() {
         searchLabel="Kullanıcı ara"
         hasFilters={filtered}
         onClear={() => setFilters({})}
-        end={
-          superAdmin && (
-            <AdminPageSize size={paging.size} onChange={paging.setSize} />
-          )
-        }
       >
         <AdminSelect
           label="Rol"
@@ -270,6 +264,9 @@ function AdminUsersContent() {
           onNext={() => {
             if (result && !result.isDone) paging.next(result.continueCursor);
           }}
+          size={paging.size}
+          sizes={[10, 25, 50]}
+          onSizeChange={paging.setSize}
         />
       )}
       {open && (

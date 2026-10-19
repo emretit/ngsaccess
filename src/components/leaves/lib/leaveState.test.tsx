@@ -7,6 +7,7 @@ import { LeaveDetails } from "../LeaveDetails";
 import { LeaveList } from "../LeaveList";
 import { LeaveResults } from "../LeaveResults";
 import {
+  boundaryFor,
   calendarDays,
   currentMonth,
   leaveError,
@@ -14,6 +15,7 @@ import {
   leaveStatuses,
   leaveTypes,
   makeLeaveFormSchema,
+  pageSlice,
   projectScopedLeaveParams,
   monthRange,
   pdksHref,
@@ -334,5 +336,36 @@ describe("bounded list presentation", () => {
     const html = renderResults();
     expect(html).toContain("İzin kayıtları yükleniyor.");
     expect(html).not.toContain("0 kayıt");
+  });
+});
+
+describe("page boundaries survive live list changes", () => {
+  const ids = (rows: { _id: string }[]) => rows.map((item) => item._id);
+  const make = (...names: string[]) => names.map((_id) => ({ _id }));
+  const list = make("a", "b", "c", "d", "e", "f");
+  const boundaries = [boundaryFor(list.slice(0, 3))];
+
+  it("splits pages at the recorded record", () => {
+    expect(ids(pageSlice(list, boundaries, 0))).toEqual(["a", "b", "c"]);
+    expect(ids(pageSlice(list, boundaries, 1))).toEqual(["d", "e", "f"]);
+  });
+  it("does not repeat or skip records when a new one is inserted at the top", () => {
+    const live = [{ _id: "new" }, ...list];
+    expect(ids(pageSlice(live, boundaries, 0))).toEqual(["new", "a", "b", "c"]);
+    expect(ids(pageSlice(live, boundaries, 1))).toEqual(["d", "e", "f"]);
+  });
+  it("keeps the next page intact when the boundary record is deleted", () => {
+    const live = list.filter((item) => item._id !== "c");
+    expect(ids(pageSlice(live, boundaries, 0))).toEqual(["a", "b"]);
+    expect(ids(pageSlice(live, boundaries, 1))).toEqual(["d", "e", "f"]);
+  });
+  it("keeps an empty candidate page empty and cuts the open page at the pending boundary", () => {
+    const empty = [boundaryFor(list.slice(0, 3)), boundaryFor(list.slice(0, 3))];
+    expect(pageSlice(list, empty, 1)).toEqual([]);
+    expect(ids(pageSlice(list, empty, 2))).toEqual(["d", "e", "f"]);
+    expect(ids(pageSlice(list, [], 0, boundaryFor(list.slice(0, 2))))).toEqual(["a", "b"]);
+  });
+  it("starts from the beginning when nothing was loaded yet", () => {
+    expect(ids(pageSlice(list, [boundaryFor([])], 1))).toEqual(ids(list));
   });
 });

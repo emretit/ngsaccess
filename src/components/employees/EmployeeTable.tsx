@@ -36,6 +36,8 @@ interface EmployeeTableProps {
   onDelete: (employee: Employee) => void;
   onViewDetails: (employee: Employee) => void;
   onRefresh?: () => void;
+  /** Departman filtresi aktifken sütun her satırda aynı değeri tekrarlar; gizlenir. */
+  showDepartment?: boolean;
 }
 
 export default function EmployeeTable({
@@ -46,6 +48,7 @@ export default function EmployeeTable({
   onDelete: _onDelete,
   onViewDetails,
   onRefresh,
+  showDepartment = true,
 }: EmployeeTableProps) {
   const { isAdmin, projectId } = useActiveProjectScope();
   const [failedSyncIds, setFailedSyncIds] = useState<Id<"employees">[]>([]);
@@ -310,11 +313,12 @@ export default function EmployeeTable({
               </TableHead>
               {column("name", "Ad soyad")}
               {column("email", "E-posta", "hidden min-[1100px]:table-cell")}
-              {column(
-                "department",
-                "Departman",
-                "hidden min-[760px]:table-cell",
-              )}
+              {showDepartment &&
+                column(
+                  "department",
+                  "Departman",
+                  "hidden min-[760px]:table-cell",
+                )}
               {column("position", "Pozisyon", "hidden min-[1100px]:table-cell")}
               {column("card", "Kart no", "hidden min-[760px]:table-cell")}
               {column("status", "Durum", "w-[68px]")}
@@ -359,8 +363,13 @@ export default function EmployeeTable({
                         {employee.firstName} {employee.lastName}
                       </button>
                       <p className="truncate text-[11px] text-muted-foreground min-[760px]:hidden">
-                        {employee.departments?.name ?? "Atanmamış"}
-                        {employee.payrollCode ? ` · ${employee.payrollCode}` : ""}
+                        {[
+                          showDepartment &&
+                            (employee.departments?.name ?? "Atanmamış"),
+                          employee.payrollCode,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </p>
                     </div>
                   </div>
@@ -368,9 +377,11 @@ export default function EmployeeTable({
                 <TableCell className="hidden truncate min-[1100px]:table-cell">
                   {employee.email}
                 </TableCell>
-                <TableCell className="hidden truncate min-[760px]:table-cell">
-                  {employee.departments?.name ?? "Atanmamış"}
-                </TableCell>
+                {showDepartment && (
+                  <TableCell className="hidden truncate min-[760px]:table-cell">
+                    {employee.departments?.name ?? "Atanmamış"}
+                  </TableCell>
+                )}
                 <TableCell className="hidden truncate min-[1100px]:table-cell">
                   {employee.positions?.name ?? "—"}
                 </TableCell>

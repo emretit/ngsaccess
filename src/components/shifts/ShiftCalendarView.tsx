@@ -12,6 +12,7 @@ import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { Button } from "@/components/ui/button";
 import { DateInput } from "@/components/ui/date-picker";
+import { PaginationBar, pageRange } from "@/components/shared/PaginationBar";
 import { ShiftCalendarGrid } from "./ShiftCalendarGrid";
 import { ShiftAgendaView } from "./ShiftAgendaView";
 import { ShiftDayDetails } from "./ShiftDayDetails";
@@ -355,37 +356,19 @@ function Plan({
           )}
         </>
       )}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span>
-          {filtered.length ? currentPage * 50 + 1 : 0}–
-          {Math.min((currentPage + 1) * 50, filtered.length)} /{" "}
-          {filtered.length} çalışan · İstanbul saati
-        </span>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={currentPage === 0}
-            onClick={() => {
-              setPage(currentPage - 1);
-              clearSelection();
-            }}
-          >
-            Önceki kişiler
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={currentPage >= pageCount - 1}
-            onClick={() => {
-              setPage(currentPage + 1);
-              clearSelection();
-            }}
-          >
-            Sonraki kişiler
-          </Button>
-        </div>
-      </div>
+      <PaginationBar
+        summary={`${pageRange(filtered.length, currentPage + 1, 50)} / ${filtered.length} çalışan · İstanbul saati`}
+        page={currentPage + 1}
+        pageCount={pageCount}
+        onPrevious={() => {
+          setPage(currentPage - 1);
+          clearSelection();
+        }}
+        onNext={() => {
+          setPage(currentPage + 1);
+          clearSelection();
+        }}
+      />
       {assign && (
         <AssignShiftDialog
           open

@@ -50,7 +50,7 @@ export function AddDepartmentDialog({
   return (
     <Dialog open={isOpen} onOpenChange={close}>
       <DialogContent
-        className="sm:max-w-[425px]"
+        className="sm:max-w-[440px]"
         onInteractOutside={(event) => {
           if (pending) event.preventDefault();
         }}
@@ -86,7 +86,7 @@ export function AddDepartmentDialog({
               onChange={(event) => setDepartmentName(event.target.value)}
             />
           </FormFieldWrapper>
-          <DialogFooter>
+          <DialogFooter className="pt-2">
             <Button
               type="button"
               variant="outline"
@@ -96,7 +96,7 @@ export function AddDepartmentDialog({
               İptal
             </Button>
             <Button type="submit" disabled={pending}>
-              {pending ? "Ekleniyor..." : "Ekle"}
+              {pending ? "Ekleniyor…" : "Ekle"}
             </Button>
           </DialogFooter>
         </form>

@@ -36,16 +36,15 @@ export function AddZoneDialog({ open, onOpenChange, onSuccess }: AddZoneDialogPr
   };
   return <>
     <Dialog open={open} onOpenChange={next => { if (!next) close(); }}>
-      <DialogContent className="sm:max-w-[480px] max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[440px] max-h-[90dvh] overflow-y-auto">
         <DialogHeader><DialogTitle>Bölge ekle</DialogTitle></DialogHeader>
 
         <form onSubmit={submit} noValidate className="space-y-4" aria-busy={pending}>
-          {error && <p role="alert" className="text-sm text-destructive">Kaydedilemedi. {error}</p>}
           <fieldset disabled={pending} className="space-y-4">
             <FormFieldWrapper htmlFor="add-zone-name" label="Bölge adı" error={error}><Input ref={nameInput} id="add-zone-name" value={name} onChange={e => { setName(e.target.value); setError(undefined); }} /></FormFieldWrapper>
             <FormFieldWrapper htmlFor="add-zone-description" label="Açıklama"><Textarea id="add-zone-description" value={description} onChange={e => setDescription(e.target.value)} /></FormFieldWrapper>
           </fieldset>
-          <DialogFooter className="border-t border-line pt-4"><Button type="button" variant="outline" disabled={pending} onClick={close}>İptal</Button><Button type="submit" disabled={pending}>{pending ? "Ekleniyor…" : "Ekle"}</Button></DialogFooter>
+          <DialogFooter className="pt-2"><Button type="button" variant="outline" disabled={pending} onClick={close}>İptal</Button><Button type="submit" disabled={pending}>{pending ? "Ekleniyor…" : "Ekle"}</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

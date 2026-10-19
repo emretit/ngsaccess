@@ -1,4 +1,5 @@
 import { EmptyState } from "@/components/shared/EmptyState";
+import { PaginationBar } from "@/components/shared/PaginationBar";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -63,32 +64,6 @@ export function useStableAdminPage<T>(
   return value !== undefined || previous.key !== key ? value : previous.value;
 }
 
-export function AdminPageSize({
-  size,
-  onChange,
-  max = 50,
-}: {
-  size: number;
-  onChange: (size: number) => void;
-  max?: number;
-}) {
-  return (
-    <AdminSelect
-      label="Sayfa boyutu"
-      value={String(size)}
-      onChange={(value) => onChange(Number(value))}
-    >
-      {[10, 25, 50]
-        .filter((value) => value <= max)
-        .map((value) => (
-          <option key={value} value={value}>
-            {value}
-          </option>
-        ))}
-    </AdminSelect>
-  );
-}
-
 export function AdminPagination({
   page,
   count,
@@ -96,6 +71,9 @@ export function AdminPagination({
   loading,
   onPrevious,
   onNext,
+  size,
+  sizes,
+  onSizeChange,
 }: {
   page: number;
   count: number;
@@ -103,34 +81,30 @@ export function AdminPagination({
   loading: boolean;
   onPrevious: () => void;
   onNext: () => void;
+  size?: number;
+  sizes?: readonly number[];
+  onSizeChange?: (size: number) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-      <p role="status">
-        Sayfa {page} · {loading ? "Yükleniyor" : `Bu sayfada ${count} kayıt`}
-        {!done && !loading && count === 0
-          ? " · Tarama sürüyor; sonraki sayfaya geçin."
-          : ""}
-      </p>
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={loading || page <= 1}
-          onClick={onPrevious}
-        >
-          Önceki
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={loading || done}
-          onClick={onNext}
-        >
-          Sonraki
-        </Button>
-      </div>
-    </div>
+    <PaginationBar
+      summary={
+        <>
+          Sayfa {page} · {loading ? "Yükleniyor" : `Bu sayfada ${count} kayıt`}
+          {!done && !loading && count === 0
+            ? " · Tarama sürüyor; sonraki sayfaya geçin."
+            : ""}
+        </>
+      }
+      page={page}
+      onPrevious={onPrevious}
+      onNext={onNext}
+      previousDisabled={loading || page <= 1}
+      nextDisabled={loading || done}
+      pageSize={size}
+      pageSizes={sizes}
+      onPageSizeChange={onSizeChange}
+      pageSizeLabel="Sayfa boyutu"
+    />
   );
 }
 

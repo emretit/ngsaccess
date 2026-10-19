@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { DevicesContent } from '@/components/devices/DevicesContent';
-import { ZoneDoorTreePanel } from '@/components/access-control/ZoneDoorTreePanel';
+import { LocationTree } from '@/components/devices/LocationTree';
 import { QRCodeDialog } from '@/components/devices/QRCodeDialog';
 import { AssignLocationForm } from '@/components/devices/AssignLocationForm';
 import { DeviceDetailsPanel } from '@/components/devices/DeviceDetailsPanel';
@@ -41,7 +41,6 @@ const Devices = () => {
   const { loading: projectLoading, isAdmin } = useProjectAccess();
   const { devices, isLoading, hasProjectAccess } = useProjectFilteredDevices();
   const { zones, doors } = useZonesAndDoors();
-  const [locationOpen, setLocationOpen] = useState(false);
   const { zoneId: selectedZoneId, doorId: selectedDoorId } = readDeviceFilters(searchParams);
   const setSelectedZoneId = (zoneId: string | null) => setSearchParams(current => writeDeviceFilters(current, { zoneId, doorId: null }));
   const setSelectedDoorId = (doorId: string | null) => setSearchParams(current => writeDeviceFilters(current, { doorId, ...(doorId ? { zoneId: doors.find(door => door._id === doorId)?.zoneId ?? null } : {}) }));
@@ -144,20 +143,16 @@ const Devices = () => {
     <>
     {unavailable ?? (
     <div className="min-h-full min-w-0 space-y-4">
-      <ZoneDoorTreePanel
-          open={locationOpen}
-          onOpenChange={setLocationOpen}
-          selectedZoneId={selectedZoneId}
-          selectedDoorId={selectedDoorId}
-          onSelectZone={setSelectedZoneId}
-          onSelectDoor={setSelectedDoorId}
-        />
-
       <div className="flex-1 min-w-0 space-y-3">
         {projectLoading ? <SectionSkeleton rows={5} label="Proje yükleniyor" /> : <DevicesContent
-          onOpenLocation={() => setLocationOpen(true)}
-          onClearLocation={() => setSelectedZoneId(null)}
-          locationLabel={selectedDoorId ? `Konum: ${zones.find(z => z._id === doors.find(d => d._id === selectedDoorId)?.zoneId)?.name ?? "Bölge"} / ${doors.find(d => d._id === selectedDoorId)?.name ?? "Kapı"}` : selectedZoneId ? `Konum: ${zones.find(z => z._id === selectedZoneId)?.name ?? "Bölge"}` : undefined}
+          sidebar={<LocationTree
+            key={projectId ?? "none"}
+            selectedZoneId={selectedZoneId}
+            selectedDoorId={selectedDoorId}
+            onSelectZone={setSelectedZoneId}
+            onSelectDoor={setSelectedDoorId}
+            canManage={isAdmin}
+          />}
           devices={devices}
           isLoading={isLoading}
           zones={zones}

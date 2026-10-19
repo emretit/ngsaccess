@@ -38,16 +38,15 @@ export function AddDoorDialog({ open, onOpenChange, onSuccess, zoneId, zoneName 
   };
   return <>
     <Dialog open={open} onOpenChange={next => { if (!next) close(); }}>
-      <DialogContent className="sm:max-w-[480px] max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[440px] max-h-[90dvh] overflow-y-auto">
         <DialogHeader><DialogTitle>Kapı ekle</DialogTitle></DialogHeader>
         <p className="break-words text-sm text-muted-foreground">{zoneName}</p>
         <form onSubmit={submit} noValidate className="space-y-4" aria-busy={pending}>
-          {error && <p role="alert" className="text-sm text-destructive">Kaydedilemedi. {error}</p>}
           <fieldset disabled={pending} className="space-y-4">
             <FormFieldWrapper htmlFor="add-door-name" label="Kapı adı" error={error}><Input ref={nameInput} id="add-door-name" value={name} onChange={e => { setName(e.target.value); setError(undefined); }} /></FormFieldWrapper>
             <FormFieldWrapper htmlFor="add-door-code" label="Kapı kodu"><Input id="add-door-code" value={doorCode} onChange={e => setDoorCode(e.target.value)} /></FormFieldWrapper><FormFieldWrapper htmlFor="add-door-direction" label="Yön">{control => <Select disabled={pending} value={direction} onValueChange={value => { if (value === "entry" || value === "exit" || value === "both") setDirection(value); }}><SelectTrigger {...control}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="entry">Giriş</SelectItem><SelectItem value="exit">Çıkış</SelectItem><SelectItem value="both">Giriş/Çıkış</SelectItem></SelectContent></Select>}</FormFieldWrapper>
           </fieldset>
-          <DialogFooter className="border-t border-line pt-4"><Button type="button" variant="outline" disabled={pending} onClick={close}>İptal</Button><Button type="submit" disabled={pending}>{pending ? "Ekleniyor…" : "Ekle"}</Button></DialogFooter>
+          <DialogFooter className="pt-2"><Button type="button" variant="outline" disabled={pending} onClick={close}>İptal</Button><Button type="submit" disabled={pending}>{pending ? "Ekleniyor…" : "Ekle"}</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

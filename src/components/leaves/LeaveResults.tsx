@@ -2,12 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import type { FunctionArgs } from "convex/server";
 import { api } from "../../../convex/_generated/api";
-import { Button } from "@/components/ui/button";
+import { PaginationBar } from "@/components/shared/PaginationBar";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { LeaveList } from "./LeaveList";
-import { type LeaveRow } from "./lib/leaveState";
+import {
+  boundaryFor,
+  pageSlice,
+  type LeavePageBoundary,
+  type LeaveRow,
+} from "./lib/leaveState";
 
 export type LeaveQueryFilters = FunctionArgs<typeof api.leaves.summary>;
 function LeaveSummary({
@@ -88,6 +93,7 @@ export function LeaveResults({
   onEdit,
   requestedId,
   onRows,
+  onPageSizeChange,
 }: {
   filters: LeaveQueryFilters;
   pageSize: number;
@@ -98,6 +104,7 @@ export function LeaveResults({
   onEdit: (row: LeaveRow) => void;
   requestedId?: string;
   onRows: (rows: LeaveRow[]) => void;
+  onPageSizeChange?: (size: number) => void;
 }) {
   // Convex manages splitCursor / SplitRequired internally, including empty candidate pages.
   const { results, status, loadMore } = usePaginatedQuery(
@@ -105,16 +112,18 @@ export function LeaveResults({
     filters,
     { initialNumItems: pageSize },
   );
-  const [pages, setPages] = useState([0]);
+  // Sayfa sınırları sıra numarası değil kayıt kimliğiyle tutulur: liste canlı
+  // güncellenirken (ekleme/silme) sayfalar kaymaz, kayıt tekrarlanmaz veya atlanmaz.
+  const [boundaries, setBoundaries] = useState<LeavePageBoundary[]>([]);
   const [index, setIndex] = useState(0);
-  const [requested, setRequested] = useState<number | null>(null);
+  const [pending, setPending] = useState<LeavePageBoundary | null>(null);
   useEffect(() => {
-    if (requested === null) return;
+    if (pending === null) return;
     if (status !== "CanLoadMore" && status !== "Exhausted") return;
-    setPages((previous) => [...previous, requested]);
+    setBoundaries((previous) => [...previous, pending]);
     setIndex((previous) => previous + 1);
-    setRequested(null);
-  }, [status, requested]);
+    setPending(null);
+  }, [status, pending]);
   useEffect(() => {
     onRows(results);
   }, [results, onRows]);
@@ -129,16 +138,13 @@ export function LeaveResults({
   }, [requestedId, results, onDetails]);
   if (status === "LoadingFirstPage")
     return <SectionSkeleton rows={5} label="İzin kayıtları yükleniyor." />;
-  const rows = results.slice(
-    pages[index],
-    pages[index + 1] ?? requested ?? undefined,
-  );
-  const loading = status === "LoadingMore" || requested !== null;
-  const hasNext = index < pages.length - 1 || status === "CanLoadMore";
+  const rows = pageSlice(results, boundaries, index, pending);
+  const loading = status === "LoadingMore" || pending !== null;
+  const hasNext = index < boundaries.length || status === "CanLoadMore";
   const next = () => {
-    if (index < pages.length - 1) setIndex(index + 1);
-    else if (status === "CanLoadMore" && requested === null) {
-      setRequested(results.length);
+    if (index < boundaries.length) setIndex(index + 1);
+    else if (status === "CanLoadMore" && pending === null) {
+      setPending(boundaryFor(results));
       loadMore(pageSize);
     }
   };
@@ -163,7 +169,7 @@ export function LeaveResults({
           onDetails={onDetails}
           onEdit={onEdit}
         />
-      ) : hasNext || pages.length > 1 ? (
+      ) : hasNext || boundaries.length > 0 ? (
         <EmptyState
           title="Bu sayfada eşleşen izin yok; daha eski kayıtları tarayın."
           description="Filtreler aday kayıt sayfasına uygulanır."
@@ -182,29 +188,23 @@ export function LeaveResults({
         </QuerySectionBoundary>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-        <span role="status">
-          {loading
+      <PaginationBar
+        summary={
+          loading
             ? "İzin kayıtları yükleniyor…"
-            : `${index + 1}. sayfa · ${rows.length} kayıt gösteriliyor`}
-        </span>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            disabled={index === 0 || loading}
-            onClick={() => setIndex(index - 1)}
-          >
-            Önceki
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!hasNext || loading}
-            onClick={next}
-          >
-            {!rows.length && hasNext ? "Devam" : "Sonraki"}
-          </Button>
-        </div>
-      </div>
+            : `${index + 1}. sayfa · ${rows.length} kayıt gösteriliyor`
+        }
+        page={index + 1}
+        onPrevious={() => setIndex(index - 1)}
+        onNext={next}
+        previousDisabled={index === 0 || loading}
+        nextDisabled={!hasNext || loading}
+        nextLabel={!rows.length && hasNext ? "Devam" : "Sonraki"}
+        pageSize={pageSize}
+        pageSizes={[25, 50]}
+        onPageSizeChange={onPageSizeChange}
+        pageSizeLabel="Sayfadaki izin sayısı"
+      />
     </div>
   );
 }

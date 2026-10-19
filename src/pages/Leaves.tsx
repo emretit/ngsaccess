@@ -146,6 +146,7 @@ function LeavesProject({
           onEdit={onEdit}
           requestedId={params.get("leave") ?? undefined}
           onRows={onRows}
+          onPageSizeChange={(size) => updateFilters({ size: String(size) })}
         />
       </LeaveQueryBoundary>
       <LeaveDetails
