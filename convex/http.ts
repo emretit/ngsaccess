@@ -457,41 +457,8 @@ http.route({
   }),
 });
 
-// /hik-bridge/roster kaldırıldı (2026-10-19): 2026-06-19'dan kalan sahipsiz test köprüsü bu yolu 3 sn'de bir
-// çağırıp Convex kotasını tüketiyordu. Köprü baştan yazılacak; yeni sürüm yeni bir yol kullanmalı.
-
-/**
- * Tek-yer modeli: bridge token ile claimed SDK işini done/failed kapat.
- */
-http.route({
-  path: "/hik-bridge/roster-ack",
-  method: "POST",
-  handler: httpAction(async (ctx, request) => {
-    const token = bridgeBearerToken(request);
-    if (!token) return jsonResponse({ ok: false, error: "unauthorized" }, 401);
-    const body = (await request.json()) as {
-      opId?: string;
-      ok?: boolean;
-      message?: string;
-    };
-    if (!body.opId || typeof body.ok !== "boolean") {
-      return jsonResponse({ ok: false, error: "opId+ok gerekli" }, 400);
-    }
-    const result = await ctx.runMutation(internal.hikBridge.ackBridgeOperation, {
-      token,
-      opId: body.opId as Id<"hikPendingOperations">,
-      ok: body.ok,
-      // null → undefined: Convex v.optional(v.string()) açık null'ı reddeder; başarılı
-      // ack'te bridge message=null gönderir, bu satır olmadan op processing'te kalırdı.
-      message: typeof body.message === "string" ? body.message : undefined,
-    });
-    if (!result.ok && result.error === "unauthorized") {
-      return jsonResponse(result, 401);
-    }
-    if (!result.ok) return jsonResponse(result, 404);
-    return jsonResponse(result);
-  }),
-});
+// /hik-bridge/roster + /hik-bridge/roster-ack kaldırıldı (2026-10-19): 2026-06-19'dan kalan sahipsiz test köprüsü
+// roster'ı 3 sn'de bir çağırıp Convex kotasını tüketiyordu. Köprü baştan yazılacak; yeni sürüm yeni bir yol kullanmalı.
 
 /**
  * Relay onay endpoint'i - eski /confirm-relay uyumluluğu için

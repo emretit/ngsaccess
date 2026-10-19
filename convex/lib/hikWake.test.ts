@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "../_generated/dataModel";
 import { wake } from "../actions/hikBridgeWake";
 import type { MutationCtx } from "../_generated/server";
-import { claimBridgeRoster, scheduleBridgeWakeForProject } from "../hikBridge";
+import { scheduleBridgeWakeForProject } from "../hikBridge";
 import {
   earliestPendingRetryAt,
   hmacHex,
@@ -91,47 +91,6 @@ describe("relay yapılandırması", () => {
 // Bu testler yalnız kullanılan Convex bağlam yüzeyini taklit eder; canlı DB'ye erişmez.
 const bridgeId = "bridge-test" as Id<"hikBridges">;
 const projectId = "project-test" as Id<"projects">;
-function rosterContext(bridge: { lastSeenAt?: number; lastClientInfo?: string }) {
-  const patch = vi.fn();
-  const ctx = {
-    db: {
-      patch,
-      query: () => ({ withIndex: () => ({
-        first: async () => ({ _id: bridgeId, projectId, ...bridge }),
-        collect: async () => [],
-      }) }),
-    },
-  } as unknown as MutationCtx;
-  return { ctx, patch };
-}
-const roster = (claimBridgeRoster as unknown as {
-  _handler: (ctx: MutationCtx, args: { token: string; clientInfo?: string }) => Promise<unknown>;
-})._handler;
-
-describe("roster bağlantı bilgisi", () => {
-  it("60 saniyeye kadar tekrar yazmaz, sınırda yazar", async () => {
-    vi.spyOn(Date, "now").mockReturnValue(100_000);
-    const recent = rosterContext({ lastSeenAt: 40_001, lastClientInfo: "bridge" });
-    await roster(recent.ctx, { token: "test", clientInfo: "bridge" });
-    expect(recent.patch).not.toHaveBeenCalled();
-    const due = rosterContext({ lastSeenAt: 40_000, lastClientInfo: "bridge" });
-    await roster(due.ctx, { token: "test", clientInfo: "bridge" });
-    expect(due.patch).toHaveBeenCalledWith(bridgeId, { lastSeenAt: 100_000 });
-  });
-  it("ilk bağlantıyı ve kırpılmış istemci bilgisini tek patch ile yazar", async () => {
-    vi.spyOn(Date, "now").mockReturnValue(100_000);
-    const { ctx, patch } = rosterContext({});
-    expect(await roster(ctx, { token: "test", clientInfo: "a".repeat(250) })).toMatchObject({ ok: true, bridgeId });
-    expect(patch).toHaveBeenCalledExactlyOnceWith(bridgeId, { lastSeenAt: 100_000, lastClientInfo: "a".repeat(200) });
-  });
-  it("istemci değişimi heartbeat zamanını ilerletmez", async () => {
-    vi.spyOn(Date, "now").mockReturnValue(100_000);
-    const { ctx, patch } = rosterContext({ lastSeenAt: 99_000, lastClientInfo: "old" });
-    await roster(ctx, { token: "test", clientInfo: "new" });
-    expect(patch).toHaveBeenCalledExactlyOnceWith(bridgeId, { lastClientInfo: "new" });
-  });
-});
-
 describe("proje uyandırması", () => {
   it("relay kapalı veya proje yoksa veritabanına bile erişmez", async () => {
     vi.stubEnv("HIK_RELAY_URL", "");
