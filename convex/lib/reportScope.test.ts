@@ -71,7 +71,9 @@ function readingContext(readings: Doc<"cardReadings">[]) {
   return {
     user,
     auth: { getUserIdentity: async () => ({ subject: "admin|session" }) },
-    db: { query, get: async (id: string) => id === employeeId ? reportEmployee : id === "admin" ? user : null },
+    db: { query, get: async (id: string) => id === "session"
+      ? { _id: "session", userId: "admin", expirationTime: Date.now() + 60_000 }
+      : id === employeeId ? reportEmployee : id === "admin" ? user : null },
   } as unknown as QueryCtx;
 }
 async function invoke(fn: unknown, ctx: QueryCtx, args: object) {

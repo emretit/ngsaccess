@@ -29,6 +29,7 @@ const handler = (consume as unknown as {
 })._handler;
 const userId = 'recipient' as Id<'users'>;
 const attackerId = 'inviter' as Id<'users'>;
+const sessionId = 'session' as Id<'authSessions'>;
 const projectId = 'invited-project' as Id<'projects'>;
 const otherProjectId = 'existing-project' as Id<'projects'>;
 const args = { token: 'invite-token', email: 'recipient@example.test' };
@@ -75,6 +76,7 @@ function fixture(options: {
   identity?: Id<'users'> | null;
   memberships?: Id<'projects'>[];
   missingUser?: boolean;
+  missingSession?: boolean;
   missingInvite?: boolean;
 } = {}) {
   let user: Doc<'users'> = {
@@ -89,7 +91,9 @@ function fixture(options: {
   };
   const memberships = (options.memberships ?? []).map((id) => ({ userId, projectId: id }));
   const identity = options.identity === undefined ? userId : options.identity;
-  const get = vi.fn(async (id: Id<'users'>) => {
+  let sessionExists = !options.missingSession;
+  const get = vi.fn(async (id: Id<'users'> | Id<'authSessions'>) => {
+    if (id === sessionId) return sessionExists ? { _id: sessionId, userId: identity, expirationTime: Date.now() + 60_000 } : null;
     if (id === userId) return options.missingUser ? null : user;
     if (id === attackerId) return { _id: attackerId, email: 'inviter@example.test', role: 'project_admin' };
     return null;
@@ -112,7 +116,7 @@ function fixture(options: {
     } },
     db: { get, patch, insert, query },
   } as unknown as MutationCtx;
-  return { ctx, get, patch, insert, memberships, user: () => user, invite: () => invite };
+  return { ctx, get, patch, insert, memberships, user: () => user, invite: () => invite, deleteSession: () => { sessionExists = false; } };
 }
 
 function setupFixture(options: {
@@ -135,7 +139,9 @@ function setupFixture(options: {
   };
   const memberships = (options.memberships ?? []).map((id) => ({ userId, projectId: id }));
   const authAccounts = options.account === false ? [] : [{ provider: 'password', providerAccountId: args.email, userId }];
-  const get = vi.fn(async (id: Id<'users'>) => id === userId ? user : null);
+  const get = vi.fn(async (id: Id<'users'> | Id<'authSessions'>) => id === sessionId
+    ? { _id: sessionId, userId, expirationTime: Date.now() + 60_000 }
+    : id === userId ? user : null);
   const patch = vi.fn(async (id: string, changes: Record<string, unknown>) => {
     if (id === userId) user = { ...user, ...changes };
     else if (id === invite._id) Object.assign(invite, changes);
@@ -352,6 +358,12 @@ describe('invites.consume authorization and global role protection', () => {
   });
   it('rejects a missing authenticated user document', async () => {
     await expectRejected(fixture({ missingUser: true }), 'INVITE_AUTH_REQUIRED');
+  });
+  it('rejects a squatter JWT after invalidateSessions deleted its session', async () => {
+    const f = fixture();
+    vi.mocked(invalidateSessions).mockImplementationOnce(async () => f.deleteSession());
+    await invalidateSessions(f.ctx as unknown as ActionCtx, { userId });
+    await expectRejected(f, 'INVITE_AUTH_REQUIRED');
   });
   it('does not authorize an account without an email using the supplied email', async () => {
     await expectRejected(fixture({ user: { email: undefined } }), 'INVITE_EMAIL_MISMATCH');

@@ -16,6 +16,7 @@ vi.mock("./lib/customFunctions", () => {
 
 const userId = "user-1" as Id<"users">;
 const otherUserId = "user-2" as Id<"users">;
+const sessionId = "session" as Id<"authSessions">;
 const projectId = "project-1" as Id<"projects">;
 const otherProjectId = "project-2" as Id<"projects">;
 
@@ -66,7 +67,9 @@ function makeContext(options: {
 }) {
   const memberships = options.memberships ?? [];
   const db = {
-    get: async (id: Id<"users">) => options.users.find((user) => user._id === id) ?? null,
+    get: async (id: Id<"users"> | Id<"authSessions">) => id === sessionId
+      ? { _id: sessionId, userId: options.caller._id, expirationTime: Date.now() + 60_000 }
+      : options.users.find((user) => user._id === id) ?? null,
     query: (table: string) => queryResult(table === "userProjects"
       ? memberships
       : options.users),

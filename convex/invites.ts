@@ -1,12 +1,12 @@
 import { ConvexError, v } from "convex/values";
-import { getAuthUserId, invalidateSessions, modifyAccountCredentials } from "@convex-dev/auth/server";
+import { invalidateSessions, modifyAccountCredentials } from "@convex-dev/auth/server";
 import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { superAdminQuery } from "./lib/customFunctions";
 import { limiter } from "./lib/rateLimit";
-import { verifyUser } from "./lib/auth";
+import { getValidAuthUserId, verifyUser } from "./lib/auth";
 
 /** Kurulumda tüketilebilecek davet: kullanılmamış, süresi dolmamış, "reset" olmayan. */
 async function getOpenSetupInvite(ctx: QueryCtx | MutationCtx, token: string) {
@@ -223,7 +223,7 @@ export const consume = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getValidAuthUserId(ctx);
     if (!userId) throw new ConvexError({ code: "INVITE_AUTH_REQUIRED" });
     const user = await ctx.db.get(userId);
     if (!user) throw new ConvexError({ code: "INVITE_AUTH_REQUIRED" });

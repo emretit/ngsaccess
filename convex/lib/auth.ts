@@ -1,6 +1,24 @@
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
-import { getAuthUserId } from "@convex-dev/auth/server";
+import { getAuthSessionId, getAuthUserId } from "@convex-dev/auth/server";
+
+/**
+ * JWT'deki kullanıcı kimliğini, JWT'nin işaret ettiği oturum hâlâ mevcutsa kabul eder.
+ * Oturum silinince elde kalmış access token da sonraki istekte geçersiz olur.
+ */
+export async function getValidAuthUserId(
+  ctx: QueryCtx | MutationCtx
+): Promise<Id<"users"> | null> {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) return null;
+
+  const sessionId = await getAuthSessionId(ctx);
+  if (!sessionId) return null;
+
+  const session = await ctx.db.get(sessionId);
+  if (!session || session.userId !== userId) return null;
+  return userId;
+}
 
 /**
  * Kimliği doğrulanmış kullanıcıyı döndürür.
@@ -9,7 +27,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 export async function getCurrentUser(
   ctx: QueryCtx | MutationCtx
 ): Promise<Doc<"users">> {
-  const userId = await getAuthUserId(ctx);
+  const userId = await getValidAuthUserId(ctx);
   if (!userId) {
     throw new Error("Giriş yapmanız gerekiyor");
   }
@@ -33,7 +51,7 @@ export async function getCurrentUser(
 export async function getCurrentUserOrNull(
   ctx: QueryCtx | MutationCtx
 ): Promise<Doc<"users"> | null> {
-  const userId = await getAuthUserId(ctx);
+  const userId = await getValidAuthUserId(ctx);
   if (!userId) return null;
   return await ctx.db.get(userId);
 }

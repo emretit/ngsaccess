@@ -6,9 +6,8 @@ import { profileName } from "./lib/settingsUx";
 import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { optionalAuthQuery, authedMutation, adminQuery, superAdminQuery, superAdminMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser, verifyUser } from "./lib/auth";
+import { getProjectIdsForUser, getValidAuthUserId, verifyUser } from "./lib/auth";
 import { membershipChanged, userProtectionError } from "./lib/adminGuards";
 import { publicUserValidator, toPublicUser } from "./lib/publicUser";
 
@@ -212,7 +211,7 @@ export const initializeAdmin = mutation({
   args: { secret: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getValidAuthUserId(ctx);
     if (!userId) {
       throw new Error("Giriş yapmanız gerekiyor");
     }

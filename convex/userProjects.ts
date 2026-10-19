@@ -1,12 +1,12 @@
 import { v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
 import { query } from "./_generated/server";
 import { authedQuery, superAdminMutation } from "./lib/customFunctions";
+import { getValidAuthUserId } from "./lib/auth";
 
 export const getByCurrentUser = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getValidAuthUserId(ctx);
     if (!userId) return [];
     const rows = await ctx.db
       .query("userProjects")
@@ -29,7 +29,7 @@ export const getByCurrentUser = query({
 export const getProjectIdsForCurrentUser = query({
   args: {},
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
+    const userId = await getValidAuthUserId(ctx);
     if (!userId) return [];
     const user = await ctx.db.get(userId);
     if (!user) return [];
