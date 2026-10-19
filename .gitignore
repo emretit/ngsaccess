@@ -82,3 +82,7 @@ build/
 
 # Temp / local only
 tmp/
+
+# Oturum devir notlari (cihaz sifresi/token icerebilir) ve playwright-cli ciktisi
+.claude/handoff-*.md
+.playwright-cli/
