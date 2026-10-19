@@ -10,6 +10,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { optionalAuthQuery, authedMutation, adminQuery, superAdminQuery, superAdminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, verifyUser } from "./lib/auth";
 import { membershipChanged, userProtectionError } from "./lib/adminGuards";
+import { publicUserValidator, toPublicUser } from "./lib/publicUser";
 
 /** Kurulum sayfası için: Sistemde super_admin var mı? (Public - auth gerekmez) */
 export const hasSuperAdmin = query({
@@ -26,9 +27,10 @@ export const hasSuperAdmin = query({
 
 export const currentUser = optionalAuthQuery({
   args: {},
+  returns: v.union(publicUserValidator, v.null()),
   handler: async (ctx) => {
     if (!ctx.user) return null;
-    return ctx.user;
+    return toPublicUser(ctx.user);
   },
 });
 
@@ -45,8 +47,19 @@ export const listProjectIdsForCurrentUser = internalQuery({
 
 export const getProfile = adminQuery({
   args: { userId: v.id("users") },
+  returns: v.union(publicUserValidator, v.null()),
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.userId);
+    const user = await ctx.db.get(args.userId);
+    if (!user) return null;
+    if (ctx.user.role !== "super_admin") {
+      const projectIds = await getProjectIdsForUser(ctx);
+      if (projectIds.length === 0) return null;
+      const memberships = await ctx.db.query("userProjects")
+        .withIndex("by_user", (q) => q.eq("userId", user._id))
+        .collect();
+      if (!memberships.some((membership) => projectIds.includes(membership.projectId))) return null;
+    }
+    return toPublicUser(user);
   },
 });
 
@@ -144,9 +157,10 @@ export const updateProfile = authedMutation({
 
 export const list = adminQuery({
   args: {},
+  returns: v.array(publicUserValidator),
   handler: async (ctx) => {
     if (ctx.user.role === "super_admin") {
-      return await ctx.db.query("users").collect();
+      return (await ctx.db.query("users").collect()).map(toPublicUser);
     }
     const projectIds = await getProjectIdsForUser(ctx);
     if (projectIds.length === 0) return [];
@@ -160,7 +174,7 @@ export const list = adminQuery({
     );
     const uniqueIds = [...new Set(rows.flat().map((r) => r.userId))];
     const users = await Promise.all(uniqueIds.map((id) => ctx.db.get(id)));
-    return users.filter((u): u is NonNullable<typeof u> => u !== null);
+    return users.filter((u): u is NonNullable<typeof u> => u !== null).map(toPublicUser);
   },
 });
 
