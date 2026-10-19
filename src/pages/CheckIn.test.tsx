@@ -23,8 +23,22 @@ describe('CheckIn presentation', () => {
     expect(checkInPresentation({ success: true, locationRecorded: false })).toMatchObject({
       usedLocation: false,
     });
-    expect(checkInPresentation({ success: true })).toMatchObject({ usedLocation: false });
+    expect(checkInPresentation({ success: true })).toMatchObject({ usedLocation: undefined });
   });
+  it.each(['invalid_token', 'expired_token'])(
+    'uses %s even when backend wording changes',
+    (code) => {
+      expect(checkInPresentation({ success: false, code, error: 'Yeni hata metni' }))
+        .toEqual({ status: 'error', failure: 'invalid' });
+    },
+  );
+  it.each(['employee_not_found', 'future_code', ''])(
+    'keeps %s rejected even if legacy text suggests an invalid token',
+    (code) => {
+      expect(checkInPresentation({ success: false, code, error: 'Kodun süresi doldu' }))
+        .toEqual({ status: 'error', failure: 'rejected' });
+    },
+  );
   it.each(['Geçersiz veya süresi dolmuş kod', 'Kodun süresi doldu'])(
     'maps %s to invalid presentation without exposing backend text',
     (error) => {

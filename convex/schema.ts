@@ -128,6 +128,8 @@ export default defineSchema({
     token: v.string(),
     expiresAt: v.string(),
     usedAt: v.optional(v.string()),
+    employeeName: v.optional(v.string()),
+    locationRecorded: v.optional(v.boolean()),
     createdAt: v.string(),
   })
     .index("by_token", ["token"])

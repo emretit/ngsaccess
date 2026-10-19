@@ -3,6 +3,21 @@
 
 <head>
   <meta charset="UTF-8" />
+  <!-- Pre-CSS visual hint; mirrored and verified by themeBootstrap.test.ts. -->
+  <script id="theme-bootstrap">
+    (() => {
+      try {
+        const prefixes = ['/home', '/employees', '/devices', '/virtual-readers', '/access-control', '/visitors', '/live-monitoring', '/pdks-records', '/shifts', '/leaves', '/reports', '/audit-log', '/engineering-department', '/system-admin', '/settings', '/profile'];
+        const path = location.pathname;
+        if (!prefixes.some(prefix => path === prefix || path.startsWith(prefix + '/'))) return;
+        const scope = JSON.parse(localStorage.getItem('ngs.theme.activeScope.v1') || 'null');
+        const cache = JSON.parse(localStorage.getItem('ngs.theme.v1') || 'null');
+        const valid = value => value && value.v === 1 && typeof value.userId === 'string' && value.userId.length > 0 && typeof value.projectId === 'string' && value.projectId.length > 0;
+        const now = Date.now();
+        if (valid(scope) && valid(cache) && scope.userId === cache.userId && scope.projectId === cache.projectId && localStorage.getItem('ngs.activeProjectId') === scope.projectId && cache.dark === true && Number.isFinite(cache.at) && cache.at <= now && now - cache.at <= 604800000) document.documentElement.classList.add('dark');
+      } catch { /* Disabled storage or invalid JSON: keep the light default. */ }
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Personel ve geçiş yönetimi · NGS Plus</title>
   <meta name="description" content="Personel girişlerini, kapı yetkilerini ve çalışma planlarını NGS Plus ile aynı yerde takip edin." />

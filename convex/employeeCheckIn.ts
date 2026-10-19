@@ -45,33 +45,36 @@ export const checkInWithToken = mutation({
 
     const state = checkInTokenState(record, Date.now());
     if (!record || state === "invalid") {
-      return { success: false, error: "Geçersiz veya süresi dolmuş kod" };
+      return { success: false, code: "invalid_token", error: "Geçersiz veya süresi dolmuş kod" };
     }
     if (state === "expired") {
-      return { success: false, error: "Kodun süresi doldu" };
-    }
-
-    const employee = await ctx.db.get(record.employeeId);
-    if (!employee) {
-      return { success: false, error: "Çalışan bulunamadı" };
+      return { success: false, code: "expired_token", error: "Kodun süresi doldu" };
     }
 
     if (state === "completed") {
       return {
         success: true,
-        employeeName: `${employee.firstName} ${employee.lastName}`,
+        employeeName: record.employeeName,
         accessTime: record.usedAt,
+        locationRecorded: record.locationRecorded,
       };
     }
 
+    const employee = await ctx.db.get(record.employeeId);
+    if (!employee) {
+      return { success: false, code: "employee_not_found", error: "Çalışan bulunamadı" };
+    }
+
     const now = new Date().toISOString();
-    await ctx.db.patch(record._id, { usedAt: now });
+    const employeeName = `${employee.firstName} ${employee.lastName}`;
+    const locationRecorded = args.latitude != null && args.longitude != null;
+    await ctx.db.patch(record._id, { usedAt: now, employeeName, locationRecorded });
 
     await ctx.db.insert("cardReadings", {
       projectId: employee.projectId,
       employeeId: record.employeeId,
       cardNo: employee.cardNumber,
-      employeeName: `${employee.firstName} ${employee.lastName}`,
+      employeeName,
       accessTime: now,
       accessStatus: "izin_verildi",
       rawData: args.latitude != null ? `qr_checkin:lat=${args.latitude},lng=${args.longitude}` : "qr_checkin",
@@ -81,9 +84,9 @@ export const checkInWithToken = mutation({
 
     return {
       success: true,
-      employeeName: `${employee.firstName} ${employee.lastName}`,
+      employeeName,
       accessTime: now,
-      locationRecorded: args.latitude != null && args.longitude != null,
+      locationRecorded,
     };
   },
 });

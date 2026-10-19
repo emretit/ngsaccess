@@ -1,3 +1,4 @@
+import { ThemeSessionSync } from './hooks/useDarkMode';
 import { createRoot } from 'react-dom/client';
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import App from './App.tsx';
@@ -10,6 +11,7 @@ installPopstateInterceptor();
 
 createRoot(document.getElementById("root")!).render(
   <ConvexAuthProvider client={convex}>
+    <ThemeSessionSync />
     <App />
   </ConvexAuthProvider>
 );

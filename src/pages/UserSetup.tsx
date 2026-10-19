@@ -10,8 +10,27 @@ import { Label } from '@/components/ui/label';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { useAuthActions } from '@convex-dev/auth/react';
-import { useMutation, useQuery } from 'convex/react';
+import { useConvexAuth, useMutation, useQuery } from 'convex/react';
+import { ConvexError } from 'convex/values';
 import { api } from '../../convex/_generated/api';
+
+export function inviteSetupError(error: unknown): string {
+  const data: unknown = error instanceof ConvexError ? error.data : null;
+  const code = data && typeof data === 'object' && 'code' in data ? data.code : null;
+  switch (code) {
+    case 'INVITE_AUTH_REQUIRED':
+    case 'INVITE_AUTH_TIMEOUT':
+      return 'Oturumunuz hazırlanamadı. Mevcut hesap seçeneğiyle yeniden giriş yapıp daveti kabul edin.';
+    case 'INVITE_EMAIL_MISMATCH':
+      return 'Oturum açtığınız hesabın e-posta adresi davetle eşleşmiyor. Davet edilen hesabınızla giriş yapın.';
+    case 'INVITE_WRONG_TYPE':
+      return 'Bu bağlantı hesap daveti değil. Yöneticinizden yeni bir davet bağlantısı isteyin.';
+    case 'INVITE_INVALID':
+      return 'Davet kullanılmış veya süresi dolmuş olabilir. Yöneticinizden yeni bir davet bağlantısı isteyin.';
+    default:
+      return 'Davet kabul edilemedi. Bilgilerinizi kontrol edin. Hesabınız oluştuysa mevcut hesap seçeneğiyle devam edin; sorun sürerse yöneticinizden yeni davet isteyin.';
+  }
+}
 
 export default function UserSetup() {
   usePageTitle('Daveti kabul et');
@@ -20,6 +39,7 @@ export default function UserSetup() {
   const { runSetup, user } = useAuth();
   const token = searchParams.get('token');
   const { signIn } = useAuthActions();
+  const { isAuthenticated } = useConvexAuth();
   const consumeInvite = useMutation(api.invites.consume);
 
   // Token ile davet bilgisini al (email pre-fill)
@@ -36,6 +56,28 @@ export default function UserSetup() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [existingAccount, setExistingAccount] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [authWaiter, setAuthWaiter] = useState<{
+    resolve: () => void;
+    reject: (error: unknown) => void;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!authWaiter) return;
+    // signIn dönüşü transport'un hazır olduğunu garanti etmez. Profil eşleşmesi
+    // önceki başka bir hesabın hazır oturumunu da yanlışlıkla kullanmayı önler.
+    if (isAuthenticated && user?.email?.toLowerCase() === email.toLowerCase()) {
+      authWaiter.resolve();
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      authWaiter.reject(new ConvexError({ code: 'INVITE_AUTH_TIMEOUT' }));
+    }, 15_000);
+    return () => window.clearTimeout(timer);
+  }, [authWaiter, isAuthenticated, user?.email, email]);
+
+  useEffect(() => () => {
+    authWaiter?.reject(new ConvexError({ code: 'INVITE_AUTH_TIMEOUT' }));
+  }, [authWaiter]);
 
   // Davet emailini otomatik doldur
   useEffect(() => {
@@ -64,12 +106,15 @@ export default function UserSetup() {
     try {
       await runSetup(async () => {
         await signIn('password', { email, password, flow: existingAccount ? 'signIn' : 'signUp' });
+        try {
+          await new Promise<void>((resolve, reject) => setAuthWaiter({ resolve, reject }));
+        } finally {
+          setAuthWaiter(null);
+        }
         await consumeInvite({ token, email });
       });
-    } catch {
-      fail(
-        'Davet kabul edilemedi. Bilgilerinizi kontrol edin. Hesabınız oluştuysa mevcut hesap seçeneğiyle devam edin; sorun sürerse yöneticinizden yeni davet isteyin.',
-      );
+    } catch (error: unknown) {
+      fail(inviteSetupError(error));
     }
     setCompleted(true);
   });

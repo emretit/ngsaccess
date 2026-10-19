@@ -8,7 +8,7 @@ export function PublicFooter() {
       <div className="pub-footer-main">
         <div>
           <Link to="/" aria-label="NGS Plus ana sayfa">
-            <Logo variant="compact" tone="dark" size="md" />
+            <Logo tone="dark" size="md" />
           </Link>
           <p>{copy.footerDescription}</p>
         </div>

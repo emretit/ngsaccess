@@ -63,7 +63,6 @@ export default function Register() {
     if (signUpError) {
       const message = 'Hesap oluşturulamadı. Bilgilerinizi kontrol edin; mevcut hesabınız varsa giriş yapın.';
       setError(message);
-      document.getElementById('email')?.focus();
       throw new Error(message);
     }
     // Hesap ve mail talebi ayrı sonuçlardır; kurtarma giriş ekranında sürer.
@@ -77,10 +76,11 @@ export default function Register() {
   });
   const submitting = registration.pending;
   useEffect(() => {
-    if (error && !submitting) document.getElementById('email')?.focus();
+    if (error && !submitting) document.getElementById('form-error')?.focus();
   }, [error, submitting]);
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    setError(null);
     const result = registrationSchema.safeParse({ firstName, lastName, companyName, email, password });
     if (!result.success) {
       setFieldErrors(fieldMessages(result.error));
@@ -117,8 +117,6 @@ export default function Register() {
                 autoComplete="given-name"
                 value={firstName}
                 onChange={(event) => setFirstName(event.target.value)}
-                aria-describedby={error ? 'form-error' : undefined}
-                aria-invalid={Boolean(error || fieldErrors.firstName)}
               />
             </FormFieldWrapper>
             <FormFieldWrapper htmlFor="lastName" label="Soyad" error={fieldErrors.lastName}>
@@ -126,8 +124,6 @@ export default function Register() {
                 autoComplete="family-name"
                 value={lastName}
                 onChange={(event) => setLastName(event.target.value)}
-                aria-describedby={error ? 'form-error' : undefined}
-                aria-invalid={Boolean(error || fieldErrors.lastName)}
               />
             </FormFieldWrapper>
           </div>
@@ -136,8 +132,6 @@ export default function Register() {
               autoComplete="organization"
               value={companyName}
               onChange={(event) => setCompanyName(event.target.value)}
-              aria-describedby={error ? 'form-error' : undefined}
-              aria-invalid={Boolean(error || fieldErrors.companyName)}
             />
           </FormFieldWrapper>
           <FormFieldWrapper htmlFor="email" label="E-posta" error={fieldErrors.email}>
@@ -146,8 +140,6 @@ export default function Register() {
               autoComplete="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              aria-describedby={error ? 'form-error' : undefined}
-              aria-invalid={Boolean(error || fieldErrors.email)}
             />
           </FormFieldWrapper>
           <FormFieldWrapper
@@ -160,8 +152,6 @@ export default function Register() {
               autoComplete="new-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              aria-describedby={error ? 'form-error' : undefined}
-              aria-invalid={Boolean(error || fieldErrors.password)}
             />
           </FormFieldWrapper>
         </fieldset>
@@ -169,6 +159,7 @@ export default function Register() {
           <p
             id="form-error"
             role="alert"
+            tabIndex={-1}
             className="rounded-md border border-line bg-danger-bg p-4 text-sm text-danger"
           >
             {error}

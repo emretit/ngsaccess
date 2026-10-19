@@ -1,6 +1,5 @@
 interface LogoProps {
   size?: 'md';
-  variant?: 'compact';
   tone?: 'light' | 'dark';
   className?: string;
 }

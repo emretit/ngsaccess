@@ -80,7 +80,6 @@ export function StatusScreen({
             className="mb-8 inline-flex min-h-11 items-center sm:mb-10"
           >
             <Logo
-              variant="compact"
               tone="dark"
               size="md"
               className="[&_img]:h-[30px] [&_img]:w-[30px] [&_span]:text-[19px]"

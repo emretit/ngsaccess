@@ -9,6 +9,7 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 type CheckInResult = {
   success: boolean;
   error?: string;
+  code?: string;
   locationRecorded?: boolean;
   employeeName?: string;
   accessTime?: string | number;
@@ -18,14 +19,16 @@ export function checkInPresentation(result: CheckInResult) {
   if (result.success) {
     return {
       status: 'success' as const,
-      usedLocation: result.locationRecorded === true,
+      usedLocation: result.locationRecorded,
       record: { name: result.employeeName ?? '', accessTime: result.accessTime },
     };
   }
   const tokenErrors = ['Geçersiz veya süresi dolmuş kod', 'Kodun süresi doldu'];
   return {
     status: 'error' as const,
-    failure: tokenErrors.includes(result.error ?? '') ? ('invalid' as const) : ('rejected' as const),
+    failure: (result.code !== undefined
+      ? result.code === 'invalid_token' || result.code === 'expired_token'
+      : tokenErrors.includes(result.error ?? '')) ? ('invalid' as const) : ('rejected' as const),
   };
 }
 
@@ -40,7 +43,7 @@ export default function CheckIn() {
   const [failure, setFailure] = useState<'invalid' | 'rejected' | 'unknown'>('invalid');
   const [record, setRecord] = useState<{ name: string; accessTime?: string | number } | null>(null);
   const [locationNotice, setLocationNotice] = useState('');
-  const [usedLocation, setUsedLocation] = useState(false);
+  const [usedLocation, setUsedLocation] = useState<boolean | undefined>(undefined);
 
   useEffect(() => {
     if (!token) {
@@ -52,7 +55,7 @@ export default function CheckIn() {
 
     if (running.current === token) return;
     running.current = token;
-    setUsedLocation(false);
+    setUsedLocation(undefined);
     setPhase('Konum bilgisi bekleniyor…');
     setLocationNotice('');
     setStatus('loading');
@@ -165,7 +168,9 @@ export default function CheckIn() {
           )}
         </dl>
         <p className="text-xs text-muted-foreground">
-          {usedLocation ? 'Konum bilgisi kayda eklendi.' : 'Konum bilgisi eklenemedi.'}
+          {usedLocation === undefined
+            ? 'Bu kayıt için konum bilgisi bilinmiyor.'
+            : usedLocation ? 'Konum bilgisi kayda eklendi.' : 'Konum bilgisi eklenemedi.'}
         </p>
       </StatusScreen>
     );

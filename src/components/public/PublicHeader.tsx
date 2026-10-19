@@ -32,7 +32,7 @@ export function PublicHeader({ tone = 'light' }: PublicHeaderProps) {
       </a>
       <header className="pub-site-header pub-wrap">
         <Link to="/" aria-label="NGS Plus ana sayfa">
-          <Logo variant="compact" tone={burgundy ? 'light' : 'dark'} size="md" />
+          <Logo tone={burgundy ? 'light' : 'dark'} size="md" />
         </Link>
         <nav className="pub-site-nav" aria-label="Ana menü">
           {copy.nav.map((link) => (

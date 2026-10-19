@@ -29,7 +29,7 @@ export function AuthShell({ title, description, children, footer }: AuthShellPro
         <section className="flex min-w-0 flex-col px-[var(--public-gutter)] py-5 sm:px-8 sm:py-6 lg:px-12 lg:py-8">
           <header className="flex items-center justify-between gap-4">
             <Link to="/" aria-label="NGS Plus ana sayfa" className="inline-flex min-h-11 items-center">
-              <Logo variant="compact" tone="dark" size="md" />
+              <Logo tone="dark" size="md" />
             </Link>
             <Link to="/" className="inline-flex min-h-11 items-center text-[13px]">
               Ana sayfa
