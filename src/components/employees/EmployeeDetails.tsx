@@ -104,6 +104,16 @@ export default function EmployeeDetails({
       >
         <EmployeeSyncSection employeeId={employee._id} />
       </EmployeeActivityBoundary>
+      {/* key: çalışan değişince açık rıza/iptal formu önceki çalışanda kalmasın. */}
+      <EmployeeActivityBoundary
+        key={employee._id}
+        employeeId={employee._id}
+        projectId={projectId}
+        title="KVKK Rızalar"
+        description="Rıza kayıtları yüklenemedi."
+      >
+        <EmployeeConsentsCard employeeId={employee._id} />
+      </EmployeeActivityBoundary>
       <EmployeeActivityBoundary
         employeeId={employee._id}
         projectId={projectId}
@@ -127,16 +137,6 @@ export default function EmployeeDetails({
           Fotoğraf personel profilinde kullanılır.
         </p>
       </section>
-      {/* key: çalışan değişince açık rıza/iptal formu önceki çalışanda kalmasın. */}
-      <EmployeeActivityBoundary
-        key={employee._id}
-        employeeId={employee._id}
-        projectId={projectId}
-        title="KVKK Rızalar"
-        description="Rıza kayıtları yüklenemedi."
-      >
-        <EmployeeConsentsCard employeeId={employee._id} />
-      </EmployeeActivityBoundary>
     </div>
   );
 }

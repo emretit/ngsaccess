@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePaginatedQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { Button } from '@/components/ui/button';
 import { QuerySectionBoundary } from '@/components/shared/QuerySectionBoundary';
-import { EmptyState } from '@/components/shared/EmptyState';
 import { SectionSkeleton } from '@/components/shared/SectionSkeleton';
-import { AuditTable } from './AuditTable';
+import { AuditResultsContent } from './AuditResultsContent';
 import { AuditDetailPanel } from './AuditDetailPanel';
 import type { AuditArgs, AuditRow } from './auditState';
 
@@ -33,7 +31,7 @@ function AuditQuery({ args, onSnapshot, onActive, hasRows }: { args: AuditArgs; 
   return status === 'LoadingFirstPage' && !hasRows ? <SectionSkeleton label="Denetim kayıtları yükleniyor…" rows={5} /> : null;
 }
 
-export function AuditResults({ args, onClear }: { args: AuditArgs; onClear: () => void }) {
+export function AuditResults({ args }: { args: AuditArgs }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const returnFocus = useRef<HTMLButtonElement | null>(null);
   const [selected, setSelected] = useState<AuditRow | null>(null);
@@ -47,12 +45,7 @@ export function AuditResults({ args, onClear }: { args: AuditArgs; onClear: () =
     <QuerySectionBoundary title={rows.length ? 'Diğer kayıtlar yüklenemedi' : 'Denetim kayıtları yüklenemedi'} description={rows.length ? 'Yüklenen kayıtlar aşağıda korunuyor.' : 'Filtreleriniz korunuyor. Yeniden deneyebilirsiniz.'}>
       <AuditQuery args={args} onSnapshot={receive} onActive={setActive} hasRows={rows.length > 0} />
     </QuerySectionBoundary>
-    {!firstLoading && <>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><p role="status" aria-live="polite">{rows.length} eşleşen kayıt yüklendi · {more ? 'Daha fazla kayıt olabilir' : 'Kapsamın sonuna ulaşıldı'}</p><span>{args.search ? 'Uygunluk sırası' : 'En yeni önce'}</span></div>
-      {rows.length ? <AuditTable rows={rows} allProjects={args.allProjects} onSelect={(row, trigger) => { returnFocus.current = trigger; setSelected(row); }} /> : <EmptyState title={more ? 'Taranan kayıtlarda eşleşme yok' : filtered ? 'Filtrelere uygun kayıt yok' : 'Henüz denetim kaydı yok'} description={more ? 'Taranacak kayıtlar var; aramayı sürdürebilirsiniz.' : filtered ? 'Aramayı veya filtreleri değiştirin.' : 'Bu kapsamda kaydedilen olaylar burada görünür.'} />}
-      {!rows.length && !more && filtered && <Button variant="outline" onClick={onClear}>Filtreleri temizle</Button>}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3 text-xs text-muted-foreground"><p role="status" aria-live="polite">{active && snapshot?.status === 'LoadingMore' ? 'Diğer kayıtlar yükleniyor…' : more ? 'Daha fazla kayıt olabilir.' : 'Bu kapsamdaki tüm eşleşmeler yüklendi.'}</p>{more && <Button variant="outline" disabled={!active || snapshot?.status !== 'CanLoadMore'} onClick={() => snapshot?.loadMore()}>{active && snapshot?.status === 'LoadingMore' ? 'Diğer kayıtlar yükleniyor…' : 'Daha fazla yükle'}</Button>}</div>
-    </>}
+    {!firstLoading && <AuditResultsContent rows={rows} more={more} filtered={filtered} active={active} status={snapshot?.status} loadMore={() => snapshot?.loadMore()} args={args} onSelect={(row, trigger) => { returnFocus.current = trigger; setSelected(row); }} />}
     <AuditDetailPanel returnFocus={returnFocus} row={selected} onClose={() => setSelected(null)} />
   </div>;
 }

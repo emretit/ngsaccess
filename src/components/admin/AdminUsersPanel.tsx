@@ -111,7 +111,7 @@ function ExpiredInvites({
     </section>
   );
 }
-function AdminUsersContent() {
+export function AdminUsersContent() {
   const { profile } = useAuth();
   const superAdmin = profile?.role === "super_admin";
   const [filters, setFilters] = useState<Filters>({});
@@ -120,27 +120,16 @@ function AdminUsersContent() {
   const paging = useAdminPagination(JSON.stringify(queryFilters));
   const result = useQuery(
     api.users.adminList,
-    superAdmin
-      ? {
-          ...queryFilters,
-          paginationOpts: { numItems: paging.size, cursor: paging.cursor },
-        }
-      : "skip",
+    {
+      ...queryFilters,
+      paginationOpts: { numItems: paging.size, cursor: paging.cursor },
+    },
   );
-  const scoped = useQuery(api.users.list, !superAdmin ? {} : "skip");
   const management = useUserManagement();
   const [open, setOpen] = useState(false);
   const [deleteUser, setDeleteUser] = useState<User | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const users = superAdmin
-    ? result?.page
-    : scoped?.filter(
-        (user) =>
-          `${user.fullName ?? ""} ${user.email ?? ""}`
-            .toLocaleLowerCase("tr-TR")
-            .includes((filters.search ?? "").toLocaleLowerCase("tr-TR")) &&
-          (!filters.role || user.role === filters.role),
-      );
+  const users = result?.page;
   const create = () => {
     management.resetForm();
     setOpen(true);
@@ -179,7 +168,7 @@ function AdminUsersContent() {
           value={filters.role ?? "all"}
           onChange={(value) =>
             setFilters({
-              ...queryFilters,
+              ...filters,
               role: value === "all" ? undefined : (value as Filters["role"]),
             })
           }
@@ -199,7 +188,7 @@ function AdminUsersContent() {
             value={filters.project ?? "all"}
             onChange={(value) =>
               setFilters({
-                ...queryFilters,
+                ...filters,
                 project:
                   value === "all" ? undefined : (value as Filters["project"]),
               })
@@ -254,8 +243,7 @@ function AdminUsersContent() {
           }}
         />
       )}
-      {superAdmin && (
-        <AdminPagination
+      <AdminPagination
           page={paging.page}
           count={users?.length ?? 0}
           done={result?.isDone ?? false}
@@ -268,7 +256,6 @@ function AdminUsersContent() {
           sizes={[10, 25, 50]}
           onSizeChange={paging.setSize}
         />
-      )}
       {open && (
         <UserFormDialog
           isOpen

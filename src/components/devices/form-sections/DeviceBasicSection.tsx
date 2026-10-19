@@ -32,7 +32,7 @@ export function DeviceTypeField({ form }: DeviceBasicSectionProps) {
           : DEVICE_TYPES;
         return (
         <FormItem>
-          <FormLabel>Cihaz Tipi</FormLabel>
+          <FormLabel>Cihaz tipi</FormLabel>
           <Select onValueChange={field.onChange} value={field.value}>
             <FormControl>
               <SelectTrigger>
@@ -67,7 +67,7 @@ export function DeviceBasicSection({ form, isEdit }: DeviceBasicSectionProps) {
         name="name"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Cihaz Adı</FormLabel>
+            <FormLabel>Cihaz adı</FormLabel>
             <FormControl>
               <Input placeholder="Cihaz adını giriniz" {...field} />
             </FormControl>
@@ -83,7 +83,7 @@ export function DeviceBasicSection({ form, isEdit }: DeviceBasicSectionProps) {
         name="device_serial"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Seri Numarası</FormLabel>
+            <FormLabel>Seri numarası</FormLabel>
             <FormControl>
               <Input placeholder="Seri numarasını giriniz" {...field} />
             </FormControl>

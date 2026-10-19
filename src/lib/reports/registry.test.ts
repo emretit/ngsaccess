@@ -29,7 +29,7 @@ describe('report registry', () => {
       if (report.slug === 'aylik-calisma-suresi') {
         const row = buildMonthlyStatusRows(sheet)[0];
         expect(day?.value(row)).toBe('8:55');
-        expect(columns.find(column => column.key === 'day:20')?.value(row)).toBe('');
+        expect(columns.find(column => column.key === 'day:20')?.value(row)).toBe('—');
       }
       if (!report.monthlyDays) expect(columns.some(column => column.key.startsWith('day:'))).toBe(false);
     }

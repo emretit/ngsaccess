@@ -18,13 +18,13 @@ export function ShiftAgendaView({
     >
       {employees.map((employee) => (
         <div key={employee._id} className="py-3 min-w-0">
-          <label className="flex items-center gap-2 font-medium break-words">
+          <label className="flex min-h-11 items-center gap-2 font-medium break-words">
             <input
-              type="checkbox"
+              type="checkbox" className="size-6 shrink-0 accent-primary"
               checked={selected.has(employee._id)}
               onChange={() => onSelect(employee._id)}
               aria-label={`${employee.firstName} ${employee.lastName} seç`}
-              className="size-4 accent-primary"
+
             />
             {employee.firstName} {employee.lastName}
           </label>

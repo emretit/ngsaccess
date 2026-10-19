@@ -13,13 +13,14 @@ import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { notify } from "@/lib/notify";
-import { visitorPresenceLabels, visitorStatusInfo } from "./lib/status";
+import { displayVisitorStatus, visitorPresenceLabels, visitorStatusInfo } from "./lib/status";
 import { formatVisitorTime } from "./visitorTime";
+import { VisitorCollapsible } from "./VisitorCollapsible";
 import VisitorForm from "./VisitorForm";
 import { useStableQuery } from "./hooks/useStableQuery";
 
-export default function VisitorSlideOverPanel({ isOpen, onClose, visitor, onSave, refreshKey, canManage }: {
-  isOpen: boolean; onClose: () => void; visitor: Visitor | null; onSave: (payload?: unknown) => void; refreshKey: number; canManage: boolean;
+export default function VisitorSlideOverPanel({ isOpen, onClose, visitor, onSave, now, canManage }: {
+  isOpen: boolean; onClose: () => void; visitor: Visitor | null; onSave: (payload?: unknown) => void; now: number; canManage: boolean;
 }) {
   const [formState, setFormState] = useState({ dirty: false, pending: false });
   const guard = useUnsavedChangesGuard(formState.dirty);
@@ -30,7 +31,7 @@ export default function VisitorSlideOverPanel({ isOpen, onClose, visitor, onSave
       <SheetHeader className="shrink-0 border-b p-5 pr-14 text-left"><SheetTitle>{visitor ? `${visitor.firstName} ${visitor.lastName}` : "Ziyaretçi kaydet"}</SheetTitle><SheetDescription>Seçili projenin geçici erişim kaydı</SheetDescription></SheetHeader>
       <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
         <QuerySectionBoundary title={visitor ? "Ziyaret ayrıntısı yüklenemedi" : "Form bilgileri yüklenemedi"} resetKey={visitor?._id ?? "new"}>
-          {visitor ? <VisitorDetailContent visitor={visitor} refreshKey={refreshKey} canManage={canManage} onClose={close} onSaved={onClose} onFormState={onFormState} /> :
+          {visitor ? <VisitorDetailContent visitor={visitor} now={now} canManage={canManage} onClose={close} onSaved={onClose} onFormState={onFormState} /> :
             <VisitorForm onClose={close} onSave={onSave} onStateChange={onFormState} />}
         </QuerySectionBoundary>
       </div>
@@ -38,29 +39,29 @@ export default function VisitorSlideOverPanel({ isOpen, onClose, visitor, onSave
   </Sheet>{guard.dialog}</>;
 }
 
-function VisitorDetailContent({ visitor, refreshKey, canManage, onClose, onSaved, onFormState }: {
-  visitor: Visitor; refreshKey: number; canManage: boolean; onClose: () => void; onSaved: () => void; onFormState: (dirty: boolean, pending: boolean) => void;
+function VisitorDetailContent({ visitor, now, canManage, onClose, onSaved, onFormState }: {
+  visitor: Visitor; now: number; canManage: boolean; onClose: () => void; onSaved: () => void; onFormState: (dirty: boolean, pending: boolean) => void;
 }) {
-  const detail = useStableQuery(useQuery(api.visitors.getDetail, { visitorId: visitor._id, refreshKey }), visitor._id);
+  const detail = useStableQuery(useQuery(api.visitors.getDetail, { visitorId: visitor._id }), visitor._id);
   const [editing, setEditing] = useState(false);
   if (detail === undefined) return <SectionSkeleton className="p-5" rows={6} label="Ziyaret ayrıntısı yükleniyor" />;
   if (!detail) return <EmptyState title="Ziyaretçi bulunamadı" description="Kayıt silinmiş veya artık bu projede bulunmuyor olabilir." />;
   if (editing) return <VisitorForm visitor={detail} onClose={onClose} onSave={onSaved} onStateChange={onFormState} />;
-  return <VisitorDetailView detail={detail} canManage={canManage} onEdit={() => setEditing(true)} onDeleted={onSaved} />;
+  return <VisitorDetailView now={now} detail={detail} canManage={canManage} onEdit={() => setEditing(true)} onDeleted={onSaved} />;
 }
 
-function VisitorDetailView({ detail, canManage, onEdit, onDeleted }: { detail: VisitorDetail; canManage: boolean; onEdit: () => void; onDeleted: () => void }) {
+export function VisitorDetailView({ now, detail, canManage, onEdit, onDeleted }: { now: number; detail: VisitorDetail; canManage: boolean; onEdit: () => void; onDeleted: () => void }) {
   const [showCard, setShowCard] = useState(false);
   const [confirmation, setConfirmation] = useState<"checkout" | "release" | "delete" | null>(null);
   const checkOut = useMutation(api.visitors.checkOut);
   const releaseCard = useMutation(api.visitors.releaseCard);
   const remove = useMutation(api.employees.remove);
-  const status = visitorStatusInfo[detail.status];
+  const status = visitorStatusInfo[displayVisitorStatus(detail, now)];
   const name = `${detail.firstName} ${detail.lastName}`;
   const fields = [
     ["Geçerlilik bitişi (TR)", formatVisitorTime(detail.visitEnd)],
-    ["Erişim bölgesi", detail.presetRuleName ?? "Kaydedilmedi"],
-    ["Ziyaret edilen", detail.hostName ?? "Seçilmedi"],
+    ["Erişim bölgesi", detail.presetRuleName ?? "Belirtilmedi"],
+    ["Ziyaret edilen", detail.hostName ?? "Belirtilmedi"],
     ["Son okumaya göre konum", visitorPresenceLabels[detail.presence]],
     ["Son izinli okuma", formatVisitorTime(detail.lastSeenAt)],
   ];
@@ -71,9 +72,9 @@ function VisitorDetailView({ detail, canManage, onEdit, onDeleted }: { detail: V
         {!detail.cardReleased && <Button variant="ghost" size="sm" onClick={() => setShowCard(previous => !previous)}>{showCard ? "Gizle" : "Tam numarayı göster"}</Button>}</dd></div>
     </dl>
     <p className="text-xs text-muted-foreground">Son konum izinli okumaya dayanır. Sürenin dolması veya manuel sonlandırma fiziksel çıkış okuması oluşturmaz.</p>
-    <details className="space-y-3 border-t pt-3"><summary className="cursor-pointer font-medium">Şirket, iletişim ve ek bilgiler</summary><dl className="space-y-3">
-      {[["Şirket", detail.visitorCompany], ["Ziyaret amacı", detail.visitPurpose], ["Telefon", detail.visitorPhone], ["E-posta", detail.email], ["Notlar", detail.notes]].map(([label, value]) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="whitespace-pre-wrap break-words">{value || "Kaydedilmedi"}</dd></div>)}
-    </dl></details>
+    <VisitorCollapsible title="Şirket, iletişim ve ek bilgiler"><dl className="space-y-3">
+      {[["Şirket", detail.visitorCompany], ["Ziyaret amacı", detail.visitPurpose], ["Telefon", detail.visitorPhone], ["E-posta", detail.email?.toLowerCase().endsWith("@ngsaccess.local") ? null : detail.email], ["Notlar", detail.notes]].map(([label, value]) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="whitespace-pre-wrap break-words">{value || "Belirtilmedi"}</dd></div>)}
+    </dl></VisitorCollapsible>
     <div className="space-y-1 border-t pt-3"><h3 className="font-medium">KVKK rıza kaydı</h3><p>{detail.kvkkConsent ? `Kayıt tarihi: ${formatVisitorTime(detail.kvkkConsent.grantedAt)}` : "Rıza kaydı bulunmuyor."}</p>
       {detail.kvkkConsent && <><p className="text-xs text-muted-foreground">Sürüm: {detail.kvkkConsent.version ?? "Kaydedilmedi"}</p>{detail.kvkkConsent.documentUrl && /^https?:\/\//i.test(detail.kvkkConsent.documentUrl) && <a className="underline" href={detail.kvkkConsent.documentUrl} target="_blank" rel="noopener noreferrer">Kayıtlı belgeyi aç</a>}</>}
     </div>

@@ -15,6 +15,9 @@ vi.mock("./auth", async (importOriginal) => ({
   getProjectIdsForUser: vi.fn(async (ctx: { allowedProjectIds?: string[] }) => ctx.allowedProjectIds ?? ["project"]),
 }));
 
+// Exercise the handlers against an indexed in-memory transport; stream filtering happens before pagination.
+vi.mock("convex-helpers/server/stream", () => ({ stream: (db: QueryCtx["db"]) => ({ query: (table: "leaves") => db.query(table) }) }));
+
 const projectId = "project" as Id<"projects">;
 const employeeId = "employee" as Id<"employees">;
 const leaveId = "leave" as Id<"leaves">;
@@ -51,6 +54,8 @@ function fixture(leaves: Doc<"leaves">[] = []) {
         bounds.push(["gte", field, value]); selected = selected.filter(row => typeof row[field] === "string" && row[field] >= value); return index;
       },
     };
+    let predicate: (row: Row) => Promise<boolean> = async () => true;
+    const matching = async () => { const flags = await Promise.all(selected.map(predicate)); return selected.filter((_, i) => flags[i]); };
     const chain = {
       withIndex: (name: string, apply: (q: typeof index) => unknown) => {
         indexes.push({ table, name, bounds });
@@ -63,13 +68,15 @@ function fixture(leaves: Doc<"leaves">[] = []) {
           || String(a._id).localeCompare(String(b._id))) * (direction === "desc" ? -1 : 1));
         return chain;
       },
-      take: async (n: number) => selected.slice(0, n),
+      filterWith: (fn: typeof predicate) => { predicate = fn; return chain; },
+      first: async () => (await matching())[0] ?? null,
+      take: async (n: number) => (await matching()).slice(0, n),
       collect: async () => selected,
       paginate: async (opts: { numItems: number; cursor: string | null; maximumRowsRead: number }) => {
-        expect(opts.maximumRowsRead).toBeLessThanOrEqual(200);
+        const matched = await matching();
         const offset = Number(opts.cursor ?? 0);
-        const count = Math.min(opts.numItems, opts.maximumRowsRead);
-        return { page: selected.slice(offset, offset + count), isDone: offset + count >= selected.length, continueCursor: String(offset + count) };
+        const count = opts.numItems;
+        return { page: matched.slice(offset, offset + count), isDone: offset + count >= matched.length, continueCursor: String(offset + count) };
       },
     };
     return chain;
@@ -234,7 +241,7 @@ describe("bounded leave queries", () => {
     const page = await invoke<FunctionReturnType<typeof api.leaves.listPage>>(listPage, f.ctx, { ...filters, paginationOpts });
     expect(page.page.map(row => row._id)).toEqual(["crossing", leaveId]);
     expect(page.page[1].calendarDays).toBeGreaterThan(366);
-    expect(await invoke(summary, f.ctx, filters)).toMatchObject({ recordCount: 2, employeeCount: 1, truncated: false });
+    expect(await invoke(summary, f.ctx, { ...filters, paginationOpts })).toMatchObject({ page: [{ recordCount: 2, employeeIds: [employeeId, employeeId] }], isDone: true });
     expect(await invoke(listForRange, f.ctx, { projectId, startDate: filters.rangeStart, endDate: filters.rangeEnd })).toEqual([long, f.tables.leaves[1]]);
     expect(f.indexes.some(index => index.name === "by_project_end")).toBe(true);
   });
@@ -254,7 +261,7 @@ describe("bounded leave queries", () => {
     expect(page.page[0]).toMatchObject({ employeeName: "Personel bulunamadı", employeeMissing: true, calendarDays: null });
     expect(page.page[0].departmentName).toBeUndefined();
   });
-  it("applies all filters, scopes projects and retains a cursor across empty candidate pages", async () => {
+  it("applies all filters, scopes projects and retains a cursor without empty candidate pages", async () => {
     const f = fixture([
       savedLeave({ _id: "first" as Id<"leaves">, startDate: "2026-10-05", endDate: "2026-10-05", leaveType: "sick" }),
       savedLeave(),
@@ -262,11 +269,12 @@ describe("bounded leave queries", () => {
     ]);
     const args = { ...filters, employeeId, leaveType: "annual", status: "approved", paginationOpts: { numItems: 1, cursor: null } };
     const first = await invoke<FunctionReturnType<typeof api.leaves.listPage>>(listPage, f.ctx, args);
-    expect(first).toMatchObject({ page: [], isDone: false, scannedCount: 1, filterScope: "candidatePage" });
+    expect(first.page.map(row => row._id)).toEqual([leaveId]);
+    expect(first.isDone).toBe(true);
     const next = await invoke<FunctionReturnType<typeof api.leaves.listPage>>(listPage, f.ctx, { ...args, paginationOpts: { numItems: 1, cursor: first.continueCursor } });
-    expect(next.page.map(row => row._id)).toEqual([leaveId]);
+    expect(next.page).toEqual([]);
     expect(next.isDone).toBe(true);
-    expect(await invoke(summary, f.ctx, args)).toMatchObject({ recordCount: 1, employeeCount: 1, truncated: false });
+    expect(await invoke(summary, f.ctx, args)).toMatchObject({ page: [{ recordCount: 1, employeeIds: [employeeId] }], isDone: true });
     for (const override of [{ employeeId: "missing" }, { status: "rejected" }]) {
       const filtered = await invoke<FunctionReturnType<typeof api.leaves.listPage>>(listPage, f.ctx, { ...args, ...override, paginationOpts });
       expect(filtered.page).toEqual([]);
@@ -278,9 +286,18 @@ describe("bounded leave queries", () => {
     const next = await invoke<FunctionReturnType<typeof api.leaves.listPage>>(listPage, f.ctx, { ...filters, paginationOpts: { numItems: 1, cursor: first.continueCursor } });
     expect([...first.page, ...next.page].map(row => row._id)).toEqual(["second", leaveId]);
   });
-  it("marks capped summaries partial and rejects incomplete calendar arrays", async () => {
+  it("counts beyond 5000 without truncation and rejects incomplete calendar arrays", async () => {
     const f = fixture(Array.from({ length: 5001 }, (_, n) => savedLeave({ _id: `leave-${n}` as Id<"leaves"> })));
-    expect(await invoke(summary, f.ctx, filters)).toEqual({ recordCount: 5000, employeeCount: 1, truncated: true, scannedCount: 5001 });
+    let cursor: string | null = null;
+    let count = 0;
+    let done = false;
+    while (!done) {
+      const result: FunctionReturnType<typeof api.leaves.summary> = await invoke(summary, f.ctx, { ...filters, paginationOpts: { numItems: 500, cursor } });
+      count += result.page[0].recordCount;
+      cursor = result.continueCursor;
+      done = result.isDone;
+    }
+    expect(count).toBe(5001);
     await expect(invoke(listForRange, f.ctx, { projectId, startDate: filters.rangeStart, endDate: filters.rangeEnd })).rejects.toMatchObject(errorData("LEAVE_SCAN_LIMIT"));
   });
   it("applies the calendar candidate limit independently to each allowed project", async () => {
@@ -317,7 +334,7 @@ describe("bounded leave queries", () => {
   it("provides capped active-person options with Turkish name/department search", async () => {
     const f = fixture();
     f.tables.employees.push({ ...f.tables.employees[0], _id: "inactive", isActive: false }, { ...f.tables.employees[0], _id: "visitor", isVisitor: true });
-    expect(await invoke(employeeOptions, f.ctx, { projectId, search: "ÜRETİM" })).toEqual({ options: [{ _id: employeeId, employeeName: "Ada Test", departmentName: "Üretim" }], truncated: false });
+    expect(await invoke(employeeOptions, f.ctx, { projectId, search: "ÜRETİM" })).toEqual({ selected: null, options: [{ _id: employeeId, employeeName: "Ada Test", departmentName: "Üretim" }], truncated: false });
     f.tables.employees = Array.from({ length: 1001 }, (_, n) => ({ ...f.tables.employees[0], _id: `employee-${n}` }));
     const options = await invoke<FunctionReturnType<typeof api.leaves.employeeOptions>>(employeeOptions, f.ctx, { projectId });
     expect(options.options).toHaveLength(50); expect(options.truncated).toBe(true);

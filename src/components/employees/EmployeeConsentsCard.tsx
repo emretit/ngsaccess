@@ -1,8 +1,7 @@
 import { BIOMETRIC_NOTICE_TEMPLATE } from "@/lib/consentNotice";
 import { useId, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { format } from "date-fns";
-import { tr } from "date-fns/locale";
+import { formatTrDateTime } from "@/lib/date";
 import { ShieldCheck, ShieldX, ScanFace, Fingerprint, CreditCard, Camera } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
@@ -162,7 +161,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                 </div>
                 {active && (
                   <div className="text-[11px] text-muted-foreground mt-1">
-                    Alındı: {format(new Date(active.grantedAt), "dd MMM yyyy HH:mm", { locale: tr })}
+                    Alındı: {formatTrDateTime(new Date(active.grantedAt))}
                     {active.notes && <span> · {active.notes}</span>}
                   </div>
                 )}

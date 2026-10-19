@@ -22,7 +22,7 @@ export function formatDuration(minutes: number, compact = false): string {
   return compact ? `${h}:${m}` : `${h} sa ${m} dk`;
 }
 export function displayDuration(minutes: number, status: PdksCell["status"]): string {
-  return status === "future" || status === "noData" ? "—" : formatDuration(minutes);
+  return minutes === 0 && status !== "present" && status !== "late" || status === "future" || status === "noData" || status === "notEmployed" ? "—" : formatDuration(minutes);
 }
 export function timeMinutes(value: string | null): number | null {
   if (!value || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return null;
@@ -63,7 +63,7 @@ export function readableDate(date: string): string {
 export function cellLabel(name: string, date: string, cell?: PdksCell): string {
   const status = cell?.status ?? "noData";
   const duration =
-    status === "future" || status === "noData"
+    status === "future" || status === "noData" || status === "notEmployed"
       ? "Süre yok"
       : `${Math.floor((cell?.totalMinutes ?? 0) / 60)} saat ${(cell?.totalMinutes ?? 0) % 60} dakika`;
   return `${name}, ${readableDate(date)}, ${STATUS_META[status].label}, ${duration}`;
@@ -71,7 +71,7 @@ export function cellLabel(name: string, date: string, cell?: PdksCell): string {
 export function periodTotals(days: readonly PdksCell[]) {
   return days.reduce(
     (sum, day) =>
-      day.status === "future" || day.status === "noData"
+      day.status === "future" || day.status === "noData" || day.status === "notEmployed"
         ? sum
         : {
             totalMinutes: sum.totalMinutes + day.totalMinutes,
@@ -84,6 +84,7 @@ export function validateManual(
   entry: string,
   exit: string,
   note: string,
+  isOvernightShift = false,
 ): Record<string, string> {
   const errors: Record<string, string> = {};
   if (entry && timeMinutes(entry) === null)
@@ -91,7 +92,7 @@ export function validateManual(
   if (exit && timeMinutes(exit) === null)
     errors.exit = "Geçerli bir saat girin (08:30).";
   if (!entry && !exit) errors.entry = "En az bir saat girin.";
-  if (entry && exit && !errors.entry && !errors.exit && entry >= exit)
+  if (entry && exit && !errors.entry && !errors.exit && entry >= exit && !isOvernightShift)
     errors.exit = "Çıkış saati girişten sonra olmalı.";
   if (note.trim().length < 3 || note.trim().length > 500)
     errors.note = "Gerekçe 3–500 karakter olmalı.";

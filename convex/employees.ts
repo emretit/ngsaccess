@@ -8,7 +8,7 @@ import { assertSameProject, validatePay, employeeDependentTables, assertEmployee
 import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { authedQuery, adminMutation } from "./lib/customFunctions";
+import { authedQuery, adminMutation, adminQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, QueryCtx } from "./_generated/server";
@@ -107,23 +107,11 @@ export const list = authedQuery({
   },
 });
 
-export const listLightForImport = authedQuery({
-  args: {},
-  handler: async (ctx) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const employees =
-      ctx.user.role === "super_admin"
-        ? await ctx.db.query("employees").collect()
-        : (
-            await Promise.all(
-              allowedProjectIds.map((pid) =>
-                ctx.db
-                  .query("employees")
-                  .withIndex("by_project", (q) => q.eq("projectId", pid))
-                  .collect(),
-              ),
-            )
-          ).flat();
+export const listLightForImport = adminQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    await resolveProjectScope(ctx, args.projectId);
+    const employees = await ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", args.projectId)).collect();
     return employees
       .filter((e) => e.isVisitor !== true)
       .map((e) => ({

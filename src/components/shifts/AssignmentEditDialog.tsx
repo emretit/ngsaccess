@@ -1,3 +1,6 @@
+import { WeekdaySelection } from "./WeekdaySelection";
+import { ShiftSelect } from "./ShiftSelect";
+import { shiftMessage, shortDate, shiftTimeLabel } from "./lib/planning";
 import { shiftError } from "./lib/shiftError";
 import { useRef, useState } from "react";
 import { useMutation } from "convex/react";
@@ -131,18 +134,18 @@ function EditForm({
           if (!next) close();
         }}
       >
-        <DialogContent className="sm:max-w-[520px] max-h-[90dvh] overflow-y-auto">
+        <DialogContent className="[&_button]:max-sm:min-h-11 [&_label:has(input[type=checkbox])]:min-h-11 [&_label:has(input[type=checkbox])]:items-center sm:max-w-[520px] max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Tüm atama serisini düzenle</DialogTitle>
             <DialogDescription>
-              {employeeName} · {shiftName} · {assignment.startDate}–
-              {assignment.endDate}. Kaydetme ve silme tüm seriye uygulanır. Tek
+              {employeeName} · {shiftName} · {shortDate(assignment.startDate)}–
+              {shortDate(assignment.endDate)}. Kaydetme ve silme tüm seriye uygulanır. Tek
               gün istisnası desteklenmiyor.
             </DialogDescription>
           </DialogHeader>
           {serverError && (
             <p role="alert" className="text-sm text-danger">
-              {serverError.message}
+              {shiftMessage(serverError.message)}
             </p>
           )}
           <fieldset disabled={pending} className="space-y-4">
@@ -151,22 +154,10 @@ function EditForm({
               label="Vardiya"
               error={errors.shiftId}
             >
-              <select
-                id="edit-shift"
-                className="w-full h-9 rounded-md border border-control bg-surface px-2"
-                value={values.shiftId}
-                onChange={(e) => change({ ...values, shiftId: e.target.value })}
-              >
-                {shifts
-                  .filter(
-                    (s) => s.isActive !== false || s._id === assignment.shiftId,
-                  )
-                  .map((s) => (
-                    <option key={s._id} value={s._id}>
-                      {s.name} ({s.startTime}–{s.endTime})
-                    </option>
-                  ))}
-              </select>
+              <ShiftSelect id="edit-shift" label="Vardiya" value={values.shiftId}
+                invalid={!!errors.shiftId} describedBy={errors.shiftId ? "edit-shift-error" : undefined}
+                onChange={(shiftId) => change({ ...values, shiftId })}
+                options={shifts.filter(s => s.isActive !== false || s._id === assignment.shiftId).map(s => ({ value: s._id, label: `${s.name} · ${shiftTimeLabel(s)}` }))} />
             </FormFieldWrapper>
             <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3">
               {(["startDate", "endDate"] as const).map((key) => (
@@ -186,7 +177,7 @@ function EditForm({
             </div>
             <label className="flex gap-2 text-sm">
               <input
-                type="checkbox"
+                type="checkbox" className="size-6 shrink-0 accent-primary"
                 checked={values.specificDays}
                 onChange={(e) =>
                   change({ ...values, specificDays: e.target.checked })
@@ -195,54 +186,19 @@ function EditForm({
               Belirli günler
             </label>
             {values.specificDays ? (
-              <fieldset>
-                <legend className="text-sm">Uygulanacak günler</legend>
-                <div className="flex flex-wrap gap-3 mt-2">
-                  {DAYS.map(([code, label]) => (
-                    <label className="flex gap-1 text-sm" key={code}>
-                      <input
-                        type="checkbox"
-                        aria-invalid={code === "MON" && !!errors.weekPattern}
-                        aria-describedby={
-                          errors.weekPattern
-                            ? "assignment-days-error"
-                            : undefined
-                        }
-                        checked={values.weekPattern.includes(code)}
-                        onChange={() =>
-                          change({
-                            ...values,
-                            weekPattern: values.weekPattern.includes(code)
-                              ? values.weekPattern.filter((d) => d !== code)
-                              : [...values.weekPattern, code],
-                          })
-                        }
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-                {errors.weekPattern && (
-                  <p
-                    role="alert"
-                    id="assignment-days-error"
-                    className="text-xs text-danger"
-                  >
-                    {errors.weekPattern}
-                  </p>
-                )}
-              </fieldset>
+              <WeekdaySelection id="assignment-days" value={values.weekPattern} error={errors.weekPattern}
+                    onChange={(weekPattern) => change({ ...values, weekPattern })} />
             ) : (
               <p className="text-sm">Her gün</p>
             )}
             <p className="text-xs text-muted-foreground">
-              {values.startDate}–{values.endDate} dahil tüm seri. Mevcut diğer
+              {shortDate(values.startDate)}–{shortDate(values.endDate)} dahil tüm seri. Mevcut diğer
               atamalar korunur.
             </p>
             {serverError?.code === "SHIFT_OVERLAP" && (
               <label className="flex gap-2 text-sm">
                 <input
-                  type="checkbox"
+                  type="checkbox" className="size-6 shrink-0 accent-primary"
                   checked={forceConfirm}
                   onChange={(e) => setForceConfirm(e.target.checked)}
                 />
@@ -252,7 +208,7 @@ function EditForm({
             {serverError?.code === "SHIFT_CALENDAR_CONFLICT" && (
               <label className="flex gap-2 text-sm">
                 <input
-                  type="checkbox"
+                  type="checkbox" className="size-6 shrink-0 accent-primary"
                   checked={calendarConfirmed}
                   onChange={(e) => setCalendarConfirmed(e.target.checked)}
                 />
@@ -288,11 +244,11 @@ function EditForm({
             ? "Tüm seri silinsin mi?"
             : "Tüm seri güncellensin mi?"
         }
-        objectName={`${employeeName} · ${shiftName} · ${assignment.startDate}–${assignment.endDate}`}
+        objectName={`${employeeName} · ${shiftName} · ${shortDate(assignment.startDate)}–${shortDate(assignment.endDate)}`}
         effects={[
           confirm === "delete"
             ? "Bu atamanın tüm tarih aralığı kalıcı silinir."
-            : `Tüm seri ${values.startDate}–${values.endDate} ve seçili günlerle güncellenir.`,
+            : `Tüm seri ${shortDate(values.startDate)}–${shortDate(values.endDate)} ve seçili günlerle güncellenir.`,
         ]}
         confirmLabel={
           confirm === "delete" ? "Tüm seriyi sil" : "Tüm seriyi güncelle"

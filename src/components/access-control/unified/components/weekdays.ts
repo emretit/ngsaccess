@@ -15,13 +15,13 @@ export interface Weekday {
 }
 
 export const WEEKDAYS: Weekday[] = [
-  { value: "Monday",    short: "Pt", abbr: "Pzt", full: "Pazartesi" },
-  { value: "Tuesday",   short: "Sa", abbr: "Sal", full: "Salı" },
-  { value: "Wednesday", short: "Ça", abbr: "Çar", full: "Çarşamba" },
-  { value: "Thursday",  short: "Pe", abbr: "Per", full: "Perşembe" },
-  { value: "Friday",    short: "Cu", abbr: "Cum", full: "Cuma" },
-  { value: "Saturday",  short: "Ct", abbr: "Cmt", full: "Cumartesi" },
-  { value: "Sunday",    short: "Pz", abbr: "Paz", full: "Pazar" },
+  { value: "Monday",    short: "Pzt", abbr: "Pzt", full: "Pazartesi" },
+  { value: "Tuesday",   short: "Sal", abbr: "Sal", full: "Salı" },
+  { value: "Wednesday", short: "Çar", abbr: "Çar", full: "Çarşamba" },
+  { value: "Thursday",  short: "Per", abbr: "Per", full: "Perşembe" },
+  { value: "Friday",    short: "Cum", abbr: "Cum", full: "Cuma" },
+  { value: "Saturday",  short: "Cmt", abbr: "Cmt", full: "Cumartesi" },
+  { value: "Sunday",    short: "Paz", abbr: "Paz", full: "Pazar" },
 ];
 
 export const DEFAULT_WORKDAYS: WeekdayValue[] = [

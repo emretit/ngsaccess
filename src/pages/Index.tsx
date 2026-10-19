@@ -9,10 +9,10 @@ import QuickLinksGrid from "@/components/dashboard/QuickLinksGrid";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 
-const TWO_COLUMNS = "grid gap-5 min-[1000px]:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] min-[1000px]:gap-6";
+const TWO_COLUMNS = "grid items-start gap-5 min-[1000px]:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] min-[1000px]:gap-6";
 
 export default function Index() {
-  const { activeProject, projectId, projects, loading, isSuperAdmin } = useActiveProject();
+  const { projectId, projects, loading, isSuperAdmin } = useActiveProject();
   const navigate = useNavigate();
   const noProject = !loading && !projectId;
   return <div className="mx-auto max-w-[1536px] space-y-6">
@@ -31,6 +31,5 @@ export default function Index() {
         <QuerySectionBoundary title="Hızlı erişim alınamadı" resetKey={projectId}><QuickLinksGrid /></QuerySectionBoundary>
       </div>
     </div>}
-    <footer className="flex flex-wrap justify-between gap-2 text-[11px] text-muted-foreground"><span>{activeProject?.name ?? "Proje seçilmedi"}</span><span>İstanbul saati (UTC+3)</span></footer>
   </div>;
 }

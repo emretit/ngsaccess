@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { todayInTurkey, toLocalDateString } from "./date";
+import { formatTrDate, formatTrDateTime, todayInTurkey, toLocalDateString } from "./date";
 
 afterEach(() => vi.useRealTimers());
 
@@ -18,5 +18,26 @@ describe("todayInTurkey", () => {
   });
   it("preserves the explicit local date formatter", () => {
     expect(toLocalDateString(new Date(2026, 0, 2))).toBe("2026-01-02");
+  });
+});
+
+describe("Turkey display formatters", () => {
+  it("formats a date and timestamp with two-digit date and time fields", () => {
+    const date = new Date("2026-10-19T15:20:07Z");
+    expect(formatTrDateTime(date)).toBe("19.10.2026 18:20");
+    expect(formatTrDateTime(date.getTime(), { seconds: true })).toBe("19.10.2026 18:20:07");
+    expect(formatTrDateTime(date, { seconds: false })).toBe("19.10.2026 18:20");
+    expect(formatTrDate(date)).toBe("19.10.2026");
+    expect(formatTrDate(date.getTime())).toBe("19.10.2026");
+  });
+
+  it("rolls UTC 21:30 into the next Turkey day", () => {
+    const date = new Date("2026-10-19T21:30:00Z");
+    expect(formatTrDateTime(date)).toBe("20.10.2026 00:30");
+    expect(formatTrDate(date)).toBe("20.10.2026");
+  });
+
+  it("pads single-digit fields and rolls across year boundaries", () => {
+    expect(formatTrDateTime(new Date("2026-12-31T21:05:09Z"), { seconds: true })).toBe("01.01.2027 00:05:09");
   });
 });

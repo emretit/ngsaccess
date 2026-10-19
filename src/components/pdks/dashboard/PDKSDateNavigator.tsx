@@ -1,3 +1,4 @@
+import { pdksToday } from "@/components/pdks/lib/calendar";
 import {
   addDays,
   addMonths,
@@ -21,7 +22,7 @@ export function PDKSDateNavigator({
   values: FilterValues;
   onChange: (values: FilterValues) => void;
 }) {
-  const anchor = values.anchorDate ?? new Date();
+  const anchor = values.anchorDate ?? pdksToday();
   const label =
     values.reportType === "custom"
       ? values.dateRange.from && values.dateRange.to
@@ -45,7 +46,7 @@ export function PDKSDateNavigator({
         ? startOfWeek(d, { weekStartsOn: 1 })
         : startOfDay(d);
   // Gelecek dönemde kayıt olmaz; herkes "devamsız" görünmesin.
-  const nextDisabled = periodStart(shift(1)) > new Date();
+  const nextDisabled = periodStart(shift(1)) > pdksToday();
   const move = (step: number) =>
     onChange({ ...values, anchorDate: shift(step) });
   return (
@@ -54,7 +55,7 @@ export function PDKSDateNavigator({
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7"
+          className="h-9 w-9"
           aria-label="Önceki dönem"
           onClick={() => move(-1)}
         >
@@ -86,7 +87,7 @@ export function PDKSDateNavigator({
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7"
+          className="h-9 w-9"
           aria-label="Sonraki dönem"
           disabled={nextDisabled}
           onClick={() => move(1)}
@@ -97,11 +98,11 @@ export function PDKSDateNavigator({
       <Button
         variant="outline"
         size="sm"
-        className="h-7 text-xs"
+        className="h-9 text-xs"
         onClick={() =>
           onChange({
             ...values,
-            anchorDate: new Date(),
+            anchorDate: pdksToday(),
             reportType:
               values.reportType === "custom" ? "daily" : values.reportType,
             dateRange: { from: undefined, to: undefined },

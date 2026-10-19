@@ -1,4 +1,4 @@
-import { usePaginatedQuery } from "convex/react";
+import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { Button } from "@/components/ui/button";
@@ -68,16 +68,33 @@ export function AccessRuleDetails({
   ruleId: Id<"accessRules">;
   projectId: Id<"projects">;
 }) {
+  const rule = useQuery(api.accessRules.getDetails, { ruleId, projectId });
+  if (!rule) return <SectionSkeleton rows={3} label="Kural ayrıntısı yükleniyor" />;
   return (
     <div className="mt-4 space-y-6 min-w-0">
-      <p className="text-xs text-muted-foreground">
-        Ziyaretçiler şablona Ziyaretçiler ekranından eklenir. Panel seçimi ve
-        açık kapı seçimleri ayrı gösterilir; açık kapı seçimi olmayan panelde
-        tüm cihaz kapsamı geçerlidir.
-      </p>
+      {rule.targetType === "visitor" && (
+        <p className="text-xs text-muted-foreground">
+          Ziyaretçiler şablona Ziyaretçiler ekranından eklenir.
+        </p>
+      )}
       <Members key={`${ruleId}-people`} ruleId={ruleId} kind="people" />
-      <Members key={`${ruleId}-devices`} ruleId={ruleId} kind="devices" />
-      <Members key={`${ruleId}-doors`} ruleId={ruleId} kind="doors" />
+      <section className="space-y-2">
+        <h3 className="font-semibold">Paneller ve kapılar</h3>
+        {rule.scopeTruncated && <p role="status">Kapsam çok geniş; tüm panel ve kapılar burada gösterilemiyor. Tam seçimleri düzenleme ekranından inceleyin.</p>}
+        <ul className="space-y-3">
+          {rule.panels.map((panel) => (
+            <li key={panel.deviceId} className="break-words">
+              <p className="font-medium">{panel.label}</p>
+              <ul className="ml-4 list-disc">
+                {panel.doors.map((door) => <li key={door.doorId}>{door.name}{door.zoneName ? ` · ${door.zoneName}` : ""}</li>)}
+              </ul>
+              {panel.doorsTruncated && <p className="text-xs text-muted-foreground">Tüm kapılar gösterilemiyor.</p>}
+            </li>
+          ))}
+          {rule.unassignedDoors.map((door) => <li key={door.doorId}>{door.name} · Panel bağlantısı yok; cihaza uygulanamaz</li>)}
+        </ul>
+        {!rule.scopeTruncated && rule.panels.length === 0 && rule.unassignedDoors.length === 0 && <p className="text-xs text-muted-foreground">Kapı veya panel seçilmemiş.</p>}
+      </section>
       <RecentRuns projectId={projectId} ruleId={ruleId} />
     </div>
   );

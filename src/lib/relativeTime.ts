@@ -1,3 +1,4 @@
+import { formatTrDateTime } from "./date";
 import { trDateKey, trTodayKey } from "../../convex/lib/trDate";
 
 const timeFormat = new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", hour: "2-digit", minute: "2-digit" });
@@ -23,14 +24,12 @@ export function timeAgoTr(iso: string | null | undefined, nowMs: number): string
   return `${Math.floor(diff / DAY)} gün önce`;
 }
 
-/** Akış zamanı: son bir saat göreli, bugün saat, daha eski gün.ay saat (İstanbul). */
+/** Akış zamanı: son bir saat göreli, bugün saat, daha eski tam tarih ve saat (İstanbul). */
 export function feedTimeTr(iso: string | null | undefined, nowMs: number): string | null {
   const date = parse(iso);
   if (!date) return null;
   if (nowMs - date.getTime() < HOUR) return timeAgoTr(iso, nowMs);
   const dayKey = trDateKey(date.toISOString());
   if (dayKey === trTodayKey(new Date(nowMs))) return timeFormat.format(date);
-  // tr-TR gün+ay kısa biçimi "18/10" verir; uygulamadaki "18.10" biçimi elle kurulur.
-  const [, month, day] = dayKey.split("-");
-  return `${day}.${month} ${timeFormat.format(date)}`;
+  return formatTrDateTime(date);
 }

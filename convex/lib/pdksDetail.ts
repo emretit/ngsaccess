@@ -1,38 +1,19 @@
 // Reading inputs must already be source-filtered at the handler/loader boundary.
 import { classifyPdksDay } from "./pdksTable";
-/**
- * `cardReadings.getEmployeeAttendanceDetail`'in günlük hesap + özet çekirdeği. ctx YOK,
- * async YOK — tüm DB okuması ve shift çözümü çağıran handler'da kalır; bu modül yalnız
- * çözülmüş gün verisini işler. `pdksDetail.test.ts` golden testleriyle donduruldu.
- *
- * DİKKAT (R8): bu ekran mesaiyi **sabit 8 saatten** hesaplar
- * (`max(0, netMinutes − 8h)`) — tablo/bordro ekranlarının shift-duyarlı
- * `dailyOvertimeForShift`'inden BİLİNÇLİ farklıdır (ürün kararı bekliyor). Refactor bu
- * farkı KORUR; testler kazara değişmesin diye bunu da pinler.
- */
 import type { Doc } from "../_generated/dataModel";
 import {
-  classifyDay,
   payrollCodeForDay,
-  evaluateLateEarly,
   type EffectiveWorkSettings,
+  type EffectiveOvertimeRates,
 } from "./pdksHelpers";
 import { settingsForShift } from "./shiftResolver";
-import {
-  manualOverrideMinutes,
-  minutesBetweenISO,
-  formatIstanbulTime,
-  formatHoursLabel,
-} from "./pdksCalc";
-import { netWorkMinutes } from "./breakDeduction";
+import { formatIstanbulTime, formatHoursLabel } from "./pdksCalc";
+import { computePdksDay } from "./pdksDay";
 
-/**
- * Tek bir gün için devam detayını hesaplar. Manuel giriş/çıkış override'ı ham okumaların
- * önüne geçer; total → net (mola düşümü) → sabit-8h mesai. Statü/puantaj kodu/geç-erken
- * çıkış zaten test edilmiş lib primitiflerine delege edilir.
- */
 export function computeAttendanceDetailDay(params: {
   date: string;
+  availableDateKeys: ReadonlySet<string>;
+  firstRecordDate?: string | null;
   dayReadings: Doc<"cardReadings">[];
   manualDay: Doc<"pdksRecords"> | undefined;
   leaves: Doc<"leaves">[];
@@ -40,78 +21,63 @@ export function computeAttendanceDetailDay(params: {
   dayShift: Doc<"shifts"> | null;
   workSettings: EffectiveWorkSettings;
   workingDays: string[];
+  overtimeRates?: EffectiveOvertimeRates;
 }) {
-  const {
-    date: dk,
-    dayReadings,
-    manualDay,
-    leaves,
-    holiday,
-    dayShift,
+  const { date, dayShift, workSettings } = params;
+  const day = computePdksDay({
+    date,
+    readings: params.dayReadings,
+    manual: params.manualDay,
+    shift: dayShift,
     workSettings,
-    workingDays,
-  } = params;
-
-  const granted = dayReadings.filter((r) => r.accessStatus === "izin_verildi");
-  const firstISO = manualDay?.entryTime
-    ? `${dk}T${manualDay.entryTime}:00.000+03:00`
-    : granted[0]?.accessTime ?? null;
-  const lastISO = manualDay?.exitTime
-    ? `${dk}T${manualDay.exitTime}:00.000+03:00`
-    : granted.length > 1 ? granted[granted.length - 1].accessTime : null;
-
-  let totalMinutes = 0;
-  if (manualDay?.entryTime && manualDay?.exitTime) {
-    totalMinutes = manualOverrideMinutes(
-      manualDay.entryTime,
-      manualDay.exitTime,
-    );
-  } else if (firstISO && lastISO) {
-    totalMinutes = Math.max(0, minutesBetweenISO(firstISO, lastISO));
-  }
-
-  const cls = classifyDay(dk, workingDays, holiday);
-  const hasLeave = leaves.some((l) => dk >= l.startDate && dk <= l.endDate);
-  const leaveOnDay = leaves.find((l) => dk >= l.startDate && dk <= l.endDate);
-  const code = payrollCodeForDay({
-    classification: cls,
-    hasLeave,
-    hasAttendance: !!firstISO || !!manualDay?.exitTime,
+    overtimeRates: params.overtimeRates,
+    workingDays: params.workingDays,
+    holiday: params.holiday,
   });
-  const daySettingsForLate = settingsForShift(dayShift, workSettings);
-  const { isLate, isEarlyExit } = evaluateLateEarly(
-    firstISO ?? undefined,
-    lastISO ?? undefined,
-    daySettingsForLate,
+  const leave = params.leaves.find(
+    (l) => date >= l.startDate && date <= l.endDate,
   );
-
+  const settings = settingsForShift(dayShift, workSettings);
   const status = classifyPdksDay({
-    date: dk,
-    classification: cls,
-    hasAttendance: !!firstISO || !!manualDay?.exitTime,
-    hasLeave,
-    isLate,
+    date,
+    dataAvailable: params.availableDateKeys.has(date),
+    firstRecordDate: params.firstRecordDate,
+    shiftStart: dayShift?.startTime,
+    hasAssignedShift:
+      params.firstRecordDate !== undefined ? dayShift !== null : undefined,
+    lateTolerance: settings.maxLateMinutes,
+    classification: day.classification,
+    hasAttendance: day.hasAttendance,
+    hasLeave: !!leave,
+    isLate: day.isLate,
   });
-
-  const netMinutes = netWorkMinutes(totalMinutes, dayShift);
-  const overtimeMinutes = Math.max(0, netMinutes - 8 * 60);
-  totalMinutes = netMinutes;
-
+  const code = payrollCodeForDay({
+    classification: day.classification,
+    hasLeave: !!leave,
+    hasAttendance: day.hasAttendance,
+  });
   return {
-    date: dk,
-    firstEntry: firstISO ? formatIstanbulTime(firstISO) : null,
-    lastExit: lastISO ? formatIstanbulTime(lastISO) : null,
-    totalMinutes,
-    totalHours: formatHoursLabel(totalMinutes),
+    date,
+    firstEntry: day.firstISO ? formatIstanbulTime(day.firstISO) : null,
+    lastExit: day.lastISO ? formatIstanbulTime(day.lastISO) : null,
+    totalMinutes: day.totalMinutes,
+    rawTotalMinutes: day.rawTotalMinutes,
+    totalHours: formatHoursLabel(day.totalMinutes),
+    nightMinutes: day.nightMinutes,
     status,
-    isLate,
-    isEarlyExit,
-    payrollCode: status === "future" || status === "noData" ? "—" : code,
-    overtimeMinutes,
-    isManual: !!manualDay,
-    manualNote: manualDay?.manualNote ?? null,
-    leaveType: leaveOnDay?.leaveType ?? null,
-    rawReadings: dayReadings.map((r) => ({
+    isLate: day.isLate,
+    isEarlyExit: day.isEarlyExit,
+    payrollCode:
+      status === "future" || status === "noData" || status === "notEmployed"
+        ? "—"
+        : code,
+    overtimeMinutes: day.overtimeMinutes,
+    isManual: !!params.manualDay,
+    isOvernightShift: day.isOvernightShift,
+    exitNextDay: day.exitNextDay,
+    manualNote: params.manualDay?.manualNote ?? null,
+    leaveType: leave?.leaveType ?? null,
+    rawReadings: params.dayReadings.map((r) => ({
       id: String(r._id),
       time: formatIstanbulTime(r.accessTime, true),
       accessStatus: r.accessStatus,

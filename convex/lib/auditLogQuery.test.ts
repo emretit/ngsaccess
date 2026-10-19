@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   auditDateRange,
@@ -63,16 +65,45 @@ describe("denetim sorgusu", () => {
   });
   it("hedef sözlüğü audit yazıcılarının desteklediği tabloları sunar", () => {
     expect(Object.keys(AUDIT_TARGET_LABELS).sort()).toEqual([
+      "alarmSettings",
+      "attendanceCorrections",
       "biometricDestruction",
       "biometricDestructionCheck",
       "biometricDestructionDevice",
       "biometricDestructionDeviceCheck",
       "biometricDestructionRun",
+      "cardReadings",
+      "deviceEvents",
       "employeeConsents",
       "employees",
       "holidays",
+      "leaves",
       "overtimeRates",
       "pdksRecords",
+      "projectPrivacySettings",
     ]);
   });
+});
+
+it("gizlilik ayarları ve kart temizliği Türkçe hedef etiketiyle aranabilir", () => {
+ for (const [targetTable, search] of [["projectPrivacySettings", "proje gizlilik ayarları"], ["cardReadings", "kart okumaları"]]) {
+   expect(auditPageMatches({ targetTable, targetId: "p", action: "update" }, { search })).toBe(true);
+ }
+});
+
+it("tüm gerçek audit hedefleri etiket sözlüğünde bulunur", () => {
+ const root = fileURLToPath(new URL("../", import.meta.url));
+ const paths = readdirSync(root, { recursive: true });
+ const targets = new Set<string>();
+ for (const path of paths) {
+  if (typeof path !== "string" || !path.endsWith(".ts") || path.endsWith(".test.ts") || path.startsWith("_generated/")) continue;
+  const source = readFileSync(`${root}/${path}`, "utf8");
+  for (const match of source.matchAll(/targetTable:\s*["']([^"']+)["']/g)) targets.add(match[1]);
+  if (/targetTable:\s*STATE_TABLE/.test(source)) {
+   const constant = source.match(/const STATE_TABLE = ["']([^"']+)["']/);
+   if (constant) targets.add(constant[1]);
+  }
+ }
+ expect(targets.size).toBeGreaterThan(0);
+ for (const target of targets) expect(AUDIT_TARGET_LABELS[target], target).toBeDefined();
 });

@@ -1,3 +1,4 @@
+import { formatTrDateTime } from "@/lib/date";
 import { useId, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import type { Id } from "../../../../../convex/_generated/dataModel";
@@ -50,7 +51,7 @@ function BiometricModuleForm({ projectId }: { projectId: Id<"projects"> }) {
     {data.legacy && data.enabled && <p className="text-sm text-muted-foreground">Bu proje eski ayarla açık; gerekmiyorsa kapatın.</p>}
     <p className="text-sm text-muted-foreground">Modülü kapatmak mevcut yüz ve parmak izi şablonlarını silmez. Silmek için biyometrik veri imha aracını kullanın.</p>
     {data.reason && <p className="text-sm break-words">Gerekçe: {data.reason}</p>}
-    <p className="text-xs text-muted-foreground">Son değişiklik: {data.changedAt ? new Date(data.changedAt).toLocaleString("tr-TR") : "Kayıt yok"}</p>
+    <p className="text-xs text-muted-foreground">Son değişiklik: {data.changedAt ? formatTrDateTime(new Date(data.changedAt)) : "Kayıt yok"}</p>
     <Button variant="outline" disabled={busy} onClick={() => { setTarget(!data.enabled); setReason(""); }}>{data.enabled ? "Modülü kapat" : "Modülü aç"}</Button>
     <Dialog open={target !== null && !confirmDisable} onOpenChange={open => { if (!open) requestClose(); }}>
       <DialogContent className="max-h-[90vh] overflow-y-auto" onEscapeKeyDown={event => { if (busy) event.preventDefault(); }} onPointerDownOutside={event => { if (busy) event.preventDefault(); }}>

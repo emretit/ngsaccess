@@ -1,10 +1,10 @@
+import { getPdksTableData, getMonthlyPayrollSheet, getEmployeeAttendanceDetail } from "../cardReadings";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Doc, Id } from "../_generated/dataModel";
 import { selectProjectScope } from "./projectScope";
 import type { QueryCtx } from "../_generated/server";
 import * as pdksSource from "./pdksSource";
 import * as projectScope from "./projectScope";
-import { getPdksTableData, getPdksChartData, getMonthlyPayrollSheet, getEmployeeAttendanceDetail } from "../cardReadings";
 import { readReportReadings, reportPeriod, selectScheduleProjectIds } from "./reportScope";
 
 describe("rapor proje kapsamı ve dönem", () => {
@@ -64,7 +64,8 @@ function readingContext(readings: Doc<"cardReadings">[]) {
   const query = (table: string) => {
     const rows = table === "cardReadings" ? readings : table === "employees" ? [reportEmployee] : [];
     const chain = {
-      withIndex: () => chain, filter: () => chain,
+      withIndex: () => chain, filter: () => chain, order: () => chain, take: async () => rows,
+      [Symbol.asyncIterator]: async function* () { yield* rows; },
       collect: async () => rows, first: async () => rows[0] ?? null,
     };
     return chain;
@@ -92,7 +93,6 @@ describe("PDKS source filtering at loader/handler boundaries", () => {
   });
   it.each([
     ["table", getPdksTableData, { startDate: "2026-06-22", endDate: "2026-06-22", viewMode: "matrix" }],
-    ["chart", getPdksChartData, { startDate: "2026-06-22", endDate: "2026-06-22" }],
     ["payroll", getMonthlyPayrollSheet, { year: 2026, month: 6 }],
     ["detail", getEmployeeAttendanceDetail, { employeeId, startDate: "2026-06-22", endDate: "2026-06-22" }],
   ])("%s: biyometri devam/süre/mesai/hareket üretmez; tek süzme kartı korur", async (_name, fn, args) => {
@@ -114,7 +114,7 @@ describe("PDKS source filtering at loader/handler boundaries", () => {
 describe("çalışan katılım detayı erişimi", () => {
   const orphan = { ...reportEmployee, projectId: undefined } as Doc<"employees">;
   function orphanContext(role: string) {
-    const chain = { withIndex: () => chain, filter: () => chain, collect: async () => [], first: async () => null };
+    const chain = { [Symbol.asyncIterator]: async function* () {}, withIndex: () => chain, filter: () => chain, order: () => chain, take: async () => [], collect: async () => [], first: async () => null };
     return {
       user: { _id: "user", role },
       db: { query: () => chain, get: async (id: string) => id === employeeId ? orphan : null },

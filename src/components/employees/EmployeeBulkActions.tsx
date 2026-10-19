@@ -47,7 +47,7 @@ export function EmployeeBulkActions({
   isSyncing,
   pending,
 }: EmployeeBulkActionsProps) {
-  const [confirm, setConfirm] = useState<"department" | "sync" | null>(null);
+  const [confirm, setConfirm] = useState<"department" | null>(null);
   return (
     <BulkBar count={selectedCount} onClear={() => onClear?.()}>
       <Select
@@ -79,7 +79,7 @@ export function EmployeeBulkActions({
       {onSyncToDevices && (
         <Button
           variant="outline"
-          onClick={() => setConfirm("sync")}
+          onClick={onSyncToDevices}
           disabled={isSyncing || pending}
         >
           {isSyncing ? (
@@ -91,7 +91,8 @@ export function EmployeeBulkActions({
         </Button>
       )}
       <Button
-        variant="destructive"
+        variant="outline"
+        className="ml-3 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
         onClick={onDelete}
         disabled={pending || selectedCount > EMPLOYEE_BULK_DELETE_LIMIT}
         aria-describedby={
@@ -117,9 +118,7 @@ export function EmployeeBulkActions({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {confirm === "department"
-                ? "Departman değiştirilsin mi?"
-                : "Cihazlara gönderilsin mi?"}
+              Departman değiştirilsin mi?
             </DialogTitle>
             <DialogDescription className="break-words">
               {names}
@@ -133,8 +132,7 @@ export function EmployeeBulkActions({
           )}
           <Button
             onClick={() => {
-              if (confirm === "department") onUpdateDepartment();
-              else onSyncToDevices?.();
+              onUpdateDepartment();
               setConfirm(null);
             }}
           >

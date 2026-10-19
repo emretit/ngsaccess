@@ -19,7 +19,7 @@ import {
 import { diffIds, staleGroupDoorIds } from "./lib/reconcileMath";
 import type { Doc, Id } from "./_generated/dataModel";
 import { paginationOptsValidator, type PaginationOptions } from "convex/server";
-import { matchesRuleStatus, panelScope, pageRuleCandidates, personSearchTerms, activeRuleCursor } from "./lib/accessRuleSummary";
+import { matchesRuleStatus, matchesRuleType, personnelRuleTypes, ruleTypeStages, pageRuleStages, panelScope, pageRuleCandidates, personSearchTerms, activeRuleCursor } from "./lib/accessRuleSummary";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 
 /**
@@ -429,6 +429,51 @@ async function listActiveRules(
   };
 }
 
+async function listTypedRules(
+  ctx: QueryCtx,
+  projectId: Id<"projects">,
+  search: string,
+  type: "visitor" | "personnel",
+  status: "all" | "active" | "inactive",
+  paginationOpts: PaginationOptions,
+) {
+  const personnelTypes = type === "personnel" ? await personnelRuleTypes(after => ctx.db.query("accessRules")
+    .withIndex("by_project_targetType", q => after ? q.eq("projectId", projectId).gt("targetType", after.value) : q.eq("projectId", projectId))
+    .first()) : [];
+  const stages = ruleTypeStages(type, status, personnelTypes);
+  const query = (phase: number) => {
+    const stage = stages[phase];
+    if (!stage) throw new Error("Geçersiz sayfa");
+    if (search) return ctx.db.query("accessRules").withSearchIndex("search_name", q => {
+      const named = q.search("name", search).eq("projectId", projectId).eq("targetType", stage.targetType);
+      return stage.isActive === "all" ? named : named.eq("isActive", stage.isActive);
+    });
+    const isActive = stage.isActive;
+    return isActive === "all"
+      ? ctx.db.query("accessRules").withIndex("by_project_targetType", q => q.eq("projectId", projectId).eq("targetType", stage.targetType)).order("desc")
+      : ctx.db.query("accessRules").withIndex("by_project_targetType_isActive", q => q.eq("projectId", projectId).eq("targetType", stage.targetType).eq("isActive", isActive)).order("desc");
+  };
+  return pageRuleStages(stages.length, JSON.stringify([projectId, search, type, status, stages]), paginationOpts.cursor,
+    (phase, cursor) => query(phase).paginate({ ...paginationOpts, cursor }),
+    async phase => (await query(phase).first()) !== null);
+}
+
+/** Only aggregates leave the server; authorization matches the rule list. */
+export const projectDeviceCounts = authedQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, { projectId }) => {
+    await resolveProjectScope(ctx, projectId);
+    const brands: Record<string, number> = {};
+    let total = 0;
+    for await (const device of ctx.db.query("devices").withIndex("by_project", q => q.eq("projectId", projectId))) {
+      const brand = device.brand ?? "other";
+      brands[brand] = (brands[brand] ?? 0) + 1;
+      total += 1;
+    }
+    return { total, brands };
+  },
+});
+
 export const listSummaries = authedQuery({
   args: {
     projectId: v.id("projects"),
@@ -436,6 +481,7 @@ export const listSummaries = authedQuery({
     searchBy: v.optional(
       v.union(v.literal("rule"), v.literal("person"), v.literal("door")),
     ),
+    type: v.optional(v.union(v.literal("all"), v.literal("visitor"), v.literal("personnel"))),
     status: v.optional(
       v.union(v.literal("all"), v.literal("active"), v.literal("inactive")),
     ),
@@ -446,6 +492,7 @@ export const listSummaries = authedQuery({
     const search = args.search?.trim() ?? "";
     const searchBy = args.searchBy ?? "rule";
     const status = args.status ?? "all";
+    const type = args.type ?? "all";
     const matchedIds =
       search && searchBy !== "rule"
         ? await matchingRuleIds(ctx, args.projectId, search, searchBy)
@@ -467,12 +514,14 @@ export const listSummaries = authedQuery({
               .filter(
                 (rule) =>
                   rule.projectId === args.projectId &&
-                  matchesRuleStatus(rule.isActive, status),
+                  matchesRuleStatus(rule.isActive, status) && matchesRuleType(rule.targetType, type),
               ),
             args.paginationOpts.cursor,
             paginationOpts.numItems,
-            JSON.stringify([args.projectId, search, searchBy, status]),
+            JSON.stringify([args.projectId, search, searchBy, status, type]),
           )
+        : type !== "all"
+          ? await listTypedRules(ctx, args.projectId, search, type, status, paginationOpts)
         : status === "active"
           ? await listActiveRules(ctx, args.projectId, search, paginationOpts)
           : await (

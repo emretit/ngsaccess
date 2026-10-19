@@ -17,7 +17,7 @@ import { DeviceIdeSmartSection } from "./form-sections/DeviceIdeSmartSection";
 import { DeviceNameSection } from "./form-sections/DeviceNameSection";
 import { DeviceZoneSection } from "./form-sections/DeviceZoneSection";
 import { BRAND_LABELS } from "./hooks/useDeviceFormSchema";
-import { getHikModelSpec } from "../../../convex/lib/hikModels";
+import { topologyPreview } from "./topologyPreview";
 import type { DeviceBrand } from "./hooks/useDeviceFormSchema";
 
 interface DeviceFormProps {
@@ -106,7 +106,7 @@ export function DeviceForm({
                 name="device_serial"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Seri Numarası</FormLabel>
+                    <FormLabel>Seri numarası</FormLabel>
                     <FormControl>
                       <Input placeholder="Seri numarasını giriniz" {...field} />
                     </FormControl>
@@ -179,11 +179,11 @@ export function DeviceForm({
 
         </fieldset>
         {connectionError && <p role="alert" className="text-sm text-destructive">{connectionError}</p>}
-        {!device && <section className="space-y-1 border-t border-line pt-4 text-sm" aria-label="Kayıt özeti">
+        {!device && <section className="space-y-1 border-t border-line pt-4 pb-24 text-sm" aria-label="Kayıt özeti">
           <h3 className="font-medium">Kaydetmeden önce gözden geçirin</h3>
           <p className="break-words">{form.watch("name") || "Cihaz adı girilmedi"} · {BRAND_LABELS[brand]}</p>
           <p className="break-words text-muted-foreground">{selectedZoneId === "__new__" ? `Yeni bölge: ${form.watch("new_zone_name") || "Ad girilmedi"}` : zones.find(zone => zone._id === selectedZoneId)?.name ?? "Bölge seçilmedi"}</p>
-          <p className="text-muted-foreground">{brand === "hikvision" && getHikModelSpec(form.watch("hik_model")) ? `${getHikModelSpec(form.watch("hik_model"))?.doorCount} kapı · ${(getHikModelSpec(form.watch("hik_model"))?.doorCount ?? 0) * (getHikModelSpec(form.watch("hik_model"))?.defaultReadersPerDoor ?? 0)} okuyucu oluşturulacak.` : `${brand === "ide_smart" ? form.watch("ide_door_count") ?? 4 : brand === "hikvision" ? form.watch("hik_door_count") ?? 4 : form.watch("door_count") ?? 1} kapı oluşturulacak.`}</p>
+          <p className="text-muted-foreground">{topologyPreview(form.watch())}</p>
         </section>}
         {device && <p className="text-sm text-muted-foreground">Model ve kapı sayısı mevcut kapı/okuyucu yapısını değiştirmez. Topoloji düzenleme bu ekranda desteklenmiyor.</p>}
         <div className="sticky bottom-0 flex flex-wrap justify-between gap-2 border-t border-line bg-surface py-4">

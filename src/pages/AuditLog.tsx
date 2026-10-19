@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { SectionSkeleton } from '@/components/shared/SectionSkeleton';
 import { Switch } from '@/components/ui/switch';
+import { AuditCoverage } from '@/components/audit/AuditCoverage';
 import { AuditFilters } from '@/components/audit/AuditFilters';
 import { AuditResults } from '@/components/audit/AuditResults';
 import { auditArgs, auditRangeError } from '@/components/audit/auditState';
@@ -25,9 +26,10 @@ function AuthorizedAuditLog() {
     <PageHeader title="Denetim Kaydı" scope={<span>{allProjects ? 'Tüm projeler · Projesiz kayıtlar dahil' : activeProject?.name ?? 'Proje seçilmedi'} · İstanbul saati (UTC+3)</span>}>
       {profile?.role === 'super_admin' && <label className="flex min-h-10 items-center gap-2 text-sm"><Switch checked={allProjects} onCheckedChange={checked => state.update('allProjects', checked ? 'true' : '')} />Tüm projeler</label>}
     </PageHeader>
+    <AuditCoverage />
     <AuditFilters state={state} args={args} ready={ready && !state.changingScope} rangeError={rangeError} />
     {!allProjects && <p className="text-xs text-muted-foreground">Seçili projenin kayıtları gösteriliyor. Projeyi üst çubuktan değiştirebilirsiniz.</p>}
-    {loading || state.changingScope ? <SectionSkeleton label="Denetim kayıtları yükleniyor…" rows={5} /> : !ready ? <EmptyState title="Bir proje seçin" description="Denetim kayıtlarını görmek için üst çubuktan bir proje seçin." /> : rangeError ? <p role="status" className="text-sm text-muted-foreground">Tarih aralığını düzeltin.</p> : <AuditResults key={JSON.stringify(args)} args={args} onClear={state.clear} />}
+    {loading || state.changingScope ? <SectionSkeleton label="Denetim kayıtları yükleniyor…" rows={5} /> : !ready ? <EmptyState title="Bir proje seçin" description="Denetim kayıtlarını görmek için üst çubuktan bir proje seçin." /> : rangeError ? null : <AuditResults key={JSON.stringify(args)} args={args} />}
   </div>;
 }
 

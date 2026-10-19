@@ -12,6 +12,6 @@ export function LiveFeedControls({ paused, count, reloadRequired, onPause, onApp
     {reloadRequired ? <Button variant="outline" onClick={onReload}>Yeni kayıtlar var · Yeniden yükle</Button> : count > 0 && <Button variant="outline" onClick={onApply}>{count} yeni kaydı göster</Button>}
     <p className="text-xs text-muted-foreground" role="status">{connection.isWebSocketConnected ? "Abonelik bağlı" : "Bağlantı kesildi · Gösterilen kayıtlar güncel olmayabilir"} · {paused ? "Görüntü durduruldu; kayıt alımı sürüyor" : "Görüntü güncelleniyor"}</p>
     <span className="sr-only" role="status">{announcedCount > 0 ? `${announcedCount} yeni kayıt bekliyor` : ""}</span>
-    {lastEvent && <span className="text-xs text-muted-foreground">Son olay {lastEvent}</span>}
+    {lastEvent && <span className="text-xs text-muted-foreground">Son okuma {lastEvent}</span>}
   </div>;
 }

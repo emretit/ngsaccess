@@ -24,11 +24,11 @@ const employee: Employee = {
 };
 
 describe("çalışan ayrıntısı", () => {
-  it("KVKK rıza kartını seçili çalışan için fotoğraf bölümünden sonra gösterir", () => {
+  it("KVKK rıza kartını seçili çalışan için son geçişlerin üstünde gösterir", () => {
     const html = renderToStaticMarkup(<EmployeeDetails employee={employee} onEdit={() => undefined} onClose={() => undefined} />);
     expect(html).toContain('data-employee-id="employee-a"');
     expect(html.indexOf("Fotoğraf ve veri kayıtları")).toBeGreaterThan(-1);
-    expect(html.indexOf('data-testid="consents"')).toBeGreaterThan(html.indexOf("Fotoğraf ve veri kayıtları"));
+    expect(html.indexOf('data-testid="consents"')).toBeLessThan(html.indexOf('data-testid="readings"'));
   });
 
   it("çalışan yokken hiçbir bölüm, rıza kartı dahil, çizmez", () => {

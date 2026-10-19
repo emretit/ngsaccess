@@ -53,4 +53,5 @@ Ekran görüntüleri: `docs/ui-audit-2/13-ayarlar/` (d01–d09).
 
 ## Kararlar (Emre, 2026-10-19)
 - 13-H1: gece çarpanı hesaba katılacak (gece saatlerine düşen çalışma); 08-H2 gece vardiyası işiyle birlikte.
+- 13-H1 ek karar (2026-10-19 gece): çarpan birleşimi ayarlanabilir (Büyük olan / Çarpım / Ek prim; varsayılan Büyük olan), yalnız gece penceresindeki fazla mesaiye uygulanır; normal gece çalışmasına prim yok, yalnız gece dakikası gösterilir.
 - 13-O5: eski SGK/resmi raporlar Ayarlar'da kalır; Raporlar'daki satırlar derin bağlantıyla ilgili rapora gider (11-O7).

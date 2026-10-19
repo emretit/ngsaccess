@@ -1,3 +1,4 @@
+import { pdksToday } from "@/components/pdks/lib/calendar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type {
@@ -26,6 +27,7 @@ export const STATUS_FILTERS: StatusFilter[] = [
   "holiday",
   "future",
   "noData",
+  "notEmployed",
 ];
 
 /** Geçersiz biçim ve taşan tarihleri (2026-02-31) reddeder. */
@@ -58,7 +60,7 @@ export function usePdksFilterParams(defaults: FilterValues, projectId?: string):
       (params.get(key) ?? undefined) as Id<T> | undefined;
     return {
       anchorDate:
-        parseDate(params.get("date")) ?? defaults.anchorDate ?? new Date(),
+        parseDate(params.get("date")) ?? defaults.anchorDate ?? pdksToday(),
       dateRange: {
         from: parseDate(params.get("from")) ?? defaults.dateRange.from,
         to: parseDate(params.get("to")) ?? defaults.dateRange.to,
@@ -66,6 +68,7 @@ export function usePdksFilterParams(defaults: FilterValues, projectId?: string):
       reportType: REPORT_TYPES.includes(reportRaw as ReportType)
         ? (reportRaw as ReportType)
         : defaults.reportType,
+      employeeId: getId<"employees">("employeeId"),
       companyId: getId<"companies">("company"),
       departmentId: getId<"departments">("dept"),
       positionId: getId<"positions">("pos"),
@@ -91,10 +94,11 @@ export function usePdksFilterParams(defaults: FilterValues, projectId?: string):
         "shift",
         "status",
         "person",
+        "employeeId",
       ])
         sp.delete(key);
-      const anchorKey = toLocalDateString(next.anchorDate ?? new Date());
-      if (anchorKey !== toLocalDateString(new Date()))
+      const anchorKey = toLocalDateString(next.anchorDate ?? pdksToday());
+      if (anchorKey !== toLocalDateString(pdksToday()))
         sp.set("date", anchorKey);
       if (next.dateRange.from)
         sp.set("from", toLocalDateString(next.dateRange.from));
@@ -105,6 +109,7 @@ export function usePdksFilterParams(defaults: FilterValues, projectId?: string):
       if (next.positionId) sp.set("pos", next.positionId);
       if (next.shiftId) sp.set("shift", next.shiftId);
       if (next.statusFilter !== "all") sp.set("status", next.statusFilter);
+      if (next.employeeId) sp.set("employeeId", next.employeeId);
       if (next.person) sp.set("person", next.person);
       setParams(sp, { replace: true });
     },

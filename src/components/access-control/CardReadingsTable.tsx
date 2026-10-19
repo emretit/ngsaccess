@@ -4,10 +4,10 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
 import { sourceLabel, resultLabel, personLabel, trTime, type Reading } from "@/components/live-monitoring/lib/readings";
 
-export function CardReadingsTable({ readings, onOpen, freshIds, emptyMessage = "Henüz erişim okuması yok. İlk okuma geldiğinde burada görünecek." }: { readings: Reading[]; onOpen: (reading: Reading, trigger: HTMLElement) => void; emptyMessage?: string; freshIds?: ReadonlySet<string> }) {
+export function CardReadingsTable({ readings, onOpen, freshIds, live = false, emptyMessage = "Henüz erişim okuması yok. İlk okuma geldiğinde burada görünecek." }: { readings: Reading[]; onOpen: (reading: Reading, trigger: HTMLElement) => void; emptyMessage?: string; live?: boolean; freshIds?: ReadonlySet<string> }) {
   const result = (r: Reading) => <><StatusBadge tone={r.accessStatus === "izin_verildi" ? "success" : r.accessStatus === "reddedildi" ? "danger" : "neutral"}>{resultLabel(r)}</StatusBadge>{r.accessStatus === "reddedildi" && <span className="block max-w-64 truncate text-xs text-muted-foreground" title={r.hikDenialReason}>{r.hikDenialReason || "Neden bilinmiyor"}</span>}</>;
-  const action = (r: Reading) => <Button variant="ghost" size="icon" aria-label={`${trTime(r.accessTime)} ${personLabel(r)} okuma ayrıntısı`} onClick={e => onOpen(r, e.currentTarget)}>⋯</Button>;
-  if (!readings.length) return <EmptyState title="Okuma bulunamadı" description={emptyMessage} />;
+  const action = (r: Reading) => <Button variant="ghost" aria-label={`${trTime(r.accessTime)} ${personLabel(r)} okuma ayrıntısı`} onClick={e => onOpen(r, e.currentTarget)}>Ayrıntı</Button>;
+  if (!readings.length) return <EmptyState title={live ? "Bugün okuma yok" : "Okuma bulunamadı"} description={emptyMessage} />;
   return <>
     <div className="hidden min-w-0 overflow-x-auto rounded-md border border-line min-[761px]:block"><Table density="compact"><TableHeader><TableRow>{["Zaman (TR)", "Kişi / kart", "Kapı / cihaz", "Yön", "Sonuç", "Kaynak", "İşlem"].map(label => <TableHead key={label}>{label}</TableHead>)}</TableRow></TableHeader><TableBody>{readings.map(r => <TableRow key={r._id} className={freshIds?.has(r._id) ? "bg-info-bg" : undefined}>
       <TableCell className="whitespace-nowrap tabular-nums text-xs">{freshIds?.has(r._id) && <span className="mr-1">Yeni</span>}{trTime(r.accessTime)}</TableCell>

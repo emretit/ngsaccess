@@ -1,3 +1,4 @@
+import { shortDate } from "../lib/planning";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -189,7 +190,7 @@ export function AddShiftDialog({
           if (!next) close();
         }}
       >
-        <DialogContent className="sm:max-w-[520px] max-h-[90dvh] overflow-y-auto min-w-0">
+        <DialogContent className="[&_button]:max-sm:min-h-11 [&_label:has(input[type=checkbox])]:min-h-11 [&_label:has(input[type=checkbox])]:items-center sm:max-w-[520px] max-h-[90dvh] overflow-y-auto min-w-0">
           <DialogHeader>
             <DialogTitle>
               {editingShift ? "Vardiya düzenle" : "Yeni vardiya tanımla"}
@@ -213,7 +214,7 @@ export function AddShiftDialog({
                   className="rounded-md border p-3 space-y-1 text-sm"
                 >
                   <p>
-                    {usage.asOfDate} itibarıyla aktif/gelecek:{" "}
+                    {shortDate(usage.asOfDate)} itibarıyla aktif/gelecek:{" "}
                     {usage.countLabel} {usage.assignmentCount} seri ·{" "}
                     {usage.countLabel} {usage.employeeCount} kişi.
                   </p>
@@ -264,7 +265,7 @@ export function AddShiftDialog({
                 )}
               <label className="flex gap-2 items-center text-sm">
                 <input
-                  type="checkbox"
+                  type="checkbox" className="size-6 shrink-0 accent-primary"
                   checked={breakEnabled}
                   onChange={(e) => setBreakEnabled(e.target.checked)}
                 />
@@ -283,7 +284,7 @@ export function AddShiftDialog({
               )}
               <label className="flex gap-2 items-center text-sm">
                 <input
-                  type="checkbox"
+                  type="checkbox" className="size-6 shrink-0 accent-primary"
                   checked={values.overtimeEnabled}
                   onChange={(e) =>
                     setValues({ ...values, overtimeEnabled: e.target.checked })
@@ -297,7 +298,7 @@ export function AddShiftDialog({
               </p>
               <label className="flex gap-2 items-center text-sm">
                 <input
-                  type="checkbox"
+                  type="checkbox" className="size-6 shrink-0 accent-primary"
                   checked={values.isActive}
                   onChange={(e) =>
                     setValues({ ...values, isActive: e.target.checked })

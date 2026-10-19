@@ -1,7 +1,8 @@
 "use node";
 
 import { v } from "convex/values";
-import { validateManualPdksNote } from "../lib/pdksManual";
+import type { Id } from "../_generated/dataModel";
+import { isManualPdksTimeOrderValid, validateManualPdksNote } from "../lib/pdksManual";
 import { action } from "../_generated/server";
 import { api } from "../_generated/api";
 
@@ -51,13 +52,13 @@ function parseCsvLine(line: string): string[] {
 function parseCsv(csv: string): ParsedRow[] {
   const lines = csv.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length === 0) return [];
-  const headerCols = parseCsvLine(lines[0]).map((c) => c.toLowerCase());
+  const headerCols = parseCsvLine(lines[0]).map((c) => c.toLocaleLowerCase("tr-TR"));
   const idIdx = headerCols.findIndex((c) =>
     ["tc", "tcno", "tckimlik", "tc_no", "id", "employee", "personel"].some((k) => c.includes(k)),
   );
   const dateIdx = headerCols.findIndex((c) => c.includes("tarih") || c === "date");
   const entryIdx = headerCols.findIndex((c) => c.includes("giri") || c === "entry" || c === "entry_time");
-  const exitIdx = headerCols.findIndex((c) => c.includes("çık") || c === "exit" || c === "exit_time");
+  const exitIdx = headerCols.findIndex((c) => c.includes("çık") || c.includes("cik") || c === "exit" || c === "exit_time");
   const noteIdx = headerCols.findIndex((c) => c.includes("not") || c === "note");
 
   if (idIdx < 0 || dateIdx < 0) {
@@ -84,7 +85,7 @@ function parseCsv(csv: string): ParsedRow[] {
 }
 
 export const previewPdksCsv = action({
-  args: { csvText: v.string() },
+  args: { csvText: v.string(), projectId: v.id("projects") },
   handler: async (ctx, args): Promise<{
     rows: MatchedRow[];
     summary: { total: number; matched: number; errors: number };
@@ -96,12 +97,19 @@ export const previewPdksCsv = action({
     }
 
     const lookups: { tcNo: string; firstName?: string; lastName?: string; _id: string }[] =
-      await ctx.runQuery(api.employees.listLightForImport, {});
+      await ctx.runQuery(api.employees.listLightForImport, { projectId: args.projectId });
     const byTc = new Map<string, (typeof lookups)[number]>();
     for (const e of lookups) {
       if (e.tcNo) byTc.set(e.tcNo, e);
     }
 
+    const reverseRows = rows.flatMap(row => {
+      const employee = byTc.get(row.identifier.trim());
+      return employee && DATE_REGEX.test(row.date) && row.entryTime && row.exitTime && HHMM_REGEX.test(row.entryTime) && HHMM_REGEX.test(row.exitTime) && row.entryTime >= row.exitTime
+        ? [{ employeeId: employee._id as Id<"employees">, date: row.date }] : [];
+    });
+    const overnightShifts: { key: string; startTime: string; endTime: string }[] = reverseRows.length ? await ctx.runQuery(api.pdksRecords.previewManualShifts, { projectId: args.projectId, rows: reverseRows }) : [];
+    const overnight = new Map(overnightShifts.map(shift => [shift.key, shift]));
     const matched: MatchedRow[] = rows.map((r) => {
       const result: MatchedRow = { ...r };
       const emp = byTc.get(r.identifier.trim());
@@ -121,6 +129,14 @@ export const previewPdksCsv = action({
         result.error = "Geçersiz çıkış saati";
         return result;
       }
+      if (!isManualPdksTimeOrderValid(r.entryTime, r.exitTime, overnight.get(`${emp._id}__${r.date}`))) {
+        result.error = "Çıkış saati girişten sonra olmalı. Gece vardiyası atanmamış.";
+        return result;
+      }
+      if (!r.entryTime && !r.exitTime) {
+        result.error = "En az bir saat girin.";
+        return result;
+      }
       result.employeeId = emp._id;
       result.matchedName = `${emp.firstName ?? ""} ${emp.lastName ?? ""}`.trim();
       return result;
@@ -138,7 +154,7 @@ export const previewPdksCsv = action({
 });
 
 export const importPdksCsv = action({
-  args: { csvText: v.string(), note: v.string() },
+  args: { csvText: v.string(), note: v.string(), projectId: v.id("projects") },
   handler: async (ctx, args): Promise<{ inserted: number; updated: number; errors: number }> => {
     const note = validateManualPdksNote(args.note);
     const preview: {
@@ -146,8 +162,9 @@ export const importPdksCsv = action({
       summary: { total: number; matched: number; errors: number };
     } = await ctx.runAction(api.actions.pdksImport.previewPdksCsv, {
       csvText: args.csvText,
+      projectId: args.projectId,
     });
-    const validRows = preview.rows.filter((r): r is MatchedRow & { employeeId: string } => Boolean(r.employeeId));
+    const validRows = preview.rows.filter((r): r is MatchedRow & { employeeId: string } => Boolean(r.employeeId) && !r.error);
     if (validRows.length === 0) {
       return { inserted: 0, updated: 0, errors: preview.summary.errors };
     }

@@ -1,0 +1,15 @@
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/shared/EmptyState';
+import { AuditTable } from './AuditTable';
+import type { AuditArgs, AuditRow } from './auditState';
+
+export function AuditResultsContent({ rows, more, filtered, active, status, loadMore, args, onSelect }: {
+ rows: AuditRow[]; more: boolean; filtered: boolean; active: boolean; status?: string;
+ loadMore: () => void; args: AuditArgs; onSelect: (row: AuditRow, trigger: HTMLButtonElement) => void;
+}) {
+  return <>
+      {rows.length > 0 && <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><p role="status" aria-live="polite">{rows.length} eşleşen kayıt yüklendi · {more ? 'Daha fazla kayıt olabilir' : 'Kapsamın sonuna ulaşıldı'}</p><span>{args.search ? 'Uygunluk sırası' : 'En yeni önce'}</span></div>}
+      {rows.length ? <AuditTable rows={rows} allProjects={args.allProjects} onSelect={onSelect} /> : <EmptyState title={more ? 'Taranan kayıtlarda eşleşme yok' : filtered ? 'Filtrelere uygun kayıt yok' : 'Henüz denetim kaydı yok'} description={more ? 'Taranacak kayıtlar var; aramayı sürdürebilirsiniz.' : filtered ? 'Aramayı veya filtreleri değiştirin.' : 'Bu kapsamda kaydedilen olaylar burada görünür.'} />}
+      {(rows.length > 0 || more) && <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-3 text-xs text-muted-foreground"><p role="status" aria-live="polite">{active && status === 'LoadingMore' ? 'Diğer kayıtlar yükleniyor…' : more ? 'Daha fazla kayıt olabilir.' : 'Bu kapsamdaki tüm eşleşmeler yüklendi.'}</p>{more && <Button variant="outline" disabled={!active || status !== 'CanLoadMore'} onClick={() => loadMore()}>{active && status === 'LoadingMore' ? 'Diğer kayıtlar yükleniyor…' : 'Daha fazla yükle'}</Button>}</div>}
+  </>;
+}

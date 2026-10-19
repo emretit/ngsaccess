@@ -4,8 +4,8 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import type { api } from "./_generated/api";
 import * as auth from "./lib/auth";
+import { listPage as visitorsListPage } from "./visitors";
 import { list as employeesList, getById } from "./employees";
-import { list as visitorsList } from "./visitors";
 import { getMonthlyPayrollSheet, getPdksTableData } from "./cardReadings";
 import { getDepartmentCostReport, getOvertimeSummaryReport } from "./reports";
 
@@ -58,7 +58,7 @@ function fixture(role: typeof roles[number], overrides: Doc<"employees">[] = emp
     const chain = {
       withIndex: (_name: string, configure: (range: typeof index) => unknown) => { configure(index); return chain; },
       filter: () => chain, order: () => chain,
-      collect: async () => [...rows], first: async () => rows[0] ?? null,
+      take: async (limit: number) => rows.slice(0, limit), collect: async () => [...rows], first: async () => rows[0] ?? null,
     };
     return chain;
   };
@@ -97,10 +97,21 @@ describe.each(roles)("%s public pay responses", (role) => {
     const result = await invoke(getById, fixture(role, [orphan]), { employeeId: emp._id });
     expect(result).toEqual(role === "super_admin" ? orphan : null);
   });
-  it("visitors.list masks legacy pay on visitor documents", async () => {
-    const rows = await invoke<FunctionReturnType<typeof api.visitors.list>>(visitorsList, fixture(role), { projectId });
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ hourlyRate: visible ? 300 : null, monthlySalary: visible ? 67500 : null });
+  it("visitors.listPage omits legacy pay from visitor rows", async () => {
+    const visitor = employees.find(row => row.isVisitor);
+    if (!visitor) throw new Error("Missing visitor fixture");
+    const base = fixture(role);
+    const query = (table: string) => {
+      const chain = { withIndex: () => chain, order: () => chain, first: async () => null,
+        async *[Symbol.asyncIterator]() { if (table === "employees") yield visitor; },
+      };
+      return chain;
+    };
+    const ctx = { ...base, db: { ...base.db, query } } as unknown as QueryCtx;
+    const result = await invoke<FunctionReturnType<typeof api.visitors.listPage>>(visitorsListPage, ctx, { projectId, paginationOpts: { numItems: 25, cursor: null } });
+    expect(result.page).toHaveLength(1);
+    expect(result.page[0]).not.toHaveProperty("hourlyRate");
+    expect(result.page[0]).not.toHaveProperty("monthlySalary");
   });
   it("PDKS table masks rates and calculated pay in single and matrix views", async () => {
     for (const viewMode of ["single", "matrix"]) {
@@ -155,7 +166,7 @@ describe.each(roles)("%s public pay responses", (role) => {
     expect(result.rows.map(row => row.cost)).toEqual(visible ? [1500, 750, 375, 375] : [null, null, null, null]);
   });
   it("list/report endpoints still reject a foreign selected project", async () => {
-    for (const fn of [employeesList, visitorsList, getPdksTableData, getMonthlyPayrollSheet, getOvertimeSummaryReport, getDepartmentCostReport]) {
+    for (const fn of [employeesList, visitorsListPage, getPdksTableData, getMonthlyPayrollSheet, getOvertimeSummaryReport, getDepartmentCostReport]) {
       await expect(invoke(fn, fixture(role), { ...period, projectId: otherProjectId })).rejects.toThrow("erişim yetkiniz yok");
     }
   });
@@ -166,7 +177,6 @@ it("project_user responses cannot reveal changing stored pay through costs or or
   const changedPay = employees.map(emp => ({ ...emp, hourlyRate: 50000, monthlySalary: 999999 }));
   for (const [fn, args] of [
     [employeesList, { projectId }], [getById, { employeeId: employees[0]._id }],
-    [visitorsList, { projectId }],
     [getPdksTableData, { projectId, startDate: "2026-06-22", endDate: "2026-06-23" }],
     [getMonthlyPayrollSheet, period], [getOvertimeSummaryReport, period],
     [getDepartmentCostReport, { ...period, hourlyRate: 50 }],

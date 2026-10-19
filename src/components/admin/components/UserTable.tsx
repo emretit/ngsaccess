@@ -57,7 +57,7 @@ export function UserTable({
   const identity = (user: User) => (
     <>
       <p className="break-words font-medium">{userName(user)}</p>
-      <p className="break-all text-xs text-muted-foreground">{user.email}</p>
+      {user.email && userName(user) !== user.email && <p className="break-all text-xs text-muted-foreground">{user.email}</p>}
       {"pendingSetup" in user && user.pendingSetup && (
         <p className="text-xs text-muted-foreground">
           E-posta doğrulaması bekliyor

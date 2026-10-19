@@ -159,6 +159,7 @@ function EmployeePage() {
             sort={sort}
             onSortChange={(value) => update({ sort: value })}
             hasFilters={hasFilters}
+            hideClear={filtered.length === 0}
             onClear={() => {
               setPrivateQuery(null);
               update({ q: "", department: "", status: "" });
@@ -173,10 +174,10 @@ function EmployeePage() {
             />
           ) : filtered.length === 0 ? (
             <EmptyState
-              title="Aramanızla eşleşen personel yok"
+              title={q ? "Aramanızla eşleşen personel yok" : department && status === "all" ? "Bu departmanda doğrudan bağlı kişi yok" : "Seçili filtrelerle eşleşen personel yok"}
               description="Aramayı veya departman seçimini değiştirin."
               action={{
-                label: "Filtreleri temizle",
+                label: department && !q && status === "all" ? "Tüm personele dön" : "Filtreleri temizle",
                 onClick: () => {
                   setPrivateQuery(null);
                   update({ q: "", department: "", status: "" });
@@ -191,13 +192,12 @@ function EmployeePage() {
               showDepartment={!department}
               employees={filtered.slice((page - 1) * size, page * size)}
               onEdit={(employee) => open(employee, false)}
-              onDelete={() => undefined}
               onViewDetails={(employee) => open(employee, true)}
               onRefresh={refetch}
             />
           )}
           <PaginationBar
-            summary={`${employees.length} personelden ${filtered.length} sonuç · ${pageRange(filtered.length, page, size)} gösteriliyor`}
+            summary={filtered.length === 0 ? "0 sonuç" : `${employees.length} personelden ${filtered.length} sonuç · ${pageRange(filtered.length, page, size)} gösteriliyor`}
             page={page}
             pageCount={Math.max(1, Math.ceil(filtered.length / size))}
             onPrevious={() => update({ page: String(page - 1) }, false)}

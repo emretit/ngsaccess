@@ -12,6 +12,8 @@ interface EmptyStateProps {
   };
   className?: string;
   compact?: boolean;
+  /** Disable live announcements for static informational content. */
+  live?: boolean;
 }
 
 export function EmptyState({
@@ -21,10 +23,11 @@ export function EmptyState({
   action,
   className,
   compact = false,
+  live = true,
 }: EmptyStateProps) {
   return (
     <div
-      role="status"
+      role={live ? "status" : undefined}
       className={cn(
         "flex flex-col items-center justify-center py-16 px-4 text-center",
         compact && "min-h-0 py-6",

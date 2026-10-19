@@ -13,11 +13,12 @@ interface FormFieldWrapperProps {
   error?: string;
   hint?: string;
   className?: string;
+  inline?: boolean;
   children: React.ReactNode | ((props: FieldControlProps) => React.ReactNode);
 }
 
 /** Tek kontrol veya render slot'u; DOM sarmalayıcılarına ARIA eklenmez. */
-export function FormFieldWrapper({ htmlFor, label, error, hint, className, children }: FormFieldWrapperProps) {
+export function FormFieldWrapper({ htmlFor, label, error, hint, className, inline = false, children }: FormFieldWrapperProps) {
   const errorId = `${htmlFor}-error`;
   const hintId = `${htmlFor}-hint`;
   const control: FieldControlProps = {
@@ -36,9 +37,12 @@ export function FormFieldWrapper({ htmlFor, label, error, hint, className, child
       "aria-describedby": [child.props["aria-describedby"], control["aria-describedby"]].filter(Boolean).join(" ") || undefined,
     });
   });
+  const renderedControl = typeof children === "function" ? children(control) : enhance(children);
   return <div className={cn("space-y-1.5", className)}>
-    <Label htmlFor={htmlFor}>{label}</Label>
-    {typeof children === "function" ? children(control) : enhance(children)}
+    {inline ? <Label htmlFor={htmlFor} className="flex min-h-11 cursor-pointer items-center justify-between gap-4">
+      <span className="min-w-0 flex-1">{label}</span>
+      {renderedControl}
+    </Label> : <><Label htmlFor={htmlFor}>{label}</Label>{renderedControl}</>}
     {hint && <p id={hintId} className="text-xs text-muted-foreground">{hint}</p>}
     <FieldError message={error} id={errorId} />
   </div>;

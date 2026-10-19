@@ -66,7 +66,7 @@ export function PDKSTableView({
       <div className="hidden md:block">
         <table className="w-full table-fixed border-collapse text-xs">
           <caption className="sr-only">
-            Günlük PDKS kayıtları. Saatler İstanbul saatidir.
+            Günlük PDKS kayıtları. Saatler İstanbul saatidir. Toplam süreden mola düşülmüştür.
           </caption>
           <thead className="sticky top-0 bg-muted">
             <tr className="h-9 border-b">
@@ -146,6 +146,7 @@ export function PDKSTableView({
                 <td className="px-2 tabular-nums">{displayTime(r.lastExit)}</td>
                 <td className="px-2 tabular-nums">
                   {displayDuration(r.totalMinutes, r.status)}
+                  {(r.nightMinutes ?? 0) > 0 && <span className="block text-muted-foreground">Gece: {displayDuration(r.nightMinutes ?? 0, r.status)}</span>}
                 </td>
                 <td className="px-2 tabular-nums">
                   {displayDuration(r.overtimeMinutes, r.status)}

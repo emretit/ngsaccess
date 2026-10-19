@@ -69,9 +69,10 @@ export function classifyReadingSource(reading: PdksSourceReading): PdksReadingSo
   return reading.cardNo?.trim() ? "card" : "unknown";
 }
 
-/** Unknown legacy events remain eligible, but never get relabeled as cards/biometrics. */
+/** Unproven events are excluded from attendance calculations. */
 export function isPdksEligibleReading(reading: PdksSourceReading): boolean {
-  return classifyReadingSource(reading) !== "biometric";
+  const source = classifyReadingSource(reading);
+  return source !== "biometric" && source !== "unknown";
 }
 
 /** Shared calculation boundary. An explicit project excludes unassigned and foreign rows too. */

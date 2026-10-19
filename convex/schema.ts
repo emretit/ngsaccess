@@ -118,6 +118,10 @@ export default defineSchema({
     .index("by_department", ["departmentId"])
     .index("by_photo_storage", ["photoStorageId"])
     .index("by_project_visitor", ["projectId", "isVisitor"])
+    // Ziyaretçi listesi durum filtresi: projede süre aralığına göre cursor tarama (UI audit 2, 06-H1).
+    .index("by_project_visitor_expiry", ["projectId", "isVisitor", "accessExpiresAt"])
+    // Bitişi ileri taşınmış ama durumu "expired" kalan ziyaretçiler için ikinci tarama aralığı (06-H1).
+    .index("by_project_visitor_status_expiry", ["projectId", "isVisitor", "visitorStatus", "accessExpiresAt"])
     .searchIndex("search_first_name", { searchField: "firstName", filterFields: ["projectId"] })
     .searchIndex("search_last_name", { searchField: "lastName", filterFields: ["projectId"] })
     // Expiry cron: isVisitor=true ∧ isActive=true ∧ accessExpiresAt<=now (ISO-UTC sıralanabilir).
@@ -409,9 +413,12 @@ export default defineSchema({
   })
     .index("by_project", ["projectId"])
     .index("by_project_active", ["projectId", "isActive"])
+    // Kural listesi tür filtresi sayfalamadan önce (UI audit 2, 05-D1).
+    .index("by_project_targetType", ["projectId", "targetType"])
+    .index("by_project_targetType_isActive", ["projectId", "targetType", "isActive"])
     .index("by_active", ["isActive"])
     .index("by_hikWeekPlanNo", ["hikWeekPlanNo"])
-    .searchIndex("search_name", { searchField: "name", filterFields: ["projectId", "isActive"] }),
+    .searchIndex("search_name", { searchField: "name", filterFields: ["projectId", "isActive", "targetType"] }),
 
   groupMembers: defineTable({
     groupId: v.id("accessRules"),
@@ -988,6 +995,9 @@ export default defineSchema({
     .index("by_dates", ["startDate", "endDate"])
     .index("by_project_start", ["projectId", "startDate"])
     .index("by_project_end", ["projectId", "endDate"])
+    .index("by_project_type_end", ["projectId", "leaveType", "endDate"])
+    .index("by_project_employee_end", ["projectId", "employeeId", "endDate"])
+    .index("by_project_employee_type_end", ["projectId", "employeeId", "leaveType", "endDate"])
     .index("by_employee_start", ["employeeId", "startDate"]),
 
   leaveBalances: defineTable({
@@ -1035,6 +1045,8 @@ export default defineSchema({
     grantedAt: v.string(),
     revokedAt: v.optional(v.string()),
     documentUrl: v.optional(v.string()),
+    // Onay anındaki aydınlatma metni sürümü (ziyaretçi KVKK, 06-O5).
+    documentVersion: v.optional(v.string()),
     grantedBy: v.optional(v.id("users")),
     notes: v.optional(v.string()),
   })
@@ -1073,6 +1085,8 @@ export default defineSchema({
     nightShiftMultiplier: v.number(),
     nightShiftStart: v.string(),
     nightShiftEnd: v.string(),
+    // Gece penceresindeki fazla mesaide gün türü ve gece çarpanının birleşimi (13-H1). Boşsa "max".
+    nightCombineMode: v.optional(v.union(v.literal("max"), v.literal("multiply"), v.literal("additive"))),
     updatedAt: v.string(),
   }).index("by_project", ["projectId"]),
 
@@ -1149,6 +1163,9 @@ export default defineSchema({
     biometricChangedBy: v.optional(v.id("users")),
     cardReadingRetentionDays: v.optional(v.number()),
     aiMaskNames: v.optional(v.boolean()),
+    // Ziyaretçi KVKK aydınlatma metni bağlantısı ve sürümü (06-O5; Ayarlar > Gizlilik'ten yönetilir).
+    visitorKvkkUrl: v.optional(v.string()),
+    visitorKvkkVersion: v.optional(v.string()),
     updatedAt: v.string(),
   }).index("by_project", ["projectId"]),
 

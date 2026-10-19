@@ -1,3 +1,4 @@
+import { shortDate, shiftTimeLabel } from "./lib/planning";
 import {
   Dialog,
   DialogContent,
@@ -38,7 +39,7 @@ export function ShiftDayDetails({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="max-h-[85dvh] overflow-y-auto min-w-0">
+      <DialogContent className="[&_button]:max-sm:min-h-11 [&_label:has(input[type=checkbox])]:min-h-11 [&_label:has(input[type=checkbox])]:items-center max-h-[85dvh] overflow-y-auto min-w-0">
         <DialogHeader>
           <DialogTitle>
             {employee.firstName} {employee.lastName} · {dayLabel(date)}
@@ -59,10 +60,10 @@ export function ShiftDayDetails({
             <p className="text-sm tabular-nums">
               {continuation
                 ? `Önceki günden · 00:00–${shift.endTime}`
-                : `${shift.startTime}–${shift.endTime}${shift.endTime < shift.startTime ? " (+1 gün)" : ""}`}
+                : shiftTimeLabel(shift)}
             </p>
             <p className="text-sm">
-              Seri: {assignment.startDate} – {assignment.endDate}
+              Seri: {shortDate(assignment.startDate)} – {shortDate(assignment.endDate)}
             </p>
             <p className="text-xs text-muted-foreground">
               {assignment.weekPattern?.length
@@ -78,7 +79,8 @@ export function ShiftDayDetails({
             </Button>
           </div>
         ))}
-        <Button disabled={!canAssign} onClick={onAssign}>
+        {!canAssign && <p id="day-assign-help" className="text-sm text-muted-foreground">Önce vardiya tanımlayın veya bir tanımı etkinleştirin.</p>}
+        <Button aria-describedby={!canAssign ? "day-assign-help" : undefined} disabled={!canAssign} onClick={onAssign}>
           Bu tarihe vardiya ata
         </Button>
       </DialogContent>

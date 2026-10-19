@@ -1,3 +1,4 @@
+import { formatTrDateTime } from "@/lib/date";
 import { visitorTime } from "../../../convex/lib/visitorStatus";
 // Ziyaretçi zaman yardımcıları.
 // accessExpiresAt ISO UTC olarak saklanır; form <input type="datetime-local"> tarayıcı
@@ -34,13 +35,6 @@ export function defaultExpiryLocalInput(): string {
 
 /** ISO → TR (UTC+3) gösterim. */
 export function formatVisitorTime(iso?: string | null): string {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString("tr-TR", {
-    timeZone: "Europe/Istanbul",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const time = iso ? visitorTime(iso) : NaN;
+  return Number.isFinite(time) ? formatTrDateTime(time) : "—";
 }

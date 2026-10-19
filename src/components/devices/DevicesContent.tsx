@@ -9,6 +9,7 @@ import { Device } from "@/types/device";
 import { DeviceList } from "@/components/devices/DeviceList";
 import { DeviceFilters } from "@/components/devices/DeviceFilters";
 import { Zone } from "@/hooks/useZonesAndDoors";
+import { deviceMatchesFilters } from "@/lib/deviceDisplay";
 import { useDeviceFilters } from "@/hooks/useDeviceFilters";
 
 interface DevicesContentProps {
@@ -62,6 +63,8 @@ export function DevicesContent({
     filteredDevices
   } = useDeviceFilters(devices, selectedZoneId, selectedDoorId);
 
+  const locationDevices = devices.filter(device => deviceMatchesFilters(device, { search: "", status: "all", type: "all", zoneId: selectedZoneId, doorId: selectedDoorId }));
+
   return (
     <div className="min-w-0 space-y-5">
       <PageHeader title="Cihazlar">
@@ -75,10 +78,10 @@ export function DevicesContent({
         onClearFilters={clearFilters}
         locationActive={Boolean(selectedZoneId || selectedDoorId)}
         statusCounts={{
-          all: devices.length,
-          online: devices.filter(d => d.connectionStatus === "online").length,
-          offline: devices.filter(d => d.connectionStatus === "offline").length,
-          never: devices.filter(d => d.connectionStatus === "never").length,
+          all: locationDevices.length,
+          online: locationDevices.filter(d => d.connectionStatus === "online").length,
+          offline: locationDevices.filter(d => d.connectionStatus === "offline").length,
+          never: locationDevices.filter(d => d.connectionStatus === "never").length,
         }}
         search={search}
         onSearchChange={setSearch}

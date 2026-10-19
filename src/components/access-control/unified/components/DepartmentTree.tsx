@@ -55,7 +55,7 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
             change([employee._id], checked === true)
           }
         />
-        <Label htmlFor={id} className="min-w-0 break-words font-normal">
+        <Label htmlFor={id} className="flex flex-1 min-h-11 items-center cursor-pointer min-w-0 break-words font-normal">
           {employee.firstName} {employee.lastName}
         </Label>
       </div>
@@ -103,7 +103,7 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
             type="button"
             size="icon"
             variant="ghost"
-            className="h-8 w-8 shrink-0"
+            className="h-11 w-11 shrink-0"
             aria-label={`${department.name} departmanını ${open ? "daralt" : "genişlet"}`}
             aria-expanded={open}
             aria-controls={contentId}
@@ -136,7 +136,7 @@ export const DepartmentTree = <T extends DepartmentTreeFormData>({
               )
             }
           />
-          <Label htmlFor={id} className="min-w-0 break-words">
+          <Label htmlFor={id} className="flex flex-1 min-h-11 items-center cursor-pointer min-w-0 break-words">
             {department.name} ({scopedEmployees.length} kişi)
           </Label>
         </div>

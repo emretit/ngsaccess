@@ -1,3 +1,5 @@
+import { CalendarIcon } from 'lucide-react';
+import { formatTrDate } from '@/lib/date';
 import { useState } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
@@ -14,7 +16,7 @@ function ActorFilter({ args, value, onChange }: { args: AuditArgs; value: string
   // Seçenek taraması ağır (2000 olay) ve her yeni kayıtta yeniden çalışır: yalnız seçici açılınca veya seçili aktör varken yükle.
   const [wanted, setWanted] = useState(Boolean(value) && value !== 'system');
   const options = useQuery(api.auditLog.actorOptions, (wanted || Boolean(value && value !== 'system')) ? { projectId: args.projectId, allProjects: args.allProjects } : 'skip');
-  const statuses = { active: 'Aktif kullanıcı', member: 'Proje üyesi', deleted: 'Silinmiş kullanıcı', removed: 'Proje üyesi değil' };
+  const statuses = { active: 'Kayıtları yapan kişi', member: 'Proje üyesi', deleted: 'Silinmiş kullanıcı', removed: 'Mevcut üye listesinde yok' };
   return <div className="min-w-0 space-y-1">
     <label id="audit-user-label" className="text-xs text-muted-foreground">Kullanıcı</label>
     <Select value={value || 'all'} onValueChange={onChange} onOpenChange={open => { if (open) setWanted(true); }}>
@@ -41,10 +43,10 @@ export function AuditFilters({ state, args, ready, rangeError }: { state: Return
           <div className="min-w-0 space-y-1"><label id="audit-action-label" className="text-xs text-muted-foreground">Eylem</label><Select value={args.action || 'all'} onValueChange={value => state.update('action', value)}><SelectTrigger aria-labelledby="audit-action-label"><SelectValue /></SelectTrigger><SelectContent className="max-w-[calc(100vw-32px)]"><SelectItem value="all">Tüm eylemler</SelectItem>{Object.entries(actionLabels).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
           <div className="min-w-0 space-y-1"><label id="audit-target-label" className="text-xs text-muted-foreground">Varlık</label><Select value={args.targetTable || 'all'} onValueChange={value => state.update('target', value)}><SelectTrigger aria-labelledby="audit-target-label"><SelectValue /></SelectTrigger><SelectContent className="max-w-[calc(100vw-32px)]"><SelectItem value="all">Tüm varlıklar</SelectItem>{Object.entries(AUDIT_TARGET_LABELS).map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
         </div>
-        <div className="hidden w-full md:block" aria-hidden="true" /><div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 md:w-[420px]">{[['start', 'Başlangıç'], ['end', 'Bitiş']].map(([key, label]) => <div key={key} className="min-w-0 space-y-1"><label htmlFor={`audit-${key}`} className="text-xs text-muted-foreground">{label}</label><DateInput id={`audit-${key}`} className="min-w-0 w-full" value={state.params.get(key) || ''} onChange={value => state.update(key, value)} aria-invalid={Boolean(rangeError)} aria-describedby={rangeError ? 'audit-range-error' : undefined} /></div>)}</div>
-        {rangeError && <p id="audit-range-error" role="alert" className="text-sm text-destructive">{rangeError}</p>}
+        <div className="hidden w-full md:block" aria-hidden="true" /><div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 md:w-[420px]">{[['start', 'Başlangıç'], ['end', 'Bitiş']].map(([key, label]) => { const value = state.params.get(key) || ''; const display = value && !Number.isNaN(Date.parse(`${value}T12:00:00Z`)) ? formatTrDate(new Date(`${value}T12:00:00Z`)) : 'Tarih seçin'; return <div key={key} className="min-w-0 space-y-1"><label htmlFor={`audit-${key}`} className="text-xs text-muted-foreground">{label}</label><DateInput id={`audit-${key}`} className="min-w-0 w-full" value={value} trigger={<Button id={`audit-${key}`} type="button" variant="outline" className="h-9 w-full justify-between text-xs font-normal" aria-label={`${label}: ${display}`} aria-invalid={Boolean(rangeError)} aria-describedby={rangeError ? 'audit-range-error' : undefined}>{display}<CalendarIcon aria-hidden="true" className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button>} onChange={value => state.update(key, value)} aria-invalid={Boolean(rangeError)} aria-describedby={rangeError ? 'audit-range-error' : undefined} /></div>; })}</div>
       </div>
     </FilterBar>
+    {rangeError && <p id="audit-range-error" role="alert" className="w-full text-sm text-destructive">{rangeError}</p>}
     <p className="text-xs text-muted-foreground">Arama: kullanıcı, varlık etiketi, not ve kaydedilmiş ad/unvan alanları.</p>
     <details className="text-xs text-muted-foreground"><summary className="cursor-pointer focus-visible:outline focus-visible:outline-ring">Arama kapsamı</summary><p className="mt-2 max-w-3xl">Eski arama metni bulunmayan kayıtlar metin aramasına dahil edilmez; geçmişi incelemek için aramayı temizleyin. Kimlik, kart, TC, telefon ve tüm JSON alanlarında arama yapılmaz. Kayıtların arama metni en çok 500 karakterdir.{args.search && (args.startDate || args.endDate) && ' Aramada tarih aralığı yüklenen sonuçlara uygulanır; eşleşme görmüyorsanız daha fazla yükleyin.'}</p></details>
   </div>;

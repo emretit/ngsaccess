@@ -38,7 +38,7 @@ import { formatWeekdaysAbbr } from "./components/weekdays";
 import { AccessRuleDetails } from "./AccessRuleDetails";
 import { ProjectSyncButton, RecentRuns } from "./SyncRuns";
 import { loadRuleEditor } from "./lib/loadRuleEditor";
-import { ruleTypeMatches } from "./lib/presentation";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AccessRule } from "@/types/access-control";
 import { PaginationBar } from "@/components/shared/PaginationBar";
 type Summary = FunctionReturnType<
@@ -51,10 +51,7 @@ interface Props {
 function scopeText(rule: Summary) {
   if (rule.scopeTruncated) return "Geniş kapsam · Ayrıntıyı aç";
   const panels = rule.panels
-    .map(
-      (panel) =>
-        `${panel.label} · ${panel.wholePanel ? "tüm kapılar" : `${panel.selectedDoors}/${panel.totalDoors} kapı`}`,
-    )
+    .map((panel) => panel.label)
     .join(", ");
   return (
     [
@@ -103,7 +100,7 @@ function RuleRow({
         <TableCell className="min-w-0">
           <Button
             variant="link"
-            className="h-auto max-w-full whitespace-normal break-words p-0 text-left justify-start text-foreground"
+            className="h-auto min-h-11 md:min-h-0 w-full max-w-full whitespace-normal break-words p-0 text-left justify-start text-foreground"
             onClick={() => setOpen(true)}
           >
             {rule.name}
@@ -189,7 +186,7 @@ function RuleRow({
               (Türkiye saati)
             </SheetDescription>
           </SheetHeader>
-          <p className="mt-4 break-words">{rule.description}</p>
+          {rule.description?.trim() && <p className="mt-4 break-words">{rule.description}</p>}
           {open && (
             <QuerySectionBoundary
               resetKey={rule._id}
@@ -230,7 +227,7 @@ function RulesPage({
   search: string;
   searchBy: "rule" | "person" | "door";
   status: "all" | "active" | "inactive";
-  type: string;
+  type: "all" | "visitor" | "personnel";
   clear: () => void;
   onCount: (count: number | undefined) => void;
 }) {
@@ -240,30 +237,20 @@ function RulesPage({
     search,
     searchBy,
     status,
+    type,
     paginationOpts: {
       cursor: cursors[cursors.length - 1] ?? null,
       numItems: 20,
     },
   });
   useEffect(() => {
-    onCount(
-      result?.page.filter((rule) => ruleTypeMatches(rule.targetType, type))
-        .length,
-    );
-  }, [result, type, onCount]);
+    onCount(result?.page.length);
+  }, [result, onCount]);
   if (!result)
     return <SectionSkeleton rows={4} label="Erişim kuralları yükleniyor" />;
-  const rows = result.page.filter((rule) =>
-    ruleTypeMatches(rule.targetType, type),
-  );
+  const rows = result.page;
   return (
     <div className="space-y-3 min-w-0">
-      {type !== "all" && (
-        <p className="text-xs text-muted-foreground">
-          Tür filtresi bu cursor sayfasındaki kayıtları daraltır. Diğer sonuçlar
-          için sonraki sayfaya geçin.
-        </p>
-      )}
       {result.searchLimited ? (
         <EmptyState
           title="Aramayı daraltın"
@@ -326,6 +313,7 @@ function RulesPage({
         </div>
       )}
       <PaginationBar
+        className="max-md:[&_button]:min-h-11"
         summary={`Sayfa ${cursors.length} · ${rows.length} kural gösteriliyor`}
         page={cursors.length}
         onPrevious={() => setCursors((prev) => prev.slice(0, -1))}
@@ -386,6 +374,7 @@ export default function AccessRulesList(props: Props) {
   return (
     <div className="space-y-4 min-w-0">
       <PageHeader
+        className="max-md:[&_button]:min-h-11"
         title="Geçiş Kontrol"
         scope={`${activeProject?.name ?? "Proje seçilmedi"} · Erişim kuralları`}
         primaryAction={
@@ -470,20 +459,16 @@ export default function AccessRulesList(props: Props) {
                 ],
               },
             ].map((filter) => (
-              <label key={filter.key} className="min-w-0 text-xs">
-                <span className="sr-only">{filter.label}</span>
-                <select
-                  className="h-9 max-w-full rounded-md border border-input bg-background px-2"
-                  value={filter.value}
-                  onChange={(event) => change(filter.key, event.target.value)}
-                >
+              <Select key={filter.key} value={filter.value} onValueChange={(value) => change(filter.key, value)}>
+                <SelectTrigger aria-label={filter.label} className="w-auto min-w-36 max-w-full text-base md:text-sm max-md:min-h-11">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
                   {filter.options.map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
                   ))}
-                </select>
-              </label>
+                </SelectContent>
+              </Select>
             ))}
           </FilterBar>
           <QuerySectionBoundary

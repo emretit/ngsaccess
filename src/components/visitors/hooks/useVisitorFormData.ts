@@ -19,6 +19,7 @@ export interface VisitorFormData {
   isActive: boolean;
   notes: string;
   kvkkConsent: boolean;
+  kvkkDocumentVersion?: string;
   projectId?: Id<"projects">;
 }
 
@@ -55,9 +56,9 @@ export const useVisitorFormData = (visitor?: VisitorDetail | null) => {
 
   const presetRules = (presetRulesData ?? [])
     .filter((r) => r.isActive || r._id === visitor?.presetRuleId)
-    .map((r) => ({ id: r._id, name: r.name }));
+    .map((r) => ({ id: r._id, name: r.hasDoors ? r.name : `${r.name} (Kapı yok)`, disabled: !r.hasDoors }));
   if (visitor?.presetRuleId && !presetRules.some(rule => rule.id === visitor.presetRuleId)) {
-    presetRules.push({ id: visitor.presetRuleId, name: visitor.presetRuleName ?? "Kayıtlı erişim bölgesi" });
+    presetRules.push({ id: visitor.presetRuleId, name: visitor.presetRuleName ?? "Kayıtlı erişim bölgesi", disabled: true });
   }
   const hostEmployees = (employeesData ?? []).filter(e => !e.isVisitor).map((e) => ({
     id: e._id,
@@ -82,6 +83,7 @@ export const useVisitorFormData = (visitor?: VisitorDetail | null) => {
         isActive: visitor.isActive ?? true,
         notes: visitor.notes || "",
         kvkkConsent: visitor.hasKvkkConsent ?? false,
+        kvkkDocumentVersion: visitor.kvkkConsent?.version ?? undefined,
         projectId: visitor.projectId ?? defaultProjectId,
       };
       setFormData(initial);

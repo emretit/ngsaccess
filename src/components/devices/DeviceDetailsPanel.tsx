@@ -19,9 +19,11 @@ interface DeviceDetailsPanelProps { open: boolean; onClose: () => void; selected
 export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess, projectId: draftProjectId }: DeviceDetailsPanelProps) {
   const { projectId } = useActiveProject();
   const projectChanged = open && projectId !== draftProjectId;
-  const projects = useQuery(api.projects.list, open ? {} : "skip");
-  const [commandPending, setCommandPending] = useState(false);
   const [step, setStep] = useState<"picker" | "form">("picker");
+  const [settingsVisited, setSettingsVisited] = useState(false);
+  const needsProjects = open && (!selectedDevice || settingsVisited);
+  const projects = useQuery(api.projects.list, needsProjects ? {} : "skip");
+  const [commandPending, setCommandPending] = useState(false);
   const [brand, setBrand] = useState<DeviceBrand>("other");
   const [draftBrands, setDraftBrands] = useState<DeviceBrand[]>([]);
   const [formStates, setFormStates] = useState<Partial<Record<DeviceBrand, { dirty: boolean; pending: boolean }>>>({});
@@ -35,6 +37,7 @@ export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess, p
     setDraftBrands([]);
     setFormStates({});
     setCommandPending(false);
+    setSettingsVisited(false);
   }, [open, selectedDevice]);
   const pending = commandPending || Object.values(formStates).some(state => state?.pending);
   const dirty = Object.values(formStates).some(state => state?.dirty);
@@ -50,19 +53,20 @@ export function DeviceDetailsPanel({ open, onClose, selectedDevice, onSuccess, p
       <SheetContent size="full" className="w-full sm:max-w-[620px] min-w-0 overflow-y-auto p-0">
         <SheetHeader className="border-b border-line p-5 pr-12 text-left"><SheetTitle className="break-words">{selectedDevice?.name ?? (step === "picker" ? "Yeni cihaz" : `Yeni cihaz · ${BRAND_LABELS[brand]}`)}</SheetTitle></SheetHeader>
         <fieldset disabled={projectChanged} onSubmitCapture={event => { if (projectChanged) { event.preventDefault(); event.stopPropagation(); } }} className="min-w-0 p-5">
-          {projects === undefined || !draftProjectId ? <SectionSkeleton label="Cihaz bilgileri yükleniyor" /> : selectedDevice ? (
-            <Tabs key={selectedDevice._id} defaultValue="overview" className="min-w-0 space-y-5">
+          {!draftProjectId ? <SectionSkeleton label="Cihaz bilgileri yükleniyor" /> : selectedDevice ? (
+            <Tabs key={selectedDevice._id} defaultValue="overview" onValueChange={value => { if (value === "settings") setSettingsVisited(true); }} className="min-w-0 space-y-5">
               <TabsList className="grid w-full grid-cols-2"><TabsTrigger value="overview">Genel bakış</TabsTrigger><TabsTrigger value="settings">Ayarlar</TabsTrigger></TabsList>
               <TabsContent value="overview" forceMount className="data-[state=inactive]:hidden"><QuerySectionBoundary resetKey={selectedDevice._id}><DeviceCommandCenter device={selectedDevice} onPendingChange={setCommandPending} /></QuerySectionBoundary></TabsContent>
-              <TabsContent value="settings" forceMount className="space-y-5 data-[state=inactive]:hidden">
-                <DeviceForm projectIdOverride={draftProjectId} open={open} device={selectedDevice} projects={projects} defaultBrand={selectedDevice.brand ?? "other"} onSuccess={onSuccess} onClose={close} onStateChange={updateFormState} />
+              {settingsVisited && <TabsContent value="settings" forceMount className="space-y-5 data-[state=inactive]:hidden">
+                {projects === undefined ? <SectionSkeleton label="Cihaz ayarları yükleniyor" /> : <DeviceForm projectIdOverride={draftProjectId} open={open} device={selectedDevice} projects={projects} defaultBrand={selectedDevice.brand ?? "other"} onSuccess={onSuccess} onClose={close} onStateChange={updateFormState} />}
                 <DeviceApiTokenCard key={selectedDevice._id} deviceId={selectedDevice._id} deviceName={selectedDevice.name} currentToken={selectedDevice.apiToken} currentTokenCreatedAt={selectedDevice.apiTokenCreatedAt} />
-              </TabsContent>
+              </TabsContent>}
             </Tabs>
           ) : <>
             {step === "picker" && <BrandPickerStep onSelect={pickBrand} onCancel={close} />}
-            {draftBrands.map(draftBrand => <div key={draftBrand} hidden={step !== "form" || draftBrand !== brand}>
-              <DeviceForm projectIdOverride={draftProjectId} open={open} device={null} projects={projects} defaultBrand={draftBrand} onBack={() => setStep("picker")} onSuccess={onSuccess} onClose={close} onStateChange={updateFormState} />
+            {step === "form" && projects === undefined && <SectionSkeleton label="Cihaz bilgileri yükleniyor" />}
+            {projects !== undefined && draftBrands.map(draftBrand => <div key={draftBrand} hidden={step !== "form" || draftBrand !== brand}>
+              <DeviceForm projectIdOverride={draftProjectId} open={open} device={null} projects={projects ?? []} defaultBrand={draftBrand} onBack={() => setStep("picker")} onSuccess={onSuccess} onClose={close} onStateChange={updateFormState} />
             </div>)}
           </>}
         </fieldset>

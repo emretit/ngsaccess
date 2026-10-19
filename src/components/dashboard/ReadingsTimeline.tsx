@@ -31,8 +31,8 @@ export default function ReadingsTimeline() {
       context="Bugün, saatlik"
       aside={timeline && timeline.total > 0 && (
         <>
-          <LegendItem color={chartConfig.granted.color} label="İzin" value={timeline.granted} />
-          <LegendItem color={chartConfig.denied.color} label="Ret" value={timeline.denied} />
+          <LegendItem color={chartConfig.granted.color} label={chartConfig.granted.label} value={timeline.granted} />
+          <LegendItem color={chartConfig.denied.color} label={chartConfig.denied.label} value={timeline.denied} />
         </>
       )}
     >
@@ -40,7 +40,7 @@ export default function ReadingsTimeline() {
         {loading ? (
           <SectionSkeleton rows={4} label="Saatlik okumalar yükleniyor" className="px-2" />
         ) : !timeline || timeline.total === 0 ? (
-          <p role="status" className="grid h-[200px] place-items-center text-center text-sm text-muted-foreground">
+          <p role="status" className="grid min-h-24 place-items-center px-2 py-6 text-center text-sm text-muted-foreground">
             Bugün henüz kart okuması yok.
           </p>
         ) : (

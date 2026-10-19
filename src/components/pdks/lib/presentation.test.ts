@@ -76,7 +76,7 @@ describe("PDKS presentation", () => {
       expect(displayDuration(0, status)).toBe("—");
       expect(displayDuration(500, status)).toBe("—");
     }
-    expect(displayDuration(0, "absent")).toBe("00 sa 00 dk");
+    expect(displayDuration(0, "absent")).toBe("—");
     expect(displayDuration(510, "present")).toBe("08 sa 30 dk");
   });
   it("sorts Turkish names and numeric duration rather than legacy strings", () => {
@@ -158,4 +158,10 @@ it("filters period rows by a matching day while preserving the full period", () 
   expect(filterPdksRows([employee], "absent")).toEqual([employee]);
   expect(filterPdksRows([employee], "leave")).toEqual([]);
   expect(filterPdksRows([row("İpek", 480)], "absent")).toEqual([]);
+});
+
+it("08-H2 accepts next-day manual exit only for an assigned overnight shift", () => {
+  expect(validateManual("22:00", "06:00", "Kart unutuldu", true)).toEqual({});
+  expect(validateManual("22:00", "06:00", "Kart unutuldu").exit).toBeDefined();
+  expect(validateManual("22:00", "22:00", "Kart unutuldu", true)).toEqual({});
 });

@@ -21,6 +21,7 @@ interface SerializableFilters {
   shiftId?: string;
   statusFilter: string;
   person: string;
+  employeeId?: string;
 }
 
 function serialize(f: FilterValues): SerializableFilters {
@@ -34,6 +35,7 @@ function serialize(f: FilterValues): SerializableFilters {
     shiftId: f.shiftId,
     statusFilter: f.statusFilter,
     person: f.person,
+    employeeId: f.employeeId,
   };
 }
 
@@ -52,6 +54,7 @@ function deserialize(s: SerializableFilters): FilterValues {
     shiftId: s.shiftId as FilterValues["shiftId"],
     statusFilter: s.statusFilter as FilterValues["statusFilter"],
     person: s.person,
+    employeeId: s.employeeId as FilterValues["employeeId"],
   };
 }
 

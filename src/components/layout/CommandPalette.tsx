@@ -31,7 +31,7 @@ export function CommandPalette() {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
   return <Dialog open={open} onOpenChange={changeOpen}>
-    <DialogTrigger asChild><Button variant="outline" aria-label="Sayfa ara (⌘K / Ctrl+K)" className="h-9 w-9 shrink-0 border-line bg-canvas p-0 text-muted-foreground min-[1000px]:w-[240px] min-[1000px]:justify-start min-[1000px]:px-3">
+    <DialogTrigger asChild><Button variant="outline" aria-label="Sayfa ara (⌘K / Ctrl+K)" className="h-11 w-11 shrink-0 border-line bg-canvas p-0 text-muted-foreground min-[1000px]:w-[240px] min-[1000px]:justify-start min-[1000px]:px-3">
       <Search aria-hidden="true" /><span className="hidden min-[1000px]:inline">Sayfa ara…</span><kbd className="ml-auto hidden rounded border px-1 text-[11px] min-[1000px]:inline">⌘K</kbd>
     </Button></DialogTrigger>
     <DialogContent className="overflow-hidden p-0" onCloseAutoFocus={event => {

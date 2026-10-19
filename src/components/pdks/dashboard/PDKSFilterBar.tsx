@@ -1,3 +1,5 @@
+import { STATUS_FILTER_LABELS } from "../statusMeta";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { usePdksFilterOptions } from "@/hooks/usePdksFilterOptions";
 import { useState } from "react";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -23,11 +25,13 @@ export interface FilterValues {
   shiftId?: Id<"shifts">;
   statusFilter: StatusFilter;
   person: string;
+  employeeId?: Id<"employees">;
 }
 export function clearPdksFilters(values: FilterValues): FilterValues {
   return {
     ...values,
     person: "",
+    employeeId: undefined,
     companyId: undefined,
     departmentId: undefined,
     positionId: undefined,
@@ -44,11 +48,14 @@ export function PDKSFilterBar({
   onChange: (values: FilterValues) => void;
   onClear?: () => void;
 }) {
+  const [mobileFilters, setMobileFilters] = useState(false);
   const [advanced, setAdvanced] = useState(false);
   const { departments, companies, positions, shifts } = usePdksFilterOptions();
-  const controlClass =
-    "h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm";
+
   return (
+    <>
+    <Button className="sm:hidden" variant="outline" aria-expanded={mobileFilters} onClick={() => setMobileFilters(v => !v)}>Filtreler</Button>
+    <div className={mobileFilters ? "block" : "hidden sm:block"}>
     <FilterBar
       search={values.person}
       onSearchChange={(person) => onChange({ ...values, person })}
@@ -68,25 +75,18 @@ export function PDKSFilterBar({
     >
       <label className="text-xs sm:w-48">
         Departman
-        <select
-          className={`${controlClass} mt-1`}
-          value={values.departmentId ?? ""}
-          onChange={(e) =>
-            onChange({
-              ...values,
-              departmentId: (e.target.value || undefined) as
-                | Id<"departments">
-                | undefined,
-            })
-          }
-        >
-          <option value="">Tüm departmanlar</option>
-          {departments?.map((d) => (
-            <option key={d._id} value={d._id}>
-              {d.name}
-            </option>
-          ))}
-        </select>
+        <Select value={values.departmentId ?? "all"} onValueChange={value => onChange({ ...values, departmentId: value === "all" ? undefined : value as Id<"departments"> })}>
+                <SelectTrigger className="mt-1" aria-label="Tüm departmanlar"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="all">Tüm departmanlar</SelectItem>
+                  {departments?.map(d => <SelectItem key={d._id} value={d._id}>{d.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+      </label>
+      <label className="text-xs sm:w-48">Durum
+        <Select value={values.statusFilter} onValueChange={value => onChange({ ...values, statusFilter: value as StatusFilter })}>
+          <SelectTrigger className="mt-1" aria-label="Durum"><SelectValue /></SelectTrigger>
+          <SelectContent>{Object.entries(STATUS_FILTER_LABELS).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent>
+        </Select>
       </label>
       <Button variant="outline" onClick={() => setAdvanced(true)}>
         Diğer filtreler
@@ -105,69 +105,30 @@ export function PDKSFilterBar({
           <div className="mt-6 space-y-5">
             <label className="block text-sm">
               Şirket
-              <select
-                className={`${controlClass} mt-1`}
-                value={values.companyId ?? ""}
-                onChange={(e) =>
-                  onChange({
-                    ...values,
-                    companyId: (e.target.value || undefined) as
-                      | Id<"companies">
-                      | undefined,
-                  })
-                }
-              >
-                <option value="">Tüm şirketler</option>
-                {companies?.map((c) => (
-                  <option key={c._id} value={c._id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <Select value={values.companyId ?? "all"} onValueChange={value => onChange({ ...values, companyId: value === "all" ? undefined : value as Id<"companies"> })}>
+                <SelectTrigger className="mt-1" aria-label="Tüm şirketler"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="all">Tüm şirketler</SelectItem>
+                  {companies?.map(c => <SelectItem key={c._id} value={c._id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </label>
             <label className="block text-sm">
               Pozisyon
-              <select
-                className={`${controlClass} mt-1`}
-                value={values.positionId ?? ""}
-                onChange={(e) =>
-                  onChange({
-                    ...values,
-                    positionId: (e.target.value || undefined) as
-                      | Id<"positions">
-                      | undefined,
-                  })
-                }
-              >
-                <option value="">Tüm pozisyonlar</option>
-                {positions?.map((p) => (
-                  <option key={p._id} value={p._id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
+              <Select value={values.positionId ?? "all"} onValueChange={value => onChange({ ...values, positionId: value === "all" ? undefined : value as Id<"positions"> })}>
+                <SelectTrigger className="mt-1" aria-label="Tüm pozisyonlar"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="all">Tüm pozisyonlar</SelectItem>
+                  {positions?.map(p => <SelectItem key={p._id} value={p._id}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </label>
             <label className="block text-sm">
               Vardiya
-              <select
-                className={`${controlClass} mt-1`}
-                value={values.shiftId ?? ""}
-                onChange={(e) =>
-                  onChange({
-                    ...values,
-                    shiftId: (e.target.value || undefined) as
-                      | Id<"shifts">
-                      | undefined,
-                  })
-                }
-              >
-                <option value="">Tüm vardiyalar</option>
-                {shifts?.map((s) => (
-                  <option key={s._id} value={s._id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+              <Select value={values.shiftId ?? "all"} onValueChange={value => onChange({ ...values, shiftId: value === "all" ? undefined : value as Id<"shifts"> })}>
+                <SelectTrigger className="mt-1" aria-label="Tüm vardiyalar"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="all">Tüm vardiyalar</SelectItem>
+                  {shifts?.map(s => <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </label>
             <Button
               variant="outline"
@@ -180,5 +141,7 @@ export function PDKSFilterBar({
         </SheetContent>
       </Sheet>
     </FilterBar>
+    </div>
+    </>
   );
 }

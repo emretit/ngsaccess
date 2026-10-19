@@ -1,5 +1,5 @@
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/lib/convexApi";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
@@ -34,12 +34,17 @@ const MONTHS = [
   { value: 12, label: "Aralık" },
 ];
 
-const selectStyle = "h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm";
+const selectStyle = "h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm";
 const currentDate = todayInTurkey();
 const currentYear = Number(currentDate.slice(0, 4));
 const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
-function ReportDownloadSettings() {
+export function linkedReportType(value: string | null | undefined): ReportType {
+  return value === "dept-cost" ? "department" : value === "overtime" ? "overtime" : "sgk";
+}
+
+function ReportDownloadSettings({ requestedReport }: { requestedReport?: string | null }) {
+  const section = useRef<HTMLElement>(null);
   const { projectId: activeProjectId, projectIds, activeProject, loading: accessLoading } = useActiveProjectScope();
   const [scopeSelection, setScopeSelection] = useState("active");
   const projectId = scopeSelection === "all" ? undefined : activeProjectId ?? undefined;
@@ -48,7 +53,10 @@ function ReportDownloadSettings() {
   useEffect(() => { setScopeSelection("active"); }, [activeProjectId]);
   const [year, setYear] = useState(currentYear);
   const [month, setMonth] = useState(Number(currentDate.slice(5, 7)));
-  const [reportType, setReportType] = useState<ReportType>("sgk");
+  const [reportType, setReportType] = useState<ReportType>(() => linkedReportType(requestedReport));
+  useEffect(() => {
+    if (requestedReport) { setReportType(linkedReportType(requestedReport)); section.current?.scrollIntoView?.({ block: "start", behavior: "smooth" }); }
+  }, [requestedReport]);
   const [hourlyRate, setHourlyRate] = useState<number | undefined>(undefined);
   const debouncedHourlyRate = useDebouncedValue(hourlyRate, 300);
   const [overtimePeriod, setOvertimePeriod] = useState<"month" | "year">("month");
@@ -115,7 +123,7 @@ function ReportDownloadSettings() {
 
   return (
     <div className="space-y-6">
-      <section className="min-w-0 space-y-4">
+      <section ref={section} id="settings-report-download" className="min-w-0 space-y-4">
         <div className="space-y-1">
           <h3 className="text-base font-semibold">Rapor indir</h3>
           <p className="text-sm text-muted-foreground">
@@ -173,7 +181,7 @@ function ReportDownloadSettings() {
             <>
               <div className="rounded-lg border p-4 bg-muted/30">
                 <p className="text-sm text-muted-foreground">
-                  {`${currentData?.rows.length ?? 0} kayıt`}{" "}
+                  {`${currentData?.rows.length ?? 0} ${reportType === "department" ? "departman" : "personel"}`}{" "}
                   — {reportType === "overtime" && overtimePeriod === "year" ? year : `${MONTHS.find((m) => m.value === month)?.label} ${year}`}
                 </p>
                 {reportType === "overtime" && overtimeData && "totalOvertimeHours" in overtimeData && (
@@ -198,7 +206,7 @@ function ReportDownloadSettings() {
               <div className="flex flex-wrap gap-2">
                 <Button onClick={() => void excelAction.run()} disabled={!hasData || excelAction.pending || pdfAction.pending} variant="default">
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  Excel İndir
+                  Excel indir
                 </Button>
                 {reportType === "sgk" && <Button
                   onClick={() => void pdfAction.run()}
@@ -206,7 +214,7 @@ function ReportDownloadSettings() {
                   variant="outline"
                 >
                   <FileText className="h-4 w-4 mr-2" />
-                  PDF İndir
+                  PDF indir
                 </Button>}
               </div>
             </>
@@ -219,10 +227,10 @@ function ReportDownloadSettings() {
   );
 }
 
-export function ReportsSettings() {
+export function ReportsSettings({ requestedReport }: { requestedReport?: string | null }) {
   const { isAdmin, projectId } = useActiveProjectScope();
   return <div className="min-w-0 space-y-8">
-    <QuerySectionBoundary resetKey={projectId} title="Raporlar yüklenemedi"><ReportDownloadSettings /></QuerySectionBoundary>
+    <QuerySectionBoundary resetKey={projectId} title="Raporlar yüklenemedi"><ReportDownloadSettings requestedReport={requestedReport} /></QuerySectionBoundary>
     {isAdmin && <QuerySectionBoundary resetKey={projectId} title="Hatırlatma yüklenemedi"><ReportReminderSettings /></QuerySectionBoundary>}
   </div>;
 }

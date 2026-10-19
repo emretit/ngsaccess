@@ -1,4 +1,5 @@
 import { useRef, useState, type ChangeEvent } from "react";
+import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useAction } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import {
@@ -19,7 +20,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-const SAMPLE_CSV = `tcNo,tarih,giris,cikis,not
+const SAMPLE_CSV = `tcNo,tarih,giriş,çıkış,not
 12345678901,2026-05-15,09:00,18:00,Manuel düzeltme
 98765432109,2026-05-15,08:30,17:30,`;
 
@@ -27,6 +28,7 @@ export function PDKSImportDialog(props: Props) {
   return props.open ? <ImportForm {...props} /> : null;
 }
 function ImportForm({ onOpenChange }: Props) {
+  const { projectId, activeProject } = useActiveProject();
   const [csvText, setCsvText] = useState("");
   const [note, setNote] = useState("");
   const [noteError, setNoteError] = useState("");
@@ -35,6 +37,7 @@ function ImportForm({ onOpenChange }: Props) {
   const [result, setResult] = useState<ImportResult | null>(null);
   const [pending, setPending] = useState(false);
   const lock = useRef(false);
+  const requireProject = () => { if (!projectId) throw new Error("Bir proje seçin."); return projectId; };
   const previewAction = useAction(api.actions.pdksImport.previewPdksCsv);
   const importAction = useAction(api.actions.pdksImport.importPdksCsv);
   const close = (open: boolean) => {
@@ -56,7 +59,7 @@ function ImportForm({ onOpenChange }: Props) {
     setPending(true);
     setServerError("");
     try {
-      setPreview(await previewAction({ csvText }));
+      setPreview(await previewAction({ csvText, projectId: requireProject() }));
     } catch (error) {
       setServerError(errorMessage(error));
     } finally {
@@ -76,7 +79,7 @@ function ImportForm({ onOpenChange }: Props) {
     lock.current = true;
     setPending(true);
     try {
-      setResult(await importAction({ csvText, note: reason }));
+      setResult(await importAction({ csvText, note: reason, projectId: requireProject() }));
     } catch (error) {
       setServerError(errorMessage(error));
     } finally {
@@ -92,10 +95,10 @@ function ImportForm({ onOpenChange }: Props) {
     <Dialog open onOpenChange={close}>
       <DialogContent className="flex max-h-[85dvh] w-[calc(100%-32px)] max-w-3xl flex-col overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>PDKS CSV İçe Aktarımı</DialogTitle>
+          <DialogTitle>PDKS kayıtlarını içe aktar</DialogTitle>
           <DialogDescription>
-            CSV dosyası yükleyin veya yapıştırın. Başlıklar: tcNo, tarih, giris, cikis, not.
-            Tarih YYYY-MM-DD, saat HH:MM biçiminde olmalı.
+            {activeProject?.name} projesine yazılır. Başlıklar: tcNo, tarih, giriş, çıkış, not.
+            Tarih örneği: 2026-05-15; saat örneği: 09:00.
           </DialogDescription>
         </DialogHeader>
         <div className="min-w-0 space-y-4">
@@ -107,6 +110,7 @@ function ImportForm({ onOpenChange }: Props) {
                   onChange={(event) => void handleFile(event)}
                   className="mt-1 block w-full min-w-0 text-sm" />
               </label>
+              <a className="inline-block text-sm underline" download="pdks-ornek.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent(SAMPLE_CSV)}`}>Örnek dosyayı indir</a>
               <Button variant="ghost" size="sm" disabled={pending}
                 onClick={() => setCsvText(SAMPLE_CSV)}>Örnek doldur</Button>
               <label htmlFor="pdks-import-csv" className="block text-sm">CSV içeriği</label>
@@ -169,7 +173,7 @@ function ImportForm({ onOpenChange }: Props) {
             onClick={() => setPreview(null)}>Geri</Button>}
           {!result && <Button disabled={pending || (!preview ? !csvText.trim() : preview.summary.matched === 0)}
             onClick={() => void (preview ? handleImport() : handlePreview())}>
-            {pending ? "İşleniyor…" : preview ? `${preview.summary.matched} satırı içe aktar` : "Ön izle"}
+            {pending ? "İşleniyor…" : preview ? `${preview.summary.matched} satırı içe aktar` : "Önizle"}
           </Button>}
         </DialogFooter>
       </DialogContent>

@@ -24,24 +24,24 @@ interface DeviceFiltersProps {
 }
 
 export function DeviceFilters({ onClearFilters, locationActive, statusCounts,
-  search, onSearchChange, statusFilter, onStatusFilterChange, typeFilter, onTypeFilterChange, deviceTypes }: DeviceFiltersProps) {
-  return <FilterBar search={search} onSearchChange={onSearchChange}
+  filteredCount, search, onSearchChange, statusFilter, onStatusFilterChange, typeFilter, onTypeFilterChange, deviceTypes }: DeviceFiltersProps) {
+  return <div className={filteredCount === 0 ? "[&_[role=search]>button:last-child]:hidden" : undefined}><FilterBar search={search} onSearchChange={onSearchChange}
     searchLabel="Cihaz adı, seri numarası veya UUID ile ara" placeholder="Ad, seri no veya UUID ara…"
     hasFilters={statusFilter !== "all" || typeFilter !== "all" || !!locationActive} onClear={() => onClearFilters?.()}>
     <Select value={statusFilter} onValueChange={onStatusFilterChange}>
-      <SelectTrigger aria-label="Bağlantı filtresi" className="w-auto max-w-full min-w-36"><SelectValue /></SelectTrigger>
+      <SelectTrigger aria-label="Bağlantı filtresi" className="w-auto max-w-full min-w-36"><span className="mr-1">Bağlantı:</span><SelectValue /></SelectTrigger>
       <SelectContent>
-        <SelectItem value="all">Bağlantı: Tümü ({statusCounts.all})</SelectItem>
-        <SelectItem value="online">Bağlantı: Çevrimiçi ({statusCounts.online})</SelectItem>
-        <SelectItem value="offline">Bağlantı: Çevrimdışı ({statusCounts.offline})</SelectItem>
-        <SelectItem value="never">Bağlantı: Henüz bağlanmadı ({statusCounts.never})</SelectItem>
+        <SelectItem value="all">Tümü ({statusCounts.all})</SelectItem>
+        <SelectItem value="online">Çevrimiçi ({statusCounts.online})</SelectItem>
+        <SelectItem value="offline">Çevrimdışı ({statusCounts.offline})</SelectItem>
+        <SelectItem value="never">Henüz bağlanmadı ({statusCounts.never})</SelectItem>
       </SelectContent>
     </Select>
     <Select value={typeFilter} onValueChange={onTypeFilterChange}>
-      <SelectTrigger aria-label="Cihaz tipi filtresi" className="w-auto max-w-full min-w-28"><SelectValue /></SelectTrigger>
-      <SelectContent><SelectItem value="all">Tip: Tümü</SelectItem>
-        {deviceTypes.map(type => <SelectItem key={type} value={type}>Tip: {type}</SelectItem>)}
+      <SelectTrigger aria-label="Cihaz tipi filtresi" className="w-auto max-w-full min-w-28"><span className="mr-1">Tip:</span><SelectValue /></SelectTrigger>
+      <SelectContent><SelectItem value="all">Tümü</SelectItem>
+        {deviceTypes.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
       </SelectContent>
     </Select>
-  </FilterBar>;
+  </FilterBar></div>;
 }

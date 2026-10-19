@@ -1,3 +1,4 @@
+import { shortDayLabel } from "./lib/planning";
 import { useEffect, useRef, useState } from "react";
 import { ShiftCalendarCell } from "./ShiftCalendarCell";
 import {
@@ -51,7 +52,7 @@ export function ShiftCalendarGrid({
           style={{ minWidth: 216 + days.length * (days.length > 7 ? 92 : 112) }}
         >
           <caption className="sr-only">
-            Çalışanlara göre {days[0]} – {days[days.length - 1]} vardiya planı
+            Çalışanlara göre {days[0] ? dayLabel(days[0]) : ""} – {days[days.length - 1] ? dayLabel(days[days.length - 1] ?? "") : ""} vardiya planı
           </caption>
           <thead className="sticky top-0 z-20 bg-subtle">
             <tr>
@@ -67,7 +68,8 @@ export function ShiftCalendarGrid({
                   scope="col"
                   className="p-2 text-xs font-medium border-l"
                 >
-                  {dayLabel(day)}
+                  <span aria-hidden="true">{shortDayLabel(day)}</span>
+                  <span className="sr-only">{dayLabel(day)}</span>
                   {day === istanbulToday() && (
                     <span className="block">Bugün</span>
                   )}
@@ -84,11 +86,11 @@ export function ShiftCalendarGrid({
                 >
                   <label className="flex gap-2 items-start">
                     <input
-                      type="checkbox"
+                      type="checkbox" className="size-6 shrink-0 accent-primary"
                       checked={selected.has(employee._id)}
                       onChange={() => onSelect(employee._id)}
                       aria-label={`${employee.firstName} ${employee.lastName} seç`}
-                      className="mt-1 size-4 accent-primary"
+
                     />
                     <span className="min-w-0 break-words">
                       <span className="font-medium">

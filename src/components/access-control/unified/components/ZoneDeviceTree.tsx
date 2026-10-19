@@ -19,12 +19,14 @@ import {
 
 interface ZoneDeviceTreeProps<T extends DoorSelection> {
   formData: T;
+  disableDoorless?: boolean;
   setFormData: (updater: (prev: T) => T) => void;
 }
 
 export const ZoneDeviceTree = <T extends DoorSelection>({
   formData,
   setFormData,
+  disableDoorless = false,
 }: ZoneDeviceTreeProps<T>) => {
   const prefix = useId();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -56,7 +58,7 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
         ...next,
         selected_devices: toggleSelection(
           next.selected_devices,
-          deviceIds,
+          disableDoorless ? [] : deviceIds,
           checked,
         ),
       };
@@ -66,7 +68,7 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
       doorIds,
       deviceIds,
       effective,
-      formData.selected_devices,
+      disableDoorless ? [] : formData.selected_devices,
     );
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -114,7 +116,7 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 w-8 shrink-0"
+            className="h-11 w-11 shrink-0"
             aria-label={`${name} bölgesini ${open ? "daralt" : "genişlet"}`}
             aria-expanded={open}
             aria-controls={`${id}-content`}
@@ -128,6 +130,7 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
           </Button>
           <Checkbox
             id={id}
+            disabled={disableDoorless && zoneDoors.length === 0}
             checked={state(
               zoneDoors.map((door) => door._id),
               zoneDoorless.map((device) => device._id),
@@ -140,8 +143,8 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
               )
             }
           />
-          <Label htmlFor={id} className="min-w-0 break-words">
-            {name} ({zoneDoors.length} kapı)
+          <Label htmlFor={id} className="flex flex-1 min-h-11 items-center cursor-pointer min-w-0 break-words">
+            {name} ({zoneDoors.length} kapı){disableDoorless && zoneDoors.length === 0 ? " · Kapı yok" : ""}
           </Label>
         </div>
         <div
@@ -167,7 +170,7 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 shrink-0"
+                      className="h-11 w-11 shrink-0"
                       aria-label={`${deviceName} kapılarını ${deviceOpen ? "daralt" : "genişlet"}`}
                       aria-expanded={deviceOpen}
                       aria-controls={`${deviceId}-content`}
@@ -182,6 +185,7 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
                   )}
                   <Checkbox
                     id={deviceId}
+                    disabled={disableDoorless && scopedDoors.length === 0}
                     checked={state(doorIds, noDoors)}
                     onCheckedChange={(checked) =>
                       changeScope(doorIds, noDoors, checked === true)
@@ -189,12 +193,12 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
                   />
                   <Label
                     htmlFor={deviceId}
-                    className="min-w-0 break-words font-normal"
+                    className="flex flex-1 min-h-11 items-center cursor-pointer min-w-0 break-words font-normal"
                   >
                     {deviceName}
                     {scopedDoors.length > 0
                       ? ` — bu bölgede ${scopedDoors.length} kapı`
-                      : " — tüm cihaz"}
+                      : disableDoorless ? " — Kapı yok" : " — tüm cihaz"}
                   </Label>
                 </div>
                 <div
@@ -223,7 +227,7 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
                         />
                         <Label
                           htmlFor={`${deviceId}-${door._id}`}
-                          className="min-w-0 break-words font-normal"
+                          className="flex flex-1 min-h-11 items-center cursor-pointer min-w-0 break-words font-normal"
                         >
                           {door.name}
                         </Label>
@@ -251,7 +255,7 @@ export const ZoneDeviceTree = <T extends DoorSelection>({
           variant="outline"
           size="sm"
           className="h-auto min-h-9 max-w-full whitespace-normal"
-          disabled={isLoading || loading}
+          disabled={isLoading || loading || (disableDoorless && allDoorIds.length === 0)}
           onClick={() =>
             changeScope(
               allDoorIds,

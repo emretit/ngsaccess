@@ -125,3 +125,47 @@ it("aktif sayfalama eski kayıt aşamasını ve filtre kapsamını korur", () =>
     ),
   ).toThrow();
 });
+
+// The native query is called once per response; partitions are checked without pagination.
+describe("tür filtresi tüm kayıtlarda sayfalanır", () => {
+  it("sonraki tür bölümünü ve bölüm içindeki sayfaları kayıpsız gezer", async () => {
+    const { pageRuleStages } = await import("./accessRuleSummary");
+    const batches = [["legacy-person"], [], Array.from({ length: 21 }, (_, i) => `person-${i}`)];
+    let paginations = 0;
+    const fetch = async (phase: number, cursor: string | null) => {
+      paginations += 1;
+      const start = Number(cursor ?? 0);
+      const rows = batches[phase] ?? [];
+      return { page: rows.slice(start, start + 20), isDone: start + 20 >= rows.length, continueCursor: String(start + 20) };
+    };
+    const exists = async (phase: number) => Boolean(batches[phase]?.length);
+    const first = await pageRuleStages(3, "personnel", null, fetch, exists);
+    expect(first.page).toEqual(["legacy-person"]);
+    expect(first.isDone).toBe(false);
+    const second = await pageRuleStages(3, "personnel", first.continueCursor, fetch, exists);
+    expect(second.page).toHaveLength(20);
+    const third = await pageRuleStages(3, "personnel", second.continueCursor, fetch, exists);
+    expect(third.page).toEqual(["person-20"]);
+    expect(third.isDone).toBe(true);
+    expect(paginations).toBe(3);
+    await expect(pageRuleStages(3, "visitor", first.continueCursor, fetch, exists)).rejects.toThrow("Arama değişti");
+  });
+  it("eski ve bilinmeyen personel türlerini, eksik aktiflik alanını korur", async () => {
+    const { personnelRuleTypes, ruleTypeStages, matchesRuleType } = await import("./accessRuleSummary");
+    const rows = [{}, { targetType: "employee" }, { targetType: "legacy-custom" }, { targetType: "visitor" }];
+    let index = 0;
+    const types = await personnelRuleTypes(async () => rows[index++] ?? null);
+    expect(types).toEqual([undefined, "employee", "legacy-custom"]);
+    const stages = ruleTypeStages("personnel", "active", types);
+    expect(stages).toHaveLength(6);
+    expect(stages).toContainEqual({ targetType: "legacy-custom", isActive: undefined });
+    expect(stages.some(stage => stage.targetType === "visitor")).toBe(false);
+    expect(ruleTypeStages("visitor", "inactive")).toEqual([{ targetType: "visitor", isActive: false }]);
+    expect(matchesRuleType("legacy-custom", "personnel")).toBe(true);
+    expect(matchesRuleType(undefined, "visitor")).toBe(false);
+  });
+  it("boş bütün tür bölümlerinde kayıt varmış gibi sonraki sayfa sunmaz", async () => {
+    const { pageRuleStages } = await import("./accessRuleSummary");
+    expect(await pageRuleStages(2, "p", null, async () => { throw new Error("paginate çağrılmamalı"); }, async () => false)).toEqual({ page: [], isDone: true, continueCursor: "" });
+  });
+});

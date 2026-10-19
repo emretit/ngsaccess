@@ -1,3 +1,4 @@
+import { useAuth } from '@/components/auth/AuthProvider';
 import { useState, type ReactNode } from 'react';
 import { Columns3, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,16 +12,21 @@ import { STATUS_META } from '@/components/pdks/statusMeta';
 import { notify } from '@/lib/notify';
 import { PDF_MAX_ROWS, PDF_ROW_LIMIT_MESSAGE, exportReport, type ReportExportMeta } from '@/lib/reports/export';
 import { reportColumns, type ReportDefinition, type ReportFormat } from '@/lib/reports/registry';
-import { readHiddenColumns, saveHiddenColumns, toggleHiddenColumn } from '@/lib/reports/columns';
+import { readHiddenColumns, saveHiddenColumns, toggleHiddenColumn, type ColumnScope } from '@/lib/reports/columns';
 import type { ReportRow } from '@/lib/reports/rows';
 
 export interface ReportPageProps {
   definition: ReportDefinition; rows: readonly ReportRow[]; days?: readonly string[];
-  meta: Omit<ReportExportMeta, 'columns'>; loading?: boolean; hasMoreTransactions?: boolean; loadedCount?: number; children?: ReactNode;
+  projectId?: string; onClear?: () => void; meta: Omit<ReportExportMeta, 'columns'>; loading?: boolean; hasMoreTransactions?: boolean; loadedCount?: number; children?: ReactNode;
 }
-export function ReportPage({ definition, rows, days, meta, loading = false, hasMoreTransactions = false, loadedCount, children }: ReportPageProps) {
+export function ReportPage(props: ReportPageProps) {
+  const { profile } = useAuth();
+  const scope = props.projectId && profile?._id ? { projectId: props.projectId, userId: profile._id } : undefined;
+  return <ReportTable key={`${scope?.projectId}:${scope?.userId}:${props.definition.slug}`} {...props} scope={scope} />;
+}
+function ReportTable({ definition, rows, days, meta, loading = false, hasMoreTransactions = false, loadedCount, children, onClear, scope }: ReportPageProps & { scope?: ColumnScope }) {
   const columns = reportColumns(definition, days);
-  const [hidden, setHidden] = useState(() => readHiddenColumns(definition.slug));
+  const [hidden, setHidden] = useState(() => readHiddenColumns(definition.slug, scope));
   const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
   const visible = columns.filter(column => !column.exportOnly && !hidden.includes(column.key) && (column.defaultVisible || hidden.includes(`show:${column.key}`)));
@@ -29,7 +35,7 @@ export function ReportPage({ definition, rows, days, meta, loading = false, hasM
   const currentPage = Math.min(page, pageCount);
   const toggle = (key: string, defaultVisible: boolean) => {
     const next = toggleHiddenColumn(hidden, key, defaultVisible);
-    setHidden(next); saveHiddenColumns(definition.slug, next);
+    setHidden(next); saveHiddenColumns(definition.slug, next, scope);
   };
   const runExport = async (format: ReportFormat) => {
     if (exporting) return;
@@ -38,6 +44,7 @@ export function ReportPage({ definition, rows, days, meta, loading = false, hasM
     catch (error: unknown) { notify.error('Rapor dışa aktarılamadı', error); }
     finally { setExporting(false); }
   };
+  const emptyTitle = ({ devamsizlar: 'Bu dönemde devamsız kişi yok.', 'erken-cikanlar': 'Bu dönemde erken çıkan kişi yok.', 'mola-ihlalleri': 'Bu dönemde mola ihlali yok.', 'gec-kalanlar': 'Bu dönemde geç kalan kişi yok.' } as Record<string, string>)[definition.slug] ?? 'Kayıt bulunamadı';
   return <div className="min-w-0 space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <p className="text-xs text-muted-foreground" role="status">{loadedCount === undefined ? `${rows.length} kayıt` : `Yüklenen ${loadedCount} kayıt${rows.length !== loadedCount ? ` · Filtreye uyan ${rows.length}` : ''}`}</p>
@@ -51,9 +58,9 @@ export function ReportPage({ definition, rows, days, meta, loading = false, hasM
       </div>
     </div>
     {pdfOverLimit && definition.formats.includes('pdf') && <p className="text-xs text-muted-foreground">{PDF_ROW_LIMIT_MESSAGE}</p>}
-    {loading ? <SectionSkeleton rows={5} label="Rapor yükleniyor…" /> : rows.length === 0 ? hasMoreTransactions ? <p role="status" className="rounded-md border border-line p-6 text-sm text-muted-foreground">Taranan kayıtlarda eşleşme yok. Daha eski kayıtlar için “Daha fazla yükle”.</p> : <EmptyState title="Kayıt bulunamadı" description="Bu dönem ve filtrelerle eşleşen kayıt yok. Filtreleri değiştirebilirsiniz." /> : <div className="min-w-0 overflow-hidden rounded-md border border-line bg-surface">
-      <Table aria-label={definition.title}><TableHeader><TableRow>{visible.map(column => <TableHead scope="col" key={column.key} className={`whitespace-nowrap ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}>{column.label}</TableHead>)}</TableRow></TableHeader>
-        <TableBody>{rows.slice((currentPage - 1) * 50, currentPage * 50).map(row => <TableRow key={row.id}>{visible.map(column => <TableCell key={column.key} className={`${column.key === 'punches' ? 'min-w-64 max-w-lg whitespace-normal break-words' : 'whitespace-nowrap'} tabular-nums ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}>
+    {loading ? <SectionSkeleton rows={5} label="Rapor yükleniyor…" /> : rows.length === 0 ? hasMoreTransactions ? <p role="status" className="rounded-md border border-line p-6 text-sm text-muted-foreground">Taranan kayıtlarda eşleşme yok. Daha eski kayıtlar için “Daha fazla yükle”.</p> : <EmptyState title={emptyTitle} description="Seçili dönem ve filtreler için." action={onClear ? { label: 'Filtreleri temizle', onClick: onClear } : undefined} /> : <div className="min-w-0 overflow-hidden rounded-md border border-line bg-surface">
+      <Table aria-label={definition.title}><TableHeader><TableRow>{visible.map(column => <TableHead scope="col" key={column.key} title={column.fullLabel} aria-label={column.fullLabel} className={`${column.key === 'name' ? 'sticky left-0 z-20 bg-surface' : ''} whitespace-nowrap ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}>{column.label}</TableHead>)}</TableRow></TableHeader>
+        <TableBody>{rows.slice((currentPage - 1) * 50, currentPage * 50).map(row => <TableRow key={row.id}>{visible.map(column => <TableCell key={column.key} className={`${column.key === 'name' ? 'sticky left-0 z-10 bg-surface' : ''} ${column.key === 'punches' ? 'min-w-64 max-w-lg whitespace-normal break-words' : 'whitespace-nowrap'} tabular-nums ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}>
           {column.key === 'status' && row.kind === 'daily' ? <StatusBadge tone={STATUS_META[row.cell.status].tone}>{STATUS_META[row.cell.status].label}</StatusBadge> : column.key === 'result' && row.kind === 'transaction' ? <StatusBadge tone={row.transaction.result === 'granted' ? 'success' : row.transaction.result === 'denied' ? 'danger' : 'neutral'}>{column.value(row) ?? '—'}</StatusBadge> : column.value(row) ?? '—'}
         </TableCell>)}</TableRow>)}</TableBody></Table>
       <PaginationBar summary={`${pageRange(rows.length, currentPage, 50)} / ${rows.length} kayıt`} page={currentPage} pageCount={pageCount} onPrevious={() => setPage(Math.max(1, currentPage - 1))} onNext={() => setPage(Math.min(pageCount, currentPage + 1))} />

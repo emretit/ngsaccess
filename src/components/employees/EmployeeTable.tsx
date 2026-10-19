@@ -1,3 +1,4 @@
+import { EmployeeSyncConfirmDialog } from "./EmployeeSyncConfirmDialog";
 import { departmentPath } from "./lib/departmentPath";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
@@ -33,7 +34,6 @@ interface EmployeeTableProps {
   sort?: string;
   onSortChange?: (sort: string) => void;
   onEdit: (employee: Employee) => void;
-  onDelete: (employee: Employee) => void;
   onViewDetails: (employee: Employee) => void;
   onRefresh?: () => void;
   /** Departman filtresi aktifken sütun her satırda aynı değeri tekrarlar; gizlenir. */
@@ -45,12 +45,12 @@ export default function EmployeeTable({
   sort = "name:asc",
   onSortChange,
   onEdit,
-  onDelete: _onDelete,
   onViewDetails,
   onRefresh,
   showDepartment = true,
 }: EmployeeTableProps) {
   const { isAdmin, projectId } = useActiveProjectScope();
+  const [syncRequest, setSyncRequest] = useState<{ employees: Employee[]; retry?: boolean } | null>(null);
   const [failedSyncIds, setFailedSyncIds] = useState<Id<"employees">[]>([]);
   const [syncReport, setSyncReport] = useState<string[]>([]);
   const [selectedEmployeeForReset, setSelectedEmployeeForReset] =
@@ -79,8 +79,8 @@ export default function EmployeeTable({
       ]);
       if (result.failed > 0) {
         notify.error(
-          "İşlem bazı kişiler için tamamlanamadı.",
-          result.errors.join("; "),
+          "Cihaza gönderilemedi",
+          "Teknik ayrıntıları gönderim sonucunda inceleyebilirsiniz.",
         );
       } else if (result.synced > 0) {
         notify.success(
@@ -88,7 +88,7 @@ export default function EmployeeTable({
           `${employee.firstName} ${employee.lastName} — ${result.synced} cihaza gönderildi.`,
         );
       } else if (result.errors.length > 0) {
-        notify.error("Cihaz gönderimi tamamlanamadı", result.errors.join(", "));
+        notify.error("Cihaza gönderilemedi", "Teknik ayrıntıları gönderim sonucunda inceleyebilirsiniz.");
       } else {
         notify.info(
           "Bilgi",
@@ -98,9 +98,10 @@ export default function EmployeeTable({
     } catch (err) {
       setFailedSyncIds([empId]);
       setSyncReport([
-        `${employee.firstName} ${employee.lastName}: ${errorMessage(err)}`,
+        "Cihaza gönderilemedi",
+        errorMessage(err),
       ]);
-      notify.error("Cihaz gönderimi tamamlanamadı", err);
+      notify.error("Cihaza gönderilemedi", "Teknik ayrıntıları gönderim sonucunda inceleyebilirsiniz.");
     }
   });
   const handleSyncToDevice = syncAction.run;
@@ -194,7 +195,7 @@ export default function EmployeeTable({
         `${totalSynced} cihaza gönderildi${totalFailed > 0 ? `, ${totalFailed} hata` : ""}.`,
       );
     } else if (allErrors.length > 0) {
-      notify.error("Cihaz gönderimi tamamlanamadı", allErrors.join("; "));
+      notify.error("Cihaza gönderilemedi", "Teknik ayrıntıları gönderim sonucunda inceleyebilirsiniz.");
     } else {
       notify.info("Bilgi", "Seçili çalışanlar için bağlı cihaz bulunamadı.");
     }
@@ -229,8 +230,9 @@ export default function EmployeeTable({
     </TableHead>
   );
   return (
-    <div className="space-y-4">
+    <div className={isAdmin && selectedEmployees.length > 0 ? "space-y-4 pb-[calc(40vh+2rem)]" : "space-y-4"}>
       {isAdmin && selectedEmployees.length > 0 && (
+        <div className="fixed bottom-4 left-4 right-4 z-40 max-h-[40vh] overflow-y-auto rounded-md border bg-background shadow-lg md:left-auto md:max-w-3xl">
         <EmployeeBulkActions
           onClear={() => {
             if (!departmentPending && !isBulkSyncing && !syncAction.pending)
@@ -253,11 +255,12 @@ export default function EmployeeTable({
           onUpdateDepartment={handleBulkDepartmentUpdate}
           onDelete={() => setShowDeleteDialog(true)}
           onSyncToDevices={() => {
-            void handleBulkSyncToDevices(false);
+            setSyncRequest({ employees: employees.filter(emp => selectedEmployees.includes(emp._id)) });
           }}
           isSyncing={isBulkSyncing || syncAction.pending}
           pending={departmentPending || isBulkSyncing || syncAction.pending}
         />
+        </div>
       )}
 
       {syncReport.length > 0 && (
@@ -269,14 +272,13 @@ export default function EmployeeTable({
           <p className="text-muted-foreground">
             Gönderim sonucu cihazda doğrulandığı anlamına gelmez.
           </p>
-          {syncReport.map((line, index) => (
-            <p key={index}>{line}</p>
-          ))}
+          <p>{syncReport[0]}</p>
+          {syncReport.length > 1 && <details><summary className="cursor-pointer">Teknik ayrıntı</summary>{syncReport.slice(1).map((line, index) => <p key={index}>{line}</p>)}</details>}
           {failedSyncIds.length > 0 && (
             <Button
               disabled={bulkSyncAction.pending}
               onClick={() => {
-                void handleBulkSyncToDevices(true);
+                setSyncRequest({ employees: employees.filter(emp => failedSyncIds.includes(emp._id)), retry: true });
               }}
             >
               Başarısız kişileri yeniden gönder
@@ -288,10 +290,10 @@ export default function EmployeeTable({
         <Table className="w-full table-fixed text-xs">
           <TableHeader>
             <TableRow className="h-9 bg-muted/50">
-              <TableHead className="w-10">
+              <TableHead className="w-11 px-2">
                 <Checkbox
                   aria-label="Bu sayfadaki personeli seç"
-                  className="relative data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-primary-foreground data-[state=indeterminate]:after:absolute data-[state=indeterminate]:after:inset-x-[3px] data-[state=indeterminate]:after:top-1/2 data-[state=indeterminate]:after:h-0.5 data-[state=indeterminate]:after:-translate-y-1/2 data-[state=indeterminate]:after:bg-current data-[state=indeterminate]:after:content-[''] [&[data-state=indeterminate]_svg]:hidden"
+                  className="data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-primary-foreground data-[state=indeterminate]:before:absolute data-[state=indeterminate]:before:inset-x-[3px] data-[state=indeterminate]:before:top-1/2 data-[state=indeterminate]:before:h-0.5 data-[state=indeterminate]:before:-translate-y-1/2 data-[state=indeterminate]:before:bg-current data-[state=indeterminate]:before:content-[''] [&[data-state=indeterminate]_svg]:hidden"
                   disabled={
                     !isAdmin ||
                     departmentPending ||
@@ -413,7 +415,7 @@ export default function EmployeeTable({
                               syncAction.pending || bulkSyncAction.pending
                             }
                             onSelect={() => {
-                              void handleSyncToDevice(employee);
+                              setSyncRequest({ employees: [employee] });
                             }}
                           >
                             Cihazlara gönder
@@ -467,6 +469,12 @@ export default function EmployeeTable({
         }
         onConfirm={handleIndividualDeleteConfirm}
       />
+
+      {syncRequest && <EmployeeSyncConfirmDialog employees={syncRequest.employees} onClose={() => setSyncRequest(null)} onConfirm={() => {
+        if (syncRequest.employees.length === 1 && !syncRequest.retry) void handleSyncToDevice(syncRequest.employees[0]);
+        else void handleBulkSyncToDevices(syncRequest.retry ?? false);
+        setSyncRequest(null);
+      }} />}
 
       <EmployeePasswordResetDialog
         isOpen={showPasswordResetDialog}

@@ -185,7 +185,13 @@ describe("leave date and filter contracts", () => {
     expect(next.has("cursor")).toBe(false);
     expect(next.get("period")).toBe("2026-09");
     expect(next.get("type")).toBe("sick");
+    expect(next.has("scope")).toBe(false);
     expect(params.get("employee")).toBe("person-1");
+    const same = projectScopedLeaveParams(new URLSearchParams("scope=new&employee=person-1"), "new");
+    expect(same.has("scope")).toBe(false);
+    expect(same.get("employee")).toBe("person-1");
+    const clean = new URLSearchParams("period=2026-10");
+    expect(projectScopedLeaveParams(clean, "new")).toBe(clean);
   });
   it("does not invent statutory durations or rename legacy statuses", () => {
     expect(leaveTypes.marriage).toBe("Evlilik izni");
@@ -195,7 +201,7 @@ describe("leave date and filter contracts", () => {
     });
     expect(leaveStatuses.rejected.tone).toBe("danger");
   });
-  it("links PDKS using supported name search and custom range", () => {
+  it("links PDKS using employee identity and custom range", () => {
     const url = new URL(pdksHref(row), "http://local");
     expect(url.pathname).toBe("/pdks-records");
     expect(Object.fromEntries(url.searchParams)).toEqual({
@@ -203,13 +209,13 @@ describe("leave date and filter contracts", () => {
       from: row.startDate,
       to: row.endDate,
       date: row.startDate,
-      person: row.employeeName,
+      employeeId: row.employeeId,
     });
     expect(
       new URL(
         pdksHref({ ...row, employeeMissing: true }),
         "http://local",
-      ).searchParams.has("person"),
+      ).searchParams.has("employeeId"),
     ).toBe(false);
   });
   it("narrows server error and retains the overlap record context", () => {
@@ -253,39 +259,16 @@ function renderResults() {
   );
 }
 describe("bounded list presentation", () => {
-  it("keeps empty candidate pages navigable", () => {
-    mocks.paginated.mockReturnValue({
-      results: [],
-      status: "CanLoadMore",
-      loadMore: vi.fn(),
-    });
-    mocks.query.mockReturnValue({
-      truncated: false,
-      recordCount: 1,
-      employeeCount: 1,
-    });
+  it("shows exact record and distinct employee counts beyond 5000", () => {
+    const pages = [{ _id: "one", recordCount: 5000, employeeIds: ["a", "b"], projectHasRecords: true }, { _id: "two", recordCount: 501, employeeIds: ["a", "c"], projectHasRecords: true }];
+    mocks.paginated.mockReset().mockReturnValueOnce({ results: [row], status: "Exhausted", loadMore: vi.fn() }).mockReturnValueOnce({ results: pages, status: "Exhausted", loadMore: vi.fn() });
     const html = renderResults();
-    expect(html).toContain(
-      "Bu sayfada eşleşen izin yok; daha eski kayıtları tarayın.",
-    );
-    const next = html.match(/<button[^>]*>Devam<\/button>/)?.[0];
-    expect(next).toBeDefined();
-    expect(next).not.toContain(' disabled="');
+    expect(html).toContain("5501 kayıt · 3 kişi");
+    expect(html).not.toContain("aday kayıt");
   });
-  it("never presents truncated summaries as an exact total", () => {
-    mocks.paginated.mockReturnValue({
-      results: [row],
-      status: "Exhausted",
-      loadMore: vi.fn(),
-    });
-    mocks.query.mockReturnValue({
-      truncated: true,
-      recordCount: 5000,
-      employeeCount: 4000,
-    });
-    const html = renderResults();
-    expect(html).toContain("1 kayıt gösteriliyor");
-    expect(html).not.toContain("5000 kayıt");
+  it("does not fabricate a total while the count cursor is incomplete", () => {
+    mocks.paginated.mockReset().mockReturnValueOnce({ results: [row], status: "Exhausted", loadMore: vi.fn() }).mockReturnValueOnce({ results: [], status: "CanLoadMore", loadMore: vi.fn() });
+    expect(renderResults()).toContain("İzin özeti hesaplanıyor…");
   });
   it("keeps table and semantic mobile list with full record duration", () => {
     const html = renderToStaticMarkup(
@@ -324,11 +307,12 @@ describe("bounded list presentation", () => {
     );
     expect(html).toContain("Açıklama yalnız yöneticilere görünür.");
     expect(html).not.toContain("Gizli açıklama");
-    expect(html).toContain("aynı adlı kişiler de eşleşebilir");
+    expect(html).toContain("15:00");
+    expect(html).toContain("PDKS seçili kişi ve bu dönem ile açılır.");
     expect(html).not.toContain(">Düzenle<");
   });
   it("shows loading without a fabricated zero", () => {
-    mocks.paginated.mockReturnValue({
+    mocks.paginated.mockReset().mockReturnValue({
       results: [],
       status: "LoadingFirstPage",
       loadMore: vi.fn(),

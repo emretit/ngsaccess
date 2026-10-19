@@ -39,7 +39,7 @@ describe("PDKS source boundary", () => {
   it("Hik belirsizliği kart no ile kapanmaz, major alanı minor yorumunu sınırlar", () => {
     expect(classifyReadingSource({ hikMajorEventType: 3, hikSubEventType: 0x4b, cardNo: "123" })).toBe("unknown");
     expect(classifyReadingSource({ rawData: '{"AccessControllerEvent":{"currentVerifyMode":"face"}}' })).toBe("biometric");
-    expect(isPdksEligibleReading({ hikMajorEventType: 5, hikSubEventType: 999 })).toBe(true);
+    expect(isPdksEligibleReading({ hikMajorEventType: 5, hikSubEventType: 999 })).toBe(false);
     expect(countPdksReadingSources([{ hikCurrentVerifyMode: "face" }, { hikMajorEventType: 5, hikSubEventType: 999 }])).toMatchObject({ biometric: 1, unknown: 1 });
   });
   it("izinli iki proje olsa da seçilen proje dışındaki ve projesiz okumaları dışlar", () => {

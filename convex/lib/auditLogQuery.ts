@@ -1,16 +1,22 @@
 import { trDayRangeISO } from "./trDate";
 
 export const AUDIT_TARGET_LABELS: Record<string, string> = {
-  biometricDestructionRun: "Biyometrik İmha Durumu",
-  biometricDestruction: "Biyometrik İmha Tutanağı",
-  biometricDestructionCheck: "Biyometrik Cihaz Kontrolü",
-  biometricDestructionDeviceCheck: "Biyometrik Cihaz Kontrolü",
-  biometricDestructionDevice: "Biyometrik Cihaz İmhası",
-  pdksRecords: "PDKS Kaydı",
+  projectPrivacySettings: "Proje gizlilik ayarları",
+  cardReadings: "Kart okumaları",
+  biometricDestructionRun: "Biyometrik imha durumu",
+  biometricDestruction: "Biyometrik imha tutanağı",
+  biometricDestructionCheck: "Biyometrik cihaz kontrolü",
+  biometricDestructionDeviceCheck: "Biyometrik cihaz kontrolü",
+  biometricDestructionDevice: "Biyometrik cihaz imhası",
+  pdksRecords: "PDKS kaydı",
   holidays: "Tatil",
-  overtimeRates: "Mesai Oranı",
+  overtimeRates: "Mesai oranı",
   employees: "Çalışan",
-  employeeConsents: "Çalışan İzni / Ziyaretçi Onayı",
+  employeeConsents: "Çalışan izni / Ziyaretçi onayı",
+  deviceEvents: "Cihaz olayı / Alarm",
+  attendanceCorrections: "PDKS düzeltme talebi",
+  alarmSettings: "Alarm bildirim ayarı",
+  leaves: "İzin",
 };
 
 export function auditDateRange(startDate?: string, endDate?: string) {

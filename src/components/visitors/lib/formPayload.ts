@@ -10,7 +10,7 @@ type FormPayload = { kind: "create"; args: FunctionArgs<typeof api.visitors.crea
 export function visitorFormPayload(formData: VisitorFormData, visitor?: VisitorDetail | null): FormPayload {
   const originalExpiry = visitor ? isoToLocalInput(visitor.visitEnd ?? "") : undefined;
   const parsed = visitorFormSchema.parse({ ...formData, isEditing: !!visitor, originalExpiry, wasActive: visitor?.isActive });
-  const shared = { firstName: parsed.firstName, lastName: parsed.lastName, isActive: formData.isActive, kvkkConsent: formData.kvkkConsent };
+  const shared = { firstName: parsed.firstName, lastName: parsed.lastName, isActive: formData.isActive, kvkkConsent: formData.kvkkConsent, kvkkDocumentVersion: formData.kvkkDocumentVersion };
   if (visitor) {
     return { kind: "update", args: {
       visitorId: visitor._id, projectId: formData.projectId, ...shared,

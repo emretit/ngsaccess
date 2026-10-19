@@ -1,3 +1,4 @@
+import { pdksToday } from "@/components/pdks/lib/calendar";
 import { isSameDay, isSameMonth, isSameWeek } from "date-fns";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,10 +19,10 @@ const PRESETS: Array<{ key: PresetKey; reportType: ReportType }> = [
 
 function isActive(values: FilterValues, reportType: ReportType, range: { from: Date; to: Date }): boolean {
   if (values.reportType !== reportType) return false;
-  const anchor = values.anchorDate ?? new Date();
-  if (reportType === "daily") return isSameDay(anchor, new Date());
-  if (reportType === "weekly") return isSameWeek(anchor, new Date(), { weekStartsOn: 1 });
-  if (reportType === "monthly") return isSameMonth(anchor, new Date());
+  const anchor = values.anchorDate ?? pdksToday();
+  if (reportType === "daily") return isSameDay(anchor, pdksToday());
+  if (reportType === "weekly") return isSameWeek(anchor, pdksToday(), { weekStartsOn: 1 });
+  if (reportType === "monthly") return isSameMonth(anchor, pdksToday());
   const { from, to } = values.dateRange;
   return !!from && !!to && isSameDay(from, range.from) && isSameDay(to, range.to);
 }
@@ -35,7 +36,7 @@ export function PDKSQuickPresets({ values, onChange }: PDKSQuickPresetsProps) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {PRESETS.map((p) => {
-        const range = getDateRange(p.key);
+        const range = getDateRange(p.key, pdksToday());
         const active = isActive(values, p.reportType, range);
         return (
           <Button
@@ -44,7 +45,7 @@ export function PDKSQuickPresets({ values, onChange }: PDKSQuickPresetsProps) {
             size="sm"
             className="h-7 text-xs rounded-full px-3"
             onClick={() =>
-              onChange({ ...values, anchorDate: new Date(), dateRange: p.reportType === "custom" ? range : { from: undefined, to: undefined }, reportType: p.reportType })
+              onChange({ ...values, anchorDate: pdksToday(), dateRange: p.reportType === "custom" ? range : { from: undefined, to: undefined }, reportType: p.reportType })
             }
           >
             {PRESET_LABELS[p.key]}

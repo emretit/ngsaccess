@@ -1,3 +1,6 @@
+import { Link } from "react-router-dom";
+import { formatTrDateTime } from "@/lib/date";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
@@ -13,9 +16,10 @@ export function EmployeeRecentReadings({
 }: {
   employeeId: Id<"employees">;
 }) {
+  const { projectId } = useActiveProjectScope();
   const result = useQuery(api.peopleActivity.employeeRecentReadings, {
     employeeId,
-    limit: 10,
+    limit: 5,
   });
   return (
     <section className="space-y-3 border-t pt-5">
@@ -29,6 +33,7 @@ export function EmployeeRecentReadings({
       ) : (
         <ReadingsList readings={result} />
       )}
+      <Link className="text-sm underline" to={`/live-monitoring?mode=history&employee=${encodeURIComponent(employeeId)}&liveProject=${encodeURIComponent(projectId ?? "")}`}>Tüm geçişler</Link>
     </section>
   );
 }
@@ -42,7 +47,7 @@ function ReadingsList({ readings }: { readings: Readings }) {
           <li key={row._id} className="space-y-1 py-3 text-sm">
             <div className="flex flex-wrap justify-between gap-2">
               <time dateTime={row.accessTime}>
-                {new Date(row.accessTime).toLocaleString("tr-TR")}
+                {formatTrDateTime(new Date(row.accessTime))}
               </time>
               <StatusBadge
                 tone={allowed ? "success" : denied ? "danger" : "warning"}

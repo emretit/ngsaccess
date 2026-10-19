@@ -22,7 +22,7 @@ export function DeviceAddMenu({ onAddNew, onAddFromCloud }: DeviceAddMenuProps) 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="sm" className="h-8 gap-1.5 text-xs">
+        <Button size="sm" className="min-h-11 md:min-h-8 gap-1.5 text-xs">
           <Plus className="h-3.5 w-3.5" />
           Cihaz ekle
           <ChevronDown className="h-3.5 w-3.5 opacity-70" />

@@ -1,12 +1,11 @@
 import { visitorExpiryError } from "./visitorPresence";
 
-export type VisitorStatus = "active" | "checkedOut" | "expired" | "preRegistered" | "inactive";
+export type VisitorStatus = "active" | "checkedOut" | "expired" | "preRegistered";
 export const visitorStatusLabels = {
   active: { label: "Erişim aktif", tone: "success" },
-  checkedOut: { label: "Ziyaret sonlandırıldı", tone: "neutral" },
+  checkedOut: { label: "Sonlandırıldı / pasif", tone: "neutral" },
   expired: { label: "Süresi doldu", tone: "warning" },
   preRegistered: { label: "Ön kayıt", tone: "neutral" },
-  inactive: { label: "Pasif", tone: "neutral" },
 } as const;
 
 /** datetime-local girdileri TR saatidir; ofsetli ISO girdiler anı korur. */
@@ -36,7 +35,7 @@ export function visitorStatus(input: { visitorStatus?: string; isActive?: boolea
   if (input.visitorStatus === "expired" || visitorTime(input.accessExpiresAt) <= now) return "expired";
   if (input.isActive === true) return "active";
   if (input.visitorStatus === "preRegistered") return "preRegistered";
-  return "inactive";
+  return "checkedOut";
 }
 
 /** Pasif geçmiş kaydı düzenlenebilir; aktivasyon her zaman etkin bitişi doğrular. */
@@ -73,4 +72,12 @@ export function visitorSensitiveFields(input: { cardNumber: string; tcNo?: strin
     tcNo: input.tcNo ? canView ? input.tcNo : `•••• ${input.tcNo.slice(-4)}` : null,
     sensitiveMasked: !canView,
   };
+}
+
+/** Client clocks may differ by at most five minutes from the server clock. */
+export function visitorQueryNow(clientNow: number | undefined, serverNow = Date.now()): number {
+  const requested = clientNow ?? serverNow;
+  if (!Number.isFinite(requested)) throw new Error("Geçersiz sorgu zamanı");
+  const tolerance = 5 * 60 * 1000;
+  return Math.min(serverNow + tolerance, Math.max(serverNow - tolerance, requested));
 }

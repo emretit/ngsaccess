@@ -1,3 +1,4 @@
+import { restorePdksFocus } from "./lib/focus";
 import { useRef, useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -18,9 +19,11 @@ import { errorMessage, notify } from "@/lib/notify";
 import { displayTime, readableDate, validateManual } from "./lib/presentation";
 interface Props {
   open: boolean;
+  returnFocusTo?: HTMLElement | null;
   employeeId: Id<"employees">;
   employeeName: string;
   date: string;
+  isOvernightShift?: boolean;
   initialEntry: string;
   initialExit: string;
   onClose: () => void;
@@ -31,9 +34,11 @@ export function ManualPdksEditDialog(props: Props) {
   return <ManualForm key={`${props.employeeId}:${props.date}`} {...props} />;
 }
 function ManualForm({
+  returnFocusTo,
   employeeId,
   employeeName,
   date,
+  isOvernightShift = false,
   initialEntry,
   initialExit,
   onClose,
@@ -55,7 +60,7 @@ function ManualForm({
   };
   const save = async () => {
     if (lock.current) return;
-    const next = validateManual(entry, exit, note);
+    const next = validateManual(entry, exit, note, isOvernightShift);
     setErrors(next);
     if (Object.keys(next).length) return;
     lock.current = true;
@@ -85,7 +90,7 @@ function ManualForm({
           if (!open) close();
         }}
       >
-        <DialogContent className="max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] max-w-md overflow-y-auto">
+        <DialogContent onCloseAutoFocus={event => restorePdksFocus(event, returnFocusTo)} className="max-h-[calc(100dvh-32px)] w-[calc(100%-32px)] max-w-md overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Manuel düzelt</DialogTitle>
             <DialogDescription>
@@ -155,6 +160,7 @@ function ManualForm({
                   </div>
                 ))}
               </div>
+              {isOvernightShift && entry && exit && exit <= entry && <p className="text-sm text-muted-foreground">Çıkış ertesi gün kaydedilecek.</p>}
               <div>
                 <label htmlFor="manual-note" className="text-sm">
                   Gerekçe (zorunlu)
@@ -183,14 +189,14 @@ function ManualForm({
                 )}
               </div>
             </fieldset>
-            {Object.keys(errors).length > 0 && (
+            {errors.server && (
               <div
                 role="alert"
                 className="rounded-md border p-3 text-sm text-danger"
               >
                 <p className="font-medium">Düzeltme kaydedilemedi.</p>
                 <ul className="mt-1 list-disc pl-4">
-                  {Object.values(errors).map((error) => (
+                  {[errors.server].map((error) => (
                     <li key={error}>{error}</li>
                   ))}
                 </ul>

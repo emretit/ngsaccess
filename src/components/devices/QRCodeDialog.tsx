@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 
 interface QRCodeDialogProps {
@@ -27,14 +28,16 @@ export function QRCodeDialog({
       <DialogContent className="sm:max-w-md flex flex-col items-center">
         <DialogHeader>
           <DialogTitle className="text-center">
-            {qrData?.name} QR Kodu
+            Kimlik QR kodu — {qrData?.name}
           </DialogTitle>
         </DialogHeader>
         {qrData && (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Cihaz kimlik etiketi. Bu QR kod geçiş yetkisi sağlamaz.</p>
+            <DialogDescription>Cihaz kimlik etiketi. Bu QR kod geçiş yetkisi sağlamaz.</DialogDescription>
             <QRCode
               id="qr-large"
+              role="img"
+              aria-label={`${qrData.name} kimlik QR kodu`}
               value={qrData.serial}
               size={256}
               level="H"

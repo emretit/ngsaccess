@@ -40,6 +40,7 @@ const SATURDAY = "2026-06-27"; // Cumartesi (weekend)
 type DayParams = Parameters<typeof computeAttendanceDetailDay>[0];
 const day = (overrides: Partial<DayParams>): DayParams => ({
   date: MONDAY,
+  availableDateKeys: new Set(["2026-06-22", "2026-06-23", "2026-06-24", "2026-06-27", "2026-06-28"]),
   dayReadings: [],
   manualDay: undefined,
   leaves: [],
@@ -71,11 +72,11 @@ describe("pdksDetail – computeAttendanceDetailDay", () => {
     expect(r.rawReadings).toEqual([]);
   });
 
-  it("manuel giriş/çıkış geç başlangıç → late / N, 8h altı mesai 0", () => {
+  it("manuel giriş/çıkış geç başlangıç → late / N, vardiya bitişinden sonraki mesai 45", () => {
     const r = computeAttendanceDetailDay(
       day({ manualDay: manual("10:00", "19:00", "elle düzeltme") }),
     );
-    // override 540dk → ≥450 mola 60 → net 480 → mesai max(0,480-480)=0
+    // Ham 540 → mola 60 → net 480; mesai = 19:00 − 18:15 = 45.
     expect(r).toMatchObject({
       firstEntry: "10:00",
       lastExit: "19:00",
@@ -85,24 +86,24 @@ describe("pdksDetail – computeAttendanceDetailDay", () => {
       isLate: true,
       isEarlyExit: false,
       payrollCode: "N",
-      overtimeMinutes: 0,
+      overtimeMinutes: 45,
       isManual: true,
       manualNote: "elle düzeltme",
     });
   });
 
-  it("manuel uzun gün → sabit 8h kuralı mesai üretir (R8 farkı)", () => {
+  it("manuel uzun gün → tablo ve bordroyla aynı vardiya eşiği", () => {
     const r = computeAttendanceDetailDay(
       day({ manualDay: manual("08:00", "20:00") }),
     );
-    // override 720dk → mola 60 → net 660 → mesai max(0,660-480)=180
+    // Ham 720 → mola 60 → net 660; mesai = 20:00 − 18:15 = 105.
     expect(r).toMatchObject({
       totalMinutes: 660,
       totalHours: "11h 0m",
       status: "present",
       isLate: false,
       payrollCode: "N",
-      overtimeMinutes: 180,
+      overtimeMinutes: 105,
     });
   });
 

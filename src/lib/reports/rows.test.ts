@@ -74,7 +74,7 @@ describe('monthly attendance reports', () => {
   }
   it('counts actual payroll codes and flags, excluding future and unavailable cells', () => {
     expect(countAttendance(fixture().rows[0].cells)).toEqual({ workedDays: 1, holidayWorkedDays: 0, lateDays: 1, earlyExitDays: 1, absentDays: 1, leaveDays: 1, weekendDays: 1, holidayDays: 1 });
-    expect(formatShortMinutes(515)).toBe('8:35'); expect(formatShortMinutes(0)).toBe('');
+    expect(formatShortMinutes(515)).toBe('8:35'); expect(formatShortMinutes(0)).toBe('0:00');
   });
   it('aggregates people, days and authoritative duration totals by department', () => {
     const sheet = fixture(); const base = sheet.rows[0];

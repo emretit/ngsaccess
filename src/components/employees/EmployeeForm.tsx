@@ -77,9 +77,9 @@ export default function EmployeeForm({
   useEffect(() => {
     onPendingChange?.(isLoading || uploading);
   }, [isLoading, uploading, onPendingChange]);
-  const currentEmployees = useQuery(
-    api.employees.list,
-    employee && formData.projectId ? { projectId: formData.projectId } : "skip",
+  const currentEmployee = useQuery(
+    api.employees.getById,
+    employee ? { employeeId: employee._id } : "skip",
   );
   const onPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     handleFileChange(
@@ -114,11 +114,7 @@ export default function EmployeeForm({
     handleSubmit(formData);
   };
 
-  if (
-    employee &&
-    currentEmployees &&
-    !currentEmployees.some((person) => person._id === employee._id)
-  )
+  if (employee && currentEmployee === null)
     return (
       <EmptyState
         title="Personel kaydı artık bulunamıyor."
@@ -154,6 +150,7 @@ export default function EmployeeForm({
             <SectionSkeleton label="Form bilgileri yükleniyor" />
           ) : (
             <EmployeeFormFields
+              autoFocusFirstName={!employee}
               formData={formData}
               setFormData={setFormData}
               companies={companies}

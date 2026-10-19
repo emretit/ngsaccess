@@ -1,3 +1,6 @@
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { VisitorCollapsible } from "./VisitorCollapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,19 +16,13 @@ import { DateInput } from "@/components/ui/date-picker";
 
 export default function VisitorFormFields({ formData, setFormData, presetRules, hostEmployees, isEditing, kvkkConsentAt, errors = {}, onNewZone }: {
   formData: VisitorFormData; setFormData: (data: VisitorFormData) => void;
-  presetRules: { id: string; name: string }[]; hostEmployees: { id: string; name: string }[];
+  presetRules: { id: string; name: string; disabled?: boolean }[]; hostEmployees: { id: string; name: string }[];
   isEditing: boolean; kvkkConsentAt?: string | null; errors?: Partial<Record<string, string>>; onNewZone: () => void;
 }) {
+  const notice = useQuery(api.visitors.kvkkNotice, formData.projectId ? { projectId: formData.projectId } : "skip");
   const change = <K extends keyof VisitorFormData>(field: K, value: VisitorFormData[K]) => setFormData({ ...formData, [field]: value });
-  return <div className="min-w-0 space-y-5">
-    <h3 className="text-base font-semibold">Ziyaretçi bilgileri</h3>
-    <FormFieldWrapper htmlFor="v_first_name" label="Ad *" error={errors.firstName}><Input id="v_first_name" value={formData.firstName} onChange={e => change("firstName", e.target.value)} autoComplete="given-name" /></FormFieldWrapper>
-    <FormFieldWrapper htmlFor="v_last_name" label="Soyad *" error={errors.lastName}><Input id="v_last_name" value={formData.lastName} onChange={e => change("lastName", e.target.value)} autoComplete="family-name" /></FormFieldWrapper>
-    <FormFieldWrapper htmlFor="v_company" label="Şirket / kurum"><Input id="v_company" value={formData.visitorCompany} onChange={e => change("visitorCompany", e.target.value)} /></FormFieldWrapper>
-    <h3 className="border-t pt-4 text-base font-semibold">Ziyaret</h3>
-    <FormFieldWrapper htmlFor="v_host" label="Ziyaret edilen kişi"><VisitorCombobox id="v_host" label="Ziyaret edilen kişi" value={formData.hostEmployeeId} options={hostEmployees} allowClear onChange={value => change("hostEmployeeId", value as Id<"employees"> | null)} /></FormFieldWrapper>
-    <FormFieldWrapper htmlFor="v_purpose" label="Ziyaret amacı"><Input id="v_purpose" value={formData.visitPurpose} onChange={e => change("visitPurpose", e.target.value)} /></FormFieldWrapper>
-    <h3 className="border-t pt-4 text-base font-semibold">Erişim</h3>
+  return <div className="min-w-0 space-y-5 [&_[aria-invalid=true]]:border-destructive">
+    <h3 className="text-base font-semibold">Erişim</h3>
     <FormFieldWrapper htmlFor="v_zone" label="Ziyaretçi erişim bölgesi *" error={errors.presetRuleId} hint={isEditing ? "Mevcut ziyarette erişim bölgesi değiştirilemez. Farklı bölge için yeni ziyaret kaydı oluşturun." : "Kapı, gün ve saat izinleri seçilen erişim bölgesinden gelir."}>
       <VisitorCombobox id="v_zone" label="Ziyaretçi erişim bölgesi" value={formData.presetRuleId} options={presetRules} disabled={isEditing} error={errors.presetRuleId} onChange={value => change("presetRuleId", value as Id<"accessRules"> | null)} />
     </FormFieldWrapper>
@@ -34,10 +31,17 @@ export default function VisitorFormFields({ formData, setFormData, presetRules, 
     <FormFieldWrapper htmlFor="v_card" label="Kart numarası *" error={errors.cardNumber}><Input id="v_card" value={formData.cardNumber} onChange={e => change("cardNumber", e.target.value)} placeholder="Okuyucudan alın veya elle girin" /></FormFieldWrapper>
     <VisitorCardCapture currentCard={formData.cardNumber} onCapture={card => change("cardNumber", card)} />
     <div className="flex items-center gap-2"><Checkbox id="v_active" checked={formData.isActive} onCheckedChange={checked => change("isActive", checked === true)} /><Label htmlFor="v_active">Erişim izni ver</Label></div><p className="text-xs text-muted-foreground">Erişim geçerlilik bitişiyle sınırlıdır; süresi dolan kayıt aktif sayılmaz.</p>
-    <details className="border-t pt-4"><summary className="cursor-pointer font-medium">Ek bilgiler</summary><div className="mt-4 space-y-4">
+    <h3 className="text-base font-semibold">Ziyaretçi bilgileri</h3>
+    <div className="grid gap-4 min-[761px]:grid-cols-2"><FormFieldWrapper htmlFor="v_first_name" label="Ad *" error={errors.firstName}><Input id="v_first_name" value={formData.firstName} onChange={e => change("firstName", e.target.value)} autoComplete="given-name" /></FormFieldWrapper>
+    <FormFieldWrapper htmlFor="v_last_name" label="Soyad *" error={errors.lastName}><Input id="v_last_name" value={formData.lastName} onChange={e => change("lastName", e.target.value)} autoComplete="family-name" /></FormFieldWrapper></div>
+    <FormFieldWrapper htmlFor="v_company" label="Şirket / kurum"><Input id="v_company" value={formData.visitorCompany} onChange={e => change("visitorCompany", e.target.value)} /></FormFieldWrapper>
+    <h3 className="border-t pt-4 text-base font-semibold">Ziyaret</h3>
+    <FormFieldWrapper htmlFor="v_host" label="Ziyaret edilen kişi"><VisitorCombobox id="v_host" label="Ziyaret edilen kişi" value={formData.hostEmployeeId} options={hostEmployees} allowClear onChange={value => change("hostEmployeeId", value as Id<"employees"> | null)} /></FormFieldWrapper>
+    <FormFieldWrapper htmlFor="v_purpose" label="Ziyaret amacı"><Input id="v_purpose" value={formData.visitPurpose} onChange={e => change("visitPurpose", e.target.value)} /></FormFieldWrapper>
+    <VisitorCollapsible title="Ek bilgiler">
       <FormFieldWrapper htmlFor="v_phone" label="Telefon"><Input id="v_phone" type="tel" value={formData.visitorPhone} onChange={e => change("visitorPhone", e.target.value)} /></FormFieldWrapper>
       <FormFieldWrapper htmlFor="v_notes" label="Notlar"><Textarea id="v_notes" value={formData.notes} onChange={e => change("notes", e.target.value)} rows={3} /></FormFieldWrapper>
-    </div></details>
-    <div className="space-y-1 border-t pt-4"><div className="flex items-center gap-2"><Checkbox id="v_kvkk" checked={formData.kvkkConsent} disabled={!!kvkkConsentAt} onCheckedChange={checked => change("kvkkConsent", checked === true)} /><Label htmlFor="v_kvkk">KVKK rıza kaydı alındı</Label></div><p className="text-xs text-muted-foreground">{kvkkConsentAt ? `Kayıt tarihi: ${formatVisitorTime(kvkkConsentAt)}` : "Bu alan isteğe bağlıdır. Mevcut kayıt sistemine rıza bilgisi ekler."} Metin sürümü kaydedilmiyor.</p></div>
+    </VisitorCollapsible>
+    <div className="space-y-1 border-t pt-4"><div className="flex items-center gap-2"><Checkbox id="v_kvkk" checked={!!kvkkConsentAt || (formData.kvkkConsent && formData.kvkkDocumentVersion === notice?.version)} disabled={!!kvkkConsentAt || !notice?.version || !notice?.url} onCheckedChange={checked => setFormData({ ...formData, kvkkConsent: checked === true, kvkkDocumentVersion: checked === true ? notice?.version ?? undefined : undefined })} /><Label htmlFor="v_kvkk">KVKK rıza kaydı alındı</Label></div><p className="text-xs text-muted-foreground">{kvkkConsentAt ? `Kayıt tarihi: ${formatVisitorTime(kvkkConsentAt)}` : "Bu alan isteğe bağlıdır. Mevcut kayıt sistemine rıza bilgisi ekler."}</p>{notice?.url && notice.version ? <a className="text-sm underline" href={notice.url} target="_blank" rel="noopener noreferrer">Aydınlatma metni · Sürüm {notice.version}</a> : <p className="text-xs text-muted-foreground">Aydınlatma metni henüz tanımlanmadı</p>}</div>
   </div>;
 }

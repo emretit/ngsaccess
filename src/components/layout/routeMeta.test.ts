@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { routeMeta, safeReturnPath } from "../../lib/routeMeta";
+import { routeMeta, safeReturnPath, visibleRoutes } from "../../lib/routeMeta";
 
 describe("güvenli giriş dönüşü", () => {
   it("sorgu ve hash'i korur", () => expect(safeReturnPath("/employees?status=active#person-42")).toBe("/employees?status=active#person-42"));
@@ -7,5 +7,12 @@ describe("güvenli giriş dönüşü", () => {
   it("her rota tek ve eksik başlıklar tanımlı", () => {
     expect(new Set(routeMeta.map(item => item.href)).size).toBe(routeMeta.length);
     for (const href of ["/home", "/audit-log", "/engineering-department", "/virtual-readers"]) expect(routeMeta.find(item => item.href === href)?.name).toBeTruthy();
+  });
+});
+
+describe("Sanal okuyucular menüsü", () => {
+  it("keeps the destination visible with its upcoming badge", () => {
+    expect(visibleRoutes("admin").find(route => route.href === "/virtual-readers"))
+      .toMatchObject({ name: "Sanal Okuyucular", badge: "Yakında" });
   });
 });

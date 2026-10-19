@@ -1,12 +1,12 @@
 import { capabilities } from "./capabilities";
 import { Activity, BarChart3, CalendarClock, ClipboardList, Cpu, DoorOpen, FileText, Home, Palmtree, Settings, Shield, ShieldCheck, Users, Wrench, ScanLine, User, type LucideIcon } from "lucide-react";
 
-export interface RouteMeta { href: string; name: string; icon: LucideIcon; adminOnly?: boolean; superAdminOnly?: boolean; menu?: boolean; group?: "main" | "attendance" | "management" }
+export interface RouteMeta { href: string; name: string; icon: LucideIcon; adminOnly?: boolean; superAdminOnly?: boolean; menu?: boolean; badge?: "Yakında"; group?: "main" | "attendance" | "management" }
 export const routeMeta: RouteMeta[] = [
   { href: "/home", group: "main", name: "Ana Sayfa", icon: Home },
   { href: "/employees", group: "main", name: "Kişiler", icon: Users },
   { href: "/devices", group: "main", name: "Cihazlar", icon: Cpu },
-  { href: "/virtual-readers", group: "main", name: "Sanal Okuyucular", icon: ScanLine },
+  { href: "/virtual-readers", group: "main", name: "Sanal Okuyucular", icon: ScanLine, badge: "Yakında" },
   { href: "/access-control", group: "main", name: "Geçiş Kontrol", icon: Shield },
   { href: "/visitors", group: "main", name: "Ziyaretçiler", icon: DoorOpen },
   { href: "/live-monitoring", group: "main", name: "Canlı İzleme", icon: Activity },

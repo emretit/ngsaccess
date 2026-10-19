@@ -64,7 +64,7 @@ export function DeviceZoneSection({ form, zones, allowCreate = true }: DeviceZon
           name="new_zone_name"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Yeni Bölge Adı</FormLabel>
+              <FormLabel>Yeni bölge adı</FormLabel>
               <FormControl>
                 <Input placeholder="Örn. Giriş Katı" {...field} value={field.value ?? ""} />
               </FormControl>

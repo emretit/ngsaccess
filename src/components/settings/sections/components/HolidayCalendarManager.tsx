@@ -6,6 +6,7 @@ import { api } from "../../../../../convex/_generated/api";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { notify } from "@/lib/notify";
+import { getTurkishHolidaysForYear } from "../../../../../convex/lib/turkishHolidays";
 import { todayInTurkey } from "@/lib/date";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -30,6 +31,11 @@ export const holidaySchema = z.object({
 type HolidayValues = z.infer<typeof holidaySchema>;
 const empty: HolidayValues = { date: "", name: "", isHalfDay: false };
 
+export function countMissingHolidays(year: number, existing: readonly { date: string }[]): number {
+  const dates = new Set(existing.map(row => row.date));
+  return getTurkishHolidaysForYear(year).filter(row => !dates.has(row.date)).length;
+}
+
 function HolidayCalendarContent() {
   const { projectId, loading, isAdmin } = useActiveProjectScope();
   const [year, setYear] = useState(Number(todayInTurkey().slice(0, 4)));
@@ -43,6 +49,7 @@ function HolidayCalendarContent() {
   const [deleting, setDeleting] = useState(false);
   const [deleteHoliday, setDeleteHoliday] = useState<FunctionReturnType<typeof api.holidays.list>[number] | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [seedOpen, setSeedOpen] = useState(false);
   const dirty = open && (values.date !== "" || values.name !== "" || values.isHalfDay);
   const guard = useUnsavedChangesGuard(dirty);
   const holidays = useQuery(api.holidays.list, !loading && projectId && isAdmin ? { projectId, year } : "skip");
@@ -60,6 +67,7 @@ function HolidayCalendarContent() {
     const missing = result.missingReligiousYears ?? [];
     notify.success(`${year} resmi tatilleri yüklendi`, `${result.inserted} yeni eklendi, ${result.skipped} mevcut.${missing.length ? ` ${missing.join(", ")} için dini tatilleri ayrıca ekleyin.` : ""}`);
   }, { error: "Tatiller yüklenemedi" });
+  const seedCount = countMissingHolidays(year, holidays ?? []);
   const pending = add.pending || seedAction.pending || deleting;
   useSettingsFormState("holidays", dirty, pending);
   useEffect(() => {
@@ -77,7 +85,7 @@ function HolidayCalendarContent() {
           const next = Number(text); if (/^\d{4}$/.test(text) && next >= 1900 && next <= 2100) setYear(next);
         }} onBlur={() => setYearText(String(year))} />
       </FormFieldWrapper>
-      <Button variant="outline" disabled={pending || !projectId || holidays === undefined} onClick={() => void seedAction.run()}>{seedAction.pending ? "Yükleniyor…" : "Resmi tatilleri yükle"}</Button>
+      <Button variant="outline" disabled={pending || !projectId || holidays === undefined} onClick={() => setSeedOpen(true)}>{seedAction.pending ? "Yükleniyor…" : "Resmi tatilleri yükle"}</Button>
       <Button variant="outline" disabled={pending || !projectId} onClick={() => setOpen(true)}>Tatil ekle</Button>
     </div>
     {loading || holidays === undefined ? <SectionSkeleton label="Tatiller yükleniyor" /> : holidays.length === 0 ?
@@ -106,12 +114,13 @@ function HolidayCalendarContent() {
           <fieldset disabled={pending} className="space-y-4">
             <FormFieldWrapper htmlFor="holiday-date" label="Tarih *" error={errors.date}><DateInput required value={values.date} onChange={date => setValues({ ...values, date })} /></FormFieldWrapper>
             <FormFieldWrapper htmlFor="holiday-name" label="Tatil adı *" error={errors.name}><Input required maxLength={100} value={values.name} onChange={event => setValues({ ...values, name: event.target.value })} /></FormFieldWrapper>
-            <FormFieldWrapper htmlFor="holiday-half" label="Yarım gün"><Checkbox checked={values.isHalfDay} onCheckedChange={checked => setValues({ ...values, isHalfDay: checked === true })} /></FormFieldWrapper>
+            <FormFieldWrapper inline htmlFor="holiday-half" label="Yarım gün"><Checkbox checked={values.isHalfDay} onCheckedChange={checked => setValues({ ...values, isHalfDay: checked === true })} /></FormFieldWrapper>
           </fieldset>
           <div className="flex flex-wrap justify-end gap-3"><Button type="button" variant="outline" disabled={pending} onClick={close}>Vazgeç</Button><Button type="submit" disabled={pending}>{add.pending ? "Ekleniyor…" : "Tatili ekle"}</Button></div>
         </form>
       </DialogContent>
     </Dialog>
+    <HolidaySeedConfirmation open={seedOpen} year={year} count={seedCount} pending={seedAction.pending} onOpenChange={setSeedOpen} onConfirm={async () => { if (await seedAction.run()) setSeedOpen(false); }} />
     {guard.dialog}
     <ConfirmDestructive open={deleteOpen} onOpenChange={setDeleteOpen} title="Tatil silinsin mi?" objectName={deleteHoliday?.name ?? "Tatil"}
       effects={[`${deleteHoliday?.date ?? "Seçili gün"} için tatil tanımı kaldırılır.`]} confirmLabel="Tatili sil" onConfirm={async () => {
@@ -124,4 +133,14 @@ function HolidayCalendarContent() {
 export function HolidayCalendarManager() {
   const { projectId } = useActiveProjectScope();
   return <QuerySectionBoundary resetKey={projectId} title="Tatil takvimi yüklenemedi"><HolidayCalendarContent /></QuerySectionBoundary>;
+}
+
+export function HolidaySeedConfirmation({ open, year, count, pending, onOpenChange, onConfirm }: {
+  open: boolean; year: number; count: number; pending: boolean; onOpenChange: (open: boolean) => void; onConfirm: () => void;
+}) {
+  return <Dialog open={open} onOpenChange={next => { if (!pending) onOpenChange(next); }}>
+    <DialogContent><DialogHeader><DialogTitle>Resmi tatiller yüklensin mi?</DialogTitle><DialogDescription>{year} yılı için {count} tatil eklenecek. Mevcut tarihler korunur.</DialogDescription></DialogHeader>
+      <div className="flex justify-end gap-3"><Button variant="outline" disabled={pending} onClick={() => onOpenChange(false)}>Vazgeç</Button><Button disabled={pending || count === 0} onClick={onConfirm}>Tatilleri yükle</Button></div>
+    </DialogContent>
+  </Dialog>;
 }

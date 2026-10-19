@@ -22,7 +22,7 @@ export default function VisitorTable({ visitors, onOpen }: { visitors: Visitor[]
       <Table density="compact" className="w-full table-fixed"><TableHeader><TableRow>
         <TableHead className="w-[20%]">Ziyaretçi</TableHead><TableHead className="w-[15%]">Ziyaret edilen</TableHead><TableHead className="w-[16%]">Erişim bölgesi</TableHead><TableHead className="w-[16%]">Geçerlilik bitişi</TableHead><TableHead className="w-[17%]">Erişim</TableHead><TableHead>Son konum</TableHead><TableHead className="w-12"><span className="sr-only">İşlemler</span></TableHead>
       </TableRow></TableHeader><TableBody>{visitors.map(visitor => <TableRow key={visitor._id}>
-        <TableCell className="break-words">{name(visitor)}</TableCell><TableCell className="truncate" title={visitor.hostName ?? undefined}>{visitor.hostName ?? "Seçilmedi"}</TableCell>
+        <TableCell className="break-words">{name(visitor)}</TableCell><TableCell className="truncate" title={visitor.hostName ?? undefined}>{visitor.hostName ?? "—"}</TableCell>
         <TableCell className="truncate" title={visitor.presetRuleName ?? undefined}>{visitor.presetRuleName ?? "—"}</TableCell><TableCell className="tabular-nums whitespace-normal">{formatVisitorTime(visitor.visitEnd)}</TableCell>
         <TableCell className="[&_span]:whitespace-normal">{badge(visitor)}</TableCell><TableCell>{visitorPresenceLabels[visitor.presence]}</TableCell><TableCell>{menu(visitor)}</TableCell>
       </TableRow>)}</TableBody></Table>

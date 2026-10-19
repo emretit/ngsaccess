@@ -1,5 +1,5 @@
 import type { Doc, Id } from "../_generated/dataModel";
-import { appliesOn, minute, scheduleIntervals, validateRange, type ScheduleRange } from "./shiftUx";
+import { shiftTimeLabel, appliesOn, minute, scheduleIntervals, validateRange, type ScheduleRange } from "./shiftUx";
 
 const DAY = 86_400_000;
 const WEEKDAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -92,7 +92,7 @@ export function evaluateShiftAssignment(input: {
   }
   if (!input.calendarConfirmed && base.leave) return { ...base, status: "on_leave", reason: `İzin: ${base.leave.date}` };
   if (!input.calendarConfirmed && base.holiday) return { ...base, status: "holiday", reason: `${base.holiday.date}: ${base.holiday.name}` };
-  if (!input.forceConfirm && base.conflict) return { ...base, status: "conflict", reason: `OVERLAP:1 ${base.conflict.shiftName} ${base.conflict.startTime}–${base.conflict.endTime} (${base.conflict.startDate}–${base.conflict.endDate})` };
+  if (!input.forceConfirm && base.conflict) return { ...base, status: "conflict", reason: `OVERLAP:1 ${base.conflict.shiftName} ${shiftTimeLabel(base.conflict)} (${base.conflict.startDate}–${base.conflict.endDate})` };
   return base;
 }
 

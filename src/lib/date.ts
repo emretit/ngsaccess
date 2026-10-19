@@ -29,3 +29,27 @@ export function todayInTurkey(): string {
     day: "2-digit",
   }).format(new Date());
 }
+
+/** Calendar date in Turkey, independent of the browser's timezone. */
+export function formatTrDate(value: number | Date): string {
+  return new Intl.DateTimeFormat("tr-TR", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
+}
+
+export function formatTrDateTime(
+  value: number | Date,
+  opts?: { seconds?: boolean },
+): string {
+  const time = new Intl.DateTimeFormat("tr-TR", {
+    timeZone: "Europe/Istanbul",
+    hour: "2-digit",
+    minute: "2-digit",
+    ...(opts?.seconds ? { second: "2-digit" } : {}),
+    hourCycle: "h23",
+  }).format(value);
+  return `${formatTrDate(value)} ${time}`;
+}

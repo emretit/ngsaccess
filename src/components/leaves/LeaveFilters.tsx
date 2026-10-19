@@ -1,9 +1,6 @@
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useState } from "react";
-import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { FilterBar } from "@/components/shared/FilterBar";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { DateInput, MonthPicker } from "@/components/ui/date-picker";
@@ -16,9 +13,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { selectClass } from "./EmployeePicker";
+import { EmployeePicker, selectClass } from "./EmployeePicker";
 import {
-  currentMonth,
   dateLabel,
   leaveTypes,
   monthRange,
@@ -27,52 +23,6 @@ import {
 } from "./lib/leaveState";
 
 type Filters = ReturnType<typeof readFilters>;
-function PersonOptions({
-  projectId,
-  search,
-  selected,
-  onChange,
-}: {
-  projectId: Id<"projects">;
-  search: string;
-  selected?: string;
-  onChange: (value: string) => void;
-}) {
-  const data = useQuery(api.leaves.employeeOptions, {
-    projectId,
-    search: search || undefined,
-  });
-  return (
-    <div className="w-full min-w-0 md:w-[230px]">
-      <FormFieldWrapper htmlFor="leave-filter-person" label="Kişi">
-        <select
-          className={selectClass}
-          value={selected ?? ""}
-          disabled={data === undefined}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          <option value="">
-            {data === undefined ? "Kişiler yükleniyor…" : "Tüm kişiler"}
-          </option>
-          {selected && !data?.options.some((item) => item._id === selected) && (
-            <option value={selected}>Seçili kişi</option>
-          )}
-          {data?.options.map((item) => (
-            <option key={item._id} value={item._id}>
-              {item.employeeName} ·{" "}
-              {item.departmentName ?? "Departman belirtilmemiş"}
-            </option>
-          ))}
-        </select>
-      </FormFieldWrapper>
-      {data?.truncated && (
-        <p className="mt-1 text-xs text-muted-foreground">
-          Sınırlı seçenek; aramayı daraltın. Tüm kişiler bulunmayabilir.
-        </p>
-      )}
-    </div>
-  );
-}
 export function LeaveFilters({
   projectId,
   filters,
@@ -84,8 +34,8 @@ export function LeaveFilters({
   onChange: (values: Record<string, string | undefined>) => void;
   onClear: () => void;
 }) {
-  const [search, setSearch] = useState("");
-  const debouncedSearch = useDebouncedValue(search, 300);
+  const mobile = useIsMobile();
+  const [expanded, setExpanded] = useState(false);
   const [custom, setCustom] = useState(false);
   const [range, setRange] = useState({
     start: filters.rangeStart,
@@ -94,34 +44,14 @@ export function LeaveFilters({
   const [error, setError] = useState("");
   return (
     <>
-      <FilterBar
-        search={search}
-        onSearchChange={setSearch}
-        searchLabel="Kişi seçeneklerinde ara"
-        placeholder="Kişi adı veya departman ara"
-        hasFilters={Boolean(
-          filters.employeeId ||
-          filters.leaveType ||
-          filters.period !== currentMonth(),
-        )}
-        onClear={() => {
-          setSearch("");
-          onClear();
-        }}
-      >
-        <QuerySectionBoundary
-          title="Kişi seçenekleri yüklenemedi."
-          resetKey={`${projectId}:${debouncedSearch}`}
-          className="w-full min-w-0 md:w-auto"
-        >
-          <PersonOptions
-            projectId={projectId}
-            search={debouncedSearch}
-            selected={filters.employeeId}
-            onChange={(value) => onChange({ employee: value })}
-          />
+      {mobile && <Button variant="outline" aria-expanded={expanded} aria-controls="leave-filters" onClick={() => setExpanded(!expanded)}>Filtreler{filters.employeeId || filters.leaveType ? " · Etkin" : ""}</Button>}
+      <div id="leave-filters" role="search" aria-label="İzin filtreleri" className={`${mobile && !expanded ? "hidden" : "flex"} flex-wrap items-end gap-3`}>
+        <QuerySectionBoundary title="Kişiler yüklenemedi." resetKey={projectId} className="w-full min-w-0 md:w-[230px]">
+          <FormFieldWrapper htmlFor="leave-filter-person" label="Kişi">
+            {control => <EmployeePicker projectId={projectId} value={filters.employeeId ?? ""} onChange={value => onChange({ employee: value })} control={control} allowAll />}
+          </FormFieldWrapper>
         </QuerySectionBoundary>
-        <div className="grid w-full min-w-0 grid-cols-2 gap-3 md:w-auto">
+        <div className="w-full min-w-0 md:w-[180px]">
           <FormFieldWrapper htmlFor="leave-filter-type" label="İzin türü">
             <select
               className={selectClass}
@@ -136,56 +66,22 @@ export function LeaveFilters({
               ))}
             </select>
           </FormFieldWrapper>
-          <FormFieldWrapper htmlFor="leave-period" label="Dönem">
-            <select
-              className={selectClass}
-              value={filters.period === "custom" ? "custom" : "month"}
-              onChange={(event) => {
-                if (event.target.value === "custom") {
-                  setRange({
-                    start: filters.rangeStart,
-                    end: filters.rangeEnd,
-                  });
-                  setError("");
-                  setCustom(true);
-                } else
-                  onChange({
-                    period: currentMonth(),
-                    from: undefined,
-                    to: undefined,
-                  });
-              }}
-            >
-              <option value="month">Ay seçimi</option>
-              <option value="custom">Özel aralık</option>
-            </select>
-          </FormFieldWrapper>
         </div>
-        {filters.period === "custom" ? (
-          <Button
-            variant="outline"
-            onClick={() => {
-              setRange({ start: filters.rangeStart, end: filters.rangeEnd });
-              setError("");
-              setCustom(true);
-            }}
-          >
-            {dateLabel(filters.rangeStart)} – {dateLabel(filters.rangeEnd)}
-          </Button>
-        ) : (
-          <FormFieldWrapper htmlFor="leave-month" label="Ay">
-            <MonthPicker
-              className="w-full min-w-0 md:w-[160px]"
-              date={parseDateString(`${filters.period}-01`)}
-              onSelect={(date) => {
-                const period = formatDateString(date).slice(0, 7);
-                if (monthRange(period))
-                  onChange({ period, from: undefined, to: undefined });
-              }}
-            />
-          </FormFieldWrapper>
-        )}
-      </FilterBar>
+        <div className="w-full min-w-0 space-y-1.5 md:w-auto">
+          <span aria-hidden="true" className="block text-sm font-medium">Dönem</span>
+          <label htmlFor="leave-month" className="sr-only">Dönem ayı: {new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric", timeZone: "Europe/Istanbul" }).format(new Date(`${filters.rangeStart}T12:00:00Z`))}</label>
+          <div className="flex flex-wrap gap-2">
+            <MonthPicker id="leave-month" className="min-w-0 w-[180px]" date={parseDateString(`${filters.period === "custom" ? filters.rangeStart.slice(0, 7) : filters.period}-01`)} onSelect={date => {
+              const period = formatDateString(date).slice(0, 7);
+              if (monthRange(period)) onChange({ period, from: undefined, to: undefined });
+            }} />
+            <Button variant="outline" onClick={() => { setRange({ start: filters.rangeStart, end: filters.rangeEnd }); setError(""); setCustom(true); }}>
+              {filters.period === "custom" ? `${dateLabel(filters.rangeStart)} – ${dateLabel(filters.rangeEnd)}` : "Özel aralık…"}
+            </Button>
+          </div>
+        </div>
+        <Button type="button" variant="ghost" onClick={onClear}>Filtreleri temizle</Button>
+      </div>
       <Dialog open={custom} onOpenChange={setCustom}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto">
           <DialogHeader>

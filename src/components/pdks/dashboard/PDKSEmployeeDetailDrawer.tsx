@@ -1,3 +1,4 @@
+import { restorePdksFocus } from "../lib/focus";
 import { Component, useState, type ReactNode } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -26,6 +27,7 @@ import { PDKSAuditTimeline } from "./PDKSAuditTimeline";
 import { errorMessage } from "@/lib/notify";
 interface Props {
   open: boolean;
+  returnFocusTo?: HTMLElement | null;
   onOpenChange: (open: boolean) => void;
   employeeId: Id<"employees"> | null;
   startDate: string;
@@ -66,7 +68,7 @@ export function PDKSEmployeeDetailDrawer(props: Props) {
   const { projectId } = useActiveProject();
   return (
     <Sheet open={props.open} onOpenChange={props.onOpenChange}>
-      <SheetContent className="flex w-full flex-col overflow-y-auto sm:max-w-lg">
+      <SheetContent onCloseAutoFocus={event => restorePdksFocus(event, props.returnFocusTo)} className="flex w-full flex-col overflow-y-auto sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>Çalışan · gün detayı</SheetTitle>
           <SheetDescription>
@@ -97,6 +99,7 @@ function Detail({
     startDate: highlightDate ?? startDate,
     endDate: highlightDate ?? endDate,
   });
+  const [manualTrigger, setManualTrigger] = useState<HTMLElement | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   if (detail === undefined)
     return <SectionSkeleton rows={6} label="Gün detayı yükleniyor." />;
@@ -129,9 +132,11 @@ function Detail({
           <dl className="grid grid-cols-2 gap-3 text-sm tabular-nums">
             {[
               ["İlk giriş", displayTime(day.firstEntry)],
-              ["Son çıkış", displayTime(day.lastExit)],
-              ["Toplam süre", displayDuration(day.totalMinutes, day.status)],
+              ["Son çıkış", `${displayTime(day.lastExit)}${day.exitNextDay ? " (ertesi gün)" : ""}`],
+              ["Brüt süre", displayDuration(day.rawTotalMinutes ?? day.totalMinutes, day.status)],
+              ["Toplam süre (mola sonrası)", displayDuration(day.totalMinutes, day.status)],
               ["Fazla mesai", displayDuration(day.overtimeMinutes, day.status)],
+              ["Gece süresi", displayDuration(day.nightMinutes ?? 0, day.status)],
             ].map(([label, value]) => (
               <div key={label}>
                 <dt className="text-xs text-muted-foreground">{label}</dt>
@@ -201,14 +206,16 @@ function Detail({
             />
           </details>
           {isAdmin && day.status !== "future" && (
-            <Button onClick={() => setEditing(day.date)}>Manuel düzelt</Button>
+            <Button onClick={event => { setManualTrigger(event.currentTarget); setEditing(day.date); }}>Manuel düzelt</Button>
           )}
           {editing === day.date && day.status !== "future" && (
             <ManualPdksEditDialog
               open
+              returnFocusTo={manualTrigger}
               employeeId={employeeId}
               employeeName={name}
               date={day.date}
+              isOvernightShift={day.isOvernightShift}
               initialEntry={day.firstEntry ?? ""}
               initialExit={day.lastExit ?? ""}
               onClose={() => setEditing(null)}

@@ -3,9 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { Id } from "../../../../../convex/_generated/dataModel";
 import { BiometricModuleCard, BIOMETRIC_WARNING, validBiometricReason } from "./BiometricModuleCard";
 
-const state = vi.hoisted(() => ({ enabled: false, legacy: false }));
+const state = vi.hoisted(() => ({ enabled: false, legacy: false, changedAt: null as string | null }));
 vi.mock("convex/react", () => ({
-  useQuery: () => ({ ...state, reason: null, changedAt: null, changedBy: null }),
+  useQuery: () => ({ ...state, reason: null, changedBy: null }),
   useMutation: () => vi.fn(),
 }));
 const projectId = "project" as Id<"projects">;
@@ -32,4 +32,11 @@ describe("biyometri ayar kartı", () => {
     expect(html).toContain("Modülü kapat");
     expect(html).toContain("Bu proje eski ayarla açık; gerekmiyorsa kapatın.");
   });
+  it("13-O7 renders the last change in Istanbul time", () => {
+    state.changedAt = "2026-01-01T23:15:00Z";
+    const html = renderToStaticMarkup(<BiometricModuleCard projectId={projectId} />);
+    expect(html).toContain("02.01.2026 02:15");
+    state.changedAt = null;
+  });
+
 });

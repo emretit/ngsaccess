@@ -27,10 +27,10 @@ export function PDKSHeatmapView({
     end: new Date(`${endDate}T12:00:00`),
   }).map((d) => format(d, "yyyy-MM-dd"));
   const grid = {
-    gridTemplateColumns: `192px repeat(${dates.length}, 72px) 120px`,
+    gridTemplateColumns: `minmax(0, var(--pdks-person-width)) repeat(${dates.length}, 72px) 120px`,
   };
   return (
-    <div className="min-w-0 space-y-3">
+    <div className="min-w-0 space-y-3 [--pdks-person-width:120px] sm:[--pdks-person-width:192px]">
       <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
         {Object.entries(STATUS_META)
           .filter(([s]) => s !== "overtime")

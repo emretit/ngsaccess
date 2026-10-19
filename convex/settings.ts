@@ -256,14 +256,16 @@ export const saveOvertime = adminMutation({
   args: {
     projectId: v.id("projects"), annualOvertimeLimitHours: v.number(), overtimeStartToleranceMinutes: v.number(), monthlyHoursBase: v.number(),
     weekdayMultiplier: v.number(), weekendMultiplier: v.number(), holidayMultiplier: v.number(), nightShiftMultiplier: v.number(), nightShiftStart: v.string(), nightShiftEnd: v.string(),
+    nightCombineMode: v.optional(v.union(v.literal("max"), v.literal("multiply"), v.literal("additive"))),
   },
   handler: async (ctx, args) => {
     await resolveProjectScope(ctx, args.projectId);
     validateSettingsNumbers(args);
+    if (args.nightShiftStart === args.nightShiftEnd) throw new Error("Gece başlangıcı ve bitişi farklı olmalı.");
     const { projectId, annualOvertimeLimitHours, overtimeStartToleranceMinutes, monthlyHoursBase, ...rates } = args;
     const updatedAt = new Date().toISOString();
     const work = { projectId, annualOvertimeLimitHours, overtimeStartToleranceMinutes, monthlyHoursBase, updatedAt };
-    const rate = { ...rates, projectId, updatedAt };
+    const rate = { ...rates, nightCombineMode: rates.nightCombineMode ?? "max", projectId, updatedAt };
     const existingWork = await ctx.db.query("workSettings").withIndex("by_project", q => q.eq("projectId", projectId)).first();
     const existingRates = await ctx.db.query("overtimeRates").withIndex("by_project", q => q.eq("projectId", projectId)).first();
     if (existingWork) await ctx.db.patch(existingWork._id, work);

@@ -1,7 +1,7 @@
+import { pdksAvailableDateKeys, pdksLeaveMatchesProject, pdksFirstRecordDate } from "./pdksAvailability";
 import type { enrichReadingsForList } from "./cardReadingAudit";
 import {
   classifyReadingSource,
-  isPdksEligibleReading,
   type PdksReadingSource,
   type PdksSourceReading,
 } from "./pdksSource";
@@ -12,7 +12,8 @@ import { buildPeriodDateKeys } from "./pdksCalc";
 import { getEffectiveWorkSettings, getEffectiveOvertimeRates, getHolidaysMap, classifyDay } from "./pdksHelpers";
 import { buildShiftResolver, assignmentAppliesOnDate } from "./shiftResolver";
 import { getTurkishHolidaysForYear, hasReligiousData } from "./turkishHolidays";
-import { trTodayKey, trDayRangeISO } from "./trDate";
+import { trTodayKey } from "./trDate";
+import { buildPdksWorkDateResolver, pdksWorkDayRange } from "./pdksWorkDay";
 import { readReportReadings, reportPeriod } from "./reportScope";
 
 export const ATTENDANCE_RELIABILITY_NOTE = "Güvenilirlik sınırı: İşe giriş/çıkış tarihleri tutulmadığından dönem, bugün aktif olan personelin tamamına uygulanır; ay ortasında işe başlayanlar ayrıştırılamaz. Günler PDKS tablo motoruyla hesaplanır; yarım tatil günleri PDKS gibi tatil sayılır. Devam oranı, tamamlanmış beklenen günlerden izinler çıkarılarak hesaplanır. Tek izinli okuma veya manuel giriş devam kabul edilir; bu bir bordro onayı değildir.";
@@ -61,23 +62,27 @@ export async function loadAttendanceReport(ctx: QueryCtx, projectIds: Id<"projec
   const { startDate, endDate } = reportPeriod(year, month);
   const today = trTodayKey();
   const periodDateKeys = buildPeriodDateKeys(startDate, endDate).filter((date) => date < today);
-  const { startISO, endISO } = trDayRangeISO(startDate, endDate);
+  const { startISO, endISO } = pdksWorkDayRange(startDate, endDate);
   const projectRows = await Promise.all(projectIds.map(async (projectId) => {
-    const [allEmployees, readings, workSettings, overtimeRates, holidayMap, generalSettings, projectLeaves] = await Promise.all([
+    const [allEmployees, readings, workSettings, overtimeRates, holidayMap, generalSettings] = await Promise.all([
       ctx.db.query("employees").withIndex("by_project", (q) => q.eq("projectId", projectId)).collect(),
       readReportReadings(ctx, [projectId], startISO, endISO),
       getEffectiveWorkSettings(ctx, projectId),
       getEffectiveOvertimeRates(ctx, projectId),
       getHolidaysMap(ctx, projectId, startDate, endDate),
       ctx.db.query("generalSettings").withIndex("by_project", (q) => q.eq("projectId", projectId)).first(),
-      ctx.db.query("leaves").withIndex("by_project", (q) => q.eq("projectId", projectId)).collect(),
     ]);
     const employees = allEmployees.filter((employee) => employee.isActive === true && employee.isVisitor !== true);
     const employeeMap = buildPdksEmployeeReadingMap({ employees, readings });
-    const shiftResolver = await buildShiftResolver(ctx, employees);
+    const shiftResolver = await buildShiftResolver(ctx, allEmployees.filter(e => e.isActive));
     const workingDays = generalSettings?.workingDays?.length ? generalSettings.workingDays : ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
-    const allLeaves = projectLeaves.filter((leave) => leave.status === "approved" && leave.startDate <= endDate && leave.endDate >= startDate);
+    const leaveLists = await Promise.all(employees.map(employee => ctx.db.query("leaves")
+      .withIndex("by_employee_start", q => q.eq("employeeId", employee._id).lte("startDate", endDate)).collect()));
+    const leavesByEmployee = new Map(employees.map((employee, index) => [employee._id,
+      leaveLists[index].filter(leave => pdksLeaveMatchesProject(leave, projectId) && leave.status === "approved" && leave.endDate >= startDate)]));
     const calendarIssues = attendanceCalendarIssues(year, periodDateKeys, holidayMap);
+    const workDate = buildPdksWorkDateResolver(allEmployees.filter(e => e.isActive), (id, date) => { const shift = shiftResolver.resolve(id, date); return shift?.projectId === projectId ? shift : null; });
+    const availableDateKeys = pdksAvailableDateKeys(readings, workDate);
     return await Promise.all(employees.map(async (employee) => {
       const [records, department, assignments] = await Promise.all([
         ctx.db.query("pdksRecords").withIndex("by_employee_date", (q) => q.eq("employeeId", employee._id).gte("date", startDate).lte("date", endDate)).collect(),
@@ -91,16 +96,18 @@ export async function loadAttendanceReport(ctx: QueryCtx, projectIds: Id<"projec
       const manualPdksByEmpDate = new Map(records.filter((record) => record.manualEntry && record.projectId === projectId).map((record) => [`${employee._id}__${record.date}`, record]));
       return {
         ...summarizeAttendance({
+          availableDateKeys,
+          firstRecordDate: await pdksFirstRecordDate(ctx, employee, employeeMap.get(employee._id) ?? [], records.filter(r => r.manualEntry && r.projectId === projectId).map(r => r.date), workDate),
           empKey: employee._id,
           employee,
           empReadings: employeeMap.get(employee._id) ?? [],
-          departmentName: department?.projectId === projectId ? department.name : "Belirtilmemiş",
+          departmentName: department?.projectId === projectId ? department.name : "Departmansız",
           periodDateKeys,
           startDate,
           isSingleDay: false,
           viewMode: "matrix",
           manualPdksByEmpDate,
-          allLeaves,
+          allLeaves: leavesByEmployee.get(employee._id) ?? [],
           holidayMap,
           workingDays,
           workSettings,
@@ -155,7 +162,7 @@ export const READING_SOURCE_LABELS: Record<PdksReadingSource, string> = {
   mobile: "Mobil",
   manual: "Manuel",
   biometric: "Biyometrik",
-  unknown: "Bilinmiyor",
+  unknown: "Belirsiz",
 };
 
 export function readingResult(status: Doc<"cardReadings">["accessStatus"]): ReportTransactionResult {
@@ -189,13 +196,14 @@ export function toReportTransactionRow(
   };
 }
 
+/** Raw report boundary: unknown is visible, only biometrics are hidden. */
 export function splitPdksEligible<T extends PdksSourceReading>(
   rows: readonly T[],
 ): { eligible: T[]; hiddenBiometricCount: number } {
   const eligible: T[] = [];
   let hiddenBiometricCount = 0;
   for (const row of rows) {
-    if (isPdksEligibleReading(row)) eligible.push(row);
+    if (classifyReadingSource(row) !== "biometric") eligible.push(row);
     else hiddenBiometricCount += 1;
   }
   return { eligible, hiddenBiometricCount };

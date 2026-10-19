@@ -34,6 +34,7 @@ const RATES: EffectiveOvertimeRates = {
 type CellParams = Parameters<typeof computePayrollCell>[0];
 const cell = (overrides: Partial<CellParams>): CellParams => ({
   date: MONDAY,
+  availableDateKeys: new Set(["2026-06-22", "2026-06-23", "2026-06-24", "2026-06-27", "2026-06-28"]),
   manual: undefined,
   dayReadings: [],
   hasLeave: false,

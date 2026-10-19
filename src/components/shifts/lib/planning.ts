@@ -1,3 +1,4 @@
+import { formatTrDate } from "@/lib/date";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "../../../../convex/_generated/api";
 import {
@@ -179,3 +180,20 @@ export function cellData(
   };
 }
 export type DayData = ReturnType<typeof cellData>;
+
+export { shiftTimeLabel } from "../../../../convex/lib/shiftUx";
+export function shortDate(day: string) {
+  const date = new Date(`${day}T12:00:00Z`);
+  return Number.isFinite(date.getTime()) ? formatTrDate(date) : "Tarih seçilmedi";
+}
+export function shortDayLabel(day: string) {
+  return new Intl.DateTimeFormat("tr-TR", { day: "numeric", weekday: "short", timeZone: "Europe/Istanbul" }).format(new Date(`${day}T12:00:00Z`));
+}
+export function assignmentInitial(day: string, employeeIds?: string[]) {
+  return { startDate: day, endDate: day, ...(employeeIds ? { employeeIds } : {}) };
+}
+
+/** Old deployments may still include ISO keys inside conflict/error messages. */
+export function shiftMessage(message: string) {
+  return message.replace(/\b\d{4}-\d{2}-\d{2}\b/g, shortDate);
+}

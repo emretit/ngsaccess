@@ -75,6 +75,7 @@ const holiday = (date: string): Doc<"holidays"> =>
 type RowParams = Parameters<typeof computePdksTableRow>[0];
 const rowParams = (overrides: Partial<RowParams> = {}): RowParams => ({
   empKey: String(EMP_ID),
+  availableDateKeys: new Set(["2026-06-22", "2026-06-23", "2026-06-24", "2026-06-27", "2026-06-28"]),
   empReadings: [],
   employee: employee(),
   departmentName: "Ar-Ge",
@@ -135,11 +136,10 @@ describe("pdksTable – computePdksTableRow", () => {
       },
     }));
 
-    expect(row.totalHours).toBe("3h 0m");
-    expect(row.days[0]).toMatchObject({ date: MONDAY, totalMinutes: 180 });
+    expect(row.totalHours).toBe("2h 45m");
+    expect(row.days[0]).toMatchObject({ date: MONDAY, totalMinutes: 165 });
     expect(row.days[1]).toMatchObject({ date: TUESDAY, totalMinutes: 0 });
-    expect(resolvedDates[0]).toBe(MONDAY);
-    expect(resolvedDates).not.toContain("2026-06-21");
+    expect(resolvedDates).toContain(MONDAY); // previous-day shift lookup is required for overnight attribution.
   });
 
   it("tek gün okuma/manuel/izin yok → absent / DV", () => {
@@ -159,7 +159,7 @@ describe("pdksTable – computePdksTableRow", () => {
       overtimeMultiplier: 0,
       overtimePayTRY: null,
       hourlyRate: 100,
-      leaveType: "-",
+      leaveType: "",
       status: "absent",
       isLate: false,
       isEarlyExit: false,
@@ -182,7 +182,7 @@ describe("pdksTable – computePdksTableRow", () => {
     });
   });
 
-  it("geç giriş okuması → raw dakika + shift-duyarlı mesai (R8 tablo varyantı)", () => {
+  it("geç giriş okuması → ortak net dakika + shift-duyarlı mesai", () => {
     const row = computePdksTableRow(
       rowParams({
         empReadings: [
@@ -195,7 +195,7 @@ describe("pdksTable – computePdksTableRow", () => {
     expect(row).toMatchObject({
       firstEntry: "10:00",
       lastExit: "18:30",
-      totalHours: "8h 30m",
+      totalHours: "7h 30m",
       overtime: "15m",
       overtimeHours: 0.25,
       overtimeMultiplier: 1.5,
@@ -207,7 +207,7 @@ describe("pdksTable – computePdksTableRow", () => {
     });
   });
 
-  it("manuel giriş/çıkış +03:00 olarak biçimlenir ve mola düşmeden ham dakika döner", () => {
+  it("manuel giriş/çıkış +03:00 olarak biçimlenir ve ortak net dakika döner", () => {
     const manualByDate = new Map<string, Doc<"pdksRecords">>([
       [`${EMP_ID}__${MONDAY}`, manual(MONDAY, "09:00", "20:00", "elle")],
     ]);
@@ -221,7 +221,7 @@ describe("pdksTable – computePdksTableRow", () => {
     expect(row).toMatchObject({
       firstEntry: "09:00",
       lastExit: "20:00",
-      totalHours: "11h 0m",
+      totalHours: "10h 0m",
       overtime: "105m",
       overtimePayTRY: 262.5,
       status: "present",
@@ -252,7 +252,9 @@ describe("pdksTable – computePdksTableRow", () => {
         date: MONDAY,
         firstEntry: "09:00",
         lastExit: "20:00",
-        totalMinutes: 660,
+        totalMinutes: 600,
+        rawTotalMinutes: 660,
+        nightMinutes: 0,
         status: "present",
         isLate: false,
         lateMinutes: 0,
@@ -279,6 +281,8 @@ describe("pdksTable – computePdksTableRow", () => {
         firstEntry: null,
         lastExit: null,
         totalMinutes: 0,
+        rawTotalMinutes: 0,
+        nightMinutes: 0,
         status: "leave",
         isLate: false,
         lateMinutes: 0,
@@ -305,6 +309,8 @@ describe("pdksTable – computePdksTableRow", () => {
         firstEntry: null,
         lastExit: null,
         totalMinutes: 0,
+        rawTotalMinutes: 0,
+        nightMinutes: 0,
         status: "holiday",
         isLate: false,
         lateMinutes: 0,
@@ -473,4 +479,53 @@ describe("pdksTable – punches and breaks", () => {
     expect(detail?.readingCount).toBe(27);
     expect(detail?.breakViolation).toBe(false);
   });
+});
+
+describe("08-H1/O1 ve 11-H1", () => {
+  it("proje okuması yoksa devamsızlık üretmez; ilk kayıttan önce puantaj ve sayaç dışıdır", () => {
+    const row = computePdksTableRow(rowParams({ firstRecordDate: TUESDAY, viewMode: "matrix", availableDateKeys: new Set([MONDAY]) }));
+    expect(row.status).toBe("notEmployed");
+    expect(row.days[0]).toMatchObject({ status: "notEmployed", payrollCode: "—" });
+    expect(computePdksTableRow(rowParams({ availableDateKeys: new Set() })).status).toBe("noData");
+  });
+  it("atanmış vardiya+tolerans sınırında henüz gelmedi; sonrasında veri varsa devamsız", () => {
+    const shift = { startTime: "09:00", endTime: "18:00" } as Doc<"shifts">;
+    const input = rowParams({ today: MONDAY, firstRecordDate: MONDAY, resolveShift: () => shift, viewMode: "matrix", workSettings: { ...DEFAULT_WORK_SETTINGS, maxLateMinutes: 10 } });
+    const before = computePdksTableRow({ ...input, now: Date.parse(`${MONDAY}T09:10:00+03:00`) });
+    expect(before.status).toBe("future");
+    expect(computePdksTableRow({ ...input, firstRecordDate: null, now: Date.parse(`${MONDAY}T09:00:00+03:00`) }).status).toBe("future");
+    expect(before.days[0]?.status).toBe("future");
+    const after = computePdksTableRow({ ...input, now: Date.parse(`${MONDAY}T09:10:01+03:00`) });
+    expect(after.status).toBe("absent");
+    expect(after.days[0]?.status).toBe("absent");
+    expect(computePdksTableRow({ ...input, availableDateKeys: new Set(), now: Date.parse(`${MONDAY}T09:10:01+03:00`) }).status).toBe("noData");
+  });
+  it("vardiya atanmayan kişiyi devamsız saymaz", () => {
+    expect(computePdksTableRow(rowParams({ firstRecordDate: MONDAY })).status).toBe("noData");
+  });
+});
+
+describe("R3B-E1: noData only suppresses absence", () => {
+  it.each([null, TUESDAY])("leave survives missing/later first record (%s)", firstRecordDate => {
+    const row = computePdksTableRow(rowParams({ firstRecordDate, availableDateKeys: new Set(), allLeaves: [leave(MONDAY, MONDAY)], viewMode: "matrix" }));
+    expect(row.days[0]).toMatchObject({ status: "leave", payrollCode: "İZN" });
+  });
+  it.each([false, true])("public holiday survives no readings, including half day (%s)", isHalfDay => {
+    const row = computePdksTableRow(rowParams({ firstRecordDate: null, availableDateKeys: new Set(), holidayMap: new Map([[MONDAY, { ...holiday(MONDAY), isHalfDay }]]), viewMode: "matrix" }));
+    expect(row.days[0]).toMatchObject({ status: "holiday", payrollCode: "RT" });
+  });
+  it("Sunday remains HT and an ordinary workday remains noData", () => {
+    const row = computePdksTableRow(rowParams({ firstRecordDate: null, availableDateKeys: new Set(), periodDateKeys: ["2026-06-28", MONDAY], viewMode: "matrix" }));
+    expect(row.days[0]).toMatchObject({ status: "weekend", payrollCode: "HT" });
+    expect(row.days[1]).toMatchObject({ status: "noData", payrollCode: "—" });
+  });
+});
+
+it("R3B-E1: known attendance retains its status before the inferred first record, including holiday/leave days", () => {
+  const row = computePdksTableRow(rowParams({
+    firstRecordDate: TUESDAY, availableDateKeys: new Set(), viewMode: "matrix",
+    empReadings: [reading(`${MONDAY}T06:00:00Z`)],
+    allLeaves: [leave(MONDAY, MONDAY)], holidayMap: new Map([[MONDAY, holiday(MONDAY)]]),
+  }));
+  expect(row.days[0]).toMatchObject({ status: "present", payrollCode: "RT" });
 });

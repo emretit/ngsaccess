@@ -27,7 +27,6 @@ interface DeviceHikLocalBridgeSectionProps {
  */
 export function DeviceHikLocalBridgeSection({
   form,
-  device,
 }: DeviceHikLocalBridgeSectionProps) {
   return (
     <>
@@ -38,7 +37,7 @@ export function DeviceHikLocalBridgeSection({
           name="hik_port"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>SDK Port</FormLabel>
+              <FormLabel>SDK portu</FormLabel>
               <FormControl>
                 <Input
                   type="number"
@@ -57,7 +56,7 @@ export function DeviceHikLocalBridgeSection({
           name="device_username"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Cihaz Kullanıcı Adı</FormLabel>
+              <FormLabel>Cihaz kullanıcı adı</FormLabel>
               <FormControl>
                 <Input placeholder="admin" {...field} value={field.value ?? ""} />
               </FormControl>
@@ -71,7 +70,7 @@ export function DeviceHikLocalBridgeSection({
           name="device_password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Cihaz Şifresi</FormLabel>
+              <FormLabel>Cihaz şifresi</FormLabel>
               <FormControl>
                 <PasswordField
                   placeholder="Panel şifresi"
@@ -86,11 +85,7 @@ export function DeviceHikLocalBridgeSection({
         />
       </div>
 
-      {device && (
-        <p className="pt-2 border-t text-xs text-muted-foreground">
-          Kapı açmak için Genel bakış sekmesinde hedef kapıyı seçip onaylayın.
-        </p>
-      )}
+
     </>
   );
 }

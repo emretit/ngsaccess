@@ -56,6 +56,7 @@ describe("çalışan rıza kartı", () => {
     expect(html).toContain("Yüz Tanıma");
     expect(html).toContain("Aktif");
     expect(html).toContain("Alındı:");
+    expect(html).toContain("19.10.2026 09:00");
     expect(html).not.toContain("Rıza Kaydı");
     expect(html).not.toContain("Rıza Al");
     expect(html).not.toContain("İptal");

@@ -1,3 +1,4 @@
+import { pdksToday } from "@/components/pdks/lib/calendar";
 import { useRef, useState } from "react";
 import { useConvex } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -43,7 +44,7 @@ interface Props {
 export function PDKSEnhancedExportPanel({
   records = [],
   dateRange = "",
-  selectedDate = new Date(),
+  selectedDate = pdksToday(),
   filterSummary = "Tüm personel",
   selectedCount = 0,
   totalCount = records.length,

@@ -1,3 +1,4 @@
+import { formatTrDateTime } from "@/lib/date";
 import { errorMessage } from "@/lib/notify";
 import type { FunctionArgs, FunctionReturnType } from 'convex/server';
 import type { Id } from '../../../convex/_generated/dataModel';
@@ -7,7 +8,7 @@ import { auditDateRange } from '../../../convex/lib/auditLogQuery';
 export type AuditArgs = Omit<FunctionArgs<typeof api.auditLog.list>, 'paginationOpts'>;
 export type AuditRow = FunctionReturnType<typeof api.auditLog.list>['page'][number];
 export const actionLabels = { create: 'Oluşturuldu', update: 'Güncellendi', delete: 'Silindi' };
-export const timestampFormat = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', dateStyle: 'short', timeStyle: 'medium' });
+export const timestampFormat = { format: (value: number) => formatTrDateTime(value, { seconds: true }) };
 export const filterKeys = ['q', 'user', 'action', 'target', 'start', 'end'] as const;
 export function clearAuditFilters(params: URLSearchParams) {
   const next = new URLSearchParams(params);

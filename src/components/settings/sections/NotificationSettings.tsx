@@ -25,8 +25,8 @@ export function NotificationSettings({ onComplete }: { onComplete?: () => void }
         ["emailNotifications", "E-posta bildirimleri", "Projenin e-posta bildirim tercihi."],
         ["lateNotifications", "Geç kalma bildirimleri", "Geç kalma olayları için tercih."],
         ["reportNotifications", "Rapor bildirimleri", "Proje rapor bildirim tercihi; kişisel hatırlatmadan ayrıdır."],
-        ["systemNotifications", "Sistem bildirimleri", "Genel bölümündeki sistem bildirimi kaydından ayrıdır."],
-      ] as const).map(([key, label, hint]) => <FormFieldWrapper key={key} htmlFor={key} label={label} hint={hint}>
+        ["systemNotifications", "Sistem olayları için bildirim tercihi", "Sistem olaylarına ait proje tercihidir. Genel bölümündeki eski kayıt bu tercihi değiştirmez; bu kayıt henüz gönderimi durdurmaz."],
+      ] as const).map(([key, label, hint]) => <FormFieldWrapper key={key} inline htmlFor={key} label={label} hint={hint}>
         <Switch checked={draft.values[key]} onCheckedChange={checked => draft.change({ [key]: checked })} />
       </FormFieldWrapper>)}
     </fieldset>

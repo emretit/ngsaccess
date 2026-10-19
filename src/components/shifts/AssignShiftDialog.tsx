@@ -1,3 +1,6 @@
+import { WeekdaySelection } from "./WeekdaySelection";
+import { ShiftSelect } from "./ShiftSelect";
+import { shiftMessage, shortDate, shiftTimeLabel } from "./lib/planning";
 import { useRef, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -22,7 +25,6 @@ import {
   type BulkAssignmentFormValues,
 } from "./assignmentFormSchema";
 import {
-  DAYS,
   decisionLabels,
   decisionTone,
   previewSummary,
@@ -133,7 +135,7 @@ export function AssignShiftDialog({
           if (!next) close();
         }}
       >
-        <DialogContent className="sm:max-w-[560px] max-h-[90dvh] overflow-y-auto min-w-0">
+        <DialogContent className="[&_button]:max-sm:min-h-11 [&_label:has(input[type=checkbox])]:min-h-11 [&_label:has(input[type=checkbox])]:items-center sm:max-w-[560px] max-h-[90dvh] overflow-y-auto min-w-0">
           <DialogHeader>
             <DialogTitle>Vardiya ata</DialogTitle>
             <DialogDescription>
@@ -143,7 +145,7 @@ export function AssignShiftDialog({
           </DialogHeader>
           {serverError && (
             <p role="alert" className="text-danger text-sm">
-              {serverError}
+              {shiftMessage(serverError)}
             </p>
           )}
           {result ? (
@@ -167,7 +169,7 @@ export function AssignShiftDialog({
                     >
                       {decisionLabels[item.status]}
                     </StatusBadge>
-                    <p className="text-xs">{item.reason}</p>
+                    <p className="text-xs">{shiftMessage(item.reason)}</p>
                   </li>
                 ))}
               </ul>
@@ -219,7 +221,7 @@ export function AssignShiftDialog({
                     .map((e) => (
                       <label key={e._id} className="flex gap-2 p-2 text-sm">
                         <input
-                          type="checkbox"
+                          type="checkbox" className="size-6 shrink-0 accent-primary"
                           checked={values.employeeIds.includes(e._id)}
                           onChange={() =>
                             change({
@@ -246,23 +248,10 @@ export function AssignShiftDialog({
                   label="Vardiya"
                   error={errors.shiftId}
                 >
-                  <select
-                    id="assignment-shift"
-                    className="w-full h-9 rounded-md border border-control bg-surface px-2"
-                    value={values.shiftId}
-                    onChange={(e) =>
-                      change({ ...values, shiftId: e.target.value })
-                    }
-                  >
-                    <option value="">Vardiya seçin</option>
-                    {shifts
-                      .filter((s) => s.isActive !== false)
-                      .map((s) => (
-                        <option key={s._id} value={s._id}>
-                          {s.name} ({s.startTime}–{s.endTime})
-                        </option>
-                      ))}
-                  </select>
+                  <ShiftSelect id="assignment-shift" label="Vardiya" value={values.shiftId}
+                    invalid={!!errors.shiftId} describedBy={errors.shiftId ? "assignment-shift-error" : undefined}
+                    onChange={(shiftId) => change({ ...values, shiftId })} placeholder="Vardiya seçin"
+                    options={shifts.filter(s => s.isActive !== false).map(s => ({ value: s._id, label: `${s.name} · ${shiftTimeLabel(s)}` }))} />
                 </FormFieldWrapper>
                 <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3">
                   {(["startDate", "endDate"] as const).map((key) => (
@@ -282,7 +271,7 @@ export function AssignShiftDialog({
                 </div>
                 <label className="flex items-center gap-2 text-sm">
                   <input
-                    type="checkbox"
+                    type="checkbox" className="size-6 shrink-0 accent-primary"
                     checked={values.specificDays}
                     onChange={(e) =>
                       change({ ...values, specificDays: e.target.checked })
@@ -291,57 +280,13 @@ export function AssignShiftDialog({
                   Belirli günler
                 </label>
                 {values.specificDays ? (
-                  <fieldset
-                    aria-describedby={
-                      errors.weekPattern ? "assignment-days-error" : undefined
-                    }
-                  >
-                    <legend className="text-sm mb-2">Uygulanacak günler</legend>
-                    <div className="flex flex-wrap gap-3">
-                      {DAYS.map(([code, label]) => (
-                        <label
-                          key={code}
-                          className="flex gap-1 items-center text-sm"
-                        >
-                          <input
-                            type="checkbox"
-                            aria-invalid={
-                              code === "MON" && !!errors.weekPattern
-                            }
-                            aria-describedby={
-                              errors.weekPattern
-                                ? "assignment-days-error"
-                                : undefined
-                            }
-                            checked={values.weekPattern.includes(code)}
-                            onChange={() =>
-                              change({
-                                ...values,
-                                weekPattern: values.weekPattern.includes(code)
-                                  ? values.weekPattern.filter((d) => d !== code)
-                                  : [...values.weekPattern, code],
-                              })
-                            }
-                          />
-                          {label}
-                        </label>
-                      ))}
-                    </div>
-                    {errors.weekPattern && (
-                      <p
-                        role="alert"
-                        id="assignment-days-error"
-                        className="text-danger text-xs"
-                      >
-                        {errors.weekPattern}
-                      </p>
-                    )}
-                  </fieldset>
+                  <WeekdaySelection id="assignment-days" value={values.weekPattern} error={errors.weekPattern}
+                    onChange={(weekPattern) => change({ ...values, weekPattern })} />
                 ) : (
                   <p className="text-sm">Her gün uygulanır.</p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  {values.startDate}–{values.endDate} dahil aralık ·{" "}
+                  {shortDate(values.startDate)}–{shortDate(values.endDate)} dahil aralık ·{" "}
                   {values.employeeIds.length} kişi. Gece vardiyaları ertesi güne
                   devam edebilir.
                 </p>
@@ -383,7 +328,7 @@ export function AssignShiftDialog({
     </>
   );
 }
-function PreviewPanel({
+export function PreviewPanel({
   values,
   projectId,
   forceConfirm,
@@ -420,7 +365,7 @@ function PreviewPanel({
       <p role="status" className="text-sm">
         {previewSummary(preview.summary)}
       </p>
-      <ul className="divide-y max-h-64 overflow-y-auto">
+      <ul className="divide-y">
         {preview.results.map((item) => (
           <Decision key={item.employeeId} item={item} />
         ))}
@@ -428,7 +373,7 @@ function PreviewPanel({
       {preview.results.some((r) => r.conflict) && (
         <label className="flex gap-2 text-sm">
           <input
-            type="checkbox"
+            type="checkbox" className="size-6 shrink-0 accent-primary"
             disabled={pending}
             checked={forceConfirm}
             onChange={(e) => setForceConfirm(e.target.checked)}
@@ -439,7 +384,7 @@ function PreviewPanel({
       {preview.results.some((r) => r.leave || r.holiday) && (
         <label className="flex gap-2 text-sm">
           <input
-            type="checkbox"
+            type="checkbox" className="size-6 shrink-0 accent-primary"
             disabled={pending}
             checked={calendarConfirmed}
             onChange={(e) => setCalendarConfirmed(e.target.checked)}
@@ -457,7 +402,7 @@ function PreviewPanel({
     </section>
   );
 }
-function Decision({ item }: { item: Preview["results"][number] }) {
+export function Decision({ item }: { item: Preview["results"][number] }) {
   return (
     <li className="py-2 space-y-1 text-sm break-words">
       <p className="font-medium">{item.employeeName || "Çalışan"}</p>
@@ -468,25 +413,24 @@ function Decision({ item }: { item: Preview["results"][number] }) {
         {decisionLabels[item.status]}
       </StatusBadge>
       <p className="text-xs">
-        {item.reason} · {item.occurrenceCount} başlangıç günü
+        {shiftMessage(item.reason)} · {item.occurrenceCount} başlangıç günü
       </p>
       {item.conflict && (
         <p className="text-xs">
-          {item.conflict.shiftName} · {item.conflict.startDate}–
-          {item.conflict.endDate} · {item.conflict.startTime}–
-          {item.conflict.endTime}
+          {item.conflict.shiftName} · {shortDate(item.conflict.startDate)}–
+          {shortDate(item.conflict.endDate)} · {shiftTimeLabel(item.conflict)}
         </p>
       )}
       {item.leave && (
         <p className="text-xs">
-          {item.leave.date} ·{" "}
+          {shortDate(item.leave.date)} ·{" "}
           {LEAVE_TYPE_LABEL_TR[item.leave.leaveType] ?? item.leave.leaveType}{" "}
           izni
         </p>
       )}
       {item.holiday && (
         <p className="text-xs">
-          {item.holiday.date} · {item.holiday.name}
+          {shortDate(item.holiday.date)} · {item.holiday.name}
           {item.holiday.isHalfDay ? " · Yarım gün" : ""}
         </p>
       )}

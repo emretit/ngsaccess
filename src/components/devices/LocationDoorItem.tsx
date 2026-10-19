@@ -1,3 +1,4 @@
+import { formatTrDateTime } from "@/lib/date";
 import { useId } from "react";
 import type { FunctionReturnType } from "convex/server";
 import { ArrowRightLeft, ChevronRight, DoorOpen, Plus, Settings2, Trash2 } from "lucide-react";
@@ -35,7 +36,7 @@ function readerDetails(reader: ReaderRow): string[] {
     reader.hikReaderNo !== null ? `Hik okuyucu #${reader.hikReaderNo}` : null,
     reader.hikCardReaderPlanTemplateNo !== null ? `Plan ${reader.hikCardReaderPlanTemplateNo}` : null,
     reader.hikCardReaderAntiSneakEnabled !== null ? `APB ${reader.hikCardReaderAntiSneakEnabled ? "açık" : "kapalı"}` : null,
-    reader.hikLastCfgAt ? `Ayar okundu ${new Date(reader.hikLastCfgAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}` : null,
+    reader.hikLastCfgAt ? `Ayar okundu ${formatTrDateTime(new Date(reader.hikLastCfgAt))}` : null,
   ].filter((item): item is string => item !== null);
 }
 
@@ -128,7 +129,7 @@ export function LocationDoorItem({
             {readers.length === 0 && <li className="py-1 pl-2 text-xs text-muted-foreground">Okuyucu atanmamış.</li>}
             {readers.map((reader) => {
               const details = readerDetails(reader);
-              const label = reader.readerName !== door.name ? reader.readerName : "Okuyucu";
+              const label = reader.readerName || "Okuyucu";
               const fetching = reader.readerId !== null && fetchingReaderId === reader.readerId;
               return (
                 <li key={reader.readerId ?? `legacy-${door._id}`}>
@@ -136,7 +137,7 @@ export function LocationDoorItem({
                     <span aria-hidden="true" className={cn("h-1.5 w-1.5 shrink-0 rounded-full", reader.online ? "status-success-bg" : "bg-muted-foreground/40")} />
                     <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                       <span className="text-foreground">{label}</span> · {DIRECTION_LABEL[reader.readerDirection]}
-                      <span className="sr-only">, {reader.online ? "çevrimiçi" : "çevrimdışı"}</span>
+                      <span className="block text-[10px]">{reader.online ? "Çevrimiçi" : "Çevrimdışı"}</span>
                     </span>
                     {reader.hikCardReaderAntiSneakEnabled === true && (
                       <span className="status-warning-badge shrink-0 rounded-sm px-1 text-[10px] font-medium">APB</span>

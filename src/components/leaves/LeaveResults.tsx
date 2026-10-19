@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { usePaginatedQuery, useQuery } from "convex/react";
+import { usePaginatedQuery } from "convex/react";
 import type { FunctionArgs } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import { PaginationBar } from "@/components/shared/PaginationBar";
@@ -14,74 +14,12 @@ import {
   type LeaveRow,
 } from "./lib/leaveState";
 
-export type LeaveQueryFilters = FunctionArgs<typeof api.leaves.summary>;
-function LeaveSummary({
-  filters,
-  shown,
-}: {
-  filters: LeaveQueryFilters;
-  shown: number;
-}) {
-  const summary = useQuery(api.leaves.summary, filters);
-  return (
-    <p className="text-sm text-muted-foreground" role="status">
-      {summary === undefined
-        ? "İzin özeti yükleniyor…"
-        : !summary.truncated
-          ? `${summary.recordCount} kayıt · ${summary.employeeCount} kişi`
-          : `${shown} kayıt gösteriliyor`}
-    </p>
-  );
-}
-function LeaveEmptyState({
-  filters,
-  isAdmin,
-  onCreate,
-  onClear,
-}: {
-  filters: LeaveQueryFilters;
-  isAdmin: boolean;
-  onCreate: () => void;
-  onClear: () => void;
-}) {
-  const filtered = Boolean(filters.employeeId || filters.leaveType);
-  const projectSummary = useQuery(
-    api.leaves.summary,
-    filtered
-      ? "skip"
-      : {
-          projectId: filters.projectId,
-          rangeStart: "0001-01-01",
-          rangeEnd: "9999-12-31",
-        },
-  );
-  if (!filtered && projectSummary === undefined)
-    return (
-      <SectionSkeleton rows={1} label="İzin kayıtları kontrol ediliyor." />
-    );
-  if (
-    !filtered &&
-    projectSummary?.truncated === false &&
-    projectSummary.recordCount === 0
-  )
-    return (
-      <EmptyState
-        title="Henüz izin kaydı yok."
-        description={
-          isAdmin
-            ? "Bu proje için ilk izin kaydını ekleyin."
-            : "Yöneticiniz kayıt eklediğinde burada görünür."
-        }
-        action={isAdmin ? { label: "İzin ekle", onClick: onCreate } : undefined}
-      />
-    );
-  return (
-    <EmptyState
-      title="Bu filtrelerle eşleşen izin yok."
-      description="Kişi, tür veya dönemi değiştirin."
-      action={{ label: "Filtreleri temizle", onClick: onClear }}
-    />
-  );
+export type LeaveQueryFilters = Omit<FunctionArgs<typeof api.leaves.listPage>, "paginationOpts">;
+function LeaveSummary({ filters, onProjectRecords }: { filters: LeaveQueryFilters; onProjectRecords: (value: boolean) => void }) {
+  const { results, status, loadMore } = usePaginatedQuery(api.leaves.summary, filters, { initialNumItems: 500 });
+  useEffect(() => { if (status === "CanLoadMore") loadMore(500); }, [status, loadMore]);
+  useEffect(() => { if (results[0]) onProjectRecords(results[0].projectHasRecords); }, [results, onProjectRecords]);
+  return <p className="text-sm text-muted-foreground" role="status">{status === "Exhausted" ? `${results.reduce((count, page) => count + page.recordCount, 0)} kayıt · ${new Set(results.flatMap(page => page.employeeIds)).size} kişi` : "İzin özeti hesaplanıyor…"}</p>;
 }
 export function LeaveResults({
   filters,
@@ -106,7 +44,7 @@ export function LeaveResults({
   onRows: (rows: LeaveRow[]) => void;
   onPageSizeChange?: (size: number) => void;
 }) {
-  // Convex manages splitCursor / SplitRequired internally, including empty candidate pages.
+  const [projectHasRecords, setProjectHasRecords] = useState(true);
   const { results, status, loadMore } = usePaginatedQuery(
     api.leaves.listPage,
     filters,
@@ -154,7 +92,7 @@ export function LeaveResults({
         title="İzin özeti yüklenemedi."
         resetKey={JSON.stringify(filters)}
       >
-        <LeaveSummary filters={filters} shown={rows.length} />
+        <LeaveSummary filters={filters} onProjectRecords={setProjectHasRecords} />
       </QuerySectionBoundary>
       {requestedId && !results.some((row) => row._id === requestedId) && (
         <p role="status" className="text-sm text-muted-foreground">
@@ -169,23 +107,10 @@ export function LeaveResults({
           onDetails={onDetails}
           onEdit={onEdit}
         />
-      ) : hasNext || boundaries.length > 0 ? (
-        <EmptyState
-          title="Bu sayfada eşleşen izin yok; daha eski kayıtları tarayın."
-          description="Filtreler aday kayıt sayfasına uygulanır."
-        />
       ) : (
-        <QuerySectionBoundary
-          title="İzin kayıtları kontrol edilemedi."
-          resetKey={JSON.stringify(filters)}
-        >
-          <LeaveEmptyState
-            filters={filters}
-            isAdmin={isAdmin}
-            onCreate={onCreate}
-            onClear={onClear}
-          />
-        </QuerySectionBoundary>
+        <EmptyState title={projectHasRecords ? "Bu filtrelerle eşleşen izin yok." : "Henüz izin kaydı yok."}
+          description={projectHasRecords ? "Kişi, tür veya dönemi değiştirin." : "Bu proje için izin kaydı eklenmedi."}
+          action={projectHasRecords ? { label: "Filtreleri temizle", onClick: onClear } : isAdmin ? { label: "İzin ekle", onClick: onCreate } : undefined} />
       )}
 
       <PaginationBar
@@ -199,7 +124,7 @@ export function LeaveResults({
         onNext={next}
         previousDisabled={index === 0 || loading}
         nextDisabled={!hasNext || loading}
-        nextLabel={!rows.length && hasNext ? "Devam" : "Sonraki"}
+        nextLabel="Sonraki"
         pageSize={pageSize}
         pageSizes={[25, 50]}
         onPageSizeChange={onPageSizeChange}

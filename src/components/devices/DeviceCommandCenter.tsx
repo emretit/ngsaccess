@@ -1,3 +1,4 @@
+import { formatTrDateTime } from "@/lib/date";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
@@ -69,7 +70,7 @@ function formatDateTime(value: string | number | undefined): string {
   if (value === undefined) return "Henüz sinyal alınmadı";
   const date = typeof value === "number" ? new Date(value) : new Date(value);
   if (Number.isNaN(date.getTime())) return "Henüz sinyal alınmadı";
-  return `${date.toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })} (TR)`;
+  return formatTrDateTime(date);
 }
 
 function formatDirection(value: string | undefined): string {
@@ -242,6 +243,9 @@ export function DeviceCommandCenter({ device, onUpdated, onPendingChange }: Devi
 
   const connection = deviceConnection(overview.device, clock);
   const connected = connection === "online";
+  const offlineMessage = device.brand === "ide_smart" || (device.brand === "hikvision" && device.hikTransport === "localBridge")
+    ? "Cihaz çevrimdışı — komut kuyruğa alınır"
+    : "Cihaz çevrimdışı — komut ulaşmayabilir";
   const hasIdeDoor = overview.doors.some((door) => typeof door.ioId === "number");
   const adapter = getAdapter(overview.device, hasIdeDoor);
   const queueRows: { label: string; value: number }[] =
@@ -382,7 +386,8 @@ export function DeviceCommandCenter({ device, onUpdated, onPendingChange }: Devi
   };
 
   return (
-    <div className="min-w-0 divide-y divide-line">
+    <div className="min-w-0 divide-y divide-line [&_button]:min-h-11 md:[&_button]:min-h-0">
+      {connection === "offline" && <p role="status" className="py-3 text-sm text-warning">{offlineMessage}</p>}
       <section className="min-w-0 py-5 first:pt-0">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
@@ -395,7 +400,7 @@ export function DeviceCommandCenter({ device, onUpdated, onPendingChange }: Devi
               {overview.device.deviceIp ?? overview.device.deviceSerial ?? overview.device.ideUuid ?? "Temel cihaz kaydı"}
             </p>
           </div>
-          <StatusBadge tone={connected ? "success" : "neutral"}>
+          <StatusBadge tone={connected ? "success" : connection === "offline" ? "warning" : "neutral"}>
             {connected ? "Çevrimiçi" : connection === "never" ? "Henüz bağlanmadı" : "Çevrimdışı"}
           </StatusBadge>
         </div>
@@ -448,7 +453,7 @@ export function DeviceCommandCenter({ device, onUpdated, onPendingChange }: Devi
                     <div className="text-xs text-muted-foreground">
                       {device.brand === "ide_smart"
                         ? `ioId ${door.ioId ?? "-"} · Sensör ${door.requireSensor ? "zorunlu" : "zorunlu değil"}`
-                        : `Hik kapı #${door.hikDoorNo ?? "-"}`}
+                        : door.hikDoorNo != null ? `Hik kapı kanalı #${door.hikDoorNo}` : ""}
                     </div>
                     {door.latestReading && (
                       <div className="mt-1 text-xs text-muted-foreground">
@@ -460,6 +465,7 @@ export function DeviceCommandCenter({ device, onUpdated, onPendingChange }: Devi
                     type="button"
                     size="sm"
                     variant="outline"
+                    title={connection === "offline" ? offlineMessage : undefined}
                     disabled={!adapter.supported.openDoor || busy !== null}
                     onClick={() => handleOpenDoor(door._id, door.hikDoorNo, door.name)}
                   >
@@ -477,7 +483,7 @@ export function DeviceCommandCenter({ device, onUpdated, onPendingChange }: Devi
                           <span className="text-muted-foreground"> · {formatDirection(reader.direction)}</span>
                           {device.brand === "hikvision" && (
                             <span className="text-muted-foreground">
-                              {" "}· Hik #{reader.hikReaderNo ?? "-"} · Plan {reader.hikCardReaderPlanTemplateNo ?? "-"} · APB {reader.hikCardReaderAntiSneakEnabled ? "açık" : "kapalı"}
+                              {reader.hikReaderNo != null && ` · Hik okuyucu kanalı #${reader.hikReaderNo}`}{reader.hikCardReaderPlanTemplateNo != null && ` · Plan ${reader.hikCardReaderPlanTemplateNo}`}{reader.hikCardReaderAntiSneakEnabled != null && ` · APB ${reader.hikCardReaderAntiSneakEnabled ? "açık" : "kapalı"}`}
                             </span>
                           )}
                         </div>
@@ -486,11 +492,12 @@ export function DeviceCommandCenter({ device, onUpdated, onPendingChange }: Devi
                             type="button"
                             size="sm"
                             variant="ghost"
+                            title={!adapter.supported.readerCfg ? "Bu bağlantı yöntemi okuyucu ayarını okumayı desteklemiyor." : busy !== null ? "Devam eden işlemin bitmesini bekleyin." : undefined}
                             disabled={!adapter.supported.readerCfg || busy !== null}
                             onClick={() => handleFetchReaderCfg(reader._id)}
                           >
                             {busy === "readerCfg" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Settings2 className="h-4 w-4" />}
-                            Oku
+                            Okuyucu ayarını oku
                           </Button>
                         )}
                       </div>

@@ -6,7 +6,7 @@ export function projectScopedPdksParams(
 ): URLSearchParams {
   if (!previousProjectId || previousProjectId === projectId) return params;
   const next = new URLSearchParams(params);
-  for (const key of ["company", "dept", "pos", "shift", "person"])
+  for (const key of ["company", "dept", "pos", "shift", "person", "employeeId"])
     next.delete(key);
   return next;
 }

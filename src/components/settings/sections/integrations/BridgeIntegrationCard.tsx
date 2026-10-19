@@ -32,7 +32,7 @@ export function BridgeIntegrationCard() {
   const copy = useAsyncAction(async (token: string) => { await navigator.clipboard.writeText(token); },
     { success: "Köprü anahtarı panoya kopyalandı", error: "Anahtar kopyalanamadı" });
   useSettingsFormState("bridge", false, create.pending || revoking);
-  const mask = (token: string) => `${token.slice(0, 8)}••••••••••••`;
+  const mask = () => "••••••••";
   return <section className="min-w-0 space-y-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0 space-y-1"><h3 className="text-base font-semibold">Hikvision köprüsü</h3>
@@ -46,12 +46,12 @@ export function BridgeIntegrationCard() {
         const shown = reveal[bridge._id] ?? false;
         return <div key={bridge._id} className="min-w-0 space-y-2 py-4">
           <FormFieldWrapper htmlFor={`bridge-${bridge._id}`} label="Köprü anahtarı">
-            <Input readOnly value={shown ? bridge.token : mask(bridge.token)} className="min-w-0 font-mono text-xs" />
+            <Input readOnly value={shown ? bridge.token : mask()} className="min-w-0 font-mono text-xs" />
           </FormFieldWrapper>
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="icon" aria-label={shown ? "Anahtarı gizle" : "Anahtarı göster"} onClick={() => setReveal(previous => ({ ...previous, [bridge._id]: !shown }))}>{shown ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</Button>
             <Button variant="outline" size="icon" aria-label="Anahtarı kopyala" disabled={copy.pending} onClick={() => void copy.run(bridge.token)}><Copy className="h-4 w-4" /></Button>
-            <Button variant="outline" disabled={create.pending || revoking} onClick={() => { setRevokeTarget({ id: bridge._id, label: `Anahtar ${mask(bridge.token)}` }); setRevokeOpen(true); }}>Anahtarı iptal et</Button>
+            <Button variant="outline" disabled={create.pending || revoking} onClick={() => { setRevokeTarget({ id: bridge._id, label: `Anahtar ${mask()}` }); setRevokeOpen(true); }}>Anahtarı iptal et</Button>
           </div>
           <p className="text-xs text-muted-foreground">{bridge.lastSeenAt ? `Son görülme: ${new Date(bridge.lastSeenAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })}` : "Henüz bağlanmadı"}. Bu bilgi güncel çevrimiçi durumunu göstermez.</p>
           {bridge.lastClientInfo && <p className="break-all text-xs text-muted-foreground">{bridge.lastClientInfo}</p>}

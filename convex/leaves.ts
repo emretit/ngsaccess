@@ -1,3 +1,5 @@
+import { stream } from "convex-helpers/server/stream";
+import schema from "./schema";
 import { resolveProjectScope } from "./lib/projectScope";
 import { ConvexError, v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
@@ -102,62 +104,75 @@ function matchesLeaveFilters(leave: Doc<"leaves">, filters: LeaveFilters) {
     && (filters.status === undefined || leave.status === filters.status);
 }
 
+/** Equality filters precede the end-date lower bound; overlap keeps legacy long leaves. */
+export function filteredLeaves(ctx: QueryCtx, args: LeaveFilters) {
+  const { employeeId, leaveType } = args;
+  const source = stream(ctx.db, schema).query("leaves");
+  const indexed = employeeId && leaveType
+    ? source.withIndex("by_project_employee_type_end", q => q.eq("projectId", args.projectId).eq("employeeId", employeeId).eq("leaveType", leaveType).gte("endDate", args.rangeStart))
+    : employeeId
+      ? source.withIndex("by_project_employee_end", q => q.eq("projectId", args.projectId).eq("employeeId", employeeId).gte("endDate", args.rangeStart))
+      : leaveType
+        ? source.withIndex("by_project_type_end", q => q.eq("projectId", args.projectId).eq("leaveType", leaveType).gte("endDate", args.rangeStart))
+        : source.withIndex("by_project_end", q => q.eq("projectId", args.projectId).gte("endDate", args.rangeStart));
+  return indexed.order("desc").filterWith(async leave => matchesLeaveFilters(leave, args));
+}
 export const listPage = authedQuery({
   args: { ...leaveFilterArgs, paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
     await resolveProjectScope(ctx, args.projectId);
     calendarDays(args.rangeStart, args.rangeEnd);
-    if (!Number.isInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 200) {
-      return leaveError("LEAVE_INVALID_PAGE_SIZE");
-    }
-    // No start-date lower bound: historical leaves were allowed to exceed 366 days.
-    // A bounded candidate page retains these records without an unbounded filter scan.
-    const result = await ctx.db.query("leaves")
-      .withIndex("by_project_start", q => q.eq("projectId", args.projectId).lte("startDate", args.rangeEnd))
-      .order("desc").paginate({ ...args.paginationOpts, maximumRowsRead: 200 });
-    return {
-      ...result,
-      page: await enrichLeavePage(ctx, result.page.filter(leave => matchesLeaveFilters(leave, args)), args.projectId, !canManageLeaves(ctx.user.role)),
-      scannedCount: result.page.length,
-      filterScope: "candidatePage" as const,
-    };
+    if (!Number.isInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 200) return leaveError("LEAVE_INVALID_PAGE_SIZE");
+    const result = await filteredLeaves(ctx, args).paginate(args.paginationOpts);
+    return { ...result, page: await enrichLeavePage(ctx, result.page, args.projectId, !canManageLeaves(ctx.user.role)) };
   },
 });
 
+// One bounded summary subscription, resumed by cursor; no 5000-row truncation.
 export const summary = authedQuery({
-  args: leaveFilterArgs,
+  args: { ...leaveFilterArgs, paginationOpts: paginationOptsValidator },
   handler: async (ctx, args) => {
     await resolveProjectScope(ctx, args.projectId);
     calendarDays(args.rangeStart, args.rangeEnd);
-    const candidates = await ctx.db.query("leaves")
-      .withIndex("by_project_end", q => q.eq("projectId", args.projectId).gte("endDate", args.rangeStart))
-      .take(LEAVE_SCAN_LIMIT + 1);
-    const matching = candidates.slice(0, LEAVE_SCAN_LIMIT).filter(leave => matchesLeaveFilters(leave, args));
-    return {
-      recordCount: matching.length, employeeCount: new Set(matching.map(leave => leave.employeeId)).size,
-      truncated: candidates.length > LEAVE_SCAN_LIMIT, scannedCount: candidates.length,
-    };
+    const result = await filteredLeaves(ctx, args).paginate({ ...args.paginationOpts, numItems: Math.min(500, args.paginationOpts.numItems) });
+    const projectRecord = await ctx.db.query("leaves").withIndex("by_project", q => q.eq("projectId", args.projectId)).first();
+    return { ...result, page: [{ _id: "summary:" + (args.paginationOpts.cursor ?? "first"), employeeIds: result.page.map(leave => leave.employeeId), recordCount: result.page.length, projectHasRecords: projectRecord !== null }] };
+  },
+});
+
+export const conflictFor = authedQuery({
+  args: { projectId: v.id("projects"), employeeId: v.id("employees"), startDate: v.string(), endDate: v.string(), excludeLeaveId: v.optional(v.id("leaves")) },
+  handler: async (ctx, args) => {
+    await requireLeaveEmployee(ctx, args.employeeId, args.projectId);
+    validateLeaveRange(args.startDate, args.endDate);
+    const conflict = await stream(ctx.db, schema).query("leaves")
+      .withIndex("by_employee_start", q => q.eq("employeeId", args.employeeId).lte("startDate", args.endDate))
+      .filterWith(async leave => leave._id !== args.excludeLeaveId && leave.status === "approved" && overlaps(args.startDate, args.endDate, leave.startDate, leave.endDate)).first();
+    return conflict ? { id: conflict._id, start: conflict.startDate, end: conflict.endDate } : null;
   },
 });
 
 export const employeeOptions = authedQuery({
-  args: { projectId: v.id("projects"), search: v.optional(v.string()) },
+  args: { projectId: v.id("projects"), search: v.optional(v.string()), selectedId: v.optional(v.id("employees")) },
   handler: async (ctx, args) => {
     await resolveProjectScope(ctx, args.projectId);
-    const scanLimit = 1000;
-    const candidates = await ctx.db.query("employees")
-      .withIndex("by_project", q => q.eq("projectId", args.projectId)).take(scanLimit + 1);
-    // Undefined is the legacy active default; visitors are never leave candidates.
-    const employees = candidates.slice(0, scanLimit).filter(employee => employee.isActive !== false && employee.isVisitor !== true);
-    const departments = await loadDepartments(ctx, employees, args.projectId);
+    const selectedEmployee = args.selectedId ? await ctx.db.get(args.selectedId) : null;
+    const selected = selectedEmployee?.projectId === args.projectId ? { _id: selectedEmployee._id, employeeName: `${selectedEmployee.firstName} ${selectedEmployee.lastName}`.trim() } : null;
     const search = args.search?.trim().toLocaleLowerCase("tr-TR") ?? "";
-    const options = employees.map(employee => ({
-      _id: employee._id,
-      employeeName: `${employee.firstName} ${employee.lastName}`.trim(),
+    const employees = await stream(ctx.db, schema).query("employees")
+      .withIndex("by_project", q => q.eq("projectId", args.projectId))
+      .filterWith(async employee => {
+        if (employee.isActive === false || employee.isVisitor === true) return false;
+        if (!search) return true;
+        const department = employee.departmentId ? await ctx.db.get(employee.departmentId) : null;
+        return `${employee.firstName} ${employee.lastName} ${department?.projectId === args.projectId ? department.name : ""}`.toLocaleLowerCase("tr-TR").includes(search);
+      }).take(51);
+    const departments = await loadDepartments(ctx, employees, args.projectId);
+    const options = employees.slice(0, 50).map(employee => ({
+      _id: employee._id, employeeName: `${employee.firstName} ${employee.lastName}`.trim(),
       departmentName: employee.departmentId ? departments.get(employee.departmentId) : undefined,
-    })).filter(option => `${option.employeeName} ${option.departmentName ?? ""}`.toLocaleLowerCase("tr-TR").includes(search))
-      .sort((a, b) => a.employeeName.localeCompare(b.employeeName, "tr-TR") || a._id.localeCompare(b._id));
-    return { options: options.slice(0, 50), truncated: candidates.length > scanLimit || options.length > 50 };
+    })).sort((a, b) => a.employeeName.localeCompare(b.employeeName, "tr-TR") || a._id.localeCompare(b._id));
+    return { selected, options, truncated: employees.length > 50 };
   },
 });
 

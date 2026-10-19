@@ -70,7 +70,7 @@ export function DeviceIdeSmartSection({ form, isEdit }: DeviceIdeSmartSectionPro
         name="ide_door_count"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Kapı Sayısı</FormLabel>
+            <FormLabel>Kapı sayısı</FormLabel>
             <FormControl>
               <Input disabled={isEdit} type="number" placeholder="4" className="max-w-[10rem]" {...field} value={field.value ?? ""} />
             </FormControl>
@@ -86,7 +86,7 @@ export function DeviceIdeSmartSection({ form, isEdit }: DeviceIdeSmartSectionPro
             name="device_ip"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Panel IP Adresi</FormLabel>
+                <FormLabel>Panel IP adresi</FormLabel>
                 <FormControl>
                   <Input placeholder="192.168.1.100" {...field} value={field.value ?? ""} />
                 </FormControl>
@@ -99,7 +99,7 @@ export function DeviceIdeSmartSection({ form, isEdit }: DeviceIdeSmartSectionPro
             name="ide_http_port"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>HTTP Port</FormLabel>
+                <FormLabel>HTTP portu</FormLabel>
                 <FormControl>
                   <Input type="number" placeholder="80" {...field} value={field.value ?? ""} />
                 </FormControl>

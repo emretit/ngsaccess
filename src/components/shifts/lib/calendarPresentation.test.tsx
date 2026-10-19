@@ -83,3 +83,12 @@ describe("Vardiya takvimi erişilebilir sunum sözleşmesi", () => {
     expect(html).toContain("Çakışma");
   });
 });
+
+
+it("09-D3/D10: başlıkta kısa Türkçe gün, erişilebilir adda tam tarih ve 24px seçim alanı vardır", () => {
+  const html = renderToStaticMarkup(<ShiftCalendarGrid {...props} />);
+  expect(html).toContain('<span aria-hidden="true">20 Sal</span>');
+  expect(html).toContain('<span class="sr-only">20 Ekim 2026 Sal</span>');
+  expect(html).toContain("size-6 shrink-0 accent-primary");
+  expect(html).not.toContain("2026-10-20");
+});

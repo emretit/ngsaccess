@@ -1,6 +1,6 @@
 import { notify } from '@/lib/notify';
 import type { ReportColumn, ReportDefinition, ReportFormat } from './registry';
-import type { ReportRow } from './rows';
+import { formatReportDate, type ReportRow } from './rows';
 export const PDF_MAX_ROWS = 2000;
 export const PDF_ROW_LIMIT_MESSAGE = 'PDF en fazla 2.000 satır destekler; daha büyük raporlar için Excel kullanın.';
 /** Hidden identifiers stay hidden; every horizontal part repeats visible identifiers. */
@@ -67,7 +67,7 @@ async function exportPdf(def: ReportDefinition, rows: readonly ReportRow[], meta
       if (!ctx) throw new Error('PDF için çizim alanı oluşturulamadı.');
       ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, width, height);
       ctx.fillStyle = '#252523'; ctx.font = '600 30px system-ui'; ctx.fillText(def.title, margin, 65);
-      ctx.font = '19px system-ui'; ctx.fillText(`${meta.projectName ?? ''} · ${meta.from} – ${meta.to} · İstanbul saati (UTC+3)`, margin, 104);
+      ctx.font = '19px system-ui'; ctx.fillText(`${meta.projectName ?? ''} · ${formatReportDate(meta.from)} – ${formatReportDate(meta.to)} · İstanbul saati (UTC+3)`, margin, 104);
       ctx.font = '600 18px system-ui';
       const headers = columns.map(column => wrap(column.label));
       const headerLines = Math.max(...headers.map(lines => lines.length));
@@ -115,11 +115,16 @@ export async function exportReport(format: ReportFormat, def: ReportDefinition, 
   const { default: ExcelJS } = await import('exceljs');
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Rapor', { views: [{ state: 'frozen', ySplit: 4 }] });
-  sheet.addRow([def.title]); sheet.addRow([meta.projectName ?? '', `${meta.from} – ${meta.to}`, 'İstanbul saati (UTC+3)']); sheet.addRow([]);
-  sheet.addRow(meta.columns.map(column => column.label));
-  rows.forEach(row => sheet.addRow(meta.columns.map(column => safeSpreadsheetValue(column.value(row)))));
+  sheet.addRow([def.title]); sheet.addRow([meta.projectName ?? '', `${formatReportDate(meta.from)} – ${formatReportDate(meta.to)}`, 'İstanbul saati (UTC+3)']); sheet.addRow([]);
+  const excelColumns = excelReportColumns(meta.columns);
+  sheet.addRow(excelColumns.map(column => column.fullLabel ?? column.label));
+  rows.forEach(row => sheet.addRow(excelColumns.map(column => safeSpreadsheetValue(column.value(row)))));
   sheet.getRow(4).font = { bold: true };
-  sheet.columns.forEach(column => { column.width = 22; });
+  sheet.columns.forEach((column, index) => { const reportColumn = excelColumns[index]; column.width = reportColumn?.key.startsWith('day:') ? 12 : reportColumn?.key === 'name' ? 28 : 22; });
   const buffer = await workbook.xlsx.writeBuffer();
   download(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), filename);
+}
+
+export function excelReportColumns(columns: readonly ReportColumn[]): ReportColumn[] {
+  return columns.flatMap(column => column.minutesValue ? [column, { key: `${column.key}:minutes`, label: `${column.fullLabel ?? column.label} (dk)`, defaultVisible: true, value: column.minutesValue }] : [column]);
 }

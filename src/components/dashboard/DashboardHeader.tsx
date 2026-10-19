@@ -14,7 +14,8 @@ export default function DashboardHeader() {
   return (
     <PageHeader title="Ana Sayfa" scope={dateFormat.format(now)}>
       {/* Dakika değişince rakamlar kayar; hareket azaltma tercihinde NumberFlow animasyonu kapatır. */}
-      <p className="text-right" aria-label={`İstanbul saati ${clock}`}>
+      <p className="text-right">
+        <span className="sr-only">İstanbul saati {clock}</span>
         <span aria-hidden="true" className="block text-[26px] font-[550] leading-[34px] tabular-nums tracking-[-0.025em]">
           <NumberFlowGroup>
             <NumberFlow value={hour} format={TWO_DIGITS} />

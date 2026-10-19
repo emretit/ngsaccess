@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
+import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { capabilities } from "@/lib/capabilities";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -23,6 +24,7 @@ const emptyForm = (): UserFormData => ({
 });
 export const useUserManagement = () => {
   const { profile } = useAuth();
+  const { projectId } = useActiveProjectScope();
   const permissions = capabilities(profile?.role);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserFormData>(emptyForm);
@@ -113,8 +115,9 @@ export const useUserManagement = () => {
     },
     resetForm: () => {
       setCurrentUser(null);
-      setFormData(emptyForm());
-      setBaseline(emptyForm());
+      const initial = { ...emptyForm(), projectId: projectId ?? undefined };
+      setFormData(initial);
+      setBaseline(initial);
       setError(undefined);
     },
   };

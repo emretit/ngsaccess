@@ -147,7 +147,7 @@ export function UserFormDialog({
             <FormFieldWrapper
               htmlFor="admin-user-role"
               label="Rol"
-              hint="Bu rol tüm projelerde geçerlidir"
+              hint="Rol hesabın tamamı için geçerlidir; proje erişimi aşağıda seçilir."
             >
               <select
                 className="h-9 w-full rounded-md border bg-background px-3 text-sm"

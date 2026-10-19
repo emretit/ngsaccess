@@ -6,7 +6,7 @@ const sdkPath = new URL("../../node_modules/convex/dist/esm/server/impl/database
 const { setupReader } = await import(/* @vite-ignore */ sdkPath) as {
   setupReader: () => GenericDatabaseReader<DataModel>;
 };
-import { auditActorIndex, maskAuditEmail, mergeAuditActors } from "./auditActors";
+import { auditActorIndex, mergeAuditActors } from "./auditActors";
 
 const id = (value: string) => value as Id<"users">;
 const callerId = id("caller");
@@ -46,12 +46,12 @@ describe("denetim aktörleri", () => {
     });
     expect(result.includesSystem).toBe(true);
     expect(result.actors.find(actor => actor.userId === "deleted")).toMatchObject({ label: "Son ad", status: "deleted", lastSeenAt: 4 });
-    expect(result.actors.find(actor => actor.userId === "removed")).toMatchObject({ label: "Yeni ad", status: "removed" });
+    expect(result.actors.find(actor => actor.userId === "removed")).toMatchObject({ label: "Yeni ad", status: "active" });
     expect(result.actors.find(actor => actor.userId === "member")?.status).toBe("member");
     expect(result.actors.find(actor => actor.userId === callerId)?.status).toBe("member");
   });
 
-  it("aynı adlı aktörleri tam e-posta/kimlik eklemeden ayırır ve Türkçe etikette arar", () => {
+  it("aynı adlı aktörleri tam e-postayla ayırır ve Türkçe etikette arar", () => {
     const users = ["one", "two"].map(value => ({ _id: id(value), fullName: "İPEK", email: "ipek@example.com" }));
     const result = mergeAuditActors({ ...base, users: [...base.users, ...users],
       memberIds: users.map(user => user._id), search: "  ipek  ",
@@ -59,9 +59,8 @@ describe("denetim aktörleri", () => {
     });
     expect(result.actors).toHaveLength(2);
     expect(new Set(result.actors.map(actor => actor.label)).size).toBe(2);
-    expect(JSON.stringify(result.actors)).not.toContain("ipek@example.com");
+    expect(JSON.stringify(result.actors)).toContain("ipek@example.com");
     expect(result.actors.every(actor => actor.status === "active")).toBe(true);
-    expect(maskAuditEmail("e@example.com")).toBe("e***@example.com");
   });
 
   it("2.000 olay ve 2.000 üyeyi tekilleştirir; kesik üyelik taramasından çıkarılma iddiası üretmez", () => {
@@ -77,13 +76,25 @@ describe("denetim aktörleri", () => {
     expect(partial.actors.find(actor => actor.userId === "old")?.status).toBe("active");
   });
 
-  it("e-posta olan snapshotı maskeler ve global kapsamda eski üyeliği removed diye işaretlemez", () => {
+  it("e-posta olan snapshotı tam gösterir ve global kapsamda eski üyeliği removed diye işaretlemez", () => {
     const result = mergeAuditActors({ ...base, allProjects: true,
       users: [...base.users, { _id: id("old"), name: "old@example.com" }],
       events: [{ userId: id("old"), timestamp: 1 }, { userId: id("missing"), timestamp: 2 }],
     });
-    expect(result.actors.find(actor => actor.userId === "old")).toMatchObject({ label: "o***@example.com", status: "active" });
+    expect(result.actors.find(actor => actor.userId === "old")).toMatchObject({ label: "old@example.com", status: "active" });
     expect(result.actors.find(actor => actor.userId === "missing")?.label).toBe("Silinmiş kullanıcı");
     expect(result.includesSystem).toBe(false);
   });
 });
+
+ it("adı ve snapshotı olmayan aktörü tam e-postasıyla bulur; üyeliği olmayan yazarı yanlış etiketlemez", () => {
+   const result = mergeAuditActors({ ...base, search: "someone@example.com",
+     users: [...base.users, { _id: id("writer"), email: "someone@example.com" }],
+     events: [{ userId: id("writer"), timestamp: 3 }],
+   });
+   expect(result.actors).toEqual([{ userId: "writer", label: "someone@example.com", status: "active", lastSeenAt: 3 }]);
+ });
+ it("silinmiş aktörün tarihsel e-postasını tam gösterir", () => {
+   const result = mergeAuditActors({ ...base, events: [{ userId: id("gone"), userName: "old@example.com", timestamp: 3 }] });
+   expect(result.actors.find(actor => actor.userId === "gone")).toMatchObject({ label: "old@example.com", status: "deleted" });
+ });

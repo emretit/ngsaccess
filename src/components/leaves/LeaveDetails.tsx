@@ -1,3 +1,4 @@
+import { formatTrDateTime } from "@/lib/date";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -85,7 +86,7 @@ export function LeaveDetails({
               {row.updatedAt && (
                 <div>
                   <dt className="text-muted-foreground">Son güncelleme</dt>
-                  <dd>{new Date(row.updatedAt).toLocaleString("tr-TR")}</dd>
+                  <dd>{formatTrDateTime(new Date(row.updatedAt))}</dd>
                 </div>
               )}
             </dl>
@@ -109,7 +110,7 @@ export function LeaveDetails({
                 {dateLabel(row.endDate)}.{" "}
                 {row.employeeMissing
                   ? "PDKS sayfasında dönemi kontrol edin."
-                  : "PDKS kişi adı araması ve bu dönem ile açılır; aynı adlı kişiler de eşleşebilir."}
+                  : "PDKS seçili kişi ve bu dönem ile açılır."}
               </p>
             </div>
             <div className="mt-auto flex flex-wrap gap-2 pt-4">

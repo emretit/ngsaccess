@@ -17,7 +17,7 @@ export function DeviceNetworkSection({ form }: DeviceNetworkSectionProps) {
         name="device_ip"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>IP Adresi</FormLabel>
+            <FormLabel>IP adresi</FormLabel>
             <FormControl>
               <Input placeholder="192.168.1.100" {...field} />
             </FormControl>
@@ -31,7 +31,7 @@ export function DeviceNetworkSection({ form }: DeviceNetworkSectionProps) {
         name="device_username"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Cihaz Kullanıcı Adı</FormLabel>
+            <FormLabel>Cihaz kullanıcı adı</FormLabel>
             <FormControl>
               <Input placeholder="admin" {...field} />
             </FormControl>
@@ -44,7 +44,7 @@ export function DeviceNetworkSection({ form }: DeviceNetworkSectionProps) {
         name="device_password"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Cihaz Şifresi</FormLabel>
+            <FormLabel>Cihaz şifresi</FormLabel>
             <FormControl>
               <PasswordField placeholder="Cihaz şifresi" {...field} />
             </FormControl>

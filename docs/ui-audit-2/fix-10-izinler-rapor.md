@@ -1,0 +1,9 @@
+10-H1 → Tam filtre sayfalamadan önce indexli stream üzerinde; gerçek cursor (`convex/leaves.ts:108`, `:120`); 3 index koordinatör tarafından schema.ts içine eklendi.
+10-O1, 10-D4 → Tek dönem grubu, üstte etiket, değer içeren erişilebilir ay adı (`src/components/leaves/LeaveFilters.tsx:70`).
+10-O2, 10-D2 → Form ve filtrede ortak aranabilir combobox; ilk 50 dışında seçili kişinin adı id ile yükleniyor, arama 1000 kişiyle kesilmiyor (`src/components/leaves/EmployeePicker.tsx:20`, `convex/leaves.ts:155`).
+10-O3 → Ortak diyaloğun “Düzenlemeye dön / Kaydetmeden çık” metinleri doğrulandı (`src/components/shared/UnsavedChangesDialog.tsx:24`); değiştirilmedi.
+10-O4 → onChange tarih doğrulaması ve salt okunur conflictFor sorgusu; kontrol bitmeden veya çakışmada mutation engellenir (`src/components/leaves/LeaveForm.tsx:72`, `:166`, `convex/leaves.ts:143`).
+10-O5 → Tek cursor sayaç akışı, 500lük parçalar, tam kayıt/tekil kişi sayısı; boş durum için aynı sorguda first() (`convex/leaves.ts:132`, `src/components/leaves/LeaveResults.tsx:18`); toplam okuma eşleşen kayıt sayısıyla artar, aggregate tablosu/migration yok.
+10-O6, 10-D1 → PDKS employeeId bağlantısı; İstanbul saatli ayrıntı (`src/components/leaves/lib/leaveState.ts:123`, `src/components/leaves/LeaveDetails.tsx:89`); 10-D3 → mobil katlama (`src/components/leaves/LeaveFilters.tsx:47`); 10-D5 → scope yazımı kaldırıldı, eski parametre bir kez temizleniyor (`src/pages/Leaves.tsx:67`, `src/components/leaves/lib/leaveState.ts:101`).
+Kapılar: eslint 0 error/0 warning; odaklı 5 dosya/80 test geçti; tam vitest src/components/leaves convex 82 dosya/1357 test geçti; tsc leaves 0 hata, toplam 2 kapsam dışı hata: src/components/pdks/lib/analysis.ts:31 ve :37 (notEmployed); tam TS kapısı koordinatöre bırakıldı, talimat msg_4a34c72d953c.
+Yapılamayan izin bulgusu yok; tam gün, onaylı örtüşme engeli ve eski pending/rejected salt okunurluğu korundu; commit/push/deploy/DB yazımı yapılmadı.

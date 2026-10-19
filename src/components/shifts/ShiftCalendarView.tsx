@@ -1,3 +1,5 @@
+import { ShiftSelect } from "./ShiftSelect";
+import { assignmentInitial, shiftTimeLabel } from "./lib/planning";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "convex/react";
@@ -76,12 +78,14 @@ export function ShiftCalendarView({
       >
         Vardiya tanımları
       </Button>
-      <ShiftListSidebar
-        open={definitions}
-        onOpenChange={setDefinitions}
-        shifts={shifts}
-        projectId={projectId}
-      />
+      <QuerySectionBoundary resetKey={projectId} title="Vardiya tanımları yüklenemedi">
+        <ShiftListSidebar
+          open={definitions}
+          onOpenChange={setDefinitions}
+          shifts={shifts}
+          projectId={projectId}
+        />
+      </QuerySectionBoundary>
     </div>
   );
 }
@@ -185,19 +189,16 @@ function Plan({
     onSelect: select,
   };
   return (
-    <>
+    <div className="space-y-4 [&_button]:max-sm:min-h-11 [&_input]:max-sm:min-h-11">
       <PageHeader
         title="Vardiyalar"
         scope={<span className="break-all">{projectName} · Çalışma planı</span>}
         primaryAction={{
-          label: "Vardiya ata",
+          label: active.length ? "Vardiya ata" : "Önce vardiya tanımla",
           disabled: loading,
           onClick: () =>
             active.length
-              ? setAssign({
-                  startDate: range.rangeStart,
-                  endDate: range.rangeEnd,
-                })
+              ? setAssign(assignmentInitial(day))
               : openDefinitions(),
         }}
         secondaryMenu={
@@ -209,7 +210,6 @@ function Plan({
       <StatInline
         items={[
           { label: "Görünen çalışan", value: filtered.length },
-          { label: "Gün", value: range.days.length },
           { label: "Proje genelinde aktif tanım", value: active.length },
         ]}
       />
@@ -231,23 +231,10 @@ function Plan({
             clearSelection();
           }}
         >
-          <label className="text-xs space-y-1 min-w-0 max-w-full">
+          <label className="text-xs flex flex-col gap-1 min-w-0 max-w-full">
             Vardiya
-            <select
-              className="block h-9 w-full max-w-[260px] rounded-md border border-control bg-surface px-2 text-sm"
-              value={shiftFilter}
-              onChange={(e) => {
-                setShiftFilter(e.target.value);
-                clearSelection();
-              }}
-            >
-              <option value="all">Tüm vardiyalar</option>
-              {shifts.map((s) => (
-                <option key={s._id} value={s._id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
+            <ShiftSelect label="Vardiya" value={shiftFilter} onChange={(value) => { setShiftFilter(value); clearSelection(); }}
+              options={[{ value: "all", label: "Tüm vardiyalar" }, ...shifts.map(s => ({ value: s._id, label: `${s.name} · ${shiftTimeLabel(s)}` }))]} />
           </label>
         </FilterBar>
       </div>
@@ -269,7 +256,7 @@ function Plan({
         >
           Sonraki
         </Button>
-        <label className="text-xs">
+        <label className="text-xs flex flex-col gap-1">
           Tarih
           <DateInput
             required
@@ -279,19 +266,9 @@ function Plan({
           />
         </label>
         {!compact && (
-          <label className="text-xs">
+          <label className="text-xs flex flex-col gap-1">
             Dönem
-            <select
-              value={period}
-              className="block h-9 border border-control rounded-md bg-surface px-2"
-              onChange={(e) => {
-                setPeriod(e.target.value as Period);
-                clearSelection();
-              }}
-            >
-              <option value="week">Hafta</option>
-              <option value="month">Ay</option>
-            </select>
+            <ShiftSelect label="Dönem" value={period} onChange={(value) => { if (value === "week" || value === "month") { setPeriod(value); clearSelection(); } }} options={[{ value: "week", label: "Hafta" }, { value: "month", label: "Ay" }]} />
           </label>
         )}
       </div>
@@ -305,11 +282,7 @@ function Plan({
         <Button
           disabled={loading || !active.length}
           onClick={() =>
-            setAssign({
-              employeeIds: [...selected],
-              startDate: range.rangeStart,
-              endDate: range.rangeEnd,
-            })
+            setAssign(assignmentInitial(day, [...selected]))
           }
         >
           Seçilenlere ata
@@ -346,7 +319,7 @@ function Plan({
         <>
           {assignments.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              Bu dönemde atama yok. Boş bir gün seçerek plan oluşturabilirsiniz.
+              Bu dönemde atama yok.{active.length > 0 ? " Boş bir gün seçerek plan oluşturabilirsiniz." : ""}
             </p>
           )}
           {compact ? (
@@ -416,6 +389,6 @@ function Plan({
           .map((e) => `${e.firstName} ${e.lastName}`)
           .join("")}
       />
-    </>
+    </div>
   );
 }

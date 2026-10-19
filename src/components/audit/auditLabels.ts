@@ -1,4 +1,39 @@
+import { formatTrDateTime } from "@/lib/date";
+
 const commonLabels: Record<string, string> = {
+  visitorKvkkUrl: "Ziyaretçi aydınlatma metni bağlantısı",
+  visitorKvkkVersion: "Ziyaretçi aydınlatma metni sürümü",
+  documentVersion: "Belge sürümü",
+  assigned: "Atanan kayıt sayısı",
+  imported: "İçe aktarılan kayıt sayısı",
+  skipped: "Atlanan kayıt sayısı",
+  actorType: "İşlemi yapanın türü",
+  baslatan: "Başlatan",
+  userId: "Kullanıcı kimliği",
+  batches: "İşlenen grup sayısı",
+  cutoff: "Saklama sınırı tarihi",
+  dailyLimitReached: "Günlük sınıra ulaşıldı",
+  deleted: "Silinen kayıt sayısı",
+  stoppedBySettingsChange: "Ayar değişikliği nedeniyle durduruldu",
+  ackedAt: "Onaylanma zamanı",
+  emailEnabled: "E-posta bildirimi",
+  minSeverity: "En düşük bildirim önemi",
+  recipientCount: "Alıcı sayısı",
+  exported: "Dışa aktarılan kayıt sayısı",
+  cardNumber: "Kart numarası",
+  readingId: "Kart okuma kimliği",
+  insertedCount: "Eklenen kayıt sayısı",
+  years: "Yıllar",
+  errors: "Hatalar",
+  inserted: "Eklenen kayıt sayısı",
+  touched: "İşlenen kayıt sayısı",
+  updated: "Güncellenen kayıt sayısı",
+  biometricEnabled: "Biyometrik veri işleme",
+  biometricReason: "Biyometrik veri işleme gerekçesi",
+  biometricChangedAt: "Biyometrik ayar değişiklik zamanı",
+  biometricChangedBy: "Biyometrik ayarı değiştiren",
+  cardReadingRetentionDays: "Kart okuma saklama süresi (gün)",
+  aiMaskNames: "Yapay zekâda adları gizleme",
   name: "Ad",
   fullName: "Ad soyad",
   firstName: "Ad",
@@ -181,12 +216,12 @@ export function auditFieldDisplayValue(field: string, value: unknown): string {
   if (typeof value === 'string') {
     if ((key === 'consentType' || key === 'status') && auditEnumLabels[value]) return auditEnumLabels[value];
     if (/^\d{4}-\d{2}-\d{2}T\d{2}:/.test(value) && !Number.isNaN(Date.parse(value))) {
-      return new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', dateStyle: 'short', timeStyle: 'medium' }).format(new Date(value));
+      return formatTrDateTime(new Date(value), { seconds: true });
     }
     if (key === 'date' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value.split('-').reverse().join('.');
   }
   if (typeof value === 'number' && ['timestamp', 'grantedAt', 'revokedAt', 'createdAt', 'updatedAt'].includes(key) && Number.isFinite(value) && Math.abs(value) < 8.64e15) {
-    return new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', dateStyle: 'short', timeStyle: 'medium' }).format(value);
+    return formatTrDateTime(value, { seconds: true });
   }
   return auditDisplayValue(value);
 }

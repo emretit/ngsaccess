@@ -6,7 +6,7 @@ import { profileName } from "./lib/settingsUx";
 import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { optionalAuthQuery, authedMutation, adminQuery, superAdminQuery, superAdminMutation } from "./lib/customFunctions";
+import { optionalAuthQuery, authedMutation, adminQuery, superAdminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, getValidAuthUserId, verifyUser } from "./lib/auth";
 import { membershipChanged, userProtectionError } from "./lib/adminGuards";
 import { publicUserValidator, toPublicUser } from "./lib/publicUser";
@@ -384,7 +384,7 @@ export const adminFindByEmail = internalQuery({
 });
 
 /** Safe admin directory: filtering happens before cursor pagination. */
-export const adminList = superAdminQuery({
+export const adminList = adminQuery({
   args: {
     search: v.optional(v.string()),
     role: v.optional(v.union(v.literal("super_admin"), v.literal("project_admin"), v.literal("project_user"))),
@@ -393,6 +393,8 @@ export const adminList = superAdminQuery({
   },
   handler: async (ctx, args) => {
     const pagination = adminPaginationOptions(args.paginationOpts);
+    const allowedProjects = ctx.user.role === "super_admin" ? null : await getProjectIdsForUser(ctx);
+    if (allowedProjects !== null && args.project && (args.project === "none" || !allowedProjects.includes(args.project))) throw new ConvexError("Bu proje filtresi için yetkiniz yok.");
     const projectCache = new Map<Id<"projects">, Promise<Doc<"projects"> | null>>();
     const membershipCache = new Map<Id<"users">, Promise<{ _id: Id<"projects">; name: string; isActive: boolean }[]>>();
     const memberships = (userId: Id<"users">) => {
@@ -414,6 +416,10 @@ export const adminList = superAdminQuery({
     let totalScanned = 0;
     const result = await stream(ctx.db, schema).query("users").order("desc").filterWith(async user => {
       totalScanned++;
+      if (allowedProjects !== null) {
+        const projects = await memberships(user._id);
+        if (!projects.some(project => allowedProjects.includes(project._id))) return false;
+      }
       if (args.role && user.role !== args.role) return false;
       if (!adminSearch(args.search, user.fullName, user.name, user.email)) return false;
       if (!args.project) return true;
@@ -421,7 +427,7 @@ export const adminList = superAdminQuery({
       return args.project === "none" ? projects.length === 0 : projects.some(p => p._id === args.project);
     }).paginate(pagination);
     return {
-      ...result, page: await Promise.all(result.page.map(async user => adminUserRow(user, ctx.user._id, await memberships(user._id)))),
+      ...result, page: await Promise.all(result.page.map(async user => adminUserRow(user, ctx.user._id, (await memberships(user._id)).filter(project => allowedProjects === null || allowedProjects.includes(project._id))))),
       filterScope: "server" as const, totalScanned,
     };
   },

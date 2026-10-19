@@ -90,13 +90,13 @@ export function DeviceList({
 
   return (
     <div className="min-w-0 overflow-hidden rounded-md border border-line bg-surface">
-      {selectedDevices.length > 0 && (
+      <div className="h-[88px] overflow-auto border-b border-line sm:h-[53px]">{selectedDevices.length > 0 ? (
         <DeviceBulkActions
           selectedCount={selectedDevices.length}
           onDelete={() => setShowDeleteDialog(true)}
           onClear={() => handleSelectAll(false)}
         />
-      )}
+      ) : <p className="px-3 py-4 text-xs text-muted-foreground">Cihaz seçerek toplu işlem yapabilirsiniz.</p>}</div>
 
       <div role="region" aria-label="Cihaz listesi, yatay kaydırılabilir" tabIndex={0} className="min-w-0 max-w-full overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         <Table density="compact" className="w-full table-fixed">
@@ -105,6 +105,7 @@ export function DeviceList({
               <TableHead className="w-9 px-2 md:w-10 md:px-3">
                 <Checkbox
                   aria-label="Görünen tüm cihazları seç"
+                  className="data-[state=indeterminate]:[&_svg]:hidden data-[state=indeterminate]:before:content-['−'] data-[state=indeterminate]:before:absolute data-[state=indeterminate]:before:inset-0 data-[state=indeterminate]:before:flex data-[state=indeterminate]:before:items-center data-[state=indeterminate]:before:justify-center"
                   checked={pageDevices.length > 0 && pageDevices.every(device => selectedDevices.includes(device._id)) ? true : selectedDevices.length > 0 ? "indeterminate" : false}
                   onCheckedChange={checked => handleSelectAll(checked === true)}
                 />
@@ -115,7 +116,7 @@ export function DeviceList({
               <TableHead className="hidden xl:table-cell w-[170px]">Seri no / UUID</TableHead>
               {!(hideLocation || hideZoneColumn) && <TableHead className="hidden lg:table-cell w-[140px]">Bölge</TableHead>}
               <TableHead className="w-[112px] px-1 md:w-[132px] md:px-3">Bağlantı</TableHead>
-              <TableHead className="w-10 px-1 md:w-11"><span className="sr-only">İşlemler</span></TableHead>
+              <TableHead className="w-11 px-0 md:px-1"><span className="sr-only">İşlemler</span></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -160,7 +161,7 @@ export function DeviceList({
       </div>
 
       <PaginationBar
-        summary={<>{devices.length} cihazdan {filteredDevices.length} sonuç · {pageRange(filteredDevices.length, currentPage, pageSize)} gösteriliyor</>}
+        summary={<>{devices.length} cihazdan {filteredDevices.length} sonuç{filteredDevices.length > 0 && <> · {pageRange(filteredDevices.length, currentPage, pageSize)} gösteriliyor</>}</>}
         page={currentPage}
         pageCount={pageCount}
         onPrevious={() => setPage(currentPage - 1)}

@@ -23,14 +23,14 @@ export function DashboardPanel({
 }) {
   const headingId = useId();
   return (
-    <section aria-labelledby={headingId} className={cn("flex h-full min-w-0 flex-col overflow-hidden rounded-lg border bg-surface", className)}>
+    <section aria-labelledby={headingId} className={cn("flex min-w-0 flex-col overflow-hidden rounded-lg border bg-surface", className)}>
       <header className="flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2 min-[761px]:px-5">
         <h2 id={headingId} className="text-sm font-semibold">{title}</h2>
         {context && <span className="text-xs text-muted-foreground">{context}</span>}
         <div className="ml-auto flex items-center gap-3 text-xs">
           {aside}
           {link && (
-            <Link to={link.to} className="inline-flex min-h-8 items-center gap-1 font-medium text-muted-foreground hover:text-foreground">
+            <Link to={link.to} className="inline-flex min-h-11 items-center gap-1 font-medium text-muted-foreground hover:text-foreground">
               {link.label}
               <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
             </Link>

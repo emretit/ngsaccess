@@ -1,3 +1,4 @@
+import { isOvernightShift, type PdksShift } from "./pdksWorkDay";
 import { ConvexError } from "convex/values";
 
 export function validateManualPdksNote(value?: string) {
@@ -6,8 +7,12 @@ export function validateManualPdksNote(value?: string) {
   return note;
 }
 
+export function isManualPdksTimeOrderValid(entryTime: string | undefined, exitTime: string | undefined, shift?: PdksShift | null): boolean {
+  return !entryTime || !exitTime || entryTime < exitTime || isOvernightShift(shift);
+}
+
 /** Shared, side-effect-free validation; note stays optional at transport level for old callers. */
-export function validateManualPdksInput(input: { date: string; entryTime?: string; exitTime?: string; note?: string }) {
+export function validateManualPdksInput(input: { date: string; entryTime?: string; exitTime?: string; note?: string }, shift?: PdksShift | null) {
   const note = validateManualPdksNote(input.note);
   const entryTime = input.entryTime?.trim() || undefined;
   const exitTime = input.exitTime?.trim() || undefined;
@@ -16,6 +21,6 @@ export function validateManualPdksInput(input: { date: string; entryTime?: strin
   const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
   if (entryTime && !hhmm.test(entryTime)) throw new ConvexError("Geçersiz giriş saati (HH:MM)");
   if (exitTime && !hhmm.test(exitTime)) throw new ConvexError("Geçersiz çıkış saati (HH:MM)");
-  if (entryTime && exitTime && entryTime >= exitTime) throw new ConvexError("Çıkış saati giriş saatinden sonra olmalı");
+  if (!isManualPdksTimeOrderValid(entryTime, exitTime, shift)) throw new ConvexError("Çıkış saati giriş saatinden sonra olmalı");
   return { note, entryTime, exitTime };
 }

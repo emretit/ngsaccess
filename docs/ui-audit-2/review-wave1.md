@@ -1,0 +1,45 @@
+# Dalga 1 denetimi (Adım 0 + 01/02/03/04/07) — salt okuma
+
+**Sonuç:** Kod genel olarak sağlam: yetki/proje kapsamı korunmuş, kararlar (02-O5/D5, 03-O9, 03-O1, 07-O3) çiğnenmemiş, cihaza komut gönderen kod değişmemiş. Ama **1 engel** var: Canlı İzleme kaynak filtresi sayfalamadan SONRA uygulanıyor (spec'in açıkça yasakladığı tür). 5 düzeltilmeli, 8 not.
+
+**Sayı: Engel 1 · Düzeltilmeli 5 · Not 8**
+
+Kapılar (kendi koşumum): `tsc` kapsam içi 0 hata (toplam 8 hata hepsi kapsam dışı: `convex/accessRules.ts`, `convex/payVisibility.handlers.test.ts`, `src/components/shifts/*`); `eslint` (kapsam klasörleri) 0 sorun; `vitest src` 97/98 dosya, 692/693 test — tek kırmızı `src/components/visitors/lib/status.test.ts` (kapsam dışı, Ziyaretçiler dalgası).
+
+**Tarayıcı sınırı:** Canlı İzleme (Canlı + Geçmiş + kaynak filtresi) görsel olarak doğrulanamadı — bkz. R1-D4. /home, /virtual-readers, /employees (+ayrıntı, sync onayı, toplu çubuk), /devices (+ayrıntı, Ayarlar, anahtar kartı), /audit-log (FilterBar tüketicisi) bakıldı; bu sayfalarda konsol hatası yok.
+
+## Bulgular
+
+| ID | Önem | Dosya:satır | Sorun | Öneri |
+|---|---|---|---|---|
+| R1-E1 | **Engel** | `convex/cardReadings.ts:222-226` (Geçmiş), `:264` (Canlı) | `source` filtresi `paginate` bittikten sonra, dönen ≤200 aday satırı üzerinde `liveReadingSource(row) === source` ile süzülüyor (06-H1 türü). `schema.ts` diff'inde cardReadings için yeni index yok; kaynak rawData/`hikCurrentVerifyMode`'dan türetildiği için indexlenemiyor. Seyrek kaynakta (QR/Mobil) her sayfa boş dönebilir; kullanıcı "Daha eski kayıtları yükle"ye tekrar tekrar basmak zorunda. Test bunu zaten belgeliyor: `liveReadings.test.ts:284-288` ("empty source page keeps cursor…"). Canlıda da yalnız bugünün son 500 kaydı içinde süzülüyor (`hasMore` süzülmemiş satıra göre). Spec: "sayfa içi süzme YOK". | En az: istemci `useFilteredReadings` kaynak seçiliyken sayfa boşsa/N'den azsa otomatik devam etsin (üst sınırlı döngü, ör. 10 sayfa). Kalıcı: kaynağı yazarken `readingSource` alanı + `by_project_source_time` index (schema koordinatörde, backfill gerekir). Koordinatör kararı: engel olarak mı kabul edilir yoksa otomatik-devam ile geçici kabul mü. |
+| R1-D1 | Düzeltilmeli | `src/components/layout/AppSidebarNav.tsx:233` | "Yakında" rozeti sidebar'da **"Yakı…"** diye kesiliyor, "Sanal Okuyucular" adı da 2 satıra bölünüyor (ölçüm: rozet `scrollWidth 50 > clientWidth 44`; `home.png`, `virtual-readers.png`). Testler (`shellAudit.test.tsx`, `routeMeta.test.ts`) yalnız sınıf/metin arıyor, kesilmeyi yakalamıyor. | Rozeti `shrink-0 whitespace-nowrap` yap, ya da ad yerine ikon yanına küçük nokta/“Yakında” `title`; menü adı tek satır kalsın. |
+| R1-D2 | Düzeltilmeli | `src/components/devices/DeviceCommandCenter.tsx:387,465` (karşılaştır `:350`) | "Cihaz çevrimdışı — komut kuyruğa alınır" uyarısı **Hikvision Gateway** cihazında yanlış: kod `queued`'ı yalnız `hikTransport === "localBridge"` için true yapıyor; gateway'de komut kuyruğa alınmıyor, doğrudan gider/hata verir. Gerçek cihazda (NGS0001, Gateway, çevrimdışı) uyarı görünüyor (`device-detail.png`). Kapı açma bağlamında yanıltıcı. | Metni aktarıma göre ver: IDE/localBridge → "komut kuyruğa alınır"; gateway → "Cihaz çevrimdışı — komut ulaşmayabilir". (Emre kararı komutların aktif kalması; metin doğruluğu ayrı.) |
+| R1-D3 | Düzeltilmeli | `src/components/employees/EmployeeTable.tsx:235` | Toplu çubuk `fixed bottom-4`, ~100 px yüksek (2 satıra sarıyor, `employees-selected.png`), `main` alt dolgusu 32 px. Çok satırlı listede sayfa altındaki sayfalama/son satır çubuğun altında kalır (WCAG 2.4.11 odak örtülmesi). Tek kişiyle yalnız görüntü doğrulandı; 10+ satırda denemedim. | Seçim varken içeriğe alt boşluk (`pb-28`) ver ya da çubuğu `sticky bottom-0` yap. |
+| R1-D4 | Düzeltilmeli | `convex/cardReadings.ts:123,148,172` ↔ `CardReadings.tsx:26,44` | Yeni `searchMonitoringPeople`, `lastMonitoringReading` ve `source` argümanı canlı Convex'te (notable-tern-4) henüz yok → /live-monitoring tümüyle "Bir hata oluştu" (`live-canli.png`; konsol: `Could not find public function for 'cardReadings:searchMonitoringPeople'`). Web, Convex'ten önce yayınlanırsa sayfa bozulur; ayrıca bu yüzden Canlı/Geçmiş görseli doğrulanamadı. | Sıra: önce `npx convex dev --once` (bu projenin deploy yolu), sonra web. Deploy sonrası Canlı/Geçmiş/kaynak filtresini bir kez gözle doğrula. |
+| R1-D5 | Düzeltilmeli | `src/components/devices/DeviceApiTokenCard.tsx:42-44` | Yeni `catch` hatayı yutuyor → `ConfirmDestructive` `run()` `true` döner ve diyalog yenileme BAŞARISIZ olsa da kapanır (eskiden hata fırlayınca açık kalıyordu; `useAsyncAction` zaten "İşlem tamamlanamadı" bildiriyordu). | `catch`'i kaldır (genel bildirim kalsın) ya da `notify.error` sonrası `throw error`; test: reddedilen mutasyonda diyalog açık kalıyor. |
+| R1-D6 | Düzeltilmeli | `convex/cardReadings.ts:143-148`, `AssignReadingCardForm.tsx:16` | `searchMonitoringPeople` ziyaretçileri (`isVisitor`) dışlamıyor; eski `employees.list` dışlıyordu (`employees.ts:83`). Kart atama formunda ziyaretçiye kalıcı kart atanabilir hâle geldi (`assignCardFromReading` ziyaretçiyi engellemiyor). | Atama için `isVisitor !== true` süz; filtre seçicisinde kalabilir ama etiketle. |
+| R1-N1 | Not | `VirtualReaders.test.tsx`, `shellAudit.test.tsx`, `dashboard.test.tsx` | Çok sayıda test Tailwind sınıf metnine bakıyor (`"border border-line bg-surface hover:bg-accent"`, `py-6`, `max-w-xl`); davranışı değil stili kilitliyor ve R1-D1'i yakalamadı. Sunucu filtre testi `paginate`'i taklit etmiyor. | Sınıf assert'lerini azalt; filtre testine "boş sayfa + sonraki sayfada eşleşme" zaten var, otomatik-devam eklenince oraya test koy. |
+| R1-N2 | Not | `EmployeeFilters.tsx:204`, `DeviceFilters.tsx:28` | "Filtreleri temizle"yi gizlemek için `[&>[role=search]>button:last-of-type]:hidden` — FilterBar iç yapısına bağlı, kırılgan. | `FilterBar`'a `hideClear` prop'u. |
+| R1-N3 | Not | `CardReadingsFilters.tsx` (kaldırılan effect), `CardReadings.tsx:28` | URL'deki geçersiz/yabancı `employee` kimliği artık temizlenmiyor; kişi bulunamayınca filtre sessizce düşüyor, URL'de kalıyor. | Bulunamayan kimliği `change({employee:""})` ile temizle. |
+| R1-N4 | Not | `live-monitoring/lib/scroll.ts:6` | Mount'ta `scroll()` hemen çağrılıyor; `main` 80 px'ten fazla kaydırılmışken Canlı'ya geçince / kaynak değişince (`key` ile remount) akış kendiliğinden duruyor. | İlk çağrıyı kaldır ya da yalnız kullanıcı kaydırınca tetikle. |
+| R1-N5 | Not | `EmployeeSyncConfirmDialog.tsx:30`, `EmployeeTable.tsx:516` | Pasif kişide gönderim cihazdan SİLER (`hikvisionSync.ts:114`) ama diyalog "bilgileri … gönderilecek" diyor. Ayrıca toplu çubukta tek kişi seçiliyse artık tekli yola gidiyor (toast türü değişir). | Pasif seçimde metni "cihazdan kaldırılacak" yap. |
+| R1-N6 | Not | `FilterBar.tsx:13` | Görünür etiket 8 diğer tüketiciyi de etkiliyor (visitors, leaves, admin*, pdks, audit). Yalnız `/audit-log` baktım: hizalama sorunsuz (`audit-log-filterbar.png`). | Diğerleri için kısa göz turu. |
+| R1-N7 | Not | çalışma ağacı | 50 dosya silinmiş görünüyor (ör. `src/hooks/useCardReadings.ts` — 07 sahibi; `ui/*`, `utils/*`). Dalga 1 yol listesinde yok, incelenmedi; ben silmedim (salt okuma). Kapsam içi tsc bunlardan etkilenmiyor. | Koordinatör hangi worker'ın sildiğini doğrulasın; commit pathspec'ine alma kararı onda. |
+| R1-N8 | Not | `DeviceDetailsPanel.tsx:70-75` | Sheet kapanırken kısa süre "Yeni cihaz · Hikvision" başlığı + iskelet görünüyor (`open=false` iken `step/brand` sıfırlanmıyor, `selectedDevice` null). Eski kodda da iskelet vardı; yeni regresyon değil. Escape ile kapanma çalışıyor (03-O6: gerçek hata yok, worker doğru). | İstenirse kapanma sırasında önceki içeriği tut. |
+
+## Kararlara uyum
+
+- 02-O5/02-D5: `departments/**` diff'i yok, `Employees.tsx`'te yetki değişikliği yok → uyumlu.
+- 03-O9: `convex/devices.ts` değişmemiş; yalnız `DeviceApiTokenCard` anahtarı tam maske (`••••••••`), ekranda doğrulandı.
+- 03-O1: komut düğmeleri hâlâ `adapter.supported`/`busy`'ye bağlı (çevrimdışı kilitlenmiyor) + uyarı var — metin doğruluğu R1-D2.
+- 07-O3: tarih alanları yalnız `mode === "history"` (`CardReadingsFilters.tsx:128`) → uyumlu.
+- Cihaza komut kodu (`handleOpenDoor`, `openHikDoor/openIdeDoor`) değişmemiş.
+
+## Backend yetki taraması (grep tabanlı)
+
+Değişen/yeni her public fonksiyon (`searchMonitoringPeople`, `lastMonitoringReading`, `listFiltered`, `listLiveSince`, `getReading`) `resolveProjectScope(ctx, projectId)` ile başlıyor; arama `.eq("projectId")`, seçili kişi `projectId` kontrollü; `getReading` yabancı/geçersiz kimlikte `null`. Süzgeçsiz yol yok. İndeksler mevcut (`by_project`, search index'leri `projectId` filterField'lı). Okuma sayısı sınırlı (≤200 aday, 20+20+1 kişi, 1 son okuma).
+
+## Ekran görüntüleri
+
+`docs/ui-audit-2/review-wave1/`: `home`, `virtual-readers`, `employees`, `employees-selected`, `employee-sync-confirm`, `employee-detail`, `employee-detail-bottom`, `devices`, `device-detail`, `device-settings-bottom`, `devices-after-escape`, `live-canli` (hata durumu), `audit-log-filterbar`.

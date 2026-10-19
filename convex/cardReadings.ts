@@ -1,10 +1,12 @@
+import { stream } from "convex-helpers/server/stream";
+import schema from "./schema";
 import { canSeePay } from "./lib/payVisibility";
 import { classifyReadingSource, filterPdksReadings } from "./lib/pdksSource";
-import { matchesReadingSources, splitPdksEligible, toReportTransactionRow } from "./lib/reportAttendance";
+import { matchesReadingSources, toReportTransactionRow } from "./lib/reportAttendance";
 import { paginationOptsValidator, type PaginationResult } from "convex/server";
 import { resolveProjectScope } from "./lib/projectScope";
 import { cardReadingDateBounds, scopedCardReadingQuery } from "./lib/cardReadingList";
-import { assignmentPrecondition, ASSIGN_CARD_ERRORS, liveReadingWindow, matchesReadingResult } from "./lib/liveReadings";
+import { assignmentPrecondition, ASSIGN_CARD_ERRORS, liveReadingSource, liveReadingWindow, matchesReadingResult } from "./lib/liveReadings";
 import { getEmployeeTargetDevices } from "./lib/peopleHikSnapshot";
 import { writeAudit } from "./lib/audit";
 import { toUtcISO, trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
@@ -40,7 +42,6 @@ import { ideResultGranted } from "./lib/cardReaderParse";
 import { canEmployeeAccessDevice } from "./lib/accessDecision";
 import {
   buildPeriodDateKeys,
-  matchEmployeeKey,
   formatHoursLabel,
 } from "./lib/pdksCalc";
 import {
@@ -58,12 +59,13 @@ import {
   summarizeAttendanceDays,
 } from "./lib/pdksDetail";
 import { computePayrollCell } from "./lib/pdksPayroll";
+import { buildPdksWorkDateResolver, groupPdksWorkDays, pdksWorkDayRange } from "./lib/pdksWorkDay";
 import {
   buildPdksEmployeeReadingMap,
   computePdksTableRow,
   filterPdksTableRows,
 } from "./lib/pdksTable";
-import { computePdksChartData, emptyPdksChartData } from "./lib/pdksChart";
+import { pdksAvailableDatesByProject, pdksManualDatesByEmployee, pdksLeaveMatchesProject, readPdksAvailableDateKeys, pdksFirstRecordDate } from "./lib/pdksAvailability";
 
 export type CardReadingListPage = PaginationResult<Awaited<ReturnType<typeof enrichReadingsForList>>[number]>;
 
@@ -120,10 +122,45 @@ export const list = authedQuery({
   },
 });
 
-/** Each cursor consumes at most 200 candidates; residual filters may leave an empty page. */
+const monitoringSource = v.union(v.literal("card"), v.literal("qr"), v.literal("mobile"), v.literal("biometric"));
+
+/** Bounded person picker for monitoring filters and card assignment. */
+export const searchMonitoringPeople = authedQuery({
+  args: { projectId: v.id("projects"), search: v.string(), selectedId: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    await resolveProjectScope(ctx, args.projectId);
+    const term = args.search.trim().slice(0, 100);
+    const people = term
+      ? (await Promise.all([
+          ctx.db.query("employees").withSearchIndex("search_first_name", q => q.search("firstName", term).eq("projectId", args.projectId)).take(20),
+          ctx.db.query("employees").withSearchIndex("search_last_name", q => q.search("lastName", term).eq("projectId", args.projectId)).take(20),
+        ])).flat()
+      : await ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", args.projectId)).take(20);
+    const selectedId = args.selectedId ? ctx.db.normalizeId("employees", args.selectedId) : null;
+    const selected = selectedId ? await ctx.db.get(selectedId) : null;
+    if (selected?.projectId === args.projectId) people.push(selected);
+    return [...new Map(people.filter(person => person.isVisitor !== true).map(person => [person._id, person])).values()].slice(0, 41).map(person => ({
+      _id: person._id, firstName: person.firstName, lastName: person.lastName,
+      cardNumber: person.cardNumber, isActive: person.isActive,
+    }));
+  },
+});
+
+/** Last received reading, including days before today's live window. */
+export const lastMonitoringReading = authedQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    await resolveProjectScope(ctx, args.projectId);
+    const row = await ctx.db.query("cardReadings").withIndex("by_project", q => q.eq("projectId", args.projectId)).order("desc").first();
+    return row ? { accessTime: row.accessTime } : null;
+  },
+});
+
+/** Scan until the requested matches are found or the bounded read budget is exhausted. */
 export const listFiltered = authedQuery({
   args: {
     projectId: v.id("projects"),
+    source: v.optional(monitoringSource),
     deviceId: v.optional(v.id("devices")),
     employeeId: v.optional(v.id("employees")),
     doorId: v.optional(v.id("doors")),
@@ -155,7 +192,7 @@ export const listFiltered = authedQuery({
       throw new ConvexError("Sayfa boyutu pozitif bir tam sayı olmalı");
     }
     const status = args.result === "granted" ? "izin_verildi" : args.result === "denied" ? "reddedildi" : undefined;
-    const query = ctx.db.query("cardReadings");
+    const query = stream(ctx.db, schema).query("cardReadings");
     const indexed = (() => {
       if (door && deviceId && door.ioId !== undefined) return query.withIndex("by_device_io_time", q => {
         const prefix = q.eq("deviceId", deviceId).eq("ideIoId", door.ioId);
@@ -177,23 +214,32 @@ export const listFiltered = authedQuery({
         const prefix = q.eq("projectId", args.projectId).eq("accessStatus", status);
         return bounds ? prefix.gte("accessTime", bounds.startISO).lte("accessTime", bounds.endISO) : prefix;
       });
-      return scopedCardReadingQuery(ctx, { ...args, deviceId });
+      if (deviceId) return query.withIndex("by_project_device_time", q => {
+        const prefix = q.eq("projectId", args.projectId).eq("deviceId", deviceId);
+        return bounds ? prefix.gte("accessTime", bounds.startISO).lte("accessTime", bounds.endISO) : prefix;
+      });
+      return query.withIndex("by_project_access_time", q => {
+        const prefix = q.eq("projectId", args.projectId);
+        return bounds ? prefix.gte("accessTime", bounds.startISO).lte("accessTime", bounds.endISO) : prefix;
+      });
     })();
-    const page = await indexed.order("desc").paginate({
-      ...args.paginationOpts,
-      numItems: Math.min(args.paginationOpts.numItems, 200),
-      maximumRowsRead: 200,
-    });
-    const matching = page.page.filter(row =>
-      row.projectId === args.projectId
-      && (args.employeeId === undefined || row.employeeId === args.employeeId)
-      && matchesReadingResult(row.accessStatus, args.result),
-    );
+    let scannedCount = 0;
+    // filterWith runs JS classification inside the stream, before pagination. Its
+    // cursor advances over rejected rows too; no native paginate loop is needed.
+    const page = await indexed.order("desc").filterWith(async row => {
+      scannedCount += 1;
+      return row.projectId === args.projectId
+        && (args.employeeId === undefined || row.employeeId === args.employeeId)
+        && matchesReadingResult(row.accessStatus, args.result)
+        && (args.source === undefined || liveReadingSource(row) === args.source);
+    }).paginate({ ...args.paginationOpts, numItems: Math.min(args.paginationOpts.numItems, 200), maximumRowsRead: 2000, maximumBytesRead: 2_000_000 });
     return {
       ...page,
-      page: await enrichReadingsForList(ctx, matching),
-      scannedCount: page.page.length,
-      filterScope: "candidatePage" as const,
+      page: await enrichReadingsForList(ctx, page.page),
+      scannedCount,
+      matchedCount: page.page.length,
+      scanLimitReached: page.pageStatus === "SplitRequired",
+      filterScope: "boundedScan" as const,
     };
   },
 });
@@ -202,6 +248,7 @@ export const listFiltered = authedQuery({
 export const listLiveSince = authedQuery({
   args: {
     projectId: v.id("projects"),
+    source: v.optional(monitoringSource),
     afterCreationTime: v.optional(v.number()),
     limit: v.number(),
   },
@@ -215,24 +262,39 @@ export const listLiveSince = authedQuery({
     }
     const today = trTodayKey();
     const dayStart = Date.parse(trDayRangeISO(today, today).startISO);
-    const readings = await ctx.db.query("cardReadings")
-      // Convex appends _creationTime to every index, including by_project.
+    let scannedCount = 0;
+    let latestCreationTime = args.afterCreationTime ?? null;
+    const page = await stream(ctx.db, schema).query("cardReadings")
       .withIndex("by_project", q => {
         const prefix = q.eq("projectId", args.projectId);
         return args.afterCreationTime === undefined
           ? prefix.gte("_creationTime", dayStart)
           : prefix.gt("_creationTime", args.afterCreationTime);
-      }).order("desc").take(args.limit + 1);
-    const window = liveReadingWindow(readings, args.limit, args.afterCreationTime);
-    return { ...window, rows: await enrichReadingsForList(ctx, window.rows) };
+      }).order("desc").filterWith(async row => {
+        scannedCount += 1;
+        latestCreationTime = Math.max(latestCreationTime ?? 0, row._creationTime);
+        return args.source === undefined || liveReadingSource(row) === args.source;
+      }).paginate({ cursor: null, numItems: args.limit + 1, maximumRowsRead: 2000, maximumBytesRead: 2_000_000 });
+    const window = liveReadingWindow(page.page, args.limit, args.afterCreationTime);
+    return {
+      ...window,
+      latestCreationTime,
+      hasMore: window.hasMore || !page.isDone,
+      rows: await enrichReadingsForList(ctx, window.rows),
+      scannedCount,
+      matchedCount: page.page.length,
+      scanLimitReached: page.pageStatus === "SplitRequired",
+    };
   },
 });
 
 /** Null deliberately covers missing, unscoped and inaccessible direct links alike. */
 export const getReading = authedQuery({
-  args: { readingId: v.id("cardReadings") },
+  args: { readingId: v.string() },
   handler: async (ctx, args) => {
-    const reading = await ctx.db.get(args.readingId);
+    const id = ctx.db.normalizeId("cardReadings", args.readingId);
+    if (!id) return null;
+    const reading = await ctx.db.get(id);
     if (!reading?.projectId) return null;
     const allowed = await resolveProjectScope(ctx);
     if (!allowed.includes(reading.projectId)) return null;
@@ -339,10 +401,12 @@ export const getPdksTableData = authedQuery({
         v.literal("weekend"),
         v.literal("holiday"),
         v.literal("future"),
-        v.literal("noData")
+        v.literal("noData"),
+        v.literal("notEmployed")
       )
     ),
     person: v.optional(v.string()),
+    employeeId: v.optional(v.id("employees")),
     viewMode: v.optional(v.union(v.literal("single"), v.literal("matrix"))),
     includePunches: v.optional(v.boolean()),
   },
@@ -353,7 +417,7 @@ export const getPdksTableData = authedQuery({
     const today = args.date ?? trTodayKey();
     const startDate = args.startDate ?? today;
     const endDate = args.endDate ?? today;
-    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
+    const { startISO, endISO } = pdksWorkDayRange(startDate, endDate);
     const isSingleDay = startDate === endDate;
     const viewMode = args.viewMode ?? "single";
 
@@ -400,6 +464,9 @@ export const getPdksTableData = authedQuery({
       return [];
     }
 
+    const availabilityEmployees = employees;
+    if (args.employeeId) employees = employees.filter(e => e._id === args.employeeId);
+
     // Çalışan filtreleri (company/department/position/shift/person)
     if (args.companyId) {
       employees = employees.filter((e) => e.companyId === args.companyId);
@@ -445,7 +512,7 @@ export const getPdksTableData = authedQuery({
           .query("generalSettings")
           .withIndex("by_project", (q) => q.eq("projectId", referenceProjectId))
           .first(),
-        buildShiftResolver(ctx, employees),
+        buildShiftResolver(ctx, availabilityEmployees),
         getEffectiveOvertimeRates(ctx, referenceProjectId),
       ]);
     const workingDays =
@@ -476,19 +543,18 @@ export const getPdksTableData = authedQuery({
       }
     }
 
-    // Yalnız dönemle kesişen onaylı izinler (gün eşleşmesi pdksTable'da).
-    const allLeaves = (
-      await ctx.db
-        .query("leaves")
-        .withIndex("by_status", (q) => q.eq("status", "approved"))
-        .collect()
-    ).filter((l) => (!args.projectId || !l.projectId || l.projectId === args.projectId) && l.startDate <= endDate && l.endDate >= startDate);
+    const allLeaves = (await Promise.all(employees.map(emp => ctx.db.query("leaves")
+      .withIndex("by_employee_start", q => q.eq("employeeId", emp._id).lte("startDate", endDate)).collect())))
+      .flat().filter(l => l.status === "approved" && l.endDate >= startDate);
 
     const periodDateKeys = buildPeriodDateKeys(startDate, endDate);
 
-    const tableDepartments = await ctx.db.query("departments").collect();
-    const tableDeptById = new Map(tableDepartments.map((d) => [String(d._id), d]));
+    const tableDepartments = await Promise.all([...new Set(employees.flatMap(e => e.departmentId ? [e.departmentId] : []))].map(id => ctx.db.get(id)));
+    const tableDeptById = new Map(tableDepartments.filter((d): d is NonNullable<typeof d> => d !== null).map((d) => [String(d._id), d]));
 
+    const tableWorkDate = buildPdksWorkDateResolver(availabilityEmployees, (id, date) => scopedPdksShift(shiftResolver.resolve(id, date), args.projectId));
+    const tableAvailableDates = pdksAvailableDatesByProject(readings, tableWorkDate);
+    const tableManualDates = pdksManualDatesByEmployee(manualPdksByEmpDate.values());
     const tableData = await Promise.all(
       Array.from(employeeMap.entries()).map(async ([empKey, empReadings]) => {
         const employee = empById.get(empKey) ?? null;
@@ -504,7 +570,10 @@ export const getPdksTableData = authedQuery({
           ? await ctx.db.get(manualToday.editedBy)
           : null;
 
+        const firstRecordDate = employee ? await pdksFirstRecordDate(ctx, employee, empReadings, tableManualDates.get(employee._id) ?? [], tableWorkDate) : null;
         return computePdksTableRow({
+          availableDateKeys: tableAvailableDates.get(employee?.projectId) ?? new Set<string>(),
+          firstRecordDate,
           empKey,
           empReadings,
           // Stored pay fields are optional numbers; absent inputs resolve to null pay.
@@ -513,14 +582,14 @@ export const getPdksTableData = authedQuery({
             hourlyRate: payVisible ? employee.hourlyRate : undefined,
             monthlySalary: payVisible ? employee.monthlySalary : undefined,
           } : null,
-          departmentName: department?.name ?? "-",
+          departmentName: department?.projectId === employee?.projectId ? department?.name ?? "" : "",
           periodDateKeys,
           startDate,
           isSingleDay,
           viewMode,
           includePunches: args.includePunches,
           manualPdksByEmpDate,
-          allLeaves,
+          allLeaves: allLeaves.filter(l => l.employeeId === employee?._id && pdksLeaveMatchesProject(l, employee?.projectId)),
           holidayMap,
           workingDays,
           workSettings,
@@ -538,93 +607,6 @@ export const getPdksTableData = authedQuery({
     const filtered = filterPdksTableRows(tableData, args.statusFilter);
 
     return filtered.sort((a, b) => a.name.localeCompare(b.name, "tr"));
-  },
-});
-
-/**
- * PDKS grafik verileri - devam oranı, departman devamsızlık, geç kalma dağılımı
- */
-export const getPdksChartData = authedQuery({
-  args: {
-    projectId: v.optional(v.id("projects")),
-    startDate: v.string(),
-    endDate: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
-    const { startISO, endISO } = trDayRangeISO(args.startDate, args.endDate);
-
-    let readings;
-    if (ctx.user.role === "super_admin" && !args.projectId) {
-      readings = await ctx.db
-        .query("cardReadings")
-        .withIndex("by_access_time", q => q.gte("accessTime", startISO).lte("accessTime", endISO))
-        .collect();
-    } else if (allowedProjectIds.length > 0) {
-      const results = await Promise.all(
-        allowedProjectIds.map((pid) =>
-          ctx.db
-            .query("cardReadings")
-            .withIndex("by_project_access_time", q => q.eq("projectId", pid).gte("accessTime", startISO).lte("accessTime", endISO))
-            .collect()
-        )
-      );
-      readings = results.flat();
-    } else {
-      return emptyPdksChartData();
-    }
-
-    readings = filterPdksReadings(readings, args.projectId);
-
-    readings.sort(
-      (a, b) => new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
-    );
-
-    const chartProjectId = args.projectId ?? (
-      ctx.user.role === "super_admin" && !args.projectId
-        ? undefined
-        : allowedProjectIds[0] ?? undefined);
-    const chartSettings = await getEffectiveWorkSettings(ctx, chartProjectId);
-
-    const chartEmployees =
-      ctx.user.role === "super_admin" && !args.projectId
-        ? await ctx.db.query("employees").collect()
-        : (
-            await Promise.all(
-              allowedProjectIds.map((pid) =>
-                ctx.db
-                  .query("employees")
-                  .withIndex("by_project", (q) => q.eq("projectId", pid))
-                  .collect(),
-              ),
-            )
-          ).flat();
-    const chartShiftResolver = await buildShiftResolver(ctx, chartEmployees);
-
-    const empToDept = new Map<string, string>();
-    for (const r of readings) {
-      const empKey = r.employeeId ?? r.cardNo;
-      if (empToDept.has(empKey)) continue;
-      const emp = r.employeeId ? await ctx.db.get(r.employeeId) : null;
-      if (emp?.departmentId) {
-        const dept = await ctx.db.get(emp.departmentId);
-        empToDept.set(empKey, dept?.name ?? "Bilinmiyor");
-      } else {
-        empToDept.set(empKey, "Bilinmiyor");
-      }
-    }
-
-    return computePdksChartData({
-      readings,
-      startDate: args.startDate,
-      endDate: args.endDate,
-      chartSettings,
-      employeeDepartmentByKey: empToDept,
-      resolveShift: (employeeId, dateISO) => {
-        const shift = chartShiftResolver.resolve(employeeId, dateISO);
-        return args.projectId && shift?.projectId !== args.projectId ? null : shift;
-      },
-    });
   },
 });
 
@@ -650,7 +632,7 @@ export const getMonthlyPayrollSheet = authedQuery({
     const lastDay = new Date(Date.UTC(args.year, args.month, 0)).getUTCDate();
     const startDate = `${args.year}-${monthStr}-01`;
     const endDate = `${args.year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
-    const { startISO, endISO } = trDayRangeISO(startDate, endDate);
+    const { startISO, endISO } = pdksWorkDayRange(startDate, endDate);
 
     let readings;
     let employees: Doc<"employees">[];
@@ -719,11 +701,9 @@ export const getMonthlyPayrollSheet = authedQuery({
       days.push(`${args.year}-${monthStr}-${String(d).padStart(2, "0")}`);
     }
 
-    // Onaylı izinler
-    const approvedLeaves = await ctx.db
-      .query("leaves")
-      .filter((q) => q.eq(q.field("status"), "approved"))
-      .collect();
+    const approvedLeaves = (await Promise.all(employees.map(emp => ctx.db.query("leaves")
+      .withIndex("by_employee_start", q => q.eq("employeeId", emp._id).lte("startDate", endDate)).collect())))
+      .flat().filter(l => l.status === "approved" && l.endDate >= startDate);
 
     // Manuel pdksRecords her çalışan için ay aralığı (batch: tek query, in-memory filter)
     const empIds = employees.map((e) => e._id);
@@ -740,27 +720,20 @@ export const getMonthlyPayrollSheet = authedQuery({
       }
     }
 
-    // readings'i çalışan × gün'e grupla
-    const empIdByCard = new Map<string, string>();
-    for (const e of employees) {
-      if (e.cardNumber) empIdByCard.set(e.cardNumber, String(e._id));
-    }
-
+    const payrollEmployeesById = new Map(employees.map(e => [String(e._id), e]));
+    const payrollEmployeeReadings = buildPdksEmployeeReadingMap({ employees, readings });
+    const payrollWorkDate = buildPdksWorkDateResolver(employees, (id, date) => scopedPdksShift(payrollShiftResolver.resolve(id, date), args.projectId));
+    const payrollAvailableDates = pdksAvailableDatesByProject(readings, payrollWorkDate);
+    const payrollManualDates = pdksManualDatesByEmployee(manualByEmpDate.values());
     const empDayReadings = new Map<string, Doc<"cardReadings">[]>();
-    for (const r of readings) {
-      const empId = matchEmployeeKey(
-        { employeeId: r.employeeId, cardNo: r.cardNo },
-        empIdSet,
-        empIdByCard,
-      );
-      if (!empId) continue;
-      const dateKey = trDateKey(r.accessTime);
-      const key = `${empId}__${dateKey}`;
-      if (!empDayReadings.has(key)) empDayReadings.set(key, []);
-      empDayReadings.get(key)!.push(r);
+    for (const [empId, employeeReadings] of payrollEmployeeReadings) {
+      const employee = payrollEmployeesById.get(empId);
+      if (!employee) continue;
+      const byDay = groupPdksWorkDays(employeeReadings, employee._id, (id, date) => scopedPdksShift(payrollShiftResolver.resolve(id, date), args.projectId));
+      for (const [date, dayReadings] of byDay) empDayReadings.set(`${empId}__${date}`, dayReadings);
     }
 
-    const allDepartments = await ctx.db.query("departments").collect();
+    const allDepartments = (await Promise.all([...new Set(employees.flatMap(e => e.departmentId ? [e.departmentId] : []))].map(id => ctx.db.get(id)))).filter((d): d is NonNullable<typeof d> => d !== null);
     const deptById = new Map(allDepartments.map((d) => [String(d._id), d]));
 
     const rows = await Promise.all(
@@ -775,15 +748,19 @@ export const getMonthlyPayrollSheet = authedQuery({
           monthlyHoursBase: workSettings.monthlyHoursBase,
         }) : null;
 
+        const firstRecordDate = await pdksFirstRecordDate(ctx, emp, payrollEmployeeReadings.get(String(emp._id)) ?? [], payrollManualDates.get(emp._id) ?? [], payrollWorkDate);
+        const availableDateKeys = payrollAvailableDates.get(emp.projectId) ?? new Set<string>();
         const cells = days.map((d) =>
           computePayrollCell({
+            availableDateKeys,
+            firstRecordDate,
             date: d,
             manual: manualByEmpDate.get(`${emp._id}__${d}`),
             dayReadings: empDayReadings.get(`${emp._id}__${d}`) ?? [],
             hasLeave: approvedLeaves.some(
               (l) =>
                 l.employeeId === emp._id &&
-                (!args.projectId || !l.projectId || l.projectId === args.projectId) &&
+                pdksLeaveMatchesProject(l, emp.projectId) &&
                 d >= l.startDate &&
                 d <= l.endDate
             ),
@@ -802,10 +779,7 @@ export const getMonthlyPayrollSheet = authedQuery({
           classification: c.classification,
         }));
         const buckets = bucketWeeklyOvertime(dayEntries);
-        const weeklyOvertimeMin = buckets.reduce(
-          (s, b) => s + b.overtimeMinutes + b.premiumMinutes,
-          0,
-        );
+        const monthlyOvertimeMinutes = buckets.reduce((sum, bucket) => sum + bucket.overtimeMinutes + bucket.premiumMinutes, 0);
         const exceedsDaily11h = buckets.flatMap((b) => b.exceedsDaily11h);
 
         const totals = cells.reduce(
@@ -831,12 +805,12 @@ export const getMonthlyPayrollSheet = authedQuery({
           payrollCode: emp.payrollCode ?? "",
           name: `${emp.firstName} ${emp.lastName}`.trim(),
           cardNumber: emp.cardNumber,
-          department: department?.name ?? "-",
+          department: department?.projectId === emp.projectId ? department?.name ?? "Departmansız" : "Departmansız",
           hourlyRate: empHourlyRate,
           cells,
           totals: {
             ...totals,
-            overtimeMinutes: weeklyOvertimeMin,
+            overtimeMinutes: monthlyOvertimeMinutes,
             overtimePayTRY: empHourlyRate !== null ? totals.overtimePayTRY : null,
             exceedsDaily11h,
           },
@@ -1494,24 +1468,21 @@ export const getEmployeeAttendanceDetail = authedQuery({
       return null;
     }
 
-    const { startISO, endISO } = trDayRangeISO(args.startDate, args.endDate);
+    const { startISO, endISO } = pdksWorkDayRange(args.startDate, args.endDate);
 
-    let readings = args.projectId
-      ? (await ctx.db.query("cardReadings")
-          .withIndex("by_project_access_time", q => q.eq("projectId", args.projectId).gte("accessTime", startISO).lte("accessTime", endISO))
-          .collect()).filter(reading => reading.employeeId === args.employeeId)
-      : await ctx.db
-      .query("cardReadings")
-      .withIndex("by_employee_device_time", (q) =>
-        q.eq("employeeId", args.employeeId)
-      )
-      .filter((q) =>
-        q.and(
-          q.gte(q.field("accessTime"), startISO),
-          q.lte(q.field("accessTime"), endISO)
-        )
-      )
+    let readings = await ctx.db.query("cardReadings")
+      .withIndex("by_project_employee_time", q => q.eq("projectId", employee.projectId).eq("employeeId", employee._id).gte("accessTime", startISO).lte("accessTime", endISO))
       .collect();
+    // Legacy card-only events use the employee-less index prefix, never all project rows.
+    if (employee.cardNumber) {
+      const unassigned = ctx.db.query("cardReadings")
+        .withIndex("by_project_employee_time", q => q.eq("projectId", employee.projectId).eq("employeeId", undefined).gte("accessTime", startISO).lte("accessTime", endISO));
+      for await (const reading of unassigned) {
+        if (!reading.employeeId && reading.cardNo === employee.cardNumber) readings.push(reading);
+      }
+    }
+    const availabilityEmployees = await ctx.db.query("employees")
+      .withIndex("by_project", q => q.eq("projectId", employee.projectId)).collect();
 
     readings = filterPdksReadings(readings, args.projectId);
 
@@ -1522,7 +1493,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
 
     const referenceProjectId = args.projectId ?? (
       ctx.user.role === "super_admin" && !args.projectId ? undefined : employee.projectId);
-    const [workSettings, holidayMap, generalSettings, manualRecords, leaves, department, company, position, shift, detailShiftResolver] =
+    const [workSettings, holidayMap, generalSettings, manualRecords, leaves, department, company, position, shift, detailShiftResolver, overtimeRates] =
       await Promise.all([
         getEffectiveWorkSettings(ctx, referenceProjectId),
         getHolidaysMap(ctx, referenceProjectId, args.startDate, args.endDate),
@@ -1549,7 +1520,8 @@ export const getEmployeeAttendanceDetail = authedQuery({
         employee.companyId ? ctx.db.get(employee.companyId) : Promise.resolve(null),
         employee.positionId ? ctx.db.get(employee.positionId) : Promise.resolve(null),
         employee.shiftId ? ctx.db.get(employee.shiftId) : Promise.resolve(null),
-        buildShiftResolver(ctx, [employee]),
+        buildShiftResolver(ctx, availabilityEmployees.filter(e => e.isActive)),
+        getEffectiveOvertimeRates(ctx, referenceProjectId),
       ]);
 
     const workingDays =
@@ -1564,22 +1536,24 @@ export const getEmployeeAttendanceDetail = authedQuery({
 
     const periodDateKeys = buildPeriodDateKeys(args.startDate, args.endDate);
 
-    const readingsByDate = new Map<string, typeof readings>();
-    for (const r of readings) {
-      const dk = trDateKey(r.accessTime);
-      if (!readingsByDate.has(dk)) readingsByDate.set(dk, []);
-      readingsByDate.get(dk)!.push(r);
-    }
+    const readingsByDate = groupPdksWorkDays(readings, employee._id, (id, date) => scopedPdksShift(detailShiftResolver.resolve(id, date), args.projectId));
 
+    const detailWorkDate = buildPdksWorkDateResolver(availabilityEmployees.filter(e => e.isActive), (id, date) => scopedPdksShift(detailShiftResolver.resolve(id, date), args.projectId));
+    const availableDateKeys = await readPdksAvailableDateKeys(ctx, employee.projectId, periodDateKeys, detailWorkDate);
+    const firstRecordDate = await pdksFirstRecordDate(ctx, employee, readings, [...manualByDate.keys()], detailWorkDate);
+    const scopedLeaves = leaves.filter(l => pdksLeaveMatchesProject(l, employee.projectId));
     const days = periodDateKeys.map((dk) =>
       computeAttendanceDetailDay({
+        availableDateKeys,
+        firstRecordDate,
         date: dk,
         dayReadings: readingsByDate.get(dk) ?? [],
         manualDay: manualByDate.get(dk),
-        leaves: leaves.filter(l => !args.projectId || !l.projectId || l.projectId === args.projectId),
+        leaves: scopedLeaves,
         holiday: holidayMap.get(dk),
         dayShift: scopedPdksShift(detailShiftResolver.resolve(employee._id, dk), args.projectId),
         workSettings,
+        overtimeRates,
         workingDays,
       })
     );
@@ -1754,13 +1728,14 @@ export const backfillHikEventRow = internalMutation({
   },
 });
 
-/** Each cursor scans at most 200 candidates; biometric readings never become report rows. */
+/** Server filters run before pagination; each cursor reads at most 2,000 candidates. */
 export const listReportTransactions = authedQuery({
   args: {
     projectId: v.id("projects"),
     startDate: v.optional(v.string()),
     endDate: v.optional(v.string()),
     employeeId: v.optional(v.id("employees")),
+    departmentId: v.optional(v.id("departments")),
     result: v.optional(v.union(v.literal("granted"), v.literal("denied"), v.literal("unknown"))),
     sources: v.optional(v.array(v.union(v.literal("card"), v.literal("pin"), v.literal("qr"), v.literal("mobile"), v.literal("manual"), v.literal("unknown")))),
     paginationOpts: paginationOptsValidator,
@@ -1768,6 +1743,10 @@ export const listReportTransactions = authedQuery({
   handler: async (ctx, args) => {
     await resolveProjectScope(ctx, args.projectId);
     const bounds = cardReadingDateBounds(args.startDate, args.endDate);
+    if (args.departmentId) {
+      const department = await ctx.db.get(args.departmentId);
+      if (department?.projectId !== args.projectId) throw new ConvexError("Departman seçili projede bulunamadı");
+    }
     if (args.employeeId) {
       const employee = await ctx.db.get(args.employeeId);
       if (employee?.projectId !== args.projectId) throw new ConvexError("Kişi seçili projede bulunamadı");
@@ -1776,7 +1755,7 @@ export const listReportTransactions = authedQuery({
       throw new ConvexError("Sayfa boyutu pozitif bir tam sayı olmalı");
     }
     const status = args.result === "granted" ? "izin_verildi" : args.result === "denied" ? "reddedildi" : undefined;
-    const query = ctx.db.query("cardReadings");
+    const query = stream(ctx.db, schema).query("cardReadings");
     const indexed = (() => {
       if (args.employeeId) return query.withIndex("by_project_employee_time", q => {
         const prefix = q.eq("projectId", args.projectId).eq("employeeId", args.employeeId);
@@ -1786,25 +1765,33 @@ export const listReportTransactions = authedQuery({
         const prefix = q.eq("projectId", args.projectId).eq("accessStatus", status);
         return bounds ? prefix.gte("accessTime", bounds.startISO).lte("accessTime", bounds.endISO) : prefix;
       });
-      return scopedCardReadingQuery(ctx, args);
+      return query.withIndex("by_project_access_time", q => {
+        const prefix = q.eq("projectId", args.projectId);
+        return bounds ? prefix.gte("accessTime", bounds.startISO).lte("accessTime", bounds.endISO) : prefix;
+      });
     })();
-    const page = await indexed.order("desc").paginate({
-      ...args.paginationOpts,
-      numItems: args.sources?.length ? 1000 : Math.min(args.paginationOpts.numItems, 200),
-      maximumRowsRead: args.sources?.length ? 1000 : 200,
-    });
-    const matching = page.page.filter(row =>
-      row.projectId === args.projectId
-      && (args.employeeId === undefined || row.employeeId === args.employeeId)
-      && matchesReadingResult(row.accessStatus, args.result),
-    );
-    const { eligible, hiddenBiometricCount } = splitPdksEligible(matching);
-    const sourceMatching = eligible.filter(row => matchesReadingSources(classifyReadingSource(row), args.sources));
-    const enriched = await enrichReadingsForList(ctx, sourceMatching);
+    let scannedCount = 0;
+    let hiddenBiometricCount = 0;
+    const employees = new Map<Id<"employees">, Doc<"employees"> | null>();
+    const page = await indexed.order("desc").filterWith(async row => {
+      scannedCount += 1;
+      if (row.projectId !== args.projectId
+        || (args.employeeId !== undefined && row.employeeId !== args.employeeId)
+        || !matchesReadingResult(row.accessStatus, args.result)) return false;
+      if (args.departmentId) {
+        if (!row.employeeId) return false;
+        if (!employees.has(row.employeeId)) employees.set(row.employeeId, await ctx.db.get(row.employeeId));
+        const employee = employees.get(row.employeeId);
+        if (employee?.projectId !== args.projectId || employee.departmentId !== args.departmentId) return false;
+      }
+      if (classifyReadingSource(row) === "biometric") { hiddenBiometricCount += 1; return false; }
+      return matchesReadingSources(classifyReadingSource(row), args.sources);
+    }).paginate({ ...args.paginationOpts, numItems: Math.min(args.paginationOpts.numItems, 200), maximumRowsRead: 2000, maximumBytesRead: 2_000_000 });
+    const enriched = await enrichReadingsForList(ctx, page.page);
     return {
       ...page,
       page: enriched.map(toReportTransactionRow),
-      scannedCount: page.page.length,
+      scannedCount,
       hiddenBiometricCount,
     };
   },

@@ -9,6 +9,7 @@ import { SettingsSidebar } from "./SettingsSidebar";
 import { SettingsSaveBar } from "./SettingsSaveBar";
 import { ReportsSettings } from "./sections/ReportsSettings";
 import Settings from "@/pages/Settings";
+import { SETTINGS_SECTIONS } from "./SettingsSidebar";
 import { holidaySchema } from "./sections/components/HolidayCalendarManager";
 
 const mocks = vi.hoisted(() => ({ role: "project_admin", query: vi.fn(), mutation: vi.fn() }));
@@ -130,6 +131,7 @@ describe("settings page permission boundary", () => {
     mocks.query.mockReturnValue(null);
     const html = renderToStaticMarkup(<MemoryRouter initialEntries={["/settings?tab=unknown"]}><Settings /></MemoryRouter>);
     expect(html.match(/<h1[ >]/g)).toHaveLength(1);
+    expect(html.split(SETTINGS_SECTIONS[0].scope)).toHaveLength(2);
     expect(html).toContain("Henüz şirket bilgisi kaydedilmemiş");
     expect(html).not.toContain("Genel ayarları kaydet");
   });

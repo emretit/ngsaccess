@@ -1,3 +1,4 @@
+import { pdksToday } from "@/components/pdks/lib/calendar";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
@@ -23,7 +24,8 @@ export type PdksStatusFilter =
   | "weekend"
   | "holiday"
   | "future"
-  | "noData";
+  | "noData"
+  | "notEmployed";
 
 export interface PdksTableFilters {
   anchorDate?: Date;
@@ -35,11 +37,12 @@ export interface PdksTableFilters {
   shiftId?: Id<"shifts">;
   statusFilter?: PdksStatusFilter;
   person?: string;
+  employeeId?: Id<"employees">;
 }
 
 export const usePdksTableData = (filters?: PdksTableFilters) => {
   const { loading: projectLoading, projectId } = useActiveProject();
-  const selectedDate = filters?.anchorDate ?? new Date();
+  const selectedDate = filters?.anchorDate ?? pdksToday();
 
   const reportType = filters?.reportType ?? "daily";
   const isMatrix = reportType !== "daily";
@@ -54,6 +57,7 @@ export const usePdksTableData = (filters?: PdksTableFilters) => {
       positionId: filters?.positionId,
       shiftId: filters?.shiftId,
       person: filters?.person,
+      employeeId: filters?.employeeId,
       // Even a daily report needs its day cell for scoped analysis / late minutes.
       viewMode: "matrix" as const,
     };
@@ -100,17 +104,17 @@ export const usePdksTableData = (filters?: PdksTableFilters) => {
   const dateRangeLabel = () => {
     const range = filters?.dateRange;
     if (reportType === "custom" && range?.from && range?.to) {
-      return `${format(range.from, "dd.MM.yyyy")} - ${format(range.to, "dd.MM.yyyy")}`;
+      return `${format(range.from, "d MMM", { locale: tr })} – ${format(range.to, "d MMM yyyy", { locale: tr })}`;
     }
     if (reportType === "weekly") {
       const w = startOfWeek(selectedDate, { weekStartsOn: 1 });
       const we = endOfWeek(selectedDate, { weekStartsOn: 1 });
-      return `${format(w, "dd.MM.yyyy")} - ${format(we, "dd.MM.yyyy")}`;
+      return `${format(w, "d MMM", { locale: tr })} – ${format(we, "d MMM yyyy", { locale: tr })}`;
     }
     if (reportType === "monthly") {
       return format(selectedDate, "MMMM yyyy", { locale: tr });
     }
-    return format(selectedDate, "dd.MM.yyyy");
+    return format(selectedDate, "d MMMM yyyy", { locale: tr });
   };
 
   const args = getQueryArgs();

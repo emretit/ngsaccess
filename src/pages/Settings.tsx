@@ -66,13 +66,13 @@ export default function Settings() {
     setSearchParams(next, { replace: true });
   };
   if (loading) return <SectionSkeleton label="Ayarlar yükleniyor" />;
-  if (!permissions.settingsTabs.includes(activeTab)) return <><AccessDenied message="Bu ayar bölümünü görüntüleme yetkiniz yok." /><Link className="text-sm underline" to="/profile">Profilimi aç</Link></>;
+  if (!permissions.settingsTabs.includes(activeTab)) return <><AccessDenied message="Bu ayar bölümünü görüntüleme yetkiniz yok." /><Link className="inline-flex min-h-11 items-center text-sm underline" to="/profile">Profilimi aç</Link></>;
   const content = () => {
     switch (activeTab) {
       case "general": return <GeneralSettings />;
       case "users": return <div className="min-w-0 max-w-full overflow-x-auto"><AdminUsersPanel /></div>;
       case "work-payroll": return <WorkAndPayrollSettings />;
-      case "reports": return <ReportsSettings />;
+      case "reports": return <ReportsSettings requestedReport={searchParams.get("report")} />;
       case "integrations": return <IntegrationsSettings />;
       case "privacy": return <PrivacySettings />;
       case "mail": return <MailSettings />;
@@ -80,7 +80,7 @@ export default function Settings() {
     }
   };
   return <div className="min-w-0 space-y-8">
-    <PageHeader title="Ayarlar" scope={`${scope.activeProject?.name ?? "Proje seçilmedi"} · ${section.scope}`} />
+    <PageHeader title="Ayarlar" scope={scope.activeProject?.name ?? "Proje seçilmedi"} />
     <div className="flex min-w-0 flex-col gap-6 min-[761px]:flex-row min-[761px]:gap-12">
       <SettingsSidebar selected={activeTab} onSelect={handleTabChange} disabled={pending} />
       <div className="w-full min-w-0 max-w-[800px] flex-1 space-y-6">

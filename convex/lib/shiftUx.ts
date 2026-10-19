@@ -57,3 +57,8 @@ export function overlapOnDay(a: ScheduleRange, aShift: {startTime: string; endTi
   const start = Date.parse(day) / 60000;
   return scheduleIntervals(a, aShift).some(([s, e]) => scheduleIntervals(b, bShift).some(([bs, be]) => Math.max(s, bs, start) < Math.min(e, be, start + 1440)));
 }
+
+/** Shared display for every shift picker and summary. */
+export function shiftTimeLabel(shift: { startTime: string; endTime: string }) {
+  return `${shift.startTime}–${shift.endTime}${shift.endTime < shift.startTime ? " (+1 gün)" : ""}`;
+}

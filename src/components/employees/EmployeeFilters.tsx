@@ -1,4 +1,5 @@
 import { FilterBar } from "@/components/shared/FilterBar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 interface Props {
   searchQuery: string;
   onSearchChange: (value: string) => void;
@@ -9,54 +10,25 @@ interface Props {
   onSortChange: (value: string) => void;
   onClear: () => void;
   hasFilters: boolean;
+  hideClear?: boolean;
 }
 export function EmployeeFilters(p: Props) {
-  const selectClass =
-    "h-9 max-w-full rounded-md border border-input bg-background px-2 text-sm";
-  return (
-    <FilterBar
-      search={p.searchQuery}
-      onSearchChange={p.onSearchChange}
-      searchLabel="Personel ara"
-      placeholder="Ad, e-posta, kart veya bordro…"
-      onClear={p.onClear}
-      hasFilters={p.hasFilters}
-    >
-      <select
-        aria-label="Personel durumu"
-        className={selectClass}
-        value={p.status}
-        onChange={(e) => p.onStatusChange(e.target.value)}
-      >
-        <option value="all">Tüm durumlar ({p.statusCounts.all})</option>
-        <option value="active">Aktif ({p.statusCounts.active})</option>
-        <option value="inactive">Pasif ({p.statusCounts.inactive})</option>
-      </select>
-      <select
-        aria-label="Personel sıralaması"
-        className={selectClass}
-        value={p.sort}
-        onChange={(e) => p.onSortChange(e.target.value)}
-      >
-        {[
-          ["name:asc", "Ad (A–Z)"],
-          ["name:desc", "Ad (Z–A)"],
-          ["department:asc", "Departman (A–Z)"],
-          ["department:desc", "Departman (Z–A)"],
-          ["email:asc", "E-posta (A–Z)"],
-          ["email:desc", "E-posta (Z–A)"],
-          ["position:asc", "Pozisyon (A–Z)"],
-          ["position:desc", "Pozisyon (Z–A)"],
-          ["card:asc", "Kart no (artan)"],
-          ["card:desc", "Kart no (azalan)"],
-          ["status:asc", "Durum (artan)"],
-          ["status:desc", "Durum (azalan)"],
-        ].map(([v, l]) => (
-          <option key={v} value={v}>
-            {l}
-          </option>
-        ))}
-      </select>
-    </FilterBar>
-  );
+  return <div className={p.hideClear ? "[&>[role=search]>button:last-of-type]:hidden" : undefined}><FilterBar search={p.searchQuery} onSearchChange={p.onSearchChange} searchLabel="Personel ara" placeholder="Ad, e-posta, kart veya bordro…" onClear={p.onClear} hasFilters={p.hasFilters}>
+    <Select value={p.status} onValueChange={p.onStatusChange}>
+      <SelectTrigger aria-label="Personel durumu" className="h-9 w-auto min-w-40"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="all">Tüm durumlar ({p.statusCounts.all})</SelectItem>
+        <SelectItem value="active">Aktif ({p.statusCounts.active})</SelectItem>
+        <SelectItem value="inactive">Pasif ({p.statusCounts.inactive})</SelectItem>
+      </SelectContent>
+    </Select>
+    <div className="min-[760px]:hidden">
+      <Select value={p.sort} onValueChange={p.onSortChange}>
+        <SelectTrigger aria-label="Personel sıralaması" className="h-9 w-auto min-w-40"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          {[["name", "Ad"], ["department", "Departman"], ["email", "E-posta"], ["position", "Pozisyon"], ["card", "Kart no"], ["status", "Durum"]].flatMap(([key, label]) => ["asc", "desc"].map(direction => <SelectItem key={`${key}:${direction}`} value={`${key}:${direction}`}>{label} ({["card", "status"].includes(key) ? direction === "asc" ? "artan" : "azalan" : direction === "asc" ? "A–Z" : "Z–A"})</SelectItem>))}
+        </SelectContent>
+      </Select>
+    </div>
+  </FilterBar></div>;
 }

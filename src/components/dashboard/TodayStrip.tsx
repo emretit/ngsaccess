@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 function Metric({ label, value, suffix, tone, loading, children }: {
   label: string;
-  value: number;
+  value: number | null;
   suffix?: ReactNode;
   tone?: "warning";
   loading: boolean;
@@ -21,9 +21,9 @@ function Metric({ label, value, suffix, tone, loading, children }: {
         {loading ? (
           <><span className="sr-only">Yükleniyor</span><Skeleton className="my-2 h-6 w-16" /></>
         ) : (
-          <span className={cn("text-[30px] font-[550] leading-10 tracking-[-1px] tabular-nums", tone === "warning" && value > 0 && "text-warning")}>
-            <NumberFlow value={value} locales="tr-TR" />
-            {suffix && <span className="ml-1 text-base font-normal tracking-normal text-muted-foreground">{suffix}</span>}
+          <span className={cn("text-[30px] font-[550] leading-10 tracking-[-1px] tabular-nums", tone === "warning" && value !== null && value > 0 && "text-warning")}>
+            {value === null ? "—" : <NumberFlow value={value} locales="tr-TR" />}
+            {value !== null && suffix && <span className="ml-1 text-base font-normal tracking-normal text-muted-foreground">{suffix}</span>}
           </span>
         )}
       </dd>
@@ -40,13 +40,13 @@ export default function TodayStrip() {
   const { timeline, loading: timelineLoading } = useDashboardTimeline();
   const loading = statsLoading || activityLoading;
   const employees = stats?.employees ?? 0;
-  const present = summary?.presentToday ?? 0;
-  const rate = employees > 0 ? Math.min(100, Math.round((present / employees) * 100)) : 0;
+  const present = summary?.presentToday ?? null;
+  const rate = present !== null && employees > 0 ? Math.min(100, Math.round((present / employees) * 100)) : 0;
   return (
     <>
       <dl aria-label="Bugünün özeti" aria-busy={loading || timelineLoading} className="grid grid-cols-2 overflow-hidden rounded-lg border bg-surface min-[1000px]:grid-cols-4 max-[999px]:[&>div:nth-child(-n+2)]:border-b max-[999px]:[&>div:nth-child(odd)]:border-r min-[1000px]:[&>div:not(:last-child)]:border-r">
         <Metric label="Bugün gelen" value={present} suffix={`/ ${employees.toLocaleString("tr-TR")}`} loading={loading}>
-          <span className="flex items-center gap-2">
+          {present === null ? "Bugün okuma yok" : <span className="flex items-center gap-2">
             <span
               role="progressbar"
               aria-label="Katılım oranı"
@@ -58,13 +58,13 @@ export default function TodayStrip() {
               <span className="block h-full rounded-full bg-primary transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${rate}%` }} />
             </span>
             <span className="tabular-nums">%{rate}</span>
-          </span>
+          </span>}
         </Metric>
-        <Metric label="Şu an içeride" value={summary?.insideBuilding ?? 0} loading={loading}>
-          Son okuması giriş olanlar
+        <Metric label="Şu an içeride" value={summary?.insideBuilding ?? null} loading={loading}>
+          {summary?.insideBuilding == null ? "Bugün okuma yok" : "Son okuması giriş olanlar"}
         </Metric>
-        <Metric label="Geç kalan" value={summary?.lateArrivals ?? 0} tone="warning" loading={loading}>
-          {summary?.workHours ? `Mesai ${summary.workHours}` : "Mesai saati okumayla görünür"}
+        <Metric label="Geç kalan" value={summary?.lateArrivals ?? null} tone="warning" loading={loading}>
+          {summary?.lateArrivals == null ? "Bugün okuma yok" : summary.workHours ? `Mesai ${summary.workHours}` : "Mesai saati okumayla görünür"}
         </Metric>
         <Metric label="Kart okuması" value={timeline?.total ?? 0} loading={timelineLoading}>
           İzin verilen + reddedilen

@@ -14,14 +14,24 @@ import { Input } from "@/components/ui/input";
 const nonnegative = z.number({ error: "Geçerli bir sayı girin." }).min(0, "Negatif olamaz.");
 const multiplier = z.number({ error: "Geçerli bir sayı girin." }).min(1, "Çarpan en az 1 olmalıdır.");
 const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Geçerli bir saat girin.");
-const schema = z.object({
+export const overtimeSettingsSchema = z.object({
   annualOvertimeLimitHours: nonnegative,
   overtimeStartToleranceMinutes: nonnegative,
   monthlyHoursBase: z.number({ error: "Geçerli bir sayı girin." }).positive("Saat tabanı sıfırdan büyük olmalıdır."),
   weekdayMultiplier: multiplier, weekendMultiplier: multiplier, holidayMultiplier: multiplier, nightShiftMultiplier: multiplier,
   nightShiftStart: time, nightShiftEnd: time,
-});
-type Values = z.infer<typeof schema>;
+  nightCombineMode: z.enum(["max", "multiply", "additive"]),
+}).refine(value => value.nightShiftStart !== value.nightShiftEnd, { message: "Gece başlangıcı ve bitişi farklı olmalı.", path: ["nightShiftEnd"] });
+type Values = z.infer<typeof overtimeSettingsSchema>;
+export const overtimeHints: Partial<Record<keyof Values, string>> = {
+  annualOvertimeLimitHours: "Yıllık fazla mesai toplamı bu sınırla karşılaştırılır; aşım çalışma kaydını engellemez.",
+  overtimeStartToleranceMinutes: "Planlanan mesai bitiminden sonraki bu süre fazla mesai başlangıç toleransıdır.",
+  monthlyHoursBase: "Aylık ücret bu saat tabanına bölünerek saatlik ücret hesaplanır.",
+  weekdayMultiplier: "Hafta içi fazla mesai saatlik ücretine uygulanır.",
+  weekendMultiplier: "Hafta tatiline düşen çalışma saatlik ücretine uygulanır.",
+  holidayMultiplier: "Resmi tatile düşen çalışma saatlik ücretine uygulanır.",
+  nightShiftMultiplier: "Yalnız gece penceresindeki fazla mesaiye uygulanır. Normal gece çalışmasına ek prim verilmez.",
+};
 const numbers = [
   ["annualOvertimeLimitHours", "Yıllık sınır (saat)", 0], ["overtimeStartToleranceMinutes", "Başlangıç toleransı (dk)", 0],
   ["monthlyHoursBase", "Aylık saat tabanı", 0.1], ["weekdayMultiplier", "Hafta içi çarpanı", 1],
@@ -39,6 +49,7 @@ export function OvertimeSettingsForm() {
     overtimeStartToleranceMinutes: work?.overtimeStartToleranceMinutes ?? 15, monthlyHoursBase: work?.monthlyHoursBase ?? 225,
     weekdayMultiplier: rates?.weekdayMultiplier ?? 1.5, weekendMultiplier: rates?.weekendMultiplier ?? 2,
     holidayMultiplier: rates?.holidayMultiplier ?? 2, nightShiftMultiplier: rates?.nightShiftMultiplier ?? 1.5,
+    nightCombineMode: rates && "nightCombineMode" in rates ? rates.nightCombineMode ?? "max" : "max",
     nightShiftStart: rates?.nightShiftStart ?? "22:00", nightShiftEnd: rates?.nightShiftEnd ?? "06:00",
   });
   const { values, change } = draft;
@@ -48,7 +59,7 @@ export function OvertimeSettingsForm() {
     draft.reset();
   }, { success: "Mesai ayarları ve çarpanlar kaydedildi" });
   useSettingsFormState("overtime", draft.dirty, pending);
-  const parsed = schema.safeParse(values);
+  const parsed = overtimeSettingsSchema.safeParse(values);
   const visibleErrors: Partial<Record<keyof Values, string>> = {};
   if ((draft.dirty || Object.keys(errors).length > 0) && !parsed.success) for (const issue of parsed.error.issues) visibleErrors[issue.path[0] as keyof Values] = issue.message;
   if (loading || work === undefined || rates === undefined) return <SectionSkeleton label="Mesai ayarları yükleniyor" />;
@@ -56,7 +67,7 @@ export function OvertimeSettingsForm() {
     <DraftNotice remoteChanged={draft.remoteChanged} failed={failed} />
     <form noValidate className="space-y-4" onSubmit={async event => {
       event.preventDefault();
-      const result = schema.safeParse(values);
+      const result = overtimeSettingsSchema.safeParse(values);
       if (!result.success) {
         const next: Partial<Record<keyof Values, string>> = {};
         for (const issue of result.error.issues) {
@@ -71,9 +82,19 @@ export function OvertimeSettingsForm() {
       setFailed(!await run(result.data));
     }}>
       <fieldset disabled={pending} className="grid grid-cols-1 gap-4 min-[761px]:grid-cols-2">
-        {numbers.map(([key, label, min]) => <FormFieldWrapper key={key} htmlFor={key} label={label} error={visibleErrors[key]}>
+        {numbers.map(([key, label, min]) => <FormFieldWrapper key={key} htmlFor={key} label={label} hint={overtimeHints[key]} error={visibleErrors[key]}>
           <Input id={key} type="number" min={min} step="any" value={Number.isNaN(values[key]) ? "" : values[key]} onChange={event => change({ [key]: event.target.value === "" ? NaN : Number(event.target.value) })} />
         </FormFieldWrapper>)}
+        <FormFieldWrapper htmlFor="nightCombineMode" label="Gece fazla mesaisinde çarpan" hint="Gün türü çarpanı 2, gece çarpanı 1,5 ise: büyük olan 2; çarpım 3; ek prim 2,5 olur." error={visibleErrors.nightCombineMode}>
+          <select id="nightCombineMode" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={values.nightCombineMode} onChange={event => {
+            const mode = event.target.value;
+            if (mode === "max" || mode === "multiply" || mode === "additive") change({ nightCombineMode: mode });
+          }}>
+            <option value="max">Büyük olan</option>
+            <option value="multiply">Çarpım</option>
+            <option value="additive">Ek prim</option>
+          </select>
+        </FormFieldWrapper>
         {(["nightShiftStart", "nightShiftEnd"] as const).map(key => <FormFieldWrapper key={key} htmlFor={key} label={key === "nightShiftStart" ? "Gece başlangıcı" : "Gece bitişi"} error={visibleErrors[key]}>
           <Input id={key} type="time" value={values[key]} onChange={event => change({ [key]: event.target.value })} />
         </FormFieldWrapper>)}

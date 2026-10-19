@@ -21,6 +21,7 @@ const employee = (id: string): Doc<"employees"> => ({
 const holiday: Doc<"holidays"> = { _id: "holiday" as Id<"holidays">, _creationTime: 0, date: "2026-01-01", name: "Yılbaşı", createdAt: "2025-12-01" };
 const workingDays = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
 const params = (emp: Doc<"employees">): Parameters<typeof computePdksTableRow>[0] => ({
+  availableDateKeys: new Set(),
   empKey: emp._id, employee: emp, empReadings: [], departmentName: "Test", periodDateKeys: buildPeriodDateKeys("2026-01-01", "2026-01-31"), startDate: "2026-01-01", isSingleDay: false, viewMode: "matrix", manualPdksByEmpDate: new Map(), allLeaves: [], holidayMap: new Map([[holiday.date, holiday]]), workingDays, workSettings: DEFAULT_WORK_SETTINGS, overtimeRates: DEFAULT_OVERTIME_RATES, resolveShift: () => null, manualEditedBy: null,
 });
 
@@ -41,8 +42,8 @@ describe("rapor devam adaptörü / PDKS tablo tutarlılığı", () => {
       expect(report.leaveDays).toBe(table.filter((day) => day.payrollCode === "İZN").length);
       return report;
     });
-    expect(rows[0]).toMatchObject({ presentDays: 0, leaveDays: 0, absentDays: 9, expectedDays: 9, devamOrani: 0 });
-    expect(rows[1]).toMatchObject({ presentDays: 0, leaveDays: 2, absentDays: 7, expectedDays: 7, devamOrani: 0 });
+    expect(rows[0]).toMatchObject({ presentDays: 0, leaveDays: 0, absentDays: 0, expectedDays: 0, devamOrani: null });
+    expect(rows[1]).toMatchObject({ presentDays: 0, leaveDays: 2, absentDays: 0, expectedDays: 0, devamOrani: null });
   });
 
   it("manuel giriş ve izinli tek okuma PDKS hücresiyle aynı devam sayılır", () => {
@@ -79,7 +80,7 @@ it("biyometrik okuma zamanlanmış rapor yükleyicisinde bir kez süzülür", as
   const ctx = (readings: Doc<"cardReadings">[]) => ({ db: {
     query: (table: string) => {
       const rows = table === "employees" ? [emp] : table === "cardReadings" ? readings : [];
-      const chain = { withIndex: () => chain, collect: async () => rows, first: async () => null };
+      const chain = { withIndex: () => chain, order: () => chain, take: async () => rows, collect: async () => rows, first: async () => null };
       return chain;
     },
   } }) as unknown as QueryCtx;
@@ -209,7 +210,7 @@ describe("report transaction rows", () => {
     expect(toReportTransactionRow(reading({ rawData: '{"source":"manual"}' })))
       .toMatchObject({ source: "manual", sourceLabel: "Manuel" });
     expect(toReportTransactionRow(reading({ cardNo: "", hikMajorEventType: 3 })))
-      .toMatchObject({ source: "unknown", sourceLabel: "Bilinmiyor" });
+      .toMatchObject({ source: "unknown", sourceLabel: "Belirsiz" });
     expect(READING_SOURCE_LABELS.biometric).toBe("Biyometrik");
   });
 });
@@ -230,4 +231,13 @@ describe("matchesReadingSources", () => {
       .toEqual([{ hikCurrentVerifyMode: "password" }]);
     expect(split.hiddenBiometricCount).toBe(1);
   });
+});
+
+it("11-H1: ortak rapor motoru ilk kayıttan önce devamsızlık veya beklenen gün saymaz", () => {
+  const input = params(employee("new"));
+  input.availableDateKeys = new Set(buildPeriodDateKeys("2026-01-01", "2026-01-10"));
+  input.firstRecordDate = "2026-01-12";
+  const result = summarizeAttendance(input, "2026-01-11");
+  expect(result).toMatchObject({ presentDays: 0, absentDays: 0, leaveDays: 0, expectedDays: 0, devamOrani: null });
+  expect(computePdksTableRow(input).days.filter(day => day.date < "2026-01-12" && day.detail?.dayType === "workday").every(day => day.payrollCode === "—")).toBe(true);
 });

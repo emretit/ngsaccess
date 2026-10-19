@@ -3,7 +3,7 @@ import type { ReportDefinition } from './registry';
 
 export interface ReportQueryFilters {
   projectId: Id<'projects'>; from: string; to: string; person: string;
-  departmentId?: Id<'departments'>; result?: 'granted' | 'denied' | 'unknown';
+  employeeId?: Id<'employees'>; departmentId?: Id<'departments'>; result?: 'granted' | 'denied' | 'unknown';
   year: number; month: number;
 }
 export function dailyReportArgs(filters: ReportQueryFilters, definition?: ReportDefinition) {
@@ -14,7 +14,7 @@ export function monthlyReportArgs(filters: ReportQueryFilters) {
   return { projectId: filters.projectId, year: filters.year, month: filters.month };
 }
 export function transactionReportArgs(filters: ReportQueryFilters, definition?: ReportDefinition) {
-  return { projectId: filters.projectId, startDate: filters.from, endDate: filters.to, result: filters.result,
+  return { projectId: filters.projectId, startDate: filters.from, endDate: filters.to, result: filters.result, employeeId: filters.employeeId, departmentId: filters.departmentId,
     ...(definition?.transactionSources ? { sources: [...definition.transactionSources] } : {}) };
 }
 /** Only server filters and explicit refreshes may discard accumulated pages. */

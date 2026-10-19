@@ -36,6 +36,10 @@ describe("visitor form boundary contracts", () => {
     expect(payload.args).toMatchObject({ notes: "düzeltme", visitorPhone: null, visitorCompany: null, hostEmployeeId: null });
     expect(payload.args).not.toHaveProperty("cardNumber", "IADE:old");
   });
+  it("submits exactly the notice version approved in the form", () => {
+    const payload = visitorFormPayload({ ...form, kvkkConsent: true, kvkkDocumentVersion: "2026-1" }, detail);
+    expect(payload.args).toMatchObject({ kvkkConsent: true, kvkkDocumentVersion: "2026-1" });
+  });
   it("rejects reactivation with past expiry or a returned card", () => {
     expect(() => visitorFormPayload({ ...form, isActive: true, cardNumber: "1234" }, detail)).toThrow();
     expect(() => visitorFormPayload({ ...form, isActive: true, accessExpiresAt: "2099-01-01T18:00" }, detail)).toThrow();
@@ -56,7 +60,7 @@ describe("visitor form boundary contracts", () => {
 describe("visitor list data minimization and summary", () => {
   it("keeps checked out access separate from inside presence, omits company/card, and opens detail by button", () => {
     const html = renderToStaticMarkup(<VisitorTable visitors={[row]} onOpen={() => undefined} />);
-    expect(html).toContain("Ziyaret sonlandırıldı");
+    expect(html).toContain("Sonlandırıldı / pasif");
     expect(html).toContain("İçeride");
     expect(html).not.toContain("Süresi doldu");
     expect(html).not.toContain("Gizli Şirket");
@@ -66,14 +70,15 @@ describe("visitor list data minimization and summary", () => {
   });
   it("shows a summary skeleton while unresolved, never transient zeros", () => {
     query.mockReturnValue(undefined);
-    const html = renderToStaticMarkup(<VisitorStats refreshKey={1} />);
+    const html = renderToStaticMarkup(<VisitorStats now={1} />);
     expect(html).toContain('aria-busy="true"');
     expect(html).not.toContain(">0</dd>");
   });
-  it("explains truncated summary counts independently of page matches", () => {
-    query.mockReturnValue({ total: 500, accessActive: 4, accessClosed: 496, inside: 8, truncated: true, scanLimit: 500 });
-    const html = renderToStaticMarkup(<VisitorStats refreshKey={1} />);
-    expect(html).toContain("yalnız son 500 ziyaretçi");
-    expect(html).toContain("sayılar toplanmaz");
+  it("shows exactly the four filter states with full project counts", () => {
+    query.mockReturnValue({ total: 604, counts: { active: 501, expired: 100, checkedOut: 2, preRegistered: 1 }, nextExpiry: null });
+    const html = renderToStaticMarkup(<VisitorStats now={1} />);
+    for (const label of ["Aktif", "Süresi doldu", "Sonlandırıldı / pasif", "Ön kayıt"]) expect(html).toContain(label);
+    expect(html).not.toContain("Erişimi kapalı");
+    expect(html).not.toContain("İçeride");
   });
 });

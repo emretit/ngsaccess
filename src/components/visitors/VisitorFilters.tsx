@@ -22,6 +22,6 @@ export function VisitorFilters({ searchQuery, onSearchChange, statusFilter, onSt
       </div>
       {onNewZone && <Button variant="outline" onClick={onNewZone}>Erişim bölgesi oluştur</Button>}
     </FilterBar>
-    <p className="text-xs text-muted-foreground">Arama ve durum filtresi sunucuda yalnız alınan sayfaya uygulanır. Diğer kayıtları taramak için sonraki sayfaya geçin.</p>
+
   </div>;
 }

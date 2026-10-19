@@ -7,6 +7,7 @@ import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { useDashboardReadings } from "@/hooks/useDashboard";
 import { useNow } from "@/hooks/useNow";
 import { capabilities } from "@/lib/capabilities";
+import { formatTrDateTime } from "@/lib/date";
 import { feedTimeTr } from "@/lib/relativeTime";
 import { cn } from "@/lib/utils";
 import { DashboardPanel } from "./DashboardPanel";
@@ -23,16 +24,21 @@ export default function LiveFeed() {
   const { readings, loading } = useDashboardReadings(FEED_SIZE);
   const { profile } = useAuth();
   const now = useNow(30_000);
+  const latestTime = Math.max(...readings.map(reading => Date.parse(reading.accessTime)).filter(Number.isFinite));
+  const hasLatest = Number.isFinite(latestTime);
+  const live = !loading && hasLatest && now - latestTime <= 60 * 60_000;
   return (
     <DashboardPanel
-      title="Canlı akış"
+      title="Son okumalar"
       aside={
         <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-          <span aria-hidden="true" className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full status-success-bg opacity-60 motion-reduce:animate-none" />
-            <span className="relative inline-flex h-2 w-2 rounded-full status-success-bg" />
-          </span>
-          Canlı
+          {live ? <>
+            <span aria-hidden="true" className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full status-success-bg opacity-60 motion-reduce:animate-none" />
+              <span className="relative inline-flex h-2 w-2 rounded-full status-success-bg" />
+            </span>
+            Canlı
+          </> : loading ? "Yükleniyor" : hasLatest ? `Son okuma: ${formatTrDateTime(latestTime)}` : "Henüz okuma yok"}
         </span>
       }
       link={{ to: "/live-monitoring", label: "Tümü" }}
@@ -70,7 +76,7 @@ export default function LiveFeed() {
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="text-xs tabular-nums text-muted-foreground">
-                    <time dateTime={reading.accessTime}>{feedTimeTr(reading.accessTime, now) ?? "—"}</time>
+                    <time dateTime={reading.accessTime} title={Number.isFinite(Date.parse(reading.accessTime)) ? formatTrDateTime(new Date(reading.accessTime)) : undefined}>{feedTimeTr(reading.accessTime, now) ?? "—"}</time>
                   </p>
                   <p className={cn("text-[11px] font-medium", granted ? "text-success" : denied ? "text-danger" : "text-muted-foreground")}>
                     {granted ? "İzin verildi" : denied ? "Reddedildi" : "Durum bilinmiyor"}

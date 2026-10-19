@@ -22,7 +22,7 @@ export function SettingsSidebar({ selected, onSelect, disabled = false }: {
   return <div className="w-full min-w-0 shrink-0 min-[761px]:w-[184px]">
     <div className="space-y-1 min-[761px]:hidden">
       <label htmlFor="settings-section" className="text-sm font-medium">Ayar bölümü</label>
-      <select id="settings-section" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={selected} disabled={disabled}
+      <select id="settings-section" className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={selected} disabled={disabled}
         onChange={event => { const item = items.find(item => item.key === event.target.value); if (item) onSelect(item.key); }}>
         {items.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}
       </select>

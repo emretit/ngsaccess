@@ -1,3 +1,4 @@
+import { formatTrDateTime } from "@/lib/date";
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
@@ -80,13 +81,14 @@ function SyncDevices({ result }: { result: SyncResult }) {
               {row.lastChangedAt !== null && (
                 <p className="text-xs text-muted-foreground">
                   Son görülen kayıt:{" "}
-                  {new Date(row.lastChangedAt).toLocaleString("tr-TR")}
+                  {formatTrDateTime(new Date(row.lastChangedAt))}
                 </p>
               )}
               {row.errorMessage && (
-                <p className="break-words text-xs text-destructive">
-                  {row.errorMessage}
-                </p>
+                <div className="text-xs">
+                  <p className="text-destructive">Cihaza gönderilemedi</p>
+                  <details className="mt-2 break-words"><summary className="cursor-pointer">Teknik ayrıntı</summary><p className="mt-1">{row.errorMessage}</p></details>
+                </div>
               )}
             </li>
           ))}

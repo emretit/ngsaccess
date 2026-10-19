@@ -23,6 +23,13 @@ describe("feedTimeTr", () => {
     expect(feedTimeTr("2026-10-19T11:20:00.000Z", now)).toBe("10 dk önce");
     expect(feedTimeTr("2026-10-19T06:05:00.000Z", now)).toBe("09:05");
     // 18.10 23:50 İstanbul — UTC'de aynı gün olsa da İstanbul'da dün.
-    expect(feedTimeTr("2026-10-18T20:50:00.000Z", now)).toBe("18.10 23:50");
+    expect(feedTimeTr("2026-10-18T20:50:00.000Z", now)).toBe("18.10.2026 23:50");
+  });
+});
+
+describe("feed dates across years", () => {
+  it("retains the year in old readings", () => {
+    expect(feedTimeTr("2025-08-18T13:06:00Z", now)).toBe("18.08.2025 16:06");
+    expect(feedTimeTr("invalid", now)).toBeNull();
   });
 });

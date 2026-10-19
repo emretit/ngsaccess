@@ -30,6 +30,7 @@ interface PDKSSavedViewsProps {
 export function PDKSSavedViews({ filters, onApply }: PDKSSavedViewsProps) {
   const { views, save, remove, apply } = usePdksSavedViews();
   const [saveOpen, setSaveOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [name, setName] = useState("");
 
   const handleSave = () => {
@@ -45,7 +46,7 @@ export function PDKSSavedViews({ filters, onApply }: PDKSSavedViewsProps) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-1.5">
+          <Button aria-label="Kayıtlı görünümler" variant="outline" size="sm" className="gap-1.5">
             <Bookmark className="h-4 w-4" />
             <span className="hidden sm:inline">Görünümler</span>
             {views.length > 0 && (
@@ -63,27 +64,12 @@ export function PDKSSavedViews({ filters, onApply }: PDKSSavedViewsProps) {
             </div>
           ) : (
             views.map((v) => (
-              <DropdownMenuItem
-                key={v.id}
-                onSelect={(e) => e.preventDefault()}
-                className="flex items-center justify-between gap-2"
-              >
-                <button
-                  type="button"
-                  className="flex-1 text-left text-sm"
-                  onClick={() => onApply(apply(v))}
-                >
-                  {v.name}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => remove(v.id)}
-                  className="text-muted-foreground hover:text-destructive"
-                  title="Sil"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </DropdownMenuItem>
+              <div key={v.id}>
+                <DropdownMenuItem onSelect={() => onApply(apply(v))}>{v.name}</DropdownMenuItem>
+                <DropdownMenuItem aria-label={`${v.name} görünümünü sil`} onSelect={() => setDeleteId(v.id)} className="gap-2 text-destructive">
+                  <Trash2 className="h-3.5 w-3.5" /> Sil
+                </DropdownMenuItem>
+              </div>
             ))
           )}
           <DropdownMenuSeparator />
@@ -94,6 +80,12 @@ export function PDKSSavedViews({ filters, onApply }: PDKSSavedViewsProps) {
         </DropdownMenuContent>
       </DropdownMenu>
 
+      <Dialog open={deleteId !== null} onOpenChange={open => { if (!open) setDeleteId(null); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader><DialogTitle>Görünüm silinsin mi?</DialogTitle><DialogDescription>Kaydedilen filtre seçimi silinir.</DialogDescription></DialogHeader>
+          <DialogFooter><Button variant="outline" onClick={() => setDeleteId(null)}>Vazgeç</Button><Button variant="destructive" onClick={() => { if (deleteId) remove(deleteId); setDeleteId(null); }}>Sil</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toLocalDateString } from "@/lib/date";
+import { todayInTurkey, toLocalDateString } from "@/lib/date";
 import { summarizePdksRecords } from "@/lib/pdksSummary";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { usePdksTableData } from "@/hooks/usePdksTableData";
@@ -28,10 +28,7 @@ import { PDKSOvertimeAlert } from "@/components/pdks/dashboard/PDKSOvertimeAlert
 import { PDKSSavedViews } from "@/components/pdks/dashboard/PDKSSavedViews";
 import { PDKSAiChat } from "@/components/pdks/PDKSAiChat";
 import { STATUS_FILTER_LABELS } from "@/components/pdks/statusMeta";
-import {
-  formatDuration,
-  readableDate,
-} from "@/components/pdks/lib/presentation";
+import { formatDuration } from "@/components/pdks/lib/presentation";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { BulkBar } from "@/components/shared/BulkBar";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -85,6 +82,7 @@ function PDKSContent({
   const {
     projectId,
     activeProject,
+    isAdmin,
     loading: projectLoading,
   } = useActiveProject();
   const [ai, setAi] = useState(false),
@@ -136,12 +134,12 @@ function PDKSContent({
         )
       : new Set<string>();
   const detail = drilldown?.scope === scope ? drilldown : null;
-  const summary = summarizePdksRecords(allRecords, toLocalDateString());
+  const summary = summarizePdksRecords(allRecords, todayInTurkey());
   const exportRows = selectedIds.size
     ? records.filter((r) => selectedIds.has(r.id))
     : records;
   const hasFilters = Boolean(
-    filters.person ||
+    filters.person || filters.employeeId ||
     filters.companyId ||
     filters.departmentId ||
     filters.positionId ||
@@ -153,6 +151,7 @@ function PDKSContent({
     [
       effectiveSmartPreset?.label,
       filters.person && `Ad / soyad: ${filters.person}`,
+      filters.employeeId && `Kişi: ${rawAllRecords.find(row => row.id === filters.employeeId)?.name ?? "Seçili personel"}`,
       filters.departmentId &&
         `Departman: ${departments?.find((d) => d._id === filters.departmentId)?.name ?? "Seçili"}`,
       filters.companyId &&
@@ -166,36 +165,39 @@ function PDKSContent({
     ]
       .filter(Boolean)
       .join(" · ") || "Tüm personel";
-  const openDetail = (employeeId: string, date: string) =>
+  const [detailTrigger, setDetailTrigger] = useState<HTMLElement | null>(null);
+  const openDetail = (employeeId: string, date: string) => {
+    setDetailTrigger(document.activeElement instanceof HTMLElement ? document.activeElement : null);
     setDrilldown({ scope, employeeId: employeeId as Id<"employees">, date });
+  };
+  const passive = (status: "weekend" | "holiday" | "noData" | "future") => allRecords.reduce((sum, row) => sum + (row.days.length ? row.days.filter(d => d.status === status).length : Number(row.status === status)), 0);
   const counters = [
     { status: "present", value: summary.present },
     { status: "late", value: summary.late },
     { status: "absent", value: summary.absent },
     { status: "leave", value: summary.leave },
+    { status: "weekend", value: passive("weekend") },
+    { status: "holiday", value: passive("holiday") },
+    { status: "noData", value: passive("noData") },
+    { status: "future", value: passive("future") },
   ] as const;
   return (
     <div className="min-w-0 max-w-full space-y-4">
       <PageHeader
         title="PDKS Kayıtları"
-        scope={`${activeProject?.name ?? "Proje seçin"} · ${filters.reportType === "daily" ? readableDate(selectedDateKey) : dateRangeLabel}`}
+        scope={`${activeProject?.name ?? "Proje seçin"} · ${dateRangeLabel}`}
         secondaryMenu={
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">Diğer</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setImport(true)}>
-                İçe aktar
-              </DropdownMenuItem>
+              {isAdmin && <DropdownMenuItem onClick={() => setImport(true)}>İçe aktar</DropdownMenuItem>}
               <DropdownMenuItem onClick={() => setWarningsOpen(true)}>
                 Uyarılar
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setAi(true)}>
                 Asistan
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setAnalysis((v) => !v)}>
-                {analysis ? "Kayıtlara dön" : "Analiz"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -245,6 +247,10 @@ function PDKSContent({
           Tarih ve kayıtlı görünümler
         </Button>
       </div>
+      <div role="group" aria-label="Görünüm" className="flex gap-1">
+        <Button variant={!analysis || filters.reportType === "daily" ? "secondary" : "ghost"} aria-pressed={!analysis || filters.reportType === "daily"} onClick={() => setAnalysis(false)}>Kayıtlar</Button>
+        <Button disabled={filters.reportType === "daily"} variant={analysis && filters.reportType !== "daily" ? "secondary" : "ghost"} aria-pressed={analysis && filters.reportType !== "daily"} onClick={() => setAnalysis(true)}>Analiz</Button>
+      </div>
       <PDKSFilterBar
         values={filters}
         onChange={setFilters}
@@ -286,26 +292,6 @@ function PDKSContent({
               Fazla mesai{" "}
               {formatDuration(Math.round(summary.overtimeHours * 60))}
             </span>
-            <label className="flex flex-wrap items-center gap-2">
-              Durum
-              <select
-                className="h-9 rounded-md border border-input bg-background px-2"
-                value={filters.statusFilter}
-                onChange={(e) =>
-                  setFilters({
-                    ...filters,
-                    statusFilter: e.target
-                      .value as FilterValues["statusFilter"],
-                  })
-                }
-              >
-                {Object.entries(STATUS_FILTER_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
           </div>
           <BulkBar
             count={selectedIds.size}
@@ -337,7 +323,7 @@ function PDKSContent({
                 },
               }}
             />
-          ) : analysis ? (
+          ) : analysis && filters.reportType !== "daily" ? (
             <PDKSChartView
               records={records}
               scope={`${activeProject?.name} · ${dateRangeLabel} · ${filterSummary}`}
@@ -364,6 +350,7 @@ function PDKSContent({
         </>
       )}
       <PDKSEmployeeDetailDrawer
+        returnFocusTo={detailTrigger}
         open={detail !== null}
         onOpenChange={(open) => {
           if (!open) setDrilldown(null);

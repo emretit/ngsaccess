@@ -42,7 +42,7 @@ export function DeviceLocationSection({
   const isCreatingZone = false;
 
   // Hikvision'da kapı sayısı modelden türetilir (DeviceHikvisionSection) → generic
-  // "Kapı Sayısı" select'ini gizle. Diğer markalarda eski davranış korunur.
+  // "Kapı sayısı" select'ini gizle. Diğer markalarda eski davranış korunur.
   const brand = form.watch("brand");
   const showDoorCount = brand !== "hikvision";
 
@@ -119,7 +119,7 @@ export function DeviceLocationSection({
                   </SelectItem>
                 ))}
                 {allowCreate && form.watch("zone_id") !== NEW_ZONE_VALUE && (
-                  <SelectItem value={NEW_ZONE_VALUE}>+ Yeni Bölge Ekle</SelectItem>
+                  <SelectItem value={NEW_ZONE_VALUE}>+ Yeni bölge ekle</SelectItem>
                 )}
               </SelectContent>
             </Select>
@@ -137,14 +137,14 @@ export function DeviceLocationSection({
       >
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
-            <DialogTitle>Yeni Bölge Ekle</DialogTitle>
+            <DialogTitle>Yeni bölge ekle</DialogTitle>
             <DialogDescription>
               Bölge cihaz kaydedildiğinde oluşturulur.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <FormLabel htmlFor="new-device-zone-name">Bölge Adı</FormLabel>
+              <FormLabel htmlFor="new-device-zone-name">Bölge adı</FormLabel>
               <Input
                 id="new-device-zone-name"
                 autoFocus
@@ -182,7 +182,7 @@ export function DeviceLocationSection({
           name="door_count"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Kapı Sayısı</FormLabel>
+              <FormLabel>Kapı sayısı</FormLabel>
               <Select
                 disabled={!allowCreate}
                 value={field.value ? String(field.value) : ""}

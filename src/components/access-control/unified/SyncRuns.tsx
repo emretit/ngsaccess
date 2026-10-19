@@ -13,7 +13,9 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
+import { deviceBrandLabel } from "@/lib/deviceBrand";
+import { formatTrDateTime } from "@/lib/date";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
@@ -39,7 +41,7 @@ function RunResult({ runId }: { runId: Id<"deviceSyncRuns"> }) {
           <li key={target._id} className="py-3 space-y-1">
             <p className="break-words font-medium">
               {target.deviceName}{" "}
-              <span className="text-muted-foreground">({target.brand})</span>
+              <span className="text-muted-foreground">({deviceBrandLabel(target.brand)})</span>
             </p>
             <StatusBadge tone={targetTone(target.status)}>
               {targetLabels[target.status]}
@@ -122,9 +124,7 @@ export function RecentRuns({
             >
               <div className="min-w-0 flex-1">
                 <p>
-                  {new Date(run.startedAt).toLocaleString("tr-TR", {
-                    timeZone: "Europe/Istanbul",
-                  })}{" "}
+                  {formatTrDateTime(run.startedAt)}{" "}
                   ·{" "}
                   {run.kind === "project_resync"
                     ? "Proje gönderimi"
@@ -135,7 +135,7 @@ export function RecentRuns({
                   {runSummary(run.counts)}
                 </p>
               </div>
-              <Button variant="outline" onClick={() => setSelected(run._id)} aria-label={`${new Date(run.startedAt).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" })} gönderiminin ayrıntısı`}>
+              <Button variant="outline" onClick={() => setSelected(run._id)} aria-label={`${formatTrDateTime(run.startedAt)} gönderiminin ayrıntısı`}>
                 Ayrıntı
               </Button>
             </li>
@@ -153,45 +153,42 @@ export function ProjectSyncButton({
 }) {
   const [confirm, setConfirm] = useState(false);
   const [runId, setRunId] = useState<Id<"deviceSyncRuns"> | null>(null);
-  const devices = useQuery(api.devices.list, { projectId });
+  const counts = useQuery(api.accessRules.projectDeviceCounts, { projectId });
   const start = useAction(api.deviceSyncRuns.startProjectResync);
-  const brands = (devices ?? []).reduce<Record<string, number>>(
-    (counts, device) => {
-      const brand = device.brand ?? "other";
-      counts[brand] = (counts[brand] ?? 0) + 1;
-      return counts;
-    },
-    {},
-  );
+  const send = useAsyncAction(async () => {
+    const result = await start({ projectId });
+    setRunId(result.runId);
+    setConfirm(false);
+  }, { error: "Cihaz gönderimi başlatılamadı" });
   return (
     <>
       <Button
         variant="outline"
-        disabled={!devices}
+        className="min-h-11 md:min-h-9 whitespace-normal"
+        disabled={!counts || counts.total === 0 || send.pending}
         onClick={() => setConfirm(true)}
       >
-        Cihazlara gönder
+        Tüm proje cihazlarına gönder
       </Button>
-      <ConfirmDestructive
-        open={confirm}
-        onOpenChange={setConfirm}
-        title="Proje cihazlarına gönderilsin mi?"
-        objectName={`${devices?.length ?? 0} cihaz`}
-        effects={[
-          `Marka dağılımı: ${
-            Object.entries(brands)
-              .map(([brand, count]) => `${brand}: ${count}`)
-              .join(", ") || "Cihaz yok"
-          }.`,
-          "Projedeki tüm cihazlar değerlendirilir; liste filtreleri kapsamı daraltmaz. Aktif kurallar gönderilir, uygun olmayan cihazlar gerekçesiyle atlanır.",
-          "Hikvision gönderimi teslim kanıtı değildir; IDE cihaz onayı ayrıca izlenir.",
-        ]}
-        confirmLabel="Gönderimi başlat"
-        onConfirm={async () => {
-          const result = await start({ projectId });
-          setRunId(result.runId);
-        }}
-      />
+      <AlertDialog open={confirm} onOpenChange={(open) => { if (!send.pending) setConfirm(open); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tüm proje cihazlarına gönderilsin mi?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {counts?.total ?? 0} cihaz. Marka dağılımı: {brandDistribution(counts?.brands ?? {})}.
+              {" "}Projedeki tüm cihazlar değerlendirilir; liste filtreleri kapsamı daraltmaz.
+              Aktif kurallar gönderilir, uygun olmayan cihazlar gerekçesiyle atlanır.
+              Hikvision gönderimi teslim kanıtı değildir; IDE cihaz onayı ayrıca izlenir.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={send.pending}>Vazgeç</AlertDialogCancel>
+            <Button disabled={send.pending} onClick={() => { void send.run(); }}>
+              {send.pending ? "Başlatılıyor…" : "Tüm proje cihazlarına gönder"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <SyncRunSheet runId={runId} onClose={() => setRunId(null)} />
     </>
   );
@@ -223,4 +220,13 @@ export function RuleSaveNotice({ result, onDismiss }: { result: RuleSaveResult; 
       <SyncRunSheet runId={selected} onClose={() => setSelected(null)} />
     </section>
   );
+}
+
+export function brandDistribution(brands: Record<string, number>) {
+  const labels = new Map<string, number>();
+  for (const [brand, count] of Object.entries(brands)) {
+    const label = deviceBrandLabel(brand);
+    labels.set(label, (labels.get(label) ?? 0) + count);
+  }
+  return [...labels].map(([label, count]) => `${label}: ${count}`).join(", ") || "Cihaz yok";
 }

@@ -20,9 +20,9 @@ export function AppSidebarNav() {
         const active = isUnder(location.pathname, item.href);
         // Raporlar alt grupları yalnız modül açıkken görünür; ikon modunda SidebarMenuSub zaten gizlenir.
         const showReportGroups = item.href === REPORTS_BASE_PATH && active;
-        return <SidebarMenuItem key={item.href}><SidebarMenuButton asChild isActive={active} tooltip={item.name}>
+        return <SidebarMenuItem key={item.href}><SidebarMenuButton asChild isActive={active} tooltip={item.name} className={item.badge ? "gap-2 px-2" : undefined}>
           <Link to={item.href} aria-current={location.pathname === item.href ? "page" : undefined} onClick={closeMobile}>
-            <item.icon className="h-4 w-4 text-side-muted" aria-hidden="true" /><span>{item.name}</span>
+            <item.icon className="h-4 w-4 text-side-muted" aria-hidden="true" /><span className="min-w-0 flex-1 whitespace-nowrap">{item.name}</span>{item.badge && <span className="ml-auto shrink-0 whitespace-nowrap rounded border border-line bg-subtle px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground group-data-[collapsible=icon]:hidden">{item.badge}</span>}
           </Link>
         </SidebarMenuButton>
         {showReportGroups && <SidebarMenuSub aria-label={`${item.name} grupları`}>{REPORT_GROUPS.map(reportGroup => {

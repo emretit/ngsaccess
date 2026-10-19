@@ -24,6 +24,8 @@ it('wraps all 24 daily punches and continues long cells across PDF pages', async
   vi.stubGlobal('document', { createElement: () => ({ getContext: () => context, toDataURL: () => 'data:image/png;base64,AA==' }) });
   await exportReport('pdf', definition, rows, { from: cell.date, to: cell.date, columns: definition.columns });
   const content = drawn.join('');
+  expect(content).toContain('19.10.2026 – 19.10.2026');
+  expect(content).not.toContain('2026-10-19 – 2026-10-19');
   for (const punch of cell.detail.punches) expect(content).toContain(punch.time);
   expect(pdf.addPage).toHaveBeenCalled();
   expect(pdf.save).toHaveBeenCalledWith('rapor-okutma-karti-2026-10-19_2026-10-19.pdf');

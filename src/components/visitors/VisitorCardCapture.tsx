@@ -1,3 +1,4 @@
+import { canCaptureVisitorCard, visitorReaderLabel } from "./lib/readerCapability";
 import { createCardCaptureSession } from "./cardCaptureSession";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -28,7 +29,8 @@ interface VisitorCardCaptureProps {
 // Kayıt okuyucusu seçilir; ziyaretçi kartı bastırılınca okunan numara Convex reaktif
 // query ile anında yakalanıp forma düşürülür (getLastUnknownByDevice → bilinmeyen kart).
 export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCardCaptureProps) {
-  const { devices } = useDevices();
+  const { devices: projectDevices } = useDevices();
+  const devices = projectDevices.filter(canCaptureVisitorCard);
   const { projectId } = useActiveProjectScope();
 
   const [readerId, setReaderIdState] = useState<Id<"devices"> | null>(() => {
@@ -116,7 +118,7 @@ export default function VisitorCardCapture({ onCapture, currentCard }: VisitorCa
         <SelectContent>
           {devices.map((d) => (
             <SelectItem key={d._id} value={d._id}>
-              {d.name}
+              {visitorReaderLabel(d)}
             </SelectItem>
           ))}
         </SelectContent>

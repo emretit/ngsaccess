@@ -46,11 +46,12 @@ function manualContext() {
   };
   const chain = {
     withIndex: (_name: string, fn: (q: typeof index) => unknown) => { fn(index); return chain; },
+    collect: async () => [],
     first: async () => date === "2026-10-17" ? { _id: existingId } : null,
   };
   const ctx = {
     user: { _id: "admin", role: "super_admin" },
-    db: { get: async () => ({ firstName: "Test", lastName: "Personel" }), query: () => chain, insert, patch },
+    db: { get: async () => ({ _id: "emp", firstName: "Test", lastName: "Personel" }), query: () => chain, insert, patch },
   } as unknown as MutationCtx;
   return { ctx, patch, insert };
 }

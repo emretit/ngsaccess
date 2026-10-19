@@ -5,6 +5,7 @@ import { api } from "@/lib/convexApi";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { Input } from "@/components/ui/input";
@@ -18,7 +19,7 @@ const reminderSchema = z.object({ enabled: z.boolean(), email: z.string(), repor
     if (value.enabled && !z.string().email().safeParse(value.email.trim()).success) ctx.addIssue({ code: "custom", path: ["email"], message: "Geçerli bir e-posta adresi girin" });
   });
 type ReminderValues = z.infer<typeof reminderSchema>;
-const selectStyle = "h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm";
+const selectStyle = "h-9 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm";
 
 export function ReportReminderSettings() {
   const [scope, setScope] = useState("active");
@@ -32,7 +33,8 @@ function ReminderForm({ scope, setScope }: { scope: string; setScope: (scope: st
   const savedType = reminderSchema.shape.reportType.safeParse(saved?.reportType);
   const draft = useSettingsDraft<ReminderValues>({ email: saved?.email ?? "", enabled: saved?.enabled ?? false, reportType: savedType.success ? savedType.data : "sgk" });
   const [failed, setFailed] = useState(false);
-  const guard = useUnsavedChangesGuard(draft.dirty);
+  useUnsavedChangesGuard(draft.dirty);
+  const [nextScope, setNextScope] = useState<string | null>(null);
   const parsed = reminderSchema.safeParse(draft.values);
   const error = !parsed.success ? parsed.error.issues[0]?.message : undefined;
   const action = useAsyncAction(async (payload: ReminderValues) => {
@@ -44,7 +46,7 @@ function ReminderForm({ scope, setScope }: { scope: string; setScope: (scope: st
     <div><h3 className="text-base font-semibold">Kişisel e-posta hatırlatması</h3>
       <p className="mt-1 text-sm text-muted-foreground">Her ayın ilk günü size rapor hatırlatması ve kapsam bilgisi gönderilir. Dosya eki gönderilmez; raporu bu ekrandan indirirsiniz.</p></div>
     <FormFieldWrapper htmlFor="reminder-scope" label="Hatırlatma kapsamı">
-      <select className={selectStyle} value={scope} disabled={action.pending} onChange={event => { const next = event.target.value; guard.requestClose(() => setScope(next)); }}>
+      <select className={selectStyle} value={scope} disabled={action.pending} onChange={event => { const next = event.target.value; if (draft.dirty) setNextScope(next); else setScope(next); }}>
         <option value="active">{activeProject?.name ?? "Aktif proje"}</option>
         {projectIds.length > 1 && <option value="all">Tüm erişilebilir projeler</option>}
       </select>
@@ -56,7 +58,7 @@ function ReminderForm({ scope, setScope }: { scope: string; setScope: (scope: st
     }}>
       <DraftNotice remoteChanged={draft.remoteChanged} failed={failed} />
       <fieldset disabled={action.pending} className="min-w-0 space-y-4">
-        <FormFieldWrapper htmlFor="reminder-enabled" label="Aylık rapor hatırlatmasını al">
+        <FormFieldWrapper inline htmlFor="reminder-enabled" label="Aylık rapor hatırlatmasını al">
           <Switch checked={draft.values.enabled} onCheckedChange={enabled => draft.change({ enabled })} />
         </FormFieldWrapper>
         <FormFieldWrapper htmlFor="reminder-type" label="Hatırlatılacak rapor türü">
@@ -71,6 +73,12 @@ function ReminderForm({ scope, setScope }: { scope: string; setScope: (scope: st
       <SettingsSaveBar dirty={draft.dirty} saving={action.pending} valid={parsed.success} label="Hatırlatmayı kaydet" onCancel={() => { draft.reset(); setFailed(false); }} />
       <p role="status" className="text-sm text-muted-foreground break-words">Kayıtlı durum: {saved?.enabled ? `Açık — ${saved.email}` : "Kapalı"}</p>
     </form>}
-    {guard.dialog}
+    <ReminderScopeConfirmation open={nextScope !== null} onOpenChange={open => { if (!open) setNextScope(null); }} onConfirm={() => { if (nextScope !== null) setScope(nextScope); }} />
   </section>;
+}
+
+export function ReminderScopeConfirmation({ open, onOpenChange, onConfirm }: { open: boolean; onOpenChange: (open: boolean) => void; onConfirm: () => void }) {
+  return <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Kapsam değiştirilsin mi?</AlertDialogTitle><AlertDialogDescription>Kapsamı değiştirirseniz kaydedilmemiş hatırlatma taslağı silinir.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Düzenlemeye dön</AlertDialogCancel><AlertDialogAction onClick={onConfirm}>Kapsamı değiştir</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+  </AlertDialog>;
 }

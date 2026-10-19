@@ -1,7 +1,7 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { UNSAFE_NavigationContext } from "react-router-dom";
 import { installNavigationGuard } from "@/lib/navigationGuard";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { api } from "../../../convex/_generated/api";
@@ -69,6 +69,7 @@ export function LeaveForm({
   const [serverError, setServerError] =
     useState<ReturnType<typeof leaveError>>();
   const form = useForm<LeaveFormValues>({
+    mode: "onChange",
     resolver: zodResolver(makeLeaveFormSchema(validationRange)),
     defaultValues: {
       employeeId: row?.employeeId ?? "",
@@ -161,6 +162,12 @@ export function LeaveForm({
     name: ["startDate", "endDate", "employeeId"],
   });
   const days = calendarDays(startDate, endDate);
+  const datesChanged = !validationRange || startDate !== validationRange.startDate || endDate !== validationRange.endDate;
+  const checkConflict = Boolean(employeeId && days !== null && days <= 366 && datesChanged);
+  const conflict = useQuery(api.leaves.conflictFor, checkConflict ? {
+    projectId, employeeId: employeeId as Id<"employees">, startDate, endDate, excludeLeaveId: row?._id,
+  } : "skip");
+
   const Header = mobile ? SheetHeader : DialogHeader,
     Title = mobile ? SheetTitle : DialogTitle,
     Description = mobile ? SheetDescription : DialogDescription;
@@ -175,6 +182,7 @@ export function LeaveForm({
         className="flex min-h-0 flex-1 flex-col"
         onSubmit={form.handleSubmit(
           async (values) => {
+            if (checkConflict && (conflict === undefined || conflict !== null)) return;
             if (await run(values)) onClose();
           },
           (errors) => {
@@ -208,7 +216,7 @@ export function LeaveForm({
                   </p>
                   <Button asChild variant="link" className="h-auto p-0">
                     <a
-                      href={`/leaves?${new URLSearchParams({ scope: projectId, employee: employeeId, period: "custom", from: serverError.conflict.start, to: serverError.conflict.end, leave: serverError.conflict.id })}`}
+                      href={`/leaves?${new URLSearchParams({ employee: employeeId, period: "custom", from: serverError.conflict.start, to: serverError.conflict.end, leave: serverError.conflict.id })}`}
                       onClick={(event) => {
                         if (
                           event.metaKey ||
@@ -332,7 +340,7 @@ export function LeaveForm({
               onChange={(value) =>
                 form.setValue("startDate", value, {
                   shouldDirty: true,
-                  shouldValidate: form.formState.isSubmitted,
+                  shouldValidate: true,
                 })
               }
             />
@@ -349,11 +357,16 @@ export function LeaveForm({
               onChange={(value) =>
                 form.setValue("endDate", value, {
                   shouldDirty: true,
-                  shouldValidate: form.formState.isSubmitted,
+                  shouldValidate: true,
                 })
               }
             />
           </FormFieldWrapper>
+          {checkConflict && conflict === undefined && <p role="status" className="text-sm">İzin çakışması kontrol ediliyor…</p>}
+          {checkConflict && conflict && <div role="alert" className="rounded-md border border-danger p-3 text-sm">
+            <p>Bu tarihler onaylı bir izinle çakışıyor: {dateLabel(conflict.start)} – {dateLabel(conflict.end)}.</p>
+            <Button type="button" variant="link" onClick={() => guard.requestClose(() => onConflict(conflict, employeeId))}>Kaydı aç</Button>
+          </div>}
           {row && (days === null || days > 366) && (
             <p className="text-xs text-muted-foreground">
               Eski kaydın tarihlerini değiştirmeden tür ve açıklamayı
@@ -390,7 +403,7 @@ export function LeaveForm({
           >
             İptal
           </Button>
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" disabled={pending || (checkConflict && conflict !== null)}>
             {pending ? "Kaydediliyor…" : "Kaydet"}
           </Button>
         </div>

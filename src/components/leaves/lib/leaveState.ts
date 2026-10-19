@@ -102,24 +102,25 @@ export function projectScopedLeaveParams(
   params: URLSearchParams,
   projectId: string,
 ): URLSearchParams {
-  if (!params.get("scope") || params.get("scope") === projectId) return params;
+  if (!params.has("scope")) return params;
   const next = new URLSearchParams(params);
-  for (const key of ["employee", "leave", "cursor"]) next.delete(key);
-  next.set("scope", projectId);
+  if (params.get("scope") !== projectId) {
+    for (const key of ["employee", "leave", "cursor"]) next.delete(key);
+  }
+  next.delete("scope");
   return next;
 }
 export function dateLabel(value: string): string {
   return validDate(value) ? value.split("-").reverse().join(".") : value;
 }
 export function pdksHref(row: LeaveRow): string {
-  // PDKS accepts person as a name search, not an employee ID.
   const params = new URLSearchParams({
     report: "custom",
     from: row.startDate,
     to: row.endDate,
     date: row.startDate,
   });
-  if (!row.employeeMissing) params.set("person", row.employeeName);
+  if (!row.employeeMissing) params.set("employeeId", row.employeeId);
   return `/pdks-records?${params}`;
 }
 export function makeLeaveFormSchema(

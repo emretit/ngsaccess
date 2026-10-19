@@ -24,7 +24,10 @@ export const DEFAULT_WORK_SETTINGS: EffectiveWorkSettings = {
   monthlyHoursBase: 225,
 };
 
+export type NightCombineMode = "max" | "multiply" | "additive";
+
 export interface EffectiveOvertimeRates {
+  nightCombineMode?: NightCombineMode;
   weekdayMultiplier: number;
   weekendMultiplier: number;
   holidayMultiplier: number;
@@ -34,6 +37,7 @@ export interface EffectiveOvertimeRates {
 }
 
 export const DEFAULT_OVERTIME_RATES: EffectiveOvertimeRates = {
+  nightCombineMode: "max",
   weekdayMultiplier: 1.5,
   weekendMultiplier: 2.0,
   holidayMultiplier: 2.0,
@@ -88,6 +92,7 @@ export async function getEffectiveOvertimeRates(
       r?.weekendMultiplier ?? DEFAULT_OVERTIME_RATES.weekendMultiplier,
     holidayMultiplier:
       r?.holidayMultiplier ?? DEFAULT_OVERTIME_RATES.holidayMultiplier,
+    nightCombineMode: r?.nightCombineMode ?? "max",
     nightShiftMultiplier:
       r?.nightShiftMultiplier ?? DEFAULT_OVERTIME_RATES.nightShiftMultiplier,
     nightShiftStart:

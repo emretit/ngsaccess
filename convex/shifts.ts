@@ -356,6 +356,36 @@ async function readDefinitionAssignments(ctx: ReadCtx, shiftId: Id<"shifts">) {
     skippedAssignments: rows.filter(row => row.projectId === undefined).length, truncated: rows.length > ASSIGNMENT_SCAN_LIMIT };
 }
 
+/** One subscription and one shared read budget for the entire definitions panel. */
+export const definitionImpacts = authedQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    await resolveProjectScope(ctx, args.projectId);
+    const definitions = await ctx.db.query("shifts").withIndex("by_project", q => q.eq("projectId", args.projectId)).take(1000);
+    let remaining = ASSIGNMENT_SCAN_LIMIT;
+    const impacts = [];
+    for (const shift of definitions) {
+      if (remaining === 0) {
+        // A separate indexed existence probe does not pretend to compute a total.
+        const first = await ctx.db.query("shiftAssignments").withIndex("by_shift", q => q.eq("shiftId", shift._id)).take(1);
+        impacts.push({ shiftId: shift._id, assignmentCount: null, employeeCount: null,
+          skippedAssignments: 0, truncated: true, countLabel: "Hesaplanamadı", hasAssignments: first.length > 0 });
+        continue;
+      }
+      const candidates = await ctx.db.query("shiftAssignments").withIndex("by_shift", q => q.eq("shiftId", shift._id)).take(remaining + 1);
+      const truncated = remaining === 0 || candidates.length > remaining;
+      const scanned = candidates.slice(0, remaining);
+      remaining -= scanned.length;
+      const rows = scanned.filter(row => row.projectId === args.projectId);
+      impacts.push({ shiftId: shift._id, assignmentCount: rows.length,
+        skippedAssignments: scanned.length - rows.length,
+        employeeCount: new Set(rows.map(row => row.employeeId)).size,
+        truncated, countLabel: truncated ? "En az" : "Toplam", hasAssignments: rows.length > 0 });
+    }
+    return impacts;
+  },
+});
+
 export const assignmentDeleteImpact = authedQuery({
   args: { shiftId: v.id("shifts") },
   handler: async (ctx, args) => {

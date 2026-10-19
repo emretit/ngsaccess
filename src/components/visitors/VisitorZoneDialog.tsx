@@ -95,7 +95,7 @@ export default function VisitorZoneDialog({ isOpen, onClose, onCreated }: Visito
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
           <fieldset disabled={isSaving} className="min-w-0 space-y-4">
-          <FormFieldWrapper htmlFor="zone_name" label="Bölge adı" error={fieldErrors.name}>
+          <FormFieldWrapper htmlFor="zone_name" label="Bölge adı *" error={fieldErrors.name}>
             <Input
               id="zone_name"
               value={formData.name}
@@ -107,7 +107,7 @@ export default function VisitorZoneDialog({ isOpen, onClose, onCreated }: Visito
 
           <TimeSchedule formData={formData} setFormData={setFormData} />
           {scheduleError && <p role="alert" className="text-sm text-destructive">{scheduleError}</p>}
-          <ZoneDeviceTree formData={formData} setFormData={setFormData} />
+          <ZoneDeviceTree disableDoorless formData={formData} setFormData={setFormData} />
 
           {fieldErrors.targets && <p role="alert" className="text-sm text-destructive">{fieldErrors.targets}</p>}
           {failed && <p role="alert" className="text-sm text-destructive">Bölge oluşturulamadı. Girişleriniz korundu; tekrar deneyin.</p>}

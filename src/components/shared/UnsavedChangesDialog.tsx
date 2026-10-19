@@ -21,8 +21,8 @@ export function UnsavedChangesDialog({ open, onOpenChange, onConfirm }: UnsavedC
         <AlertDialogDescription>Çıkarsanız bu formdaki kaydedilmemiş değişiklikler silinecek.</AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>Vazgeç</AlertDialogCancel>
-        <AlertDialogAction onClick={onConfirm}>Çık</AlertDialogAction>
+        <AlertDialogCancel>Düzenlemeye dön</AlertDialogCancel>
+        <AlertDialogAction onClick={onConfirm}>Kaydetmeden çık</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>;

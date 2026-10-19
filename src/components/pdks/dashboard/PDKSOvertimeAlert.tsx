@@ -1,10 +1,11 @@
+import { todayInTurkey } from "@/lib/date";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { formatDuration } from "../lib/presentation";
 export function PDKSOvertimeAlert({
-  year = new Date().getFullYear(),
+  year = Number(todayInTurkey().slice(0, 4)),
 }: {
   year?: number;
 }) {

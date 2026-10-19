@@ -116,7 +116,7 @@ export const TimeSchedule = <T extends TimeScheduleFormData>({
               key={day.value}
               value={day.value}
               aria-label={day.full}
-              className="h-11 w-10 p-0"
+              className="h-11 w-10 border-input bg-background p-0 text-foreground data-[state=on]:border-primary data-[state=on]:bg-primary data-[state=on]:text-primary-foreground data-[state=on]:hover:bg-primary data-[state=on]:hover:text-primary-foreground"
             >
               {day.short}
             </ToggleGroupItem>

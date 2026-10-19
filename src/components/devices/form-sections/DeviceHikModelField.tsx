@@ -44,7 +44,7 @@ export function DeviceHikModelField({ form, isEdit }: DeviceHikModelFieldProps) 
         name="hik_model"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Cihaz Modeli</FormLabel>
+            <FormLabel>Cihaz modeli</FormLabel>
             <Select
               value={field.value ?? ""}
               onValueChange={(value) => {
@@ -86,7 +86,7 @@ export function DeviceHikModelField({ form, isEdit }: DeviceHikModelFieldProps) 
           name="hik_door_count"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Kapı Sayısı</FormLabel>
+              <FormLabel>Kapı sayısı</FormLabel>
               <FormControl>
                 <Input
                   disabled={isEdit}

@@ -9,7 +9,7 @@ export function dailySource(days: DailyCell[]): DailySourceRow {
 }
 export function monthlySheet(employeeKey = 'employee-a'): MonthlySheet {
   return { year: 2026, month: 10, days: ['2026-10-19'], rows: [{ employeeId: employeeKey as Id<'employees'>, payrollCode: 'P01', name: 'Ayşe Yılmaz', cardNumber: '123', department: 'Üretim', hourlyRate: null,
-    cells: [{ date: '2026-10-19', status: 'present', payrollCode: 'N', totalMinutes: 535, overtimeMinutes: 0, multiplier: 0, overtimePayTRY: null, isLate: false, isEarlyExit: false, isManual: false, classification: 'workday' }],
+    cells: [{ date: '2026-10-19', status: 'present', payrollCode: 'N', totalMinutes: 535, rawTotalMinutes: 535, nightMinutes: 0, overtimeMinutes: 0, multiplier: 0, overtimePayTRY: null, isLate: false, isEarlyExit: false, isManual: false, classification: 'workday' }],
     totals: { totalMinutes: 535, overtimeMinutes: 0, overtimePayTRY: null, leaveDays: 0, absentDays: 0, lateDays: 0, exceedsDaily11h: [] } }] };
 }
 export function transactionPage(id = 'reading-a', hiddenBiometricCount = 0, isDone = false): TransactionPage {

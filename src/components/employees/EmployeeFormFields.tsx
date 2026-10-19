@@ -18,6 +18,7 @@ interface Props {
   positions: Option[];
   errors?: Partial<Record<string, string>>;
   photo?: ReactNode;
+  autoFocusFirstName?: boolean;
 }
 export default function EmployeeFormFields({
   formData,
@@ -28,6 +29,7 @@ export default function EmployeeFormFields({
   positions,
   errors = {},
   photo,
+  autoFocusFirstName = false,
 }: Props) {
   const [otherOpen, setOtherOpen] = useState(false);
   useEffect(() => {
@@ -53,6 +55,7 @@ export default function EmployeeFormFields({
       <Input
         id={`employee-${key}`}
         name={key}
+        autoFocus={key === "firstName" && autoFocusFirstName}
         type={type}
         required={["firstName", "lastName", "email", "cardNumber"].includes(
           key,
@@ -83,7 +86,7 @@ export default function EmployeeFormFields({
         }
       >
         <option value="">
-          {key === "accessRuleId" ? "Yeni kural ekleme" : "Atanmamış"}
+          {key === "accessRuleId" ? "Kural eklenmesin" : "Atanmamış"}
         </option>
         {options.map((option) => (
           <option key={option.id} value={option.id}>
@@ -143,8 +146,13 @@ export default function EmployeeFormFields({
             {input("cardNumber", "Kart numarası *")}
             {input("tcNo", "TC kimlik no")}
             {input("payrollCode", "Bordro kodu")}
-            {select("accessRuleId", "Erişim kuralı ekle", accessRules)}
           </div>
+        </>,
+      )}
+      {section(
+        "Erişim",
+        <>
+          {select("accessRuleId", "Erişim kuralı ekle", accessRules)}
           <p className="text-xs text-muted-foreground">
             Bu seçim mevcut erişimleri kaldırmaz. Üyelikleri kaldırmak için{" "}
             <a className="underline" href="/access-control">

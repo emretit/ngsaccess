@@ -84,3 +84,53 @@ describe("denetim ayrıntısı maskeleme", () => {
     });
   });
 });
+
+it("gizlilik ayarlarındaki tüm kaydedilen alanları Türkçe gösterir", () => {
+ expect(auditFieldLabel("projectPrivacySettings", "biometricEnabled")).toBe("Biyometrik veri işleme");
+ expect(auditFieldLabel("projectPrivacySettings", "cardReadingRetentionDays")).toBe("Kart okuma saklama süresi (gün)");
+ expect(auditFieldLabel("projectPrivacySettings", "aiMaskNames")).toBe("Yapay zekâda adları gizleme");
+ for (const field of ["biometricReason", "biometricChangedAt", "biometricChangedBy"]) expect(auditFieldLabel("projectPrivacySettings", field)).not.toBe(field);
+});
+
+// Parse source rather than executing mutations. Dynamic keys and non-literal
+// payloads cannot be resolved here and are intentionally left to runtime tests.
+import ts from "typescript";
+const auditSources = import.meta.glob("../../../convex/**/*.ts", { eager: true, query: "?raw", import: "default" });
+it("labels every statically known oldValue/newValue object key written by Convex", () => {
+  const missing = new Set<string>();
+  const checked = new Set<string>();
+  function key(name: ts.PropertyName): string | undefined {
+    return ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name) ? name.text : undefined;
+  }
+  function fields(value: ts.Expression, table: string) {
+    if (!ts.isObjectLiteralExpression(value)) return;
+    for (const property of value.properties) {
+      if (!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property)) continue;
+      const field = key(property.name);
+      if (!field) continue;
+      checked.add(field);
+      if (auditFieldLabel(table, field) === field) missing.add(`${table}.${field}`);
+      if (ts.isPropertyAssignment(property)) fields(property.initializer, table);
+    }
+  }
+  for (const [path, source] of Object.entries(auditSources)) {
+    if (path.includes("/_generated/") || path.endsWith(".test.ts") || typeof source !== "string") continue;
+    const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true);
+    function visit(node: ts.Node) {
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "writeAudit") {
+        const payload = node.arguments[1];
+        if (payload && ts.isObjectLiteralExpression(payload)) {
+          const tableProperty = payload.properties.find(property => ts.isPropertyAssignment(property) && key(property.name) === "targetTable");
+          const table = tableProperty && ts.isPropertyAssignment(tableProperty) && ts.isStringLiteral(tableProperty.initializer) ? tableProperty.initializer.text : "unknown";
+          for (const property of payload.properties) {
+            if (ts.isPropertyAssignment(property) && ["oldValue", "newValue"].includes(key(property.name) ?? "")) fields(property.initializer, table);
+          }
+        }
+      }
+      ts.forEachChild(node, visit);
+    }
+    visit(file);
+  }
+  for (const field of ["visitorKvkkUrl", "visitorKvkkVersion", "documentVersion"]) expect(checked.has(field)).toBe(true);
+  expect([...missing].sort()).toEqual([]);
+});

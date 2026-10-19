@@ -25,15 +25,15 @@ export function AppHeader({ title, className, children }: AppHeaderProps) {
     finally { setPending(false); }
   };
   return <header className={cn("flex h-16 shrink-0 items-center gap-3 border-b bg-surface px-4 min-[761px]:gap-4 min-[761px]:px-8", className)}>
-    <SidebarTrigger className="shrink-0 min-[761px]:hidden" />
+    <SidebarTrigger className="h-11 w-11 shrink-0 min-[761px]:hidden" />
     <div className="min-w-0 flex-1 min-[761px]:max-w-[240px]"><ProjectSwitcher /></div>
-    <nav aria-label="İçerik yolu" className="hidden min-w-0 items-center gap-2 border-l pl-4 text-sm min-[761px]:flex">
+    {title && title !== "Ana Sayfa" && <nav aria-label="İçerik yolu" className="hidden min-w-0 items-center gap-2 border-l pl-4 text-sm min-[761px]:flex">
       {title !== "Ana Sayfa" && <><Link to="/home" className="shrink-0 text-muted-foreground hover:underline">Ana Sayfa</Link><span aria-hidden="true" className="text-muted-foreground">/</span></>}
       <span aria-current="page" className="truncate">{title}</span>
-    </nav>
+    </nav>}
     {children}
     <div className="ml-auto flex shrink-0 items-center gap-2"><CommandPalette />
-      <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" aria-label="Hesap menüsü" className="h-9 w-9 rounded-full p-0">
+      <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" aria-label="Hesap menüsü" className="h-11 w-11 rounded-full p-0">
         <Avatar className="h-7 w-7"><AvatarImage src={profile?.photoUrl || profile?.image || ""} alt="" /><AvatarFallback className="border bg-subtle text-[11px] font-medium text-muted-foreground">{initials}</AvatarFallback></Avatar>
       </Button></DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">

@@ -37,11 +37,11 @@ const DAILY_SORTS: Record<string, (a: DailyReportRow, b: DailyReportRow) => numb
 };
 export function flattenDailyRows(rows: readonly DailySourceRow[], predicate: DailyPredicate = () => true): DailyReportRow[] {
   return rows.flatMap(row => row.days.filter(cell => cell.status !== 'future' && cell.status !== 'noData' && predicate(cell)).map(cell => ({
-    kind: 'daily' as const, id: `${row.id}:${cell.date}`, name: row.name, department: row.department, payrollCode: row.payrollEmployeeCode, cell,
+    kind: 'daily' as const, id: `${row.id}:${cell.date}`, name: row.name, department: departmentLabel(row.department), payrollCode: row.payrollEmployeeCode, cell,
   })));
 }
 export function buildMonthlyStatusRows(sheet: MonthlySheet): MonthlyReportRow[] {
-  return sheet.rows.map(row => ({ ...row, kind: 'monthly', id: String(row.employeeId), attendance: countAttendance(row.cells) }));
+  return sheet.rows.map(row => ({ ...row, department: departmentLabel(row.department), kind: 'monthly', id: String(row.employeeId), attendance: countAttendance(row.cells) }));
 }
 export function countAttendance(cells: MonthlyReportRow['cells']): AttendanceCounts {
   const counts: AttendanceCounts = { workedDays: 0, holidayWorkedDays: 0, lateDays: 0, earlyExitDays: 0, absentDays: 0, leaveDays: 0, weekendDays: 0, holidayDays: 0 };
@@ -89,9 +89,8 @@ export function monthlyRowsForReport(sheet: MonthlySheet, mode: MonthlyRowMode =
     (mode === 'departments' || row.name.toLocaleLowerCase('tr-TR').includes(person.toLocaleLowerCase('tr-TR'))));
   return MONTHLY_BUILDERS[mode](rows);
 }
-export function buildTransactionRows(rows: readonly ReportTransactionRow[], person: string, departmentName?: string): TransactionReportRow[] {
-  return rows.filter(row => (!departmentName || row.department === departmentName) && (row.employeeName ?? '').toLocaleLowerCase('tr-TR').includes(person.toLocaleLowerCase('tr-TR')))
-    .map(transaction => ({ kind: 'transaction', id: transaction._id, transaction }));
+export function buildTransactionRows(rows: readonly ReportTransactionRow[]): TransactionReportRow[] {
+  return rows.map(transaction => ({ kind: 'transaction', id: transaction._id, transaction }));
 }
 export function dailyRowsForReport(rows: readonly DailySourceRow[], slug: string): DailyReportRow[] {
   const result = flattenDailyRows(rows, DAILY_PREDICATES[slug]);
@@ -112,8 +111,11 @@ export function formatPunches(cell: DailyCell): string {
   if (remaining > 0) parts.push(`+${remaining} okutma daha`);
   return parts.join(' · ');
 }
+export function departmentLabel(value: string | null | undefined): string {
+  return !value || ['-', '—', 'Belirtilmemiş'].includes(value.trim()) ? 'Departmansız' : value;
+}
 export function formatShortMinutes(value: number): string {
-  return value > 0 ? `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}` : '';
+  return value > 0 ? `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}` : '0:00';
 }
 export function formatMinutes(value: number): string {
   return `${Math.floor(value / 60)} sa ${String(value % 60).padStart(2, '0')} dk`;

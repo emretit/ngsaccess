@@ -32,7 +32,7 @@ describe('server query identity', () => {
     expect(reportQueryKey(mobile, filters, 0)).not.toBe(reportQueryKey({ ...mobile, transactionSources: ['card'] }, filters, 0));
     expect(reportQueryKey(mobile, { ...filters, person: 'Ayşe' }, 0)).toBe(reportQueryKey(mobile, filters, 0));
   });
-  it('preserves two loaded transaction pages while person and department filters change', () => {
+  it('resets transaction pages for server person and department filters', () => {
     const report = definition('transactions');
     const first = transactionPage('first', 2);
     first.page[0].employeeName = 'Mehmet';
@@ -41,11 +41,13 @@ describe('server query identity', () => {
     const state = transactionReducer({ pages: {} }, { type: 'page', cursor: null, page: first });
     const snapshot = transactionSnapshot(state, first.continueCursor, second);
     const filtered = { ...filters, person: 'ayşe', departmentId: 'department-a' as Id<'departments'> };
-    // React keeps the reducer and cursor because ReportResults receives the same key.
-    expect(reportQueryKey(report, filtered, 0)).toBe(reportQueryKey(report, filters, 0));
-    expect(buildTransactionRows(snapshot.rows, filtered.person, 'Üretim').map(row => row.id)).toEqual(['second']);
-    expect(buildTransactionRows(snapshot.rows, '', 'İdari').map(row => row.id)).toEqual(['first']);
-    expect(buildTransactionRows(transactionSnapshot(state, first.continueCursor, second).rows, '').map(row => row.id)).toEqual(['first', 'second']);
+    // Changing a server filter remounts ReportResults and resets accumulated pages.
+    expect(reportQueryKey(report, filtered, 0)).not.toBe(reportQueryKey(report, filters, 0));
+    const employee = { ...filters, employeeId: 'employee-a' as Id<'employees'> };
+    expect(transactionReportArgs(employee).employeeId).toBe('employee-a');
+    expect(reportQueryKey(report, employee, 0)).not.toBe(reportQueryKey(report, filters, 0));
+    expect(buildTransactionRows(snapshot.rows).map(row => row.id)).toEqual(['first', 'second']);
+    expect(buildTransactionRows(transactionSnapshot(state, first.continueCursor, second).rows).map(row => row.id)).toEqual(['first', 'second']);
     expect(snapshot.hiddenBiometricCount).toBe(5);
   });
   it('keeps monthly query arguments and remount identity stable under client filters', () => {

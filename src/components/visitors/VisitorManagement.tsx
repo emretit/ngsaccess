@@ -10,11 +10,12 @@ import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { DeviceSyncStatusBanner } from "@/components/sync/DeviceSyncStatusBanner";
 import { VisitorFilters, type VisitorStatusFilter } from "./VisitorFilters";
-import { isVisitorStatus } from "./lib/status";
+import { displayVisitorStatus, isVisitorStatus } from "./lib/status";
 import { VisitorStats } from "./VisitorStats";
 import VisitorTable from "./VisitorTable";
 import VisitorSlideOverPanel from "./VisitorSlideOverPanel";
 import VisitorZoneDialog from "./VisitorZoneDialog";
+import { useVisitorClock } from "./hooks/useVisitorClock";
 import { useStableQuery } from "./hooks/useStableQuery";
 import { PaginationBar } from "@/components/shared/PaginationBar";
 
@@ -27,11 +28,7 @@ export default function VisitorManagement() {
   const [pageSize, setPageSize] = useState(25);
   const [panel, setPanel] = useState<{ visitor: Visitor | null; projectId: typeof projectId } | null>(null);
   const [zoneOpen, setZoneOpen] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(() => Math.floor(Date.now() / 60000));
-  useEffect(() => {
-    const timer = window.setInterval(() => setRefreshKey(Math.floor(Date.now() / 60000)), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
+  const { now, onNextExpiry } = useVisitorClock();
   useEffect(() => { setPanel(null); setZoneOpen(false); }, [projectId]);
   const filter = (q: string, nextStatus: VisitorStatusFilter, replace = false) => {
     setParams(previous => {
@@ -47,37 +44,37 @@ export default function VisitorManagement() {
     <PageHeader title="Ziyaretçiler" scope={`${activeProject?.name ?? "Proje seçin"} · Geçici erişim kayıtları`}
       primaryAction={isAdmin && projectId ? { label: "Ziyaretçi kaydet", onClick: () => setPanel({ visitor: null, projectId }) } : undefined} />
     {loading ? <SectionSkeleton rows={6} label="Ziyaretçiler yükleniyor" /> : !projectId ? !isSuperAdmin ? <AccessDenied compact /> : <EmptyState title="Proje seçin" description="Ziyaretçileri görmek için erişiminiz olan aktif bir proje seçin." /> : <>
-      <QuerySectionBoundary title="Ziyaretçi özeti yüklenemedi" resetKey={projectId}><VisitorStats refreshKey={refreshKey} /></QuerySectionBoundary>
-      <QuerySectionBoundary title="Cihaz durumu yüklenemedi" resetKey={projectId}><div id="visitor-sync-status" tabIndex={-1} aria-label="Proje cihaz senkronizasyon durumu"><DeviceSyncStatusBanner /></div></QuerySectionBoundary>
+      <QuerySectionBoundary title="Ziyaretçi özeti yüklenemedi" resetKey={projectId}><VisitorStats now={now} onNextExpiry={onNextExpiry} /></QuerySectionBoundary>
+      <QuerySectionBoundary title="Cihaz durumu yüklenemedi" resetKey={projectId}><div id="visitor-sync-status" tabIndex={-1} aria-label="Proje cihaz senkronizasyon durumu"><DeviceSyncStatusBanner hideVerified /></div></QuerySectionBoundary>
       <VisitorFilters searchQuery={search} onSearchChange={q => filter(q, status, true)} statusFilter={status} onStatusFilterChange={value => filter(search, value)} onClear={clear} onNewZone={isAdmin ? () => setZoneOpen(true) : undefined} />
       <QuerySectionBoundary title="Ziyaretçiler yüklenemedi" description="Bağlantınızı kontrol edip tekrar deneyin." resetKey={resetKey}>
-        <VisitorList key={resetKey} search={search} status={status} pageSize={pageSize} onPageSizeChange={setPageSize} refreshKey={refreshKey} onOpen={visitor => setPanel({ visitor, projectId })} onClear={clear} onCreate={isAdmin ? () => setPanel({ visitor: null, projectId }) : undefined} />
+        <VisitorList key={resetKey} search={search} status={status} pageSize={pageSize} onPageSizeChange={setPageSize} now={now} onOpen={visitor => setPanel({ visitor, projectId })} onClear={clear} />
       </QuerySectionBoundary>
-      {panel && panel.projectId === projectId && <VisitorSlideOverPanel key={`${projectId}:${panel.visitor?._id ?? "new"}`} isOpen onClose={() => setPanel(null)} visitor={panel.visitor} onSave={() => setPanel(null)} refreshKey={refreshKey} canManage={isAdmin} />}
+      {panel && panel.projectId === projectId && <VisitorSlideOverPanel key={`${projectId}:${panel.visitor?._id ?? "new"}`} isOpen onClose={() => setPanel(null)} visitor={panel.visitor} onSave={() => setPanel(null)} now={now} canManage={isAdmin} />}
       {zoneOpen && <QuerySectionBoundary title="Erişim bölgeleri yüklenemedi" resetKey={projectId}><VisitorZoneDialog isOpen onClose={() => setZoneOpen(false)} /></QuerySectionBoundary>}
     </>}
   </div>;
 }
 
-function VisitorList({ search, status, pageSize, onPageSizeChange, refreshKey, onOpen, onClear, onCreate }: {
-  search: string; status: VisitorStatusFilter; pageSize: number; onPageSizeChange: (value: number) => void; refreshKey: number;
-  onOpen: (visitor: Visitor) => void; onClear: () => void; onCreate?: () => void;
+export function VisitorList({ search, status, pageSize, onPageSizeChange, now, onOpen, onClear }: {
+  search: string; status: VisitorStatusFilter; pageSize: number; onPageSizeChange: (value: number) => void; now: number;
+  onOpen: (visitor: Visitor) => void; onClear: () => void;
 }) {
   const [cursors, setCursors] = useState<(string | null)[]>([null]);
   const cursor = cursors[cursors.length - 1];
-  const result = useVisitors({ search, status: status === "all" ? undefined : status, cursor, pageSize, refreshKey });
+  const result = useVisitors({ search, status: status === "all" ? undefined : status, cursor, pageSize, now });
   // Project/filter changes remount VisitorList via resetKey; pagination resets this cache too.
   const page = useStableQuery(result.page, JSON.stringify([search, status, pageSize, cursor]));
   if (!page) return <SectionSkeleton rows={6} label="Ziyaretçiler yükleniyor" />;
-  const visitors = page.page;
+  const visitors = page.page.map(visitor => ({ ...visitor, status: displayVisitorStatus(visitor, now) }));
   const filtered = !!search.trim() || status !== "all";
   return <div className="min-w-0 space-y-3">
     {visitors.length ? <VisitorTable visitors={visitors} onOpen={onOpen} /> : <EmptyState
-      title={filtered ? "Bu sayfada eşleşen ziyaretçi yok" : cursors.length === 1 && page.isDone ? "Henüz ziyaretçi kaydı yok" : "Bu sayfada ziyaretçi kaydı yok"}
-      description={filtered ? "Aramayı veya durum filtrelerini değiştirin. Diğer sayfalarda eşleşen kayıtlar olabilir." : "Bu projede geçici erişim verilen ziyaretçiler burada görünür."}
-      action={filtered ? { label: "Filtreleri temizle", onClick: onClear } : onCreate ? { label: "Ziyaretçi kaydet", onClick: onCreate } : undefined} />}
-    <PaginationBar summary={`Sayfa ${cursors.length} · ${page.scannedCount} kayıt tarandı · ${visitors.length} kayıt gösteriliyor`} page={cursors.length}
+      title={filtered ? "Eşleşen ziyaretçi yok" : cursors.length === 1 && page.isDone ? "Henüz ziyaretçi kaydı yok" : "Bu sayfada ziyaretçi kaydı yok"}
+      description={filtered ? "Aramayı veya durum filtrelerini değiştirin." : "Bu projede geçici erişim verilen ziyaretçiler burada görünür."}
+      action={filtered ? { label: "Filtreleri temizle", onClick: onClear } : undefined} />}
+    {visitors.length > 0 && <PaginationBar summary={`Sayfa ${cursors.length} · ${visitors.length} kayıt`} page={cursors.length}
       onPrevious={() => setCursors(previous => previous.slice(0, -1))} onNext={() => setCursors(previous => [...previous, page.continueCursor])} nextDisabled={page.isDone}
-      pageSize={pageSize} pageSizes={[25, 50]} onPageSizeChange={onPageSizeChange} pageSizeLabel="Sayfadaki ziyaretçi sayısı" />
+      pageSize={pageSize} pageSizes={[25, 50]} onPageSizeChange={onPageSizeChange} pageSizeLabel="Sayfadaki ziyaretçi sayısı" />}
   </div>;
 }

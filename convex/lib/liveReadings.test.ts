@@ -3,7 +3,7 @@ import { ConvexError } from "convex/values";
 import { getFunctionName } from "convex/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { assignCardFromReading, getReading, listFiltered, listLiveSince } from "../cardReadings";
+import { assignCardFromReading, getReading, listFiltered, listLiveSince, searchMonitoringPeople, lastMonitoringReading } from "../cardReadings";
 import { update as updateEmployee } from "../employees";
 import { getCurrentUser } from "./auth";
 import { assignmentPrecondition, isPhysicalCardNumber, liveReadingSource, liveReadingWindow, matchesReadingResult, mergeLiveReadings } from "./liveReadings";
@@ -95,14 +95,18 @@ function context(rows: Doc<"cardReadings">[] = [reading()]) {
     let selected = [...(tables[table] ?? [])];
     let sortField = "_creationTime";
     const index = {
+      search: (field: string, value: string) => { selected = selected.filter(row => String(row[field]).toLowerCase().includes(value.toLowerCase())); return index; },
       eq: (field: string, value: unknown) => { selected = selected.filter(row => row[field] === value); return index; },
-      gt: (field: string, value: number) => { selected = selected.filter(row => typeof row[field] === "number" && row[field] > value); return index; },
+      gt: (field: string, value: string | number) => { selected = selected.filter(row => { const v = row[field]; return (typeof v === "number" || typeof v === "string") && v > value; }); return index; },
+      lt: (field: string, value: string | number) => { selected = selected.filter(row => { const v = row[field]; return (typeof v === "number" || typeof v === "string") && v < value; }); return index; },
       gte: (field: string, value: string | number) => { selected = selected.filter(row => { const v = row[field]; return (typeof v === "number" || typeof v === "string") && v >= value; }); return index; },
       lte: (field: string, value: string | number) => { selected = selected.filter(row => { const v = row[field]; return (typeof v === "number" || typeof v === "string") && v <= value; }); return index; },
     };
     const chain = {
       withIndex: (name: string, apply: (q: typeof index) => unknown) => { indexes.push(name); sortField = name.endsWith("_time") ? "accessTime" : "_creationTime"; apply(index); return chain; },
-      order: (direction: string) => { selected.sort((a, b) => String(a[sortField]).localeCompare(String(b[sortField]), undefined, { numeric: true }) * (direction === "desc" ? -1 : 1)); return chain; },
+      order: (direction: string) => { selected.sort((a, b) => (String(a[sortField]).localeCompare(String(b[sortField]), undefined, { numeric: true }) || Number(a._creationTime) - Number(b._creationTime) || String(a._id).localeCompare(String(b._id))) * (direction === "desc" ? -1 : 1)); return chain; },
+      withSearchIndex: (name: string, apply: (q: typeof index) => unknown) => { indexes.push(name); apply(index); return chain; },
+      [Symbol.asyncIterator]: async function* () { yield* selected; },
       collect: async () => selected,
       first: async () => selected[0] ?? null,
       take: async (n: number) => selected.slice(0, n),
@@ -121,6 +125,7 @@ function context(rows: Doc<"cardReadings">[] = [reading()]) {
   const runAfter = vi.fn(async () => "scheduled");
   const db = {
     query, patch,
+    normalizeId: (_table: string, id: string) => id === "invalid" ? null : id,
     get: async (id: string) => structuredClone(Object.values(tables).flat().find(row => row._id === id) ?? null),
     insert: vi.fn(async (table: string, row: Row) => { tables[table] = [...(tables[table] ?? []), row]; return "inserted"; }),
   };
@@ -222,9 +227,9 @@ describe("public handlers through real auth wrappers", () => {
       reading({ _id: "foreign" as Id<"cardReadings">, projectId: "foreign" as Id<"projects">, deviceId, ideIoId: 0, employeeId, accessTime: "2026-10-17T06:00:00Z" }),
     ]);
     const args = { projectId, doorId, employeeId, result: "unknown", paginationOpts: { numItems: 1, cursor: null } };
-    expect(await invoke(listFiltered, f.ctx, args)).toMatchObject({ page: [], isDone: false, continueCursor: "1", scannedCount: 1, filterScope: "candidatePage" });
-    expect(await invoke(listFiltered, f.ctx, { ...args, paginationOpts: { numItems: 1, cursor: "1" } })).toMatchObject({ page: [{ _id: "unknown", source: "card" }], isDone: false });
-    expect(await invoke(listFiltered, f.ctx, { ...args, paginationOpts: { numItems: 1, cursor: "2" } })).toMatchObject({ page: [], isDone: true });
+    const first = await invoke<{ continueCursor: string }>(listFiltered, f.ctx, args);
+    expect(first).toMatchObject({ page: [{ _id: "unknown", source: "card" }], scannedCount: 2, matchedCount: 1, filterScope: "boundedScan" });
+    expect(await invoke(listFiltered, f.ctx, { ...args, paginationOpts: { numItems: 1, cursor: first.continueCursor } })).toMatchObject({ page: [], isDone: true });
     expect(f.indexes).toContain("by_device_io_time");
   });
   it("employee and unknown-result index paths stay scoped", async () => {
@@ -264,5 +269,64 @@ describe("api-fix inactive assignment", () => {
     f.tables.groupDevices = [{ projectId, groupId: "rule", deviceId }];
     f.tables.devices[0] = { ...f.tables.devices[0], brand: "hikvision", isActive: false };
     expect(await invoke(assignCardFromReading, f.ctx, { readingId, employeeId, expectedCurrentCard: "old" })).toMatchObject({ syncStatus: "noTargets" });
+  });
+});
+
+
+describe("monitoring audit query regressions", () => {
+  it.each(["card", "qr", "mobile", "biometric"] as const)("filters %s on the server in history and live", async source => {
+    const rows = ["card", "qr", "mobile", "biometric"].map((kind, i) => reading({
+      _id: kind as Id<"cardReadings">, _creationTime: 100 + i,
+      rawData: JSON.stringify({ source: kind }), ...(kind === "biometric" ? { hikCurrentVerifyMode: "face" } : {}),
+    }));
+    const f = context(rows);
+    expect(await invoke(listFiltered, f.ctx, { projectId, source, paginationOpts: { numItems: 100, cursor: null } })).toMatchObject({ page: [{ _id: source }], scannedCount: 4 });
+    expect(await invoke(listLiveSince, f.ctx, { projectId, source, afterCreationTime: 0, limit: 500 })).toMatchObject({ rows: [{ _id: source }], latestCreationTime: 103 });
+  });
+  it("scans past nonmatching candidates to fill the source page", async () => {
+    const f = context([reading({ _id: "card" as Id<"cardReadings">, accessTime: "2026-10-18T00:00:00Z" }), reading({ _id: "qr" as Id<"cardReadings">, rawData: '{"source":"qr"}' })]);
+    const args = { projectId, source: "qr", paginationOpts: { numItems: 1, cursor: null } };
+    expect(await invoke(listFiltered, f.ctx, args)).toMatchObject({ page: [{ _id: "qr" }], scannedCount: 2, matchedCount: 1, scanLimitReached: false });
+  });
+  it("source history scan stops at budget and resumes without skipping the later match", async () => {
+    const cards = Array.from({ length: 2001 }, (_, i) => reading({ _id: `c${i}` as Id<"cardReadings">, _creationTime: 4000 - i, accessTime: new Date(1_800_000_000_000 - i * 1000).toISOString() }));
+    const qr = reading({ _id: "later-qr" as Id<"cardReadings">, _creationTime: 1, accessTime: "2020-01-01T00:00:00Z", rawData: '{"source":"qr"}' });
+    const f = context([...cards, qr]);
+    const args = { projectId, source: "qr", paginationOpts: { numItems: 1, cursor: null } };
+    const first = await invoke<{ continueCursor: string }>(listFiltered, f.ctx, args);
+    expect(first).toMatchObject({ page: [], scannedCount: 2000, matchedCount: 0, scanLimitReached: true, isDone: false });
+    expect(await invoke(listFiltered, f.ctx, { ...args, paginationOpts: { numItems: 1, cursor: first.continueCursor } })).toMatchObject({ page: [{ _id: "later-qr" }], scannedCount: 2, matchedCount: 1, scanLimitReached: false });
+  });
+  it("live source scan finds sparse matches beyond the old 500 candidates and reports budget exhaustion", async () => {
+    const cards = Array.from({ length: 600 }, (_, i) => reading({ _id: `c${i}` as Id<"cardReadings">, _creationTime: 4000 - i }));
+    const qr = reading({ _id: "sparse-qr" as Id<"cardReadings">, _creationTime: 1, rawData: '{"source":"qr"}' });
+    const f = context([...cards, qr]);
+    expect(await invoke(listLiveSince, f.ctx, { projectId, source: "qr", afterCreationTime: 0, limit: 1 })).toMatchObject({ rows: [{ _id: "sparse-qr" }], scannedCount: 601, matchedCount: 1, latestCreationTime: 4000, hasMore: false });
+    f.tables.cardReadings = Array.from({ length: 2001 }, (_, i) => reading({ _id: `c${i}` as Id<"cardReadings">, _creationTime: 4000 - i }));
+    expect(await invoke(listLiveSince, f.ctx, { projectId, source: "qr", afterCreationTime: 0, limit: 1 })).toMatchObject({ rows: [], scannedCount: 2000, matchedCount: 0, scanLimitReached: true, hasMore: true });
+  });
+  it("person search excludes visitors, including explicitly selected visitor IDs", async () => {
+    const f = context();
+    f.tables.employees.push({ ...f.employee, _id: "visitor", isVisitor: true });
+    for (const search of ["", "Ada", "Test"]) {
+      expect(await invoke(searchMonitoringPeople, f.ctx, { projectId, search, selectedId: "visitor" })).toMatchObject([{ _id: employeeId }]);
+      expect(await invoke<unknown[]>(searchMonitoringPeople, f.ctx, { projectId, search, selectedId: "visitor" })).toHaveLength(1);
+    }
+  });
+  it("person picker bounds results, searches both names and preserves selected person", async () => {
+    const f = context();
+    f.tables.employees = Array.from({ length: 100 }, (_, i) => ({ ...f.employee, _id: `person${i}`, firstName: `Ada${i}`, lastName: i === 99 ? "Unique" : "Test" }));
+    expect(await invoke<unknown[]>(searchMonitoringPeople, f.ctx, { projectId, search: "" })).toHaveLength(20);
+    expect(await invoke(searchMonitoringPeople, f.ctx, { projectId, search: "Unique" })).toMatchObject([{ _id: "person99" }]);
+    const selected = await invoke<{ _id: string }[]>(searchMonitoringPeople, f.ctx, { projectId, search: "Ada", selectedId: "person99" });
+    expect(selected.length).toBeLessThanOrEqual(41);
+    expect(selected.some(person => person._id === "person99")).toBe(true);
+    expect(f.indexes).toContain("search_first_name"); expect(f.indexes).toContain("search_last_name");
+  });
+  it("last reading includes earlier days and rejects foreign scope", async () => {
+    const f = context([reading({ accessTime: "2025-01-01T00:00:00Z" })]);
+    expect(await invoke(lastMonitoringReading, f.ctx, { projectId })).toEqual({ accessTime: "2025-01-01T00:00:00Z" });
+    await expect(invoke(lastMonitoringReading, f.ctx, { projectId: "foreign" })).rejects.toThrow();
+    expect(await invoke(getReading, f.ctx, { readingId: "invalid" })).toBeNull();
   });
 });

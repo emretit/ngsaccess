@@ -20,16 +20,6 @@ export function auditActorIndex(
     : auditIndex(projectId, targetTable, userId, action);
 }
 
-export function maskAuditEmail(email: string): string {
-  const at = email.lastIndexOf("@");
-  if (at < 1 || at === email.length - 1) return "***";
-  return `${email[0]}***@${email.slice(at + 1)}`;
-}
-
-function safeLabel(value: string): string {
-  return value.replace(/[^\s<>@]+@[^\s<>@]+/g, maskAuditEmail);
-}
-
 interface ActorEvent { userId?: Id<"users">; userName?: string; timestamp: number }
 interface ActorUser { _id: Id<"users">; fullName?: string; name?: string; email?: string }
 
@@ -62,10 +52,12 @@ export function mergeAuditActors(args: {
   const actors: AuditActorOption[] = [...ids].sort().map(userId => {
     const user = users.get(userId);
     const event = snapshots.get(userId);
-    const label = safeLabel(user?.fullName?.trim() || user?.name?.trim() || event?.userName?.trim() || "Silinmiş kullanıcı");
+    const label = user?.fullName?.trim() || user?.name?.trim() || event?.userName?.trim() || user?.email?.trim() || "Silinmiş kullanıcı";
+    // A recorded actor remains identifiable even without a current membership row.
     const status: AuditActorStatus = !user ? "deleted"
+      : event ? "active"
       : !args.allProjects && args.membershipComplete !== false && !members.has(userId) ? "removed"
-      : event ? "active" : "member";
+      : "member";
     return { userId, label, status, ...(event ? { lastSeenAt: event.timestamp } : {}) };
   });
   const counts = new Map<string, number>();
@@ -78,7 +70,7 @@ export function mergeAuditActors(args: {
     const key = actor.label.toLocaleLowerCase("tr-TR");
     if ((counts.get(key) ?? 0) > 1) {
       const email = users.get(actor.userId)?.email;
-      actor.label += ` (${email ? `${maskAuditEmail(email)} · ` : ""}Aktör ${index + 1})`;
+      actor.label += ` (${email ? `${email} · ` : ""}Aktör ${index + 1})`;
     }
     while (used.has(actor.label.toLocaleLowerCase("tr-TR"))) actor.label += ` · ${index + 1}`;
     used.add(actor.label.toLocaleLowerCase("tr-TR"));

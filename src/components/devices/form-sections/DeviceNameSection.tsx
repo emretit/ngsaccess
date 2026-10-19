@@ -15,7 +15,7 @@ export function DeviceNameSection({ form }: DeviceNameSectionProps) {
       name="name"
       render={({ field }) => (
         <FormItem>
-          <FormLabel>Panel Adı</FormLabel>
+          <FormLabel>Panel adı</FormLabel>
           <FormControl>
             <Input placeholder="Örn. Ana Giriş Paneli" {...field} />
           </FormControl>

@@ -66,9 +66,9 @@ function LeavesProject({
   );
   const filters = readFilters(params);
   useEffect(() => {
-    if (params !== urlParams || !params.get("scope")) {
+    if (params !== urlParams || params.has("scope")) {
       const next = new URLSearchParams(params);
-      next.set("scope", projectId);
+      next.delete("scope");
       setParams(next, { replace: true });
     }
   }, [params, urlParams, projectId, setParams]);
@@ -89,7 +89,7 @@ function LeavesProject({
       if (value) next.set(key, value);
       else next.delete(key);
     }
-    next.set("scope", projectId);
+    next.delete("scope");
     next.delete("leave");
     next.delete("cursor");
     setParams(next, { replace: true });

@@ -55,7 +55,7 @@ export function DeviceHikvisionSection({ form, device: initialDevice, onUpdated 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <FormField control={form.control} name="hik_transport" render={({ field }) => (
           <FormItem>
-            <FormLabel>İletişim Yöntemi</FormLabel>
+            <FormLabel>İletişim yöntemi</FormLabel>
             <Select onValueChange={field.onChange} value={field.value}>
               <FormControl><SelectTrigger><SelectValue placeholder="Seçin" /></SelectTrigger></FormControl>
               <SelectContent>
@@ -80,7 +80,7 @@ export function DeviceHikvisionSection({ form, device: initialDevice, onUpdated 
             <FormItem><FormLabel>Ehome ID (zorunlu)</FormLabel><FormControl><Input {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
           )} />
           <FormField control={form.control} name="ehome_key" render={({ field }) => (
-            <FormItem><FormLabel>Şifreleme Anahtarı (zorunlu)</FormLabel><FormControl><PasswordField {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
+            <FormItem><FormLabel>Şifreleme anahtarı (zorunlu)</FormLabel><FormControl><PasswordField {...field} value={field.value ?? ""} /></FormControl><FormMessage /></FormItem>
           )} />
         </div>
         {device?.hikOfflineHint && <p className="text-sm text-destructive">{device.hikOfflineHint}</p>}

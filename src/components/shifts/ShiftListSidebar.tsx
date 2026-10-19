@@ -1,3 +1,6 @@
+import type { FunctionReturnType } from "convex/server";
+import { shiftTimeLabel } from "./lib/planning";
+type DefinitionImpact = FunctionReturnType<typeof api.shifts.definitionImpacts>[number];
 import { useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -82,14 +85,13 @@ export function ShiftListSidebar({
                     <div className="min-w-0 flex-1">
                       <p className="font-medium break-words">{shift.name}</p>
                       <p className="text-xs text-muted-foreground tabular-nums">
-                        {shift.startTime}–{shift.endTime}
-                        {shift.endTime < shift.startTime ? " (+1 gün)" : ""}
+                        {shiftTimeLabel(shift)}
                       </p>
                       <QuerySectionBoundary
                         resetKey={shift._id}
-                        title="Kullanım sayısı yüklenemedi"
+                        title="Sayı yüklenemedi"
                       >
-                        <DefinitionCount shiftId={shift._id} />
+                        <DefinitionCount projectId={projectId} shiftId={shift._id} enabled={open} />
                       </QuerySectionBoundary>
                       <StatusBadge
                         tone={shift.isActive === false ? "neutral" : "success"}
@@ -153,15 +155,18 @@ export function ShiftListSidebar({
     </>
   );
 }
-function DefinitionCount({ shiftId }: { shiftId: Id<"shifts"> }) {
-  const impact = useQuery(api.shifts.assignmentDeleteImpact, { shiftId });
+export function DefinitionCount({ projectId, shiftId, enabled }: { projectId: Id<"projects">; shiftId: Id<"shifts">; enabled: boolean }) {
+  const impacts = useQuery(api.shifts.definitionImpacts, enabled ? { projectId } : "skip");
+  const impact: DefinitionImpact | undefined = impacts?.find(item => item.shiftId === shiftId);
+  if (!enabled || (impacts && !impact)) return <span className="text-xs text-muted-foreground">Sayı yüklenemedi</span>;
+  if (impact?.assignmentCount === null) return <span className="text-xs text-muted-foreground">Hesaplanamadı</span>;
   return impact ? (
     <p className="text-xs text-muted-foreground">
       Tüm dönemlerde {impact.countLabel.toLocaleLowerCase("tr-TR")}{" "}
       {impact.assignmentCount} atama serisi
       {impact.skippedAssignments > 0 && (
         <span className="block">
-          Proje bilgisi eksik {impact.skippedAssignments} seri sayım dışında.
+          Proje bilgisi eksik veya uyuşmayan {impact.skippedAssignments} seri sayım dışında.
         </span>
       )}
     </p>
@@ -171,16 +176,14 @@ function DefinitionCount({ shiftId }: { shiftId: Id<"shifts"> }) {
     </span>
   );
 }
-function DeleteImpact({
+export function DeleteImpact({
   shift,
   onClose,
 }: {
   shift: Shift;
   onClose: () => void;
 }) {
-  const impact = useQuery(api.shifts.assignmentDeleteImpact, {
-    shiftId: shift._id,
-  });
+  const impact = useQuery(api.shifts.assignmentDeleteImpact, { shiftId: shift._id });
   const remove = useMutation(api.shifts.remove);
   const [confirm, setConfirm] = useState(false);
   return (

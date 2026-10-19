@@ -98,6 +98,7 @@ const handlers = {
   listAssignments: registeredHandler(shifts.listAssignments),
   assignmentDeleteImpact: registeredHandler(shifts.assignmentDeleteImpact),
   definitionUsage: registeredHandler(shifts.definitionUsage),
+  definitionImpacts: registeredHandler(shifts.definitionImpacts),
   remove: registeredHandler(shifts.remove),
   assignShift: registeredHandler(shifts.assignShift),
   updateAssignment: registeredHandler(shifts.updateAssignment),
@@ -284,4 +285,49 @@ describe("api-fix eski istemci ve eski kayıt uyumu", () => {
     expect(await handlers.remove(memory.mutationCtx, { shiftId })).toEqual({ removedAssignments: 1, skippedAssignments: 1 });
     expect(memory.tables.get("shiftAssignments")).toEqual([{ ...assignmentRow, _id: "legacy", projectId: undefined }]);
   });
+});
+
+
+describe("09-O6 toplu tanım sayaçları", () => {
+  it("tüm tanımların sayacını bir çağrıda döner, kişileri tekilleştirir ve eski kaydı ayrı tutar", async () => {
+    const memory = seedMemory({ shifts: [shiftRow, { ...shiftRow, _id: "night", ...night }], shiftAssignments: [assignmentRow, { ...assignmentRow, _id: "a2" }, { ...assignmentRow, _id: "legacy", projectId: undefined }, { ...assignmentRow, _id: "a3", shiftId: "night" }] });
+    const result = await handlers.definitionImpacts(memory.queryCtx, { projectId });
+    expect(result).toEqual([
+      { shiftId, assignmentCount: 2, employeeCount: 1, skippedAssignments: 1, truncated: false, countLabel: "Toplam", hasAssignments: true },
+      { shiftId: "night", assignmentCount: 1, employeeCount: 1, skippedAssignments: 0, truncated: false, countLabel: "Toplam", hasAssignments: true },
+    ]);
+    expect(memory.reads.filter(read => read.table === "shiftAssignments")).toHaveLength(2);
+    expect(memory.reads.every(read => read.limit !== null)).toBe(true);
+  });
+  it("5000 satır bütçesinden sonra toplamı bilinmeyen tutar; boş tanımın silme etkisini ayrıca hesaplar", async () => {
+    const memory = seedMemory({ shifts: [shiftRow, { ...shiftRow, _id: "night" }], shiftAssignments: Array.from({ length: 5001 }, (_, i) => ({ ...assignmentRow, _id: `a${i}` })) });
+    const result = await handlers.definitionImpacts(memory.queryCtx, { projectId });
+    expect(result[0]).toMatchObject({ assignmentCount: 5000, truncated: true, countLabel: "En az" });
+    expect(result[1]).toMatchObject({ assignmentCount: null, employeeCount: null, countLabel: "Hesaplanamadı", hasAssignments: false });
+    expect(memory.reads.filter(read => read.table === "shiftAssignments")).toHaveLength(2);
+    expect(memory.reads.filter(read => read.table === "shiftAssignments")[1]?.limit).toBe(1);
+    expect(await handlers.assignmentDeleteImpact(memory.queryCtx, { shiftId: "night" as Id<"shifts"> })).toMatchObject({ assignmentCount: 0, truncated: false });
+    expect(memory.reads.find(read => read.table === "shiftAssignments")?.limit).toBe(5001);
+  });
+  it("bütçesi biten ama ataması olan tanımda index üzerinden varlık bilgisini korur", async () => {
+    const memory = seedMemory({ shifts: [shiftRow, { ...shiftRow, _id: "night" }], shiftAssignments: [
+      ...Array.from({ length: 5000 }, (_, i) => ({ ...assignmentRow, _id: `a${i}` })),
+      { ...assignmentRow, _id: "night-assignment", shiftId: "night" },
+    ] });
+    const result = await handlers.definitionImpacts(memory.queryCtx, { projectId });
+    expect(result[1]).toMatchObject({ assignmentCount: null, hasAssignments: true, countLabel: "Hesaplanamadı" });
+    expect(await handlers.assignmentDeleteImpact(memory.queryCtx, { shiftId: "night" as Id<"shifts"> })).toMatchObject({ assignmentCount: 1, truncated: false });
+  });
+  it("başka projeye erişimi reddeder, bozuk proje bağlantısını sayım dışında tutar", async () => {
+    const memory = seedMemory({ shiftAssignments: [{ ...assignmentRow, projectId: "other" }] });
+    await expect(handlers.definitionImpacts(memory.queryCtx, { projectId: "other" as Id<"projects"> })).rejects.toThrow("erişim");
+    expect(await handlers.definitionImpacts(memory.queryCtx, { projectId })).toMatchObject([{ assignmentCount: 0, skippedAssignments: 1, hasAssignments: false }]);
+  });
+});
+
+
+it("09-O4: gece çakışmasının gerekçesi de ortak ertesi gün etiketini kullanır", () => {
+  const result = evaluateShiftAssignment({ ...base, shift: night, existing: [existing({ shift: night })] });
+  expect(result.status).toBe("conflict");
+  expect(result.reason).toContain("22:00–06:00 (+1 gün)");
 });

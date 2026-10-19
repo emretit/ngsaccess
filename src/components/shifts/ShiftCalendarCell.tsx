@@ -1,3 +1,4 @@
+import { shiftTimeLabel } from "./lib/planning";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { dayLabel, type DayData } from "./lib/planning";
 import { LEAVE_TYPE_LABEL_TR } from "./lib/calendarOverlays";
@@ -29,7 +30,7 @@ export function ShiftCalendarCell({
             <span className="text-muted-foreground tabular-nums">
               {continuation
                 ? `Önceki günden · 00:00–${shift.endTime}`
-                : `${shift.startTime}–${shift.endTime}${shift.endTime < shift.startTime ? " (+1 gün)" : ""}`}
+                : shiftTimeLabel(shift)}
             </span>
           </span>
         ))}

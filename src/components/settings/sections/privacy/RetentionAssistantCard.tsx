@@ -51,7 +51,7 @@ function RetentionForm({ projectId, days }: { projectId: Id<"projects">; days: n
     }}>
       <fieldset disabled={save.pending || confirmPending} className="min-w-0 space-y-4">
         <FormFieldWrapper htmlFor="retention-mode" label="Saklama seçimi">
-          <select id="retention-mode" className="h-10 w-full rounded-md border border-control bg-background px-3 text-sm" value={draft.values.unlimited ? "unlimited" : "custom"} onChange={event => draft.change({ unlimited: event.target.value === "unlimited" })}>
+          <select id="retention-mode" className="h-9 w-full rounded-md border border-control bg-background px-3 text-sm" value={draft.values.unlimited ? "unlimited" : "custom"} onChange={event => draft.change({ unlimited: event.target.value === "unlimited" })}>
             <option value="unlimited">Süresiz</option><option value="custom">Özel gün sayısı</option>
           </select>
         </FormFieldWrapper>
@@ -89,7 +89,7 @@ function AssistantForm({ projectId, enabled }: { projectId: Id<"projects">; enab
     <p className="text-sm text-warning">Kapatırsanız çalışan adları üçüncü taraf yapay zeka servisine gönderilir.</p>
     <DraftNotice remoteChanged={draft.remoteChanged} failed={failed} />
     <form className="space-y-4" onSubmit={async event => { event.preventDefault(); if (needsUnmaskConfirmation(enabled, draft.values.enabled)) { setConfirmUnmask(true); return; } setFailed(!await save.run()); }}>
-      <FormFieldWrapper htmlFor="assistant-mask" label="Çalışan isimlerini maskele" className="flex items-center gap-3 space-y-0">
+      <FormFieldWrapper htmlFor="assistant-mask" label="Çalışan isimlerini maskele" inline>
         <Switch id="assistant-mask" checked={draft.values.enabled} disabled={busy} onCheckedChange={next => draft.change({ enabled: next })} />
       </FormFieldWrapper>
       <SettingsSaveBar dirty={draft.dirty} saving={busy} label="Asistan gizliliğini kaydet" onCancel={() => { draft.reset(); setFailed(false); }} />

@@ -3,13 +3,8 @@
  *
  * Bu modül `ctx`/DB/async İÇERMEZ — yalnız plain-type girdi alıp değer döner,
  * böylece `accessDecision.ts` / `reconcileMath.ts` gibi birim-test edilebilir.
- * cardReadings.ts'teki 4 PDKS query'sinin (table/payroll/detail/chart) ortak,
- * **kanıtlanabilir aynı** alt-adımları buraya taşınır; her view'ın kendine özgü
- * (raw vs net dakika, sabit-8h mesai gibi) sapmaları çağıran tarafta korunur.
- *
- * Matematik primitifleri (`classifyDay`, `evaluateLateEarly`, `dailyOvertimeForShift`,
- * `netWorkMinutes`, `parseHHMM` …) zaten pdksHelpers/breakDeduction/overtimeCalc'te;
- * burada YENİDEN YAZILMAZ.
+ * Tablo, bordro ve kişi detayının toplam/net/fazla mesai hesabı pdksDay.ts'te
+ * birleşir; bu modül biçimleme, dönem ve durum gibi küçük saf yapı taşlarını içerir.
  */
 import {
   parseHHMM,
