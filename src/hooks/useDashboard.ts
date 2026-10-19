@@ -18,8 +18,13 @@ export function useDashboardActivity() {
   const summary = useQuery(api.dashboard.getActivitySummary, scope.enabled ? { projectId: scope.projectId } : "skip");
   return { summary, loading: scope.loading || (scope.enabled && summary === undefined) };
 }
-export function useDashboardReadings() {
+export function useDashboardTimeline() {
   const scope = useDashboardScope();
-  const readings = useQuery(api.dashboard.getRecentReadings, scope.enabled ? { projectId: scope.projectId, limit: 10 } : "skip");
+  const timeline = useQuery(api.dashboard.getTodayTimeline, scope.enabled ? { projectId: scope.projectId } : "skip");
+  return { timeline, loading: scope.loading || (scope.enabled && timeline === undefined) };
+}
+export function useDashboardReadings(limit = 10) {
+  const scope = useDashboardScope();
+  const readings = useQuery(api.dashboard.getRecentReadings, scope.enabled ? { projectId: scope.projectId, limit } : "skip");
   return { readings: readings ?? [], loading: scope.loading || (scope.enabled && readings === undefined) };
 }

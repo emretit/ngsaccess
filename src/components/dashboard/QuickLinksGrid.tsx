@@ -1,18 +1,45 @@
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useDashboardStats } from "@/hooks/useDashboard";
 import { visibleRoutes } from "@/lib/routeMeta";
+import { DashboardPanel } from "./DashboardPanel";
 
-const links = [
-  { href: "/employees", description: "Projedeki kişi bilgilerini görüntüleyin." },
-  { href: "/pdks-records", description: "Personel giriş çıkış kayıtlarını inceleyin." },
-  { href: "/settings", description: "Proje ayarlarını yapılandırın." },
+type Stats = ReturnType<typeof useDashboardStats>["stats"];
+
+const links: { href: string; description: (stats: Stats) => string }[] = [
+  { href: "/employees", description: (stats) => stats ? `${stats.employees.toLocaleString("tr-TR")} kişi kayıtlı` : "Proje personelini görüntüleyin" },
+  { href: "/access-control", description: (stats) => stats?.pendingRequests ? `${stats.pendingRequests.toLocaleString("tr-TR")} pasif erişim kuralı` : "Erişim kurallarını yönetin" },
+  { href: "/pdks-records", description: () => "Giriş çıkış kayıtlarını inceleyin" },
+  { href: "/reports", description: () => "Devam raporlarını oluşturun" },
+  { href: "/settings", description: () => "Proje ayarlarını yapılandırın" },
 ];
+
 export default function QuickLinksGrid() {
   const { profile } = useAuth();
+  const { stats } = useDashboardStats();
   const routes = visibleRoutes(profile?.role);
-  return <section><h2 className="text-base font-semibold">Hızlı erişim</h2><div className="mt-4">{links.map(link => {
-    const route = routes.find(item => item.href === link.href);
-    return route ? <Link key={route.href} to={route.href} className="flex items-center gap-3 border-b py-[13px] hover:bg-subtle"><div><strong className="font-[550]">{route.name}</strong><p className="mt-0.5 text-xs text-muted-foreground">{link.description}</p></div><ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" /></Link> : null;
-  })}</div></section>;
+  return (
+    <DashboardPanel title="Hızlı erişim">
+      <ul className="divide-y">
+        {links.map((link) => {
+          const route = routes.find((item) => item.href === link.href);
+          if (!route) return null;
+          const Icon = route.icon;
+          return (
+            <li key={route.href}>
+              <Link to={route.href} className="flex min-h-11 items-center gap-3 px-4 py-2 hover:bg-subtle min-[761px]:px-5">
+                <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">{route.name}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{link.description(stats)}</span>
+                </span>
+                <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </DashboardPanel>
+  );
 }

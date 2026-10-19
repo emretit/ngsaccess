@@ -1,6 +1,7 @@
 import { filterPdksReadings } from "./lib/pdksSource";
 import { summarizeDailyReadings } from "./lib/dashboardActivity";
 import { countDashboardRows } from "./lib/dashboardCounts";
+import { createHourlyCounter } from "./lib/dashboardTimeline";
 import { trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
 import type { QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
@@ -105,6 +106,30 @@ export const getStats = authedQuery({
       cardReadings: todayReadings,
       pendingRequests: pendingRules,
     };
+  },
+});
+
+/** Bugünkü kart okumalarının İstanbul saatine göre saatlik dağılımı (izin / ret). */
+export const getTodayTimeline = authedQuery({
+  args: {
+    projectId: v.optional(v.id("projects")),
+  },
+  handler: async (ctx, args) => {
+    const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
+    const today = trTodayKey();
+    const { startISO, endISO } = trDayRangeISO(today, today);
+    const counter = createHourlyCounter();
+    const queries =
+      ctx.user.role === "super_admin" && !args.projectId
+        ? [ctx.db.query("cardReadings").withIndex("by_access_time", (q) =>
+            q.gte("accessTime", startISO).lte("accessTime", endISO))]
+        : allowedProjectIds.map((pid) =>
+            ctx.db.query("cardReadings").withIndex("by_project_access_time", (q) =>
+              q.eq("projectId", pid).gte("accessTime", startISO).lte("accessTime", endISO)));
+    for (const query of queries) {
+      for await (const reading of query) counter.add(reading);
+    }
+    return counter.result();
   },
 });
 

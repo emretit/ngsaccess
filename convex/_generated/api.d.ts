@@ -84,6 +84,7 @@ import type * as lib_checkInUx from "../lib/checkInUx.js";
 import type * as lib_customFunctions from "../lib/customFunctions.js";
 import type * as lib_dashboardActivity from "../lib/dashboardActivity.js";
 import type * as lib_dashboardCounts from "../lib/dashboardCounts.js";
+import type * as lib_dashboardTimeline from "../lib/dashboardTimeline.js";
 import type * as lib_departmentTree from "../lib/departmentTree.js";
 import type * as lib_deviceConnection from "../lib/deviceConnection.js";
 import type * as lib_deviceHelpers from "../lib/deviceHelpers.js";
@@ -264,6 +265,7 @@ declare const fullApi: ApiFromModules<{
   "lib/customFunctions": typeof lib_customFunctions;
   "lib/dashboardActivity": typeof lib_dashboardActivity;
   "lib/dashboardCounts": typeof lib_dashboardCounts;
+  "lib/dashboardTimeline": typeof lib_dashboardTimeline;
   "lib/departmentTree": typeof lib_departmentTree;
   "lib/deviceConnection": typeof lib_deviceConnection;
   "lib/deviceHelpers": typeof lib_deviceHelpers;
