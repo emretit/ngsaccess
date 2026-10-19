@@ -29,7 +29,7 @@ export default function Layout() {
       previousPath.current = location.pathname;
     }
   }, [location.pathname]);
-  const pageTitle = routeMeta.find((item) => item.href === location.pathname)?.name ?? "";
+  const pageTitle = routeMeta.find((item) => location.pathname === item.href || location.pathname.startsWith(`${item.href}/`))?.name ?? "";
   if (loading) return <LoadingSpinner text="Sistem hazırlanıyor..." />;
   if (!session || profile?.verified === false) {
     const next = location.pathname + location.search + location.hash;

@@ -1,3 +1,9 @@
+import {
+  readingResult,
+  READING_SOURCE_LABELS,
+  splitPdksEligible,
+  toReportTransactionRow,
+} from "./reportAttendance";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
@@ -84,4 +90,125 @@ it("biyometrik okuma zamanlanmış rapor yükleyicisinde bir kez süzülür", as
   expect(spy).toHaveBeenCalledTimes(1);
   const card = await loadAttendanceReport(ctx([{ ...raw[0], hikCurrentVerifyMode: "card" }]), [projectId], 2026, 1);
   expect(card.rows[0]?.presentDays).toBe(1);
+});
+
+
+
+type EnrichedReading = Parameters<typeof toReportTransactionRow>[0];
+
+function reading(overrides: Partial<EnrichedReading> = {}): EnrichedReading {
+  return {
+    _id: "reading" as Id<"cardReadings">,
+    _creationTime: 0,
+    cardNo: "123",
+    accessTime: "2026-10-18T21:30:00.000Z",
+    createdAt: "2026-10-18T21:30:00.000Z",
+    updatedAt: "2026-10-18T21:30:00.000Z",
+    source: "unknown",
+    devices: null,
+    employees: null,
+    door: null,
+    ...overrides,
+  };
+}
+
+describe("report transaction results", () => {
+  it.each([
+    ["izin_verildi", "granted"],
+    ["reddedildi", "denied"],
+    [undefined, "unknown"],
+  ] as const)("maps %s to %s", (status, expected) => {
+    expect(readingResult(status)).toBe(expected);
+  });
+});
+
+describe("report biometric boundary", () => {
+  it("preserves eligible sources and order without mutating the input", () => {
+    const eligible = [
+      { cardNo: "123", ideIoId: 0 },
+      { hikMajorEventType: 5, hikSubEventType: 0x65 },
+      { rawData: '{"source":"qr"}' },
+      { rawData: '{"source":"mobile"}' },
+      { rawData: '{"source":"manual"}' },
+      {},
+    ];
+    const rows = Object.freeze([
+      eligible[0],
+      { hikMajorEventType: 5, hikSubEventType: 0x26, cardNo: "123" },
+      ...eligible.slice(1),
+      { hikMajorEventType: 5, hikSubEventType: 0x4b, hikCurrentVerifyMode: "card" },
+    ]);
+    const result = splitPdksEligible(rows);
+    expect(result.eligible).toEqual(eligible);
+    expect(result.hiddenBiometricCount).toBe(2);
+    expect(rows).toHaveLength(8);
+    expect(result.eligible[0]).toBe(rows[0]);
+  });
+
+  it("handles empty and exclusively biometric pages", () => {
+    expect(splitPdksEligible([])).toEqual({ eligible: [], hiddenBiometricCount: 0 });
+    expect(splitPdksEligible([
+      { hikCurrentVerifyMode: "cardAndFace" },
+      { rawData: '<EventNotificationAlert><majorEventType>5</majorEventType><subEventType>75</subEventType></EventNotificationAlert>' },
+    ])).toEqual({ eligible: [], hiddenBiometricCount: 2 });
+  });
+});
+
+describe("report transaction rows", () => {
+  it("falls back to the reading name and uses explicit nullable/unknown fields", () => {
+    const row = toReportTransactionRow(reading({ employeeName: "Eski Kişi" }));
+    expect(row).toEqual({
+      _id: "reading",
+      accessTime: "2026-10-18T21:30:00.000Z",
+      employeeId: null,
+      employeeName: "Eski Kişi",
+      department: null,
+      cardNo: "123",
+      deviceName: null,
+      doorName: null,
+      direction: "unknown",
+      result: "unknown",
+      denialReason: null,
+      source: "card",
+      sourceLabel: "Kart",
+    });
+    expect(toReportTransactionRow(reading()).employeeName).toBeNull();
+  });
+
+  it("uses employee, department, device and IDE door enrichment", () => {
+    const employeeId = "employee" as Id<"employees">;
+    const row = toReportTransactionRow(reading({
+      employeeId,
+      employeeName: "Eski Ad",
+      employees: { _id: employeeId, firstName: "Ada", lastName: "Yılmaz", departments: { name: "Üretim" } },
+      devices: { name: "Panel", deviceSerial: "serial" },
+      door: { _id: "door" as Id<"doors">, name: "Ana Kapı", readerName: "Okuyucu", readerDirection: "exit" },
+      direction: "entry",
+      accessStatus: "reddedildi",
+      hikDenialReason: "Yetki yok",
+    }));
+    expect(row).toMatchObject({
+      employeeId, employeeName: "Ada Yılmaz", department: "Üretim", deviceName: "Panel",
+      doorName: "Ana Kapı", direction: "entry", result: "denied", denialReason: "Yetki yok",
+    });
+    expect(row).not.toHaveProperty("rawData");
+    expect(row).not.toHaveProperty("hikPictureURL");
+  });
+
+  it.each([
+    ["card", "card", "Kart"],
+    ["password", "pin", "Şifre"],
+    ["qr", "qr", "QR"],
+    ["mobile", "mobile", "Mobil"],
+  ] as const)("classifies %s independently of audit source", (mode, source, sourceLabel) => {
+    expect(toReportTransactionRow(reading({ hikCurrentVerifyMode: mode }))).toMatchObject({ source, sourceLabel });
+  });
+
+  it("labels manual and unknown events in Turkish", () => {
+    expect(toReportTransactionRow(reading({ rawData: '{"source":"manual"}' })))
+      .toMatchObject({ source: "manual", sourceLabel: "Manuel" });
+    expect(toReportTransactionRow(reading({ cardNo: "", hikMajorEventType: 3 })))
+      .toMatchObject({ source: "unknown", sourceLabel: "Bilinmiyor" });
+    expect(READING_SOURCE_LABELS.biometric).toBe("Biyometrik");
+  });
 });

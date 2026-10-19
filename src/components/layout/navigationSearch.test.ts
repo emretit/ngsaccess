@@ -3,7 +3,7 @@ import { filterNavigationRoutes, normalizeNavigationSearch } from "./navigationS
 import { visibleRoutes } from "@/lib/routeMeta";
 
 describe("navigation visibility and Turkish search", () => {
-  it.each([["super_admin", 13], ["project_admin", 12], ["project_user", 10]])("%s has %i menu routes", (role, count) => {
+  it.each([["super_admin", 14], ["project_admin", 13], ["project_user", 11]])("%s has %i menu routes", (role, count) => {
     expect(visibleRoutes(String(role))).toHaveLength(Number(count));
   });
   it("includes profile but not hidden engineering or unauthorized routes", () => {
@@ -23,6 +23,6 @@ describe("navigation visibility and Turkish search", () => {
     expect(filterNavigationRoutes("super_admin", "bulunmayan")).toEqual([]);
   });
   it("keeps the specified group order", () => {
-    expect(visibleRoutes("super_admin").map(route => route.group)).toEqual([...Array(7).fill("main"), ...Array(3).fill("attendance"), ...Array(3).fill("management")]);
+    expect(visibleRoutes("super_admin").map(route => route.group)).toEqual([...Array(7).fill("main"), ...Array(4).fill("attendance"), ...Array(3).fill("management")]);
   });
 });

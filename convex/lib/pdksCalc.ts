@@ -82,6 +82,20 @@ export function computeLateMinutes(
   return Math.max(0, istanbulMins - startMins - tolerance);
 }
 
+/**
+ * Tolerans sonrası erken çıkış dakikası: vardiya bitişi - tolerans - çıkış saati.
+ * `isEarlyExit` false ya da çıkış yoksa 0.
+ */
+export function computeEarlyExitMinutes(
+  lastISO: string | null | undefined,
+  isEarlyExit: boolean,
+  settings: EffectiveWorkSettings,
+): number {
+  if (!isEarlyExit || !lastISO) return 0;
+  const threshold = parseHHMM(settings.workEndTime) - settings.earlyExitToleranceMinutes;
+  return Math.max(0, threshold - isoTimeToTRMinutes(lastISO));
+}
+
 /** summary modu yalnız bu 4 değeri üretir (hafta sonu/tatil yok). */
 export type SummaryDayStatus = "present" | "late" | "absent" | "leave";
 

@@ -259,6 +259,16 @@ describe("pdksTable – computePdksTableRow", () => {
         leaveType: null,
         payrollCode: "N",
         overtimeMinutes: 105,
+        detail: {
+          dayType: "workday",
+          shiftName: null,
+          plannedStart: "09:00",
+          plannedEnd: "18:00",
+          isEarlyExit: false,
+          earlyExitMinutes: 0,
+          readingCount: 0,
+          isManual: true,
+        },
       },
       {
         date: TUESDAY,
@@ -271,6 +281,16 @@ describe("pdksTable – computePdksTableRow", () => {
         leaveType: "sick",
         payrollCode: "İZN",
         overtimeMinutes: 0,
+        detail: {
+          dayType: "workday",
+          shiftName: null,
+          plannedStart: "09:00",
+          plannedEnd: "18:00",
+          isEarlyExit: false,
+          earlyExitMinutes: 0,
+          readingCount: 0,
+          isManual: false,
+        },
       },
       {
         date: SATURDAY,
@@ -283,8 +303,69 @@ describe("pdksTable – computePdksTableRow", () => {
         leaveType: null,
         payrollCode: "RT",
         overtimeMinutes: 0,
+        detail: {
+          dayType: "holiday",
+          shiftName: null,
+          plannedStart: "09:00",
+          plannedEnd: "18:00",
+          isEarlyExit: false,
+          earlyExitMinutes: 0,
+          readingCount: 0,
+          isManual: false,
+        },
       },
     ]);
+  });
+});
+
+describe("pdksTable – rapor gün ayrıntısı", () => {
+  it("vardiya planı, geç kalma ve erken çıkış dakikaları tolerans düşülerek hücrede", () => {
+    const shift = {
+      _id: "shift_1",
+      name: "Sabah",
+      startTime: "08:00",
+      endTime: "17:00",
+      lateToleranceMinutes: 10,
+      earlyExitToleranceMinutes: 5,
+    } as unknown as Doc<"shifts">;
+    const row = computePdksTableRow(
+      rowParams({
+        empReadings: [
+          reading(`${MONDAY}T05:30:00.000Z`), // TR 08:30
+          reading(`${MONDAY}T13:00:00.000Z`), // TR 16:00
+        ],
+        isSingleDay: false,
+        viewMode: "matrix",
+        resolveShift: () => shift,
+      }),
+    );
+
+    expect(row.days[0]).toMatchObject({
+      status: "late",
+      isLate: true,
+      lateMinutes: 20,
+      detail: {
+        dayType: "workday",
+        shiftName: "Sabah",
+        plannedStart: "08:00",
+        plannedEnd: "17:00",
+        isEarlyExit: true,
+        earlyExitMinutes: 55,
+        readingCount: 2,
+        isManual: false,
+      },
+    });
+  });
+
+  it("tek okumada çıkış yok: erken çıkış sayılmaz", () => {
+    const row = computePdksTableRow(
+      rowParams({
+        empReadings: [reading(`${MONDAY}T06:00:00.000Z`)],
+        isSingleDay: false,
+        viewMode: "matrix",
+      }),
+    );
+    expect(row.days[0]?.detail).toMatchObject({ isEarlyExit: false, earlyExitMinutes: 0, readingCount: 1 });
   });
 });
 

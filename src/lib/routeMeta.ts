@@ -1,5 +1,5 @@
 import { capabilities } from "./capabilities";
-import { Activity, CalendarClock, ClipboardList, Cpu, DoorOpen, FileText, Home, Palmtree, Settings, Shield, ShieldCheck, Users, Wrench, ScanLine, User, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, CalendarClock, ClipboardList, Cpu, DoorOpen, FileText, Home, Palmtree, Settings, Shield, ShieldCheck, Users, Wrench, ScanLine, User, type LucideIcon } from "lucide-react";
 
 export interface RouteMeta { href: string; name: string; icon: LucideIcon; adminOnly?: boolean; superAdminOnly?: boolean; menu?: boolean; group?: "main" | "attendance" | "management" }
 export const routeMeta: RouteMeta[] = [
@@ -13,6 +13,7 @@ export const routeMeta: RouteMeta[] = [
   { href: "/pdks-records", group: "attendance", name: "PDKS Kayıtları", icon: FileText },
   { href: "/shifts", group: "attendance", name: "Vardiyalar", icon: CalendarClock },
   { href: "/leaves", group: "attendance", name: "İzinler", icon: Palmtree },
+  { href: "/reports", group: "attendance", name: "Raporlar", icon: BarChart3 },
   { href: "/audit-log", group: "management", name: "Denetim Kaydı", icon: ClipboardList, adminOnly: true },
   { href: "/engineering-department", name: "Mühendislik", icon: Wrench, menu: false },
   { href: "/system-admin", group: "management", name: "Admin", icon: ShieldCheck, superAdminOnly: true },

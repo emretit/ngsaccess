@@ -16,6 +16,7 @@ import {
 } from "./pdksHelpers";
 import { settingsForShift } from "./shiftResolver";
 import {
+  computeEarlyExitMinutes,
   computeLateMinutes,
   formatHoursLabel,
   formatIstanbulTime,
@@ -42,6 +43,19 @@ export function classifyPdksDay(params: {
   return resolveDayStatus({ ...params, mode: "calendar", classification: params.classification === "halfDayHoliday" ? "holiday" : params.classification });
 }
 
+/** Rapor ekranları için gün ayrıntısı: plan (vardiya) ve gerçekleşen yan yana. */
+export type PdksDayDetail = {
+  dayType: "workday" | "weekend" | "holiday" | "halfDayHoliday";
+  shiftName: string | null;
+  plannedStart: string;
+  plannedEnd: string;
+  isEarlyExit: boolean;
+  /** `lateMinutes` gibi tolerans düşülerek hesaplanır. */
+  earlyExitMinutes: number;
+  readingCount: number;
+  isManual: boolean;
+};
+
 export type PdksTableDayCell = {
   date: string;
   firstEntry: string | null;
@@ -53,6 +67,8 @@ export type PdksTableDayCell = {
   lateMinutes: number;
   payrollCode: string;
   overtimeMinutes: number;
+  /** Matris modunda her zaman dolu; testlerde elle kurulan hücrelerde yok. */
+  detail?: PdksDayDetail;
 };
 
 export type PdksTableRow = {
@@ -391,7 +407,7 @@ export function computePdksTableRow(params: {
       });
       const dayShift = employee ? resolveShift(employee._id, dk) : null;
       const daySettings = settingsForShift(dayShift, workSettings);
-      const { isLate: dayLate } = evaluateLateEarly(
+      const { isLate: dayLate, isEarlyExit: dayEarly } = evaluateLateEarly(
         firstISO ?? undefined,
         lastISO ?? undefined,
         daySettings,
@@ -428,6 +444,16 @@ export function computePdksTableRow(params: {
         lateMinutes,
         payrollCode: dayStatus === "future" || dayStatus === "noData" ? "—" : dayCode,
         overtimeMinutes: dayOvertime,
+        detail: {
+          dayType: cls,
+          shiftName: dayShift?.name ?? null,
+          plannedStart: daySettings.workStartTime,
+          plannedEnd: daySettings.workEndTime,
+          isEarlyExit: dayEarly,
+          earlyExitMinutes: computeEarlyExitMinutes(lastISO, dayEarly, daySettings),
+          readingCount: dayReadings.length,
+          isManual: !!manualDay,
+        },
       });
     }
   }

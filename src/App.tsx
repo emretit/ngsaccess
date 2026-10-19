@@ -25,6 +25,7 @@ const Leaves = lazy(() => import('@/pages/Leaves'));
 const CheckIn = lazy(() => import('@/pages/CheckIn'));
 const Settings = lazy(() => import('@/pages/Settings'));
 const AuditLog = lazy(() => import('@/pages/AuditLog'));
+const Reports = lazy(() => import('@/pages/Reports'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const SystemAdmin = lazy(() => import('@/pages/SystemAdmin'));
 const EngineeringDepartment = lazy(() => import('@/pages/EngineeringDepartment'));
@@ -77,6 +78,9 @@ function AppContent() {
           <Route path="/leaves" element={<Leaves />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/audit-log" element={<AuditLog />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/reports/:group" element={<Reports />} />
+          <Route path="/reports/:group/:slug" element={<Reports />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/engineering-department" element={<EngineeringDepartment />} />
         </Route>

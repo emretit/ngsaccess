@@ -1,3 +1,10 @@
+import type { enrichReadingsForList } from "./cardReadingAudit";
+import {
+  classifyReadingSource,
+  isPdksEligibleReading,
+  type PdksReadingSource,
+  type PdksSourceReading,
+} from "./pdksSource";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { buildPdksEmployeeReadingMap, computePdksTableRow } from "./pdksTable";
@@ -114,4 +121,75 @@ export async function loadAttendanceReport(ctx: QueryCtx, projectIds: Id<"projec
     reliabilityNote: ATTENDANCE_RELIABILITY_NOTE,
     rows: projectRows.flat().sort((a, b) => a.name.localeCompare(b.name, "tr")),
   };
+}
+
+export type ReportTransactionResult = "granted" | "denied" | "unknown";
+
+export type ReportTransactionRow = {
+  _id: Id<"cardReadings">;
+  accessTime: string;
+  employeeId: Id<"employees"> | null;
+  employeeName: string | null;
+  department: string | null;
+  cardNo: string;
+  deviceName: string | null;
+  doorName: string | null;
+  direction: "entry" | "exit" | "unknown";
+  result: ReportTransactionResult;
+  denialReason: string | null;
+  source: PdksReadingSource;
+  sourceLabel: string;
+};
+
+export const READING_SOURCE_LABELS: Record<PdksReadingSource, string> = {
+  card: "Kart",
+  pin: "Şifre",
+  qr: "QR",
+  mobile: "Mobil",
+  manual: "Manuel",
+  biometric: "Biyometrik",
+  unknown: "Bilinmiyor",
+};
+
+export function readingResult(status: Doc<"cardReadings">["accessStatus"]): ReportTransactionResult {
+  if (status === "izin_verildi") return "granted";
+  if (status === "reddedildi") return "denied";
+  return "unknown";
+}
+
+/** Call only after splitting out biometric readings at the report query boundary. */
+export function toReportTransactionRow(
+  enriched: Awaited<ReturnType<typeof enrichReadingsForList>>[number],
+): ReportTransactionRow {
+  const source = classifyReadingSource(enriched);
+  const employee = enriched.employees;
+  return {
+    _id: enriched._id,
+    accessTime: enriched.accessTime,
+    employeeId: enriched.employeeId ?? null,
+    employeeName: employee
+      ? `${employee.firstName} ${employee.lastName}`.trim()
+      : enriched.employeeName ?? null,
+    department: employee?.departments?.name ?? null,
+    cardNo: enriched.cardNo,
+    deviceName: enriched.devices?.name ?? null,
+    doorName: enriched.door?.name ?? null,
+    direction: enriched.direction ?? "unknown",
+    result: readingResult(enriched.accessStatus),
+    denialReason: enriched.hikDenialReason ?? null,
+    source,
+    sourceLabel: READING_SOURCE_LABELS[source],
+  };
+}
+
+export function splitPdksEligible<T extends PdksSourceReading>(
+  rows: readonly T[],
+): { eligible: T[]; hiddenBiometricCount: number } {
+  const eligible: T[] = [];
+  let hiddenBiometricCount = 0;
+  for (const row of rows) {
+    if (isPdksEligibleReading(row)) eligible.push(row);
+    else hiddenBiometricCount += 1;
+  }
+  return { eligible, hiddenBiometricCount };
 }

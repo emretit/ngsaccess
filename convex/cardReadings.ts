@@ -1,4 +1,5 @@
 import { filterPdksReadings } from "./lib/pdksSource";
+import { splitPdksEligible, toReportTransactionRow } from "./lib/reportAttendance";
 import { paginationOptsValidator, type PaginationResult } from "convex/server";
 import { resolveProjectScope } from "./lib/projectScope";
 import { cardReadingDateBounds, scopedCardReadingQuery } from "./lib/cardReadingList";
@@ -410,9 +411,9 @@ export const getPdksTableData = authedQuery({
       employees = employees.filter((e) => e.shiftId === args.shiftId);
     }
     if (args.person && args.person.trim()) {
-      const term = args.person.trim().toLowerCase();
+      const term = args.person.trim().toLocaleLowerCase("tr-TR");
       employees = employees.filter((e) =>
-        `${e.firstName} ${e.lastName}`.toLowerCase().includes(term)
+        `${e.firstName} ${e.lastName}`.toLocaleLowerCase("tr-TR").includes(term)
       );
     }
 
@@ -1740,5 +1741,59 @@ export const backfillHikEventRow = internalMutation({
     });
 
     return { inserted: true };
+  },
+});
+
+/** Each cursor scans at most 200 candidates; biometric readings never become report rows. */
+export const listReportTransactions = authedQuery({
+  args: {
+    projectId: v.id("projects"),
+    startDate: v.optional(v.string()),
+    endDate: v.optional(v.string()),
+    employeeId: v.optional(v.id("employees")),
+    result: v.optional(v.union(v.literal("granted"), v.literal("denied"), v.literal("unknown"))),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    await resolveProjectScope(ctx, args.projectId);
+    const bounds = cardReadingDateBounds(args.startDate, args.endDate);
+    if (args.employeeId) {
+      const employee = await ctx.db.get(args.employeeId);
+      if (employee?.projectId !== args.projectId) throw new ConvexError("Kişi seçili projede bulunamadı");
+    }
+    if (!Number.isInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1) {
+      throw new ConvexError("Sayfa boyutu pozitif bir tam sayı olmalı");
+    }
+    const status = args.result === "granted" ? "izin_verildi" : args.result === "denied" ? "reddedildi" : undefined;
+    const query = ctx.db.query("cardReadings");
+    const indexed = (() => {
+      if (args.employeeId) return query.withIndex("by_project_employee_time", q => {
+        const prefix = q.eq("projectId", args.projectId).eq("employeeId", args.employeeId);
+        return bounds ? prefix.gte("accessTime", bounds.startISO).lte("accessTime", bounds.endISO) : prefix;
+      });
+      if (status !== undefined) return query.withIndex("by_project_status_time", q => {
+        const prefix = q.eq("projectId", args.projectId).eq("accessStatus", status);
+        return bounds ? prefix.gte("accessTime", bounds.startISO).lte("accessTime", bounds.endISO) : prefix;
+      });
+      return scopedCardReadingQuery(ctx, args);
+    })();
+    const page = await indexed.order("desc").paginate({
+      ...args.paginationOpts,
+      numItems: Math.min(args.paginationOpts.numItems, 200),
+      maximumRowsRead: 200,
+    });
+    const matching = page.page.filter(row =>
+      row.projectId === args.projectId
+      && (args.employeeId === undefined || row.employeeId === args.employeeId)
+      && matchesReadingResult(row.accessStatus, args.result),
+    );
+    const { eligible, hiddenBiometricCount } = splitPdksEligible(matching);
+    const enriched = await enrichReadingsForList(ctx, eligible);
+    return {
+      ...page,
+      page: enriched.map(toReportTransactionRow),
+      scannedCount: page.page.length,
+      hiddenBiometricCount,
+    };
   },
 });
