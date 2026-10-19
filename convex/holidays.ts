@@ -1,5 +1,3 @@
-import { validateSettingsNumbers } from "./lib/settingsUx";
-import { resolveProjectScope } from "./lib/projectScope";
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { adminMutation, authedQuery } from "./lib/customFunctions";
@@ -183,58 +181,3 @@ export const getOvertimeRates = query({
   },
 });
 
-export const upsertOvertimeRates = adminMutation({
-  args: {
-    projectId: v.optional(v.id("projects")),
-    weekdayMultiplier: v.number(),
-    weekendMultiplier: v.number(),
-    holidayMultiplier: v.number(),
-    nightShiftMultiplier: v.number(),
-    nightShiftStart: v.string(),
-    nightShiftEnd: v.string(),
-  },
-  handler: async (ctx, args) => {
-    await resolveProjectScope(ctx, args.projectId);
-    validateSettingsNumbers(args);
-    const existing = await ctx.db
-      .query("overtimeRates")
-      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-      .first();
-
-    const payload = {
-      projectId: args.projectId,
-      weekdayMultiplier: args.weekdayMultiplier,
-      weekendMultiplier: args.weekendMultiplier,
-      holidayMultiplier: args.holidayMultiplier,
-      nightShiftMultiplier: args.nightShiftMultiplier,
-      nightShiftStart: args.nightShiftStart,
-      nightShiftEnd: args.nightShiftEnd,
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (existing) {
-      await ctx.db.patch(existing._id, payload);
-      await writeAudit(ctx, {
-        user: ctx.user,
-        projectId: args.projectId ?? null,
-        action: "update",
-        targetTable: "overtimeRates",
-        targetId: existing._id,
-        oldValue: existing,
-        newValue: payload,
-      });
-      return existing._id;
-    } else {
-      const id = await ctx.db.insert("overtimeRates", payload);
-      await writeAudit(ctx, {
-        user: ctx.user,
-        projectId: args.projectId ?? null,
-        action: "create",
-        targetTable: "overtimeRates",
-        targetId: id,
-        newValue: payload,
-      });
-      return id;
-    }
-  },
-});

@@ -23,28 +23,6 @@ export const listForEmployee = authedQuery({
   },
 });
 
-export const hasActiveConsent = authedQuery({
-  args: {
-    employeeId: v.id("employees"),
-    consentType: v.union(
-      v.literal("biometric_face"),
-      v.literal("biometric_fingerprint"),
-      v.literal("card"),
-      v.literal("photo"),
-    ),
-  },
-  handler: async (ctx, args) => {
-    await requireEmployeeAccess(ctx, args.employeeId);
-    const rows = await ctx.db
-      .query("employeeConsents")
-      .withIndex("by_employee_type", (q) =>
-        q.eq("employeeId", args.employeeId).eq("consentType", args.consentType),
-      )
-      .collect();
-    return rows.some((r) => !r.revokedAt);
-  },
-});
-
 export const grant = adminMutation({
   args: {
     employeeId: v.id("employees"),

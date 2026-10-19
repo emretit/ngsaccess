@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Navigate, Routes, Route, useLocation, useNavigationType } from 'react-router-dom';
-import { Toaster } from '@/components/ui/toaster';
-import { Toaster as SonnerToaster } from '@/components/ui/sonner';
+import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { AuthProvider } from '@/components/auth/AuthProvider';
@@ -99,7 +98,6 @@ function App() {
             <ActiveProjectProvider>
               <AppContent />
               <Toaster />
-              <SonnerToaster />
             </ActiveProjectProvider>
           </AuthProvider>
         </Router>

@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { adminMutation, authedQuery } from "./lib/customFunctions";
+import { adminMutation } from "./lib/customFunctions";
 import { validateManualPdksInput, validateManualPdksNote } from "./lib/pdksManual";
 import { writeAudit } from "./lib/audit";
 
@@ -231,54 +231,3 @@ export const bulkUpsertManual = adminMutation({
   },
 });
 
-export const removeManual = adminMutation({
-  args: { id: v.id("pdksRecords") },
-  handler: async (ctx, args) => {
-    const old = await ctx.db.get(args.id);
-    if (!old) return;
-    await ctx.db.delete(args.id);
-    await writeAudit(ctx, {
-      user: ctx.user,
-      projectId: old.projectId ?? null,
-      action: "delete",
-      targetTable: "pdksRecords",
-      targetId: args.id,
-      oldValue: {
-        date: old.date,
-        entryTime: old.entryTime,
-        exitTime: old.exitTime,
-        status: old.status,
-      },
-    });
-  },
-});
-
-export const getManualForEmployeeDate = authedQuery({
-  args: {
-    employeeId: v.id("employees"),
-    date: v.string(),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("pdksRecords")
-      .withIndex("by_employee_date", (q) =>
-        q.eq("employeeId", args.employeeId).eq("date", args.date)
-      )
-      .first();
-  },
-});
-
-export const listAuditForRecord = authedQuery({
-  args: {
-    targetId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("auditLog")
-      .withIndex("by_target", (q) =>
-        q.eq("targetTable", "pdksRecords").eq("targetId", args.targetId)
-      )
-      .order("desc")
-      .take(50);
-  },
-});

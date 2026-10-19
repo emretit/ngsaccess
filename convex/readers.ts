@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { authedQuery, authedMutation } from "./lib/customFunctions";
+import { authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { getHikModelSpec } from "./lib/hikModels";
 import { deriveHikReaderNoFromDoorNo } from "./lib/hikReaderNumbers";
@@ -56,61 +56,6 @@ async function countReadersForDevice(
     .collect();
   return rows.length;
 }
-
-export const list = authedQuery({
-  args: {
-    doorId: v.optional(v.id("doors")),
-    zoneId: v.optional(v.id("zones")),
-    projectId: v.optional(v.id("projects")),
-  },
-  handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.doorId) {
-      const door = await ctx.db.get(args.doorId);
-      if (!door) return [];
-      if (!isProjectAllowed(allowedProjectIds, door.projectId)) return [];
-      // TypeScript narrowing: args.doorId undefined ise üsteki if bloğu buraya girmez.
-      // Tip sistemi bunu takip etmediği için lokal değişkene çekiyoruz.
-      const narrowedDoorId = args.doorId;
-      if (!narrowedDoorId) return [];
-      return await ctx.db
-        .query("readers")
-        .withIndex("by_door", (q) => q.eq("doorId", narrowedDoorId))
-        .collect();
-    }
-    if (args.zoneId) {
-      const zone = await ctx.db.get(args.zoneId);
-      if (!zone) return [];
-      if (zone.projectId && !allowedProjectIds.some((id) => id === zone.projectId)) {
-        return [];
-      }
-      const zoneReaders = await ctx.db
-        .query("readers")
-        .withIndex("by_zone", (q) => q.eq("zoneId", args.zoneId))
-        .collect();
-      if (ctx.user.role === "super_admin") return zoneReaders;
-      return zoneReaders.filter((r) => isProjectAllowed(allowedProjectIds, r.projectId));
-    }
-    if (args.projectId) {
-      if (!allowedProjectIds.some((id) => id === args.projectId)) return [];
-      return await ctx.db
-        .query("readers")
-        .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
-        .collect();
-    }
-    if (ctx.user.role === "super_admin") return await ctx.db.query("readers").collect();
-    if (allowedProjectIds.length === 0) return [];
-    const results = await Promise.all(
-      allowedProjectIds.map((pid) =>
-        ctx.db
-          .query("readers")
-          .withIndex("by_project", (q) => q.eq("projectId", pid))
-          .collect()
-      )
-    );
-    return results.flat();
-  },
-});
 
 export const create = authedMutation({
   args: {

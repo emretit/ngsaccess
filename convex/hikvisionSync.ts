@@ -4,7 +4,7 @@ import { v } from "convex/values";
 import { scheduleBridgeWakeForProject } from "./hikBridge";
 import { internalQuery, internalMutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { adminQuery, authedMutation, adminMutation } from "./lib/customFunctions";
+import { authedMutation, adminMutation } from "./lib/customFunctions";
 import { getCurrentUser, getValidAuthUserId } from "./lib/auth";
 import { resolveProjectScope } from "./lib/projectScope";
 import { scanHikSync, assertSyncScope } from "./lib/syncStatusScope";
@@ -227,59 +227,6 @@ export const assignWeekPlanNo = internalMutation({
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.accessRuleId, { hikWeekPlanNo: args.weekPlanNo });
-  },
-});
-
-/**
- * Debug: tüm zinciri (employees → groupMembers → accessRules → groupDevices → devices)
- * tek bir çağrıda rapor eder. CLI'dan ve admin UI'dan çağrılabilir.
- * adminQuery → sadece super_admin / project_admin erişebilir.
- */
-export const debugSyncChain = adminQuery({
-  args: {},
-  handler: async (ctx) => {
-    const devices = await ctx.db.query("devices").collect();
-    const employees = await ctx.db.query("employees").collect();
-    const rules = await ctx.db.query("accessRules").collect();
-    const members = await ctx.db.query("groupMembers").collect();
-    const groupDevs = await ctx.db.query("groupDevices").collect();
-
-    return {
-      devices: devices.map((d) => ({
-        _id: d._id,
-        name: d.name,
-        deviceIp: d.deviceIp,
-        ehomeID: d.ehomeID ?? null,
-        hikDevIndex: d.hikDevIndex ?? null,
-        hikModel: d.hikModel ?? null,
-        hikLastSeenAt: d.hikLastSeenAt ?? null,
-        hikOfflineHint: d.hikOfflineHint ?? null,
-        isActive: d.isActive ?? null,
-      })),
-      employees: employees.map((e) => ({
-        _id: e._id,
-        name: `${e.firstName} ${e.lastName}`,
-        cardNumber: e.cardNumber,
-        isActive: e.isActive ?? null,
-      })),
-      accessRules: rules.map((r) => ({
-        _id: r._id,
-        name: r.name,
-        isActive: r.isActive ?? null,
-        days: r.days ?? [],
-        startTime: r.startTime ?? null,
-        endTime: r.endTime ?? null,
-        hikWeekPlanNo: r.hikWeekPlanNo ?? null,
-      })),
-      groupMembers: members.map((m) => ({
-        groupId: m.groupId,
-        employeeId: m.employeeId,
-      })),
-      groupDevices: groupDevs.map((g) => ({
-        groupId: g.groupId,
-        deviceId: g.deviceId,
-      })),
-    };
   },
 });
 

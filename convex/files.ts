@@ -1,10 +1,9 @@
 import { internalMutation, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { claimEmployeePhoto } from "./lib/peoplePhoto";
 import { assertUploadOwner } from "./lib/peopleScope";
 import { v } from "convex/values";
-import { adminMutation, authedMutation } from "./lib/customFunctions";
+import { authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 
 const PENDING_CLEANUP_BATCH = 200;
@@ -32,26 +31,6 @@ export const claimUpload = authedMutation({
     if (linked) throw new Error("Fotoğraf zaten bir personele bağlı");
     if (!await ctx.db.system.get(args.storageId)) throw new Error("Yüklenen dosya bulunamadı");
     await ctx.db.insert("pendingUploads", { ...args, userId: ctx.user._id, createdAt: Date.now() });
-  },
-});
-
-export const saveEmployeePhoto = adminMutation({
-  args: {
-    employeeId: v.id("employees"),
-    storageId: v.id("_storage"),
-  },
-  handler: async (ctx, args) => {
-    const employee = await ctx.db.get(args.employeeId);
-    if (!employee) throw new Error("Çalışan bulunamadı");
-    if (ctx.user.role !== "super_admin") {
-      const allowedProjectIds = await getProjectIdsForUser(ctx);
-      if (!employee.projectId || !allowedProjectIds.some((id) => id === employee.projectId)) {
-        throw new Error("Bu çalışanın projesine erişim yetkiniz yok");
-      }
-    }
-    const photo = await claimEmployeePhoto(ctx, args.storageId, ctx.user._id, employee._id);
-    await ctx.db.patch(args.employeeId, { ...photo, updatedAt: new Date().toISOString() });
-    return photo.photoUrl;
   },
 });
 

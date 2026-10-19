@@ -40,15 +40,3 @@ export const set = authedMutation({
   },
 });
 
-export const remove = authedMutation({
-  args: { key: v.string() },
-  handler: async (ctx, args) => {
-    const existing = await ctx.db
-      .query("userPreferences")
-      .withIndex("by_user_key", (q) =>
-        q.eq("userId", ctx.user._id).eq("key", args.key),
-      )
-      .first();
-    if (existing) await ctx.db.delete(existing._id);
-  },
-});

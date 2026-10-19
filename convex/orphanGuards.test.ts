@@ -4,8 +4,6 @@ import type { MutationCtx } from "./_generated/server";
 import * as leaves from "./leaves";
 import * as shifts from "./shifts";
 import * as departments from "./departments";
-import * as positions from "./positions";
-import * as companies from "./companies";
 import * as accessRules from "./accessRules";
 
 // Keep the real scope helpers; substitute only authentication/registration and external sync.
@@ -73,9 +71,6 @@ const operations = [
   { name: "shifts.remove", fn: shifts.remove, args: { shiftId: "target" } },
   { name: "departments.update", fn: departments.update, args: { departmentId: "target", name: "Yeni" } },
   { name: "departments.remove", fn: departments.remove, args: { departmentId: "target" } },
-  { name: "positions.remove", fn: positions.remove, args: { positionId: "target" } },
-  { name: "companies.update", fn: companies.update, args: { companyId: "target", name: "Yeni" } },
-  { name: "companies.remove", fn: companies.remove, args: { companyId: "target" } },
   { name: "accessRules.remove", fn: accessRules.remove, args: { ruleId: "target" } },
   { name: "accessRules.removeGroupMember", fn: accessRules.removeGroupMember, args: { memberId: "target" } },
   { name: "accessRules.removeGroupDevice", fn: accessRules.removeGroupDevice, args: { groupDeviceId: "target" } },

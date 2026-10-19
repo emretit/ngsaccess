@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
-import { authedMutation, authedQuery } from "./lib/customFunctions";
+import { authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { classifyHikEvent } from "./lib/hikEventCatalog";
 import { toUtcISO } from "./lib/trDate";
@@ -20,29 +20,6 @@ const truncateRawData = (value: string | undefined): string | undefined => {
   if (!value) return undefined;
   return value.length > 10000 ? value.slice(0, 10000) : value;
 };
-
-export const listForDevice = authedQuery({
-  args: {
-    deviceId: v.id("devices"),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const device = await ctx.db.get(args.deviceId);
-    if (!device) return [];
-
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
-      return [];
-    }
-
-    const limit = Math.min(Math.max(args.limit ?? 10, 1), 50);
-    return await ctx.db
-      .query("deviceEvents")
-      .withIndex("by_device_and_event_time", (q) => q.eq("deviceId", args.deviceId))
-      .order("desc")
-      .take(limit);
-  },
-});
 
 export const recordSystemOperation = authedMutation({
   args: {

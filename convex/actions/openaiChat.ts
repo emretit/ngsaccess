@@ -37,16 +37,6 @@ function extractErrorMessage(value: OpenAiChatResponse): string | null {
   return typeof message === "string" ? message : null;
 }
 
-export const status = authedAction({
-  args: {},
-  returns: v.object({
-    configured: v.boolean(),
-  }),
-  handler: async () => {
-    return { configured: !!process.env.OPENAI_API_KEY };
-  },
-});
-
 export const processMessage = authedAction({
   args: {
     input: v.string(),

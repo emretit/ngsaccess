@@ -1,7 +1,6 @@
 
-import { v } from "convex/values";
-import { authedQuery, authedMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
+import { authedQuery } from "./lib/customFunctions";
+import { getProjectIdsForUser } from "./lib/auth";
 
 export const list = authedQuery({
   args: {},
@@ -21,30 +20,3 @@ export const list = authedQuery({
   },
 });
 
-export const create = authedMutation({
-  args: {
-    name: v.string(),
-    projectId: v.optional(v.id("projects")),
-  },
-  handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      throw new Error("Bu projeye erişim yetkiniz yok");
-    }
-    const now = new Date().toISOString();
-    return await ctx.db.insert("positions", { ...args, createdAt: now, updatedAt: now });
-  },
-});
-
-export const remove = authedMutation({
-  args: { positionId: v.id("positions") },
-  handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const pos = await ctx.db.get(args.positionId);
-    if (!pos) throw new Error("Pozisyon bulunamadı");
-    if (pos.projectId ? !isProjectAllowed(allowedProjectIds, pos.projectId) : ctx.user.role !== "super_admin") {
-      throw new Error("Bu pozisyona erişim yetkiniz yok");
-    }
-    await ctx.db.delete(args.positionId);
-  },
-});

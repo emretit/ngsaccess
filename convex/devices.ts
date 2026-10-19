@@ -5,8 +5,6 @@ import {
   authedQuery,
   authedMutation,
   adminMutation,
-  adminQuery,
-  superAdminMutation,
   employeeAuthedQuery,
 } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed, isManager } from "./lib/auth";
@@ -805,60 +803,6 @@ export const createHikDevice = authedMutation({
 // ────────────────────────────────────────────────────────────
 
 /**
- * Admin (super_admin) bir IDE Smart paneli UUID ile havuza ekler. Cihaz ATANMAMIŞ
- * (projectId yok) doğar; ortak varsayılan MQTT kimliği (ideDefaults) satıra kopyalanır.
- * Zone/door OLUŞTURULMAZ — onlar projeye claim anında üretilir (claimDevice).
- * Panel önceden Hetzner broker'ına ayarlı geldiği için UUID girilince bağlanınca
- * lastSeen üzerinden otomatik canlanır.
- */
-export const registerUnassignedPanel = superAdminMutation({
-  args: {
-    ideUuid: v.string(),
-    brand: v.optional(
-      v.union(v.literal("ide_smart"), v.literal("hikvision"), v.literal("other")),
-    ),
-    name: v.optional(v.string()),
-  },
-  returns: v.id("devices"),
-  handler: async (ctx, args) => {
-    const ideUuid = args.ideUuid.trim();
-    if (!ideUuid) throw new Error("UUID gerekli");
-
-    // Tekillik: aynı UUID iki cihaza yazılırsa event/komut yönlendirmesi bozulur.
-    const existing = await ctx.db
-      .query("devices")
-      .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", ideUuid))
-      .first();
-    if (existing) throw new Error("Bu UUID zaten kayıtlı");
-
-    // Ortak varsayılan kimliği oku (singleton) → satıra kopyala. Bridge op-zamanı
-    // device.ideUser/idePassword okuduğu için dinamik değil, kopya gerekir.
-    const defaults = await ctx.db.query("ideDefaults").first();
-    const ideUser = defaults?.ideUser ?? "admin";
-    const idePassword = defaults?.idePassword ?? "admin12345";
-    const ideDoorCount = defaults?.ideDoorCount ?? 4;
-
-    const now = new Date().toISOString();
-    return await ctx.db.insert("devices", {
-      name: args.name?.trim() || ideUuid,
-      // projectId YOK → atanmamış (havuzda). isProjectAllowed undefined'ı reddeder,
-      // bu yüzden normal kullanıcıya görünmez; super_admin devices.list'te görür.
-      brand: args.brand ?? "ide_smart",
-      deviceType: "Erişim Paneli",
-      ideUuid,
-      ideUser,
-      idePassword,
-      ideHttpPort: 80,
-      ideDoorCount,
-      isActive: true,
-      status: "active",
-      createdAt: now,
-      updatedAt: now,
-    });
-  },
-});
-
-/**
  * adminDevices havuzundaki cihazı bir projeye claim eder.
  * adminDevices kaydı SİLİNMEZ — assignedDeviceId + assignedProjectId set edilir.
  * devices tablosuna projectId + adminDeviceId ile yeni kayıt eklenir.
@@ -1057,40 +1001,6 @@ export const releaseDevice = adminMutation({
 
     // devices tablosundan sil
     await ctx.db.delete(args.deviceId);
-  },
-});
-
-/**
- * Cihazlar sayfası claim picker'ı için: adminDevices tablosundaki kayıtlar.
- * adminQuery — claim yönetimsel iş (super_admin + project_admin).
- * @deprecated Kullan: api.adminDevices.listForClaim — bu alias geriye uyum için kalır.
- */
-export const listClaimable = adminQuery({
-  args: {},
-  returns: v.array(
-    v.object({
-      _id: v.id("adminDevices"),
-      name: v.string(),
-      brand: v.optional(
-        v.union(v.literal("hikvision"), v.literal("other"), v.literal("ide_smart")),
-      ),
-      ideUuid: v.optional(v.string()),
-      ideDoorCount: v.optional(v.number()),
-      lastSeen: v.optional(v.string()),
-    }),
-  ),
-  handler: async (ctx) => {
-    const rows = await ctx.db.query("adminDevices").collect();
-    return rows
-      .filter((d) => !d.assignedDeviceId && !d.createdFromDevice)
-      .map((d) => ({
-        _id: d._id,
-        name: d.name,
-        brand: d.brand,
-        ideUuid: d.ideUuid,
-        ideDoorCount: d.ideDoorCount,
-        lastSeen: d.lastSeen,
-      }));
   },
 });
 

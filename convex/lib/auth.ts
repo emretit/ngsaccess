@@ -117,7 +117,7 @@ export async function requireSuperAdmin(
 /**
  * Kaynak (cihaz, çalışan, kural) caller'ın eriştiği projelerden birine aitse true.
  * projectId undefined → false (legacy "global kayıt" konsepti kaldırıldı; orphan kayıt
- * `migrations/projectIdBackfill` ile bir projeye atanmalı).
+ * bir projeye atanmalı).
  */
 export function isProjectAllowed(
   allowed: ReadonlyArray<Id<"projects">>,

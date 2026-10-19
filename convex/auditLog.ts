@@ -3,7 +3,7 @@ import { adminQuery } from "./lib/customFunctions";
 import { paginationOptsValidator } from "convex/server";
 import { resolveProjectScope } from "./lib/projectScope";
 import { normalizeAuditSearch } from "./lib/auditSearch";
-import { AUDIT_TARGET_LABELS, auditDateRange, auditPageMatches } from "./lib/auditLogQuery";
+import { auditDateRange, auditPageMatches } from "./lib/auditLogQuery";
 
 import { AUDIT_ACTOR_SCAN_LIMIT, auditActorIndex, mergeAuditActors } from "./lib/auditActors";
 
@@ -137,27 +137,6 @@ export const list = adminQuery({
       }))
       .filter(row => auditPageMatches(row, { ...args, search: undefined })) };
 
-  },
-});
-
-export const distinctTargetTables = adminQuery({
-  args: {},
-  handler: async () => Object.keys(AUDIT_TARGET_LABELS),
-});
-
-export const filterUsers = adminQuery({
-  args: { projectId: v.optional(v.id("projects")), allProjects: v.optional(v.boolean()) },
-  handler: async (ctx, args) => {
-    if (args.allProjects && ctx.user.role === "super_admin") {
-      const users = await ctx.db.query("users").collect();
-      return users.map(user => ({ _id: user._id, name: user.name ?? user.email ?? "Bilinmeyen" }));
-    }
-    const projectId = args.projectId;
-    if (!projectId) return [];
-    await resolveProjectScope(ctx, projectId);
-    const members = await ctx.db.query("userProjects").withIndex("by_project", q => q.eq("projectId", projectId)).collect();
-    const users = await Promise.all([...new Set([...members.map(member => member.userId), ctx.user._id])].map(id => ctx.db.get(id)));
-    return users.filter((user): user is NonNullable<typeof user> => user !== null).map(user => ({ _id: user._id, name: user.name ?? user.email ?? "Bilinmeyen" }));
   },
 });
 

@@ -50,24 +50,6 @@ export const create = authedMutation({
   },
 });
 
-export const update = authedMutation({
-  args: {
-    zoneId: v.id("zones"),
-    name: v.optional(v.string()),
-    description: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const zone = await ctx.db.get(args.zoneId);
-    if (!zone) throw new Error("Bölge bulunamadı");
-    if (!isProjectAllowed(allowedProjectIds, zone.projectId)) {
-      throw new Error("Bu bölgeye erişim yetkiniz yok");
-    }
-    const { zoneId, ...updates } = args;
-    await ctx.db.patch(zoneId, { ...updates, updatedAt: new Date().toISOString() });
-  },
-});
-
 export const remove = authedMutation({
   args: { zoneId: v.id("zones") },
   handler: async (ctx, args) => {
