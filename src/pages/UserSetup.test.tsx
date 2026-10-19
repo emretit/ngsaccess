@@ -6,7 +6,7 @@ import UserSetup, { inviteSetupError } from './UserSetup';
 
 const mocks = vi.hoisted(() => ({ invite: undefined as undefined | null | { email: string; type: string } }));
 vi.mock('convex/react', () => ({
-  useQuery: () => mocks.invite, useMutation: () => vi.fn(),
+  useQuery: () => mocks.invite, useMutation: () => vi.fn(), useAction: () => vi.fn(),
   useConvexAuth: () => ({ isAuthenticated: false, isLoading: false }),
 }));
 vi.mock('@convex-dev/auth/react', () => ({ useAuthActions: () => ({ signIn: vi.fn() }) }));
@@ -27,6 +27,8 @@ describe('UserSetup', () => {
     ['INVITE_EMAIL_MISMATCH', 'Oturum açtığınız hesabın e-posta adresi davetle eşleşmiyor.'],
     ['INVITE_WRONG_TYPE', 'Bu bağlantı hesap daveti değil.'],
     ['INVITE_INVALID', 'Davet kullanılmış veya süresi dolmuş olabilir.'],
+    ['INVITE_ACCOUNT_EXISTS', "Bu e-postayla doğrulanmış bir hesap var; 'Mevcut hesabım var' ile giriş yapın."],
+    ['INVITE_WEAK_PASSWORD', 'Şifre en az 8 karakter, büyük harf, küçük harf ve rakam içermelidir.'],
   ])('maps %s to fixed Turkish recovery copy', (code, message) => {
     const result = inviteSetupError(new ConvexError({ code, detail: 'PRIVATE_BACKEND_DETAIL' }));
     expect(result).toContain(message);

@@ -1,11 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FunctionArgs, FunctionReturnType } from 'convex/server';
-import type { MutationCtx, QueryCtx } from './_generated/server';
+import type { ActionCtx, MutationCtx, QueryCtx } from './_generated/server';
 import type { Doc, Id } from './_generated/dataModel';
 import type { api } from './_generated/api';
-import { consume, create, list } from './invites';
+import { invalidateSessions, modifyAccountCredentials } from '@convex-dev/auth/server';
+import { consume, create, list, setupAccountState, resetClaimedAccount, claimSetupAccount } from './invites';
 import { limiter } from './lib/rateLimit';
 
+vi.mock('@convex-dev/auth/server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@convex-dev/auth/server')>();
+  return {
+    ...actual,
+    modifyAccountCredentials: vi.fn(async () => undefined),
+    invalidateSessions: vi.fn(async () => undefined),
+  };
+});
 vi.mock('./lib/rateLimit', () => ({ limiter: { limit: vi.fn(async () => undefined) } }));
 vi.mock('./lib/customFunctions', () => {
   const register = (definition: { handler: unknown }) => ({ _handler: definition.handler });
@@ -23,6 +32,16 @@ const attackerId = 'inviter' as Id<'users'>;
 const projectId = 'invited-project' as Id<'projects'>;
 const otherProjectId = 'existing-project' as Id<'projects'>;
 const args = { token: 'invite-token', email: 'recipient@example.test' };
+
+const setupStateHandler = (setupAccountState as unknown as {
+  _handler: (ctx: QueryCtx, args: { token: string }) => Promise<unknown>;
+})._handler;
+const resetClaimedHandler = (resetClaimedAccount as unknown as {
+  _handler: (ctx: MutationCtx, args: { userId: Id<'users'> }) => Promise<null>;
+})._handler;
+const claimHandler = (claimSetupAccount as unknown as {
+  _handler: (ctx: ActionCtx, args: { token: string; password: string }) => Promise<{ flow: 'signUp' | 'signIn' }>;
+})._handler;
 
 type IndexBuilder = { eq: (field: string, value: unknown) => IndexBuilder };
 type FilterBuilder = {
@@ -95,6 +114,180 @@ function fixture(options: {
   } as unknown as MutationCtx;
   return { ctx, get, patch, insert, memberships, user: () => user, invite: () => invite };
 }
+
+function setupFixture(options: {
+  user?: Partial<Doc<'users'>>;
+  account?: boolean;
+  memberships?: Id<'projects'>[];
+  invite?: Partial<Doc<'invites'>>;
+  missingInvite?: boolean;
+} = {}) {
+  let user: Doc<'users'> = {
+    _id: userId, _creationTime: 1, email: args.email, verified: false,
+    firstCompanyName: 'Old company', name: 'Squatter', setupToken: 'old-token',
+    tokenExpiresAt: new Date(Date.now() + 60_000).toISOString(), ...options.user,
+  };
+  const invite: Doc<'invites'> = {
+    _id: 'invitation' as Id<'invites'>, _creationTime: 1, ...args, projectId,
+    role: 'project_admin', type: 'invite', used: false, createdBy: attackerId,
+    createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    ...options.invite,
+  };
+  const memberships = (options.memberships ?? []).map((id) => ({ userId, projectId: id }));
+  const authAccounts = options.account === false ? [] : [{ provider: 'password', providerAccountId: args.email, userId }];
+  const get = vi.fn(async (id: Id<'users'>) => id === userId ? user : null);
+  const patch = vi.fn(async (id: string, changes: Record<string, unknown>) => {
+    if (id === userId) user = { ...user, ...changes };
+    else if (id === invite._id) Object.assign(invite, changes);
+    else throw new Error('Unexpected patch target');
+  });
+  const insert = vi.fn(async (table: string, value: { userId: Id<'users'>; projectId: Id<'projects'> }) => {
+    if (table !== 'userProjects') throw new Error('Unexpected insert table');
+    memberships.push(value);
+    return 'new-membership';
+  });
+  const query = (table: string) => makeQuery(
+    table === 'invites' ? (options.missingInvite ? [] : [invite]) : table === 'authAccounts' ? authAccounts : table === 'userProjects' ? memberships : [],
+  );
+  const db = { get, patch, insert, query };
+  const identity = {
+    subject: `${userId}|session`, issuer: 'https://auth.example.test', tokenIdentifier: `auth|${userId}`,
+  };
+  return {
+    queryCtx: { db } as unknown as QueryCtx,
+    mutationCtx: { db, auth: { getUserIdentity: async () => identity } } as unknown as MutationCtx,
+    get, patch, insert, memberships, user: () => user, invite: () => invite,
+  };
+}
+
+describe('invites.setupAccountState', () => {
+  it('returns none when the invited email has no password account', async () => {
+    await expect(setupStateHandler(setupFixture({ account: false }).queryCtx, { token: args.token }))
+      .resolves.toEqual({ state: 'none', email: args.email });
+  });
+  it('marks only an unverified, roleless, membership-free account claimable', async () => {
+    const f = setupFixture();
+    await expect(setupStateHandler(f.queryCtx, { token: args.token }))
+      .resolves.toEqual({ state: 'claimable', email: args.email, userId });
+  });
+  it.each([
+    { user: { verified: true } },
+    { user: { verified: undefined } },
+    { user: { role: 'project_user' as const } },
+    { memberships: [otherProjectId] },
+  ])('returns taken for an existing protected account: %j', async (options) => {
+    await expect(setupStateHandler(setupFixture(options).queryCtx, { token: args.token }))
+      .resolves.toEqual({ state: 'taken' });
+  });
+  it.each([
+    { missingInvite: true },
+    { invite: { used: true } },
+    { invite: { expiresAt: new Date(0).toISOString() } },
+  ])('rejects used or expired invites: %j', async (options) => {
+    await expect(setupStateHandler(setupFixture(options).queryCtx, { token: args.token }))
+      .rejects.toMatchObject({ data: { code: 'INVITE_INVALID' } });
+  });
+  it('rejects reset invites', async () => {
+    await expect(setupStateHandler(setupFixture({ invite: { type: 'reset' } }).queryCtx, { token: args.token }))
+      .rejects.toMatchObject({ data: { code: 'INVITE_WRONG_TYPE' } });
+  });
+});
+
+describe('invites.resetClaimedAccount', () => {
+  it('rechecks claimability and does not patch protected accounts', async () => {
+    const f = setupFixture({ user: { verified: true } });
+    await expect(resetClaimedHandler(f.mutationCtx, { userId })).rejects.toMatchObject({
+      data: { code: 'INVITE_ACCOUNT_EXISTS' },
+    });
+    expect(f.patch).not.toHaveBeenCalled();
+  });
+  it('clears stale signup fields while preserving role and verification', async () => {
+    const f = setupFixture();
+    await resetClaimedHandler(f.mutationCtx, { userId });
+    expect(f.patch).toHaveBeenCalledWith(userId, expect.objectContaining({
+      firstCompanyName: undefined, name: undefined, setupToken: undefined,
+      tokenExpiresAt: undefined, updatedAt: expect.any(String),
+    }));
+    expect(f.user()).toMatchObject({ verified: false, firstCompanyName: undefined, name: undefined });
+    expect(f.user().setupToken).toBeUndefined();
+    expect(f.user().tokenExpiresAt).toBeUndefined();
+    expect(f.user().role).toBeUndefined();
+  });
+});
+
+describe('invites.claimSetupAccount', () => {
+  it('claims a squat account, invalidates sessions and then allows invite consumption', async () => {
+    vi.mocked(modifyAccountCredentials).mockClear();
+    vi.mocked(invalidateSessions).mockClear();
+    const order: string[] = [];
+    const f = setupFixture();
+    const ctx = {
+      runQuery: vi.fn(async () => setupStateHandler(f.queryCtx, { token: args.token })),
+      runMutation: vi.fn(async () => { order.push('reset'); return resetClaimedHandler(f.mutationCtx, { userId }); }),
+    } as unknown as ActionCtx;
+    vi.mocked(modifyAccountCredentials).mockImplementationOnce(async () => { order.push('modify'); });
+    vi.mocked(invalidateSessions).mockImplementationOnce(async () => { order.push('invalidate'); });
+    await expect(claimHandler(ctx, { token: args.token, password: 'Strongpass1' }))
+      .resolves.toEqual({ flow: 'signIn' });
+    expect(modifyAccountCredentials).toHaveBeenCalledWith(ctx, {
+      provider: 'password', account: { id: args.email, secret: 'Strongpass1' },
+    });
+    expect(invalidateSessions).toHaveBeenCalledWith(ctx, { userId });
+    expect(ctx.runMutation).toHaveBeenCalledOnce();
+    expect(order).toEqual(['reset', 'modify', 'invalidate']);
+    expect(f.user()).toMatchObject({ verified: false, name: undefined, firstCompanyName: undefined });
+    expect(f.user().role).toBeUndefined();
+    expect(f.user().setupToken).toBeUndefined();
+    expect(f.user().tokenExpiresAt).toBeUndefined();
+    await handler(f.mutationCtx, args);
+    expect(f.user()).toMatchObject({ role: 'project_admin', verified: true });
+    expect(f.memberships).toContainEqual(expect.objectContaining({ userId, projectId }));
+  });
+  it('does not change credentials or invalidate sessions if the account becomes protected before reset', async () => {
+    vi.mocked(modifyAccountCredentials).mockClear();
+    vi.mocked(invalidateSessions).mockClear();
+    const f = setupFixture();
+    const runMutation = vi.fn(async () => {
+      f.user().verified = true;
+      return resetClaimedHandler(f.mutationCtx, { userId });
+    });
+    const ctx = {
+      runQuery: vi.fn(async () => setupStateHandler(f.queryCtx, { token: args.token })),
+      runMutation,
+    } as unknown as ActionCtx;
+    await expect(claimHandler(ctx, { token: args.token, password: 'Strongpass1' }))
+      .rejects.toMatchObject({ data: { code: 'INVITE_ACCOUNT_EXISTS' } });
+    expect(runMutation).toHaveBeenCalledOnce();
+    expect(modifyAccountCredentials).not.toHaveBeenCalled();
+    expect(invalidateSessions).not.toHaveBeenCalled();
+  });
+  it('returns signUp without writes when no account exists', async () => {
+    vi.mocked(modifyAccountCredentials).mockClear();
+    vi.mocked(invalidateSessions).mockClear();
+    const ctx = { runQuery: vi.fn(async () => ({ state: 'none', email: args.email })), runMutation: vi.fn() } as unknown as ActionCtx;
+    await expect(claimHandler(ctx, { token: args.token, password: 'Strongpass1' })).resolves.toEqual({ flow: 'signUp' });
+    expect(ctx.runMutation).not.toHaveBeenCalled();
+    expect(modifyAccountCredentials).not.toHaveBeenCalled();
+    expect(invalidateSessions).not.toHaveBeenCalled();
+  });
+  it('rejects taken accounts without writes', async () => {
+    vi.mocked(modifyAccountCredentials).mockClear();
+    vi.mocked(invalidateSessions).mockClear();
+    const ctx = { runQuery: vi.fn(async () => ({ state: 'taken' })), runMutation: vi.fn() } as unknown as ActionCtx;
+    await expect(claimHandler(ctx, { token: args.token, password: 'Strongpass1' }))
+      .rejects.toMatchObject({ data: { code: 'INVITE_ACCOUNT_EXISTS' } });
+    expect(ctx.runMutation).not.toHaveBeenCalled();
+    expect(modifyAccountCredentials).not.toHaveBeenCalled();
+    expect(invalidateSessions).not.toHaveBeenCalled();
+  });
+  it('rejects weak passwords without writes', async () => {
+    const ctx = { runQuery: vi.fn(async () => ({ state: 'none', email: args.email })), runMutation: vi.fn() } as unknown as ActionCtx;
+    await expect(claimHandler(ctx, { token: args.token, password: 'weakpass' }))
+      .rejects.toMatchObject({ data: { code: 'INVITE_WEAK_PASSWORD' } });
+    expect(ctx.runMutation).not.toHaveBeenCalled();
+    expect(modifyAccountCredentials).not.toHaveBeenCalled();
+  });
+});
 
 async function expectRejected(f: ReturnType<typeof fixture>, code: string, input = args) {
   await expect(handler(f.ctx, input)).rejects.toMatchObject({ data: { code } });

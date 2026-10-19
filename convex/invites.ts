@@ -1,9 +1,38 @@
 import { ConvexError, v } from "convex/values";
-import { getAuthUserId } from "@convex-dev/auth/server";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { getAuthUserId, invalidateSessions, modifyAccountCredentials } from "@convex-dev/auth/server";
+import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
+import type { Doc, Id } from "./_generated/dataModel";
 import { superAdminQuery } from "./lib/customFunctions";
 import { limiter } from "./lib/rateLimit";
 import { verifyUser } from "./lib/auth";
+
+/** Kurulumda tüketilebilecek davet: kullanılmamış, süresi dolmamış, "reset" olmayan. */
+async function getOpenSetupInvite(ctx: QueryCtx | MutationCtx, token: string) {
+  const invite = await ctx.db
+    .query("invites")
+    .withIndex("by_token", (q) => q.eq("token", token))
+    .first();
+  if (!invite || invite.used || !(Date.parse(invite.expiresAt) > Date.now())) {
+    throw new ConvexError({ code: "INVITE_INVALID" });
+  }
+  if (invite.type === "reset") throw new ConvexError({ code: "INVITE_WRONG_TYPE" });
+  return invite;
+}
+
+/**
+ * auth.ts signUp profili verified=false ve role=undefined üretir. Önceden rol atanmış
+ * veya projeye üyeliği olan hesap asla yeni kurulum hesabı sayılmaz.
+ */
+async function isFreshSetupAccount(ctx: QueryCtx | MutationCtx, user: Doc<"users">) {
+  if (user.verified !== false || user.role !== undefined) return false;
+  const membership = await ctx.db
+    .query("userProjects")
+    .withIndex("by_user", (q) => q.eq("userId", user._id))
+    .first();
+  return membership === null;
+}
 
 /**
  * Yetkili kullanıcı (super_admin / proje sahibi / proje admin) bir kullanıcıyı
@@ -110,6 +139,78 @@ export const verify = query({
   },
 });
 
+/** Davet token'ı, yalnız davet e-postasına ait temiz bir sign-up hesabını devralabilir. */
+export const setupAccountState = internalQuery({
+  args: { token: v.string() },
+  returns: v.union(
+    v.object({ state: v.literal("none"), email: v.string() }),
+    v.object({ state: v.literal("claimable"), email: v.string(), userId: v.id("users") }),
+    v.object({ state: v.literal("taken") }),
+  ),
+  handler: async (ctx, args) => {
+    const invite = await getOpenSetupInvite(ctx, args.token);
+
+    const account = await ctx.db
+      .query("authAccounts")
+      .withIndex("providerAndAccountId", (q) =>
+        q.eq("provider", "password").eq("providerAccountId", invite.email),
+      )
+      .first();
+    if (!account) return { state: "none" as const, email: invite.email };
+    const user = await ctx.db.get(account.userId);
+    if (user && (await isFreshSetupAccount(ctx, user))) {
+      return { state: "claimable" as const, email: invite.email, userId: user._id };
+    }
+    return { state: "taken" as const };
+  },
+});
+
+/** Yeniden kontrol ve güvenli profil temizliği; hesabı silmez veya doğrulamaz. */
+export const resetClaimedAccount = internalMutation({
+  args: { userId: v.id("users") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user || !(await isFreshSetupAccount(ctx, user))) {
+      throw new ConvexError({ code: "INVITE_ACCOUNT_EXISTS" });
+    }
+    await ctx.db.patch(user._id, {
+      firstCompanyName: undefined,
+      name: undefined,
+      setupToken: undefined,
+      tokenExpiresAt: undefined,
+      updatedAt: new Date().toISOString(),
+    });
+    return null;
+  },
+});
+
+export const claimSetupAccount = action({
+  args: { token: v.string(), password: v.string() },
+  returns: v.object({ flow: v.union(v.literal("signUp"), v.literal("signIn")) }),
+  handler: async (ctx, args): Promise<{ flow: "signUp" | "signIn" }> => {
+    const state:
+      | { state: "none"; email: string }
+      | { state: "claimable"; email: string; userId: Id<"users"> }
+      | { state: "taken" } = await ctx.runQuery(internal.invites.setupAccountState, { token: args.token });
+    if (args.password.length < 8 || !/[A-Z]/.test(args.password) ||
+        !/[a-z]/.test(args.password) || !/\d/.test(args.password)) {
+      throw new ConvexError({ code: "INVITE_WEAK_PASSWORD" });
+    }
+    if (state.state === "none") return { flow: "signUp" };
+    if (state.state === "taken") throw new ConvexError({ code: "INVITE_ACCOUNT_EXISTS" });
+    // Recheck/cleanup commits before changing credentials. This avoids changing a password
+    // if the account became privileged after setupAccountState; cleanup clears stale signup data.
+    await ctx.runMutation(internal.invites.resetClaimedAccount, { userId: state.userId });
+    await modifyAccountCredentials(ctx, {
+      provider: "password",
+      account: { id: state.email, secret: args.password },
+    });
+    await invalidateSessions(ctx, { userId: state.userId });
+    return { flow: "signIn" };
+  },
+});
+
 /**
  * Daveti yalnız oturumu davet e-postasıyla eşleşen hesap tüketebilir.
  * Doğrulanmamış yeni hesaba bu dar yolda izin verilir; genel auth guard değişmez.
@@ -127,18 +228,7 @@ export const consume = mutation({
     const user = await ctx.db.get(userId);
     if (!user) throw new ConvexError({ code: "INVITE_AUTH_REQUIRED" });
 
-    const invite = await ctx.db
-      .query("invites")
-      .withIndex("by_token", (q) => q.eq("token", args.token))
-      .first();
-
-    if (!invite || invite.used || !(Date.parse(invite.expiresAt) > Date.now())) {
-      throw new ConvexError({ code: "INVITE_INVALID" });
-    }
-
-    if (invite.type === "reset") {
-      throw new ConvexError({ code: "INVITE_WRONG_TYPE" });
-    }
+    const invite = await getOpenSetupInvite(ctx, args.token);
 
     // args.email eski web sözleşmesi için kalır; kimlik kaynağı değildir.
     if (user.email?.toLowerCase() !== invite.email.toLowerCase() ||
@@ -146,15 +236,7 @@ export const consume = mutation({
       throw new ConvexError({ code: "INVITE_EMAIL_MISMATCH" });
     }
 
-    const firstMembership = await ctx.db
-      .query("userProjects")
-      .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .first();
-    // auth.ts signUp profili verified=false ve role=undefined üretir.
-    // Önceden rol atanmış veya üyeliği olan hesap asla yeni kurulum sayılmaz.
-    const isNewSetupAccount = user.verified === false &&
-      user.role === undefined && firstMembership === null;
-    if (isNewSetupAccount) {
+    if (await isFreshSetupAccount(ctx, user)) {
       await ctx.db.patch(user._id, {
         role: invite.role,
         updatedAt: new Date().toISOString(),

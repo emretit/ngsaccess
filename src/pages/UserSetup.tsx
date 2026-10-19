@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { useAuthActions } from '@convex-dev/auth/react';
-import { useConvexAuth, useMutation, useQuery } from 'convex/react';
+import { useAction, useConvexAuth, useMutation, useQuery } from 'convex/react';
 import { ConvexError } from 'convex/values';
 import { api } from '../../convex/_generated/api';
 
@@ -27,6 +27,10 @@ export function inviteSetupError(error: unknown): string {
       return 'Bu bağlantı hesap daveti değil. Yöneticinizden yeni bir davet bağlantısı isteyin.';
     case 'INVITE_INVALID':
       return 'Davet kullanılmış veya süresi dolmuş olabilir. Yöneticinizden yeni bir davet bağlantısı isteyin.';
+    case 'INVITE_ACCOUNT_EXISTS':
+      return "Bu e-postayla doğrulanmış bir hesap var; 'Mevcut hesabım var' ile giriş yapın.";
+    case 'INVITE_WEAK_PASSWORD':
+      return 'Şifre en az 8 karakter, büyük harf, küçük harf ve rakam içermelidir.';
     default:
       return 'Davet kabul edilemedi. Bilgilerinizi kontrol edin. Hesabınız oluştuysa mevcut hesap seçeneğiyle devam edin; sorun sürerse yöneticinizden yeni davet isteyin.';
   }
@@ -41,6 +45,7 @@ export default function UserSetup() {
   const { signIn } = useAuthActions();
   const { isAuthenticated } = useConvexAuth();
   const consumeInvite = useMutation(api.invites.consume);
+  const claimSetupAccount = useAction(api.invites.claimSetupAccount);
 
   // Token ile davet bilgisini al (email pre-fill)
   const inviteData = useQuery(api.invites.verify, token ? { token } : 'skip');
@@ -108,7 +113,10 @@ export default function UserSetup() {
     try {
       // Mevcut hesapta davet hatası oturumu kapatmaz (doğrulanmamışsa AuthProvider guard'ı kapatır).
       await runSetup(async () => {
-        await signIn('password', { email, password, flow: existingAccount ? 'signIn' : 'signUp' });
+        const flow = existingAccount
+          ? 'signIn'
+          : (await claimSetupAccount({ token, password })).flow;
+        await signIn('password', { email, password, flow });
         try {
           await new Promise<void>((resolve, reject) => setAuthWaiter({ resolve, reject }));
         } finally {
