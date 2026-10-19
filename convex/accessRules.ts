@@ -10,7 +10,7 @@ import { internal } from "./_generated/api";
 import { ConvexError, v, type Infer } from "convex/values";
 import { retainedDiffDoorIds, applyRelationDiff, assertLegacyRuleReplacement, ruleDiffSyncPlan, RULE_DETAILS_MEMBER_LIMIT, RULE_DETAILS_RELATION_LIMIT } from "./lib/accessRuleDiff";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
+import { getProjectIdsForUser, isProjectAllowed, canAccessEmployeeProject } from "./lib/auth";
 import {
   resolveRuleIdeDeviceIds,
   reconcileRemovedEmployeeIde,
@@ -742,35 +742,49 @@ export const remove = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const rule = await ctx.db.get(args.ruleId);
     if (!rule) throw new Error("Kural bulunamadı");
-    if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
+    if (rule.projectId ? !isProjectAllowed(allowedProjectIds, rule.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu kurala erişim yetkiniz yok");
     }
-    // Silmeden ÖNCE: kuralın IDE panelleri (cihaz + kapı bağı). Satırlar silinince
-    // zincir koptuğu için sonradan çözülemez; aşağıdaki orphan reconcile bunu kullanır.
+    // Validate every relation before the first delete or scheduler effect.
+    const [members, devices, doors] = await Promise.all([
+      ctx.db.query("groupMembers").withIndex("by_group", q => q.eq("groupId", args.ruleId)).collect(),
+      ctx.db.query("groupDevices").withIndex("by_group", q => q.eq("groupId", args.ruleId)).collect(),
+      ctx.db.query("groupDoors").withIndex("by_group", q => q.eq("groupId", args.ruleId)).collect(),
+    ]);
+    for (const link of [...members, ...devices, ...doors]) {
+      if (ctx.user.role !== "super_admin" &&
+        (!isProjectAllowed(allowedProjectIds, link.projectId) || link.projectId !== rule.projectId)) {
+        throw new Error("Bu kayda erişim yetkiniz yok");
+      }
+    }
+    for (const member of members) {
+      const employee = await ctx.db.get(member.employeeId);
+      if (employee && !canAccessEmployeeProject(ctx.user.role, allowedProjectIds, employee.projectId)) {
+        throw new Error("Bu çalışanın projesine erişim yetkiniz yok");
+      }
+    }
+    for (const link of devices) {
+      const device = await ctx.db.get(link.deviceId);
+      if (device && ctx.user.role !== "super_admin" && !isProjectAllowed(allowedProjectIds, device.projectId)) {
+        throw new Error("Bu cihaza erişim yetkiniz yok");
+      }
+    }
+    for (const link of doors) {
+      const door = await ctx.db.get(link.doorId);
+      if (!door) continue;
+      if (ctx.user.role !== "super_admin" && !isProjectAllowed(allowedProjectIds, door.projectId)) {
+        throw new Error("Bu kapıya erişim yetkiniz yok");
+      }
+      if (door.deviceId) {
+        const device = await ctx.db.get(door.deviceId);
+        if (device && ctx.user.role !== "super_admin" && !isProjectAllowed(allowedProjectIds, device.projectId)) {
+          throw new Error("Bu cihaza erişim yetkiniz yok");
+        }
+      }
+    }
     const candidatePanels = await resolveRuleIdeDeviceIds(ctx, args.ruleId, rule.projectId);
-
-    const members = await ctx.db
-      .query("groupMembers")
-      .withIndex("by_project_group", (q) =>
-        q.eq("projectId", rule.projectId).eq("groupId", args.ruleId),
-      )
-      .collect();
-    const affectedEmployeeIds = members.map((m) => m.employeeId);
-    await Promise.all(members.map((m) => ctx.db.delete(m._id)));
-
-    const devices = await ctx.db
-      .query("groupDevices")
-      .withIndex("by_project_group", (q) =>
-        q.eq("projectId", rule.projectId).eq("groupId", args.ruleId),
-      )
-      .collect();
-    await Promise.all(devices.map((d) => ctx.db.delete(d._id)));
-
-    const doors = await ctx.db
-      .query("groupDoors")
-      .withIndex("by_group", (q) => q.eq("groupId", args.ruleId))
-      .collect();
-    await Promise.all(doors.map((d) => ctx.db.delete(d._id)));
+    const affectedEmployeeIds = members.map(m => m.employeeId);
+    await Promise.all([...members, ...devices, ...doors].map(link => ctx.db.delete(link._id)));
 
     await ctx.db.delete(args.ruleId);
 
@@ -1205,8 +1219,44 @@ export const removeGroupMember = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const member = await ctx.db.get(args.memberId);
     if (!member) throw new Error("Üye bulunamadı");
-    if (member.projectId && !allowedProjectIds.some((id) => id === member.projectId)) {
+    if (member.projectId ? !isProjectAllowed(allowedProjectIds, member.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu üyeye erişim yetkiniz yok");
+    }
+    const rule = await ctx.db.get(member.groupId);
+    if (!rule || (rule.projectId ? !isProjectAllowed(allowedProjectIds, rule.projectId) : ctx.user.role !== "super_admin")) {
+      throw new Error("Bu kurala erişim yetkiniz yok");
+    }
+    if (ctx.user.role !== "super_admin" && member.projectId !== rule.projectId) {
+      throw new Error("Bu üyeye erişim yetkiniz yok");
+    }
+    const employee = await ctx.db.get(member.employeeId);
+    if (employee && !canAccessEmployeeProject(ctx.user.role, allowedProjectIds, employee.projectId)) {
+      throw new Error("Bu çalışanın projesine erişim yetkiniz yok");
+    }
+    // Panels reached through both device and door links may receive removal operations.
+    const [devices, doors] = await Promise.all([
+      ctx.db.query("groupDevices").withIndex("by_group", q => q.eq("groupId", rule._id)).collect(),
+      ctx.db.query("groupDoors").withIndex("by_group", q => q.eq("groupId", rule._id)).collect(),
+    ]);
+    for (const link of [...devices, ...doors]) {
+      if (ctx.user.role !== "super_admin" && !isProjectAllowed(allowedProjectIds, link.projectId)) {
+        throw new Error("Bu kayda erişim yetkiniz yok");
+      }
+    }
+    const deviceIds = devices.map(link => link.deviceId);
+    for (const link of doors) {
+      const door = await ctx.db.get(link.doorId);
+      if (!door) continue;
+      if (ctx.user.role !== "super_admin" && !isProjectAllowed(allowedProjectIds, door.projectId)) {
+        throw new Error("Bu kapıya erişim yetkiniz yok");
+      }
+      if (door.deviceId) deviceIds.push(door.deviceId);
+    }
+    for (const deviceId of deviceIds) {
+      const device = await ctx.db.get(deviceId);
+      if (device && ctx.user.role !== "super_admin" && !isProjectAllowed(allowedProjectIds, device.projectId)) {
+        throw new Error("Bu cihaza erişim yetkiniz yok");
+      }
     }
     const employeeId = member.employeeId;
     // Silinen kuralın IDE panelleri (commit ÖNCESİ; üyelik silinince zincir kopar).
@@ -1283,11 +1333,38 @@ export const removeGroupDevice = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const gd = await ctx.db.get(args.groupDeviceId);
     if (!gd) throw new Error("Kayıt bulunamadı");
-    if (gd.projectId && !allowedProjectIds.some((id) => id === gd.projectId)) {
+    if (gd.projectId ? !isProjectAllowed(allowedProjectIds, gd.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu kayda erişim yetkiniz yok");
+    }
+    const rule = await ctx.db.get(gd.groupId);
+    if (!rule || (rule.projectId ? !isProjectAllowed(allowedProjectIds, rule.projectId) : ctx.user.role !== "super_admin")) {
+      throw new Error("Bu kurala erişim yetkiniz yok");
+    }
+    const members = await ctx.db.query("groupMembers")
+      .withIndex("by_group", q => q.eq("groupId", gd.groupId)).collect();
+    for (const member of members) {
+      if (ctx.user.role !== "super_admin" && !isProjectAllowed(allowedProjectIds, member.projectId)) {
+        throw new Error("Bu üyeye erişim yetkiniz yok");
+      }
+      const employee = await ctx.db.get(member.employeeId);
+      if (employee && !canAccessEmployeeProject(ctx.user.role, allowedProjectIds, employee.projectId)) {
+        throw new Error("Bu çalışanın projesine erişim yetkiniz yok");
+      }
+    }
+    const doors = await ctx.db.query("groupDoors")
+      .withIndex("by_group", q => q.eq("groupId", gd.groupId)).collect();
+    for (const link of doors) {
+      const door = await ctx.db.get(link.doorId);
+      if (ctx.user.role !== "super_admin" &&
+        (!isProjectAllowed(allowedProjectIds, link.projectId) || (door && !isProjectAllowed(allowedProjectIds, door.projectId)))) {
+        throw new Error("Bu kapıya erişim yetkiniz yok");
+      }
     }
     // Çıkarılan cihaz aktif bir IDE paneli mi? (SİLMEDEN önce yakala.)
     const removedDevice = await ctx.db.get(gd.deviceId);
+    if (removedDevice && ctx.user.role !== "super_admin" && !isProjectAllowed(allowedProjectIds, removedDevice.projectId)) {
+      throw new Error("Bu cihaza erişim yetkiniz yok");
+    }
     const removedIdePanels: Id<"devices">[] =
       removedDevice && removedDevice.isActive && removedDevice.brand === "ide_smart"
         ? [gd.deviceId]
@@ -1313,12 +1390,6 @@ export const removeGroupDevice = authedMutation({
     // Bu gruba bağlı üyeleri yeniden sync — diğer kurallarla cihazda kalabilirler.
     // reconcileRemovedEmployeeIde: çıkarılan panele başka kuralla erişemeyen üyenin kartı
     // sökülür (orphan), erişebilenin permissions[] azaltılır (kişi silinmez).
-    const members = await ctx.db
-      .query("groupMembers")
-      .withIndex("by_project_group", (q) =>
-        q.eq("projectId", gd.projectId).eq("groupId", gd.groupId),
-      )
-      .collect();
     await Promise.all(
       members.flatMap((m) => [
         ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {

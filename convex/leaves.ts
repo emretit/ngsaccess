@@ -4,7 +4,7 @@ import { paginationOptsValidator } from "convex/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { authedQuery, adminMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
+import { getProjectIdsForUser, isProjectAllowed, canAccessEmployeeProject } from "./lib/auth";
 import { approvedLeaveFields, canManageLeaves, leaveDecisionPatch } from "./lib/leaveRules";
 import { toPatch } from "./lib/nullablePatch";
 import { calendarDays, LEAVE_ERRORS, leaveError, overlaps, validateLeaveRange } from "./lib/leaveValidation";
@@ -247,8 +247,15 @@ export const approve = adminMutation({
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const leave = await ctx.db.get(args.leaveId);
-    if (!leave || (leave.projectId && !allowedProjectIds.some((id) => id === leave.projectId))) {
+    if (!leave || (leave.projectId ? !isProjectAllowed(allowedProjectIds, leave.projectId) : ctx.user.role !== "super_admin")) {
       throw new Error("Bu izne erişim yetkiniz yok");
+    }
+    const employee = await ctx.db.get(leave.employeeId);
+    if (!employee || !canAccessEmployeeProject(ctx.user.role, allowedProjectIds, employee.projectId)) {
+      throw new Error("Bu çalışanın projesine erişim yetkiniz yok");
+    }
+    if (ctx.user.role !== "super_admin" && employee.projectId !== leave.projectId) {
+      throw new Error("İzin ve çalışan aynı projede olmalıdır");
     }
     const now = new Date().toISOString();
     const patch = leaveDecisionPatch(ctx.user.role, leave.status, "approved", ctx.user._id, now, args.notes);
@@ -265,8 +272,12 @@ export const reject = adminMutation({
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const leave = await ctx.db.get(args.leaveId);
-    if (!leave || (leave.projectId && !allowedProjectIds.some((id) => id === leave.projectId))) {
+    if (!leave || (leave.projectId ? !isProjectAllowed(allowedProjectIds, leave.projectId) : ctx.user.role !== "super_admin")) {
       throw new Error("Bu izne erişim yetkiniz yok");
+    }
+    const employee = await ctx.db.get(leave.employeeId);
+    if (!employee || !canAccessEmployeeProject(ctx.user.role, allowedProjectIds, employee.projectId)) {
+      throw new Error("Bu çalışanın projesine erişim yetkiniz yok");
     }
     const now = new Date().toISOString();
     await ctx.db.patch(args.leaveId, leaveDecisionPatch(
@@ -300,7 +311,7 @@ export const getBalances = authedQuery({
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const emp = await ctx.db.get(args.employeeId);
-    if (!emp || (emp.projectId && !allowedProjectIds.some((id) => id === emp.projectId))) {
+    if (!emp || !canAccessEmployeeProject(ctx.user.role, allowedProjectIds, emp.projectId)) {
       return [];
     }
     const year = args.year ?? new Date().getFullYear();

@@ -5,7 +5,7 @@ import { resolveProjectScope } from "./lib/projectScope";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
+import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 
 export const list = authedQuery({
   args: { projectId: v.optional(v.id("projects")) },
@@ -55,7 +55,7 @@ export const update = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const dept = await ctx.db.get(args.departmentId);
     if (!dept) throw new Error("Departman bulunamadı");
-    if (dept.projectId && !allowedProjectIds.some((id) => id === dept.projectId)) {
+    if (dept.projectId ? !isProjectAllowed(allowedProjectIds, dept.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu departmana erişim yetkiniz yok");
     }
     if (args.name !== undefined && !args.name.trim()) throw new Error("Departman adı zorunludur");
@@ -88,7 +88,7 @@ export const remove = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const dept = await ctx.db.get(args.departmentId);
     if (!dept) throw new Error("Departman bulunamadı");
-    if (dept.projectId && !allowedProjectIds.some((id) => id === dept.projectId)) {
+    if (dept.projectId ? !isProjectAllowed(allowedProjectIds, dept.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu departmana erişim yetkiniz yok");
     }
     const employees = await ctx.db.query("employees").withIndex("by_department", q => q.eq("departmentId", args.departmentId)).take(1);

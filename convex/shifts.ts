@@ -13,7 +13,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 
 import { ConvexError, v } from "convex/values";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
+import { getProjectIdsForUser, requireEmployeeAccess } from "./lib/auth";
 
 type ReadCtx = QueryCtx | MutationCtx;
 interface AssignmentReadState {
@@ -315,9 +315,10 @@ export const removeAssignment = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const assignment = await ctx.db.get(args.assignmentId);
     if (!assignment) throw new Error("Atama bulunamadı");
-    if (assignment.projectId && !allowedProjectIds.some((id) => id === assignment.projectId)) {
+    if (assignment.projectId ? !allowedProjectIds.some(id => id === assignment.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu atamaya erişim yetkiniz yok");
     }
+    await requireEmployeeAccess(ctx, assignment.employeeId);
     await ctx.db.delete(args.assignmentId);
   },
 });
@@ -456,7 +457,7 @@ export const update = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const shift = await ctx.db.get(args.shiftId);
     if (!shift) throw new Error("Vardiya bulunamadı");
-    if (shift.projectId && !allowedProjectIds.some((id) => id === shift.projectId)) {
+    if (shift.projectId ? !allowedProjectIds.some(id => id === shift.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu vardiyaya erişim yetkiniz yok");
     }
     const { shiftId, ...updates } = args;
@@ -472,7 +473,7 @@ export const remove = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const shift = await ctx.db.get(args.shiftId);
     if (!shift) throw new Error("Vardiya bulunamadı");
-    if (shift.projectId && !allowedProjectIds.some((id) => id === shift.projectId)) {
+    if (shift.projectId ? !allowedProjectIds.some(id => id === shift.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu vardiyaya erişim yetkiniz yok");
     }
     const linkedAssignments = await ctx.db

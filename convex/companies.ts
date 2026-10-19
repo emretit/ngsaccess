@@ -2,7 +2,7 @@ import { resolveProjectScope } from "./lib/projectScope";
 
 import { v } from "convex/values";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
+import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 
 export const list = authedQuery({
   args: { projectId: v.optional(v.id("projects")) },
@@ -53,7 +53,7 @@ export const update = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const company = await ctx.db.get(args.companyId);
     if (!company) throw new Error("Şirket bulunamadı");
-    if (company.projectId && !allowedProjectIds.some((id) => id === company.projectId)) {
+    if (company.projectId ? !isProjectAllowed(allowedProjectIds, company.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu şirkete erişim yetkiniz yok");
     }
     const { companyId, ...updates } = args;
@@ -67,7 +67,7 @@ export const remove = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const company = await ctx.db.get(args.companyId);
     if (!company) throw new Error("Şirket bulunamadı");
-    if (company.projectId && !allowedProjectIds.some((id) => id === company.projectId)) {
+    if (company.projectId ? !isProjectAllowed(allowedProjectIds, company.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu şirkete erişim yetkiniz yok");
     }
     await ctx.db.delete(args.companyId);
