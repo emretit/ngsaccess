@@ -1,4 +1,3 @@
-import { NEXT_POLL_SECONDS, relayConfig, secondsUntil, streamTicket } from "./lib/hikWake";
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -458,52 +457,8 @@ http.route({
   }),
 });
 
-/**
- * Tek-yer modeli: Windows bridge -> Convex. Bir bridge token ile o projedeki TÜM
- * localBridge cihazlarının roster'ı (IP/port/kullanıcı/şifre) + bekleyen SDK işleri.
- * Panel bilgileri bridge'de değil ngsplus'ta yönetilir.
- */
-http.route({
-  path: "/hik-bridge/roster",
-  method: "POST",
-  handler: httpAction(async (ctx, request) => {
-    const ua = request.headers.get("user-agent")?.slice(0, 200);
-    // TODO(Faz 0): köprü tespit edilince kaldır
-    if (Math.random() < 1 / 50) {
-      const headerNames: string[] = [];
-      request.headers.forEach((_value, name) => headerNames.push(name));
-      console.log("[hik-bridge/roster] client", JSON.stringify({
-        ua,
-        xff: request.headers.get("x-forwarded-for"),
-        realIp: request.headers.get("x-real-ip"),
-        cfIp: request.headers.get("cf-connecting-ip"),
-        headerNames,
-      }));
-    }
-    const token = bridgeBearerToken(request);
-    if (!token) return jsonResponse({ ok: false, error: "unauthorized" }, 401);
-    const body = (await request.json().catch(() => ({}))) as { max?: unknown };
-    const result = await ctx.runMutation(internal.hikBridge.claimBridgeRoster, {
-      token,
-      clientInfo: ua,
-      max: typeof body.max === "number" ? body.max : undefined,
-    });
-    if (!result.ok) return jsonResponse(result, 401);
-    const { nextDueAt, ...roster } = result;
-    const config = relayConfig(process.env);
-    const wake = config ? {
-      streamUrl: `${config.url}/hik-bridge/stream`,
-      bridgeId: roster.bridgeId,
-      ticket: await streamTicket(config.secret, roster.bridgeId),
-    } : null;
-    return jsonResponse({
-      ...roster,
-      nextPollSeconds: NEXT_POLL_SECONDS,
-      nextDueInSeconds: secondsUntil(nextDueAt, Date.now()),
-      wake,
-    });
-  }),
-});
+// /hik-bridge/roster kaldırıldı (2026-10-19): 2026-06-19'dan kalan sahipsiz test köprüsü bu yolu 3 sn'de bir
+// çağırıp Convex kotasını tüketiyordu. Köprü baştan yazılacak; yeni sürüm yeni bir yol kullanmalı.
 
 /**
  * Tek-yer modeli: bridge token ile claimed SDK işini done/failed kapat.
