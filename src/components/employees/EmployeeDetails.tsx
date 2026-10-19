@@ -10,6 +10,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { EmployeeSyncSection } from "./EmployeeSyncSection";
 import { EmployeeRecentReadings } from "./EmployeeRecentReadings";
+import { EmployeeConsentsCard } from "./EmployeeConsentsCard";
 export default function EmployeeDetails({
   employee,
   onEdit,
@@ -126,6 +127,14 @@ export default function EmployeeDetails({
           Fotoğraf personel profilinde kullanılır.
         </p>
       </section>
+      <EmployeeActivityBoundary
+        employeeId={employee._id}
+        projectId={projectId}
+        title="KVKK Rızalar"
+        description="Rıza kayıtları yüklenemedi."
+      >
+        <EmployeeConsentsCard employeeId={employee._id} />
+      </EmployeeActivityBoundary>
     </div>
   );
 }

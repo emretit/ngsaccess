@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
+import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { notify } from "@/lib/notify";
 
 type ConsentType = "biometric_face" | "biometric_fingerprint" | "card" | "photo";
@@ -100,15 +101,17 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
   };
 
   if (consents === undefined) {
-    return <div className="text-xs text-muted-foreground">Yükleniyor...</div>;
+    return (
+      <section className="space-y-3 border-t pt-5">
+        <h3 className="text-base font-semibold">KVKK Rızalar</h3>
+        <SectionSkeleton rows={2} label="Rızalar yükleniyor" />
+      </section>
+    );
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <ShieldCheck className="h-4 w-4 text-primary" />
-        <h4 className="text-sm font-medium">KVKK Rızalar</h4>
-      </div>
+    <section className="space-y-3 border-t pt-5">
+      <h3 className="text-base font-semibold">KVKK Rızalar</h3>
       <p className="text-xs text-muted-foreground">
         Biyometri yalnız erişim kontrolü için değerlendirilir. Rıza yoksa yüz/parmak izi kaydı eklenemez. Yasal danışmanınıza doğrulatın.
       </p>
@@ -243,6 +246,6 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
           await revoke({ id: revokeTarget.id });
           notify.success("Rıza iptal edildi", revokeTarget.label);
         }} />
-    </div>
+    </section>
   );
 }

@@ -89,7 +89,7 @@ function AssistantForm({ projectId, enabled }: { projectId: Id<"projects">; enab
     <p className="text-sm text-warning">Kapatırsanız çalışan adları üçüncü taraf yapay zeka servisine gönderilir.</p>
     <DraftNotice remoteChanged={draft.remoteChanged} failed={failed} />
     <form className="space-y-4" onSubmit={async event => { event.preventDefault(); if (needsUnmaskConfirmation(enabled, draft.values.enabled)) { setConfirmUnmask(true); return; } setFailed(!await save.run()); }}>
-      <FormFieldWrapper htmlFor="assistant-mask" label="Çalışan isimlerini maskele">
+      <FormFieldWrapper htmlFor="assistant-mask" label="Çalışan isimlerini maskele" className="flex items-center gap-3 space-y-0">
         <Switch id="assistant-mask" checked={draft.values.enabled} disabled={busy} onCheckedChange={next => draft.change({ enabled: next })} />
       </FormFieldWrapper>
       <SettingsSaveBar dirty={draft.dirty} saving={busy} label="Asistan gizliliğini kaydet" onCancel={() => { draft.reset(); setFailed(false); }} />
