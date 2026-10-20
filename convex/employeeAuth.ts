@@ -1,5 +1,6 @@
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { internal } from "./_generated/api";
 import { employeeAuthedMutation, employeeAuthedQuery } from "./lib/customFunctions";
 import { hashEmployeePassword, verifyEmployeePassword, writeEmployeePassword } from "./lib/employeeAuth";
 import { mobileErrorData } from "./lib/mobileErrors";
@@ -134,6 +135,35 @@ export const consumeSetupToken = internalMutation({
 
     await writeEmployeePassword(ctx, auth, args.passwordHash);
     return { status: "ok" as const };
+  },
+});
+
+// Süre index'i yok: her günlük geçiş tabloyu 200 satırlık sayfalarla tarar.
+// Filtreyi paginate sonrasında uygula; eşleşme az olsa da okuma maliyeti sınırlı kalsın.
+export const cleanupExpiredSetupTokens = internalMutation({
+  args: { cursor: v.optional(v.string()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const page = await ctx.db.query("employeeAuth").paginate({
+      numItems: 200,
+      cursor: args.cursor ?? null,
+    });
+    for (const auth of page.page) {
+      if (auth.tokenExpiresAt && Date.parse(auth.tokenExpiresAt) < now) {
+        await ctx.db.patch(auth._id, {
+          setupToken: undefined,
+          tokenExpiresAt: undefined,
+          updatedAt: new Date(now).toISOString(),
+        });
+      }
+    }
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(0, internal.employeeAuth.cleanupExpiredSetupTokens, {
+        cursor: page.continueCursor,
+      });
+    }
+    return null;
   },
 });
 

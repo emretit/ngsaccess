@@ -78,6 +78,13 @@ crons.daily(
 );
 
 crons.cron(
+  "cleanup-expired-employee-setup-tokens",
+  "15 3 * * *",
+  internal.employeeAuth.cleanupExpiredSetupTokens,
+  {},
+);
+
+crons.cron(
   "cleanup-pending-uploads",
   "0 4 * * *",
   internal.files.cleanupPendingUploads,

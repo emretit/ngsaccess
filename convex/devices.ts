@@ -149,8 +149,13 @@ export const create = authedMutation({
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      throw new Error("Bu projeye erişim yetkiniz yok");
+    // Admin formu projesiz cihazı bilinçli olarak havuza ekler; diğer kullanıcılar
+    // yalnız erişebildikleri bir proje altında cihaz oluşturabilir.
+    if (!args.projectId && ctx.user.role !== "super_admin") {
+      throw new ConvexError("Cihaz oluşturmak için bir proje seçmelisiniz");
+    }
+    if (args.projectId && !isProjectAllowed(allowedProjectIds, args.projectId)) {
+      throw new ConvexError("Bu projeye erişim yetkiniz yok");
     }
     const now = new Date().toISOString();
     const { newZoneName, ...deviceArgs } = args;
@@ -563,8 +568,13 @@ export const createIdePanel = authedMutation({
   }),
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      throw new Error("Bu projeye erişim yetkiniz yok");
+    // Admin formu projesiz cihazı bilinçli olarak havuza ekler; diğer kullanıcılar
+    // yalnız erişebildikleri bir proje altında cihaz oluşturabilir.
+    if (!args.projectId && ctx.user.role !== "super_admin") {
+      throw new ConvexError("Cihaz oluşturmak için bir proje seçmelisiniz");
+    }
+    if (args.projectId && !isProjectAllowed(allowedProjectIds, args.projectId)) {
+      throw new ConvexError("Bu projeye erişim yetkiniz yok");
     }
     if (args.ideUuid) {
       const existingDevice = await ctx.db
@@ -675,8 +685,13 @@ export const createHikDevice = authedMutation({
   }),
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      throw new Error("Bu projeye erişim yetkiniz yok");
+    // Admin formu projesiz cihazı bilinçli olarak havuza ekler; diğer kullanıcılar
+    // yalnız erişebildikleri bir proje altında cihaz oluşturabilir.
+    if (!args.projectId && ctx.user.role !== "super_admin") {
+      throw new ConvexError("Cihaz oluşturmak için bir proje seçmelisiniz");
+    }
+    if (args.projectId && !isProjectAllowed(allowedProjectIds, args.projectId)) {
+      throw new ConvexError("Bu projeye erişim yetkiniz yok");
     }
     const now = new Date().toISOString();
     const doorCount = Math.max(1, Math.min(args.doorCount, 8));
