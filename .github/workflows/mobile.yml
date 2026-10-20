@@ -55,7 +55,7 @@ jobs:
           flutter test --no-pub --reporter expanded
           python3 -m unittest discover -s scripts/tests -v
       - name: Install declared Android build tools
-        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.0.0'
       - name: Unsigned release compilation and APK inspection
         run: scripts/build_mobile.sh android-unsigned
       - uses: actions/upload-artifact@v4
@@ -72,25 +72,45 @@ jobs:
         working-directory: mobile
     steps:
       - uses: actions/checkout@v6
+      # Hosted images lag Xcode releases; skip (not fail) until the pinned major ships, never compile with another one.
+      - id: xcode
+        name: Select approved Xcode if the runner has it
+        run: |
+          major=$(python3 -c 'import json; print(json.load(open("release/toolchain.json"))["xcodeMajor"])')
+          app=$(find /Applications -maxdepth 1 \( -name "Xcode_$major.app" -o -name "Xcode_$major.*.app" \) | sort -V | tail -1)
+          if [ -z "$app" ]; then
+            echo "::warning::Xcode $major is not installed on this runner image; iOS compilation skipped."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          else
+            sudo xcode-select -s "$app/Contents/Developer"
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
       - id: pin
+        if: steps.xcode.outputs.available == 'true'
         run: python3 -c 'import json,os; p=json.load(open("release/toolchain.json")); open(os.environ["GITHUB_OUTPUT"],"a").write("flutter="+p["flutter"]+"\n")'
       - uses: subosito/flutter-action@v2
+        if: steps.xcode.outputs.available == 'true'
         with:
           flutter-version: ${{ steps.pin.outputs.flutter }}
           channel: stable
           cache: true
           cache-key: flutter-ios-${{ steps.pin.outputs.flutter }}-${{ hashFiles('mobile/pubspec.lock', 'mobile/ios/Podfile.lock') }}
       - name: Verify Xcode release toolchain
+        if: steps.xcode.outputs.available == 'true'
         run: python3 scripts/check_apple_tools.py
       - name: Install CocoaPods fallback version
+        if: steps.xcode.outputs.available == 'true'
         run: gem install cocoapods -v 1.16.2 --no-document
-      - run: flutter pub get --enforce-lockfile
+      - if: steps.xcode.outputs.available == 'true'
+        run: flutter pub get --enforce-lockfile
       - name: Simulator and unsigned device compilation
+        if: steps.xcode.outputs.available == 'true'
         run: |
           scripts/build_mobile.sh ios-simulator
           scripts/build_mobile.sh ios-nosign
           git diff --exit-code -- pubspec.lock ios/Podfile.lock ios/Runner.xcodeproj/project.pbxproj
       - uses: actions/upload-artifact@v4
+        if: steps.xcode.outputs.available == 'true'
         with:
           name: ios-unsigned-compile-evidence
           path: mobile/build/release-evidence/
