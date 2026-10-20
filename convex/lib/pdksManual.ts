@@ -8,7 +8,9 @@ export function validateManualPdksNote(value?: string) {
 }
 
 export function isManualPdksTimeOrderValid(entryTime: string | undefined, exitTime: string | undefined, shift?: PdksShift | null): boolean {
-  return !entryTime || !exitTime || entryTime < exitTime || isOvernightShift(shift);
+  if (!entryTime || !exitTime) return true;
+  if (entryTime === exitTime) return !!shift && shift.startTime === shift.endTime;
+  return entryTime < exitTime || isOvernightShift(shift);
 }
 
 /** Shared, side-effect-free validation; note stays optional at transport level for old callers. */

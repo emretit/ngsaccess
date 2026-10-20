@@ -28,3 +28,17 @@ describe("PDKS veri kapsamı", () => {
     expect(await pdksFirstRecordDate(ctx, employee, [], ["2026-10-02"])).toBe("2026-10-02");
   });
 });
+
+it("ilk kayıt için reddedilen deneme yerine izin verilen okumayı tercih eder", async () => {
+  const denied = { ...reading("2026-10-01"), accessStatus: "reddedildi" as const };
+  const granted = reading("2026-10-03");
+  const { ctx } = context([denied, granted]);
+  expect(await pdksFirstRecordDate(ctx, employee, [denied, granted])).toBe("2026-10-03");
+  expect(await pdksFirstRecordDate(ctx, employee, [denied], ["2026-09-30"])).toBe("2026-09-30");
+});
+it("izin verilen aday yoksa dönem iznini tercih eder; hiç izin yoksa mevcut davranış sürer", async () => {
+  const denied = { ...reading("2026-10-01"), accessStatus: "reddedildi" as const };
+  const { ctx } = context([denied]);
+  expect(await pdksFirstRecordDate(ctx, employee, [reading("2026-10-03")])).toBe("2026-10-03");
+  expect(await pdksFirstRecordDate(ctx, employee, [denied])).toBe("2026-10-01");
+});

@@ -86,3 +86,10 @@ export function countPdksReadingSources(readings: readonly PdksSourceReading[]):
   for (const reading of readings) counts[classifyReadingSource(reading)] += 1;
   return counts;
 }
+
+/** Count unproven events before filtering; callers supply authorized employee/work-day scope. */
+export function countExcludedUnknownPdksReadings(readings: readonly PdksSourceReading[], projectId?: string): number {
+  return readings.reduce((count, reading) => count + (
+    (projectId === undefined || reading.projectId === projectId) && classifyReadingSource(reading) === "unknown" ? 1 : 0
+  ), 0);
+}

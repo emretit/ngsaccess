@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Id } from "../_generated/dataModel";
-import { classifyReadingSource, countPdksReadingSources, filterPdksReadings, isPdksEligibleReading } from "./pdksSource";
+import { classifyReadingSource, countExcludedUnknownPdksReadings, countPdksReadingSources, filterPdksReadings, isPdksEligibleReading } from "./pdksSource";
 import { selectProjectScope } from "./projectScope";
 
 describe("PDKS source boundary", () => {
@@ -52,4 +52,20 @@ describe("PDKS source boundary", () => {
     expect(raw).toHaveLength(4);
     expect(() => selectProjectScope([a], b)).toThrow("erişim yetkiniz yok");
   });
+});
+
+it("dışlanan belirsiz okuma sayısı proje kapsamını korur; biyometrik ve izinli kaynak sayılmaz", () => {
+  const projectId = "p" as Id<"projects">;
+  const raw = [
+    { projectId, hikMajorEventType: 5, hikSubEventType: 999 },
+    { projectId, hikMajorEventType: 3, cardNo: "123" },
+    { projectId, hikCurrentVerifyMode: "face" },
+    { projectId, cardNo: "123" },
+    { projectId: "foreign" as Id<"projects">, hikMajorEventType: 5, hikSubEventType: 999 },
+    { hikMajorEventType: 5, hikSubEventType: 999 },
+  ];
+  expect(countExcludedUnknownPdksReadings(raw, projectId)).toBe(2);
+  expect(countExcludedUnknownPdksReadings(raw)).toBe(4);
+  expect(countExcludedUnknownPdksReadings([])).toBe(0);
+  expect(filterPdksReadings(raw, projectId)).toEqual([raw[3]]);
 });

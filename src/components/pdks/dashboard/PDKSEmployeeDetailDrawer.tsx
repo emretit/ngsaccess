@@ -1,5 +1,7 @@
 import { restorePdksFocus } from "../lib/focus";
 import { Component, useState, type ReactNode } from "react";
+import type { FunctionReturnType } from "convex/server";
+import { PdksExcludedReadingsNotice } from "./PdksExcludedReadingsNotice";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -93,7 +95,7 @@ function Detail({
   highlightDate,
 }: Props & { employeeId: Id<"employees"> }) {
   const { projectId, isAdmin } = useActiveProject();
-  const detail = useQuery(api.cardReadings.getEmployeeAttendanceDetail, {
+  const detail: (NonNullable<FunctionReturnType<typeof api.cardReadings.getEmployeeAttendanceDetail>> & { excludedUnknownReadings?: number }) | null | undefined = useQuery(api.cardReadings.getEmployeeAttendanceDetail, {
     projectId,
     employeeId,
     startDate: highlightDate ?? startDate,
@@ -114,6 +116,7 @@ function Detail({
   return (
     <div className="mt-5 min-w-0 space-y-4">
       <h2 className="text-lg font-semibold break-words">{name}</h2>
+      <PdksExcludedReadingsNotice count={detail.excludedUnknownReadings} />
       {detail.days.map((day) => (
         <section key={day.date} className="space-y-4 border-t pt-4">
           <h3 className="font-medium">{readableDate(day.date)}</h3>

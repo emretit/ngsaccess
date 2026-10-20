@@ -9,6 +9,7 @@ import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { SettingsSaveBar } from "../../SettingsSaveBar";
 import { DraftNotice, useSettingsDraft, useSettingsFormState } from "../../SettingsFormState";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 const nonnegative = z.number({ error: "Geçerli bir sayı girin." }).min(0, "Negatif olamaz.");
@@ -86,14 +87,16 @@ export function OvertimeSettingsForm() {
           <Input id={key} type="number" min={min} step="any" value={Number.isNaN(values[key]) ? "" : values[key]} onChange={event => change({ [key]: event.target.value === "" ? NaN : Number(event.target.value) })} />
         </FormFieldWrapper>)}
         <FormFieldWrapper htmlFor="nightCombineMode" label="Gece fazla mesaisinde çarpan" hint="Gün türü çarpanı 2, gece çarpanı 1,5 ise: büyük olan 2; çarpım 3; ek prim 2,5 olur." error={visibleErrors.nightCombineMode}>
-          <select id="nightCombineMode" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={values.nightCombineMode} onChange={event => {
-            const mode = event.target.value;
+          <Select disabled={pending} value={values.nightCombineMode} onValueChange={mode => {
             if (mode === "max" || mode === "multiply" || mode === "additive") change({ nightCombineMode: mode });
           }}>
-            <option value="max">Büyük olan</option>
-            <option value="multiply">Çarpım</option>
-            <option value="additive">Ek prim</option>
-          </select>
+            <SelectTrigger id="nightCombineMode"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="max">Büyük olan</SelectItem>
+              <SelectItem value="multiply">Çarpım</SelectItem>
+              <SelectItem value="additive">Ek prim</SelectItem>
+            </SelectContent>
+          </Select>
         </FormFieldWrapper>
         {(["nightShiftStart", "nightShiftEnd"] as const).map(key => <FormFieldWrapper key={key} htmlFor={key} label={key === "nightShiftStart" ? "Gece başlangıcı" : "Gece bitişi"} error={visibleErrors[key]}>
           <Input id={key} type="time" value={values[key]} onChange={event => change({ [key]: event.target.value })} />

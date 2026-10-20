@@ -1,6 +1,7 @@
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { STATUS_META } from "../statusMeta";
 import type { PdksRow } from "../lib/presentation";
+import { PdksExcludedReadingsNotice } from "./PdksExcludedReadingsNotice";
 export function PdksRowStatus({ record }: { record: PdksRow }) {
   const meta = STATUS_META[record.status];
   return (
@@ -10,6 +11,7 @@ export function PdksRowStatus({ record }: { record: PdksRow }) {
         <StatusBadge tone="warning">Erken çıkış</StatusBadge>
       )}
       {record.isManual && <StatusBadge tone="neutral">Manuel</StatusBadge>}
+      <PdksExcludedReadingsNotice count={record.excludedUnknownReadings} />
       {record.leaveType && (
         <span className="text-xs text-muted-foreground">
           {record.leaveType}

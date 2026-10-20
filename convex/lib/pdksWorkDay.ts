@@ -80,7 +80,8 @@ export function manualPdksTimes(
     isOvernightShift(shift) &&
     !!manual?.entryTime &&
     !!manual.exitTime &&
-    manual.exitTime <= manual.entryTime;
+    (manual.exitTime < manual.entryTime ||
+      (manual.exitTime === manual.entryTime && shift?.startTime === shift?.endTime));
   return {
     entryISO: manual?.entryTime
       ? `${date}T${manual.entryTime}:00.000+03:00`

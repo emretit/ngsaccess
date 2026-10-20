@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { tr } from "date-fns/locale";
 export type PdksRow = FunctionReturnType<
   typeof api.cardReadings.getPdksTableData
->[number];
+>[number] & { excludedUnknownReadings?: number };
 export type PdksCell = PdksRow["days"][number];
 export type SortKey =
   | "name"

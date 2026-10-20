@@ -6,6 +6,7 @@ import { writeAudit } from "./audit";
 import { describe, expect, it, vi } from "vitest";
 import { ConvexError } from "convex/values";
 import { validateManualPdksInput } from "./pdksManual";
+import { manualPdksTimes } from "./pdksWorkDay";
 const input = { date: "2026-10-16", entryTime: "09:00", note: "  Kart unutuldu  " };
 describe("zorunlu manuel düzeltme gerekçesi", () => {
   it.each([undefined, "", "   ", "ab", "a".repeat(501)])("geçersiz gerekçe reddedilir", note => {
@@ -105,4 +106,18 @@ it("CSV action batch gerekçesini doğrular ve trim ederek mutation'a geçirir",
   expect(runAction).not.toHaveBeenCalled();
   expect(await importHandler(ctx, { csvText: "csv", note: "  Kart unutuldu  " })).toEqual({ inserted: 1, updated: 0, errors: 0 });
   expect(runMutation).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ note: "Kart unutuldu" }));
+});
+
+describe("eşit manuel giriş/çıkış", () => {
+  const times = { ...input, entryTime: "08:00", exitTime: "08:00" };
+  it.each([null, { startTime: "22:00", endTime: "06:00" }, { startTime: "08:00", endTime: "17:00" }])("24 saatlik vardiya dışında reddeder (%s)", shift => {
+    expect(() => validateManualPdksInput(times, shift)).toThrow(ConvexError);
+    expect(() => validateManualPdksInput(times, shift)).toThrow("Çıkış saati giriş saatinden sonra olmalı");
+    expect(manualPdksTimes(times.date, times, shift).exitNextDay).toBe(false);
+  });
+  it("başlangıç ve bitişi eşit vardiyada ertesi gün kabul eder", () => {
+    const shift = { startTime: "22:00", endTime: "22:00" };
+    expect(validateManualPdksInput(times, shift)).toMatchObject({ entryTime: "08:00", exitTime: "08:00" });
+    expect(manualPdksTimes(times.date, times, shift)).toMatchObject({ exitNextDay: true, exitISO: "2026-10-17T08:00:00.000+03:00" });
+  });
 });

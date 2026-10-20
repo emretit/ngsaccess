@@ -15,9 +15,12 @@ export async function pdksFirstRecordDate(ctx: QueryCtx, employee: Doc<"employee
   const candidates = await ctx.db.query("cardReadings")
     .withIndex("by_project_employee_time", q => q.eq("projectId", employee.projectId).eq("employeeId", employee._id))
     .order("asc").take(20);
-  const first = candidates.find(r => r.projectId === employee.projectId && isPdksEligibleReading(r));
-  const dates = [...manualDates, ...readings.filter(r => r.projectId === employee.projectId && (r.employeeId === employee._id || r.cardNo === employee.cardNumber)).map(workDay)];
-  if (first && first.projectId === employee.projectId && isPdksEligibleReading(first)) dates.push(workDay(first));
+  const eligibleCandidates = candidates.filter(r => r.projectId === employee.projectId && isPdksEligibleReading(r));
+  const periodReadings = readings.filter(r => r.projectId === employee.projectId && (r.employeeId === employee._id || r.cardNo === employee.cardNumber) && isPdksEligibleReading(r));
+  const allowed = [...eligibleCandidates, ...periodReadings].filter(r => r.accessStatus === "izin_verildi");
+  // Rejected attempts only preserve the legacy fallback when no granted record is known.
+  const history = allowed.length > 0 ? allowed : [...eligibleCandidates.slice(0, 1), ...periodReadings];
+  const dates = [...manualDates, ...history.map(workDay)];
   return dates.sort()[0] ?? null;
 }
 
