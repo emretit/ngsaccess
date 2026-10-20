@@ -37,7 +37,7 @@ export async function writeManualPdksRecord(
     if (args.audit) {
       await writeAudit(ctx, {
         user, projectId: employee.projectId ?? null, action: "update", targetTable: "pdksRecords", targetId: existing._id,
-        oldValue: { entryTime: existing.entryTime, exitTime: existing.exitTime, status: existing.status, manualNote: existing.manualNote },
+        oldValue: { date: existing.date, entryTime: existing.entryTime, exitTime: existing.exitTime, status: existing.status, manualNote: existing.manualNote },
         newValue, note: input.note,
       });
     }

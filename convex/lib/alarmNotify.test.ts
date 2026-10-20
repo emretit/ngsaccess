@@ -68,6 +68,13 @@ describe("notifyAlarmIfNeeded", () => {
     await notifyAlarmIfNeeded(createCtx(), "new" as Id<"deviceEvents">);
     expect(state.scheduled).toBe(1);
   });
+
+  it("ignores a stale notification stamp even when the event time looks recent (device clock ahead)", async () => {
+    const future = new Date(Date.now() + 24 * 60 * 60_000).toISOString();
+    state.events = [row("future", { eventTime: future, alarmNotifiedAt: new Date(Date.now() - 11 * 60_000).toISOString() }), row("live")];
+    await notifyAlarmIfNeeded(createCtx(), "live" as Id<"deviceEvents">);
+    expect(state.scheduled).toBe(1);
+  });
 });
 
 describe("isFreshAlarmEvent", () => {
@@ -79,5 +86,10 @@ describe("isFreshAlarmEvent", () => {
     expect(isFreshAlarmEvent("2026-10-20T05:49:59.000Z", now)).toBe(false);
     expect(isFreshAlarmEvent("2026-10-19T02:00:00.000Z", now)).toBe(false);
     expect(isFreshAlarmEvent("not-a-date", now)).toBe(false);
+  });
+  it("rejects future events beyond the clock skew allowance", () => {
+    expect(isFreshAlarmEvent("2026-10-20T06:01:30.000Z", now)).toBe(true);
+    expect(isFreshAlarmEvent("2026-10-20T06:03:00.000Z", now)).toBe(false);
+    expect(isFreshAlarmEvent("2026-10-21T06:00:00.000Z", now)).toBe(false);
   });
 });

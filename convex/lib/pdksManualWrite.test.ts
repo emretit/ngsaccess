@@ -8,7 +8,7 @@ const employee = { _id: "e1" as Id<"employees">, projectId: "p1" as Id<"projects
 const input = { entryTime: "08:10", exitTime: "17:05", note: "Kart unutuldu" };
 
 function createCtx() {
-  const insert = vi.fn(async (table: string) => (table === "pdksRecords" ? "r-new" : "audit-1"));
+  const insert = vi.fn(async (table: string, _doc: Record<string, unknown>) => (table === "pdksRecords" ? "r-new" : "audit-1"));
   const patch = vi.fn(async () => undefined);
   return { ctx: { db: { insert, patch } } as unknown as MutationCtx, insert, patch };
 }
@@ -16,12 +16,16 @@ function createCtx() {
 describe("writeManualPdksRecord", () => {
   it("mevcut kaydı elle işaretleyip günceller ve eski/yeni değerle denetim yazar", async () => {
     const { ctx, insert, patch } = createCtx();
-    const existing = { _id: "r1" as Id<"pdksRecords">, entryTime: "09:00", exitTime: undefined, status: "absent", manualNote: undefined } as unknown as Doc<"pdksRecords">;
+    const existing = { _id: "r1" as Id<"pdksRecords">, date: "2026-10-20", entryTime: "09:00", exitTime: undefined, status: "absent", manualNote: undefined } as unknown as Doc<"pdksRecords">;
     const result = await writeManualPdksRecord(ctx, { user, employee, date: "2026-10-20", existing, input, audit: true });
 
     expect(result).toEqual({ id: "r1", created: false });
     expect(patch).toHaveBeenCalledWith("r1", expect.objectContaining({ entryTime: "08:10", exitTime: "17:05", status: "present", manualEntry: true, manualNote: "Kart unutuldu", editedBy: "u1" }));
     expect(insert).toHaveBeenCalledWith("auditLog", expect.objectContaining({ action: "update", targetTable: "pdksRecords", targetId: "r1" }));
+    // Değişmeyen tarih denetim farkında "eklendi" görünmesin: iki tarafta da aynı.
+    const auditRow = insert.mock.calls.find(([table]) => table === "auditLog")?.[1];
+    expect(auditRow?.oldValue).toMatchObject({ date: "2026-10-20", entryTime: "09:00", status: "absent" });
+    expect(auditRow?.newValue).toMatchObject({ date: "2026-10-20", entryTime: "08:10", exitTime: "17:05", status: "present" });
   });
 
   it("kayıt yoksa ekler; toplu yazımda kayıt başına denetim yazmaz", async () => {

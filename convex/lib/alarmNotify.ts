@@ -8,10 +8,16 @@ export type AlarmCategory = "alarm" | "exception";
 /** Debounce penceresi; taze olay sınırı da aynı (pencere "şimdi"ye göre hesaplanır). */
 export const ALARM_WINDOW_MS = 10 * 60_000;
 
-/** Tarihsel backfill'den gelen eski olaylar e-posta tetiklemesin: debounce yalnız taze olayda anlamlı. */
+/** Cihaz saatinin sunucudan ileride olmasına tanınan pay. */
+const ALARM_CLOCK_SKEW_MS = 2 * 60_000;
+
+/**
+ * Tarihsel backfill'den gelen eski olaylar e-posta tetiklemesin: debounce yalnız taze olayda anlamlı.
+ * Saati ileri kaymış cihazın gelecek tarihli olayı da taze sayılmaz (debounce'u uzun süre kilitlemesin).
+ */
 export function isFreshAlarmEvent(eventTime: string, now = Date.now()): boolean {
   const time = Date.parse(eventTime);
-  return Number.isFinite(time) && time >= now - ALARM_WINDOW_MS;
+  return Number.isFinite(time) && time >= now - ALARM_WINDOW_MS && time <= now + ALARM_CLOCK_SKEW_MS;
 }
 
 export function shouldNotifyAlarm(input: { severity: AlarmSeverity; minSeverity: "warning" | "critical"; emailEnabled: boolean; sentRecently: boolean }): boolean {
@@ -31,7 +37,8 @@ export async function notifyAlarmIfNeeded(ctx: MutationCtx, eventId: Id<"deviceE
     .withIndex("by_device_and_event_time", q => q.eq("deviceId", event.deviceId).gte("eventTime", cutoff))
     .order("desc")
     .take(200);
-  const sentRecently = recent.some(item => item._id !== event._id && item.alarmNotifiedAt !== undefined && item.label === event.label && item.category === event.category);
+  // Bastırma bildirimin kendi zamanına bakar; olay saati (cihaz saati) tek başına bildirim yaşını göstermez.
+  const sentRecently = recent.some(item => item._id !== event._id && item.alarmNotifiedAt !== undefined && item.alarmNotifiedAt >= cutoff && item.label === event.label && item.category === event.category);
   if (!shouldNotifyAlarm({ severity: event.severity, minSeverity: settings.minSeverity, emailEnabled: true, sentRecently })) return;
 
   const notifiedAt = new Date().toISOString();
