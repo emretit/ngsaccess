@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
 import '../core/errors.dart';
+import '../core/password_policy.dart';
 import '../repositories/auth_repository.dart';
 import '../services/session_store.dart';
 
@@ -276,9 +276,7 @@ class AuthProvider extends ChangeNotifier {
     _notify();
     try {
       if (!_owns(epoch)) return false;
-      if (newPassword.runes.length < 12 ||
-          utf8.encode(newPassword).length > 72 ||
-          currentPassword == newPassword) {
+      if (!isAcceptableNewPassword(newPassword, current: currentPassword)) {
         throw const BusinessError(message: '', code: 'PASSWORD_POLICY');
       }
       await _repo

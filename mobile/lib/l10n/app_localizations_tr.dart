@@ -1088,7 +1088,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get profilePasswordRules =>
-      'Yeni şifre en az 12 karakter ve en fazla 72 UTF-8 bayt olmalı, mevcut şifrenizden farklı olmalıdır. Şifre değişince tüm oturumlar kapanır; yeniden giriş yapmanız gerekir.';
+      'Yeni şifre en az 8 karakter olmalı; büyük harf, küçük harf ve rakam içermeli, en fazla 72 UTF-8 bayt olmalı ve mevcut şifrenizden farklı olmalıdır. Şifre değişince tüm oturumlar kapanır; yeniden giriş yapmanız gerekir.';
 
   @override
   String get profilePasswordInvalid =>
@@ -1115,7 +1115,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get errorPasswordPolicy =>
-      'Yeni şifre en az 12 karakter, en fazla 72 UTF-8 bayt olmalı ve mevcut şifreden farklı olmalıdır.';
+      'Yeni şifre en az 8 karakter olmalı; büyük harf, küçük harf ve rakam içermeli, en fazla 72 UTF-8 bayt olmalı ve mevcut şifreden farklı olmalıdır.';
 
   @override
   String get homeChooseDoor => 'Kapı seçin';

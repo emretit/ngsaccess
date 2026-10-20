@@ -329,7 +329,7 @@ void main() {
       expect(
         await auth.changePassword(
           currentPassword: 'test-password',
-          newPassword: 'new-test-password',
+          newPassword: 'New-test-password1',
         ),
         isTrue,
       );
@@ -341,17 +341,20 @@ void main() {
   );
 
   test(
-    'password policy rejects short, multibyte over-limit and unchanged secrets',
+    'password policy rejects weak, multibyte over-limit and unchanged secrets',
     () async {
       await auth.signIn('a@example.test', 'test-password');
       for (final value in [
-        'short',
-        'test-password',
-        List.filled(25, '界').join(),
+        'Short1a',
+        'lowercase-only1',
+        'UPPERCASE-ONLY1',
+        'No-digits-here',
+        'Aa1${List.filled(24, '界').join()}',
+        'Current-pass1',
       ]) {
         expect(
           await auth.changePassword(
-            currentPassword: 'test-password',
+            currentPassword: 'Current-pass1',
             newPassword: value,
           ),
           isFalse,
@@ -371,13 +374,13 @@ void main() {
       repo.onChangePassword = (email, password) => reply.future;
       final first = auth.changePassword(
         currentPassword: 'test-password',
-        newPassword: 'new-test-password',
+        newPassword: 'New-test-password1',
       );
       expect(auth.isChangingPassword, isTrue);
       expect(
         await auth.changePassword(
           currentPassword: 'test-password',
-          newPassword: 'new-test-password',
+          newPassword: 'New-test-password1',
         ),
         isFalse,
       );
@@ -397,7 +400,7 @@ void main() {
     repo.onChangePassword = (email, password) => reply.future;
     final change = auth.changePassword(
       currentPassword: 'test-password',
-      newPassword: 'new-test-password',
+      newPassword: 'New-test-password1',
     );
     await auth.signOut();
     repo.onSignIn = (email, password) async =>
@@ -425,7 +428,7 @@ void main() {
       expect(
         await auth.changePassword(
           currentPassword: 'test-password',
-          newPassword: 'new-test-password',
+          newPassword: 'New-test-password1',
         ),
         isFalse,
       );

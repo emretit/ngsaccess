@@ -116,8 +116,8 @@ void main() {
 
   Future<void> fillPasswords(
     WidgetTester tester, {
-    String next = 'a-safe-new-password',
-    String repeat = 'a-safe-new-password',
+    String next = 'A-safe-new-password1',
+    String repeat = 'A-safe-new-password1',
   }) async {
     await tester.enterText(
       find.byType(TextFormField).at(0),
@@ -200,7 +200,7 @@ void main() {
       await openSecurity(tester);
       await fillPasswords(
         tester,
-        next: 'a-safe-new-password',
+        next: 'A-safe-new-password1',
         repeat: 'different-password',
       );
       await tester.tap(find.widgetWithText(FilledButton, 'Change password'));
@@ -208,8 +208,8 @@ void main() {
       expect(repository.passwordChangeCalls, 0);
       await fillPasswords(
         tester,
-        next: List.filled(19, '🔒').join(),
-        repeat: List.filled(19, '🔒').join(),
+        next: 'Aa1${List.filled(18, '🔒').join()}',
+        repeat: 'Aa1${List.filled(18, '🔒').join()}',
       );
       await tester.tap(find.widgetWithText(FilledButton, 'Change password'));
       await tester.pumpAndSettle();

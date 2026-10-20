@@ -2069,7 +2069,7 @@ abstract class AppLocalizations {
   /// No description provided for @profilePasswordRules.
   ///
   /// In tr, this message translates to:
-  /// **'Yeni şifre en az 12 karakter ve en fazla 72 UTF-8 bayt olmalı, mevcut şifrenizden farklı olmalıdır. Şifre değişince tüm oturumlar kapanır; yeniden giriş yapmanız gerekir.'**
+  /// **'Yeni şifre en az 8 karakter olmalı; büyük harf, küçük harf ve rakam içermeli, en fazla 72 UTF-8 bayt olmalı ve mevcut şifrenizden farklı olmalıdır. Şifre değişince tüm oturumlar kapanır; yeniden giriş yapmanız gerekir.'**
   String get profilePasswordRules;
 
   /// No description provided for @profilePasswordInvalid.
@@ -2111,7 +2111,7 @@ abstract class AppLocalizations {
   /// No description provided for @errorPasswordPolicy.
   ///
   /// In tr, this message translates to:
-  /// **'Yeni şifre en az 12 karakter, en fazla 72 UTF-8 bayt olmalı ve mevcut şifreden farklı olmalıdır.'**
+  /// **'Yeni şifre en az 8 karakter olmalı; büyük harf, küçük harf ve rakam içermeli, en fazla 72 UTF-8 bayt olmalı ve mevcut şifreden farklı olmalıdır.'**
   String get errorPasswordPolicy;
 
   /// No description provided for @homeChooseDoor.

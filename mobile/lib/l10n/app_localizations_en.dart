@@ -1101,7 +1101,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profilePasswordRules =>
-      'Use at least 12 characters and at most 72 UTF-8 bytes, different from your current password. Changing it ends all sessions; sign in again afterwards.';
+      'Use at least 8 characters with an uppercase letter, a lowercase letter and a digit, at most 72 UTF-8 bytes, different from your current password. Changing it ends all sessions; sign in again afterwards.';
 
   @override
   String get profilePasswordInvalid =>
@@ -1128,7 +1128,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errorPasswordPolicy =>
-      'Use a new password of at least 12 characters and at most 72 UTF-8 bytes, different from the current password.';
+      'Use a new password of at least 8 characters with an uppercase letter, a lowercase letter and a digit, at most 72 UTF-8 bytes, different from the current password.';
 
   @override
   String get homeChooseDoor => 'Choose a door';

@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/spacing.dart';
 import '../../core/error_localizer.dart';
+import '../../core/password_policy.dart';
 import '../../core/safe_diagnostics.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
@@ -669,9 +668,7 @@ class _ChangePasswordFormState extends State<_ChangePasswordForm> {
               decoration: InputDecoration(labelText: l10n.profileNewPassword),
               validator: (value) {
                 if (value == null ||
-                    value.runes.length < 12 ||
-                    utf8.encode(value).length > 72 ||
-                    value == _current.text) {
+                    !isAcceptableNewPassword(value, current: _current.text)) {
                   return l10n.profilePasswordInvalid;
                 }
                 return null;

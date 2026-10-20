@@ -173,7 +173,7 @@ class AuthRepository {
       case 'PASSWORD_POLICY':
         throw const BusinessError(
           message:
-              'Yeni şifre en az 12 karakter, en fazla 72 UTF-8 bayt olmalı ve mevcut şifreden farklı olmalı.',
+              'Yeni şifre en az 8 karakter olmalı; büyük harf, küçük harf ve rakam içermeli, en fazla 72 UTF-8 bayt olmalı ve mevcut şifreden farklı olmalı.',
           code: 'PASSWORD_POLICY',
         );
       case 'RATE_LIMITED':
