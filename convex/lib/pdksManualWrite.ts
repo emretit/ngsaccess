@@ -27,14 +27,14 @@ export async function writeManualPdksRecord(
   ctx: MutationCtx,
   args: { user: Doc<"users">; employee: Doc<"employees">; date: string; existing: Doc<"pdksRecords"> | null; input: ValidManualPdks; audit: boolean },
 ): Promise<{ id: Id<"pdksRecords">; created: boolean }> {
-  const { user, employee, date, existing, input } = args;
+  const { user, employee, date, existing, input, audit } = args;
   const now = new Date().toISOString();
   const status = "present" as const;
   const values = { entryTime: input.entryTime, exitTime: input.exitTime, status, manualEntry: true, manualNote: input.note, editedBy: user._id, editedAt: Date.now(), updatedAt: now };
   const newValue = { date, entryTime: input.entryTime, exitTime: input.exitTime, status, manualNote: input.note };
   if (existing) {
     await ctx.db.patch(existing._id, values);
-    if (args.audit) {
+    if (audit) {
       await writeAudit(ctx, {
         user, projectId: employee.projectId ?? null, action: "update", targetTable: "pdksRecords", targetId: existing._id,
         oldValue: { date: existing.date, entryTime: existing.entryTime, exitTime: existing.exitTime, status: existing.status, manualNote: existing.manualNote },
@@ -47,7 +47,7 @@ export async function writeManualPdksRecord(
     projectId: employee.projectId, employeeId: employee._id, employeeFirstName: employee.firstName, employeeLastName: employee.lastName,
     date, ...values, createdAt: now,
   });
-  if (args.audit) {
+  if (audit) {
     await writeAudit(ctx, { user, projectId: employee.projectId ?? null, action: "create", targetTable: "pdksRecords", targetId: id, newValue, note: input.note });
   }
   return { id, created: true };

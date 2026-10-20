@@ -56,6 +56,14 @@ describe("employeeImportFlow", () => {
     expect(outcome.results).toHaveLength(100);
   });
 
+  it("son parça sürerken basılan iptal tamamlanmış aktarımı iptal saymaz", async () => {
+    let cancel = false;
+    const importChunk = vi.fn<ImportChunkFn>(async (chunk) => { cancel = true; return chunk.map(created); });
+    const outcome = await runEmployeeImport(rows(2, 50), [], importChunk, { isCancelled: () => cancel, onProgress: () => {} });
+    expect(outcome.cancelled).toBe(false);
+    expect(outcome.results).toHaveLength(50);
+  });
+
   it("sunucu hatasında o ana kadarki sonuçları ve hatayı döner; hata raporu yalnız hatalı satırları içerir", async () => {
     const importChunk = vi.fn<ImportChunkFn>()
       .mockImplementationOnce(async (chunk) => chunk.map((r) => r.rowNumber === 3 ? { rowNumber: 3, status: "error", message: "Kart başka kişide" } : created(r)))

@@ -1,9 +1,12 @@
+import type { FunctionReturnType } from "convex/server";
+import type { api } from "../../../convex/_generated/api";
 import type { EmployeeImportRow, ParsedEmployeeFile } from "./employeeExcelTypes";
 
-export type ImportResult = { rowNumber: number; status: "created" | "skippedDuplicate" | "error"; message: string };
+export type ImportResult = FunctionReturnType<typeof api.employeeImport.importChunk>[number];
 /** `employeeImport.importChunk` sarmalayıcısı; dryRun=true yazmadan doğrular. */
 export type ImportChunkFn = (rows: EmployeeImportRow[], dryRun: boolean) => Promise<ImportResult[]>;
 
+/** Sunucu sınırı: employeeImport.importChunk çağrı başına en fazla 100 satır kabul eder. */
 export const IMPORT_CHUNK_SIZE = 100;
 const byRow = (a: ImportResult, b: ImportResult) => a.rowNumber - b.rowNumber;
 
@@ -35,13 +38,15 @@ export async function runEmployeeImport(
   { isCancelled, onProgress }: { isCancelled: () => boolean; onProgress: (percent: number, results: ImportResult[]) => void },
 ): Promise<{ results: ImportResult[]; cancelled: boolean; error?: unknown }> {
   const completed = previewResults.filter((result) => result.status !== "created");
+  // Yalnız gerçekten bir parça atlandıysa iptal sayılır; son parça sürerken basılan iptal "tamamlandı" kalır.
+  let cancelled = false;
   try {
     for (let index = 0; index < eligibleRows.length; index += IMPORT_CHUNK_SIZE) {
-      if (isCancelled()) break;
+      if (isCancelled()) { cancelled = true; break; }
       completed.push(...await importChunk(eligibleRows.slice(index, index + IMPORT_CHUNK_SIZE), false));
       onProgress(Math.round(Math.min(index + IMPORT_CHUNK_SIZE, eligibleRows.length) / eligibleRows.length * 100), [...completed].sort(byRow));
     }
-    return { results: completed.sort(byRow), cancelled: isCancelled() };
+    return { results: completed.sort(byRow), cancelled };
   } catch (error) {
     return { results: completed.sort(byRow), cancelled: false, error };
   }
