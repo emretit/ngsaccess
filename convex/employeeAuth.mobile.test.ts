@@ -8,8 +8,8 @@ import { api, internal } from "./_generated/api";
 import schema from "./schema";
 
 const modules = import.meta.glob("./**/*.ts");
-const currentPassword = "synthetic-current-password";
-const newPassword = "synthetic-replacement-password";
+const currentPassword = "Synthetic-Current-2026";
+const newPassword = "Synthetic-Replacement-2026";
 const currentHash = bcrypt.hashSync(currentPassword, 4);
 const newHash = bcrypt.hashSync(newPassword, 4);
 const now = "2026-10-19T12:00:00.000Z";
@@ -209,7 +209,7 @@ describe("mobile auth with the real session wrapper and persisted rate limiter",
     await expect(t.query(api.employeeAuth.me, { sessionToken: "other-session" })).resolves.toMatchObject({ id: otherEmployeeId });
   });
 
-  it.each(["short", "a".repeat(73), "🔒".repeat(19), currentPassword])("rejects unsafe replacement password without changing auth", async (newPassword) => {
+  it.each(["Short1", "lowercase-only-2026", "Aa1" + "a".repeat(70), "Aa1" + "🔒".repeat(18), currentPassword])("rejects unsafe replacement password without changing auth", async (newPassword) => {
     const { t, authId } = await fixture();
     await expect(t.mutation(api.employeeAuth.changePassword, { sessionToken: "device-one", currentPassword, newPassword }))
       .resolves.toMatchObject({ error: { code: "PASSWORD_POLICY" } });

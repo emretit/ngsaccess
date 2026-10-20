@@ -4,6 +4,7 @@ import { internal } from "./_generated/api";
 import { employeeAuthedMutation, employeeAuthedQuery } from "./lib/customFunctions";
 import { hashEmployeePassword, verifyEmployeePassword, writeEmployeePassword } from "./lib/employeeAuth";
 import { mobileErrorData } from "./lib/mobileErrors";
+import { getPasswordError } from "./lib/passwordPolicy";
 import { limiter } from "./lib/rateLimit";
 import type { Doc } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
@@ -300,10 +301,12 @@ export const changePassword = employeeAuthedMutation({
     if (!limit.ok) {
       return { error: mobileErrorData("RATE_LIMITED", Math.max(1, Math.ceil(limit.retryAfter ?? 1))) };
     }
-    if (Array.from(args.newPassword).length < 12 || new TextEncoder().encode(args.newPassword).length > 72 || args.newPassword === args.currentPassword) {
+    // Ortak politika + bcrypt'in 72 bayt sınırı + mevcut şifreden farklılık.
+    const policyError = getPasswordError(args.newPassword);
+    if (policyError || new TextEncoder().encode(args.newPassword).length > 72 || args.newPassword === args.currentPassword) {
       return { error: {
         code: "PASSWORD_POLICY" as const,
-        message: "Yeni şifre en az 12 karakter, en fazla 72 UTF-8 bayt olmalı ve mevcut şifreden farklı olmalı",
+        message: `${policyError ?? "Şifre politikası karşılanmıyor."} En fazla 72 UTF-8 bayt olmalı ve mevcut şifreden farklı olmalı.`,
       } };
     }
     const auth = await ctx.db.query("employeeAuth")
