@@ -1,7 +1,7 @@
 import { stream } from "convex-helpers/server/stream";
 import schema from "./schema";
 import { canSeePay } from "./lib/payVisibility";
-import { classifyReadingSource, filterPdksReadings } from "./lib/pdksSource";
+import { classifyReadingSource, countExcludedUnknownPdksReadings, filterPdksReadings } from "./lib/pdksSource";
 import { matchesReadingSources, toReportTransactionRow } from "./lib/reportAttendance";
 import { paginationOptsValidator, type PaginationResult } from "convex/server";
 import { resolveProjectScope } from "./lib/projectScope";
@@ -488,6 +488,7 @@ export const getPdksTableData = authedQuery({
       );
     }
 
+    const sourceReadings = readings;
     readings = filterPdksReadings(readings, args.projectId);
 
     readings.sort(
@@ -554,6 +555,11 @@ export const getPdksTableData = authedQuery({
     const tableDeptById = new Map(tableDepartments.filter((d): d is NonNullable<typeof d> => d !== null).map((d) => [String(d._id), d]));
 
     const tableWorkDate = buildPdksWorkDateResolver(availabilityEmployees, (id, date) => scopedPdksShift(shiftResolver.resolve(id, date), args.projectId));
+    const tablePeriodDates = new Set(periodDateKeys);
+    const sourceReadingsByEmployee = buildPdksEmployeeReadingMap({
+      employees,
+      readings: sourceReadings.filter(r => tablePeriodDates.has(tableWorkDate(r))),
+    });
     const tableAvailableDates = pdksAvailableDatesByProject(readings, tableWorkDate);
     const tableManualDates = pdksManualDatesByEmployee(manualPdksByEmpDate.values());
     const tableData = await Promise.all(
@@ -572,7 +578,7 @@ export const getPdksTableData = authedQuery({
           : null;
 
         const firstRecordDate = employee ? await pdksFirstRecordDate(ctx, employee, empReadings, tableManualDates.get(employee._id) ?? [], tableWorkDate) : null;
-        return computePdksTableRow({
+        const row = computePdksTableRow({
           availableDateKeys: tableAvailableDates.get(employee?.projectId) ?? new Set<string>(),
           firstRecordDate,
           empKey,
@@ -601,6 +607,13 @@ export const getPdksTableData = authedQuery({
           },
           manualEditedBy: editor?.fullName ?? editor?.name ?? editor?.email ?? null,
         });
+        return {
+          ...row,
+          excludedUnknownReadings: countExcludedUnknownPdksReadings(
+            sourceReadingsByEmployee.get(empKey) ?? [],
+            employee?.projectId,
+          ),
+        };
       })
     );
 
@@ -1485,6 +1498,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
     const availabilityEmployees = await ctx.db.query("employees")
       .withIndex("by_project", q => q.eq("projectId", employee.projectId)).collect();
 
+    const sourceReadings = readings;
     readings = filterPdksReadings(readings, args.projectId);
 
     readings.sort(
@@ -1540,6 +1554,11 @@ export const getEmployeeAttendanceDetail = authedQuery({
     const readingsByDate = groupPdksWorkDays(readings, employee._id, (id, date) => scopedPdksShift(detailShiftResolver.resolve(id, date), args.projectId));
 
     const detailWorkDate = buildPdksWorkDateResolver(availabilityEmployees.filter(e => e.isActive), (id, date) => scopedPdksShift(detailShiftResolver.resolve(id, date), args.projectId));
+    const detailPeriodDates = new Set(periodDateKeys);
+    const excludedUnknownReadings = countExcludedUnknownPdksReadings(
+      sourceReadings.filter(r => detailPeriodDates.has(detailWorkDate(r))),
+      employee.projectId,
+    );
     const availableDateKeys = await readPdksAvailableDateKeys(ctx, employee.projectId, periodDateKeys, detailWorkDate);
     const firstRecordDate = await pdksFirstRecordDate(ctx, employee, readings, [...manualByDate.keys()], detailWorkDate);
     const scopedLeaves = leaves.filter(l => pdksLeaveMatchesProject(l, employee.projectId));
@@ -1562,6 +1581,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
     const summary = summarizeAttendanceDays(days);
 
     return {
+      excludedUnknownReadings,
       employee: {
         id: String(employee._id),
         firstName: employee.firstName,

@@ -3,6 +3,7 @@ import { analyzePdksRows } from "./analysis";
 import type { PdksRow } from "./presentation";
 // Only the consumed properties are supplied by this typed fixture helper.
 const make = (days: PdksRow["days"]): PdksRow => ({
+  excludedUnknownReadings: 0,
   id: "a",
   name: "A",
   cardNumber: "",

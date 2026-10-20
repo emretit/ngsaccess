@@ -36,6 +36,7 @@ const row = (
   totalMinutes: number,
   firstEntry = "08:30",
 ): PdksRow => ({
+  excludedUnknownReadings: 0,
   id: name,
   name,
   totalMinutes,

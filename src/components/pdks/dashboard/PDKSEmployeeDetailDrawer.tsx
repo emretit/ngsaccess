@@ -1,6 +1,5 @@
 import { restorePdksFocus } from "../lib/focus";
 import { Component, useState, type ReactNode } from "react";
-import type { FunctionReturnType } from "convex/server";
 import { PdksExcludedReadingsNotice } from "./PdksExcludedReadingsNotice";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -95,7 +94,7 @@ function Detail({
   highlightDate,
 }: Props & { employeeId: Id<"employees"> }) {
   const { projectId, isAdmin } = useActiveProject();
-  const detail: (NonNullable<FunctionReturnType<typeof api.cardReadings.getEmployeeAttendanceDetail>> & { excludedUnknownReadings?: number }) | null | undefined = useQuery(api.cardReadings.getEmployeeAttendanceDetail, {
+  const detail = useQuery(api.cardReadings.getEmployeeAttendanceDetail, {
     projectId,
     employeeId,
     startDate: highlightDate ?? startDate,

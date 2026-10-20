@@ -410,10 +410,10 @@ export function computePdksTableRow(params: {
   };
 }
 
-export function filterPdksTableRows(
-  rows: PdksTableRow[],
+export function filterPdksTableRows<T extends PdksTableRow>(
+  rows: T[],
   statusFilter: PdksTableStatusFilter | undefined,
-): PdksTableRow[] {
+): T[] {
   if (!statusFilter || statusFilter === "all") return rows;
   return rows.filter((row) => {
     if (statusFilter === "overtime") return row.overtimeHours > 0;
