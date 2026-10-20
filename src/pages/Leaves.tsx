@@ -1,3 +1,7 @@
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
+import { Button } from "@/components/ui/button";
+import { LeaveRequestsPanel } from "@/components/leaves/LeaveRequestsPanel";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -72,6 +76,11 @@ function LeavesProject({
       setParams(next, { replace: true });
     }
   }, [params, urlParams, projectId, setParams]);
+  const [requests, setRequests] = useState(false);
+  const count = useQuery(
+    api.leaveRequests.pendingCount,
+    isAdmin ? { projectId, kind: "leaves" } : "skip",
+  );
   const [detail, setDetail] = useState<LeaveRow | null>(null);
   const [editor, setEditor] = useState<LeaveRow | "new" | null>(null);
   const [rows, setRows] = useState<LeaveRow[]>([]);
@@ -124,31 +133,61 @@ function LeavesProject({
             : undefined
         }
       />
-      <LeaveFilters
-        projectId={projectId}
-        filters={filters}
-        onChange={updateFilters}
-        onClear={clear}
-      />
-      <p className="text-xs text-muted-foreground">
-        İzinler yöneticiler tarafından doğrudan onaylı kaydedilir. Dönem
-        filtresi izin süresini kısaltmaz.
-      </p>
-      <LeaveQueryBoundary scope={scope}>
-        <LeaveResults
-          key={scope}
-          filters={queryFilters}
-          pageSize={filters.pageSize}
-          isAdmin={isAdmin}
-          onCreate={() => setEditor("new")}
-          onClear={clear}
-          onDetails={onDetails}
-          onEdit={onEdit}
-          requestedId={params.get("leave") ?? undefined}
-          onRows={onRows}
-          onPageSizeChange={(size) => updateFilters({ size: String(size) })}
-        />
-      </LeaveQueryBoundary>
+      {isAdmin && (
+        <div role="group" aria-label="İzin görünümü" className="flex gap-2">
+          <Button
+            variant={!requests ? "secondary" : "ghost"}
+            aria-pressed={!requests}
+            onClick={() => setRequests(false)}
+          >
+            Kayıtlar
+          </Button>
+          <Button
+            variant={requests ? "secondary" : "ghost"}
+            aria-pressed={requests}
+            onClick={() => setRequests(true)}
+          >
+            Talepler (
+            {count
+              ? `${Math.min(count.count, 100)}${count.count > 100 ? "+" : ""}`
+              : "…"}
+            )
+          </Button>
+        </div>
+      )}
+      {isAdmin && requests ? (
+        <LeaveQueryBoundary scope={`requests:${projectId}`}>
+          <LeaveRequestsPanel key={projectId} projectId={projectId} />
+        </LeaveQueryBoundary>
+      ) : (
+        <>
+          <LeaveFilters
+            projectId={projectId}
+            filters={filters}
+            onChange={updateFilters}
+            onClear={clear}
+          />
+          <p className="text-xs text-muted-foreground">
+            İzinler yöneticiler tarafından doğrudan onaylı kaydedilir. Dönem
+            filtresi izin süresini kısaltmaz.
+          </p>
+          <LeaveQueryBoundary scope={scope}>
+            <LeaveResults
+              key={scope}
+              filters={queryFilters}
+              pageSize={filters.pageSize}
+              isAdmin={isAdmin}
+              onCreate={() => setEditor("new")}
+              onClear={clear}
+              onDetails={onDetails}
+              onEdit={onEdit}
+              requestedId={params.get("leave") ?? undefined}
+              onRows={onRows}
+              onPageSizeChange={(size) => updateFilters({ size: String(size) })}
+            />
+          </LeaveQueryBoundary>
+        </>
+      )}
       <LeaveDetails
         row={displayedDetail}
         isAdmin={isAdmin}

@@ -29,7 +29,7 @@ async function requireLeaveEmployee(ctx: QueryCtx | MutationCtx, employeeId: Id<
 }
 
 /** Shared by create/update. Legacy pending/rejected are read-only history, not reservations. */
-async function assertNoLeaveOverlap(
+export async function assertNoLeaveOverlap(
   ctx: MutationCtx,
   employeeId: Id<"employees">,
   startDate: string,

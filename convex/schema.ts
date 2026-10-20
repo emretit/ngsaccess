@@ -1035,6 +1035,8 @@ export default defineSchema({
     ),
     approvedBy: v.optional(v.id("users")),
     notes: v.optional(v.string()),
+    decisionNote: v.optional(v.string()),
+    decidedAt: v.optional(v.string()),
     // Başvuru-onay akışı (P3): kaydı kim açtı. Boşsa yönetici (eski kayıtlar).
     // Geri çekme: bekleyen talep silinir (status birliğine yeni değer eklenmez).
     source: v.optional(v.union(v.literal("admin"), v.literal("employee"))),
@@ -1044,6 +1046,7 @@ export default defineSchema({
     .index("by_employee", ["employeeId"])
     .index("by_project", ["projectId"])
     .index("by_status", ["status"])
+    .index("by_project_status", ["projectId", "status"])
     .index("by_dates", ["startDate", "endDate"])
     .index("by_project_start", ["projectId", "startDate"])
     .index("by_project_end", ["projectId", "endDate"])

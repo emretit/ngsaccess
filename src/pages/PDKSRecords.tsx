@@ -1,3 +1,4 @@
+import { CorrectionRequestsEntry } from "@/components/pdks/CorrectionRequestsPanel";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { todayInTurkey, toLocalDateString } from "@/lib/date";
@@ -251,6 +252,9 @@ function PDKSContent({
         <Button variant={!analysis || filters.reportType === "daily" ? "secondary" : "ghost"} aria-pressed={!analysis || filters.reportType === "daily"} onClick={() => setAnalysis(false)}>Kayıtlar</Button>
         <Button disabled={filters.reportType === "daily"} variant={analysis && filters.reportType !== "daily" ? "secondary" : "ghost"} aria-pressed={analysis && filters.reportType !== "daily"} onClick={() => setAnalysis(true)}>Analiz</Button>
       </div>
+      {isAdmin && projectId && (
+        <CorrectionRequestsEntry key={projectId} projectId={projectId} />
+      )}
       <PDKSFilterBar
         values={filters}
         onChange={setFilters}
