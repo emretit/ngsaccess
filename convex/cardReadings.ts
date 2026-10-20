@@ -9,6 +9,7 @@ import { cardReadingDateBounds, scopedCardReadingQuery } from "./lib/cardReading
 import { assignmentPrecondition, ASSIGN_CARD_ERRORS, liveReadingSource, liveReadingWindow, matchesReadingResult } from "./lib/liveReadings";
 import { getEmployeeTargetDevices } from "./lib/peopleHikSnapshot";
 import { writeAudit } from "./lib/audit";
+import { isFreshAlarmEvent, notifyAlarmIfNeeded } from "./lib/alarmNotify";
 import { toUtcISO, trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
 import { internalMutation } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
@@ -1652,7 +1653,7 @@ export const backfillHikEventRow = internalMutation({
 
       const event = classifyHikEvent(args.event.major, args.event.minor);
       const rawData = JSON.stringify(args.event);
-      await ctx.db.insert("deviceEvents", {
+      const eventId = await ctx.db.insert("deviceEvents", {
         projectId: device.projectId,
         deviceId: args.deviceId,
         source: "hikvision",
@@ -1669,6 +1670,9 @@ export const backfillHikEventRow = internalMutation({
         createdAt: eventTime,
         updatedAt: eventTime,
       });
+      // Canlı köprü yolu (deviceEvents.ts) gibi alarm e-postasını tetikle; günlük backfill'in
+      // getirdiği eski olaylar için toplu e-posta gitmesin diye yalnız taze olayda.
+      if (isFreshAlarmEvent(eventTime)) await notifyAlarmIfNeeded(ctx, eventId);
       return { inserted: true, reason: "device-event" };
     }
 

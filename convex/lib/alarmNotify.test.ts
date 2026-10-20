@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { notifyAlarmIfNeeded } from "./alarmNotify";
+import { isFreshAlarmEvent, notifyAlarmIfNeeded } from "./alarmNotify";
 
 const state = vi.hoisted(() => ({ events: [] as Array<Record<string, unknown>>, scheduled: 0 }));
 vi.mock("../_generated/api", () => ({ internal: { actions: { sendAlarmEmail: { send: "send" } } } }));
@@ -67,5 +67,17 @@ describe("notifyAlarmIfNeeded", () => {
     state.events = [row("old", { eventTime: new Date(Date.now() - 11 * 60_000).toISOString(), alarmNotifiedAt: new Date(Date.now() - 11 * 60_000).toISOString() }), row("new")];
     await notifyAlarmIfNeeded(createCtx(), "new" as Id<"deviceEvents">);
     expect(state.scheduled).toBe(1);
+  });
+});
+
+describe("isFreshAlarmEvent", () => {
+  const now = Date.parse("2026-10-20T06:00:00.000Z");
+  it("accepts events inside the ten minute window", () => {
+    expect(isFreshAlarmEvent("2026-10-20T05:51:00.000Z", now)).toBe(true);
+  });
+  it("rejects backfilled events older than the window and invalid times", () => {
+    expect(isFreshAlarmEvent("2026-10-20T05:49:59.000Z", now)).toBe(false);
+    expect(isFreshAlarmEvent("2026-10-19T02:00:00.000Z", now)).toBe(false);
+    expect(isFreshAlarmEvent("not-a-date", now)).toBe(false);
   });
 });
