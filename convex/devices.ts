@@ -11,6 +11,7 @@ import { getProjectIdsForUser, isProjectAllowed, isManager } from "./lib/auth";
 import { resolvePanelAuthorizedCards } from "./lib/accessGraph";
 import { resolveHikModelSpec } from "./lib/hikModels";
 import {
+  deleteGroupDoorsForDoor,
   purgeDeviceCascade,
   provisionPanelZoneAndDoors,
   provisionHikDoorsAndReaders,
@@ -960,6 +961,8 @@ export const releaseDevice = adminMutation({
       .query("doors")
       .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
       .collect();
+    // Sarkan groupDoors bağı kuralı UI'dan silinemez yapar (review-fazb-b3 Y1).
+    await Promise.all(ownedDoors.map((d) => deleteGroupDoorsForDoor(ctx, d._id)));
     await Promise.all(ownedDoors.map((d) => ctx.db.delete(d._id)));
 
     // adminDevices kaydını temizle:

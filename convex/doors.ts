@@ -8,6 +8,7 @@ import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { resolveProjectScope } from "./lib/projectScope";
 import { deleteReadersForDoor } from "./readers";
+import { deleteGroupDoorsForDoor } from "./lib/deviceHelpers";
 import { deriveHikReaderNoFromDoorNo } from "./lib/hikReaderNumbers";
 
 type ReaderDirection = "entry" | "exit" | "both";
@@ -129,23 +130,37 @@ export const create = authedMutation({
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      throw new Error("Bu projeye erişim yetkiniz yok");
+    const targetZone = args.zoneId ? await ctx.db.get(args.zoneId) : null;
+    const targetDevice = args.deviceId ? await ctx.db.get(args.deviceId) : null;
+    if (args.zoneId && !targetZone) throw new ConvexError("Bölge bulunamadı");
+    if (args.deviceId && !targetDevice) throw new ConvexError("Cihaz bulunamadı");
+    const projectId = args.projectId ?? targetZone?.projectId ?? targetDevice?.projectId;
+    if (!projectId) {
+      throw new ConvexError("Kapı oluşturmak için bir proje seçmelisiniz");
     }
-    // Kapı bir bölgeye bağlanıyorsa bölge aynı projede olmalı (cross-tenant pointer engeli).
-    if (args.zoneId !== undefined) {
-      const targetZone = await ctx.db.get(args.zoneId);
-      if (!targetZone) throw new Error("Bölge bulunamadı");
+    if (!isProjectAllowed(allowedProjectIds, projectId)) {
+      throw new ConvexError("Bu projeye erişim yetkiniz yok");
+    }
+    if (targetZone) {
       if (!isProjectAllowed(allowedProjectIds, targetZone.projectId)) {
-        throw new Error("Bu bölgeye erişim yetkiniz yok");
+        throw new ConvexError("Bu bölgeye erişim yetkiniz yok");
       }
-      if (targetZone.projectId !== args.projectId) {
-        throw new Error("Seçilen bölge bu kapının projesinde değil");
+      if (targetZone.projectId !== projectId) {
+        throw new ConvexError("Seçilen bölge bu kapının projesinde değil");
+      }
+    }
+    if (targetDevice) {
+      if (!isProjectAllowed(allowedProjectIds, targetDevice.projectId)) {
+        throw new ConvexError("Bu cihaza erişim yetkiniz yok");
+      }
+      if (targetDevice.projectId !== projectId) {
+        throw new ConvexError("Seçilen cihaz bu kapının projesinde değil");
       }
     }
     const now = new Date().toISOString();
     const doorId = await ctx.db.insert("doors", {
       ...args,
+      projectId,
       status: args.status ?? "active",
       createdAt: now,
       updatedAt: now,
@@ -157,7 +172,7 @@ export const create = authedMutation({
     await ctx.db.insert("readers", {
       doorId,
       deviceId: args.deviceId,
-      projectId: args.projectId,
+      projectId,
       zoneId: args.zoneId,
       name: args.name,
       direction: readerDirection,
@@ -274,6 +289,7 @@ export const remove = authedMutation({
     }
     // Önce kapının okuyucularını sil (cascade) — orphan reader sızıntısı engeli.
     await deleteReadersForDoor(ctx, args.doorId);
+    await deleteGroupDoorsForDoor(ctx, args.doorId);
     await ctx.db.delete(args.doorId);
   },
 });

@@ -42,8 +42,11 @@ export const create = authedMutation({
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      throw new Error("Bu projeye erişim yetkiniz yok");
+    if (!args.projectId) {
+      throw new ConvexError("Bölge oluşturmak için bir proje seçmelisiniz");
+    }
+    if (!isProjectAllowed(allowedProjectIds, args.projectId)) {
+      throw new ConvexError("Bu projeye erişim yetkiniz yok");
     }
     const now = new Date().toISOString();
     return await ctx.db.insert("zones", { ...args, createdAt: now, updatedAt: now });

@@ -5,6 +5,8 @@ import * as leaves from "./leaves";
 import * as shifts from "./shifts";
 import * as departments from "./departments";
 import * as accessRules from "./accessRules";
+import * as zones from "./zones";
+import * as doors from "./doors";
 
 // Keep the real scope helpers; substitute only authentication/registration and external sync.
 vi.mock("./lib/customFunctions", () => {
@@ -276,5 +278,81 @@ describe("leave decisions after an employee project transfer", () => {
     f.rows[1].projectId = "other";
     await handler(leaves.reject)(f.ctx, { leaveId: "target" });
     expect(f.patch).toHaveBeenCalledWith("target", expect.objectContaining({ status: "rejected" }));
+  });
+});
+
+
+describe("zone/door creation requires an accessible project", () => {
+  for (const role of ["project_user", "project_admin", "super_admin"] as const) {
+    for (const operation of [{ name: "zone", fn: zones.create }, { name: "door", fn: doors.create }]) {
+      for (const projectId of [undefined, "other"] as const) {
+        it(`${operation.name}: ${role} rejects ${projectId ?? "missing project"} before writes`, async () => {
+          vi.clearAllMocks();
+          const f = fixture(role, "own");
+          const args = { name: "Yeni", projectId: projectId === "other" && role === "super_admin" ? "unknown" : projectId };
+          await expect(handler(operation.fn)(f.ctx, args)).rejects.toThrow();
+          expectNoEffects(f);
+        });
+      }
+      it(`${operation.name}: ${role} creates in an accessible project`, async () => {
+        vi.clearAllMocks();
+        const f = fixture(role, "own");
+        await handler(operation.fn)(f.ctx, { name: "Yeni", projectId: "own" });
+        expect(f.insert).toHaveBeenCalledWith(operation.name === "zone" ? "zones" : "doors",
+          expect.objectContaining({ name: "Yeni", projectId: "own" }));
+      });
+    }
+    for (const source of ["zone", "device", "both"] as const) {
+      it(`door: ${role} derives project from ${source} for door and reader`, async () => {
+        vi.clearAllMocks();
+        const f = fixture(role, "own");
+        f.rows.push({ _id: "zone", table: "zones", projectId: "own" });
+        await handler(doors.create)(f.ctx, { name: "Yeni", zoneId: source !== "device" ? "zone" : undefined,
+          deviceId: source !== "zone" ? "device" : undefined });
+        expect(f.insert).toHaveBeenCalledWith("doors", expect.objectContaining({ projectId: "own" }));
+        expect(f.insert).toHaveBeenCalledWith("readers", expect.objectContaining({ projectId: "own" }));
+      });
+    }
+  }
+  for (const bad of ["missing-zone", "missing-device", "orphan-zone", "orphan-device", "other-zone", "other-device", "mismatch"] as const) {
+    it(`door rejects ${bad} before writes`, async () => {
+      vi.clearAllMocks();
+      const f = fixture("project_admin", "own", ["own", "other"]);
+      f.rows.push({ _id: "zone", table: "zones", projectId: bad === "orphan-zone" ? undefined : bad === "other-zone" || bad === "mismatch" ? "other" : "own" });
+      f.rows[3].projectId = bad === "orphan-device" ? undefined : bad === "other-device" ? "other" : "own";
+      await expect(handler(doors.create)(f.ctx, { name: "Yeni", projectId: "own",
+        zoneId: bad === "missing-zone" ? "missing" : "zone", deviceId: bad === "missing-device" ? "missing" : "device" })).rejects.toThrow();
+      expectNoEffects(f);
+    });
+  }
+  for (const role of ["project_user", "project_admin"] as const) {
+    it(`${role} without project membership cannot create`, async () => {
+      vi.clearAllMocks();
+      const f = fixture(role, "own", []);
+      for (const fn of [zones.create, doors.create]) {
+        await expect(handler(fn)(f.ctx, { name: "Yeni", projectId: "own" })).rejects.toThrow();
+      }
+      expectNoEffects(f);
+    });
+  }
+});
+
+describe("door removal deletes access-rule links", () => {
+  it("deletes all groupDoors for the door and preserves other doors' links", async () => {
+    vi.clearAllMocks();
+    const f = fixture("project_admin", "own");
+    f.rows[3].brand = "hikvision";
+    f.rows.push({ _id: "link-own", table: "groupDoors", doorId: "target", projectId: "own" },
+      { _id: "link-legacy", table: "groupDoors", doorId: "target" },
+      { _id: "link-other", table: "groupDoors", doorId: "another-door", projectId: "own" });
+    f.remove.mockImplementation((id: string) => {
+      const index = f.rows.findIndex(row => row._id === id);
+      if (index >= 0) f.rows.splice(index, 1);
+    });
+    await handler(doors.remove)(f.ctx, { doorId: "target" });
+    for (const id of ["link-own", "link-legacy", "target"]) expect(f.remove).toHaveBeenCalledWith(id);
+    expect(f.remove).not.toHaveBeenCalledWith("link-other");
+    const deleted = f.remove.mock.calls.map(([id]) => id);
+    expect(deleted.indexOf("link-own")).toBeLessThan(deleted.indexOf("target"));
   });
 });

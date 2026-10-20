@@ -11,8 +11,20 @@ import type { Id } from "../_generated/dataModel";
 import { isProjectAllowed } from "./auth";
 import { deleteReadersForDoor } from "../readers";
 
+/** Kapı silinmeden önce tüm kural bağlarını, proje alanından bağımsız temizler. */
+export async function deleteGroupDoorsForDoor(ctx: MutationCtx, doorId: Id<"doors">): Promise<void> {
+  for (;;) {
+    const links = await ctx.db
+      .query("groupDoors")
+      .withIndex("by_door", (q) => q.eq("doorId", doorId))
+      .take(100);
+    if (links.length === 0) return;
+    await Promise.all(links.map((link) => ctx.db.delete(link._id)));
+  }
+}
+
 /**
- * Bir cihazı ve doğrudan bağlı kayıtlarını (groupDevices, doors, readers) siler.
+ * Bir cihazı ve doğrudan bağlı kayıtlarını (groupDevices, groupDoors, doors, readers) siler.
  * Bölge SİLİNMEZ — artık paylaşılan mantıksal alan; başka cihaz/kapı barındırabilir.
  * adminDevices kaydına DOKUNMAZ — assignment temizleme/silme mantığı çağırana aittir.
  */
@@ -36,6 +48,7 @@ export async function purgeDeviceCascade(
     .collect();
   // Kapı silinmeden önce okuyucularını sil (orphan reader sızıntısı engeli).
   await Promise.all(ownedDoors.map((d) => deleteReadersForDoor(ctx, d._id)));
+  await Promise.all(ownedDoors.map((d) => deleteGroupDoorsForDoor(ctx, d._id)));
   await Promise.all(ownedDoors.map((d) => ctx.db.delete(d._id)));
 
   // localBridge SDK iş kuyruğu — cihaz silinince orphan kalmasın. Aksi halde "processing"
