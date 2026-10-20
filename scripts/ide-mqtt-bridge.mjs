@@ -22,16 +22,23 @@
  *   BRIDGE_DEBUG             0|1
  */
 import mqtt from "mqtt";
+import { routeMqttMessage } from "./lib/ide-mqtt-routing.mjs";
+import { panelUuid, panelTopics, bridgeSubscriptions, assertSecureBrokerTransport } from "./lib/ide-mqtt-policy.mjs";
+import { secretFromEnv } from "./lib/ide-mqtt-credentials.mjs";
 import { readFileSync } from "node:fs";
 import { randomInt } from "node:crypto";
 
 // ── Config ──────────────────────────────────────────────────────────
 const MQTT_URL = process.env.MQTT_URL || "mqtt://127.0.0.1:1883";
 const MQTT_USER = process.env.MQTT_BRIDGE_USER || "bridge";
-const MQTT_PW = process.env.MQTT_BRIDGE_PW || "";
+const MQTT_PW = secretFromEnv(process.env, "MQTT_BRIDGE_PW");
+const LEGACY_EVENTS = process.env.MQTT_SECURITY_MODE === "legacy";
+assertSecureBrokerTransport(MQTT_URL);
+if (MQTT_USER !== "bridge" || !MQTT_PW) throw new Error("Dedicated bridge credentials required");
+if (process.env.MQTT_SECURITY_MODE && !["secure", "legacy"].includes(process.env.MQTT_SECURITY_MODE)) throw new Error("Invalid MQTT_SECURITY_MODE");
 const MQTT_CA_FILE = process.env.MQTT_CA_FILE || "";
 const CONVEX_SITE_URL = (process.env.CONVEX_SITE_URL || "").replace(/\/+$/, "");
-const BRIDGE_SECRET = process.env.IDE_BRIDGE_SECRET || "";
+const BRIDGE_SECRET = secretFromEnv(process.env, "IDE_BRIDGE_SECRET");
 const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS || 2000);
 // Adaptive backoff tavanı: bekleyen komut yokken poll aralığı her boş turda 2x büyür ve
 // burada durur; komut çekilince anında tabana (POLL_INTERVAL_MS) döner. Boş /ide-bridge/poll
@@ -104,7 +111,7 @@ function loginOverMqtt(uuid, user, password) {
       resolve(null);
     }, CMD_ACK_TIMEOUT_MS);
     loginWaiters.set(msxId, { uuid: String(uuid), resolve, timer });
-    client.publish(`device/subscribe/${uuid}`, envelope, { qos: 1 }, (err) => {
+    client.publish(panelTopics(uuid).command, envelope, { qos: 1 }, (err) => {
       if (err) {
         clearTimeout(timer);
         loginWaiters.delete(msxId);
@@ -116,16 +123,13 @@ function loginOverMqtt(uuid, user, password) {
 }
 
 // ── msx-id üretimi (correlation anahtarı) ──────────────────────────
-// TAHMİN EDİLEMEZ olmalı: paneller device/publish/# write yetkisini paylaştığından
-// (ACL), tahmin edilebilir/dar bir sayaç bir panelin başka panele ait komutun
-// msx-id'sini brute-force'layıp sahte ack publish etmesine zemin hazırlar. Geniş
-// rastgele uzaydan + pending'de çakışma yoksa kullan (topic-uuid kontrolü ek savunma).
+// Random correlation IDs are defense in depth, never a substitute for broker ACLs.
 function nextMsx() {
   for (let i = 0; i < 5; i++) {
     const candidate = randomInt(1, 2_000_000_000);
-    if (!pending.has(candidate)) return candidate;
+    if (!pending.has(candidate) && !loginWaiters.has(candidate)) return candidate;
   }
-  return randomInt(1, 2_000_000_000);
+  throw new Error("Cannot allocate MQTT correlation ID");
 }
 
 // ── Convex HTTP yardımcıları ────────────────────────────────────────
@@ -200,14 +204,8 @@ if (MQTT_URL.startsWith("mqtts") && MQTT_CA_FILE) {
 const client = mqtt.connect(MQTT_URL, mqttOpts);
 
 // Panel event topic'leri (LOGGER.* default'ları) + komut response wildcard.
-const SUB_TOPICS = [
-  "event/access/online",
-  "event/access/offline",
-  "event/heartbeat",
-  "event/connected",
-  "event/disconnected",
-  "device/publish/+", // komut response'ları (msx-id correlation)
-];
+const SUB_TOPICS = bridgeSubscriptions({ legacy: LEGACY_EVENTS });
+if (LEGACY_EVENTS) log("WARNING: legacy events have no device provenance; mobile gate must stay disabled");
 
 client.on("connect", () => {
   log(`MQTT bağlandı: ${MQTT_URL}`);
@@ -221,75 +219,10 @@ client.on("error", (e) => log("MQTT error:", e.message));
 client.on("close", () => dbg("MQTT kapandı"));
 
 // ── Gelen mesaj yönlendirme ─────────────────────────────────────────
-client.on("message", async (topic, buf) => {
-  const raw = buf.toString("utf8");
-  let parsed = null;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    /* non-json — yine de forward edilebilir */
-  }
-
-  // Komut response'u mu? (device/publish/<uuid>, msx-id correlate)
-  if (topic.startsWith("device/publish/")) {
-    const msxId = parsed?.transaction?.["msx-id"];
-    const result = parsed?.payload?.result;
-    const message = parsed?.payload?.message ?? null;
-    const topicUuid = topic.slice("device/publish/".length);
-    dbg(`response topic=${topic} msx=${msxId} result=${result}`);
-
-    // Login response mu? (type=login_response, token taşır) — loginWaiters ile eşle.
-    if (msxId != null && loginWaiters.has(msxId)) {
-      const w = loginWaiters.get(msxId);
-      clearTimeout(w.timer);
-      loginWaiters.delete(msxId);
-      // Sahte response savunması: token komutun gönderildiği panelin topic'inden gelmeli.
-      if (String(w.uuid) !== topicUuid) {
-        log(`login response DROP: topic uuid=${topicUuid} beklenen=${w.uuid}`);
-        w.resolve(null);
-        return;
-      }
-      const tok = parsed?.payload?.data?.token;
-      w.resolve(typeof tok === "string" ? tok : null);
-      return;
-    }
-
-    if (msxId != null && pending.has(msxId)) {
-      const entry = pending.get(msxId);
-      // Response, komutun gönderildiği panelin KENDİ publish topic'inden gelmeli.
-      // Paneller device/publish/# write yetkisini paylaştığından (ACL), başka bir
-      // panel sahte ack publish edebilir → topic uuid ile beklenen uuid eşleşmezse drop.
-      if (String(entry.deviceUuid) !== topicUuid) {
-        log(`ack DROP: msx=${msxId} topic uuid=${topicUuid} beklenen=${entry.deviceUuid} (sahte response?)`);
-        return;
-      }
-      const { opId, timer } = entry;
-      clearTimeout(timer);
-      pending.delete(msxId);
-      // Auth/token hatası → token cache'i temizle ki bir sonraki retry yeniden login yapsın.
-      if (result !== "success" && /level|token|forbidden|unauthor/i.test(String(message))) {
-        tokenCache.delete(entry.deviceUuid);
-        dbg(`token invalidate uuid=${entry.deviceUuid} (auth fail: ${String(message).slice(0, 60)})`);
-      }
-      const ackBody = {
-        opId,
-        msxId,
-        result: result === "success" ? "success" : "fail",
-        message: typeof message === "string" ? message : JSON.stringify(message),
-      };
-      const r = await convexPost("/ide-bridge/ack", ackBody).catch((e) => ({ ok: false, text: e.message }));
-      log(`ack opId=${opId} result=${ackBody.result} → convex ${r.ok ? "OK" : "FAIL " + r.text}`);
-    }
-    return;
-  }
-
-  // Event (access/heartbeat/connected/disconnected) → Convex /ide-bridge/event
-  const type = parsed?.transaction?.type ?? topic;
-  if (type === "heartbeat") dbg(`heartbeat ${parsed?.transaction?.["src-id"]}`);
-  else log(`event ${topic} type=${type}`);
-
-  const r = await convexPost("/ide-bridge/event", { topic, body: raw }).catch((e) => ({ ok: false, text: e.message }));
-  if (!r.ok) log(`event forward FAIL topic=${topic}: ${r.status} ${r.text?.slice(0, 120)}`);
+client.on("message", (topic, buf) => {
+  void routeMqttMessage(topic, buf, {
+    pending, loginWaiters, tokenCache, convexPost, legacyEvents: LEGACY_EVENTS, log, dbg,
+  }).catch(() => log("MQTT message processing failed"));
 });
 
 // ── Komut poll döngüsü (Convex → broker) ────────────────────────────
@@ -301,11 +234,14 @@ async function pollCommands() {
   try {
     const r = await convexPost("/ide-bridge/poll", { max: 10 });
     if (!r.ok) {
-      dbg(`poll ${r.status}: ${r.text?.slice(0, 120)}`);
+      dbg(`poll failed status=${r.status}`);
       return false;
     }
     const ops = Array.isArray(r.json?.ops) ? r.json.ops : [];
     for (const op of ops) {
+      // Reject malformed/wildcard destinations before login, sent-mark or publish.
+      let uuid;
+      try { uuid = panelUuid(op.dstId); } catch { log("invalid command target dropped"); continue; }
       const msxId = nextMsx();
       // Level-1 op'lar (create_data/delete_data/sync) panelde login token'ı ister; yoksa
       // panel "forbidden: requires level 1, you are 0" döner. Token'ı MQTT login ile al/cache'le.
@@ -323,7 +259,7 @@ async function pollCommands() {
         await convexPost("/ide-bridge/ack", { opId: op.opId, msxId, result: "fail", message: "unknown opType" }).catch(() => {});
         continue;
       }
-      const cmdTopic = `device/subscribe/${op.dstId}`;
+      const cmdTopic = panelTopics(uuid).command;
       // ÖNCE Convex'e "sent" yaz (op'u pending→sent + msxId + attempts++). Bu başarısız
       // olursa PUBLISH ETME: op "pending" kalır, bir sonraki poll'da tekrar çekilir.
       // Aksi halde publish edip "sent" yazamazsak op "pending" kalır ve her poll'da
@@ -332,7 +268,7 @@ async function pollCommands() {
         (e) => ({ ok: false, text: e.message }),
       );
       if (!sentRes.ok) {
-        log(`opId=${op.opId} sent-mark FAIL (${sentRes.text ?? sentRes.status}) → publish atlandı, sonraki poll'da yeniden denenecek`);
+        log(`opId=${op.opId} sent-mark FAIL  → publish atlandı, sonraki poll'da yeniden denenecek`);
         continue;
       }
       // Timeout: panel response'u gelmezse retry'a düşür.

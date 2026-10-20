@@ -1,3 +1,5 @@
+import { panelUuid, panelTopics } from "./ide-mqtt-policy.mjs";
+
 /**
  * IDE Smart panel provisioning — saf (env'siz) mantık.
  *
@@ -77,7 +79,7 @@ async function callPanel(url, body) {
   try {
     parsed = JSON.parse(text);
   } catch {
-    throw new Error(`Panel JSON döndürmedi (HTTP ${res.status}): ${text.slice(0, 200)}`);
+    throw new Error(`Panel returned invalid JSON (HTTP ${res.status})`);
   }
   return parsed.payload;
 }
@@ -86,13 +88,14 @@ async function callPanel(url, body) {
 async function login(url, nextMsx, user, password) {
   const lr = await callPanel(url, makeEnvelope(nextMsx(), "login", { user, password }));
   if (!lr || lr.result !== "success" || !lr.data?.token) {
-    throw new Error(`Login başarısız: ${JSON.stringify(lr)}`);
+    throw new Error("Panel login failed");
   }
   const token = lr.data.token;
   const parts = token.split(".");
   const level = parts[0];
-  const dst = Number(parts[3]);
-  return { token, level, dst, uuid: String(dst) };
+  const uuid = panelUuid(parts[3]);
+  const dst = Number(uuid);
+  return { token, level, dst, uuid };
 }
 
 /**
@@ -106,22 +109,33 @@ export async function provisionPanel({
   l3Pass,
   broker,
   brokerPort = 8883,
-  mqttUser = "device",
+  mqttUser,
+  secureMode = true,
+  resolveMqttCredentials,
   mqttPw,
   ssl = true,
-  selfSigned = true,
+  selfSigned = false,
   reboot = true,
 }) {
   if (!ip) throw new Error("ip zorunlu");
   if (!l3Pass) throw new Error("l3Pass zorunlu");
   if (!broker) throw new Error("broker zorunlu");
-  if (!mqttPw) throw new Error("mqttPw zorunlu");
+  if (!mqttPw && !resolveMqttCredentials) throw new Error("MQTT per-device credentials required");
+  if (secureMode && (!ssl || selfSigned)) throw new Error("Secure provisioning requires verified TLS; self-signed bypass is forbidden");
 
   const url = `http://${ip}:${port}/`;
   let msx = 1;
   const nextMsx = () => msx++;
 
   const { token, level, dst, uuid } = await login(url, nextMsx, l3User, l3Pass);
+
+  const credentials = resolveMqttCredentials ? await resolveMqttCredentials(uuid) : { username: mqttUser, password: mqttPw };
+  if (!credentials?.password || !credentials.username) throw new Error("MQTT credentials missing for panel UUID");
+  if (secureMode && (credentials.username !== uuid || credentials.password.length < 24)) {
+    throw new Error("Secure provisioning requires UUID username and a strong per-device password");
+  }
+  const topics = panelTopics(uuid);
+  const events = secureMode ? topics.events : Object.fromEntries(Object.keys(topics.events).map((kind) => [kind, `event/${kind}`]));
 
   // 1) MQTT broker bağlantısı (L3)
   const w1 = await callPanel(
@@ -132,19 +146,21 @@ export async function provisionPanel({
       {
         "MQTT.BROKER": broker,
         "MQTT.PORT": Number(brokerPort),
-        "MQTT.USERNAME": mqttUser,
-        "MQTT.PASSWORD": mqttPw,
+        "MQTT.USERNAME": credentials.username,
+        "MQTT.PASSWORD": credentials.password,
         "MQTT.SSL_ENABLED": ssl ? 1 : 0,
         "MQTT.SSL_SELF_SIGNED": selfSigned ? 1 : 0,
         "MQTT.CLIENT_ID": `ngs-${uuid}`,
         // Topic'ler explicit (AUTO_SET kapalı) — bridge `device/subscribe/<uuid>` bekliyor.
         "MQTT.TOPIC_AUTO_SET": 0,
-        "MQTT.TOPIC_SUBSCRIBE": `device/subscribe/${uuid}`,
-        "MQTT.TOPIC_PUBLISH": `device/publish/${uuid}`,
+        "MQTT.TOPIC_SUBSCRIBE": topics.command,
+        "MQTT.TOPIC_PUBLISH": topics.response,
       },
       { token, dstId: dst },
     ),
   );
+
+  if (w1?.result !== "success") throw new Error("Panel MQTT configuration write failed");
 
   // 2) LOGGER transport=MQTT + event topic'leri (ACL ile uyumlu default'lar)
   const w2 = await callPanel(
@@ -154,13 +170,13 @@ export async function provisionPanel({
       "parameter_write",
       {
         "LOGGER.PROTOCOL": "MQTT",
-        "LOGGER.AC_LOG_TOPIC": "event/access/online",
-        "LOGGER.AC_OFFLINE_LOG_TOPIC": "event/access/offline",
-        "LOGGER.HB_TOPIC": "event/heartbeat",
+        "LOGGER.AC_LOG_TOPIC": events["access/online"],
+        "LOGGER.AC_OFFLINE_LOG_TOPIC": events["access/offline"],
+        "LOGGER.HB_TOPIC": events["heartbeat"],
         "LOGGER.HB_ENABLED": 1,
         "LOGGER.HB_INTERVAL": 30,
-        "LOGGER.CONNECTED_TOPIC": "event/connected",
-        "LOGGER.DISCONNECTED_TOPIC": "event/disconnected",
+        "LOGGER.CONNECTED_TOPIC": events["connected"],
+        "LOGGER.DISCONNECTED_TOPIC": events["disconnected"],
         "LOGGER.PUSH_ENABLED": 1,
         // HTTP_REMOTE komut kanalını kapat (artık MQTT kullanıyoruz).
         "LOGGER.HB_PROCESS_RESPONSE": 0,
@@ -168,6 +184,8 @@ export async function provisionPanel({
       { token, dstId: dst },
     ),
   );
+
+  if (w2?.result !== "success") throw new Error("Panel LOGGER configuration write failed");
 
   // 3) Read-back doğrulama
   const rb = await callPanel(
@@ -187,12 +205,34 @@ export async function provisionPanel({
           "MQTT.STATUS",
           "LOGGER.PROTOCOL",
           "LOGGER.AC_LOG_TOPIC",
+          "LOGGER.AC_OFFLINE_LOG_TOPIC",
+          "LOGGER.HB_TOPIC",
+          "LOGGER.CONNECTED_TOPIC",
+          "LOGGER.DISCONNECTED_TOPIC",
+          "MQTT.TOPIC_AUTO_SET",
+          "MQTT.CLIENT_ID",
           "LOGGER.HB_ENABLED",
+          "LOGGER.HB_PROCESS_RESPONSE",
         ],
       },
       { token, dstId: dst },
     ),
   );
+
+  const expected = {
+    "MQTT.BROKER": broker, "MQTT.PORT": Number(brokerPort),
+    "MQTT.USERNAME": credentials.username, "MQTT.SSL_ENABLED": ssl ? 1 : 0,
+    "MQTT.SSL_SELF_SIGNED": selfSigned ? 1 : 0, "MQTT.TOPIC_AUTO_SET": 0,
+    "MQTT.CLIENT_ID": `ngs-${uuid}`, "MQTT.TOPIC_SUBSCRIBE": topics.command,
+    "MQTT.TOPIC_PUBLISH": topics.response, "LOGGER.PROTOCOL": "MQTT",
+    "LOGGER.AC_LOG_TOPIC": events["access/online"], "LOGGER.AC_OFFLINE_LOG_TOPIC": events["access/offline"],
+    "LOGGER.HB_TOPIC": events.heartbeat, "LOGGER.CONNECTED_TOPIC": events.connected,
+    "LOGGER.DISCONNECTED_TOPIC": events.disconnected, "LOGGER.HB_ENABLED": 1,
+    "LOGGER.HB_PROCESS_RESPONSE": 0,
+  };
+  if (rb?.result !== "success" || Object.entries(expected).some(([key, value]) => String(rb?.data?.[key]) !== String(value))) {
+    throw new Error("Panel MQTT/LOGGER readback mismatch; reboot withheld");
+  }
 
   // 4) reboot (LOGGER.PROTOCOL/MQTT boot'ta okunur)
   let rebooted = false;
@@ -202,11 +242,12 @@ export async function provisionPanel({
   }
 
   return {
-    ok: w1?.result === "success" && w2?.result === "success",
+    ok: !reboot || rebooted,
     uuid,
     level,
-    writes: { mqtt: w1, logger: w2 },
-    readback: rb?.data ?? {},
+    writes: { mqtt: { result: w1.result }, logger: { result: w2.result } },
+    readback: expected,
+    secureConfiguration: secureMode,
     rebooted,
   };
 }
@@ -237,5 +278,7 @@ export async function readPanelMqttStatus({ ip, port = 80, l3User, l3Pass }) {
     ),
   );
 
-  return { ok: true, uuid, readback: rb?.data ?? {} };
+  const data = rb?.data ?? {};
+  const keys = ["MQTT.BROKER", "MQTT.PORT", "MQTT.STATUS", "LOGGER.PROTOCOL", "LOGGER.HB_ENABLED"];
+  return { ok: rb?.result === "success", uuid, readback: Object.fromEntries(keys.filter((key) => key in data).map((key) => [key, data[key]])) };
 }

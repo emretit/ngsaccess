@@ -1,11 +1,5 @@
-# NGS Access — IDE Smart MQTT broker (Mosquitto) — Hetzner 157.90.114.86
-#
-# Kurulum/işletim: infra/mqtt/RUNBOOK.md
-# Bu sunucu paylaşımlı (OpenClaw 80/8080, Hik ISUP 766x, nginx 8090).
-# Mosquitto: 8883 (TLS) + 1883 (plaintext) dünyaya açık.
-# NOT: Paneller TLS için CA dosyası yükleme yolu firmware'de olmadığından ("CA file missing"),
-# plaintext 1883 kullanıyor — şifreleme YOK ama parola auth (passwd) + topic ACL korunuyor.
-# İleride panele CA yüklenebilirse 8883'e (TLS) dönülmeli.
+# NGS MQTT secure rollout target; not evidence of deployed broker state.
+# Panels require verified TLS on 8883. Bridge plaintext is host-loopback only.
 services:
   mosquitto:
     image: eclipse-mosquitto:2
@@ -13,7 +7,7 @@ services:
     restart: unless-stopped
     ports:
       - "8883:8883"   # TLS — CA upload çözülünce paneller buraya (UFW + auth + TLS)
-      - "1883:1883"   # plaintext — paneller + bridge (auth + ACL; şifreleme yok)
+      - "127.0.0.1:1883:1883" # bridge only; never expose publicly
     volumes:
       - ./config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - ./config/acl:/mosquitto/config/acl:ro

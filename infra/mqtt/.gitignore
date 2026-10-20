@@ -6,3 +6,4 @@ log/
 *.key
 *.crt
 *.srl
+*.env

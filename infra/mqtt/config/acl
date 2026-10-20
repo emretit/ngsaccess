@@ -1,34 +1,22 @@
-# NGS Access — Mosquitto ACL (topic erişim kontrolü)
-# RUNBOOK: infra/mqtt/RUNBOOK.md
-#
-# Roller:
-#   device  → panel filosu. Event YAYINLAR, komut DİNLER.
-#   bridge  → bizim daemon. Event DİNLER, komut YAYINLAR.
-#
-# Topic şeması (set-mqtt-target.mjs panele bunları yazar):
-#   event/access/online      — access event (panel publish → bridge subscribe)
-#   event/access/offline     — offline-queue flush
-#   event/heartbeat          — heartbeat
-#   event/connected          — MQTT connect bildirimi
-#   event/disconnected       — LWT (broker yayınlar)
-#   device/publish/<uuid>    — komut response'u (panel publish → bridge subscribe)
-#   device/subscribe/<uuid>  — komut (bridge publish → panel subscribe)
+# Secure policy. Password file contains numeric UUID users + trusted bridge ONLY.
+# %u is the authenticated username, never client-id or payload src-id.
+# Patterns apply to every user. UUID validation and password-file generation reject
+# shared/reserved device identities; no shared device account may remain deployed.
+pattern read device/subscribe/%u
+pattern write device/publish/%u
+pattern write event/%u/access/online
+pattern write event/%u/access/offline
+pattern write event/%u/heartbeat
+pattern write event/%u/connected
+pattern write event/%u/disconnected
 
-# ── device rolü (panel filosu) ──────────────────────────────────────
-# NOT: Tüm filo tek "device" kullanıcısını paylaşır → bu kullanıcı device/publish/#
-# (tüm panellerin response topic'i) write yetkisine sahip. Bir panel teorik olarak
-# başka panelin response topic'ine yazabilir. Bridge bunu topic-uuid correlation +
-# tahmin edilemez msx-id ile savunuyor (scripts/ide-mqtt-bridge.mjs). HARDENING:
-# her panele ayrı MQTT kullanıcısı + `pattern write device/publish/%u` ile izole et.
-user device
-topic write event/#
-topic write device/publish/#
-topic read device/subscribe/#
-
-# ── bridge rolü (bizim daemon) ──────────────────────────────────────
+# Trusted infrastructure credential: never provision this account to a panel.
 user bridge
-topic read event/#
-topic read device/publish/#
-topic write device/subscribe/#
-# $SYS health/monitoring (opsiyonel)
+topic read event/+/access/online
+topic read event/+/access/offline
+topic read event/+/heartbeat
+topic read event/+/connected
+topic read event/+/disconnected
+topic read device/publish/+
+topic write device/subscribe/+
 topic read $SYS/#

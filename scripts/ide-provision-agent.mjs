@@ -13,13 +13,15 @@
  *
  * Env (.env.local — `node --env-file=.env.local`):
  *   IDE_L3_USER, IDE_L3_PASS, IDE_PORT(80)
- *   MQTT_BROKER_HOST, MQTT_BROKER_PORT(8883), MQTT_DEVICE_USER(device), MQTT_DEVICE_PW
+ *   MQTT_BROKER_HOST, MQTT_BROKER_PORT(8883), MQTT_DEVICE_CREDENTIALS_FILE (private JSON)
+ *   Or MQTT_DEVICE_USER=<UUID> + MQTT_DEVICE_PW[_FILE]; no shared fallback in secure mode.
  *   IDE_AGENT_PORT(8765)
  *
  * Kullanım:
  *   npm run ide-agent
  *   # veya: node --env-file=.env.local scripts/ide-provision-agent.mjs
  */
+import { provisioningCredentials } from "./lib/ide-mqtt-credentials.mjs";
 import { createServer } from "node:http";
 import { provisionPanel, readPanelMqttStatus, scanSubnet } from "./lib/ide-provision.mjs";
 
@@ -32,8 +34,7 @@ const ENV = {
   l3Pass: process.env.IDE_L3_PASS || process.env.IDE_PASS || "",
   broker: process.env.MQTT_BROKER_HOST || "",
   brokerPort: Number(process.env.MQTT_BROKER_PORT || 8883),
-  mqttUser: process.env.MQTT_DEVICE_USER || "device",
-  mqttPw: process.env.MQTT_DEVICE_PW || "",
+
 };
 
 const log = (...a) => console.log(`[ide-agent ${new Date().toISOString()}]`, ...a);
@@ -100,9 +101,10 @@ function readBody(req) {
 }
 
 function preflightOk() {
-  if (!ENV.broker || !ENV.mqttPw || !ENV.l3Pass) {
-    return "Eksik .env.local: MQTT_BROKER_HOST, MQTT_DEVICE_PW, IDE_L3_PASS gerekli.";
+  if (!ENV.broker || !ENV.l3Pass) {
+    return "Eksik .env.local: MQTT_BROKER_HOST, IDE_L3_PASS gerekli.";
   }
+  try { provisioningCredentials(); } catch { return "Private per-device MQTT credentials required"; }
   return null;
 }
 
@@ -188,8 +190,7 @@ const server = createServer(async (req, res) => {
         l3Pass: typeof body.l3Pass === "string" && body.l3Pass ? body.l3Pass : ENV.l3Pass,
         broker: ENV.broker,
         brokerPort: ENV.brokerPort,
-        mqttUser: ENV.mqttUser,
-        mqttPw: ENV.mqttPw,
+        ...provisioningCredentials(),
         ssl: body.ssl !== false,
         reboot: body.reboot !== false,
       });
@@ -200,7 +201,7 @@ const server = createServer(async (req, res) => {
 
     sendJson(res, 404, { ok: false, error: "not found" });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = "Panel operation failed; verify private configuration and panel connectivity";
     log("ERROR:", message);
     sendJson(res, 500, { ok: false, error: message });
   }
