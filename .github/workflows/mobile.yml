@@ -109,13 +109,16 @@ jobs:
       APP_ENV: production
       CONVEX_URL: ${{ vars.MOBILE_CONVEX_URL }}
       CONVEX_ALLOWED_HOST: ${{ vars.MOBILE_CONVEX_ALLOWED_HOST }}
-      ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/ngs-upload.jks
       ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       ANDROID_EXPECTED_CERT_SHA256: ${{ vars.ANDROID_EXPECTED_CERT_SHA256 }}
-      BUNDLETOOL_JAR: ${{ runner.temp }}/bundletool.jar
     steps:
+      # The runner context is not available in job-level env; derive temp paths at runtime.
+      - name: Temporary signing paths
+        run: |
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/ngs-upload.jks" >> "$GITHUB_ENV"
+          echo "BUNDLETOOL_JAR=$RUNNER_TEMP/bundletool.jar" >> "$GITHUB_ENV"
       - uses: actions/checkout@v6
       - id: pin
         run: python3 -c 'import json,os; p=json.load(open("release/toolchain.json")); open(os.environ["GITHUB_OUTPUT"],"a").write("flutter="+p["flutter"]+"\n")'
