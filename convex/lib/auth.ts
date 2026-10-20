@@ -61,9 +61,13 @@ export async function getCurrentUserOrNull(
  * super_admin tüm projelere erişir.
  */
 export async function getProjectIdsForUser(
-  ctx: QueryCtx | MutationCtx
+  ctx: (QueryCtx | MutationCtx) & { user?: Doc<"users"> | null }
 ): Promise<Id<"projects">[]> {
-  const user = await getCurrentUser(ctx);
+  // customFunctions has already validated this user in the same transaction.
+  const user = ctx.user ?? await getCurrentUser(ctx);
+  if (user.verified === false) {
+    throw new Error("E-posta adresinizi doğrulamanız gerekiyor");
+  }
 
   if (user.role === "super_admin") {
     const projects = await ctx.db.query("projects").collect();

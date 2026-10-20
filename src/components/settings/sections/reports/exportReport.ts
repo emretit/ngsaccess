@@ -7,7 +7,7 @@ type Report =
   | { type: "attendance"; data: FunctionReturnType<typeof api.reports.getAttendanceSummaryReport> }
   | { type: "department"; data: FunctionReturnType<typeof api.reports.getDepartmentCostReport> };
 
-export function reportExportTable(report: Report) {
+export function reportExportTable(report: Report, canSeePay = true) {
   const titles = { sgk: "SGK Aylık Döküm", overtime: "Fazla Mesai Özet", attendance: "Devam Özeti", department: "Departman Maliyet" };
   const { data } = report;
   const period = `${data.year}${data.month ? `-${String(data.month).padStart(2, "0")}` : ""}`;
@@ -35,12 +35,16 @@ export function reportExportTable(report: Report) {
       rows = report.data.rows.map((r) => [r.department, r.overtimeHours, r.employeeCount, r.cost ?? "—"]);
       break;
   }
+  if (!canSeePay && (report.type === "overtime" || report.type === "department")) {
+    headers = headers.slice(0, -1);
+    rows = rows.map(row => row.slice(0, -1));
+  }
   const fileName = `${titles[report.type]}_${period}_${data.scopeLabel}`.replace(/[<>:"/\\|?*]/g, "_").split("").map((char) => char.charCodeAt(0) < 32 ? "_" : char).join("").slice(0, 180);
   return { title, metadata, headers, rows, fileName };
 }
 
-export async function exportScopedExcel(report: Report) {
-  const table = reportExportTable(report);
+export async function exportScopedExcel(report: Report, canSeePay = true) {
+  const table = reportExportTable(report, canSeePay);
   const { default: ExcelJS } = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Rapor");

@@ -12,7 +12,8 @@ import { VisitorNoticeCard, visitorNoticeSchema } from "./sections/privacy/Visit
 import { overtimeHints } from "./sections/components/OvertimeSettingsForm";
 import type { Id } from "../../../convex/_generated/dataModel";
 
-const state = vi.hoisted(() => ({ query: vi.fn(), mutation: vi.fn() }));
+const state = vi.hoisted(() => ({ query: vi.fn(), mutation: vi.fn(), role: "project_admin" }));
+vi.mock("@/components/auth/AuthProvider", () => ({ useAuth: () => ({ profile: { role: state.role } }) }));
 vi.mock("convex/react", () => ({ useQuery: (...args: unknown[]) => state.query(...args), useMutation: () => state.mutation }));
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "project", projectIds: ["project"], activeProject: { name: "Merkez" }, isAdmin: false, loading: false }) }));
 // Render dialog content synchronously, so copy and callbacks can be checked without a browser.
@@ -51,6 +52,16 @@ describe("13 ayarlar audit düzeltmeleri", () => {
     expect(html).toContain("Excel indir");
     expect(html).not.toContain("Excel İndir");
     expect(html).not.toContain("h-10");
+  });
+  it.each(["project_user", "project_admin", "super_admin"])("shows pay controls and totals only for managers (%s)", role => {
+    state.role = role;
+    state.query.mockReturnValue({ rows: [{ employeeId: "a" }], scopeLabel: "Merkez", totalOvertimeHours: 5, totalOvertimePayTRY: 500 });
+    const department = renderToStaticMarkup(<ReportsSettings requestedReport="dept-cost" />);
+    const overtime = renderToStaticMarkup(<ReportsSettings requestedReport="overtime" />);
+    expect(department.includes("Ücret bilgisi olmayanlar için saatlik ücret")).toBe(role !== "project_user");
+    expect(overtime.includes("Toplam mesai ücreti")).toBe(role !== "project_user");
+    expect(overtime).toContain("Toplam fazla mesai: 5 saat");
+    state.role = "project_admin";
   });
   it("D5 excludes existing dates and requires explicit confirmation to load", () => {
     const total = countMissingHolidays(2026, []);

@@ -1,3 +1,5 @@
+import { useAuth } from "@/components/auth/AuthProvider";
+import { capabilities } from "@/lib/capabilities";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
@@ -44,6 +46,8 @@ export function linkedReportType(value: string | null | undefined): ReportType {
 }
 
 function ReportDownloadSettings({ requestedReport }: { requestedReport?: string | null }) {
+  const { profile } = useAuth();
+  const canSeePay = capabilities(profile?.role).admin;
   const section = useRef<HTMLElement>(null);
   const { projectId: activeProjectId, projectIds, activeProject, loading: accessLoading } = useActiveProjectScope();
   const [scopeSelection, setScopeSelection] = useState("active");
@@ -83,19 +87,19 @@ function ReportDownloadSettings({ requestedReport }: { requestedReport?: string 
       ? { year, month, projectId }
       : "skip"
   );
-  const hourlyRateError = hourlyRate !== undefined && (!Number.isFinite(hourlyRate) || hourlyRate < 0) ? "Sıfır veya pozitif bir ücret girin" : undefined;
+  const hourlyRateError = canSeePay && hourlyRate !== undefined && (!Number.isFinite(hourlyRate) || hourlyRate < 0) ? "Sıfır veya pozitif bir ücret girin" : undefined;
   const departmentData = useQuery(
     api.reports.getDepartmentCostReport,
-    scopeReady && reportType === "department" && !hourlyRateError && (debouncedHourlyRate === undefined || (Number.isFinite(debouncedHourlyRate) && debouncedHourlyRate >= 0))
-      ? { year, month, projectId, hourlyRate: debouncedHourlyRate }
+    scopeReady && reportType === "department" && !hourlyRateError && (!canSeePay || debouncedHourlyRate === undefined || (Number.isFinite(debouncedHourlyRate) && debouncedHourlyRate >= 0))
+      ? { year, month, projectId, hourlyRate: canSeePay ? debouncedHourlyRate : undefined }
       : "skip"
   );
 
   const excelAction = useAsyncAction(async () => {
     if (reportType === "sgk" && reportData) await exportScopedExcel({ type: "sgk", data: reportData });
-    else if (reportType === "overtime" && overtimeData) await exportScopedExcel({ type: "overtime", data: overtimeData });
+    else if (reportType === "overtime" && overtimeData) await exportScopedExcel({ type: "overtime", data: overtimeData }, canSeePay);
     else if (reportType === "attendance" && attendanceData) await exportScopedExcel({ type: "attendance", data: attendanceData });
-    else if (reportType === "department" && departmentData) await exportScopedExcel({ type: "department", data: departmentData });
+    else if (reportType === "department" && departmentData) await exportScopedExcel({ type: "department", data: departmentData }, canSeePay);
   }, { error: "Excel indirilemedi" });
   const pdfAction = useAsyncAction(async () => {
     if (reportType === "sgk" && reportData) await exportScopedSgkPdf(reportData);
@@ -153,7 +157,7 @@ function ReportDownloadSettings({ requestedReport }: { requestedReport?: string 
             {reportType === "overtime" && <FormFieldWrapper htmlFor="report-period" label="Dönem">
               <select className={selectStyle} value={overtimePeriod} onChange={event => { if (event.target.value === "month" || event.target.value === "year") setOvertimePeriod(event.target.value); }}><option value="month">Aylık</option><option value="year">Yıllık</option></select>
             </FormFieldWrapper>}
-            {reportType === "department" && <FormFieldWrapper htmlFor="report-hourly-rate" label="Ücret bilgisi olmayanlar için saatlik ücret (₺)" error={hourlyRateError}>
+            {canSeePay && reportType === "department" && <FormFieldWrapper htmlFor="report-hourly-rate" label="Ücret bilgisi olmayanlar için saatlik ücret (₺)" error={hourlyRateError}>
               <Input type="number" min={0} value={hourlyRate ?? ""} onChange={event => setHourlyRate(event.target.value === "" ? undefined : Number(event.target.value))} placeholder="Çalışan ücreti yoksa" />
             </FormFieldWrapper>}
           </fieldset>
@@ -189,7 +193,7 @@ function ReportDownloadSettings({ requestedReport }: { requestedReport?: string 
                     <p className="text-sm font-medium mt-1">
                       Toplam fazla mesai: {overtimeData.totalOvertimeHours} saat
                     </p>
-                    {"totalOvertimePayTRY" in overtimeData &&
+                    {canSeePay && "totalOvertimePayTRY" in overtimeData &&
                       overtimeData.totalOvertimePayTRY !== null &&
                       overtimeData.totalOvertimePayTRY > 0 && (
                         <p className="text-sm font-medium">

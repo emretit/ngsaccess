@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { QueryCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
-import { getCurrentUser, getValidAuthUserId } from "./auth";
+import type { Doc, Id } from "../_generated/dataModel";
+import { getCurrentUser, getProjectIdsForUser, getValidAuthUserId } from "./auth";
 
 const userId = "user-1" as Id<"users">;
 const otherUserId = "user-2" as Id<"users">;
@@ -12,7 +12,7 @@ function context(options: {
   sessionUserId?: Id<"users"> | null;
 } = {}) {
   const subject = options.subject === undefined ? `${userId}|${sessionId}` : options.subject;
-  const get = vi.fn(async (id: Id<"users"> | Id<"authSessions">) => {
+  const get = vi.fn(async (id: Id<"users"> | Id<"authSessions">): Promise<unknown> => {
     if (id === sessionId) {
       return options.sessionUserId === null
         ? null
@@ -55,5 +55,56 @@ describe("getValidAuthUserId", () => {
     const { ctx, get } = context({ sessionUserId: null });
     await expect(getCurrentUser(ctx)).rejects.toThrow("Giriş yapmanız gerekiyor");
     expect(get).toHaveBeenCalledOnce();
+  });
+});
+
+
+describe("getProjectIdsForUser", () => {
+  const projectId = "project-1" as Id<"projects">;
+  const user: Doc<"users"> = { _id: userId, _creationTime: 1, verified: true, role: "project_user" };
+
+  function projectContext(role: Doc<"users">["role"], cached: boolean | null = true) {
+    const { ctx, get } = context();
+    const collect = vi.fn(async () => role === "super_admin" ? [{ _id: projectId }] : [{ projectId }]);
+    const eq = vi.fn();
+    const query = vi.fn(() => ({
+      collect,
+      withIndex: (_name: string, predicate: (q: { eq: typeof eq }) => unknown) => {
+        predicate({ eq });
+        return { collect };
+      },
+    }));
+    const currentUser = { ...user, role };
+    get.mockImplementation(async id => id === userId ? currentUser : {
+      _id: sessionId, userId, expirationTime: Date.now() + 60_000,
+    });
+    return {
+      ctx: { ...ctx, db: { ...ctx.db, query }, ...(cached === true ? { user: currentUser } : cached === null ? { user: null } : {}) } as unknown as QueryCtx & { user?: Doc<"users"> | null },
+      get, query, eq,
+    };
+  }
+
+  it.each(["super_admin", "project_admin", "project_user"] as const)("reuses validated %s without session/user reads and preserves project scope", async role => {
+    const cached = projectContext(role);
+    const fallback = projectContext(role, false);
+    await expect(getProjectIdsForUser(cached.ctx)).resolves.toEqual([projectId]);
+    await expect(getProjectIdsForUser(fallback.ctx)).resolves.toEqual([projectId]);
+    expect(cached.get).not.toHaveBeenCalled();
+    expect(fallback.get.mock.calls.map(([id]) => id)).toEqual([sessionId, userId]);
+    expect(cached.query).toHaveBeenCalledWith(role === "super_admin" ? "projects" : "userProjects");
+    if (role !== "super_admin") expect(cached.eq).toHaveBeenCalledWith("userId", userId);
+  });
+
+  it("validates sessions when ctx.user is null and rejects a missing session", async () => {
+    const fallback = projectContext("project_user", null);
+    await expect(getProjectIdsForUser(fallback.ctx)).resolves.toEqual([projectId]);
+    expect(fallback.get).toHaveBeenCalledTimes(2);
+    await expect(getProjectIdsForUser(context({ sessionUserId: null }).ctx)).rejects.toThrow("Giriş yapmanız gerekiyor");
+  });
+
+  it("does not allow an unverified user supplied by optionalAuthQuery", async () => {
+    const { ctx, query } = projectContext("project_user");
+    await expect(getProjectIdsForUser({ ...ctx, user: { ...user, verified: false } })).rejects.toThrow("E-posta adresinizi doğrulamanız gerekiyor");
+    expect(query).not.toHaveBeenCalled();
   });
 });
