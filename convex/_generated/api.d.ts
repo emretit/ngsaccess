@@ -140,6 +140,7 @@ import type * as lib_pdksDay from "../lib/pdksDay.js";
 import type * as lib_pdksDetail from "../lib/pdksDetail.js";
 import type * as lib_pdksHelpers from "../lib/pdksHelpers.js";
 import type * as lib_pdksManual from "../lib/pdksManual.js";
+import type * as lib_pdksManualWrite from "../lib/pdksManualWrite.js";
 import type * as lib_pdksPayroll from "../lib/pdksPayroll.js";
 import type * as lib_pdksSource from "../lib/pdksSource.js";
 import type * as lib_pdksTable from "../lib/pdksTable.js";
@@ -333,6 +334,7 @@ declare const fullApi: ApiFromModules<{
   "lib/pdksDetail": typeof lib_pdksDetail;
   "lib/pdksHelpers": typeof lib_pdksHelpers;
   "lib/pdksManual": typeof lib_pdksManual;
+  "lib/pdksManualWrite": typeof lib_pdksManualWrite;
   "lib/pdksPayroll": typeof lib_pdksPayroll;
   "lib/pdksSource": typeof lib_pdksSource;
   "lib/pdksTable": typeof lib_pdksTable;

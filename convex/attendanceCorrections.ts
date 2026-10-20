@@ -4,8 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
 import { adminMutation, adminQuery, employeeAuthedMutation, employeeAuthedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed, canAccessEmployeeProject } from "./lib/auth";
-import { validateManualPdksInput } from "./lib/pdksManual";
-import { buildShiftResolver } from "./lib/shiftResolver";
+import { findManualPdksRecord, validateManualPdksForEmployee, writeManualPdksRecord } from "./lib/pdksManualWrite";
 import { writeAudit } from "./lib/audit";
 import { istanbulToday, validateCorrectionDate } from "./lib/requestRules";
 
@@ -79,20 +78,10 @@ async function decision(ctx: MutationCtx & { user: Doc<"users"> }, id: Id<"atten
   if (row.status !== "pending") throw new ConvexError("Yalnız bekleyen düzeltme talepleri işlenebilir");
   const now = new Date().toISOString();
   if (approve) {
-    const existing = await ctx.db.query("pdksRecords").withIndex("by_employee_date", q => q.eq("employeeId", row.employeeId).eq("date", row.date)).first();
-    // upsertManual ile aynı vardiya çözümü/doğrulama akışı. Not kaynağı bilinçli olarak farklıdır: burada yönetici notu yoksa çalışan gerekçesi kullanılır.
-    const resolver = await buildShiftResolver(ctx, [employee]);
-    const shift = resolver.resolve(employee._id, row.date);
-    const input = validateManualPdksInput({ date: row.date, entryTime: row.requestedCheckIn ?? existing?.entryTime, exitTime: row.requestedCheckOut ?? existing?.exitTime, note: note ?? row.reason }, shift?.projectId === employee.projectId ? shift : null);
-    const status = "present" as const;
-    if (existing) {
-      await ctx.db.patch(existing._id, { entryTime: input.entryTime, exitTime: input.exitTime, status, manualEntry: true, manualNote: input.note, editedBy: ctx.user._id, editedAt: Date.now(), updatedAt: now });
-      await writeAudit(ctx, { user: ctx.user, projectId: employee.projectId, action: "update", targetTable: "pdksRecords", targetId: existing._id, oldValue: { entryTime: existing.entryTime, exitTime: existing.exitTime, status: existing.status, manualNote: existing.manualNote }, newValue: { date: row.date, entryTime: input.entryTime, exitTime: input.exitTime, status, manualNote: input.note }, note: input.note });
-    } else {
-      // upsertManual ile aynı yazım: pdksRecords.ts:78
-      const recordId = await ctx.db.insert("pdksRecords", { projectId: employee.projectId, employeeId: row.employeeId, employeeFirstName: employee.firstName, employeeLastName: employee.lastName, date: row.date, entryTime: input.entryTime, exitTime: input.exitTime, status, manualEntry: true, manualNote: input.note, editedBy: ctx.user._id, editedAt: Date.now(), createdAt: now, updatedAt: now });
-      await writeAudit(ctx, { user: ctx.user, projectId: employee.projectId, action: "create", targetTable: "pdksRecords", targetId: recordId, newValue: { date: row.date, entryTime: input.entryTime, exitTime: input.exitTime, status, manualNote: input.note }, note: input.note });
-    }
+    const existing = await findManualPdksRecord(ctx, row.employeeId, row.date);
+    // Tek yönlü talep (yalnız giriş/çıkış) mevcut kaydın diğer saatini korur; yönetici notu yoksa çalışan gerekçesi not olur.
+    const input = await validateManualPdksForEmployee(ctx, employee, { date: row.date, entryTime: row.requestedCheckIn ?? existing?.entryTime, exitTime: row.requestedCheckOut ?? existing?.exitTime, note: note ?? row.reason });
+    await writeManualPdksRecord(ctx, { user: ctx.user, employee, date: row.date, existing, input, audit: true });
   }
   await ctx.db.patch(id, { status: approve ? "approved" : "rejected", decidedBy: ctx.user._id, decidedAt: now, decisionNote: note, updatedAt: now });
   await writeAudit(ctx, { user: ctx.user, projectId: row.projectId, action: "update", targetTable: "attendanceCorrections", targetId: id, oldValue: { status: row.status }, newValue: { status: approve ? "approved" : "rejected", date: row.date }, note });

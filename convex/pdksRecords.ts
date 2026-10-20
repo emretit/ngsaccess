@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { adminMutation, authedQuery } from "./lib/customFunctions";
 import { validateManualPdksInput, validateManualPdksNote } from "./lib/pdksManual";
+import { findManualPdksRecord, validateManualPdksForEmployee, writeManualPdksRecord } from "./lib/pdksManualWrite";
 import { buildShiftResolver } from "./lib/shiftResolver";
 import { resolveProjectScope } from "./lib/projectScope";
 import { isOvernightShift } from "./lib/pdksWorkDay";
@@ -31,86 +32,9 @@ export const upsertManual = adminMutation({
       }
     }
 
-    const resolver = await buildShiftResolver(ctx, [employee]);
-    const shift = resolver.resolve(employee._id, args.date);
-    const { note, entryTime, exitTime } = validateManualPdksInput(args, shift?.projectId === employee.projectId ? shift : null);
-
-    const existing = await ctx.db
-      .query("pdksRecords")
-      .withIndex("by_employee_date", (q) =>
-        q.eq("employeeId", args.employeeId).eq("date", args.date)
-      )
-      .first();
-
-    const now = new Date().toISOString();
-    const status = "present" as const;
-
-    if (existing) {
-      const oldSnapshot = {
-        entryTime: existing.entryTime,
-        exitTime: existing.exitTime,
-        status: existing.status,
-        manualNote: existing.manualNote,
-      };
-      await ctx.db.patch(existing._id, {
-        entryTime,
-        exitTime,
-        status,
-        manualEntry: true,
-        manualNote: note,
-        editedBy: ctx.user._id,
-        editedAt: Date.now(),
-        updatedAt: now,
-      });
-      await writeAudit(ctx, {
-        user: ctx.user,
-        projectId: employee.projectId ?? null,
-        action: "update",
-        targetTable: "pdksRecords",
-        targetId: existing._id,
-        oldValue: oldSnapshot,
-        newValue: {
-          entryTime,
-          exitTime,
-          status,
-          manualNote: note,
-        },
-        note,
-      });
-      return existing._id;
-    }
-
-    const id = await ctx.db.insert("pdksRecords", {
-      projectId: employee.projectId,
-      employeeId: args.employeeId,
-      employeeFirstName: employee.firstName,
-      employeeLastName: employee.lastName,
-      date: args.date,
-      entryTime,
-      exitTime,
-      status,
-      manualEntry: true,
-      manualNote: note,
-      editedBy: ctx.user._id,
-      editedAt: Date.now(),
-      createdAt: now,
-      updatedAt: now,
-    });
-    await writeAudit(ctx, {
-      user: ctx.user,
-      projectId: employee.projectId ?? null,
-      action: "create",
-      targetTable: "pdksRecords",
-      targetId: id,
-      newValue: {
-        date: args.date,
-        entryTime,
-        exitTime,
-        status,
-        manualNote: note,
-      },
-      note,
-    });
+    const input = await validateManualPdksForEmployee(ctx, employee, args);
+    const existing = await findManualPdksRecord(ctx, args.employeeId, args.date);
+    const { id } = await writeManualPdksRecord(ctx, { user: ctx.user, employee, date: args.date, existing, input, audit: true });
     return id;
   },
 });
@@ -152,7 +76,6 @@ export const bulkUpsertManual = adminMutation({
     let updated = 0;
     const errors: { index: number; message: string }[] = [];
     const touchedIds: string[] = [];
-    const now = new Date().toISOString();
 
     const employeeIds = [...new Set(args.rows.map(row => row.employeeId))];
     const employees = (await Promise.all(employeeIds.map(id => ctx.db.get(id))))
@@ -172,50 +95,13 @@ export const bulkUpsertManual = adminMutation({
         }
 
         const shift = resolver.resolve(employee._id, row.date);
-        const { note, entryTime, exitTime } = validateManualPdksInput({ ...row, note: batchNote }, shift?.projectId === employee.projectId ? shift : null);
+        const input = validateManualPdksInput({ ...row, note: batchNote }, shift?.projectId === employee.projectId ? shift : null);
 
-        const existing = await ctx.db
-          .query("pdksRecords")
-          .withIndex("by_employee_date", (q) =>
-            q.eq("employeeId", row.employeeId).eq("date", row.date),
-          )
-          .first();
-
-        const status = "present" as const;
-
-        if (existing) {
-          await ctx.db.patch(existing._id, {
-            entryTime,
-            exitTime,
-            status,
-            manualEntry: true,
-            manualNote: note,
-            editedBy: ctx.user._id,
-            editedAt: Date.now(),
-            updatedAt: now,
-          });
-          updated += 1;
-          touchedIds.push(String(existing._id));
-        } else {
-          const id = await ctx.db.insert("pdksRecords", {
-            projectId: employee.projectId,
-            employeeId: row.employeeId,
-            employeeFirstName: employee.firstName,
-            employeeLastName: employee.lastName,
-            date: row.date,
-            entryTime,
-            exitTime,
-            status,
-            manualEntry: true,
-            manualNote: note,
-            editedBy: ctx.user._id,
-            editedAt: Date.now(),
-            createdAt: now,
-            updatedAt: now,
-          });
-          inserted += 1;
-          touchedIds.push(String(id));
-        }
+        const existing = await findManualPdksRecord(ctx, row.employeeId, row.date);
+        const { id, created } = await writeManualPdksRecord(ctx, { user: ctx.user, employee, date: row.date, existing, input, audit: false });
+        if (created) inserted += 1;
+        else updated += 1;
+        touchedIds.push(String(id));
       } catch (e) {
         errors.push({
           index: i,
