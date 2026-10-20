@@ -44,33 +44,6 @@ export const listProjectIdsForCurrentUser = internalQuery({
   },
 });
 
-export const getProfile = adminQuery({
-  args: { userId: v.id("users") },
-  returns: v.union(publicUserValidator, v.null()),
-  handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.userId);
-    if (!user) return null;
-    if (ctx.user.role !== "super_admin") {
-      const projectIds = await getProjectIdsForUser(ctx);
-      if (projectIds.length === 0) return null;
-      const memberships = await ctx.db.query("userProjects")
-        .withIndex("by_user", (q) => q.eq("userId", user._id))
-        .collect();
-      if (!memberships.some((membership) => projectIds.includes(membership.projectId))) return null;
-    }
-    return toPublicUser(user);
-  },
-});
-
-export const isSuperAdmin = optionalAuthQuery({
-  args: {},
-  returns: v.boolean(),
-  handler: async (ctx) => {
-    if (!ctx.user) return false;
-    return ctx.user.role === "super_admin";
-  },
-});
-
 export const updateRole = superAdminMutation({
   args: {
     userId: v.id("users"),
@@ -124,21 +97,6 @@ export const updateRole = superAdminMutation({
   },
 });
 
-export const updatePhoto = authedMutation({
-  args: {
-    photoUrl: v.string(),
-    photoStorageId: v.optional(v.id("_storage")),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    await ctx.db.patch(ctx.user._id, {
-      photoUrl: args.photoUrl,
-      updatedAt: new Date().toISOString(),
-    });
-    return null;
-  },
-});
-
 export const updateProfile = authedMutation({
   args: {
     fullName: v.optional(v.string()),
@@ -174,27 +132,6 @@ export const list = adminQuery({
     const uniqueIds = [...new Set(rows.flat().map((r) => r.userId))];
     const users = await Promise.all(uniqueIds.map((id) => ctx.db.get(id)));
     return users.filter((u): u is NonNullable<typeof u> => u !== null).map(toPublicUser);
-  },
-});
-
-export const setupUser = superAdminMutation({
-  args: {
-    userId: v.id("users"),
-    role: v.union(
-      v.literal("super_admin"),
-      v.literal("project_admin"),
-      v.literal("project_user")
-    ),
-    fullName: v.optional(v.string()),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.userId, {
-      role: args.role,
-      fullName: args.fullName,
-      updatedAt: new Date().toISOString(),
-    });
-    return null;
   },
 });
 

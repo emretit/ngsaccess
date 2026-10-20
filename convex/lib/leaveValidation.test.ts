@@ -4,7 +4,7 @@ import type { FunctionReturnType } from "convex/server";
 import type { api } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { approve, create, employeeOptions, list, listForRange, listPage, reject, summary, update } from "../leaves";
+import { create, employeeOptions, listForRange, listPage, summary, update } from "../leaves";
 import { calendarDays, LEAVE_ERRORS, overlaps, validateLeaveRange } from "./leaveValidation";
 
 // No convex-test package is installed. Keep the real authedQuery/adminMutation wrappers;
@@ -177,14 +177,14 @@ describe("leave mutations with real role wrappers", () => {
       .rejects.toMatchObject(errorData(code));
     expect(f.patch).toHaveBeenCalledTimes(2);
   });
-  it("blocks approval of conflicting legacy pending leaves and excludes itself otherwise", async () => {
-    const pending = savedLeave({ status: "pending" });
-    const f = fixture([pending, savedLeave({ _id: "other" as Id<"leaves"> })]);
-    await expect(invoke(approve, f.ctx, { leaveId })).rejects.toMatchObject(errorData("LEAVE_OVERLAP"));
+  it("blocks conflicting date updates and excludes the edited leave otherwise", async () => {
+    const f = fixture([savedLeave(), savedLeave({ _id: "other" as Id<"leaves"> })]);
+    const args = { leaveId, expectedUpdatedAt: timestamp, endDate: "2026-10-04" };
+    await expect(invoke(update, f.ctx, args)).rejects.toMatchObject(errorData("LEAVE_OVERLAP"));
     expect(f.patch).not.toHaveBeenCalled();
     f.tables.leaves.pop();
-    await invoke(approve, f.ctx, { leaveId });
-    expect(f.tables.leaves[0].status).toBe("approved");
+    await invoke(update, f.ctx, args);
+    expect(f.tables.leaves[0]).toMatchObject({ status: "approved", endDate: args.endDate });
   });
   it("clears null notes, preserves omitted notes and detects a stale writer even in the same millisecond", async () => {
     const now = Date.parse(timestamp);
@@ -224,14 +224,7 @@ describe("leave mutations with real role wrappers", () => {
     await expect(invoke(create, f.ctx, input)).rejects.toMatchObject(errorData("LEAVE_SCAN_LIMIT"));
     expect(f.insert).not.toHaveBeenCalled();
   });
-  it("preserves the legacy decision and list entry points", async () => {
-    const f = fixture([savedLeave({ status: "pending" })]);
-    await invoke(approve, f.ctx, { leaveId });
-    expect(f.tables.leaves[0]).toMatchObject({ status: "approved", notes: "Eski not" });
-    f.tables.leaves[0].status = "pending";
-    await invoke(reject, f.ctx, { leaveId, notes: "Ret" });
-    expect(await invoke(list, f.ctx, { projectId, employeeId, status: "rejected" })).toHaveLength(1);
-  });
+
 });
 
 describe("bounded leave queries", () => {
@@ -320,7 +313,6 @@ describe("bounded leave queries", () => {
     const page = await invoke<FunctionReturnType<typeof api.leaves.listPage>>(listPage, f.ctx, { ...filters, paginationOpts });
     expect(page.page[0].notesHidden).toBe(role === "project_user");
     expect(page.page[0].notes).toBe(role === "project_user" ? undefined : "Eski not");
-    expect(await invoke(list, f.ctx, { projectId })).toMatchObject([{ notes: "Eski not" }]);
     expect(await invoke(listForRange, f.ctx, { projectId, startDate: filters.rangeStart, endDate: filters.rangeEnd }))
       .toMatchObject([{ notes: "Eski not" }]);
   });

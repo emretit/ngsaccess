@@ -6,8 +6,7 @@ import { paginationOptsValidator } from "convex/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { authedQuery, adminMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser, isProjectAllowed, canAccessEmployeeProject } from "./lib/auth";
-import { approvedLeaveFields, canManageLeaves, leaveDecisionPatch } from "./lib/leaveRules";
+import { approvedLeaveFields, canManageLeaves } from "./lib/leaveRules";
 import { toPatch } from "./lib/nullablePatch";
 import { calendarDays, LEAVE_ERRORS, leaveError, overlaps, validateLeaveRange } from "./lib/leaveValidation";
 
@@ -29,7 +28,7 @@ async function requireLeaveEmployee(ctx: QueryCtx | MutationCtx, employeeId: Id<
   return employee;
 }
 
-/** Shared by create/update/approve. Legacy pending/rejected are read-only history, not reservations. */
+/** Shared by create/update. Legacy pending/rejected are read-only history, not reservations. */
 async function assertNoLeaveOverlap(
   ctx: MutationCtx,
   employeeId: Id<"employees">,
@@ -176,24 +175,6 @@ export const employeeOptions = authedQuery({
   },
 });
 
-export const list = authedQuery({
-  args: {
-    projectId: v.optional(v.id("projects")),
-    employeeId: v.optional(v.id("employees")),
-    status: v.optional(v.union(v.literal("pending"), v.literal("approved"), v.literal("rejected"))),
-  },
-  handler: async (ctx, args) => {
-    const projectIds = await resolveProjectScope(ctx, args.projectId);
-    const results = await Promise.all(projectIds.map(projectId =>
-      ctx.db.query("leaves").withIndex("by_project", q => q.eq("projectId", projectId)).collect(),
-    ));
-    return results.flat().filter(leave =>
-      (!args.employeeId || leave.employeeId === args.employeeId) &&
-      (!args.status || leave.status === args.status),
-    );
-  },
-});
-
 export const create = adminMutation({
   args: {
     employeeId: v.id("employees"),
@@ -254,53 +235,6 @@ export const update = adminMutation({
   },
 });
 
-export const approve = adminMutation({
-  args: {
-    leaveId: v.id("leaves"),
-    notes: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const leave = await ctx.db.get(args.leaveId);
-    if (!leave || (leave.projectId ? !isProjectAllowed(allowedProjectIds, leave.projectId) : ctx.user.role !== "super_admin")) {
-      throw new Error("Bu izne erişim yetkiniz yok");
-    }
-    const employee = await ctx.db.get(leave.employeeId);
-    if (!employee || !canAccessEmployeeProject(ctx.user.role, allowedProjectIds, employee.projectId)) {
-      throw new Error("Bu çalışanın projesine erişim yetkiniz yok");
-    }
-    if (ctx.user.role !== "super_admin" && employee.projectId !== leave.projectId) {
-      throw new Error("İzin ve çalışan aynı projede olmalıdır");
-    }
-    const now = new Date().toISOString();
-    const patch = leaveDecisionPatch(ctx.user.role, leave.status, "approved", ctx.user._id, now, args.notes);
-    await assertNoLeaveOverlap(ctx, leave.employeeId, leave.startDate, leave.endDate, leave._id);
-    await ctx.db.patch(args.leaveId, patch);
-  },
-});
-
-export const reject = adminMutation({
-  args: {
-    leaveId: v.id("leaves"),
-    notes: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const leave = await ctx.db.get(args.leaveId);
-    if (!leave || (leave.projectId ? !isProjectAllowed(allowedProjectIds, leave.projectId) : ctx.user.role !== "super_admin")) {
-      throw new Error("Bu izne erişim yetkiniz yok");
-    }
-    const employee = await ctx.db.get(leave.employeeId);
-    if (!employee || !canAccessEmployeeProject(ctx.user.role, allowedProjectIds, employee.projectId)) {
-      throw new Error("Bu çalışanın projesine erişim yetkiniz yok");
-    }
-    const now = new Date().toISOString();
-    await ctx.db.patch(args.leaveId, leaveDecisionPatch(
-      ctx.user.role, leave.status, "rejected", ctx.user._id, now, args.notes,
-    ));
-  },
-});
-
 export const listForRange = authedQuery({
   args: { startDate: v.string(), endDate: v.string(), projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
@@ -315,26 +249,5 @@ export const listForRange = authedQuery({
       results.push(...candidates.filter(leave => leave.status === "approved" && overlaps(leave.startDate, leave.endDate, args.startDate, args.endDate)));
     }
     return results;
-  },
-});
-
-export const getBalances = authedQuery({
-  args: {
-    employeeId: v.id("employees"),
-    year: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const emp = await ctx.db.get(args.employeeId);
-    if (!emp || !canAccessEmployeeProject(ctx.user.role, allowedProjectIds, emp.projectId)) {
-      return [];
-    }
-    const year = args.year ?? new Date().getFullYear();
-    return await ctx.db
-      .query("leaveBalances")
-      .withIndex("by_employee_year", (q) =>
-        q.eq("employeeId", args.employeeId).eq("year", year)
-      )
-      .collect();
   },
 });

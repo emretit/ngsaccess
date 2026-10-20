@@ -138,43 +138,6 @@ export const listAssignments = authedQuery({
   },
 });
 
-export const assignShift = authedMutation({
-  args: {
-    employeeId: v.id("employees"),
-    shiftId: v.id("shifts"),
-    projectId: v.optional(v.id("projects")),
-    startDate: v.string(),
-    endDate: v.string(),
-    weekPattern: v.optional(v.array(v.string())),
-    forceConfirm: v.optional(v.boolean()),
-    calendarConfirmed: v.optional(v.boolean()),
-  },
-  handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      throw new Error("Bu projeye erişim yetkiniz yok");
-    }
-    const emp = await ctx.db.get(args.employeeId);
-    if (!emp || (emp.projectId && !allowedProjectIds.some((id) => id === emp.projectId))) {
-      throw new Error("Bu çalışana erişim yetkiniz yok");
-    }
-    const shift = await ctx.db.get(args.shiftId);
-    if (!shift || (shift.projectId && !allowedProjectIds.some((id) => id === shift.projectId))) {
-      throw new Error("Bu vardiyaya erişim yetkiniz yok");
-    }
-    if (args.projectId) assertPeopleProject(args.projectId, emp.projectId, "Atama ve çalışan");
-    await validateAssignment(ctx, emp, shift, args, args.forceConfirm, undefined, args.calendarConfirmed);
-    const now = new Date().toISOString();
-    const { forceConfirm: _force, calendarConfirmed: _calendar, ...rest } = args;
-    return await ctx.db.insert("shiftAssignments", {
-      ...rest,
-      projectId: emp.projectId,
-      createdAt: now,
-      updatedAt: now,
-    });
-  },
-});
-
 export const updateAssignment = authedMutation({
   args: {
     assignmentId: v.id("shiftAssignments"),
@@ -320,27 +283,6 @@ export const removeAssignment = authedMutation({
     }
     await requireEmployeeAccess(ctx, assignment.employeeId);
     await ctx.db.delete(args.assignmentId);
-  },
-});
-
-export const bulkRemoveAssignment = authedMutation({
-  args: { assignmentIds: v.array(v.id("shiftAssignments")) },
-  handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    let deleted = 0;
-    for (const id of args.assignmentIds) {
-      const assignment = await ctx.db.get(id);
-      if (!assignment?.projectId) continue;
-      if (
-        assignment.projectId &&
-        !allowedProjectIds.some((pid) => pid === assignment.projectId)
-      ) {
-        continue;
-      }
-      await ctx.db.delete(id);
-      deleted += 1;
-    }
-    return { deleted };
   },
 });
 

@@ -100,7 +100,6 @@ const handlers = {
   definitionUsage: registeredHandler(shifts.definitionUsage),
   definitionImpacts: registeredHandler(shifts.definitionImpacts),
   remove: registeredHandler(shifts.remove),
-  assignShift: registeredHandler(shifts.assignShift),
   updateAssignment: registeredHandler(shifts.updateAssignment),
 };
 type MemoryRow = Record<string, unknown>;
@@ -157,20 +156,10 @@ function seedMemory(overrides: Record<string, MemoryRow[]> = {}) {
 }
 
 describe("vardiya endpoint sözleşmeleri", () => {
-  it("tekli atama ve düzenleme aynı fiili gün kuralını kullanır; kendi serisini dışlar", async () => {
+  it("düzenleme fiili gün kuralını kullanır; kendi serisini dışlar", async () => {
     const memory = seedMemory({ leaves: [{ ...leave, employeeId }], shiftAssignments: [assignmentRow] });
     await expect(handlers.updateAssignment(memory.mutationCtx, { assignmentId: "assignment" as Id<"shiftAssignments">, ...range })).resolves.toBeUndefined();
     expect(memory.tables.get("shiftAssignments")?.[0]).toMatchObject(range);
-    const fresh = seedMemory({ leaves: [{ ...leave, employeeId }] });
-    expect(await handlers.assignShift(fresh.mutationCtx, { projectId, employeeId, shiftId, ...range })).toBe("new-1");
-    const denied = seedMemory({ leaves: [{ ...leave, employeeId, startDate: range.startDate, endDate: range.startDate }] });
-    await expect(handlers.assignShift(denied.mutationCtx, { projectId, employeeId, shiftId, ...range })).rejects.toMatchObject({ data: { code: "SHIFT_CALENDAR_CONFLICT", message: expect.stringContaining("CALENDAR:") } });
-  });
-  it("tekli atama çakışmasını yapılandırılmış kod ve eski mesajla döner", async () => {
-    const memory = seedMemory({ shiftAssignments: [assignmentRow] });
-    await expect(handlers.assignShift(memory.mutationCtx, { projectId, employeeId, shiftId, ...range }))
-      .rejects.toMatchObject({ data: { code: "SHIFT_OVERLAP", message: expect.stringMatching(/^OVERLAP:1 /) } });
-    expect(memory.writes()).toBe(0);
   });
   it("preview bitiş verilmezse başlangıç gününü kullanır; global tatili de okur", async () => {
     const memory = seedMemory({ holidays: [{ ...holiday, date: bulkInput.startDate }] });

@@ -147,26 +147,6 @@ export const getById = authedQuery({
   },
 });
 
-export const checkDuplicate = authedQuery({
-  args: {
-    tcNo: v.optional(v.string()),
-    cardNumber: v.string(),
-    email: v.string(),
-    excludeId: v.optional(v.id("employees")),
-  },
-  handler: async (ctx, args) => {
-    const checks: DuplicateField[] = ["cardNumber", "email", "tcNo"];
-    for (const field of checks) {
-      const value =
-        field === "cardNumber" ? args.cardNumber : field === "email" ? args.email : args.tcNo;
-      if (!value) continue;
-      const dup = await findDuplicateEmployee(ctx, field, value, args.excludeId);
-      if (dup) return { field, duplicate: true as const };
-    }
-    return { duplicate: false as const };
-  },
-});
-
 export const create = adminMutation({
   args: {
     projectId: v.optional(v.id("projects")),
@@ -426,43 +406,6 @@ export const bulkUpdateDepartment = adminMutation({
     }
     return { updatedCount: employees.length };
   },
-});
-
-export const bulkUpdateStatus = adminMutation({
-  args: {
-    employeeIds: v.array(v.id("employees")),
-    isActive: v.boolean(),
-  },
-  handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const changed: Id<"employees">[] = [];
-    for (const id of args.employeeIds) {
-      const emp = await ctx.db.get(id);
-      if (emp && emp.projectId && !allowedProjectIds.some((pid) => pid === emp.projectId)) {
-        throw new Error(`Çalışan ${emp.firstName} ${emp.lastName} için erişim yetkiniz yok`);
-      }
-      if (emp && emp.isActive !== args.isActive) changed.push(id);
-    }
-    const now = new Date().toISOString();
-    await Promise.all(
-      args.employeeIds.map((id) =>
-        ctx.db.patch(id, { isActive: args.isActive, updatedAt: now })
-      )
-    );
-    // Aktiflik değişen çalışanları cihazlara sync et (panel user.status = 0/1). Tek tek
-    // update() ile aynı desen; toplu işlemde de pasif çalışan panel erişimi kaybetsin.
-    await Promise.all(
-      changed.flatMap((id) => [
-        ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
-          employeeId: id,
-        }),
-        ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, {
-          employeeId: id,
-        }),
-      ]),
-    );
-  },
-  returns: v.null(),
 });
 
 /** Internal: Email ile çalışanı bulur (admin script'ler için) */

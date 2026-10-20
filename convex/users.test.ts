@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { currentUser, getProfile, list } from "./users";
+import { currentUser, list } from "./users";
 
 vi.mock("./lib/customFunctions", () => {
   const register = (definition: { handler: unknown }) => ({ _handler: definition.handler });
@@ -18,13 +18,11 @@ const userId = "user-1" as Id<"users">;
 const otherUserId = "user-2" as Id<"users">;
 const sessionId = "session" as Id<"authSessions">;
 const projectId = "project-1" as Id<"projects">;
-const otherProjectId = "project-2" as Id<"projects">;
 
 type HandlerContext = QueryCtx & { user: Doc<"users"> };
 type Handler<A, R> = { _handler: (ctx: HandlerContext, args: A) => Promise<R> };
 
 const currentUserHandler = (currentUser as unknown as Handler<Record<string, never>, Doc<"users"> | null>)._handler;
-const getProfileHandler = (getProfile as unknown as Handler<{ userId: Id<"users"> }, Doc<"users"> | null>)._handler;
 const listHandler = (list as unknown as Handler<Record<string, never>, Doc<"users">[]>)._handler;
 
 function makeUser(id: Id<"users">, role: Doc<"users">["role"] = "project_user"): Doc<"users"> {
@@ -113,24 +111,4 @@ describe("public user queries", () => {
     expect(result.every((user) => !("setupToken" in user) && !("tokenExpiresAt" in user))).toBe(true);
   });
 
-  it("getProfile strips secrets and hides users outside project admin scope", async () => {
-    const caller = makeUser(userId, "project_admin");
-    const target = makeUser(otherUserId);
-    const scopedContext = makeContext({
-      caller,
-      users: [caller, target],
-      memberships: [{ userId, projectId }, { userId: otherUserId, projectId }],
-    });
-    const visible = await getProfileHandler(scopedContext, { userId: otherUserId });
-    expect(visible).toMatchObject({ email: target.email, role: target.role, verified: true, name: target.name });
-    expect(visible).not.toHaveProperty("setupToken");
-    expect(visible).not.toHaveProperty("tokenExpiresAt");
-
-    const outsideScope = makeContext({
-      caller,
-      users: [caller, target],
-      memberships: [{ userId, projectId }, { userId: otherUserId, projectId: otherProjectId }],
-    });
-    expect(await getProfileHandler(outsideScope, { userId: otherUserId })).toBeNull();
-  });
 });

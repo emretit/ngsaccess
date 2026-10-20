@@ -22,7 +22,6 @@ import {
   employeeAuthedMutation,
 } from "./lib/customFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
-import type { QueryCtx } from "./_generated/server";
 import {
   isoTimeToTRMinutes,
   getEffectiveWorkSettings,
@@ -48,7 +47,6 @@ import {
 } from "./lib/pdksCalc";
 import {
   enrichReadingsForList,
-  enrichWithDeviceName,
   enrichWithDeviceInfo,
 } from "./lib/cardReadingAudit";
 import {
@@ -70,22 +68,6 @@ import {
 import { pdksAvailableDatesByProject, pdksManualDatesByEmployee, pdksLeaveMatchesProject, readPdksAvailableDateKeys, pdksFirstRecordDate } from "./lib/pdksAvailability";
 
 export type CardReadingListPage = PaginationResult<Awaited<ReturnType<typeof enrichReadingsForList>>[number]>;
-
-type AuthedReadCtx = QueryCtx & { user: Doc<"users"> };
-
-async function loadScopedCardReadings(
-  ctx: AuthedReadCtx,
-  opts: { limit: number; projectId?: Id<"projects">; projectIds?: Id<"projects">[] },
-): Promise<Doc<"cardReadings">[]> {
-  const allowed = await resolveProjectScope(ctx, opts.projectId);
-  const projects = opts.projectIds ? allowed.filter(id => opts.projectIds?.includes(id)) : allowed;
-  const results = await Promise.all(projects.map(projectId =>
-    ctx.db.query("cardReadings")
-      .withIndex("by_project_access_time", q => q.eq("projectId", projectId))
-      .order("desc").take(opts.limit),
-  ));
-  return results.flat().sort((a, b) => b.accessTime.localeCompare(a.accessTime)).slice(0, opts.limit);
-}
 
 /** Kayıt okuyucusunun seçili projedeki son atanmamış kartı. */
 export const getLastUnknownByDevice = authedQuery({
@@ -362,19 +344,6 @@ export const assignCardFromReading = adminMutation({
       note: "Canlı İzleme okumasından kart kişiye atandı; geçmiş okuma değiştirilmedi.",
     });
     return { employeeId, cardNumber: reading.cardNo, syncStatus: employee.cardNumber === reading.cardNo ? "notRequested" : hasNoTargets ? "noTargets" : "pending" };
-  },
-});
-
-export const getRecentByProjects = authedQuery({
-  args: {
-    projectId: v.optional(v.id("projects")),
-    projectIds: v.optional(v.array(v.id("projects"))),
-    limit: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const limit = Math.min(Math.max(1, args.limit ?? 10), 100);
-    const readings = await loadScopedCardReadings(ctx, { limit, projectId: args.projectId, projectIds: args.projectIds });
-    return await enrichWithDeviceName(ctx, readings);
   },
 });
 
