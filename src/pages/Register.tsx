@@ -1,3 +1,4 @@
+import { getPasswordError, PASSWORD_POLICY_MESSAGE } from '../../convex/lib/passwordPolicy';
 import { FormFieldWrapper } from '@/components/shared/FormFieldWrapper';
 import { PasswordField } from '@/components/shared/PasswordField';
 import { registrationSchema, fieldMessages } from '@/components/shared/authFormSchemas';
@@ -48,9 +49,10 @@ export default function Register() {
       setError('Lütfen tüm alanları doldurun.');
       throw new Error('Lütfen tüm alanları doldurun.');
     }
-    if (password.length < 8) {
-      setError('Şifre en az 8 karakter olmalıdır.');
-      throw new Error('Şifre en az 8 karakter olmalıdır.');
+    const passwordError = getPasswordError(password);
+    if (passwordError) {
+      setError(passwordError);
+      throw new Error(passwordError);
     }
     setError(null);
     const fullName = `${normalizedFirstName} ${normalizedLastName}`;
@@ -145,7 +147,7 @@ export default function Register() {
           <FormFieldWrapper
             htmlFor="password"
             label="Şifre"
-            hint="En az 8 karakter kullanın."
+            hint={PASSWORD_POLICY_MESSAGE}
             error={fieldErrors.password}
           >
             <PasswordField

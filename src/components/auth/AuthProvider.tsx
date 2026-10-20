@@ -1,3 +1,4 @@
+import { getPasswordError } from "../../../convex/lib/passwordPolicy";
 import { deferAuthGuard, registerAccount, shouldSignOutOrphanedSession } from './registrationFlow';
 import React, { createContext, useContext, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -177,8 +178,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!normalizedEmail || !normalizedName || !normalizedCompanyName) {
       return { error: new Error("Ad, firma ve e-posta alanları zorunludur.") };
     }
-    if (password.length < 8) {
-      return { error: new Error("Şifre en az 8 karakter olmalıdır.") };
+    const passwordError = getPasswordError(password);
+    if (passwordError) {
+      return { error: new Error(passwordError) };
     }
 
     // Bu pencerede effect'in /home'a yönlendirmesini engelle (dashboard flash'ı).

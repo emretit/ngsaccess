@@ -1,3 +1,4 @@
+import { getPasswordError } from "./lib/passwordPolicy";
 import { ConvexError, v } from "convex/values";
 import { invalidateSessions, modifyAccountCredentials } from "@convex-dev/auth/server";
 import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
@@ -193,9 +194,9 @@ export const claimSetupAccount = action({
       | { state: "none"; email: string }
       | { state: "claimable"; email: string; userId: Id<"users"> }
       | { state: "taken" } = await ctx.runQuery(internal.invites.setupAccountState, { token: args.token });
-    if (args.password.length < 8 || !/[A-Z]/.test(args.password) ||
-        !/[a-z]/.test(args.password) || !/\d/.test(args.password)) {
-      throw new ConvexError({ code: "INVITE_WEAK_PASSWORD" });
+    const passwordError = getPasswordError(args.password);
+    if (passwordError) {
+      throw new ConvexError({ code: "INVITE_WEAK_PASSWORD", message: passwordError });
     }
     if (state.state === "none") return { flow: "signUp" };
     if (state.state === "taken") throw new ConvexError({ code: "INVITE_ACCOUNT_EXISTS" });

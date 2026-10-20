@@ -1,12 +1,12 @@
 "use node";
 
 import bcrypt from "bcryptjs";
+import { getPasswordError } from "../lib/passwordPolicy";
 import { action, internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { v } from "convex/values";
 
 const BCRYPT_COST = 10;
-const MIN_PASSWORD_LENGTH = 8;
 
 export const setEmployeePassword = action({
   args: {
@@ -14,8 +14,9 @@ export const setEmployeePassword = action({
     password: v.string(),
   },
   handler: async (ctx, args): Promise<{ success: boolean; error?: string }> => {
-    if (args.password.length < MIN_PASSWORD_LENGTH) {
-      return { success: false, error: `Şifre en az ${MIN_PASSWORD_LENGTH} karakter olmalı` };
+    const passwordError = getPasswordError(args.password);
+    if (passwordError) {
+      return { success: false, error: passwordError };
     }
 
     // Ucuz ön kontrol: geçersiz token bcrypt maliyeti yaratmasın. Nihai karar
@@ -54,8 +55,9 @@ export const adminSetEmployeePassword = internalAction({
     password: v.string(),
   },
   handler: async (ctx, args): Promise<{ success: boolean; error?: string }> => {
-    if (args.password.length < MIN_PASSWORD_LENGTH) {
-      return { success: false, error: `Şifre en az ${MIN_PASSWORD_LENGTH} karakter olmalı` };
+    const passwordError = getPasswordError(args.password);
+    if (passwordError) {
+      return { success: false, error: passwordError };
     }
 
     const employee = await ctx.runQuery(internal.employees.getByEmailInternal, {

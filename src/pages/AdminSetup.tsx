@@ -1,3 +1,4 @@
+import { getPasswordError, PASSWORD_POLICY_MESSAGE } from '../../convex/lib/passwordPolicy';
 import { StatusScreen } from '@/components/public/StatusScreen';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { emailSchema } from '@/components/shared/authFormSchemas';
@@ -39,10 +40,11 @@ export default function AdminSetup() {
     if (
       !emailSchema.safeParse(email).success ||
       !password ||
-      (!existingAccount && password.length < 8) ||
       !secret
     )
-      fail('E-posta, şifre ve kurulum kodunu kontrol edin. Yeni hesap şifresi en az 8 karakter olmalıdır.');
+      fail('E-posta, şifre ve kurulum kodunu kontrol edin.');
+    const passwordError = existingAccount ? null : getPasswordError(password);
+    if (passwordError) fail(passwordError);
     try {
       await runSetup(async () => {
         await convexSignIn('password', {
@@ -166,7 +168,7 @@ export default function AdminSetup() {
           <p id="password-help" className="text-xs text-muted-foreground">
             {existingAccount
               ? 'Mevcut hesabınızın şifresini kullanın.'
-              : 'Yeni hesap şifresi en az 8 karakter olmalıdır.'}
+              : PASSWORD_POLICY_MESSAGE}
           </p>
           {formError && (
             <p id="setup-error" role="alert" className="text-sm text-danger">

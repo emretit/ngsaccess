@@ -286,10 +286,10 @@ describe('invites.claimSetupAccount', () => {
     expect(modifyAccountCredentials).not.toHaveBeenCalled();
     expect(invalidateSessions).not.toHaveBeenCalled();
   });
-  it('rejects weak passwords without writes', async () => {
+  it.each(['weakpass', 'abcdefgh1', 'ABCDEFGH1', 'Abcdefgh', 'Aa12345'])('rejects weak password %s without writes', async (password) => {
     const ctx = { runQuery: vi.fn(async () => ({ state: 'none', email: args.email })), runMutation: vi.fn() } as unknown as ActionCtx;
-    await expect(claimHandler(ctx, { token: args.token, password: 'weakpass' }))
-      .rejects.toMatchObject({ data: { code: 'INVITE_WEAK_PASSWORD' } });
+    await expect(claimHandler(ctx, { token: args.token, password }))
+      .rejects.toMatchObject({ data: { code: 'INVITE_WEAK_PASSWORD', message: 'Şifre en az 8 karakter, büyük harf, küçük harf ve rakam içermelidir.' } });
     expect(ctx.runMutation).not.toHaveBeenCalled();
     expect(modifyAccountCredentials).not.toHaveBeenCalled();
   });

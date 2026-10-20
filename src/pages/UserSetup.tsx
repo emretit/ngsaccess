@@ -1,3 +1,4 @@
+import { getPasswordChecks, isPasswordValid, PASSWORD_POLICY_MESSAGE } from '../../convex/lib/passwordPolicy';
 import { StatusScreen } from '@/components/public/StatusScreen';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { PasswordField } from '@/components/shared/PasswordField';
@@ -30,7 +31,7 @@ export function inviteSetupError(error: unknown): string {
     case 'INVITE_ACCOUNT_EXISTS':
       return "Bu e-postayla doğrulanmış bir hesap var; 'Mevcut hesabım var' ile giriş yapın.";
     case 'INVITE_WEAK_PASSWORD':
-      return 'Şifre en az 8 karakter, büyük harf, küçük harf ve rakam içermelidir.';
+      return PASSWORD_POLICY_MESSAGE;
     default:
       return 'Davet kabul edilemedi. Bilgilerinizi kontrol edin. Hesabınız oluştuysa mevcut hesap seçeneğiyle devam edin; sorun sürerse yöneticinizden yeni davet isteyin.';
   }
@@ -93,21 +94,14 @@ export default function UserSetup() {
     }
   }, [inviteData]);
 
-  const validatePassword = (pwd: string) => ({
-    minLength: pwd.length >= 8,
-    hasUpper: /[A-Z]/.test(pwd),
-    hasLower: /[a-z]/.test(pwd),
-    hasNumber: /\d/.test(pwd),
-  });
-
-  const passwordChecks = validatePassword(password);
-  const isPasswordValid = Object.values(passwordChecks).every(Boolean);
+  const passwordChecks = getPasswordChecks(password);
+  const passwordValid = isPasswordValid(password);
 
   const setup = useAsyncAction(async () => {
     setFormError(null);
     if (!password) fail('Şifrenizi girin.');
     if (!token) fail('Davet bağlantısı eksik.');
-    if (!existingAccount && (!isPasswordValid || password !== confirmPassword)) {
+    if (!existingAccount && (!passwordValid || password !== confirmPassword)) {
       fail('Şifre gereksinimlerini ve şifre tekrarını kontrol edin.');
     }
     try {
@@ -264,7 +258,7 @@ export default function UserSetup() {
             />
           </div>
           <p hidden={existingAccount} id="password-help" className="text-xs text-muted-foreground">
-            Yeni şifre en az 8 karakter, büyük harf, küçük harf ve rakam içermelidir.
+            {PASSWORD_POLICY_MESSAGE}
           </p>
           {formError && (
             <p id="setup-error" role="alert" className="text-sm text-danger">

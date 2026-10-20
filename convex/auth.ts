@@ -1,10 +1,17 @@
 import { Password } from "@convex-dev/auth/providers/Password";
 import { convexAuth } from "@convex-dev/auth/server";
+import { ConvexError } from "convex/values";
 import { normalizeAuthEmail } from "./lib/authEmail";
+import { getPasswordError } from "./lib/passwordPolicy";
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Password({
+      // Yeni şifre (signUp / reset-verification) sunucuda da ortak kuralla doğrulanır; signIn'de çağrılmaz.
+      validatePasswordRequirements(password) {
+        const error = getPasswordError(password);
+        if (error) throw new ConvexError(error);
+      },
       // Hesap oluşturulurken (signUp) profile alanlarını yaz.
       //
       // GÜVENLİK: signUp public bir HTTP endpoint'tir. verified HER ZAMAN false

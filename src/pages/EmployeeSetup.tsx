@@ -1,3 +1,4 @@
+import { getPasswordChecks, isPasswordValid, PASSWORD_POLICY_MESSAGE } from '../../convex/lib/passwordPolicy';
 import { StatusScreen } from '@/components/public/StatusScreen';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { PasswordField } from '@/components/shared/PasswordField';
@@ -34,19 +35,12 @@ export default function EmployeeSetup() {
       ? new Date(authRecord.tokenExpiresAt) > new Date()
       : false;
 
-  const validatePassword = (pwd: string) => ({
-    minLength: pwd.length >= 8,
-    hasUpper: /[A-Z]/.test(pwd),
-    hasLower: /[a-z]/.test(pwd),
-    hasNumber: /\d/.test(pwd),
-  });
-
-  const passwordChecks = validatePassword(password);
-  const isPasswordValid = Object.values(passwordChecks).every(Boolean);
+  const passwordChecks = getPasswordChecks(password);
+  const passwordValid = isPasswordValid(password);
 
   const savePassword = useAsyncAction(async () => {
     setFormError(null);
-    if (!token || !isPasswordValid || password !== confirmPassword)
+    if (!token || !passwordValid || password !== confirmPassword)
       fail('Şifre gereksinimlerini ve şifre tekrarını kontrol edin.');
     try {
       const result = await setPasswordAction({ token, password });
@@ -175,7 +169,7 @@ export default function EmployeeSetup() {
             />
           </div>
           <p id="password-help" className="text-xs text-muted-foreground">
-            Yeni şifre en az 8 karakter, büyük harf, küçük harf ve rakam içermelidir.
+            {PASSWORD_POLICY_MESSAGE}
           </p>
           {formError && (
             <p id="setup-error" role="alert" className="text-sm text-danger">
