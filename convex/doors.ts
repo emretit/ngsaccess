@@ -1,6 +1,6 @@
 
 import { ConvexError, v } from "convex/values";
-import { internalQuery } from "./_generated/server";
+import { internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
@@ -10,8 +10,67 @@ import { resolveProjectScope } from "./lib/projectScope";
 import { deleteReadersForDoor } from "./readers";
 import { deleteGroupDoorsForDoor } from "./lib/deviceHelpers";
 import { deriveHikReaderNoFromDoorNo } from "./lib/hikReaderNumbers";
+import { ruleDiffSyncPlan } from "./lib/accessRuleDiff";
+import { createRuleDiffRun } from "./deviceSyncRuns";
 
 type ReaderDirection = "entry" | "exit" | "both";
+
+/** Kuralın üyeleri + kapsadığı cihazlar (doğrudan cihaz bağı ∪ kapı bağlarının cihazı). */
+async function ruleSyncScope(
+  ctx: MutationCtx,
+  ruleId: Id<"accessRules">,
+  projectId: Id<"projects">,
+): Promise<{ memberIds: Id<"employees">[]; deviceIds: Id<"devices">[] }> {
+  const [members, deviceLinks, doorLinks] = await Promise.all([
+    ctx.db.query("groupMembers").withIndex("by_project_group", (q) => q.eq("projectId", projectId).eq("groupId", ruleId)).collect(),
+    ctx.db.query("groupDevices").withIndex("by_project_group", (q) => q.eq("projectId", projectId).eq("groupId", ruleId)).collect(),
+    ctx.db.query("groupDoors").withIndex("by_group", (q) => q.eq("groupId", ruleId)).collect(),
+  ]);
+  const doors = await Promise.all(doorLinks.map((link) => ctx.db.get(link.doorId)));
+  return {
+    memberIds: members.map((m) => m.employeeId),
+    deviceIds: [...new Set([
+      ...deviceLinks.map((link) => link.deviceId),
+      ...doors.flatMap((d) => (d?.deviceId ? [d.deviceId] : [])),
+    ])],
+  };
+}
+
+/**
+ * Silinen kapı kuralın kapsamını daraltır: kural düzenlemedeki kapı-çıkarma ile aynı
+ * fark gönderimini (kapsam değişti planı) başlat ki panel yetkileri ve roster'ı
+ * güncellensin. Kural başına ayrı transaction: her run ≤200 cihaz işi zamanlar, kapı
+ * silme mutation'ı kural sayısı × cihaz kadar iş biriktirip zamanlama sınırına takılmaz.
+ * Silme anının üye/cihaz snapshot'ı güncel durumla birleştirilir: arada kuraldan çıkarılan
+ * üye de eski panelden sökülür (hedef, erişimi güncel veriden yeniden hesaplar).
+ * Sınır aşımı (200 cihaz / 500 kişi) o kural için gönderimi atlar.
+ */
+export const syncRuleAfterDoorRemoval = internalMutation({
+  args: {
+    ruleId: v.id("accessRules"),
+    startedBy: v.id("users"),
+    memberIds: v.array(v.id("employees")),
+    beforeDeviceIds: v.array(v.id("devices")),
+  },
+  handler: async (ctx, args) => {
+    const { ruleId } = args;
+    const rule = await ctx.db.get(ruleId);
+    const projectId = rule?.projectId;
+    if (!projectId) return;
+    const current = await ruleSyncScope(ctx, ruleId, projectId);
+    const memberIds = [...new Set([...args.memberIds, ...current.memberIds])];
+    const beforeDeviceIds = [...new Set([...args.beforeDeviceIds, ...current.deviceIds])];
+    const plan = ruleDiffSyncPlan({
+      live: memberIds, next: memberIds, scopeChanged: true, settingsChanged: false, activeChanged: false,
+    });
+    try {
+      await createRuleDiffRun(ctx, { ruleId, projectId, startedBy: args.startedBy, beforeDeviceIds, plan });
+    } catch (error: unknown) {
+      if (!(error instanceof ConvexError)) throw error;
+      console.warn(`doors.remove: kural ${ruleId} fark gönderimi atlandı`, error.data);
+    }
+  },
+});
 
 /**
  * Kapı IDE Smart panele bağlıysa (deviceId → brand ide_smart, ioId var) sensör onayı
@@ -287,10 +346,25 @@ export const remove = authedMutation({
         );
       }
     }
+    // Bağlar silinmeden önce etkilenen kuralların kapsamını yakala (cihazsız kapı panele dokunmaz).
+    // Ölçek notu: okuma = Σ(kural üyesi + bağı); ~60 kural × 500 üye bu transaction'ı tarama
+    // sınırına (32K) taşır — kural diff ölçeği işiyle (E2) birlikte ele alınacak.
+    const doorLinks = door.deviceId
+      ? await ctx.db.query("groupDoors").withIndex("by_door", (q) => q.eq("doorId", args.doorId)).collect()
+      : [];
+    const linkedRuleIds = [...new Set(doorLinks.map((link) => link.groupId))];
+    const ruleSnapshots = (await Promise.all(linkedRuleIds.map(async (ruleId) => {
+      const projectId = (await ctx.db.get(ruleId))?.projectId;
+      if (!projectId) return [];
+      const scope = await ruleSyncScope(ctx, ruleId, projectId);
+      return [{ ruleId, memberIds: scope.memberIds, beforeDeviceIds: scope.deviceIds }];
+    }))).flat();
     // Önce kapının okuyucularını sil (cascade) — orphan reader sızıntısı engeli.
     await deleteReadersForDoor(ctx, args.doorId);
     await deleteGroupDoorsForDoor(ctx, args.doorId);
     await ctx.db.delete(args.doorId);
+    await Promise.all(ruleSnapshots.map((snapshot) =>
+      ctx.scheduler.runAfter(0, internal.doors.syncRuleAfterDoorRemoval, { ...snapshot, startedBy: ctx.user._id })));
   },
 });
 

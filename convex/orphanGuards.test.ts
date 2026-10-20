@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ConvexError } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import * as shifts from "./shifts";
@@ -29,6 +30,11 @@ vi.mock("./lib/accessGraph", () => ({
   reconcilePanelRosterIde: vi.fn(async () => undefined),
 }));
 import { reconcileRemovedEmployeeIde } from "./lib/accessGraph";
+vi.mock("./deviceSyncRuns", async importOriginal => ({
+  ...await importOriginal<typeof import("./deviceSyncRuns")>(),
+  createRuleDiffRun: vi.fn(async () => null),
+}));
+import { createRuleDiffRun } from "./deviceSyncRuns";
 
 type Row = Record<string, unknown> & { _id: string; table: string; projectId?: string };
 type Role = Doc<"users">["role"];
@@ -267,5 +273,54 @@ describe("door removal deletes access-rule links", () => {
     expect(f.remove).not.toHaveBeenCalledWith("link-other");
     const deleted = f.remove.mock.calls.map(([id]) => id);
     expect(deleted.indexOf("link-own")).toBeLessThan(deleted.indexOf("target"));
+  });
+
+  function linkedRuleFixture() {
+    const f = fixture("project_admin", "own");
+    f.rows[3].brand = "hikvision";
+    f.rows.push({ _id: "link-a", table: "groupDoors", doorId: "target", groupId: "rule", projectId: "own" },
+      { _id: "link-b", table: "groupDoors", doorId: "target", groupId: "rule", projectId: "own" },
+      { _id: "member", table: "groupMembers", groupId: "rule", employeeId: "employee", projectId: "own" });
+    f.remove.mockImplementation((id: string) => {
+      const index = f.rows.findIndex(row => row._id === id);
+      if (index >= 0) f.rows.splice(index, 1);
+    });
+    return f;
+  }
+
+  it("schedules one rule resync per linked rule after deleting the door", async () => {
+    vi.clearAllMocks();
+    const f = linkedRuleFixture();
+    await handler(doors.remove)(f.ctx, { doorId: "target" });
+    expect(f.remove).toHaveBeenCalledWith("target");
+    expect(f.schedule).toHaveBeenCalledTimes(1);
+    expect(f.schedule).toHaveBeenCalledWith(0, expect.anything(),
+      { ruleId: "rule", memberIds: ["employee"], beforeDeviceIds: ["device"], startedBy: "actor" });
+    expect(createRuleDiffRun).not.toHaveBeenCalled();
+  });
+
+  it("resync merges the delete-time snapshot so members removed meanwhile are still revoked", async () => {
+    vi.clearAllMocks();
+    const f = linkedRuleFixture();
+    f.rows.splice(f.rows.findIndex(row => row._id === "link-a"), 2);
+    await handler(doors.syncRuleAfterDoorRemoval)(f.ctx,
+      { ruleId: "rule", memberIds: ["employee", "removed-meanwhile"], beforeDeviceIds: ["device"], startedBy: "actor" });
+    expect(createRuleDiffRun).toHaveBeenCalledWith(f.ctx, expect.objectContaining({
+      ruleId: "rule", projectId: "own", startedBy: "actor", beforeDeviceIds: ["device"],
+      plan: expect.objectContaining({
+        syncMembers: ["employee", "removed-meanwhile"], removed: [], syncRule: true, reconcileRoster: true,
+      }),
+    }));
+  });
+
+  it("resync skips quietly when the diff run hits its limits", async () => {
+    vi.clearAllMocks();
+    const f = linkedRuleFixture();
+    vi.mocked(createRuleDiffRun).mockRejectedValueOnce(new ConvexError("Fark gönderim sınırı aşıldı"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    await expect(handler(doors.syncRuleAfterDoorRemoval)(f.ctx,
+      { ruleId: "rule", memberIds: ["employee"], beforeDeviceIds: ["device"], startedBy: "actor" })).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
