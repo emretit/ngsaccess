@@ -1,0 +1,14 @@
+{
+  "supersededBy": "../final-verification.json",
+  "finalSourceEvidence": "final-source-sha256.json",
+  "flutterTests": 433,
+  "backendTests": 2349,
+  "flutterAnalyze": "passed",
+  "typescript": "passed",
+  "eslint": "passed",
+  "androidUnsignedBuild": "passed",
+  "iosSimulatorBuild": "passed",
+  "iosNoSignBuild": "passed",
+  "iosXCTest": 2,
+  "distributionReady": false
+}

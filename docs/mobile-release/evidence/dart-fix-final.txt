@@ -1,0 +1,52 @@
+Computing fixes in mobile...
+Applying fixes...
+
+lib/models/attendance.dart
+  curly_braces_in_flow_control_structures - 6 fixes
+
+lib/models/attendance_page.dart
+  curly_braces_in_flow_control_structures - 1 fix
+
+lib/models/attendance_summary.dart
+  curly_braces_in_flow_control_structures - 4 fixes
+
+lib/models/device.dart
+  curly_braces_in_flow_control_structures - 2 fixes
+
+lib/models/qr_code_model.dart
+  curly_braces_in_flow_control_structures - 1 fix
+
+lib/models/visitor.dart
+  curly_braces_in_flow_control_structures - 4 fixes
+
+lib/providers/attendance_provider.dart
+  curly_braces_in_flow_control_structures - 2 fixes
+
+lib/providers/door_operation_provider.dart
+  curly_braces_in_flow_control_structures - 1 fix
+
+lib/providers/visitor_provider.dart
+  curly_braces_in_flow_control_structures - 5 fixes
+
+lib/repositories/attendance_repository.dart
+  curly_braces_in_flow_control_structures - 1 fix
+
+lib/repositories/visitor_repository.dart
+  curly_braces_in_flow_control_structures - 3 fixes
+
+lib/screens/profile/profile_screen.dart
+  curly_braces_in_flow_control_structures - 3 fixes
+
+lib/screens/qr_scan/qr_scan_screen.dart
+  curly_braces_in_flow_control_structures - 2 fixes
+
+lib/screens/visitor/visitor_screen.dart
+  curly_braces_in_flow_control_structures - 1 fix
+
+test/helpers/preference_store.dart
+  curly_braces_in_flow_control_structures - 1 fix
+
+test/widgets/profile_screen_test.dart
+  curly_braces_in_flow_control_structures - 1 fix
+
+38 fixes made in 16 files.

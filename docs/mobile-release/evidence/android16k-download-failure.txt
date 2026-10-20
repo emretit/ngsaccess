@@ -1,0 +1,9 @@
+Official Android API 36 16 KB ARM64 revision 7 download
+Expected archive bytes: 1875087037
+Resumed from byte: 510832848
+Partial archive bytes: 756547575
+Bounded recovery options: --connect-timeout 15 --speed-time 45 --speed-limit 1024 --max-time 900
+Observed exit code: 28
+curl: (28) Operation timed out after 951344 milliseconds with 245714727 out of 1364254189 bytes received
+Initial owned sdkmanager PID 63293 was terminated after identity verification; no retries after coordinator stop instruction.
+No AVD created, no emulator started, no license prompt accepted.

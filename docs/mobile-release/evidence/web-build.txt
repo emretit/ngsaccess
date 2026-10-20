@@ -1,0 +1,128 @@
+
+> ngsaccess@0.0.0 build
+> vite build
+
+vite v8.0.16 building client environment for production...
+[2Ktransforming...✓ 4146 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                      4.78 kB │ gzip:   1.76 kB
+dist/assets/PublicFooter-CV6auuj1.css               10.63 kB │ gzip:   2.41 kB
+dist/assets/index-b8sV4XiV.css                     106.77 kB │ gzip:  18.78 kB
+dist/assets/convexApi-BofuIIxL.js                    0.02 kB │ gzip:   0.04 kB
+dist/assets/endOfDay-dTWMfKcm.js                     0.12 kB │ gzip:   0.13 kB
+dist/assets/deviceBrand-DkmpW2ug.js                  0.13 kB │ gzip:   0.12 kB
+dist/assets/loader-circle-BaSUUJC8.js                0.13 kB │ gzip:   0.14 kB
+dist/assets/circle-check-C4ZoEcRc.js                 0.16 kB │ gzip:   0.16 kB
+dist/assets/useProjectAccess-BQWxicct.js             0.17 kB │ gzip:   0.13 kB
+dist/assets/circle-check-big-DCXEVGoo.js             0.18 kB │ gzip:   0.17 kB
+dist/assets/info-Biu8sMyd.js                         0.19 kB │ gzip:   0.17 kB
+dist/assets/lock-Dk1uFGFQ.js                         0.19 kB │ gzip:   0.18 kB
+dist/assets/circle-x-D5Qq9JlJ.js                     0.19 kB │ gzip:   0.17 kB
+dist/assets/credit-card-BQr4fpDZ.js                  0.19 kB │ gzip:   0.17 kB
+dist/assets/download-C1hbtIQA.js                     0.22 kB │ gzip:   0.18 kB
+dist/assets/history-CoNG9nqT.js                      0.22 kB │ gzip:   0.18 kB
+dist/assets/useDebouncedValue-DiAvonV9.js            0.24 kB │ gzip:   0.20 kB
+dist/assets/typeof-B5XbjTb1.js                       0.27 kB │ gzip:   0.16 kB
+dist/assets/dist-DBMNK4P5.js                         0.28 kB │ gzip:   0.22 kB
+dist/assets/refresh-cw-DJzS-FNQ.js                   0.31 kB │ gzip:   0.21 kB
+dist/assets/trash-2-A0fWyfGn.js                      0.31 kB │ gzip:   0.20 kB
+dist/assets/scan-line-DxRx9hoe.js                    0.32 kB │ gzip:   0.21 kB
+dist/assets/camera-Dk-8rHm4.js                       0.32 kB │ gzip:   0.24 kB
+dist/assets/compat-09RdQZcw.js                       0.34 kB │ gzip:   0.17 kB
+dist/assets/trDate-CUXUVa-p.js                       0.34 kB │ gzip:   0.20 kB
+dist/assets/NotFound-DlaQtEiw.js                     0.49 kB │ gzip:   0.35 kB
+dist/assets/endOfMonth-6UE4u_2v.js                   0.49 kB │ gzip:   0.33 kB
+dist/assets/useNow-ABqpyzi6.js                       0.49 kB │ gzip:   0.30 kB
+dist/assets/authFormSchemas-C6qm9Zc2.js              0.50 kB │ gzip:   0.32 kB
+dist/assets/readerCapability-gQBbUngB.js             0.50 kB │ gzip:   0.35 kB
+dist/assets/textarea-B7KjWB06.js                     0.54 kB │ gzip:   0.35 kB
+dist/assets/BulkBar-BZyGDg6d.js                      0.58 kB │ gzip:   0.41 kB
+dist/assets/deviceStatus-iByTC4iA.js                 0.61 kB │ gzip:   0.41 kB
+dist/assets/eye-Cxfh2vMI.js                          0.62 kB │ gzip:   0.33 kB
+dist/assets/RowActions-B_6yvpD3.js                   0.62 kB │ gzip:   0.38 kB
+dist/assets/useProjectFilteredDevices-MswiH08p.js    0.66 kB │ gzip:   0.43 kB
+dist/assets/AccessDenied-zS5R5p6-.js                 0.81 kB │ gzip:   0.47 kB
+dist/assets/PasswordField-Dpcj1ZWt.js                0.87 kB │ gzip:   0.51 kB
+dist/assets/FilterBar-Dl1tnpbS.js                    0.87 kB │ gzip:   0.52 kB
+dist/assets/VirtualReaders-DlaWhqCC.js               0.91 kB │ gzip:   0.54 kB
+dist/assets/usePageTitle-CmxTIqPG.js                 0.94 kB │ gzip:   0.57 kB
+dist/assets/useDepartments-C6ZP9zLv.js               1.02 kB │ gzip:   0.54 kB
+dist/assets/dist-nuF8nWb1.js                         1.03 kB │ gzip:   0.57 kB
+dist/assets/label-MTZn_Um_.js                        1.05 kB │ gzip:   0.62 kB
+dist/assets/card-BronpEEz.js                         1.06 kB │ gzip:   0.41 kB
+dist/assets/chunk-aKtaBQYM.js                        1.08 kB │ gzip:   0.62 kB
+dist/assets/deviceDisplay-gfKww5qZ.js                1.16 kB │ gzip:   0.58 kB
+dist/assets/endOfWeek-CtBGqizM.js                    1.18 kB │ gzip:   0.45 kB
+dist/assets/preload-helper-zJ_50EbN.js               1.19 kB │ gzip:   0.68 kB
+dist/assets/PaginationBar-4--xf4U_.js                1.27 kB │ gzip:   0.68 kB
+dist/assets/StatInline-BKXIZlk4.js                   1.28 kB │ gzip:   0.66 kB
+dist/assets/useDevices-Bd9A_t_U.js                   1.32 kB │ gzip:   0.61 kB
+dist/assets/FormFieldWrapper-BA3L72kG.js             1.35 kB │ gzip:   0.69 kB
+dist/assets/PageHeader-DlGkg9KZ.js                   1.39 kB │ gzip:   0.63 kB
+dist/assets/UnsavedChangesDialog-wWsNOG_z.js         1.39 kB │ gzip:   0.74 kB
+dist/assets/date-DaysJCv1.js                         1.53 kB │ gzip:   0.72 kB
+dist/assets/table-CZJptjiu.js                        1.64 kB │ gzip:   0.61 kB
+dist/assets/EngineeringDepartment-BrCyYfy3.js        1.69 kB │ gzip:   0.77 kB
+dist/assets/pdksDateRanges-ByB_uMyD.js               1.84 kB │ gzip:   0.89 kB
+dist/assets/EmployeePicker-DslM6KB-.js               2.22 kB │ gzip:   1.14 kB
+dist/assets/TreePanel-Cz6zyAdX.js                    2.50 kB │ gzip:   1.11 kB
+dist/assets/useZonesAndDoors-DWrxmdn5.js             2.51 kB │ gzip:   1.32 kB
+dist/assets/StatusScreen-BY5oPilM.js                 2.77 kB │ gzip:   1.28 kB
+dist/assets/switch-H1gcZGWG.js                       2.82 kB │ gzip:   1.42 kB
+dist/assets/button-CN1_JZ80.js                       2.97 kB │ gzip:   1.31 kB
+dist/assets/VerifyEmail-C_LIGWF8.js                  3.06 kB │ gzip:   1.54 kB
+dist/assets/use_paginated_query-D2sSpRKe.js          3.20 kB │ gzip:   1.39 kB
+dist/assets/tabs-B6d9yo8w.js                         3.32 kB │ gzip:   1.40 kB
+dist/assets/AuthShell-JerFAS9w.js                    3.57 kB │ gzip:   1.52 kB
+dist/assets/react-dom-CQlQUSPm.js                    3.57 kB │ gzip:   1.35 kB
+dist/assets/checkbox-DAned2MU.js                     4.11 kB │ gzip:   1.78 kB
+dist/assets/Register-Bx8G3q4W.js                     4.13 kB │ gzip:   1.87 kB
+dist/assets/CheckIn-DUVG4NbA.js                      4.27 kB │ gzip:   1.87 kB
+dist/assets/AdminSetup-CXWlY5u7.js                   4.27 kB │ gzip:   1.85 kB
+dist/assets/EmployeeSetup-DMvXtvWt.js                4.60 kB │ gzip:   1.89 kB
+dist/assets/Login-D5jT2HfO.js                        5.96 kB │ gzip:   2.57 kB
+dist/assets/UserSetup-D_cqSb5U.js                    6.53 kB │ gzip:   2.80 kB
+dist/assets/PublicFooter-E48SVnES.js                 6.71 kB │ gzip:   2.62 kB
+dist/assets/Profile-BJlEA25A.js                      7.71 kB │ gzip:   2.82 kB
+dist/assets/LandingPage-BsC3CwtD.js                  8.37 kB │ gzip:   2.60 kB
+dist/assets/Alarms-NuF776kY.js                       9.52 kB │ gzip:   3.07 kB
+dist/assets/tr-jIhscG5j.js                          13.02 kB │ gzip:   3.90 kB
+dist/assets/TimeSchedule-AwZULxK_.js                13.08 kB │ gzip:   4.56 kB
+dist/assets/AdminUsersPanel-BT7quork.js             18.90 kB │ gzip:   6.70 kB
+dist/assets/select-Bj_cQr6x.js                      22.85 kB │ gzip:   7.80 kB
+dist/assets/AuthProvider-CUnZtsjq.js                24.82 kB │ gzip:   8.97 kB
+dist/assets/Leaves-trQ86D-P.js                      26.50 kB │ gzip:   8.94 kB
+dist/assets/AuditLog-BfDw4Spy.js                    27.31 kB │ gzip:   9.14 kB
+dist/assets/LiveMonitoring-DxK_iMzg.js              27.77 kB │ gzip:   9.08 kB
+dist/assets/purify.es-ClkDTL63.js                   29.08 kB │ gzip:  11.46 kB
+dist/assets/zod-pvqKFlbw.js                         31.12 kB │ gzip:  11.12 kB
+dist/assets/dist-C0f-HlXf.js                        32.78 kB │ gzip:  11.01 kB
+dist/assets/notify-BZnP7EQF.js                      33.57 kB │ gzip:   9.61 kB
+dist/assets/SystemAdmin-DzvNjdMh.js                 34.10 kB │ gzip:  10.56 kB
+dist/assets/AccessControl-DHS0XATc.js               36.31 kB │ gzip:  11.21 kB
+dist/assets/Visitors-C9IpIvNU.js                    37.20 kB │ gzip:  12.14 kB
+dist/assets/Reports-CiR5bPRQ.js                     39.40 kB │ gzip:  13.04 kB
+dist/assets/Index-BSfmCnnn.js                       46.17 kB │ gzip:  14.90 kB
+dist/assets/Shifts-BaiGG9oY.js                      46.70 kB │ gzip:  13.50 kB
+dist/assets/schemas-DUYwotWa.js                     63.90 kB │ gzip:  17.38 kB
+dist/assets/date-picker-NQeYoLXi.js                 66.23 kB │ gzip:  19.48 kB
+dist/assets/Settings-f7iDAKlU.js                    72.32 kB │ gzip:  22.01 kB
+dist/assets/Employees-Dk5D_SU1.js                   77.17 kB │ gzip:  23.91 kB
+dist/assets/api-Z0cArkUl.js                         77.94 kB │ gzip:  21.21 kB
+dist/assets/utils-CtFTuoAA.js                       78.21 kB │ gzip:  26.52 kB
+dist/assets/PDKSRecords-DZ_-kUtA.js                 96.82 kB │ gzip:  29.67 kB
+dist/assets/index.es-Cac8UpV8.js                   151.41 kB │ gzip:  48.89 kB
+dist/assets/Devices-jpIt-eJt.js                    159.43 kB │ gzip:  44.60 kB
+dist/assets/html2canvas-B1hV9e2W.js                199.56 kB │ gzip:  46.78 kB
+dist/assets/index-BimeYMeq.js                      334.76 kB │ gzip: 104.85 kB
+dist/assets/BarChart-Bktl7Uzj.js                   339.49 kB │ gzip: 100.48 kB
+dist/assets/jspdf.es.min-CL_e6P_1.js               399.19 kB │ gzip: 129.51 kB
+dist/assets/exceljs.min-BEz_Ja81.js                929.91 kB │ gzip: 256.47 kB
+
+✓ built in 826ms
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.

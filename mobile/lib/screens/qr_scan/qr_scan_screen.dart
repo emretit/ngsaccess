@@ -1,116 +1,258 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
-import '../../config/convex_config.dart';
 import '../../core/error_localizer.dart';
-import '../../core/errors.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/qr_code_model.dart';
-import '../../providers/attendance_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/qr_provider.dart';
+import '../../repositories/qr_repository.dart';
 
 class QRScanScreen extends StatefulWidget {
-  const QRScanScreen({super.key});
+  const QRScanScreen({
+    super.key,
+    this.isActive = true,
+    this.repository,
+    this.cameraController,
+    this.requestCameraPermission,
+    this.cameraPermissionStatus,
+    this.openSettings,
+  });
+
+  /// The navigation shell must update this for its retained QR branch.
+  final bool isActive;
+  final QrRepository? repository;
+
+  /// Caller-owned controllers must have autoStart:false. The screen starts and
+  /// stops them, but only disposes controllers it creates itself.
+  final MobileScannerController? cameraController;
+  final Future<PermissionStatus> Function()? requestCameraPermission;
+  final Future<PermissionStatus> Function()? cameraPermissionStatus;
+  final Future<bool> Function()? openSettings;
 
   @override
   State<QRScanScreen> createState() => _QRScanScreenState();
 }
 
-class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMixin {
-  late TabController _tabController;
-  MobileScannerController cameraController = MobileScannerController();
-  bool _isProcessing = false;
-  String? _lastScannedCode;
-  DateTime? _lastScanTime;
+class _QRScanScreenState extends State<QRScanScreen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  late final TabController _tabs;
+  late MobileScannerController _camera;
+  late bool _ownsCamera;
+  final _gate = QrScanGate();
+  QrRepository? _repository;
+  QrProvider? _tokens;
+  PermissionStatus? _permission;
+  bool _permissionBusy = false;
+  bool _resumed = true;
+  String? _cameraError;
+  ModalRoute<Object?>? _route;
+  Future<void> _cameraQueue = Future<void>.value();
+  DialogRoute<void>? _dialog;
+  NavigatorState? _dialogNavigator;
+  int _operationEpoch = 0;
 
-  // Dinamik check-in token state (10 sn geçerli, cihaz QR'ı kart gibi okur)
-  String? _checkInToken;
-  DateTime? _checkInExpiresAt;
-  DateTime? _checkInIssuedAt;
-  bool _tokenLoading = false;
-  String? _tokenError;
-  Timer? _tokenTicker;
+  bool get _visible => widget.isActive && (_route?.isCurrent ?? true);
+  bool get _scanSelected => _tabs.index == 1 && !_tabs.indexIsChanging;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _refreshCheckInToken();
+    WidgetsBinding.instance.addObserver(this);
+    _resumed =
+        (WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed) ==
+        AppLifecycleState.resumed;
+    _tabs = TabController(length: 2, vsync: this)
+      ..addListener(_activityChanged);
+    _attachCamera();
   }
 
-  Future<void> _refreshCheckInToken() async {
-    if (!mounted) return;
-    setState(() {
-      _tokenLoading = true;
-      _tokenError = null;
+  void _attachCamera() {
+    _ownsCamera = widget.cameraController == null;
+    _camera =
+        widget.cameraController ??
+        MobileScannerController(
+          autoStart: false,
+          formats: const [BarcodeFormat.qrCode],
+          detectionSpeed: DetectionSpeed.unrestricted,
+        );
+    assert(
+      !_camera.autoStart,
+      'QR camera controllers must use autoStart:false',
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _route = ModalRoute.of(context);
+    // Observe auth changes so a retained branch drops the previous account's QR.
+    context.watch<AuthProvider?>();
+    final repository = widget.repository ?? context.watch<QrRepository?>();
+    if (!identical(repository, _repository)) {
+      _tokens?.removeListener(_tokenChanged);
+      _tokens?.dispose();
+      _repository = repository;
+      _tokens = repository == null ? null : QrProvider(repository: repository);
+      _tokens?.addListener(_tokenChanged);
+    }
+    _scheduleActivity();
+  }
+
+  @override
+  void didUpdateWidget(covariant QRScanScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive) {
+      _operationEpoch++;
+      if (!widget.isActive) _dismissDialog();
+    }
+    if (!identical(oldWidget.cameraController, widget.cameraController)) {
+      final old = _camera;
+      final owned = _ownsCamera;
+      _cameraQueue = _cameraQueue
+          .then((_) async {
+            try {
+              await old.stop();
+            } finally {
+              if (owned) await old.dispose();
+            }
+          })
+          .catchError((Object _) {});
+      _attachCamera();
+    }
+    if (!identical(oldWidget.repository, widget.repository)) {
+      _tokens?.removeListener(_tokenChanged);
+      _tokens?.dispose();
+      _repository = widget.repository ?? context.read<QrRepository?>();
+      final repository = _repository;
+      _tokens = repository == null ? null : QrProvider(repository: repository);
+      _tokens?.addListener(_tokenChanged);
+    }
+    _scheduleActivity();
+  }
+
+  void _tokenChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _scheduleActivity() {
+    // Stop permission/detection eligibility immediately, reconcile platform
+    // operations after build so the scanner has attached its controller.
+    _updateGate();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _activityChanged();
     });
+  }
+
+  void _updateGate() {
+    _gate.resumed = _resumed;
+    _gate.routeVisible = _visible;
+    _gate.scanSelected = _scanSelected;
+  }
+
+  void _activityChanged() {
+    if (!mounted) return;
+    _updateGate();
+    _tokens?.synchronizeSession();
+    _tokens?.setVisible(
+      _resumed && _visible && !_scanSelected && !_gate.modalOpen,
+    );
+    if (_gate.cameraAllowed &&
+        _permission == null &&
+        !_permissionBusy &&
+        _cameraError == null) {
+      unawaited(_checkPermission(request: true));
+    }
+    _reconcileCamera();
+    setState(() {});
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _resumed = state == AppLifecycleState.resumed;
+    _updateGate();
+    if (_resumed && _visible && _scanSelected) {
+      unawaited(_checkPermission());
+    }
+    _activityChanged();
+  }
+
+  Future<void> _checkPermission({bool request = false}) async {
+    if (_permissionBusy || !mounted) return;
+    _permissionBusy = true;
     try {
-      final raw = await convex.employeeMutation(
-        name: 'employeeCheckIn:createMyCheckInToken',
-        args: const {},
-      );
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map<String, dynamic>) {
-        throw Exception(
-          mounted ? AppLocalizations.of(context).qrInvalidResponse : 'Invalid response',
-        );
-      }
-      final token = decoded['token'] as String?;
-      final expiresAtStr = decoded['expiresAt'] as String?;
-      if (token == null || expiresAtStr == null) {
-        throw Exception(
-          mounted ? AppLocalizations.of(context).qrTokenMissing : 'Token missing',
-        );
-      }
+      final status = request
+          ? await (widget.requestCameraPermission?.call() ??
+                Permission.camera.request())
+          : await (widget.cameraPermissionStatus?.call() ??
+                Permission.camera.status);
       if (!mounted) return;
-      setState(() {
-        _checkInToken = token;
-        _checkInExpiresAt = DateTime.parse(expiresAtStr);
-        _checkInIssuedAt = DateTime.now();
-        _tokenLoading = false;
-      });
-      _ensureTokenTicker();
-    } catch (e) {
+      _permission = status;
+      _cameraError = null;
+    } catch (_) {
       if (!mounted) return;
-      final message = e is AppError ? e.userMessage : e.toString().replaceFirst('Exception: ', '');
-      setState(() {
-        _tokenLoading = false;
-        _tokenError = message;
-      });
+      _cameraError = AppLocalizations.of(context).qrCameraUnavailableRetry;
+    } finally {
+      _permissionBusy = false;
+      if (mounted) _activityChanged();
     }
   }
 
-  void _ensureTokenTicker() {
-    _tokenTicker?.cancel();
-    _tokenTicker = Timer.periodic(const Duration(milliseconds: 100), (_) {
+  void _reconcileCamera() {
+    final camera = _camera;
+    _cameraQueue = _cameraQueue
+        .then((_) async {
+          final allowed =
+              mounted &&
+              identical(camera, _camera) &&
+              _gate.cameraAllowed &&
+              _permission == PermissionStatus.granted &&
+              !_permissionBusy &&
+              _cameraError == null;
+          if (!allowed) {
+            await camera.stop();
+            return;
+          }
+          if (!camera.value.isRunning) await camera.start();
+          // The app may have paused while start() awaited the platform.
+          if (!mounted ||
+              !_gate.cameraAllowed ||
+              _permissionBusy ||
+              _permission != PermissionStatus.granted ||
+              !identical(camera, _camera)) {
+            await camera.stop();
+          }
+        })
+        .catchError((Object _) async {
+          try {
+            await camera.stop();
+          } catch (_) {
+            /* Native recovery is retryable. */
+          }
+          if (!mounted || !identical(camera, _camera)) return;
+          setState(
+            () =>
+                _cameraError = AppLocalizations.of(context).qrCameraInUseRetry,
+          );
+        });
+  }
+
+  Future<void> _openSettings() async {
+    try {
+      final opened = await (widget.openSettings?.call() ?? openAppSettings());
+      if (!mounted || opened) return;
+    } catch (_) {
       if (!mounted) return;
-      // Süre dolduysa ticker'ı durdur (gereksiz redraw yok)
-      if (_isTokenExpired()) {
-        _tokenTicker?.cancel();
-      }
-      setState(() {});
-    });
-  }
-
-  bool _isTokenExpired() {
-    final expiresAt = _checkInExpiresAt;
-    if (expiresAt == null) return false;
-    return !DateTime.now().isBefore(expiresAt);
-  }
-
-  double _tokenProgress() {
-    final issuedAt = _checkInIssuedAt;
-    final expiresAt = _checkInExpiresAt;
-    if (issuedAt == null || expiresAt == null) return 0;
-    final total = expiresAt.difference(issuedAt).inMilliseconds;
-    if (total <= 0) return 0;
-    final remaining = expiresAt.difference(DateTime.now()).inMilliseconds;
-    return (remaining / total).clamp(0.0, 1.0);
+    }
+    setState(
+      () => _cameraError = AppLocalizations.of(context).qrSettingsUnavailable,
+    );
   }
 
   @override
@@ -120,489 +262,408 @@ class _QRScanScreenState extends State<QRScanScreen> with TickerProviderStateMix
       appBar: AppBar(
         title: Text(l10n.qrTabTitle),
         bottom: TabBar(
-          controller: _tabController,
+          controller: _tabs,
           tabs: [
-            Tab(
-              icon: const Icon(Icons.qr_code),
-              text: l10n.qrTabMyQr,
-            ),
-            Tab(
-              icon: const Icon(Icons.camera_alt),
-              text: l10n.qrTabScan,
-            ),
+            Tab(icon: const Icon(Icons.qr_code), text: l10n.qrTabMyQr),
+            Tab(icon: const Icon(Icons.camera_alt), text: l10n.qrTabScan),
           ],
         ),
       ),
       body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildMyQRTab(),
-          _buildScannerTab(),
-        ],
+        controller: _tabs,
+        children: [_buildMyQr(), _buildScanner()],
       ),
     );
   }
 
-  Widget _buildScannerTab() {
+  Widget _buildMyQr() {
     final l10n = AppLocalizations.of(context);
-    return Stack(
-      children: [
-        MobileScanner(
-          controller: cameraController,
-          onDetect: _onDetect,
-        ),
-        if (_isProcessing)
-          Container(
-            color: Colors.black54,
-            child: const Center(
-              child: CircularProgressIndicator(),
-            ),
-          ),
-        // QR Overlay — tablet/landscape'de 400px'i geçmesin.
-        Center(
-          child: Container(
-            width: math.min(MediaQuery.of(context).size.width * 0.8, 400),
-            height: math.min(MediaQuery.of(context).size.width * 0.8, 400),
-            decoration: BoxDecoration(
-              border: Border.all(
-                color: Theme.of(context).primaryColor,
-                width: 4,
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Stack(
-              children: [
-                // Corner indicators
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(12),
+    final tokens = _tokens;
+    final token = tokens?.token;
+    final error = tokens?.error;
+    final statusError = tokens?.statusError;
+    final status = tokens?.status ?? QrViewStatus.empty;
+    final canDisplay = tokens?.canDisplay ?? false;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = math.min(280.0, math.max(1.0, constraints.maxWidth - 80));
+        return SingleChildScrollView(
+          key: const Key('qr-token-scroll'),
+          padding: const EdgeInsets.all(24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (tokens == null)
+                    Text(AppLocalizations.of(context).qrServiceUnavailable),
+                  if ((tokens?.isRefreshing ?? false) ||
+                      (tokens?.isVerifying ?? false))
+                    const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: CircularProgressIndicator(),
+                    ),
+                  if (token != null && canDisplay)
+                    Semantics(
+                      label: AppLocalizations.of(context).qrPersonalCode,
+                      image: true,
+                      child: Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.all(16),
+                        child: QrImageView(
+                          data: token.value,
+                          size: size,
+                          backgroundColor: Colors.white,
+                          errorCorrectionLevel: QrErrorCorrectLevel.M,
+                        ),
+                      ),
+                    )
+                  else if (token != null)
+                    Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Icon(
+                        status == QrViewStatus.consumed
+                            ? Icons.check_circle_outline
+                            : Icons.qr_code_2,
+                        size: 88,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
-                  ),
-                ),
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor,
-                      borderRadius: const BorderRadius.only(
-                        topRight: Radius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor,
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor,
-                      borderRadius: const BorderRadius.only(
-                        bottomRight: Radius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        // Instructions
-        Positioned(
-          bottom: 100,
-          left: 0,
-          right: 0,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              l10n.qrFrameHint,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ),
-        // Camera controls
-        Positioned(
-          top: 16,
-          right: 16,
-          child: Column(
-            children: [
-                             FloatingActionButton(
-                 mini: true,
-                 heroTag: "camera",
-                 onPressed: () => cameraController.switchCamera(),
-                 child: const Icon(Icons.flip_camera_android),
-               ),
-               const SizedBox(height: 8),
-               FloatingActionButton(
-                 mini: true,
-                 heroTag: "flash",
-                 onPressed: () => cameraController.toggleTorch(),
-                 child: const Icon(Icons.flash_on),
-               ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQrWithExpiry(String token) {
-    final l10n = AppLocalizations.of(context);
-    final expired = _isTokenExpired();
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
-                blurRadius: 10,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Opacity(
-            opacity: expired ? 0.25 : 1.0,
-            child: QrImageView(
-              data: token,
-              version: QrVersions.auto,
-              size: 250.0,
-              backgroundColor: Colors.white,
-              eyeStyle: const QrEyeStyle(
-                eyeShape: QrEyeShape.square,
-                color: Colors.black,
-              ),
-              dataModuleStyle: const QrDataModuleStyle(
-                dataModuleShape: QrDataModuleShape.square,
-                color: Colors.black,
-              ),
-              errorCorrectionLevel: QrErrorCorrectLevel.M,
-            ),
-          ),
-        ),
-        if (expired)
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: _tokenLoading ? null : _refreshCheckInToken,
-              borderRadius: BorderRadius.circular(80),
-              child: Container(
-                width: 140,
-                height: 140,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).primaryColor,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Theme.of(context)
-                          .primaryColor
-                          .withValues(alpha: 0.4),
-                      blurRadius: 20,
-                      offset: const Offset(0, 4),
+                  const SizedBox(height: 16),
+                  if (canDisplay) ...[
+                    LinearProgressIndicator(value: tokens?.progress),
+                    const SizedBox(height: 12),
+                    Text(
+                      l10n.qrRemainingSeconds(tokens?.remaining.inSeconds ?? 0),
                     ),
                   ],
-                ),
-                child: _tokenLoading
-                    ? const Center(
-                        child: SizedBox(
-                          width: 32,
-                          height: 32,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 3,
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        ),
-                      )
-                    : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.refresh,
-                            color: Colors.white,
-                            size: 40,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            l10n.qrRefresh,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                  if (token?.status == QrTokenStatus.consumed)
+                    Text(AppLocalizations.of(context).qrConsumedHint),
+                  if (token != null &&
+                      token.status != QrTokenStatus.consumed &&
+                      (tokens?.remaining == Duration.zero ||
+                          token.status == QrTokenStatus.expired))
+                    Text(AppLocalizations.of(context).qrExpiredHint),
+                  if (error != null) ...[
+                    Text(
+                      AppLocalizations.of(context).qrRefreshFailed,
+                      key: const Key('qr-refresh-error'),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
                       ),
+                    ),
+                    Text(
+                      localizeAppError(context, error),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                  if (statusError != null) ...[
+                    Text(
+                      AppLocalizations.of(context).qrStatusUnavailable,
+                      key: const Key('qr-status-error'),
+                    ),
+                    TextButton(
+                      onPressed: tokens?.checkStatus,
+                      child: Text(l10n.qrTryAgain),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Text(
+                    AppLocalizations.of(context).qrReaderHint,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    key: const Key('qr-refresh'),
+                    onPressed: tokens == null || tokens.isRefreshing
+                        ? null
+                        : tokens.refresh,
+                    icon: const Icon(Icons.refresh),
+                    label: Text(l10n.qrRefresh),
+                  ),
+                ],
               ),
             ),
           ),
-      ],
+        );
+      },
     );
   }
 
-  Widget _buildMyQRTab() {
+  Widget _buildScanner() {
     final l10n = AppLocalizations.of(context);
-    final token = _checkInToken;
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (_tokenLoading && token == null)
-            const Padding(
-              padding: EdgeInsets.all(40),
-              child: CircularProgressIndicator(),
-            )
-          else if (_tokenError != null && token == null)
-            Column(
-              children: [
-                const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                const SizedBox(height: 12),
-                Text(
-                  _tokenError!,
-                  style: const TextStyle(color: Colors.red),
-                  textAlign: TextAlign.center,
+    final granted = _permission == PermissionStatus.granted;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = math.max(
+          0.0,
+          math.min(
+            400.0,
+            math.min(constraints.maxWidth - 48, constraints.maxHeight - 160),
+          ),
+        );
+        final scanWindow = Rect.fromCenter(
+          center: constraints.biggest.center(Offset.zero),
+          width: size,
+          height: size,
+        );
+        return ColoredBox(
+          color: Colors.black,
+          child: Stack(
+            children: [
+              if (granted && _scanSelected && widget.isActive)
+                MobileScanner(
+                  key: ObjectKey(_camera),
+                  controller: _camera,
+                  useAppLifecycleState: false,
+                  scanWindow: size > 0 ? scanWindow : null,
+                  onDetect: _onDetect,
+                  errorBuilder: (context, error) => _cameraRecovery(),
                 ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: _refreshCheckInToken,
-                  icon: const Icon(Icons.refresh),
-                  label: Text(l10n.qrTryAgain),
-                ),
-              ],
-            )
-          else if (token != null) ...[
-            _buildQrWithExpiry(token),
-            const SizedBox(height: 20),
-            // Daralan progress bar
-            SizedBox(
-              width: 250,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(
-                  value: _tokenProgress(),
-                  minHeight: 8,
-                  backgroundColor: Colors.grey.withValues(alpha: 0.2),
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    _isTokenExpired()
-                        ? Colors.red
-                        : Theme.of(context).primaryColor,
+              if (granted && _cameraError == null && size > 0)
+                Positioned.fromRect(
+                  rect: scanWindow,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.white, width: 3),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                l10n.qrTokenHint,
-                style: const TextStyle(fontSize: 14, color: Colors.black87),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ]
-          else
-            Column(
-              children: [
-                const Icon(Icons.qr_code_2, size: 64, color: Colors.grey),
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  onPressed: _refreshCheckInToken,
-                  icon: const Icon(Icons.refresh),
-                  label: Text(l10n.qrRefresh),
+              if (!granted || _cameraError != null)
+                Positioned.fill(child: _cameraRecovery())
+              else ...[
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 16,
+                  child: Text(
+                    l10n.qrFrameHint,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      backgroundColor: Colors.black,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: ValueListenableBuilder<MobileScannerState>(
+                    valueListenable: _camera,
+                    builder: (context, value, _) => Wrap(
+                      children: [
+                        IconButton.filled(
+                          tooltip: AppLocalizations.of(context).qrSwitchCamera,
+                          onPressed:
+                              _gate.cameraAllowed &&
+                                  value.isRunning &&
+                                  (value.availableCameras ?? 0) > 1
+                              ? () => _cameraAction(_camera.switchCamera)
+                              : null,
+                          icon: const Icon(Icons.flip_camera_android),
+                        ),
+                        IconButton.filled(
+                          tooltip: AppLocalizations.of(context).qrFlashlight,
+                          onPressed:
+                              _gate.cameraAllowed &&
+                                  value.isRunning &&
+                                  value.torchState != TorchState.unavailable
+                              ? () => _cameraAction(_camera.toggleTorch)
+                              : null,
+                          icon: Icon(
+                            value.torchState == TorchState.on
+                                ? Icons.flash_on
+                                : Icons.flash_off,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
-            ),
-        ],
-      ),
+              if (_gate.busy)
+                const Positioned.fill(
+                  child: ColoredBox(
+                    color: Colors.black54,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  void _onDetect(BarcodeCapture capture) async {
-    if (_isProcessing) return;
-
-    final List<Barcode> barcodes = capture.barcodes;
-    final Barcode? barcode = barcodes.isNotEmpty ? barcodes.first : null;
-
-    if (barcode == null || barcode.rawValue == null) return;
-
-    final now = DateTime.now();
-    if (_lastScannedCode == barcode.rawValue && 
-        _lastScanTime != null &&
-        now.difference(_lastScanTime!).inSeconds < 3) {
-      return; // Aynı QR kodu 3 saniye içinde tekrar taramayı engelle
-    }
-
-    _lastScannedCode = barcode.rawValue;
-    _lastScanTime = now;
-
-    await _processQRCode(barcode.rawValue!);
-  }
-
-  Future<void> _processQRCode(String qrData) async {
-    final l10n = AppLocalizations.of(context);
-    setState(() => _isProcessing = true);
-
-    try {
-      Map<String, dynamic> parsedData;
-
-      try {
-        parsedData = jsonDecode(qrData);
-      } catch (e) {
-        parsedData = QRCodeGenerator.parseQRData(qrData);
-      }
-
-      if (parsedData['type'] == 'user_qr') {
-        await _processUserQRCode(parsedData);
-      } else {
-        await _processDeviceQRCode(qrData, parsedData);
-      }
-    } catch (e) {
-      _showErrorDialog(l10n.qrProcessError(e.toString()));
-    } finally {
-      setState(() => _isProcessing = false);
-    }
-  }
-
-  Future<void> _processUserQRCode(Map<String, dynamic> userData) async {
-    final l10n = AppLocalizations.of(context);
-    _showInfoDialog(
-      l10n.qrUserCodeTitle,
-      l10n.qrUserCodeBody(
-        (userData['user_name'] ?? '-').toString(),
-        (userData['user_email'] ?? '-').toString(),
-        (userData['timestamp'] ?? '-').toString(),
-      ),
-    );
-  }
-
-  Future<void> _processDeviceQRCode(String qrData, Map<String, dynamic> parsedData) async {
-    final l10n = AppLocalizations.of(context);
-    if (!parsedData['is_valid']) {
-      _showErrorDialog(parsedData['error'] ?? l10n.qrInvalidCode);
-      return;
-    }
-
-    final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
-    final success = await attendanceProvider.recordAttendance(qrData);
-
-    if (!mounted) return;
-    if (success) {
-      _showSuccessDialog(l10n.qrAccessGranted, parsedData);
-    } else {
-      final msg = attendanceProvider.lastError != null
-          ? localizeAppError(context, attendanceProvider.lastError!)
-          : (attendanceProvider.errorMessage ?? l10n.qrUnknownError);
-      _showErrorDialog(msg);
-    }
-  }
-
-  void _showSuccessDialog(String message, Map<String, dynamic> deviceInfo) {
-    final l10n = AppLocalizations.of(context);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.commonSuccess),
-        content: Column(
+  Widget _cameraRecovery() {
+    final permanent =
+        _permission == PermissionStatus.permanentlyDenied ||
+        _permission == PermissionStatus.restricted;
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(message),
-            const SizedBox(height: 8),
-            Text(l10n.qrDeviceLine((deviceInfo['deviceName'] ?? '-').toString())),
-            Text(l10n.qrLocationLine((deviceInfo['location'] ?? '-').toString())),
-            if (deviceInfo['timestamp'] != null)
-              Text(l10n.qrTimeLine(DateTime.parse(deviceInfo['timestamp'].toString()).toString())),
+            const Icon(
+              Icons.camera_alt_outlined,
+              color: Colors.white,
+              size: 48,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _cameraError ??
+                  AppLocalizations.of(context).qrCameraPermissionRequired,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: _permissionBusy
+                  ? null
+                  : () {
+                      if (permanent) {
+                        unawaited(_openSettings());
+                      } else {
+                        unawaited(_checkPermission(request: true));
+                      }
+                    },
+              child: Text(
+                permanent
+                    ? AppLocalizations.of(context).qrOpenSettings
+                    : AppLocalizations.of(context).qrTryAgain,
+              ),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.commonOk),
-          ),
-        ],
       ),
     );
   }
 
-  void _showErrorDialog(String message) {
-    final l10n = AppLocalizations.of(context);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.commonError),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.commonOk),
-          ),
-        ],
-      ),
-    );
+  Future<void> _cameraAction(Future<void> Function() action) async {
+    final camera = _camera;
+    _cameraQueue = _cameraQueue
+        .then((_) async {
+          if (!mounted || !_gate.cameraAllowed || !identical(camera, _camera)) {
+            return;
+          }
+          await action();
+          // switchCamera can restart internally after an async platform call.
+          if (!mounted || !_gate.cameraAllowed || !identical(camera, _camera)) {
+            await camera.stop();
+          }
+        })
+        .catchError((Object _) async {
+          try {
+            await camera.stop();
+          } catch (_) {
+            /* Keep the recovery UI usable. */
+          }
+          if (!mounted || !identical(camera, _camera)) return;
+          setState(
+            () => _cameraError = AppLocalizations.of(
+              context,
+            ).qrCameraControlUnavailable,
+          );
+        });
+    await _cameraQueue;
   }
 
-  void _showInfoDialog(String title, String message) {
-    final l10n = AppLocalizations.of(context);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.commonOk),
-          ),
-        ],
-      ),
+  void _onDetect(BarcodeCapture capture) {
+    _updateGate();
+    if (_permissionBusy ||
+        _permission != PermissionStatus.granted ||
+        !_camera.value.isRunning) {
+      return;
+    }
+    final code = _gate.observe(
+      capture.barcodes.map((barcode) => barcode.rawValue).whereType<String>(),
     );
+    if (code == null) return;
+    unawaited(_process(code));
+  }
+
+  Future<void> _process(String raw) async {
+    final l10n = AppLocalizations.of(context);
+    final epoch = _operationEpoch;
+    _activityChanged();
+    try {
+      final payload = QrPayloadParser.parse(raw);
+      final message = switch (payload) {
+        QrDeviceIdentity() => l10n.qrDeviceIdentityOnly,
+        QrEmployeeIdentity() => l10n.qrEmployeeIdentityOnly,
+        QrDeviceChallenge() => l10n.qrChallengeUnsupported,
+        QrInvalid(reason: QrParseError.expired) => l10n.qrScanExpired,
+        QrInvalid(reason: QrParseError.invalidDate) => l10n.qrInvalidDate,
+        QrInvalid(reason: QrParseError.unsupportedVersion) =>
+          l10n.qrUnsupportedVersion,
+        QrInvalid() => l10n.qrInvalidCode,
+      };
+      if (!mounted || !_visible || epoch != _operationEpoch) return;
+      _gate.modalOpen = true;
+      _reconcileCamera();
+      final navigator = Navigator.of(context);
+      final route = DialogRoute<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(l10n.qrTabTitle),
+          content: SingleChildScrollView(child: Text(message)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(l10n.commonOk),
+            ),
+          ],
+        ),
+      );
+      _dialog = route;
+      _dialogNavigator = navigator;
+      await navigator.push(route);
+    } finally {
+      _dialog = null;
+      _dialogNavigator = null;
+      _gate.modalOpen = false;
+      _gate.busy = false;
+      if (mounted) _activityChanged();
+    }
+  }
+
+  void _dismissDialog() {
+    final route = _dialog;
+    final navigator = _dialogNavigator;
+    if (route == null || navigator == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (navigator.mounted && route.isActive) navigator.removeRoute(route);
+    });
   }
 
   @override
   void dispose() {
-    _tokenTicker?.cancel();
-    _tabController.dispose();
-    cameraController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    _operationEpoch++;
+    _gate.routeVisible = false;
+    _dismissDialog();
+    _tabs.removeListener(_activityChanged);
+    _tabs.dispose();
+    _tokens?.removeListener(_tokenChanged);
+    _tokens?.dispose();
+    final camera = _camera;
+    final owned = _ownsCamera;
+    unawaited(
+      _cameraQueue
+          .then((_) async {
+            try {
+              await camera.stop();
+            } finally {
+              if (owned) await camera.dispose();
+            }
+          })
+          .catchError((Object _) {}),
+    );
     super.dispose();
   }
 }

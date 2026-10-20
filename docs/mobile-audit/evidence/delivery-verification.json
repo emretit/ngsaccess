@@ -1,0 +1,12 @@
+{
+  "moduleReports": 12,
+  "moduleReportLines": 2999,
+  "allWorkersSucceededReleasedArchived": true,
+  "localMarkdownLinksResolve": true,
+  "commonPackagesIncludingMOB00": 24,
+  "mobileWorkingTreeUnchanged": true,
+  "baselineAnalyze": "passed",
+  "baselineTests": 44,
+  "http560CharacterizationCases": 2,
+  "deviceLiveBackendNativeBuildStoreChecks": "not run"
+}

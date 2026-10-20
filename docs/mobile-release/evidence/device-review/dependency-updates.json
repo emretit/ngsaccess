@@ -1,0 +1,464 @@
+{
+  "checkedAtUtc": "2026-10-20T06:42:38.200282+00:00",
+  "flutter": "3.47.2",
+  "dart": "3.13.2",
+  "changed": [
+    {
+      "package": "archive",
+      "before": {
+        "version": "4.0.9",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "4.5.2",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "clock",
+      "before": {
+        "version": "1.1.2",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "1.1.3",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "code_assets",
+      "before": {
+        "version": "1.0.0",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "2.1.0",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "equatable",
+      "before": {
+        "version": "2.0.8",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "2.1.0",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "flutter_secure_storage",
+      "before": {
+        "version": "10.0.0",
+        "dependency": "direct main"
+      },
+      "after": {
+        "version": "10.3.1",
+        "dependency": "direct main"
+      }
+    },
+    {
+      "package": "flutter_secure_storage_darwin",
+      "before": {
+        "version": "0.2.0",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "0.3.2",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "flutter_svg",
+      "before": {
+        "version": "2.2.4",
+        "dependency": "direct main"
+      },
+      "after": {
+        "version": "2.3.0",
+        "dependency": "direct main"
+      }
+    },
+    {
+      "package": "glob",
+      "before": {
+        "version": "2.1.3",
+        "dependency": "transitive"
+      },
+      "after": null
+    },
+    {
+      "package": "go_router",
+      "before": {
+        "version": "17.2.3",
+        "dependency": "direct main"
+      },
+      "after": {
+        "version": "17.5.0",
+        "dependency": "direct main"
+      }
+    },
+    {
+      "package": "hooks",
+      "before": {
+        "version": "1.0.3",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "2.2.0",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "image",
+      "before": {
+        "version": "4.8.0",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "4.12.0",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "jni",
+      "before": {
+        "version": "1.0.0",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "1.1.0",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "jni_flutter",
+      "before": {
+        "version": "1.0.1",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "1.0.4+1",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "jni_util",
+      "before": null,
+      "after": {
+        "version": "1.0.0",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "json_annotation",
+      "before": {
+        "version": "4.11.0",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "4.12.0",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "mobile_scanner",
+      "before": {
+        "version": "7.2.0",
+        "dependency": "direct main"
+      },
+      "after": {
+        "version": "7.4.2",
+        "dependency": "direct main"
+      }
+    },
+    {
+      "package": "native_toolchain_c",
+      "before": {
+        "version": "0.17.6",
+        "dependency": "transitive"
+      },
+      "after": null
+    },
+    {
+      "package": "objective_c",
+      "before": {
+        "version": "9.3.0",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "9.6.2",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "package_config",
+      "before": {
+        "version": "2.2.0",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "3.0.0",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "path_provider",
+      "before": {
+        "version": "2.1.5",
+        "dependency": "direct main"
+      },
+      "after": {
+        "version": "2.1.6",
+        "dependency": "direct main"
+      }
+    },
+    {
+      "package": "path_provider_linux",
+      "before": {
+        "version": "2.2.1",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "2.2.2",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "path_provider_platform_interface",
+      "before": {
+        "version": "2.1.2",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "2.1.3",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "permission_handler",
+      "before": {
+        "version": "12.0.1",
+        "dependency": "direct main"
+      },
+      "after": {
+        "version": "12.0.3",
+        "dependency": "direct main"
+      }
+    },
+    {
+      "package": "permission_handler_apple",
+      "before": {
+        "version": "9.4.7",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "9.6.2",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "permission_handler_html",
+      "before": {
+        "version": "0.1.3+5",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "0.1.4+1",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "permission_handler_platform_interface",
+      "before": {
+        "version": "4.3.0",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "4.4.1",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "permission_handler_windows",
+      "before": {
+        "version": "0.2.1",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "0.2.2",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "petitparser",
+      "before": {
+        "version": "7.0.2",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "7.1.0",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "platform",
+      "before": {
+        "version": "3.1.6",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "3.2.0",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "posix",
+      "before": {
+        "version": "6.5.0",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "6.5.2",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "pub_semver",
+      "before": {
+        "version": "2.2.0",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "2.2.1",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "record_use",
+      "before": {
+        "version": "0.6.0",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "1.1.1",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "shared_preferences",
+      "before": {
+        "version": "2.5.5",
+        "dependency": "direct main"
+      },
+      "after": {
+        "version": "2.5.6",
+        "dependency": "direct main"
+      }
+    },
+    {
+      "package": "shared_preferences_android",
+      "before": {
+        "version": "2.4.23",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "2.5.1",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "shared_preferences_foundation",
+      "before": {
+        "version": "2.5.6",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "2.6.0",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "stack_trace",
+      "before": {
+        "version": "1.12.1",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "1.12.2",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "table_calendar",
+      "before": {
+        "version": "3.2.0",
+        "dependency": "direct main"
+      },
+      "after": {
+        "version": "3.3.0",
+        "dependency": "direct main"
+      }
+    },
+    {
+      "package": "vector_graphics",
+      "before": {
+        "version": "1.2.0",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "1.2.4",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "vector_graphics_compiler",
+      "before": {
+        "version": "1.2.0",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "1.3.2",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "vm_service",
+      "before": {
+        "version": "15.2.0",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "15.4.0",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "xml",
+      "before": {
+        "version": "6.6.1",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "7.0.1",
+        "dependency": "transitive"
+      }
+    },
+    {
+      "package": "yaml",
+      "before": {
+        "version": "3.1.3",
+        "dependency": "transitive"
+      },
+      "after": {
+        "version": "3.1.4",
+        "dependency": "transitive"
+      }
+    }
+  ],
+  "pubspecLockSha256": "9360f44ec1a0b714ed8bbaac3cfc386d5525a0be2575056b7e062cd148330ce7",
+  "advisoriesReported": 0,
+  "discontinuedReported": 0,
+  "retractedReported": 0
+}

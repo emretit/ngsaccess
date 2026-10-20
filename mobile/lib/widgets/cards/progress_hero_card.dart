@@ -1,12 +1,12 @@
-import 'package:flutter/material.dart';
+import 'dart:math' as math;
 
-import '../../theme/app_theme.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+import '../responsive_card_grid.dart';
 
 class ProgressHeroSegment {
-  const ProgressHeroSegment({
-    required this.value,
-    required this.color,
-  });
+  const ProgressHeroSegment({required this.value, required this.color});
 
   final int value;
   final Color color;
@@ -44,13 +44,16 @@ class ProgressHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final trackColor = isDark ? Colors.white.withValues(alpha: 0.08) : Colors.grey[200]!;
-    final chipBackground =
-        isDark ? AppTheme.surfaceVariantDark : AppTheme.surfaceVariantLight;
-
-    final filled = segments.fold<int>(0, (sum, s) => sum + s.value);
-    final percent = totalUnits > 0 ? (filled / totalUnits) * 100 : 0;
+    final scheme = Theme.of(context).colorScheme;
+    final filled = segments.fold<int>(
+      0,
+      (sum, s) => sum + math.max(0, s.value),
+    );
+    final ratio = totalUnits > 0 ? (filled / totalUnits).clamp(0.0, 1.0) : 0.0;
+    final percent = NumberFormat.percentPattern(
+      Localizations.localeOf(context).toLanguageTag(),
+    ).format(ratio);
+    final heading = title;
 
     return Card(
       elevation: 3,
@@ -59,54 +62,52 @@ class ProgressHeroCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
+            Wrap(
+              spacing: 12,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Expanded(
-                  child: Text(
-                    summary,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                Text(
+                  summary,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 Text(
-                  '${percent.toStringAsFixed(percent >= 10 ? 0 : 1)}%',
+                  percent,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: AppTheme.primaryBurgundy,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
-            if (title != null) ...[
+            if (heading != null) ...[
               const SizedBox(height: 4),
               Text(
-                title!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.grey[isDark ? 400 : 600],
-                    ),
+                heading,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
             ],
             const SizedBox(height: 16),
             _SegmentedBar(
               segments: segments,
               totalUnits: totalUnits,
-              trackColor: trackColor,
+              trackColor: scheme.surfaceContainerHighest,
+              semanticsValue: percent,
             ),
             const SizedBox(height: 16),
-            Row(
+            ResponsiveCardGrid(
+              maximumColumns: 3,
+              minimumCardWidth: 140,
               children: [
-                for (var i = 0; i < chips.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 8),
-                  Expanded(
-                    child: _MetricChip(
-                      data: chips[i],
-                      background: chipBackground,
-                    ),
+                for (final chip in chips)
+                  _MetricChip(
+                    data: chip,
+                    background: scheme.surfaceContainerHighest,
                   ),
-                ],
               ],
             ),
           ],
@@ -121,38 +122,52 @@ class _SegmentedBar extends StatelessWidget {
     required this.segments,
     required this.totalUnits,
     required this.trackColor,
+    required this.semanticsValue,
   });
 
   final List<ProgressHeroSegment> segments;
   final int totalUnits;
   final Color trackColor;
+  final String semanticsValue;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: SizedBox(
-        height: 12,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            return Stack(
-              children: [
-                Container(width: width, color: trackColor),
-                if (totalUnits > 0)
-                  Row(
-                    children: [
-                      for (final seg in segments)
-                        if (seg.value > 0)
-                          SizedBox(
-                            width: width * (seg.value / totalUnits),
-                            child: Container(color: seg.color),
+    final positive = segments.where((segment) => segment.value > 0).toList();
+    final sum = positive.fold<int>(
+      0,
+      (value, segment) => value + segment.value,
+    );
+    final denominator = math.max(totalUnits, sum);
+    return Semantics(
+      value: semanticsValue,
+      child: ExcludeSemantics(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: SizedBox(
+            height: 12,
+            child: ColoredBox(
+              color: trackColor,
+              child: totalUnits <= 0 || sum == 0
+                  ? const SizedBox.expand()
+                  : Row(
+                      children: [
+                        for (final segment in positive)
+                          Expanded(
+                            flex: segment.value,
+                            child: ColoredBox(
+                              color: segment.color,
+                              child: const SizedBox.expand(),
+                            ),
                           ),
-                    ],
-                  ),
-              ],
-            );
-          },
+                        if (denominator > sum)
+                          Expanded(
+                            flex: denominator - sum,
+                            child: const SizedBox.expand(),
+                          ),
+                      ],
+                    ),
+            ),
+          ),
         ),
       ),
     );
@@ -160,10 +175,7 @@ class _SegmentedBar extends StatelessWidget {
 }
 
 class _MetricChip extends StatelessWidget {
-  const _MetricChip({
-    required this.data,
-    required this.background,
-  });
+  const _MetricChip({required this.data, required this.background});
 
   final ProgressHeroChip data;
   final Color background;
@@ -174,33 +186,37 @@ class _MetricChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
       decoration: BoxDecoration(
         color: background,
+        border: Border.all(color: data.color.withValues(alpha: 0.5)),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Icon(data.icon, size: 16, color: data.color),
+              Icon(
+                data.icon,
+                size: 16,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               const SizedBox(width: 6),
               Text(
                 data.value.toString(),
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: data.color,
-                    ),
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 2),
           Text(
             data.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey[600],
-                  fontWeight: FontWeight.w500,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
             textAlign: TextAlign.center,
           ),
         ],

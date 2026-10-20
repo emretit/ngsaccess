@@ -1,0 +1,55 @@
+
+ RUN  v4.1.12 /Users/emreaydin/ngsaccess
+
+ ❯ convex/mobileAccess.handlers.test.ts (25 tests | 2 failed) 403ms
+     × queues independent localBridge operations once and never resurrects them through provisioning enqueue 4ms
+     × does not dispatch expired, revoked, or foreign localBridge operations 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  convex/mobileAccess.handlers.test.ts > mobile access with real employee authentication and persisted transactions > queues independent localBridge operations once and never resurrects them through provisioning enqueue
+ConvexError: {"code":"TRANSPORT_UNSUPPORTED","message":"TRANSPORT_UNSUPPORTED"}
+ ❯ accessError convex/lib/mobileAccess.ts:26:10
+     24|
+     25| export function accessError(code: string) {
+     26|   return new ConvexError({ code, message: code });
+       |          ^
+     27| }
+     28|
+ ❯ resolveMobileTarget convex/lib/mobileAccess.ts:152:30
+ ❯ handler convex/mobileAccess.ts:72:20
+ ❯ invokeFunction node_modules/convex/src/server/impl/registration_impl.ts:90:13
+ ❯ invokeMutation node_modules/convex/src/server/impl/registration_impl.ts:70:17
+ ❯ runMutationWithHandler node_modules/convex-test/dist/index.js:2061:31
+ ❯ Object.mutationFromPath node_modules/convex-test/dist/index.js:2205:32
+ ❯ mutation node_modules/convex-test/dist/index.js:2253:20
+ ❯ convex/mobileAccess.handlers.test.ts:189:19
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  convex/mobileAccess.handlers.test.ts > mobile access with real employee authentication and persisted transactions > does not dispatch expired, revoked, or foreign localBridge operations
+ConvexError: {"code":"TRANSPORT_UNSUPPORTED","message":"TRANSPORT_UNSUPPORTED"}
+ ❯ accessError convex/lib/mobileAccess.ts:26:10
+     24|
+     25| export function accessError(code: string) {
+     26|   return new ConvexError({ code, message: code });
+       |          ^
+     27| }
+     28|
+ ❯ resolveMobileTarget convex/lib/mobileAccess.ts:152:30
+ ❯ handler convex/mobileAccess.ts:72:20
+ ❯ invokeFunction node_modules/convex/src/server/impl/registration_impl.ts:90:13
+ ❯ invokeMutation node_modules/convex/src/server/impl/registration_impl.ts:70:17
+ ❯ runMutationWithHandler node_modules/convex-test/dist/index.js:2061:31
+ ❯ Object.mutationFromPath node_modules/convex-test/dist/index.js:2205:32
+ ❯ mutation node_modules/convex-test/dist/index.js:2253:20
+ ❯ convex/mobileAccess.handlers.test.ts:220:20
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed | 218 passed (219)
+      Tests  2 failed | 2331 passed (2333)
+   Start at  21:54:36
+   Duration  14.52s (transform 12.97s, setup 0ms, import 88.46s, tests 14.83s, environment 245ms)
+

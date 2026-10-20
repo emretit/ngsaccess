@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// HikConnect tarzı küçük hızlı işlem kartı: yuvarlak ikon kutusu + label.
-/// Grid içinde 2x2 veya tek sıra 1x4 yerleşime uygundur.
+/// An accessible action which grows vertically with its label and target name.
 class QuickActionCard extends StatelessWidget {
   const QuickActionCard({
     super.key,
@@ -10,73 +9,88 @@ class QuickActionCard extends StatelessWidget {
     required this.color,
     required this.onTap,
     this.subtitle,
+    this.isBusy = false,
+    this.busyLabel,
   });
 
   final IconData icon;
   final String label;
   final Color color;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final String? subtitle;
+  final bool isBusy;
+  final String? busyLabel;
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final tileBackground = isDark ? Colors.white.withValues(alpha: 0.04) : Colors.white;
-    final shadowColor = isDark ? Colors.black.withValues(alpha: 0.4) : Colors.black.withValues(alpha: 0.06);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
+    final scheme = Theme.of(context).colorScheme;
+    final enabled = onTap != null && !isBusy;
+    final target = subtitle;
+    final displayLabel = isBusy ? (busyLabel ?? label) : label;
+    return Semantics(
+      button: true,
+      liveRegion: isBusy,
+      enabled: enabled,
+      label: [displayLabel, ?target].join(', '),
+      onTap: enabled ? onTap : null,
+      excludeSemantics: true,
+      child: Material(
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(16),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-          decoration: BoxDecoration(
-            color: tileBackground,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: shadowColor,
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: color, size: 26),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(16),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 112, minWidth: 48),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    padding: const EdgeInsets.all(13),
+                    decoration: BoxDecoration(
+                      color: scheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: color, width: 2),
                     ),
-              ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 2),
-                Text(
-                  subtitle!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey[isDark ? 400 : 600],
+                    child: isBusy
+                        ? CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: scheme.onPrimaryContainer,
+                          )
+                        : Icon(
+                            icon,
+                            color: scheme.onPrimaryContainer,
+                            size: 24,
+                          ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    displayLabel,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: enabled
+                          ? scheme.onSurface
+                          : scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (target != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      target,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
                       ),
-                ),
-              ],
-            ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ),
       ),

@@ -1,0 +1,9 @@
+
+ RUN  v4.1.12 /Users/emreaydin/ngsaccess
+
+
+ Test Files  1 passed (1)
+      Tests  24 passed (24)
+   Start at  09:27:10
+   Duration  609ms (transform 270ms, setup 0ms, import 168ms, tests 343ms, environment 28ms)
+

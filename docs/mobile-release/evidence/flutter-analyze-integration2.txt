@@ -1,0 +1,5 @@
+Analyzing mobile...                                             
+
+   info • Unnecessary use of multiple underscores. Try using '_' • test/widgets/profile_screen_test.dart:149:39 • unnecessary_underscores
+
+1 issue found. (ran in 14.4s)

@@ -1,0 +1,9 @@
+{"backendHostSha256": "dc03727fb9e1da675704e5ef1259e0d1a5bf1d544097d40d4f60e5725acc6364", "environment": "staging"}
+{"privacyManifestSyntax": "passed", "sourcePermissions": "passed"}
+{"toolchain": "passed"}
+Building com.ngsplus.app for device (ios-release)...
+Automatically signing iOS for device deployment using specified development team in Xcode project: T9QCW8Q2C3
+Running pod install...                                             975ms
+Running Xcode build...                                          
+Xcode build done.                                           46,3s
+✓ Built build/ios/iphoneos/Runner.app (21.5MB)

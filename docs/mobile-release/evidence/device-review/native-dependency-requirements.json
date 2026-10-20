@@ -1,0 +1,138 @@
+{
+  "flutter_secure_storage": [
+    [
+      "pubspec.yaml",
+      [
+        "version: 10.3.1"
+      ]
+    ],
+    [
+      "android/build.gradle",
+      [
+        "classpath 'com.android.tools.build:gradle:8.13.2'",
+        "compileSdk = 36",
+        "minSdkVersion = 23"
+      ]
+    ]
+  ],
+  "flutter_secure_storage_darwin": [
+    [
+      "pubspec.yaml",
+      [
+        "version: 0.3.2"
+      ]
+    ]
+  ],
+  "mobile_scanner": [
+    [
+      "pubspec.yaml",
+      [
+        "version: 7.4.2"
+      ]
+    ],
+    [
+      "android/build.gradle.kts",
+      [
+        "import org.jetbrains.kotlin.gradle.dsl.JvmTarget",
+        "import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension",
+        "apply(plugin = \"kotlin-android\")",
+        "compileSdk = 36",
+        "minSdk = 23",
+        "// Configured through `extensions` rather than a `kotlin { }` block, because the",
+        "if (extensions.findByName(\"kotlin\") != null) {",
+        "plugins.withId(\"org.jetbrains.kotlin.android\") { configureKotlin() }",
+        "implementation(\"org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0\")",
+        "testImplementation(\"org.jetbrains.kotlin:kotlin-test\")"
+      ]
+    ]
+  ],
+  "package_info_plus": [
+    [
+      "pubspec.yaml",
+      [
+        "version: 8.3.1"
+      ]
+    ],
+    [
+      "android/build.gradle",
+      [
+        "ext.kotlin_version = '1.7.22'",
+        "classpath 'com.android.tools.build:gradle:8.3.1'",
+        "classpath \"org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version\"",
+        "apply plugin: 'kotlin-android'",
+        "compileSdk 34",
+        "kotlinOptions {",
+        "minSdk 19",
+        "implementation \"org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version\""
+      ]
+    ]
+  ],
+  "path_provider_android": [
+    [
+      "pubspec.yaml",
+      [
+        "version: 2.3.1"
+      ]
+    ]
+  ],
+  "path_provider_foundation": [
+    [
+      "pubspec.yaml",
+      [
+        "version: 2.6.0"
+      ]
+    ]
+  ],
+  "permission_handler_android": [
+    [
+      "pubspec.yaml",
+      [
+        "version: 13.0.1"
+      ]
+    ],
+    [
+      "android/build.gradle",
+      [
+        "classpath 'com.android.tools.build:gradle:8.0.2'",
+        "compileSdkVersion 35",
+        "minSdkVersion 19"
+      ]
+    ]
+  ],
+  "permission_handler_apple": [
+    [
+      "pubspec.yaml",
+      [
+        "version: 9.6.2"
+      ]
+    ]
+  ],
+  "shared_preferences_android": [
+    [
+      "pubspec.yaml",
+      [
+        "version: 2.5.1"
+      ]
+    ],
+    [
+      "android/build.gradle.kts",
+      [
+        "val kotlinVersion = \"2.3.0\"",
+        "classpath(\"com.android.tools.build:gradle:8.13.1\")",
+        "classpath(\"org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion\")",
+        "kotlin {",
+        "jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17",
+        "compileSdk = flutter.compileSdkVersion",
+        "minSdk = 24"
+      ]
+    ]
+  ],
+  "shared_preferences_foundation": [
+    [
+      "pubspec.yaml",
+      [
+        "version: 2.6.0"
+      ]
+    ]
+  ]
+}

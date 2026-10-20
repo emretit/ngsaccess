@@ -1,0 +1,11 @@
+{"backendHostSha256": "0e7954600da2694db0494c6abbca11bdb1dd5a106c322e285e0b0de5f9d0d8a6", "environment": "staging"}
+{"privacyManifestSyntax": "passed", "sourcePermissions": "passed"}
+{"toolchain": "passed"}
+Building com.ngsplus.app for simulator (ios)...
+The following plugins do not support Swift Package Manager for ios:
+  - permission_handler_apple
+This will become an error in a future version of Flutter. Please contact the plugin maintainers to request Swift Package Manager adoption.
+Running Xcode build...                                          
+Xcode build done.                                           434,8s
+✓ Built build/ios/iphonesimulator/Runner.app
+Build provenance written; distribution approval remains separate.

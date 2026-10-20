@@ -1,0 +1,16 @@
+{
+  "signatureVerified": true,
+  "bundleId": "com.ngsplus.app",
+  "version": "1.0.4",
+  "build": "1",
+  "minimumOS": "15.0",
+  "team": "T9QCW8Q2C3",
+  "profileDevelopment": true,
+  "profileExpiry": "2027-04-29 11:53:26",
+  "connectedDeviceProvisioned": true,
+  "binarySha256": "be357a966f1221e64dc4d42b837d49ede9dd29090812c3f620700a6aae4d838f",
+  "privacyManifestPresent": true,
+  "cameraDescriptionPresent": true,
+  "galleryDescriptionAbsent": true,
+  "dotenvAbsent": true
+}

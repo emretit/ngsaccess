@@ -1,0 +1,134 @@
+00:00 +0: loading /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart
+00:00 +0: /Users/emreaydin/ngsaccess/mobile/test/theme/app_theme_test.dart: Brightness.dark status text has readable foreground/background pairs
+00:00 +1: /Users/emreaydin/ngsaccess/mobile/test/theme/app_theme_test.dart: Brightness.dark button and card text use readable theme colors
+00:00 +2: /Users/emreaydin/ngsaccess/mobile/test/theme/app_theme_test.dart: Brightness.light status text has readable foreground/background pairs
+00:00 +3: /Users/emreaydin/ngsaccess/mobile/test/theme/app_theme_test.dart: Brightness.light button and card text use readable theme colors
+00:00 +4: /Users/emreaydin/ngsaccess/mobile/test/widgets/door_command_status_card_test.dart: acknowledged command states never promise a physical passage
+00:00 +5: /Users/emreaydin/ngsaccess/mobile/test/widgets/door_command_status_card_test.dart: acknowledged command states never promise a physical passage
+00:00 +6: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:01 +7: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:01 +8: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:01 +9: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:01 +10: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:01 +11: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:01 +12: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:01 +13: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:01 +14: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_cards_test.dart: actions use two columns at normal text and reflow at 200%
+00:01 +15: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_cards_test.dart: actions use two columns at normal text and reflow at 200%
+00:01 +16: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +17: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +18: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +19: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +20: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +21: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +22: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +23: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +24: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +25: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +26: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +27: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +28: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +29: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +30: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +31: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +32: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +33: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +34: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +35: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +36: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +37: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +38: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +39: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:04 +40: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:04 +41: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:04 +42: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:04 +43: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:04 +44: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:04 +45: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: navigation exposes five named selected controls; keyboard activates QR
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: SemanticsRole:<SemanticsRole.tab>
+  Actual: SemanticsRole:<SemanticsRole.none>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart:204:7)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1953:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart line 204
+The test description was:
+  navigation exposes five named selected controls; keyboard activates QR
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:04 +45 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:04 +45 -1: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: navigation exposes five named selected controls; keyboard activates QR [E]
+  Test failed. See exception logs above.
+  The test description was: navigation exposes five named selected controls; keyboard activates QR
+  
+00:04 +46 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:04 +47 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:04 +48 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:04 +49 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:04 +50 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:04 +51 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:04 +52 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:05 +53 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:05 +54 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:05 +55 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:05 +56 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:05 +57 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:05 +58 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:05 +59 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:05 +60 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:05 +61 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:05 +62 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:05 +63 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:05 +64 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:05 +65 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:05 +66 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:05 +67 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:05 +68 -1: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: stackless device selection has a working back fallback to profile
+00:05 +69 -1: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: stackless device selection has a working back fallback to profile
+00:05 +70 -1: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: stackless device selection has a working back fallback to profile
+00:05 +71 -1: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: stackless device selection has a working back fallback to profile
+00:05 +72 -1: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: stackless device selection has a working back fallback to profile
+00:05 +73 -1: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: stackless device selection has a working back fallback to profile
+00:05 +74 -1: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: stackless device selection has a working back fallback to profile
+00:05 +75 -1: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: stackless device selection has a working back fallback to profile
+00:05 +76 -1: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: stackless device selection has a working back fallback to profile
+00:05 +77 -1: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: stackless device selection has a working back fallback to profile
+00:05 +78 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: runtime version is consistent in profile and About (tr)
+00:05 +79 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: failed selection stays visible and never navigates as saved
+00:06 +80 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: failed selection stays visible and never navigates as saved
+00:06 +81 -1: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real retained QR and visitor branches stop hidden resources
+00:06 +82 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:06 +83 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:06 +84 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:06 +85 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:06 +86 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:06 +87 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:06 +88 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:06 +89 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:06 +90 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:06 +91 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:06 +92 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:06 +93 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:06 +94 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:06 +95 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:06 +96 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:06 +97 -1: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: replacing a pending root never restores the removed roots diagnostic hook
+00:06 +98 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: unavailable target explains its typed reason and cannot be selected
+00:07 +99 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: real password change calls backend wrapper and ends session
+00:07 +100 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: real password change calls backend wrapper and ends session
+00:07 +101 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password failure remains on form with localized safe error
+00:07 +102 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: help and privacy remain readable at large text in dark theme
+00:07 +103 -1: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: already open help follows a runtime locale change
+00:07 +104 -1: Some tests failed.
+
+Failing tests:
+  /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: navigation exposes five named selected controls; keyboard activates QR

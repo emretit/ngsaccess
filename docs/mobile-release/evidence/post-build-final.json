@@ -1,0 +1,10 @@
+{
+  "pub-lock-restore-final.txt": 0,
+  "l10n-regenerate-final.txt": 0,
+  "l10n-parity-final.txt": 0,
+  "pod-deployment-final.txt": 0,
+  "flutter-analyze-last.txt": 0,
+  "flutter-test-last.txt": 0,
+  "lockProjectDrift": [],
+  "generatedDrift": []
+}

@@ -1,1234 +1,455 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:table_calendar/table_calendar.dart';
 
+import '../../core/attendance_date.dart';
 import '../../core/error_localizer.dart';
-import '../../core/spacing.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/attendance.dart';
+import '../../models/attendance_summary.dart';
 import '../../providers/attendance_provider.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/responsive_container.dart';
+import '../../widgets/history/history_calendar.dart';
+import '../../widgets/history/history_record_tile.dart';
+import '../../widgets/history/history_records_list.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  const HistoryScreen({super.key, this.now});
+
+  /// Allows period boundaries to be exercised without changing the device clock.
+  final DateTime Function()? now;
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateMixin {
-  static const int _initialDisplayCount = 20;
-  static const int _displayIncrement = 20;
-  static const double _loadMoreThresholdPx = 240;
+enum _FilterAction { date, device, clear }
 
+class _HistoryScreenState extends State<HistoryScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
+  final _scroll = ScrollController();
   DateTime? _selectedDate;
-  String? _selectedDevice;
-  List<String> _deviceList = [];
-  bool _isLoading = false;
-  late TabController _tabController;
-  final ScrollController _allTabScrollController = ScrollController();
-  int _displayLimit = _initialDisplayCount;
+  String? _selectedDeviceId;
+  late DateTime _periodInstant;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _allTabScrollController.addListener(_onAllTabScroll);
+    _periodInstant = widget.now?.call() ?? DateTime.now();
+    _tabs = TabController(length: 3, vsync: this);
+    _scroll.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _loadData();
+      if (!mounted) return;
+      final provider = context.read<AttendanceProvider>();
+      unawaited(provider.setFilters());
+      unawaited(_loadSummaries(provider));
     });
   }
 
   @override
   void dispose() {
-    _allTabScrollController.removeListener(_onAllTabScroll);
-    _allTabScrollController.dispose();
-    _tabController.dispose();
+    _scroll.removeListener(_onScroll);
+    _scroll.dispose();
+    _tabs.dispose();
     super.dispose();
   }
 
-  void _onAllTabScroll() {
-    if (!_allTabScrollController.hasClients) return;
-    final position = _allTabScrollController.position;
-    if (position.pixels < position.maxScrollExtent - _loadMoreThresholdPx) {
+  void _onScroll() {
+    if (!mounted || !_scroll.hasClients) return;
+    if (_scroll.position.maxScrollExtent <= 0 ||
+        _scroll.position.extentAfter > 240) {
       return;
     }
-
-    final provider = Provider.of<AttendanceProvider>(context, listen: false);
-    final filteredCount = _getFilteredRecords().length;
-
-    if (_displayLimit < filteredCount) {
-      setState(() {
-        _displayLimit = (_displayLimit + _displayIncrement).clamp(
-          _initialDisplayCount,
-          filteredCount,
-        );
-      });
-    }
-
+    // Scroll callbacks run outside build and must never establish a listener.
+    final provider = context.read<AttendanceProvider>();
     if (provider.hasMore &&
+        !provider.isLoading &&
         !provider.isLoadingMore &&
-        _displayLimit + _displayIncrement >
-            provider.attendanceRecords.length) {
-      provider.loadMore();
+        provider.listError == null) {
+      unawaited(provider.loadMore());
     }
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadSummaries(AttendanceProvider provider) async {
+    final month = AttendanceDate.month(_periodInstant);
+    final week = AttendanceDate.week(_periodInstant);
+    await Future.wait([
+      provider.loadSummary(startDate: month.startDate, endDate: month.endDate),
+      provider.loadSummary(startDate: week.startDate, endDate: week.endDate),
+    ]);
+  }
+
+  Future<void> _refresh() async {
+    if (!mounted) return;
+    final provider = context.read<AttendanceProvider>();
+    setState(() => _periodInstant = widget.now?.call() ?? DateTime.now());
+    await Future.wait([
+      provider.loadAttendanceRecords(),
+      _loadSummaries(provider),
+    ]);
+    // No widget state is written after the asynchronous refresh.
+  }
+
+  void _applyFilter({required DateTime? date, required String? deviceId}) {
+    if (!mounted) return;
     setState(() {
-      _isLoading = true;
-      _displayLimit = _initialDisplayCount;
+      _selectedDate = date;
+      _selectedDeviceId = deviceId;
     });
-
-    try {
-      final attendanceProvider = Provider.of<AttendanceProvider>(context, listen: false);
-      await attendanceProvider.loadAttendanceRecords();
-
-      final devices = attendanceProvider.attendanceRecords
-          .where((record) => record.doorName.isNotEmpty)
-          .map((record) => record.doorName)
-          .toSet()
-          .toList();
-
-      setState(() {
-        _deviceList = devices;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        final l10n = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(l10n.historyErrorBody(e.toString())),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+    final day = date == null ? null : AttendanceDate.calendarKey(date);
+    // The API accepts inclusive date strings; the server resolves these to
+    // [Istanbul midnight, next midnight), including an event exactly at 00:00.
+    unawaited(
+      context.read<AttendanceProvider>().setFilters(
+        startDate: day,
+        endDate: day,
+        deviceId: deviceId,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
-
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.darkBackground : Colors.grey[50],
       appBar: AppBar(
         title: Text(l10n.historyTitle),
-        elevation: 0,
-        backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
-        foregroundColor: isDark ? Colors.white : Colors.black,
         actions: [
           IconButton(
+            tooltip: l10n.qrRefresh,
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _refresh,
+          ),
+          IconButton(
+            tooltip: l10n.historyFilterTitle,
             icon: const Icon(Icons.filter_list_rounded),
             onPressed: _showFilterDialog,
           ),
         ],
         bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppTheme.primaryColor,
-          labelColor: isDark ? Colors.white : AppTheme.primaryColor,
-          unselectedLabelColor: Colors.grey,
+          controller: _tabs,
+          isScrollable: true,
           tabs: [
             Tab(text: l10n.historyTabAll, icon: const Icon(Icons.list_rounded)),
-            Tab(text: l10n.historyTabThisMonth, icon: const Icon(Icons.calendar_month_rounded)),
-            Tab(text: l10n.historyTabStats, icon: const Icon(Icons.analytics_rounded)),
+            Tab(
+              text: l10n.historyTabThisMonth,
+              icon: const Icon(Icons.calendar_month_rounded),
+            ),
+            Tab(
+              text: l10n.historyTabStats,
+              icon: const Icon(Icons.analytics_rounded),
+            ),
           ],
         ),
       ),
-      body: _isLoading
-          ? _buildLoadingState()
-          : Consumer<AttendanceProvider>(
-              builder: (context, attendanceProvider, child) {
-                if (attendanceProvider.errorMessage != null) {
-                  final msg = attendanceProvider.lastError != null
-                      ? localizeAppError(context, attendanceProvider.lastError!)
-                      : attendanceProvider.errorMessage!;
-                  return _buildErrorState(msg);
-                }
-
-                return TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildAllRecordsTab(attendanceProvider),
-                    _buildThisMonthTab(attendanceProvider),
-                    _buildStatsTab(attendanceProvider),
-                  ],
-                );
-              },
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 840),
+            child: Consumer<AttendanceProvider>(
+              builder: (context, provider, child) => TabBarView(
+                controller: _tabs,
+                children: [
+                  _buildRecords(provider),
+                  _buildMonth(provider),
+                  _buildStats(provider),
+                ],
+              ),
             ),
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _buildLoadingState() {
+  Widget _buildRecords(AttendanceProvider provider) {
+    final records = provider.attendanceRecords;
+    final loadMoreError = provider.loadMoreError;
+    final error = identical(provider.listError, loadMoreError)
+        ? null
+        : provider.listError;
+    return HistoryRecordsList(
+      controller: _scroll,
+      recordCount: records.length,
+      itemBuilder: (context, index) => HistoryRecordTile(
+        key: ValueKey(records[index].id),
+        record: records[index],
+        accessState: _accessState(records[index]),
+        onTap: () => _showRecordDetails(records[index]),
+      ),
+      hasMore: provider.listLoaded && provider.hasMore,
+      isLoading: provider.isLoading || (!provider.listLoaded && error == null),
+      isLoadingMore: provider.isLoadingMore,
+      hasPreviousData: provider.isStale,
+      errorMessage: error == null ? null : localizeAppError(context, error),
+      loadMoreErrorMessage: loadMoreError == null
+          ? null
+          : localizeAppError(context, loadMoreError),
+      onRefresh: _refresh,
+      onLoadMore: () => unawaited(provider.loadMore()),
+      header: _filterHeader(provider),
+    );
+  }
+
+  Widget _filterHeader(AttendanceProvider provider) {
     final l10n = AppLocalizations.of(context);
-    return Center(
+    final date = _selectedDate;
+    final deviceId = _selectedDeviceId;
+    return Padding(
+      padding: const EdgeInsets.all(16),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 16),
-          Text(l10n.historyLoading),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorState(String errorMessage) {
-    final l10n = AppLocalizations.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(50),
-              ),
-              child: Icon(
-                Icons.error_outline_rounded,
-                size: 48,
-                color: Colors.red[400],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              l10n.historyErrorTitle,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+          Text(l10n.historyRawEvents),
+          const SizedBox(height: 4),
+          const Text(AttendanceDate.timeZone),
+          if (date != null || deviceId != null) ...[
             const SizedBox(height: 12),
-            Text(
-              errorMessage,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: _loadData,
-              icon: const Icon(Icons.refresh_rounded),
-              label: Text(l10n.commonRetry),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primaryColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAllRecordsTab(AttendanceProvider provider) {
-    return Column(
-      children: [
-        // Filtre çipleri
-        if (_selectedDate != null || _selectedDevice != null)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            child: Wrap(
+            Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (_selectedDate != null)
-                  Chip(
-                    label: Text(DateFormat('dd.MM.yyyy').format(_selectedDate!)),
-                    deleteIcon: const Icon(Icons.close, size: 18),
-                    onDeleted: () => setState(() => _selectedDate = null),
-                    backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-                    labelStyle: TextStyle(color: AppTheme.primaryColor),
+                if (date != null)
+                  InputChip(
+                    label: Text(_formatDay(date)),
+                    onDeleted: () =>
+                        _applyFilter(date: null, deviceId: deviceId),
+                    deleteButtonTooltipMessage: l10n.historyFilterClear,
                   ),
-                if (_selectedDevice != null)
-                  Chip(
-                    label: Text(_selectedDevice!),
-                    deleteIcon: const Icon(Icons.close, size: 18),
-                    onDeleted: () => setState(() => _selectedDevice = null),
-                    backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-                    labelStyle: TextStyle(color: AppTheme.primaryColor),
+                if (deviceId != null)
+                  InputChip(
+                    label: Text(_deviceLabel(provider.deviceFacets[deviceId])),
+                    onDeleted: () => _applyFilter(date: date, deviceId: null),
+                    deleteButtonTooltipMessage: l10n.historyFilterClear,
                   ),
               ],
             ),
-          ),
-        
-        // Kayıt listesi
-        Expanded(
-          child: _buildRecordsList(provider),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildThisMonthTab(AttendanceProvider provider) {
-    final l10n = AppLocalizations.of(context);
-    final localeTag = Localizations.localeOf(context).toLanguageTag();
-    final now = DateTime.now();
-    final startOfMonth = DateTime(now.year, now.month, 1);
-    final endOfMonth = DateTime(now.year, now.month + 1, 0);
-    final thisMonthRecords = provider.attendanceRecords.where((record) {
-      return record.timestamp.isAfter(startOfMonth.subtract(const Duration(days: 1))) &&
-             record.timestamp.isBefore(endOfMonth.add(const Duration(days: 1)));
-    }).toList();
-
-    // Günlük katılım haritası oluştur
-    final Map<DateTime, List<Attendance>> attendanceByDay = {};
-    for (final record in thisMonthRecords) {
-      final day = DateTime(record.timestamp.year, record.timestamp.month, record.timestamp.day);
-      if (attendanceByDay[day] == null) {
-        attendanceByDay[day] = [];
-      }
-      attendanceByDay[day]!.add(record);
-    }
-
-    return SingleChildScrollView(
-      child: ResponsiveContainer(
-        maxWidth: AppSpacing.contentMaxWidth,
-        child: Column(
-        children: [
-          const SizedBox(height: 16),
-          
-          // Takvim widget'ı
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark 
-                  ? AppTheme.darkSurface 
-                  : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.black.withValues(alpha: 0.3) 
-                      : Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.calendar_month_rounded,
-                      color: AppTheme.primaryColor,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      DateFormat('MMMM yyyy', localeTag).format(now),
-                      style: TextStyle(
-                        color: AppTheme.primaryColor,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TableCalendar<Attendance>(
-                  firstDay: startOfMonth,
-                  lastDay: endOfMonth,
-                  focusedDay: now,
-                  calendarFormat: CalendarFormat.month,
-                  locale: localeTag,
-                  eventLoader: (day) {
-                    return attendanceByDay[day] ?? [];
-                  },
-                  startingDayOfWeek: StartingDayOfWeek.monday,
-                  headerStyle: HeaderStyle(
-                    formatButtonVisible: false,
-                    titleCentered: true,
-                    leftChevronIcon: Icon(
-                      Icons.chevron_left,
-                      color: Theme.of(context).brightness == Brightness.dark 
-                          ? Colors.white 
-                          : AppTheme.primaryColor,
-                    ),
-                    rightChevronIcon: Icon(
-                      Icons.chevron_right,
-                      color: Theme.of(context).brightness == Brightness.dark 
-                          ? Colors.white 
-                          : AppTheme.primaryColor,
-                    ),
-                    titleTextStyle: TextStyle(
-                      color: Theme.of(context).brightness == Brightness.dark 
-                          ? Colors.white 
-                          : AppTheme.primaryColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  calendarStyle: CalendarStyle(
-                    outsideDaysVisible: false,
-                    weekendTextStyle: TextStyle(
-                      color: Colors.red[400],
-                    ),
-                    defaultTextStyle: TextStyle(
-                      color: Theme.of(context).brightness == Brightness.dark 
-                          ? Colors.white 
-                          : Colors.black87,
-                    ),
-                    todayDecoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.5),
-                      shape: BoxShape.circle,
-                    ),
-                    selectedDecoration: BoxDecoration(
-                      color: AppTheme.primaryColor,
-                      shape: BoxShape.circle,
-                    ),
-                    markerDecoration: BoxDecoration(
-                      color: Colors.green[600],
-                      shape: BoxShape.circle,
-                    ),
-                    markersMaxCount: 3,
-                    markerSize: 6,
-                    markersOffset: const PositionedOffset(bottom: 4),
-                  ),
-                  calendarBuilders: CalendarBuilders(
-                    defaultBuilder: (context, day, focusedDay) {
-                      final dayRecords = attendanceByDay[day] ?? [];
-                      Color? dayColor;
-                      
-                      if (dayRecords.isNotEmpty) {
-                        // Gün içindeki ilk giriş saatini kontrol et
-                        final firstCheckIn = dayRecords
-                            .where((r) => r.type == 'check_in')
-                            .map((r) => r.timestamp)
-                            .fold<DateTime?>(null, (earliest, current) => 
-                                earliest == null || current.isBefore(earliest) ? current : earliest);
-                        
-                        if (firstCheckIn != null) {
-                          final hour = firstCheckIn.hour;
-                          final minute = firstCheckIn.minute;
-                          
-                          // Saat 9:00'dan önce gelirse erken, 9:30'dan sonra gelirse geç
-                          if (hour < 9 || (hour == 9 && minute == 0)) {
-                            dayColor = Colors.blue[100]; // Erken giriş
-                          } else if (hour > 9 || (hour == 9 && minute > 30)) {
-                            dayColor = Colors.orange[100]; // Geç giriş
-                          } else {
-                            dayColor = Colors.green[100]; // Normal giriş
-                          }
-                        }
-                      }
-                      
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: dayColor,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Text(
-                            '${day.day}',
-                            style: TextStyle(
-                              color: Theme.of(context).brightness == Brightness.dark 
-                                  ? Colors.white 
-                                  : Colors.black87,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  onDaySelected: (selectedDay, focusedDay) {
-                    final dayRecords = attendanceByDay[selectedDay] ?? [];
-                    if (dayRecords.isNotEmpty) {
-                      _showDayDetailsDialog(selectedDay, dayRecords);
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Renk açıklamaları
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark 
-                  ? AppTheme.darkSurface.withValues(alpha: 0.5)
-                  : Colors.grey.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Theme.of(context).brightness == Brightness.dark 
-                    ? Colors.grey.withValues(alpha: 0.3)
-                    : Colors.grey.withValues(alpha: 0.2),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.palette_outlined,
-                      color: Colors.grey[600],
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      l10n.historyColorLegend,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).brightness == Brightness.dark
-                            ? Colors.white
-                            : Colors.black87,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                _buildColorLegend(
-                  Colors.blue[100]!,
-                  l10n.historyLegendEarly,
-                  l10n.historyLegendEarlyDesc,
-                  Icons.schedule_rounded,
-                ),
-                const SizedBox(height: 8),
-                _buildColorLegend(
-                  Colors.green[100]!,
-                  l10n.historyLegendNormal,
-                  l10n.historyLegendNormalDesc,
-                  Icons.check_circle_outline,
-                ),
-                const SizedBox(height: 8),
-                _buildColorLegend(
-                  Colors.orange[100]!,
-                  l10n.historyLegendLate,
-                  l10n.historyLegendLateDesc,
-                  Icons.warning_amber_rounded,
-                ),
-                const SizedBox(height: 8),
-                _buildColorLegend(
-                  Colors.transparent,
-                  l10n.historyLegendNone,
-                  l10n.historyLegendNoneDesc,
-                  Icons.remove_circle_outline,
-                ),
-                
-                const SizedBox(height: 12),
-                
-                // Ek bilgi
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: Colors.blue[600],
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          l10n.historyCalendarHint,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.blue[700],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-        ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatsTab(AttendanceProvider provider) {
-    final l10n = AppLocalizations.of(context);
-    final localeTag = Localizations.localeOf(context).toLanguageTag();
-    final records = provider.attendanceRecords;
-    final checkIns = records.where((r) => r.type == 'check_in').length;
-    final checkOuts = records.where((r) => r.type == 'check_out').length;
-    
-    // Bu ay istatistikleri
-    final now = DateTime.now();
-    final startOfMonth = DateTime(now.year, now.month, 1);
-    final endOfMonth = DateTime(now.year, now.month + 1, 0);
-    final thisMonthRecords = records.where((record) {
-      return record.timestamp.isAfter(startOfMonth.subtract(const Duration(days: 1))) && 
-             record.timestamp.isBefore(endOfMonth.add(const Duration(days: 1)));
-    }).toList();
-    
-    // Günlük katılım haritası oluştur
-    final Map<DateTime, List<Attendance>> attendanceByDay = {};
-    for (final record in thisMonthRecords) {
-      final day = DateTime(record.timestamp.year, record.timestamp.month, record.timestamp.day);
-      if (attendanceByDay[day] == null) {
-        attendanceByDay[day] = [];
-      }
-      attendanceByDay[day]!.add(record);
-    }
-    
-    // Haftalık istatistikler
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    final weeklyRecords = records.where((record) {
-      return record.timestamp.isAfter(startOfWeek) && record.timestamp.isBefore(now);
-    }).toList();
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: ResponsiveContainer(
-        maxWidth: AppSpacing.contentMaxWidth,
-        child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppTheme.primaryColor, AppTheme.primaryColor.withValues(alpha: 0.8)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.primaryColor.withValues(alpha: 0.3),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.historyMonthSummary,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  DateFormat('MMMM yyyy', localeTag).format(now),
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildMonthStat(l10n.historyTotalCheckIns,
-                      thisMonthRecords.where((r) => r.type == 'check_in').length.toString(),
-                      Icons.login_rounded),
-                    _buildMonthStat(l10n.historyTotalCheckOuts,
-                      thisMonthRecords.where((r) => r.type == 'check_out').length.toString(),
-                      Icons.logout_rounded),
-                    _buildMonthStat(l10n.historyActiveDays,
-                      attendanceByDay.keys.length.toString(),
-                      Icons.calendar_today_rounded),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          Text(
-            l10n.historyGeneralStats,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          Row(
-            children: [
-              Expanded(
-                child: _buildStatCard(
-                  l10n.historyTotalCheckIns,
-                  checkIns.toString(),
-                  Icons.login_rounded,
-                  Colors.green,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildStatCard(
-                  l10n.historyTotalCheckOuts,
-                  checkOuts.toString(),
-                  Icons.logout_rounded,
-                  Colors.red,
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 24),
-
-          Text(
-            l10n.historyThisWeek,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark 
-                  ? AppTheme.darkSurface 
-                  : Colors.blue.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.calendar_today, color: Colors.blue[600]),
-                    const SizedBox(width: 8),
-                    Text(
-                      l10n.historyWeeklySummary,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue[800],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  l10n.historyWeeklyTotalRecords(weeklyRecords.length),
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.blue[600],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  l10n.historyWeeklyCheckIn(weeklyRecords.where((r) => r.type == 'check_in').length),
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.blue[600],
-                  ),
-                ),
-                Text(
-                  l10n.historyWeeklyCheckOut(weeklyRecords.where((r) => r.type == 'check_out').length),
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.blue[600],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          const SizedBox(height: 24),
-          
-          // Cihaz bazlı istatistikler
-          if (_deviceList.isNotEmpty) ...[
-            Text(
-              l10n.historyDeviceStats,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            ..._deviceList.map((device) {
-              final deviceRecords = records.where((r) => r.doorName == device).length;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? AppTheme.darkSurface 
-                      : Colors.grey.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.devices_rounded, color: Colors.grey[600]),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        device,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        deviceRecords.toString(),
-                        style: TextStyle(
-                          color: AppTheme.primaryColor,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
           ],
         ],
-        ),
       ),
     );
   }
 
-  Widget _buildMonthStat(String title, String value, IconData icon) {
-    return Column(
-      children: [
-        Icon(icon, color: Colors.white, size: 24),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          title,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 12,
-          ),
-        ),
-      ],
+  Widget _buildMonth(AttendanceProvider provider) {
+    final month = AttendanceDate.month(_periodInstant);
+    final summary = provider.summaryFor(
+      startDate: month.startDate,
+      endDate: month.endDate,
     );
+    final businessNow = AttendanceDate.businessTime(_periodInstant);
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    return _refreshablePage([
+      Text(
+        DateFormat.yMMMM(locale).format(businessNow),
+        style: Theme.of(context).textTheme.headlineSmall,
+      ),
+      const SizedBox(height: 8),
+      const Text(AttendanceDate.timeZone),
+      const SizedBox(height: 16),
+      if (summary != null)
+        HistoryCalendar(
+          month: businessNow,
+          dayCounts: {
+            for (final day in summary.days)
+              day.date: day.entryCount + day.exitCount,
+          },
+          onDaySelected: (day) {
+            _applyFilter(date: day, deviceId: null);
+            _tabs.animateTo(0);
+          },
+        ),
+      _summaryPanel(
+        provider,
+        month,
+        AppLocalizations.of(context).historyMonthSummary,
+      ),
+    ]);
   }
 
-  Widget _buildColorLegend(Color color, String title, String description, IconData icon) {
-    return Row(
-      children: [
-        Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            color: color == Colors.transparent ? Colors.grey.withValues(alpha: 0.2) : color,
-            shape: BoxShape.circle,
-            border: color == Colors.transparent 
-                ? Border.all(color: Colors.grey.withValues(alpha: 0.5), width: 1)
-                : null,
-          ),
-          child: color == Colors.transparent 
-              ? Icon(icon, size: 12, color: Colors.grey[600])
-              : null,
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.white 
-                      : Colors.black87,
-                ),
-              ),
-              Text(
-                description,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Theme.of(context).brightness == Brightness.dark 
-                      ? Colors.grey[400] 
-                      : Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
+  Widget _buildStats(AttendanceProvider provider) {
+    final l10n = AppLocalizations.of(context);
+    return _refreshablePage([
+      Text(l10n.historyRawEvents),
+      const SizedBox(height: 4),
+      const Text(AttendanceDate.timeZone),
+      const SizedBox(height: 16),
+      _summaryPanel(
+        provider,
+        AttendanceDate.month(_periodInstant),
+        l10n.historyMonthSummary,
+      ),
+      const SizedBox(height: 16),
+      _summaryPanel(
+        provider,
+        AttendanceDate.week(_periodInstant),
+        l10n.historyWeeklySummary,
+      ),
+    ]);
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    return Container(
+  Widget _refreshablePage(List<Widget> children) => RefreshIndicator(
+    onRefresh: _refresh,
+    child: ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurface : color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 24),
-              const Spacer(),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              color: color.withValues(alpha: 0.8),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+      children: children,
+    ),
+  );
 
-  Widget _buildRecordsList(AttendanceProvider provider) {
+  Widget _summaryPanel(
+    AttendanceProvider provider,
+    ({String startDate, String endDate}) range,
+    String title,
+  ) {
     final l10n = AppLocalizations.of(context);
-    final records = _getFilteredRecords();
-
-    if (records.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: _loadData,
-        child: _buildEmptyState(l10n.historyEmpty),
-      );
-    }
-
-    final visibleCount = _displayLimit.clamp(0, records.length);
-    final hasMoreLocal = visibleCount < records.length;
-    final hasMoreRemote = provider.hasMore;
-    final showFooter = hasMoreLocal || hasMoreRemote || provider.isLoadingMore;
-
-    return RefreshIndicator(
-      onRefresh: _loadData,
-      child: ListView.builder(
-        controller: _allTabScrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: visibleCount + (showFooter ? 1 : 0),
-        itemBuilder: (context, index) {
-          if (index >= visibleCount) {
-            return _buildLoadMoreFooter();
-          }
-          return _buildModernAttendanceCard(records[index]);
-        },
-      ),
+    final summary = provider.summaryFor(
+      startDate: range.startDate,
+      endDate: range.endDate,
     );
-  }
-
-  Widget _buildLoadMoreFooter() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      child: Center(
-        child: SizedBox(
-          width: 22,
-          height: 22,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-          ),
-        ),
-      ),
+    final isLoading = provider.isSummaryLoadingFor(
+      startDate: range.startDate,
+      endDate: range.endDate,
     );
-  }
-
-  Widget _buildEmptyState(String message) {
-    final l10n = AppLocalizations.of(context);
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.grey.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(50),
-            ),
-            child: Icon(
-              Icons.history_rounded,
-              size: 48,
-              color: Colors.grey[400],
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            message,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            l10n.historyEmptyHint,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
-            ),
-          ),
-        ],
-      ),
+    final error = provider.summaryErrorFor(
+      startDate: range.startDate,
+      endDate: range.endDate,
     );
-  }
-
-  List<Attendance> _getFilteredRecords() {
-    final attendanceProvider = Provider.of<AttendanceProvider>(context);
-    var records = attendanceProvider.attendanceRecords;
-
-    if (_selectedDate != null) {
-      final startOfDay = DateTime(
-        _selectedDate!.year,
-        _selectedDate!.month,
-        _selectedDate!.day,
-      );
-      final endOfDay = startOfDay.add(const Duration(days: 1));
-
-      records = records.where((record) {
-        return record.timestamp.isAfter(startOfDay) && 
-               record.timestamp.isBefore(endOfDay);
-      }).toList();
-    }
-
-    if (_selectedDevice != null) {
-      records = records.where((record) {
-        return record.doorName == _selectedDevice;
-      }).toList();
-    }
-
-    return records;
-  }
-
-  Widget _buildModernAttendanceCard(Attendance record) {
-    final l10n = AppLocalizations.of(context);
-    final isCheckIn = record.type == 'check_in';
-    final formattedTime = DateFormat('HH:mm').format(record.timestamp);
-    final formattedDate = DateFormat('dd.MM.yyyy').format(record.timestamp);
-    final deviceName = record.doorName.isNotEmpty ? record.doorName : l10n.historyUnknownDevice;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurface : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: isDark ? Colors.black.withValues(alpha: 0.3) : Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () => _showModernRecordDetails(record),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Sol taraf - Renkli ikon
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: isCheckIn
-                          ? [Colors.green[400]!, Colors.green[600]!]
-                          : [Colors.red[400]!, Colors.red[600]!],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (isCheckIn ? Colors.green : Colors.red).withValues(alpha: 0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    isCheckIn ? Icons.login_rounded : Icons.logout_rounded,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // Orta kısım - Ana bilgiler
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Cihaz ismi
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_rounded,
-                            size: 14,
-                            color: isDark ? Colors.grey[400] : Colors.grey[600],
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              deviceName,
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? Colors.grey[300] : Colors.grey[800],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-
-                      // Tarih ve saat
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.access_time_rounded,
-                            size: 14,
-                            color: isDark ? Colors.grey[400] : Colors.grey[600],
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '$formattedDate • $formattedTime',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark ? Colors.grey[400] : Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Sağ taraf - Durum badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isCheckIn
-                        ? Colors.green.withValues(alpha: 0.1)
-                        : Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    isCheckIn ? l10n.historyBadgeIn : l10n.historyBadgeOut,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: isCheckIn ? Colors.green[700] : Colors.red[700],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showModernRecordDetails(Attendance record) {
-    final l10n = AppLocalizations.of(context);
-    final localeTag = Localizations.localeOf(context).toLanguageTag();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Row(
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: (record.type == 'check_in' ? Colors.green : Colors.red).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                record.type == 'check_in' ? Icons.login_rounded : Icons.logout_rounded,
-                color: record.type == 'check_in' ? Colors.green : Colors.red,
-              ),
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text(
+              '${_formatDay(AttendanceDate.parseDay(range.startDate))} – '
+              '${_formatDay(AttendanceDate.parseDay(range.endDate))}',
             ),
-            const SizedBox(width: 12),
-            Text(record.type == 'check_in' ? l10n.historyDetailCheckIn : l10n.historyDetailCheckOut),
+            if (isLoading) ...[
+              const SizedBox(height: 12),
+              LinearProgressIndicator(semanticsLabel: l10n.historyLoading),
+            ],
+            if (error != null || (summary == null && !isLoading)) ...[
+              const SizedBox(height: 12),
+              Semantics(
+                liveRegion: true,
+                child: Text(
+                  summary == null
+                      ? l10n.historySummaryUnavailable
+                      : l10n.historyStaleData,
+                ),
+              ),
+              if (error != null) Text(localizeAppError(context, error)),
+              TextButton.icon(
+                onPressed: isLoading
+                    ? null
+                    : () => unawaited(
+                        provider.loadSummary(
+                          startDate: range.startDate,
+                          endDate: range.endDate,
+                        ),
+                      ),
+                icon: const Icon(Icons.refresh),
+                label: Text(l10n.commonRetry),
+              ),
+            ],
+            if (summary != null) ...[
+              const SizedBox(height: 16),
+              _summaryNumbers(summary.totals),
+              const SizedBox(height: 8),
+              Text(
+                l10n.homeUpdatedAt(
+                  DateFormat.yMd(
+                    Localizations.localeOf(context).toLanguageTag(),
+                  ).add_Hm().format(
+                    AttendanceDate.businessTime(summary.generatedAt),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _summaryNumbers(AttendanceTotals totals) {
+    final l10n = AppLocalizations.of(context);
+    // Counts come from the independent server range, never the loaded page.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _number(l10n.historyTotalCheckIns, totals.entryCount),
+        _number(l10n.historyTotalCheckOuts, totals.exitCount),
+        _number(l10n.historyActiveDays, totals.presentDays),
+      ],
+    );
+  }
+
+  Widget _number(String label, int count) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Text('$label: $count'),
+  );
+
+  HistoryAccessState _accessState(Attendance record) =>
+      switch (record.decision) {
+        AttendanceDecision.granted => HistoryAccessState.granted,
+        AttendanceDecision.denied => HistoryAccessState.denied,
+        AttendanceDecision.unknown => HistoryAccessState.unknown,
+      };
+
+  String _formatDay(DateTime day) => DateFormat.yMd(
+    Localizations.localeOf(context).toLanguageTag(),
+  ).format(day);
+
+  String _deviceLabel(String? name) => name != null && name.trim().isNotEmpty
+      ? name
+      : AppLocalizations.of(context).historyUnknownDevice;
+
+  Future<void> _showRecordDetails(Attendance record) async {
+    final l10n = AppLocalizations.of(context);
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final timestamp = AttendanceDate.businessTime(record.timestamp);
+    final direction = switch (record.movement) {
+      AttendanceDirection.entry => l10n.historyEntryShort,
+      AttendanceDirection.exit => l10n.historyExitShort,
+      AttendanceDirection.unknown => l10n.historyUnknownDirection,
+    };
+    final title = switch (record.decision) {
+      AttendanceDecision.denied => '${l10n.accessDenied} · $direction',
+      AttendanceDecision.unknown => '${l10n.historyUnknownAccess} · $direction',
+      AttendanceDecision.granted => direction,
+    };
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(title),
+        scrollable: true,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildDetailRow(Icons.calendar_today_rounded, l10n.historyDetailDate,
-                DateFormat('dd.MM.yyyy EEEE', localeTag).format(record.timestamp)),
-            _buildDetailRow(Icons.access_time_rounded, l10n.historyDetailTime,
-                DateFormat('HH:mm:ss').format(record.timestamp)),
-            _buildDetailRow(Icons.location_on_rounded, l10n.historyDetailLocation,
-                record.doorName.isNotEmpty ? record.doorName : l10n.historyUnknownLocation),
-            if (record.qrData != null && record.qrData!.isNotEmpty)
-              _buildDetailRow(Icons.qr_code_rounded, l10n.historyDetailQrCode, record.qrData!),
+            Text(
+              '${l10n.historyDetailDate}: ${DateFormat.yMMMMEEEEd(locale).format(timestamp)}',
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '${l10n.historyDetailTime}: ${DateFormat.Hms(locale).format(timestamp)}',
+            ),
+            const Text(AttendanceDate.timeZone),
+            const SizedBox(height: 12),
+            Text(
+              '${l10n.historyDetailLocation}: ${_deviceLabel(record.doorName)}',
+            ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: Text(l10n.commonClose),
           ),
         ],
@@ -1236,292 +457,139 @@ class _HistoryScreenState extends State<HistoryScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildDetailRow(IconData icon, String title, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: Colors.grey[600]),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showFilterDialog() {
+  Future<void> _showFilterDialog() async {
     final l10n = AppLocalizations.of(context);
-    showDialog(
+    final date = _selectedDate;
+    final provider = context.read<AttendanceProvider>();
+    final action = await showDialog<_FilterAction>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Row(
-          children: [
-            const Icon(Icons.filter_list_rounded),
-            const SizedBox(width: 8),
-            Text(l10n.historyFilterTitle),
-          ],
-        ),
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.historyFilterTitle),
+        scrollable: true,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.calendar_today_rounded),
+              leading: const Icon(Icons.calendar_today),
               title: Text(l10n.historyFilterDate),
               subtitle: Text(
-                _selectedDate != null
-                    ? DateFormat('dd.MM.yyyy').format(_selectedDate!)
-                    : l10n.historyFilterDateNone,
+                date == null ? l10n.historyFilterDateNone : _formatDay(date),
               ),
-              onTap: () async {
-                final date = await showDatePicker(
-                  context: context,
-                  initialDate: _selectedDate ?? DateTime.now(),
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now(),
-                );
-                if (date != null) {
-                  setState(() => _selectedDate = date);
-                }
-                if (!context.mounted) return;
-                Navigator.pop(context);
-              },
+              onTap: () => Navigator.of(dialogContext).pop(_FilterAction.date),
             ),
-            if (_deviceList.isNotEmpty)
-              ListTile(
-                leading: const Icon(Icons.devices_rounded),
-                title: Text(l10n.historyFilterDevice),
-                subtitle: Text(_selectedDevice ?? l10n.historyFilterDeviceNone),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showDeviceSelectionDialog();
-                },
+            ListTile(
+              leading: const Icon(Icons.devices),
+              title: Text(l10n.historyFilterDevice),
+              subtitle: Text(
+                _selectedDeviceId == null
+                    ? l10n.historyFilterDeviceNone
+                    : _deviceLabel(provider.deviceFacets[_selectedDeviceId]),
               ),
+              onTap: () =>
+                  Navigator.of(dialogContext).pop(_FilterAction.device),
+            ),
           ],
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              setState(() {
-                _selectedDate = null;
-                _selectedDevice = null;
-              });
-              Navigator.pop(context);
-            },
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(_FilterAction.clear),
             child: Text(l10n.historyFilterClear),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.commonOk),
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(l10n.commonClose),
           ),
         ],
       ),
     );
+    if (!mounted) return;
+    switch (action) {
+      case _FilterAction.date:
+        await _selectDate();
+      case _FilterAction.device:
+        await _selectDevice();
+      case _FilterAction.clear:
+        _applyFilter(date: null, deviceId: null);
+      case null:
+        return;
+    }
   }
 
-  void _showDeviceSelectionDialog() {
-    final l10n = AppLocalizations.of(context);
-    showDialog(
+  Future<void> _selectDate() async {
+    final businessNow = AttendanceDate.businessTime(
+      widget.now?.call() ?? DateTime.now(),
+    );
+    final today = DateTime(
+      businessNow.year,
+      businessNow.month,
+      businessNow.day,
+    );
+    final selected = await showDatePicker(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Row(
-          children: [
-            const Icon(Icons.devices_rounded),
-            const SizedBox(width: 8),
-            Text(l10n.historyFilterDeviceSelectTitle),
-          ],
-        ),
+      initialDate: _selectedDate ?? today,
+      firstDate: DateTime(2020),
+      lastDate: today,
+    );
+    if (!mounted || selected == null) return;
+    _applyFilter(date: selected, deviceId: _selectedDeviceId);
+    _tabs.animateTo(0);
+  }
+
+  Future<void> _selectDevice() async {
+    final l10n = AppLocalizations.of(context);
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.historyFilterDeviceSelectTitle),
         content: SizedBox(
           width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: _deviceList.length,
-            itemBuilder: (context, index) {
-              final device = _deviceList[index];
-              return ListTile(
-                leading: const Icon(Icons.location_on_rounded),
-                title: Text(device),
-                selected: device == _selectedDevice,
-                selectedTileColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-                onTap: () {
-                  setState(() => _selectedDevice = device);
-                  Navigator.pop(context);
-                },
-              );
+          height: MediaQuery.sizeOf(dialogContext).height * 0.5,
+          child: Consumer<AttendanceProvider>(
+            builder: (context, provider, child) {
+              final devices = provider.deviceFacets.entries.toList()
+                ..sort((a, b) {
+                  final name = a.value.compareTo(b.value);
+                  return name == 0 ? a.key.compareTo(b.key) : name;
+                });
+              return devices.isEmpty
+                  ? Text(l10n.historyEmpty)
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: devices.length,
+                      itemBuilder: (context, index) {
+                        final device = devices[index];
+                        final label = _deviceLabel(device.value);
+                        final duplicateName =
+                            devices
+                                .where(
+                                  (other) => _deviceLabel(other.value) == label,
+                                )
+                                .length >
+                            1;
+                        return ListTile(
+                          key: ValueKey('history-device-${device.key}'),
+                          title: Text(label),
+                          subtitle: duplicateName ? Text(device.key) : null,
+                          selected: device.key == _selectedDeviceId,
+                          onTap: () =>
+                              Navigator.of(dialogContext).pop(device.key),
+                        );
+                      },
+                    );
             },
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: Text(l10n.commonCancel),
           ),
         ],
       ),
     );
+    if (!mounted || selected == null) return;
+    _applyFilter(date: _selectedDate, deviceId: selected);
+    _tabs.animateTo(0);
   }
-
-  void _showDayDetailsDialog(DateTime selectedDay, List<Attendance> dayRecords) {
-    final l10n = AppLocalizations.of(context);
-    final localeTag = Localizations.localeOf(context).toLanguageTag();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.calendar_today_rounded,
-                color: AppTheme.primaryColor,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    DateFormat('dd MMMM yyyy', localeTag).format(selectedDay),
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  Text(
-                    DateFormat('EEEE', localeTag).format(selectedDay),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 300,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l10n.historyDayRecordCount(dayRecords.length),
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[700],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: dayRecords.length,
-                  itemBuilder: (context, index) {
-                    final record = dayRecords[index];
-                    final isCheckIn = record.type == 'check_in';
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: isCheckIn
-                            ? Colors.green.withValues(alpha: 0.1)
-                            : Colors.red.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isCheckIn
-                              ? Colors.green.withValues(alpha: 0.3)
-                              : Colors.red.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isCheckIn ? Icons.login_rounded : Icons.logout_rounded,
-                            color: isCheckIn ? Colors.green[600] : Colors.red[600],
-                            size: 20,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  isCheckIn ? l10n.historyEntryShort : l10n.historyExitShort,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: isCheckIn ? Colors.green[700] : Colors.red[700],
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  record.doorName.isNotEmpty
-                                      ? record.doorName
-                                      : l10n.historyUnknownLocation,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            DateFormat('HH:mm').format(record.timestamp),
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: isCheckIn ? Colors.green[700] : Colors.red[700],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.commonClose),
-          ),
-        ],
-      ),
-    );
-  }
-} 
+}

@@ -1,0 +1,72 @@
+00:00 +0: loading /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart
+00:00 +0: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: success preserves explicit nulls in nested maps and lists
+00:00 +1: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: success preserves explicit nulls in nested maps and lists
+00:00 +2: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: success preserves explicit nulls in nested maps and lists
+00:00 +3: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: retains safe stack location and operation but drops secret/PII markers
+00:00 +4: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: retains safe stack location and operation but drops secret/PII markers
+00:00 +5: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: retains safe stack location and operation but drops secret/PII markers
+00:00 +6: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: 560 structured auth data takes priority over redacted errorMessage
+00:00 +7: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: 560 structured auth data takes priority over redacted errorMessage
+00:00 +8: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: 560 structured auth data takes priority over redacted errorMessage
+00:00 +9: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: unknown business code and response body never enter local diagnostics
+00:00 +10: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: unknown business code and response body never enter local diagnostics
+00:00 +11: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: unknown business code and response body never enter local diagnostics
+00:00 +12: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: unknown business code and response body never enter local diagnostics
+00:00 +13: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: unknown business code and response body never enter local diagnostics
+00:00 +14: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: structured retryAfterMs is bounded typed metadata
+00:00 +15: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: configuration rejects invalid target without HTTP: https://user:secret@example.convex.cloud
+00:00 +16: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: rate limits identical failures and bounds retained history
+00:00 +17: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: rate limits identical failures and bounds retained history
+00:00 +18: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: rate limits identical failures and bounds retained history
+00:00 +19: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: rate limits identical failures and bounds retained history
+00:00 +20: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: userMessage Network mesajı non-empty
+00:00 +21: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: terminal backend session code EMPLOYEE_INACTIVE is auth expiry
+00:00 +22: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: configuration rejects invalid target without HTTP: https://example..cloud
+00:00 +23: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: configuration rejects invalid target without HTTP: https://example..cloud
+00:00 +24: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: userMessage ServerError mesajında status code görünür
+00:00 +25: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: 200 can carry an error envelope and structured business code
+00:00 +26: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: configuration rejects invalid target without HTTP: https://example.cloud:bad
+00:00 +27: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: userMessage BusinessError bilinen TR mesajını humanize eder
+00:00 +28: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: legacy plain UDF error is allowlisted, not treated as infrastructure
+00:00 +29: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: legacy plain UDF error is allowlisted, not treated as infrastructure
+00:00 +30: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: legacy plain UDF error is allowlisted, not treated as infrastructure
+00:00 +31: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: configuration rejects invalid target without HTTP: https://example.convex.cloud?token=secret
+00:00 +32: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: redacted/unknown UDF messages are safe business failures: Server Error
+00:00 +33: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: redacted/unknown UDF messages are safe business failures: Server Error
+00:00 +34: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: configuration release ignores env and requires explicit compile target
+00:00 +35: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: configuration release ignores env and requires explicit compile target
+00:00 +36: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: configuration release ignores env and requires explicit compile target
+00:00 +37: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: redacted/unknown UDF messages are safe business failures: unexpected exception
+00:00 +38: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: configuration release requires environment and exact approved host
+00:00 +39: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: unknown structured code cannot trigger text auth fallback
+00:00 +40: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: configuration explicit but invalid define never falls back to debug env
+00:00 +41: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 560 expires session exactly once with no retry, even for concurrent calls
+00:00 +42: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 560 expires session exactly once with no retry, even for concurrent calls
+00:00 +43: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 560 expires session exactly once with no retry, even for concurrent calls
+00:00 +44: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 560 expires session exactly once with no retry, even for concurrent calls
+00:00 +45: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 560 expires session exactly once with no retry, even for concurrent calls
+00:00 +46: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 560 expires session exactly once with no retry, even for concurrent calls
+00:00 +47: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 560 expires session exactly once with no retry, even for concurrent calls
+00:00 +48: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 560 expires session exactly once with no retry, even for concurrent calls
+00:00 +49: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 560 expires session exactly once with no retry, even for concurrent calls
+00:00 +50: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 560 expires session exactly once with no retry, even for concurrent calls
+00:00 +51: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 560 expires session exactly once with no retry, even for concurrent calls
+00:00 +52: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 560 expires session exactly once with no retry, even for concurrent calls
+00:00 +53: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 560 expires session exactly once with no retry, even for concurrent calls
+00:00 +54: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 560 expires session exactly once with no retry, even for concurrent calls
+00:00 +55: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 560 expires session exactly once with no retry, even for concurrent calls
+00:00 +56: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 200 business UDF error has no retry or auth callback
+00:00 +57: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 560 business UDF error has no retry or auth callback
+00:00 +58: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 503 queries retry only to bound; mutation and action default to one attempt
+00:00 +59: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 401 is not retried and 403/429 do not expire a session
+00:00 +60: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 403 is not retried and 403/429 do not expire a session
+00:00 +61: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 429 is not retried and 403/429 do not expire a session
+00:00 +62: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: employeeAction injects original token and preserves explicit null arguments
+00:00 +63: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: late A response (200) cannot expire B session or return A data
+00:00 +64: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: late A response (401) cannot expire B session or return A data
+00:00 +65: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: late A response (560) cannot expire B session or return A data
+00:00 +66: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: close cancels polling and clears callback even with a request in flight
+00:00 +67: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: old callback owner cannot clear its replacement
+00:00 +68: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +69: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: oturum hatasından sonra polling yeniden zamanlanmaz
+00:00 +70: All tests passed!

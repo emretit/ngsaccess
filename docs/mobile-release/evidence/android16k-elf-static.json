@@ -1,0 +1,167 @@
+{
+  "scope": "64-bit LOAD segment and separate RELRO arithmetic observation; neither is runtime proof",
+  "all64bitLoadAtLeast16k": true,
+  "libraries": [
+    {
+      "library": "lib/arm64-v8a/libapp.so",
+      "loadAlignments": [
+        65536,
+        65536,
+        65536
+      ],
+      "allLoadAtLeast16k": true,
+      "relroEndModulo16k": []
+    },
+    {
+      "library": "lib/arm64-v8a/libbarhopper_v3.so",
+      "loadAlignments": [
+        16384,
+        16384,
+        16384
+      ],
+      "allLoadAtLeast16k": true,
+      "relroEndModulo16k": [
+        0
+      ]
+    },
+    {
+      "library": "lib/arm64-v8a/libdartjni.so",
+      "loadAlignments": [
+        16384,
+        16384,
+        16384
+      ],
+      "allLoadAtLeast16k": true,
+      "relroEndModulo16k": [
+        8192
+      ]
+    },
+    {
+      "library": "lib/arm64-v8a/libdatastore_shared_counter.so",
+      "loadAlignments": [
+        16384,
+        16384,
+        16384
+      ],
+      "allLoadAtLeast16k": true,
+      "relroEndModulo16k": [
+        8192
+      ]
+    },
+    {
+      "library": "lib/arm64-v8a/libflutter.so",
+      "loadAlignments": [
+        65536,
+        65536,
+        65536
+      ],
+      "allLoadAtLeast16k": true,
+      "relroEndModulo16k": [
+        12288
+      ]
+    },
+    {
+      "library": "lib/arm64-v8a/libimage_processing_util_jni.so",
+      "loadAlignments": [
+        16384,
+        16384,
+        16384
+      ],
+      "allLoadAtLeast16k": true,
+      "relroEndModulo16k": [
+        0
+      ]
+    },
+    {
+      "library": "lib/arm64-v8a/libsurface_util_jni.so",
+      "loadAlignments": [
+        16384,
+        16384
+      ],
+      "allLoadAtLeast16k": true,
+      "relroEndModulo16k": [
+        4096
+      ]
+    },
+    {
+      "library": "lib/x86_64/libapp.so",
+      "loadAlignments": [
+        65536,
+        65536,
+        65536
+      ],
+      "allLoadAtLeast16k": true,
+      "relroEndModulo16k": []
+    },
+    {
+      "library": "lib/x86_64/libbarhopper_v3.so",
+      "loadAlignments": [
+        16384,
+        16384,
+        16384
+      ],
+      "allLoadAtLeast16k": true,
+      "relroEndModulo16k": [
+        12288
+      ]
+    },
+    {
+      "library": "lib/x86_64/libdartjni.so",
+      "loadAlignments": [
+        16384,
+        16384,
+        16384
+      ],
+      "allLoadAtLeast16k": true,
+      "relroEndModulo16k": [
+        8192
+      ]
+    },
+    {
+      "library": "lib/x86_64/libdatastore_shared_counter.so",
+      "loadAlignments": [
+        16384,
+        16384
+      ],
+      "allLoadAtLeast16k": true,
+      "relroEndModulo16k": [
+        8192
+      ]
+    },
+    {
+      "library": "lib/x86_64/libflutter.so",
+      "loadAlignments": [
+        65536,
+        65536,
+        65536
+      ],
+      "allLoadAtLeast16k": true,
+      "relroEndModulo16k": [
+        0
+      ]
+    },
+    {
+      "library": "lib/x86_64/libimage_processing_util_jni.so",
+      "loadAlignments": [
+        16384,
+        16384,
+        16384
+      ],
+      "allLoadAtLeast16k": true,
+      "relroEndModulo16k": [
+        0
+      ]
+    },
+    {
+      "library": "lib/x86_64/libsurface_util_jni.so",
+      "loadAlignments": [
+        16384,
+        16384
+      ],
+      "allLoadAtLeast16k": true,
+      "relroEndModulo16k": [
+        4096
+      ]
+    }
+  ]
+}

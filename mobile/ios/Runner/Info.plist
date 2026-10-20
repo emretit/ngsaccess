@@ -43,8 +43,6 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Bu uygulama QR kod taramak için kameraya erişim gerektirir.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Bu uygulama fotoğraf galerisine erişim gerektirir.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

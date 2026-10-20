@@ -1,11 +1,9 @@
 {
   "@@locale": "en",
-
   "appName": "NGS Plus",
   "appTagline": "Attendance Tracking System",
   "pdksTitle": "Time & Attendance",
   "pdksSubtitle": "Personnel Attendance Control System",
-
   "commonOk": "OK",
   "commonCancel": "Cancel",
   "commonClose": "Close",
@@ -14,12 +12,11 @@
   "commonSuccess": "Success",
   "commonAdd": "Add",
   "comingSoon": "Coming soon.",
-
   "navHome": "Home",
   "navHistory": "History",
   "navVisitor": "Visitor",
   "navProfile": "Profile",
-
+  "loginWelcomeTitle": "Welcome back!",
   "loginTitle": "Sign In",
   "loginPrompt": "Enter your credentials to sign in to the time & attendance system",
   "loginEmailLabel": "Email",
@@ -30,7 +27,6 @@
   "loginPasswordTooShort": "Password must be at least 6 characters",
   "loginRememberMe": "Remember Me",
   "loginForgotPassword": "Forgot password",
-
   "forgotPasswordTitle": "Reset Password",
   "forgotPasswordHeadline": "Forgot your password?",
   "forgotPasswordPrompt": "Enter your email address and we'll send you a reset link.",
@@ -40,11 +36,12 @@
   "forgotPasswordSuccessBody": "A password reset link has been sent to {email}. Please check your inbox.",
   "@forgotPasswordSuccessBody": {
     "placeholders": {
-      "email": { "type": "String" }
+      "email": {
+        "type": "String"
+      }
     }
   },
   "forgotPasswordSuccessButton": "Back to Sign In",
-
   "homeGreetingMorning": "Good morning",
   "homeGreetingDay": "Good day",
   "homeGreetingEvening": "Good evening",
@@ -52,8 +49,12 @@
   "homeGreetingLine": "{greeting}, {name}!",
   "@homeGreetingLine": {
     "placeholders": {
-      "greeting": { "type": "String" },
-      "name": { "type": "String" }
+      "greeting": {
+        "type": "String"
+      },
+      "name": {
+        "type": "String"
+      }
     }
   },
   "homeAttendanceStatus": "Attendance Status",
@@ -64,11 +65,14 @@
   "homeStatusNone": "Not Yet",
   "homeAttendanceEntryRow": "Last In",
   "homeAttendanceExitRow": "Last Out",
-  "homeExtraMovements": "+{count} movements",
+  "homeExtraMovements": "{count, plural, one{+1 movement} other{+{count} movements}}",
   "@homeExtraMovements": {
     "placeholders": {
-      "count": { "type": "int" }
-    }
+      "count": {
+        "type": "int"
+      }
+    },
+    "description": "Localized record count; English singular/plural, Turkish number followed by noun."
   },
   "homeScanCheckInAgain": "Scan QR - Check In Again",
   "homeAttendanceTimeEmpty": "—",
@@ -79,8 +83,12 @@
   "homeProgressLabel": "{present} / {total} days attended",
   "@homeProgressLabel": {
     "placeholders": {
-      "present": { "type": "int" },
-      "total": { "type": "int" }
+      "present": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
     }
   },
   "homeQuoteOfTheDay": "💫 Quote of the Day",
@@ -92,14 +100,13 @@
   "homeQuote6": "Time is the most valuable treasure — use it wisely.",
   "homeQuote7": "Good habits are the key to success.",
   "homeQuote8": "Every day is an opportunity to improve yourself.",
-
   "profileTitle": "Profile",
-  "profileEditButton": "Edit Profile",
-  "profileEditDialogBody": "Profile editing will be added soon.",
+  "profileEditButton": "Personal details",
+  "profileEditDialogBody": "Your organization manages your first name, last name and email address. Contact your personnel or system administrator for corrections. These fields are read-only in this app.",
   "profileNotifications": "Notifications",
-  "profileNotificationsSubtitle": "Manage notification settings",
+  "profileNotificationsSubtitle": "Updates and usage information",
   "profileSecurity": "Security",
-  "profileSecuritySubtitle": "Password and security settings",
+  "profileSecuritySubtitle": "Password change and recovery",
   "profileTheme": "Theme",
   "profileThemeDark": "Dark theme active",
   "profileThemeLight": "Light theme active",
@@ -127,34 +134,33 @@
   "profileHelp": "Help & Support",
   "profileHelpSubtitle": "FAQ and support",
   "profileAboutApp": "About the App",
-  "profileAppVersion": "Version 1.0.0",
-  "profilePrivacy": "Privacy Policy",
-  "profilePrivacySubtitle": "Data usage policy",
+  "profileAppVersion": "Version",
+  "profilePrivacy": "Privacy information",
+  "profilePrivacySubtitle": "App data and who to contact",
   "profileLogout": "Sign Out",
   "profileLogoutSubtitle": "Sign out of your account",
   "profileLogoutConfirmTitle": "Sign Out",
   "profileLogoutConfirmBody": "Are you sure you want to sign out of your account?",
   "profileSettings": "Settings",
-  "profileSettingsBody": "Advanced settings will be added soon.",
+  "profileSettingsBody": "Set your theme, language and quick access target from Profile.",
   "profileNotificationsDialogTitle": "Notification Settings",
-  "profileNotificationsDialogBody": "Notification settings will be added soon.",
+  "profileNotificationsDialogBody": "Push delivery and notification preference management are not available in this version. Open the app and refresh to view current access and event information. Contact your organization’s administrator about missing or incorrect records.",
   "profileSecurityDialogTitle": "Security Settings",
-  "profileSecurityDialogBody": "Security settings will be added soon.",
+  "profileSecurityDialogBody": "If you know your current password, choose a new one using the form below. Changing your password ends all mobile sessions. If you forgot it, ask your organization’s administrator for a new setup link. Sign out before leaving a shared device.",
   "profileThemeDialogTitle": "Theme Settings",
-  "profileThemeDialogBody": "Theme settings will be added soon.",
+  "profileThemeDialogBody": "Choose the light, dark or system theme.",
   "profileLanguageDialogTitle": "Language Settings",
-  "profileLanguageDialogBody": "Language settings will be added soon.",
+  "profileLanguageDialogBody": "The language preference is stored on this device and retained after sign-out.",
   "profileHelpDialogTitle": "Help & Support",
-  "profileHelpDialogBody": "Help and support page will be added soon.",
-  "profilePrivacyDialogTitle": "Privacy Policy",
-  "profilePrivacyDialogBody": "Privacy policy will be added soon.",
+  "profileHelpDialogBody": "Door selection\nChoose an accessible target from Profile > Quick Access Door. You can clear the selection or refresh the list. If the list is empty, ask your administrator to check your access permissions.\n\nUsing QR codes\nCamera permission is needed only for scanning. If permission is denied, check camera access in device settings. Show your personal QR code to a supported reader and refresh it when expired. Scanning an identity label alone does not create a passage record.\n\nRecords and access issues\nCheck your connection and refresh the relevant screen. A door command, a physical passage and an official attendance result are different events. Contact your personnel or system administrator about missing or incorrect records.\n\nSupport details\nGive your administrator the app version (About the App), the time of the issue and the displayed error. Do not share passwords, session information or your personal QR code.",
+  "profilePrivacyDialogTitle": "Privacy information",
+  "profilePrivacyDialogBody": "App data information — 19 October 2026\n\nNGS Plus retrieves and displays your organization’s employee details, accessible devices and your access events from the service. Personal QR codes are obtained from the service; the camera is used for scanning. A door request sends the selected target to the service. Theme, language and scoped target preferences are stored on this device.\n\nYour organization manages employee details, access permissions and event records. Contact your personnel or data administrator about processing purposes, retention periods, legal basis and personal data requests.\n\nThis explanation describes app data use and does not replace your organization’s approved privacy policy. A published organization policy link is not configured in this version.",
   "profileAboutDialogTitle": "About NGS Plus",
   "profileAboutLine1": "NGS Plus Attendance Tracking System",
-  "profileAboutLine2": "Version: 1.0.0",
-  "profileAboutLine3": "Developer: NGS Team",
-  "profileAboutLine4": "QR code based attendance tracking application.",
-  "profileFallbackEmail": "email@example.com",
-
+  "profileAboutLine2": "Installed app version",
+  "profileAboutLine3": "Contact your organization’s administrator for support.",
+  "profileAboutLine4": "Employee access and event information application.",
+  "profileFallbackEmail": "Email unavailable",
   "historyTitle": "History",
   "historyTabAll": "All",
   "historyTabThisMonth": "This Month",
@@ -164,7 +170,9 @@
   "historyErrorBody": "Failed to load data: {error}",
   "@historyErrorBody": {
     "placeholders": {
-      "error": { "type": "String" }
+      "error": {
+        "type": "String"
+      }
     }
   },
   "historyEmpty": "No records found",
@@ -186,22 +194,29 @@
   "historyGeneralStats": "General Statistics",
   "historyThisWeek": "This Week",
   "historyWeeklySummary": "Weekly Summary",
-  "historyWeeklyTotalRecords": "{count} records this week",
+  "historyWeeklyTotalRecords": "{count, plural, one{1 record this week} other{{count} records this week}}",
   "@historyWeeklyTotalRecords": {
     "placeholders": {
-      "count": { "type": "int" }
-    }
+      "count": {
+        "type": "int"
+      }
+    },
+    "description": "Localized record count; English singular/plural, Turkish number followed by noun."
   },
   "historyWeeklyCheckIn": "Check-ins: {count}",
   "@historyWeeklyCheckIn": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "historyWeeklyCheckOut": "Check-outs: {count}",
   "@historyWeeklyCheckOut": {
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "historyDeviceStats": "Device Statistics",
@@ -224,15 +239,17 @@
   "historyFilterDeviceNone": "No device selected",
   "historyFilterClear": "Clear Filters",
   "historyFilterDeviceSelectTitle": "Select Device",
-  "historyDayRecordCount": "{count} Record(s)",
+  "historyDayRecordCount": "{count, plural, one{1 record} other{{count} records}}",
   "@historyDayRecordCount": {
     "placeholders": {
-      "count": { "type": "int" }
-    }
+      "count": {
+        "type": "int"
+      }
+    },
+    "description": "Localized record count; English singular/plural, Turkish number followed by noun."
   },
   "historyEntryShort": "In",
   "historyExitShort": "Out",
-
   "qrTabTitle": "QR Actions",
   "qrTabMyQr": "My QR",
   "qrTabScan": "Scan",
@@ -245,16 +262,24 @@
   "qrProcessError": "An error occurred while processing the QR code: {error}",
   "@qrProcessError": {
     "placeholders": {
-      "error": { "type": "String" }
+      "error": {
+        "type": "String"
+      }
     }
   },
   "qrUserCodeTitle": "User QR Code",
   "qrUserCodeBody": "User: {name}\nEmail: {email}\nDate: {date}",
   "@qrUserCodeBody": {
     "placeholders": {
-      "name": { "type": "String" },
-      "email": { "type": "String" },
-      "date": { "type": "String" }
+      "name": {
+        "type": "String"
+      },
+      "email": {
+        "type": "String"
+      },
+      "date": {
+        "type": "String"
+      }
     }
   },
   "qrInvalidCode": "Invalid QR code",
@@ -263,22 +288,27 @@
   "qrDeviceLine": "Device: {name}",
   "@qrDeviceLine": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "qrLocationLine": "Location: {location}",
   "@qrLocationLine": {
     "placeholders": {
-      "location": { "type": "String" }
+      "location": {
+        "type": "String"
+      }
     }
   },
   "qrTimeLine": "Time: {time}",
   "@qrTimeLine": {
     "placeholders": {
-      "time": { "type": "String" }
+      "time": {
+        "type": "String"
+      }
     }
   },
-
   "visitorTitle": "Visitor Management",
   "visitorStatTotal": "Total",
   "visitorStatInside": "Inside",
@@ -291,7 +321,9 @@
   "visitorContactPerson": "Contact: {name}",
   "@visitorContactPerson": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "visitorCheckOut": "Check Out",
@@ -299,13 +331,17 @@
   "visitorCheckedInToast": "{name} checked in",
   "@visitorCheckedInToast": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "visitorCheckedOutToast": "{name} checked out",
   "@visitorCheckedOutToast": {
     "placeholders": {
-      "name": { "type": "String" }
+      "name": {
+        "type": "String"
+      }
     }
   },
   "visitorFilterTitle": "Filter",
@@ -317,13 +353,14 @@
   "visitorFieldContact": "Contact Person",
   "visitorAddedToast": "Visitor added",
   "visitorAddButton": "Add Visitor",
-
   "errorNetwork": "No internet connection. Please check your connection.",
   "errorTimeout": "The server did not respond. Please try again later.",
   "errorServer": "Server error ({code}). Please try again shortly.",
   "@errorServer": {
     "placeholders": {
-      "code": { "type": "int" }
+      "code": {
+        "type": "int"
+      }
     }
   },
   "errorAuthExpired": "Your session has ended. Please sign in again.",
@@ -331,8 +368,170 @@
   "errorBusinessInvalidCredentials": "Invalid email or password",
   "errorBusinessNoMobilePassword": "Your mobile password isn't set yet. Ask your administrator for a setup link.",
   "errorBusinessEmployeeInactive": "Your employee record is not active",
-
   "passwordResetAdminInfo": "Your mobile password is set up by your administrator. Please contact them.",
   "qrInvalidDevice": "QR code is missing device information",
-  "accessDenied": "Access denied"
+  "accessDenied": "Access denied",
+  "profileFirstName": "First name",
+  "profileLastName": "Last name",
+  "profileLanguageSystem": "System language",
+  "profileLanguageScope": "Stored on this device; retained after sign-out.",
+  "profileVersionUnavailable": "Version information unavailable",
+  "profileVersionBuild": "Version {version} (build {build})",
+  "preferenceSaveFailed": "Could not save your preference. Please try again.",
+  "preferenceIdentityUnavailable": "Account or project information could not be verified. Sign in again.",
+  "selectDeviceClear": "Clear selection",
+  "selectDeviceInvalidated": "The previous target is no longer available. Choose a new target.",
+  "historyLoadMore": "Load more",
+  "historyAccessDenied": "Access denied",
+  "historyUnknownDirection": "Unknown direction",
+  "historyUnknownAccess": "Unknown access result",
+  "historyStaleData": "Showing previous data; refresh failed.",
+  "historySummaryUnavailable": "Period summary unavailable.",
+  "historyRawEvents": "Raw access events; not an official attendance result.",
+  "homeDataLoading": "Loading data",
+  "homeDataUnavailable": "Data unavailable",
+  "homeDataStale": "Showing previous data",
+  "homeDataRefreshing": "Refreshing data",
+  "homeRetry": "Try again",
+  "homeStatusUnknown": "Status unknown",
+  "homeSelfCheckIn": "Manual check-in",
+  "homeSelfCheckInRecorded": "Manual check-in recorded",
+  "homeCommandPending": "Command submitted; physical passage is not confirmed.",
+  "@profileVersionBuild": {
+    "description": "Version and build from installed package metadata, never translated.",
+    "placeholders": {
+      "version": {
+        "type": "String"
+      },
+      "build": {
+        "type": "String"
+      }
+    }
+  },
+  "qrCameraUnavailableRetry": "Camera unavailable. Try again.",
+  "qrCameraInUseRetry": "Camera unavailable. Close other camera apps and try again.",
+  "qrSettingsUnavailable": "Unable to open settings. Enable camera permission in system settings.",
+  "qrServiceUnavailable": "QR service unavailable.",
+  "qrPersonalCode": "Your personal QR code",
+  "qrConsumedHint": "Code consumed. Refresh for a new operation.",
+  "qrExpiredHint": "Code expired.",
+  "qrRefreshFailed": "Unable to refresh QR.",
+  "qrStatusUnavailable": "Unable to verify code status. Check again.",
+  "qrReaderHint": "Show this code to a supported reader. Time is based on server expiry. An operation record does not confirm a door opening or physical passage.",
+  "qrSwitchCamera": "Switch camera",
+  "qrFlashlight": "Flashlight",
+  "qrCameraPermissionRequired": "Camera permission is required to scan QR codes.",
+  "qrOpenSettings": "Open settings",
+  "qrCameraControlUnavailable": "Camera control unavailable.",
+  "qrDeviceIdentityOnly": "This is a device identity label, not access authorization or proof of presence. Use My QR at a supported reader.",
+  "qrEmployeeIdentityOnly": "This is an employee identity code. It does not verify identity or create an operation record.",
+  "qrChallengeUnsupported": "This reader’s secure operation flow is not supported yet. Use My QR at a supported reader.",
+  "qrScanExpired": "QR code expired.",
+  "qrInvalidDate": "QR code date is invalid.",
+  "qrUnsupportedVersion": "This QR version is unsupported.",
+  "qrRemainingSeconds": "Remaining: {seconds} s",
+  "@qrRemainingSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "loginRememberEmail": "Remember my email",
+  "passwordHelpTitle": "Password help",
+  "passwordHelpAdminTitle": "Contact your administrator",
+  "passwordHelpAdminBody": "Your organization’s administrator manages mobile password setup. Ask them to send a new setup link to your registered email address. Open that link to choose a new password, then return here to sign in.",
+  "passwordHelpNoEmail": "This screen does not send email or change your password.",
+  "passwordHelpRequest": "Hello, I need to set or reset my NGS Plus mobile password. Please send a new password setup link to the email address registered in my employee account.",
+  "passwordHelpCopy": "Copy request for administrator",
+  "passwordHelpCopied": "Request copied. Share it with your administrator.",
+  "passwordHelpCopyFailed": "Could not copy. You can select the request text below.",
+  "loginShowPassword": "Show password",
+  "loginHidePassword": "Hide password",
+  "startupTitle": "Starting NGS Plus",
+  "startupUnavailable": "Could not verify your session. Check your connection and try again.",
+  "startupRetry": "Try again",
+  "startupUseLogin": "Return to sign in",
+  "homeUpdatedAt": "Updated: {time}",
+  "@homeUpdatedAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "homeScanQr": "Scan QR code",
+  "homeCommandConfirmed": "The device confirmed the command; physical passage is not confirmed.",
+  "homeCommandFailed": "Door command failed.",
+  "homeCommandUnknown": "The result is uncertain. Check its status before sending another command.",
+  "homeCommandCheckStatus": "Check status",
+  "visitorFirstName": "First name",
+  "visitorLastName": "Last name",
+  "visitorPhone": "Phone",
+  "visitorStart": "Visit starts",
+  "visitorEnd": "Visit ends",
+  "visitorSave": "Save",
+  "visitorEdit": "Edit",
+  "visitorCancelInvitation": "Cancel invitation",
+  "visitorCancelConfirm": "Cancel this invitation?",
+  "visitorPreRegistered": "Awaiting operator activation",
+  "visitorAccessActive": "Access active",
+  "visitorAccessEnded": "Access ended",
+  "visitorExpired": "Expired",
+  "visitorPresenceUnknown": "Physical presence unknown",
+  "visitorPresenceInside": "Last recorded inside",
+  "visitorPresenceOutside": "Last recorded outside",
+  "visitorOperatorRequired": "Contact an authorized operator to revoke active access.",
+  "visitorSaved": "Invitation record saved; operator activation is required.",
+  "visitorCancelled": "Invitation cancelled.",
+  "visitorLoadMore": "Load more",
+  "visitorNotice": "Project visitor notice",
+  "visitorNoticeReviewed": "I have reviewed the current notice.",
+  "visitorInvalidForm": "Check the required fields and visit dates.",
+  "visitorStale": "Could not refresh; showing previous records.",
+  "visitorRefresh": "Refresh",
+  "profileChangePassword": "Change password",
+  "profileCurrentPassword": "Current password",
+  "profileNewPassword": "New password",
+  "profileRepeatPassword": "Repeat new password",
+  "profilePasswordRules": "Use at least 12 characters and at most 72 UTF-8 bytes, different from your current password. Changing it ends all sessions; sign in again afterwards.",
+  "profilePasswordInvalid": "Check the password rules and that both new passwords match.",
+  "profilePasswordRequired": "Enter your current password.",
+  "profilePasswordChanged": "Password changed. Sign in with your new password.",
+  "errorRateLimited": "Too many attempts. Wait a while and try again.",
+  "errorSessionStorageFailed": "Your session could not be stored securely. Please sign in again.",
+  "errorProtocol": "The server response could not be verified. Please try again.",
+  "errorPasswordPolicy": "Use a new password of at least 12 characters and at most 72 UTF-8 bytes, different from the current password.",
+  "homeChooseDoor": "Choose a door",
+  "homeDoorUnavailable": "The selected door is no longer available. Choose a new door from Profile.",
+  "homeNoOpenableDoor": "No door on this device is available to open.",
+  "startupContactAdministrator": "If the problem continues, contact your organization’s system administrator.",
+  "selectDeviceInactive": "Target inactive",
+  "selectDeviceOutsideSchedule": "Outside access hours",
+  "selectDeviceUnsupported": "Mobile opening is not supported for this target",
+  "selectDeviceUnavailable": "This target is currently unavailable",
+  "visitorOutcomeUnknown": "The result is unknown. Retry this same invitation before creating another; its details are locked to prevent duplicates.",
+  "homeCommandRetrySameRequest": "Retry the same request",
+  "homeCommandSending": "Sending command; waiting for a result.",
+  "startupConfigurationUnavailable": "The app could not start. Retry or contact your organization’s system administrator.",
+  "visitorSearch": "Search invitations",
+  "visitorAllStatuses": "All access states",
+  "visitorSummaryTitle": "Your invitations, all pages",
+  "visitorSummaryLimited": "These totals are lower bounds; the summary read limit was reached.",
+  "visitorSummaryError": "Summary could not be refreshed.",
+  "visitorSyncTitle": "Device synchronization",
+  "visitorSyncPending": "Device update pending",
+  "visitorSyncApplied": "Device acknowledged the update",
+  "visitorSyncFailed": "Device update failed; contact an operator.",
+  "visitorSyncUnknown": "Device result not verified",
+  "profileDiagnosticsTitle": "Technical support report",
+  "profileDiagnosticsBody": "Copy app version, build and recent technical failures for your organization’s support team. Account details, passwords, QR codes and response bodies are excluded. The bounded log stays in memory until the app closes; nothing is sent automatically. Copying puts it on the system clipboard, which other apps may access. Clearing the local log does not erase an already copied report.",
+  "profileDiagnosticsEmpty": "No recent technical failures. The report still includes app and build information.",
+  "profileDiagnosticsCopy": "Copy support report",
+  "profileDiagnosticsClear": "Clear local log",
+  "profileDiagnosticsCopied": "Support report copied. Share it only with your organization’s support team.",
+  "profileDiagnosticsCopyFailed": "Could not copy the report. Please try again.",
+  "profileDiagnosticsCleared": "Local log cleared. Previously copied reports remain on the clipboard.",
+  "visitorNotes": "Notes",
+  "visitorOptionalHint": "Optional"
 }

@@ -1,0 +1,4 @@
+Formatted mobile/lib/providers/visitor_provider.dart
+Formatted mobile/lib/screens/profile/profile_screen.dart
+Formatted mobile/test/widgets/profile_screen_test.dart
+Formatted 103 files (3 changed) in 0.19 seconds.

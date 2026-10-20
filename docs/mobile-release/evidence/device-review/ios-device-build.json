@@ -1,0 +1,9 @@
+{
+  "exitCode": 0,
+  "mode": "release",
+  "signing": "existing Apple Development identity; automatic team T9QCW8Q2C3",
+  "version": "1.0.4",
+  "build": "1",
+  "environment": "existing development backend, labeled staging",
+  "backendHost": "notable-tern-4.convex.cloud"
+}

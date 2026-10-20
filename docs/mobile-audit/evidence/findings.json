@@ -1,0 +1,681 @@
+[
+  {
+    "id": "AUTH-F01",
+    "title": "Parola ve uzun ömürlü bearer token güvenli saklama katmanı olmadan kalıcılaştırılıyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/01-auth.md",
+    "line": 69
+  },
+  {
+    "id": "AUTH-F02",
+    "title": "Açık çıkış sonraki açılışta otomatik girişi engellemiyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/01-auth.md",
+    "line": 79
+  },
+  {
+    "id": "AUTH-F03",
+    "title": "Parolanın yeniden kurulması mevcut mobil oturumları geçersiz kılmıyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/01-auth.md",
+    "line": 89
+  },
+  {
+    "id": "AUTH-F04",
+    "title": "Eşzamanlı giriş/çıkış ve gecikmiş yanıtlar için oturum sahipliği koruması yok",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/01-auth.md",
+    "line": 99
+  },
+  {
+    "id": "AUTH-F05",
+    "title": "Bootstrap geçici ağ hatası geçerli oturumu giriş ekranında bırakıyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/01-auth.md",
+    "line": 111
+  },
+  {
+    "id": "AUTH-F06",
+    "title": "Çalışan pasifleştirme hatası istemcide oturum sonu olarak işlenmiyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/01-auth.md",
+    "line": 121
+  },
+  {
+    "id": "AUTH-F07",
+    "title": "Kurtarma ekranı uygulanmamış e-posta akışını vaat ediyor ve eski hatayı gösterebiliyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/01-auth.md",
+    "line": 131
+  },
+  {
+    "id": "AUTH-F08",
+    "title": "Public mobil parola doğrulamasında uygulama düzeyinde deneme sınırı yok",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/01-auth.md",
+    "line": 141
+  },
+  {
+    "id": "AUTH-F09",
+    "title": "Convex HTTP 560 oturum hatası genel sunucu hatasına dönüşüyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/01-auth.md",
+    "line": 151
+  },
+  {
+    "id": "HOME-F01",
+    "title": "P1 — Kapıyı Aç, fiziksel komut göndermeden yoklama kaydı oluşturuyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/02-home.md",
+    "line": 89
+  },
+  {
+    "id": "HOME-F02",
+    "title": "P1 — Tek kullanıcı niyeti, tekrarlı dokunmada birden fazla giriş/çıkış üretir",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/02-home.md",
+    "line": 97
+  },
+  {
+    "id": "HOME-F03",
+    "title": "P2 — Yükleniyor, hata ve gerçekten hareket yok durumları aynı görünüyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/02-home.md",
+    "line": 105
+  },
+  {
+    "id": "HOME-F04",
+    "title": "P1 — Dashboard özeti, son oluşturulan 50 kaydın eksik penceresinden hesaplanıyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/02-home.md",
+    "line": 113
+  },
+  {
+    "id": "HOME-F05",
+    "title": "P2 — Gün sınırı ve saat politikası backend ile aynı değil",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/02-home.md",
+    "line": 121
+  },
+  {
+    "id": "HOME-F06",
+    "title": "P2 — Bilinmeyen yön sessizce giriş ve İçeride kabul ediliyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/02-home.md",
+    "line": 129
+  },
+  {
+    "id": "HOME-F07",
+    "title": "P2 — Tercih edilen cihaz kullanıcıdan bağımsız saklanıyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/02-home.md",
+    "line": 137
+  },
+  {
+    "id": "HOME-F08",
+    "title": "P1 — Geciken tek seferlik sorgu, çıkıştan sonra eski çalışanın kayıtlarını yeniden yazabilir",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/02-home.md",
+    "line": 145
+  },
+  {
+    "id": "HOME-F09",
+    "title": "P1 — Kaydedilmiş cihaz pasife alınsa da selfCheckIn onaylı kayıt üretebiliyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/02-home.md",
+    "line": 153
+  },
+  {
+    "id": "AH-F01",
+    "title": "Takvim yerel günleri UTC anahtarlarıyla arıyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/03-attendance-history.md",
+    "line": 61
+  },
+  {
+    "id": "AH-F02",
+    "title": "Eksik pencere tam dönem gibi sayılıyor; filtreli geçmiş ilerleyemiyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/03-attendance-history.md",
+    "line": 67
+  },
+  {
+    "id": "AH-F03",
+    "title": "Ay/hafta/gün sınırları farklı ve hatalı",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/03-attendance-history.md",
+    "line": 73
+  },
+  {
+    "id": "AH-F04",
+    "title": "Red ve bilinmeyen yön gerçek giriş/çıkış gibi sunuluyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/03-attendance-history.md",
+    "line": 79
+  },
+  {
+    "id": "AH-F05",
+    "title": "Bekleyen refresh yanıtı logout/hesap değişimi sonrası eski veriyi geri yazabiliyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/03-attendance-history.md",
+    "line": 85
+  },
+  {
+    "id": "AH-F06",
+    "title": "Zaman dilimi ve vardiya anlamı kaynaklar arasında ortak değil",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/03-attendance-history.md",
+    "line": 91
+  },
+  {
+    "id": "AH-F07",
+    "title": "Geçmiş zaman yerine eklenme sırasına göre sınırlanıyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/03-attendance-history.md",
+    "line": 97
+  },
+  {
+    "id": "AH-F08",
+    "title": "Cihaz filtresi/cihaz özeti ilk yükleme snapshot'ında kalıyor ve adları kimlik sayıyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/03-attendance-history.md",
+    "line": 103
+  },
+  {
+    "id": "AH-F09",
+    "title": "Yükleme sırasında ekran kapanınca state güncellemesi korunmuyor; boş refresh yüzeyi yok",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/03-attendance-history.md",
+    "line": 109
+  },
+  {
+    "id": "AH-F10",
+    "title": "Polling düzelince eski hata nesnesi kalıyor ve başka işleme yanlış hata taşınabiliyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/03-attendance-history.md",
+    "line": 115
+  },
+  {
+    "id": "AH-F11",
+    "title": "Sayfa sonu scroll callback'i dinleyen Provider okuması yapıyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/03-attendance-history.md",
+    "line": 121
+  },
+  {
+    "id": "QR-F01",
+    "title": "QR sözleşmesi ekran, model, provider ve üreticiler arasında tutarsız — P1",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/04-qr.md",
+    "line": 62
+  },
+  {
+    "id": "QR-F02",
+    "title": "Yoklama kaydı fiziksel geçiş başarısı gibi sunuluyor — P1",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/04-qr.md",
+    "line": 70
+  },
+  {
+    "id": "QR-F03",
+    "title": "Cihaz QR'ı tazelik veya fiziksel bulunma kanıtı sağlamıyor — P1",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/04-qr.md",
+    "line": 78
+  },
+  {
+    "id": "QR-F04",
+    "title": "Üç saniye sonra tekrar tarama ve belirsiz ağ sonucu çift kayıt/yön değişimi üretir — P1",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/04-qr.md",
+    "line": 86
+  },
+  {
+    "id": "QR-F05",
+    "title": "Aynı çalışan token'ı public tüketicide okuyucu/politika denetimini atlar — P1",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/04-qr.md",
+    "line": 94
+  },
+  {
+    "id": "QR-F06",
+    "title": "Mobil “kapı cihazına okutun” vaadi Hikvision/IDE token yoluyla örtüşmüyor — P1",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/04-qr.md",
+    "line": 102
+  },
+  {
+    "id": "QR-F07",
+    "title": "Kamera görünürlük ve app lifecycle yönetimi dış controller ile eksik — P2",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/04-qr.md",
+    "line": 110
+  },
+  {
+    "id": "QR-F08",
+    "title": "Bekleyen tarama ekran kaldırıldığında unmounted state güncelleniyor — P2",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/04-qr.md",
+    "line": 118
+  },
+  {
+    "id": "QR-F09",
+    "title": "Token süresi ve yenileme durumu kullanıcıya yanlış/eksik aktarılıyor — P2",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/04-qr.md",
+    "line": 126
+  },
+  {
+    "id": "QR-F10",
+    "title": "Mobil/self-check-in ve generic token kararı kuralın gün/saat sınırını uygulamıyor — P1",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/04-qr.md",
+    "line": 134
+  },
+  {
+    "id": "VIS-F01",
+    "title": "Mobil ana ziyaretçi akışı tamamen placeholder; çalışan oturumu için API sözleşmesi yok",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/05-visitor.md",
+    "line": 77
+  },
+  {
+    "id": "VIS-F02",
+    "title": "Projesiz eski ziyaretçide checkOut/releaseCard proje yetkisi kontrolünü atlıyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/05-visitor.md",
+    "line": 87
+  },
+  {
+    "id": "VIS-F03",
+    "title": "IDE kart gereksinimi kayıt öncesi doğrulanmıyor; başarılı kayıt sonradan senkronize edilemeyebilir",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/05-visitor.md",
+    "line": 97
+  },
+  {
+    "id": "VIS-F04",
+    "title": "İngilizce ekranda placeholder gövdesi Türkçe kalıyor",
+    "priority": "P3",
+    "report": "docs/mobile-audit/modules/05-visitor.md",
+    "line": 107
+  },
+  {
+    "id": "PROFILE-F01",
+    "title": "Açık çıkıştan sonra beni hatırla otomatik olarak yeniden oturum açıyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/06-profile.md",
+    "line": 71
+  },
+  {
+    "id": "PROFILE-F02",
+    "title": "Kapı tercihi hesaplar arasında taşınıyor ve geçersiz seçim temizlenemiyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/06-profile.md",
+    "line": 80
+  },
+  {
+    "id": "PROFILE-F03",
+    "title": "Profil ve ayar menüsünün önemli bölümü tamamlanmamış",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/06-profile.md",
+    "line": 89
+  },
+  {
+    "id": "PROFILE-F04",
+    "title": "Parola sıfırlama formunun vaadi gerçek yönetici akışıyla uyuşmuyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/06-profile.md",
+    "line": 98
+  },
+  {
+    "id": "PROFILE-F05",
+    "title": "Hızlı erişim kapısı ayarı gerçek kapı komutuna bağlanmıyor, attendance kaydı oluşturuyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/06-profile.md",
+    "line": 107
+  },
+  {
+    "id": "PROFILE-F06",
+    "title": "Hakkında ekranı manifest sürümünden farklı sabit sürüm gösteriyor",
+    "priority": "P3",
+    "report": "docs/mobile-audit/modules/06-profile.md",
+    "line": 116
+  },
+  {
+    "id": "DEV-F01",
+    "title": "Tercih kullanıcı/proje kapsamında değil; eski tercihi kurtarma akışı yok",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/07-devices.md",
+    "line": 72
+  },
+  {
+    "id": "DEV-F02",
+    "title": "Karar anında pasif cihaz ve kuralın saat/gün kısıtları uygulanmıyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/07-devices.md",
+    "line": 82
+  },
+  {
+    "id": "DEV-F03",
+    "title": "Yabancı proje cihazı reddedilse de kendi geçmişine bağlanıp metadata döndürülebiliyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/07-devices.md",
+    "line": 92
+  },
+  {
+    "id": "DEV-F04",
+    "title": "“Kapıyı Aç” fiziksel işlem olmadan katılım kaydı yazıyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/07-devices.md",
+    "line": 102
+  },
+  {
+    "id": "DEV-F05",
+    "title": "Yalnız kapı bağıyla verilen izin cihaz listesinde görünmüyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/07-devices.md",
+    "line": 112
+  },
+  {
+    "id": "DEV-F06",
+    "title": "Tercih kayıt hatası kullanıcı akışında yönetilmiyor; bellek ve disk ayrışabiliyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/07-devices.md",
+    "line": 122
+  },
+  {
+    "id": "DEV-F07",
+    "title": "Bozuk cihaz yanıtı boş yetki listesine veya seçilebilir sahte ID'ye dönüşebiliyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/07-devices.md",
+    "line": 132
+  },
+  {
+    "id": "DEV-F08",
+    "title": "Liste ham teknik hatayı gösteriyor; hızlı açma farklı hataları “erişim reddi”ne indiriyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/07-devices.md",
+    "line": 142
+  },
+  {
+    "id": "AN-F01",
+    "title": "Açık çıkış, yeniden başlatmada hatırlanan bilgilerle geri alınabiliyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/08-architecture-navigation.md",
+    "line": 100
+  },
+  {
+    "id": "AN-F02",
+    "title": "Eski oturumun gecikmiş liste yanıtı yeni kullanıcının ortak verisine yazılabiliyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/08-architecture-navigation.md",
+    "line": 111
+  },
+  {
+    "id": "AN-F03",
+    "title": "Deep link, bootstrap'ı atlayabiliyor ve girişten sonra hedef kayboluyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/08-architecture-navigation.md",
+    "line": 122
+  },
+  {
+    "id": "AN-F04",
+    "title": "Korunan QR sekmesinin gizlenmesi kamera/tarama ömrünü sonlandırmıyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/08-architecture-navigation.md",
+    "line": 134
+  },
+  {
+    "id": "AN-F05",
+    "title": "Seçili cihaz tercihi kullanıcı değişiminden sonra önceki hesaba ait kalıyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/08-architecture-navigation.md",
+    "line": 146
+  },
+  {
+    "id": "AN-F06",
+    "title": "Geçici bootstrap ağ hatası, geçerli session olmasına rağmen login'e düşürüyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/08-architecture-navigation.md",
+    "line": 157
+  },
+  {
+    "id": "AN-F07",
+    "title": "Eski isteğin expiry sinyali yeni session'ı temizleyebiliyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/08-architecture-navigation.md",
+    "line": 168
+  },
+  {
+    "id": "AN-F08",
+    "title": "Composition root sahipliği ve DI sınırı tamamlanmamış",
+    "priority": "P3",
+    "report": "docs/mobile-audit/modules/08-architecture-navigation.md",
+    "line": 179
+  },
+  {
+    "id": "NET-F01",
+    "title": "Convex fonksiyon hatası ve üretim auth expiry sözleşmesi bozuk",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/09-network-backend.md",
+    "line": 67
+  },
+  {
+    "id": "NET-F02",
+    "title": "“Kapıyı Aç” akışı fiziksel komut yerine başarılı geçiş kaydı yazıyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/09-network-backend.md",
+    "line": 78
+  },
+  {
+    "id": "NET-F03",
+    "title": "Mobil erişim kararı pasif cihazı ve zaman programını denetlemiyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/09-network-backend.md",
+    "line": 88
+  },
+  {
+    "id": "NET-F04",
+    "title": "Başka projedeki cihaza reddedilen istek bile yabancı cihaz bilgisini geçmişe taşıyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/09-network-backend.md",
+    "line": 97
+  },
+  {
+    "id": "NET-F05",
+    "title": "Üretilmiş QR, çalışan pasife alındıktan sonra web tüketiminde hâlâ geçiş yazabiliyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/09-network-backend.md",
+    "line": 106
+  },
+  {
+    "id": "NET-F06",
+    "title": "Yanıt bozulması boş listeye veya gerçek erişim reddine dönüştürülüyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/09-network-backend.md",
+    "line": 115
+  },
+  {
+    "id": "NET-F07",
+    "title": "Cihaz seçimi kullanıcı mesajı yerine ham hata gövdesini gösterebiliyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/09-network-backend.md",
+    "line": 124
+  },
+  {
+    "id": "NET-F08",
+    "title": "Eksik ortam yapılandırması sabit deployment'a sessizce bağlanıyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/09-network-backend.md",
+    "line": 133
+  },
+  {
+    "id": "NET-F09",
+    "title": "Geçmiş sözleşmesi olay zamanına göre sayfa garantisi vermiyor; polling büyüyen listenin tamamını okuyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/09-network-backend.md",
+    "line": 141
+  },
+  {
+    "id": "DA-F01",
+    "title": "Sabit metin/durum renkleri açık ve koyu temada yetersiz kontrast üretiyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/10-design-accessibility.md",
+    "line": 73
+  },
+  {
+    "id": "DA-F02",
+    "title": "Alt gezinmenin QR kontrolü adsız; sekme rolü/seçili durum ve klavye etkileşimi tanımlanmamış",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/10-design-accessibility.md",
+    "line": 98
+  },
+  {
+    "id": "DA-F03",
+    "title": "Bazı form ve ikon kontrollerinde erişilebilir ad/hedef sözleşmesi eksik",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/10-design-accessibility.md",
+    "line": 112
+  },
+  {
+    "id": "DA-F04",
+    "title": "Şifre sıfırlama formu klavye ve kısa ekran için kaydırılamıyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/10-design-accessibility.md",
+    "line": 126
+  },
+  {
+    "id": "DA-F05",
+    "title": "QR gösterim gövdesi sabit yükseklikli içerikle kısa viewport'u aşıyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/10-design-accessibility.md",
+    "line": 140
+  },
+  {
+    "id": "DA-F06",
+    "title": "Ortak katılım satırı ve hızlı eylemler büyük metinde yeniden yerleşmiyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/10-design-accessibility.md",
+    "line": 154
+  },
+  {
+    "id": "DA-F07",
+    "title": "Ana sayfa yüklenmeyen/hatalı katılım verisini normal durum olarak gösteriyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/10-design-accessibility.md",
+    "line": 168
+  },
+  {
+    "id": "DA-F08",
+    "title": "Geçmişin boş durumunda çekerek yenileme için Scrollable yok",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/10-design-accessibility.md",
+    "line": 182
+  },
+  {
+    "id": "L10N-F01",
+    "title": "Profil dil tercihi uygulanmamış",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/11-localization.md",
+    "line": 53
+  },
+  {
+    "id": "L10N-F02",
+    "title": "Şifre sıfırlama metni mevcut capability'yi yanlış anlatıyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/11-localization.md",
+    "line": 63
+  },
+  {
+    "id": "L10N-F03",
+    "title": "Bazı hata yolları çevrilebilir domain hatası yerine ham metin gösteriyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/11-localization.md",
+    "line": 73
+  },
+  {
+    "id": "L10N-F04",
+    "title": "Ziyaretçi placeholder'ı ve eksik cihaz fallback'i EN'de Türkçe kalıyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/11-localization.md",
+    "line": 89
+  },
+  {
+    "id": "L10N-F05",
+    "title": "QR bilgi zamanları kullanıcı tarih/saat biçiminden geçmiyor",
+    "priority": "P3",
+    "report": "docs/mobile-audit/modules/11-localization.md",
+    "line": 100
+  },
+  {
+    "id": "L10N-F06",
+    "title": "EN adet mesajları tekil sayıyı karşılamıyor",
+    "priority": "P3",
+    "report": "docs/mobile-audit/modules/11-localization.md",
+    "line": 110
+  },
+  {
+    "id": "L10N-F07",
+    "title": "Profil sürüm bilgisi paket tanımıyla uyuşmuyor",
+    "priority": "P3",
+    "report": "docs/mobile-audit/modules/11-localization.md",
+    "line": 120
+  },
+  {
+    "id": "PLAT-F01",
+    "title": "Android release debug anahtarıyla imzalanıyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/12-platform-quality.md",
+    "line": 83
+  },
+  {
+    "id": "PLAT-F02",
+    "title": "Eksik env sessizce sabit deployment'a yöneliyor",
+    "priority": "P1",
+    "report": "docs/mobile-audit/modules/12-platform-quality.md",
+    "line": 93
+  },
+  {
+    "id": "PLAT-F03",
+    "title": "Apple native lock grafikleri mevcut plugin setini temsil etmiyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/12-platform-quality.md",
+    "line": 103
+  },
+  {
+    "id": "PLAT-F04",
+    "title": "Belgelenen SDK aralığı ile kilitli graph ve otomatik kalite kapısı arasında boşluk var",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/12-platform-quality.md",
+    "line": 113
+  },
+  {
+    "id": "PLAT-F05",
+    "title": "Kullanılmayan dosya/galeri izinleri dağıtım sözleşmesini genişletiyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/12-platform-quality.md",
+    "line": 123
+  },
+  {
+    "id": "PLAT-F06",
+    "title": "macOS runner dış ağ ve kamera kabiliyetlerini tamamlamıyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/12-platform-quality.md",
+    "line": 133
+  },
+  {
+    "id": "PLAT-F07",
+    "title": "README kurulumu ve özellik durumu gerçek uygulamayla çelişiyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/12-platform-quality.md",
+    "line": 143
+  },
+  {
+    "id": "PLAT-F08",
+    "title": "Release hatalarının bağlamı merkezi olarak korunmuyor",
+    "priority": "P2",
+    "report": "docs/mobile-audit/modules/12-platform-quality.md",
+    "line": 153
+  }
+]

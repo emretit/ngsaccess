@@ -1,0 +1,33 @@
+00:00 +0: loading /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart
+00:00 +0: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: cold protected link waits for restore and keeps original target
+00:02 +1: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +2: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +3: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +4: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: abandon retry restores login target and never retries remembered credentials
+00:02 +5: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real login form auth notification restores history target
+00:03 +6: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real login form auth notification restores history target
+00:03 +7: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real login form auth notification restores history target
+00:03 +8: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real login form auth notification restores history target
+00:03 +9: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real login form auth notification restores history target
+00:03 +10: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real login form auth notification restores history target
+00:03 +11: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real login form auth notification restores history target
+00:03 +12: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real login form auth notification restores history target
+00:03 +13: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real login form auth notification restores history target
+00:04 +14: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real login form auth notification restores history target
+00:04 +15: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: custom URI normalizes to history: ngsplus:///history
+00:04 +16: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: invalid saved token returns to login without offering endless retry
+00:04 +17: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: invalid saved token returns to login without offering endless retry
+00:04 +18: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: navigation exposes five named selected controls; keyboard activates QR
+00:04 +19: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: late real HTTP restore for A cannot overwrite B or B scoped preference
+00:04 +20: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: retained history state survives branch switching and QR becomes inactive
+00:05 +21: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: retained history state survives branch switching and QR becomes inactive
+00:05 +22: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: root binds locale and clears preferred device immediately across auth epochs
+00:06 +23: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: stackless device selection has a working back fallback to profile
+00:06 +24: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real retained QR and visitor branches stop hidden resources
+00:07 +25: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: visitor polling pauses in background and resumes only on its active branch
+00:07 +26: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: owned client closes, expiry callback detaches and diagnostic hooks restore
+00:07 +27: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: injected client and auth remain caller-owned while root callback detaches
+00:07 +28: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: late factory result after root disposal closes without bootstrap
+00:08 +29: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: replacing a pending root never restores the removed roots diagnostic hook
+00:08 +30: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: configuration error is localized and retries before any auth request
+00:08 +31: All tests passed!

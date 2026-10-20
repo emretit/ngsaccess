@@ -43,3 +43,15 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Public build config is supplied via dart-define; never bundle local env files.
+.env
+.env.*
+!.env.example
+release/*.local.json
+release/ExportOptions.plist
+release/*.mobileprovision
+release/*.p12
+release/*.p8
+release/evidence/
+**/.flutter-plugins-dependencies *

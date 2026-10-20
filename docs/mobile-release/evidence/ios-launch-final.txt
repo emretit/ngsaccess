@@ -1,0 +1,4 @@
+com.ngsplus.app: 66754
+Detected file type from extension: PNG
+Note: No display specified. Defaulting to display: 8089D396-7711-493B-AB2B-ABC93B068799 (screenID: 1, name: LCD)
+Wrote screenshot to: /Users/emreaydin/ngsaccess/docs/mobile-release/evidence/ios-simulator-login-final.png

@@ -1,0 +1,360 @@
+ M convex/_generated/api.d.ts
+ M convex/accessRules.ts
+ M convex/actions/pdksImport.ts
+ M convex/cardReadings.ts
+ M convex/deviceEvents.ts
+ M convex/employees.ts
+ M convex/leaves.ts
+ M convex/lib/accessRuleSummary.test.ts
+ M convex/lib/accessRuleSummary.ts
+ M convex/lib/auditActors.test.ts
+ M convex/lib/auditActors.ts
+ M convex/lib/auditLogQuery.test.ts
+ M convex/lib/auditLogQuery.ts
+ M convex/lib/leaveValidation.test.ts
+ M convex/lib/liveReadings.test.ts
+ M convex/lib/pdksCalc.ts
+ M convex/lib/pdksDetail.test.ts
+ M convex/lib/pdksDetail.ts
+ M convex/lib/pdksHelpers.ts
+ M convex/lib/pdksManual.test.ts
+ M convex/lib/pdksManual.ts
+ M convex/lib/pdksPayroll.test.ts
+ M convex/lib/pdksPayroll.ts
+ M convex/lib/pdksSource.test.ts
+ M convex/lib/pdksSource.ts
+ M convex/lib/pdksTable.test.ts
+ M convex/lib/pdksTable.ts
+ M convex/lib/reportAttendance.test.ts
+ M convex/lib/reportAttendance.ts
+ M convex/lib/reportScope.test.ts
+ M convex/lib/shiftAssign.test.ts
+ M convex/lib/shiftAssign.ts
+ M convex/lib/shiftUx.ts
+ M convex/lib/visitorStatus.test.ts
+ M convex/lib/visitorStatus.ts
+ M convex/payVisibility.handlers.test.ts
+ M convex/pdksRecords.ts
+ M convex/privacyRetention.ts
+ M convex/schema.ts
+ M convex/settings.ts
+ M convex/shifts.ts
+ M convex/users.ts
+ M convex/visitors.ts
+ M docs/ui-audit-2/13-ayarlar.md
+ M index.html
+ M src/App.tsx
+ M src/components/access-control/CardReadings.tsx
+ M src/components/access-control/CardReadingsFilters.tsx
+ M src/components/access-control/CardReadingsTable.tsx
+ M src/components/access-control/unified/AccessRuleDetails.tsx
+ M src/components/access-control/unified/AccessRulesList.tsx
+ M src/components/access-control/unified/SyncRuns.tsx
+ M src/components/access-control/unified/components/DepartmentTree.tsx
+ M src/components/access-control/unified/components/TimeSchedule.tsx
+ M src/components/access-control/unified/components/ZoneDeviceTree.tsx
+ M src/components/access-control/unified/components/weekdays.ts
+ M src/components/admin/AdminUsersPanel.tsx
+ M src/components/admin/components/UserFormDialog.tsx
+ M src/components/admin/components/UserTable.tsx
+ M src/components/admin/hooks/useUserManagement.ts
+ M src/components/audit/AuditFilters.tsx
+ M src/components/audit/AuditResults.tsx
+ M src/components/audit/AuditTable.tsx
+ M src/components/audit/auditLabels.test.ts
+ M src/components/audit/auditLabels.ts
+ M src/components/audit/auditState.ts
+ M src/components/dashboard/DashboardHeader.tsx
+ M src/components/dashboard/DashboardPanel.tsx
+ M src/components/dashboard/LiveFeed.tsx
+ M src/components/dashboard/ReadingsTimeline.tsx
+ M src/components/dashboard/TodayStrip.tsx
+ M src/components/devices/DeviceAddMenu.tsx
+ M src/components/devices/DeviceApiTokenCard.tsx
+ M src/components/devices/DeviceCommandCenter.tsx
+ M src/components/devices/DeviceDetailsPanel.tsx
+ M src/components/devices/DeviceFilters.tsx
+ M src/components/devices/DeviceForm.tsx
+ M src/components/devices/DeviceList.tsx
+ M src/components/devices/DeviceTableRow.tsx
+ M src/components/devices/DevicesContent.tsx
+ M src/components/devices/LocationDoorItem.tsx
+ M src/components/devices/QRCodeDialog.tsx
+ M src/components/devices/form-sections/DeviceBasicSection.tsx
+ M src/components/devices/form-sections/DeviceHikLocalBridgeSection.tsx
+ M src/components/devices/form-sections/DeviceHikModelField.tsx
+ M src/components/devices/form-sections/DeviceHikvisionSection.tsx
+ M src/components/devices/form-sections/DeviceIdeSmartSection.tsx
+ M src/components/devices/form-sections/DeviceLocationSection.tsx
+ M src/components/devices/form-sections/DeviceNameSection.tsx
+ M src/components/devices/form-sections/DeviceNetworkSection.tsx
+ M src/components/devices/form-sections/DeviceZoneSection.tsx
+ M src/components/employees/EmployeeBulkActions.tsx
+ M src/components/employees/EmployeeConsentsCard.test.tsx
+ M src/components/employees/EmployeeConsentsCard.tsx
+ M src/components/employees/EmployeeDetails.test.tsx
+ M src/components/employees/EmployeeDetails.tsx
+ M src/components/employees/EmployeeFilters.tsx
+ M src/components/employees/EmployeeForm.tsx
+ M src/components/employees/EmployeeFormFields.tsx
+ M src/components/employees/EmployeeRecentReadings.tsx
+ M src/components/employees/EmployeeSyncSection.tsx
+ M src/components/employees/EmployeeTable.tsx
+ M src/components/layout/AppHeader.tsx
+ M src/components/layout/AppSidebarNav.tsx
+ M src/components/layout/CommandPalette.tsx
+ M src/components/layout/ProjectSwitcher.tsx
+ M src/components/layout/navigationSearch.test.ts
+ M src/components/layout/routeMeta.test.ts
+ M src/components/leaves/EmployeePicker.tsx
+ M src/components/leaves/LeaveDetails.tsx
+ M src/components/leaves/LeaveFilters.tsx
+ M src/components/leaves/LeaveForm.tsx
+ M src/components/leaves/LeaveResults.tsx
+ M src/components/leaves/lib/leaveState.test.tsx
+ M src/components/leaves/lib/leaveState.ts
+ M src/components/live-monitoring/AssignReadingCardForm.tsx
+ M src/components/live-monitoring/LiveFeedControls.tsx
+ M src/components/live-monitoring/ReadingDetailPanel.tsx
+ M src/components/live-monitoring/lib/readings.ts
+ M src/components/live-monitoring/useLiveReadings.ts
+ M src/components/pdks/ManualPdksEditDialog.tsx
+ M src/components/pdks/dashboard/PDKSDateNavigator.tsx
+ M src/components/pdks/dashboard/PDKSEmployeeDetailDrawer.tsx
+ M src/components/pdks/dashboard/PDKSEnhancedExportPanel.tsx
+ M src/components/pdks/dashboard/PDKSFilterBar.tsx
+ M src/components/pdks/dashboard/PDKSHeatmapView.tsx
+ M src/components/pdks/dashboard/PDKSImportDialog.tsx
+ M src/components/pdks/dashboard/PDKSMobileCardList.tsx
+ M src/components/pdks/dashboard/PDKSOvertimeAlert.tsx
+ M src/components/pdks/dashboard/PDKSQuickPresets.tsx
+ M src/components/pdks/dashboard/PDKSSavedViews.tsx
+ M src/components/pdks/dashboard/PDKSTableView.tsx
+ M src/components/pdks/lib/analysis.ts
+ M src/components/pdks/lib/filterParams.test.ts
+ M src/components/pdks/lib/filterParams.ts
+ M src/components/pdks/lib/presentation.test.ts
+ M src/components/pdks/lib/presentation.ts
+ M src/components/pdks/statusMeta.ts
+ M src/components/reports/ReportPage.test.tsx
+ M src/components/reports/ReportPage.tsx
+ M src/components/reports/ReportResults.tsx
+ M src/components/reports/ReportScreen.tsx
+ M src/components/settings/SettingsSidebar.tsx
+ M src/components/settings/sections/NotificationSettings.tsx
+ M src/components/settings/sections/PrivacySettings.tsx
+ M src/components/settings/sections/ReportsSettings.tsx
+ M src/components/settings/sections/components/HolidayCalendarManager.tsx
+ M src/components/settings/sections/components/OvertimeSettingsForm.tsx
+ M src/components/settings/sections/general/SystemSettingsForm.tsx
+ M src/components/settings/sections/integrations/BridgeIntegrationCard.tsx
+ M src/components/settings/sections/privacy/BiometricModuleCard.test.tsx
+ M src/components/settings/sections/privacy/BiometricModuleCard.tsx
+ M src/components/settings/sections/privacy/RetentionAssistantCard.tsx
+ M src/components/settings/sections/reports/ReportReminderSettings.tsx
+ M src/components/settings/settings.test.tsx
+ M src/components/shared/EmptyState.tsx
+ M src/components/shared/FilterBar.tsx
+ M src/components/shared/FormFieldWrapper.tsx
+ M src/components/shared/SaveBar.tsx
+ M src/components/shared/UnsavedChangesDialog.tsx
+ M src/components/shifts/AssignShiftDialog.tsx
+ M src/components/shifts/AssignmentEditDialog.tsx
+ M src/components/shifts/ShiftAgendaView.tsx
+ M src/components/shifts/ShiftCalendarCell.tsx
+ M src/components/shifts/ShiftCalendarGrid.tsx
+ M src/components/shifts/ShiftCalendarView.tsx
+ M src/components/shifts/ShiftDayDetails.tsx
+ M src/components/shifts/ShiftListSidebar.tsx
+ M src/components/shifts/definitions/AddShiftDialog.tsx
+ M src/components/shifts/lib/calendarPresentation.test.tsx
+ M src/components/shifts/lib/planning.ts
+ M src/components/sync/DeviceSyncStatusBanner.tsx
+ M src/components/ui/checkbox.tsx
+ M src/components/visitors/VisitorCardCapture.tsx
+ M src/components/visitors/VisitorCombobox.tsx
+ M src/components/visitors/VisitorFilters.tsx
+ M src/components/visitors/VisitorFormFields.tsx
+ M src/components/visitors/VisitorManagement.tsx
+ M src/components/visitors/VisitorSlideOverPanel.tsx
+ M src/components/visitors/VisitorStats.tsx
+ M src/components/visitors/VisitorTable.tsx
+ M src/components/visitors/VisitorZoneDialog.tsx
+ M src/components/visitors/hooks/useVisitorFormData.ts
+ M src/components/visitors/lib/formPayload.ts
+ M src/components/visitors/lib/status.test.ts
+ M src/components/visitors/lib/status.ts
+ M src/components/visitors/visitorTime.ts
+ M src/components/visitors/visitors.test.tsx
+ M src/hooks/usePdksFilterParams.ts
+ M src/hooks/usePdksSavedViews.ts
+ M src/hooks/usePdksTableData.ts
+ M src/hooks/useVisitors.ts
+ M src/lib/date.test.ts
+ M src/lib/date.ts
+ M src/lib/relativeTime.test.ts
+ M src/lib/relativeTime.ts
+ M src/lib/reports/columns.ts
+ M src/lib/reports/export.ts
+ M src/lib/reports/pdf.test.ts
+ M src/lib/reports/query.test.ts
+ M src/lib/reports/query.ts
+ M src/lib/reports/registry.test.ts
+ M src/lib/reports/registry.ts
+ M src/lib/reports/rows.test.ts
+ M src/lib/reports/rows.ts
+ M src/lib/reports/testFixtures.ts
+ M src/lib/routeMeta.ts
+ M src/lib/themeBootstrap.ts
+ M src/pages/AuditLog.tsx
+ M src/pages/Employees.tsx
+ M src/pages/Index.tsx
+ M src/pages/Leaves.tsx
+ M src/pages/PDKSRecords.tsx
+ M src/pages/Reports.tsx
+ M src/pages/Settings.tsx
+ M src/pages/VirtualReaders.tsx
+?? .claude/orca-specs/fix2-00-ortak.md
+?? .claude/orca-specs/fix2-01-04.md
+?? .claude/orca-specs/fix2-02.md
+?? .claude/orca-specs/fix2-03.md
+?? .claude/orca-specs/fix2-05.md
+?? .claude/orca-specs/fix2-06.md
+?? .claude/orca-specs/fix2-07.md
+?? .claude/orca-specs/fix2-08.md
+?? .claude/orca-specs/fix2-09.md
+?? .claude/orca-specs/fix2-10.md
+?? .claude/orca-specs/fix2-11.md
+?? .claude/orca-specs/fix2-12.md
+?? .claude/orca-specs/fix2-13.md
+?? .claude/orca-specs/fix2-4a-files.txt
+?? .claude/orca-specs/fix2-gece.md
+?? .claude/orca-specs/fix2-review-wave1.md
+?? .claude/orca-specs/fix2-review-wave2.md
+?? .claude/orca-specs/fix2-review-wave3a.md
+?? .claude/orca-specs/fix2-review-wave3b.md
+?? .claude/orca-specs/fix2-template.md
+?? .claude/orca-specs/fix2-wave1-followup.md
+?? .claude/orca-specs/fix2-wave1-paths.txt
+?? .claude/orca-specs/fix2-wave2-followup.md
+?? .claude/orca-specs/fix2-wave2-paths.txt
+?? .claude/orca-specs/fix2-wave3a-paths.txt
+?? .claude/orca-specs/fix2-wave3b-paths.txt
+?? .claude/orca-specs/kiyas-fix-alarm.md
+?? .claude/orca-specs/kiyas-fix-basvuru.md
+?? .claude/orca-specs/kiyas-fix-kisi.md
+?? .claude/orca-specs/kiyas-ortak.md
+?? .claude/orca-specs/kiyas-p1-alarm.md
+?? .claude/orca-specs/kiyas-p1b-alarm-kalan.md
+?? .claude/orca-specs/kiyas-p2-kisi-import.md
+?? .claude/orca-specs/kiyas-p2b-excel-ui.md
+?? .claude/orca-specs/kiyas-p2c-toplu-kart.md
+?? .claude/orca-specs/kiyas-p2t-backend-test.md
+?? .claude/orca-specs/kiyas-p2t2-import-test.md
+?? .claude/orca-specs/kiyas-p3a-basvuru-backend.md
+?? .claude/orca-specs/kiyas-p3t-basvuru-test.md
+?? .claude/orca-specs/kiyas-review-wave1.md
+?? .claude/ui-audit-2-commit/
+?? convex/actions/sendAlarmEmail.test.ts
+?? convex/actions/sendAlarmEmail.ts
+?? convex/alarms.test.ts
+?? convex/alarms.ts
+?? convex/attendanceCorrections.test.ts
+?? convex/attendanceCorrections.ts
+?? convex/employeeImport.test.ts
+?? convex/employeeImport.ts
+?? convex/leaveRequests.test.ts
+?? convex/leaveRequests.ts
+?? convex/lib/alarmNotify.test.ts
+?? convex/lib/alarmNotify.ts
+?? convex/lib/employeeCardChange.ts
+?? convex/lib/employeeImportValidation.test.ts
+?? convex/lib/employeeImportValidation.ts
+?? convex/lib/pdksAvailability.test.ts
+?? convex/lib/pdksAvailability.ts
+?? convex/lib/pdksDay.ts
+?? convex/lib/pdksImport.test.ts
+?? convex/lib/pdksNight.handlers.test.ts
+?? convex/lib/pdksNightSettings.test.ts
+?? convex/lib/pdksWorkDay.ts
+?? convex/lib/requestRules.test.ts
+?? convex/lib/requestRules.ts
+?? convex/privacyRetention.settings.test.ts
+?? convex/users.settings.test.ts
+?? docs/hikconnect-audit/
+?? docs/mobile-audit/
+?? docs/ui-audit-2/07-kapi-esleme-arastirma.md
+?? docs/ui-audit-2/fix-02-kisiler-rapor.md
+?? docs/ui-audit-2/fix-03-cihazlar-rapor.md
+?? docs/ui-audit-2/fix-06-ziyaretciler-rapor.md
+?? docs/ui-audit-2/fix-08-pdks-rapor.md
+?? docs/ui-audit-2/fix-10-izinler-rapor.md
+?? docs/ui-audit-2/fix-13-ayarlar-rapor.md
+?? docs/ui-audit-2/review-wave1.md
+?? docs/ui-audit-2/review-wave1/
+?? docs/ui-audit-2/review-wave2.md
+?? docs/ui-audit-2/review-wave2/
+?? docs/ui-audit-2/review-wave3a.md
+?? docs/ui-audit-2/review-wave3a/
+?? docs/ui-audit-2/review-wave3b/
+?? src/components/access-control/unified/audit.test.tsx
+?? src/components/admin/components/settingsAudit.test.tsx
+?? src/components/admin/hooks/useUserManagement.settings.test.tsx
+?? src/components/alarms/
+?? src/components/audit/AuditCoverage.tsx
+?? src/components/audit/AuditResultsContent.tsx
+?? src/components/audit/auditAudit.test.tsx
+?? src/components/dashboard/dashboard.test.tsx
+?? src/components/devices/DeviceApiTokenCard.test.tsx
+?? src/components/devices/DeviceAudit.test.tsx
+?? src/components/devices/DeviceCommandCenter.audit.test.tsx
+?? src/components/devices/DeviceDetailsPanel.test.tsx
+?? src/components/devices/DeviceList.test.tsx
+?? src/components/devices/topologyPreview.test.ts
+?? src/components/devices/topologyPreview.ts
+?? src/components/employees/EmployeeActivity.test.tsx
+?? src/components/employees/EmployeeBulkActions.test.tsx
+?? src/components/employees/EmployeeFilters.test.tsx
+?? src/components/employees/EmployeeForm.test.tsx
+?? src/components/employees/EmployeeFormFields.test.tsx
+?? src/components/employees/EmployeeSyncConfirmDialog.test.tsx
+?? src/components/employees/EmployeeSyncConfirmDialog.tsx
+?? src/components/employees/EmployeeTable.test.tsx
+?? src/components/employees/EmployeesPage.test.tsx
+?? src/components/employees/import/
+?? src/components/layout/AppSidebarNav.audit.test.tsx
+?? src/components/layout/shellAudit.test.tsx
+?? src/components/leaves/LeaveAudit.test.tsx
+?? src/components/leaves/leavesBackend.test.ts
+?? src/components/live-monitoring/MonitoringPersonPicker.test.tsx
+?? src/components/live-monitoring/MonitoringPersonPicker.tsx
+?? src/components/live-monitoring/lib/scroll.ts
+?? src/components/live-monitoring/monitoringAudit.test.tsx
+?? src/components/pdks/auditPage.test.tsx
+?? src/components/pdks/dashboard/auditFixes.test.tsx
+?? src/components/pdks/lib/calendar.ts
+?? src/components/pdks/lib/focus.ts
+?? src/components/reports/ReportDateInput.tsx
+?? src/components/reports/auditFixes.test.tsx
+?? src/components/settings/auditFixes.test.tsx
+?? src/components/settings/sections/components/OvertimeSettingsForm.test.tsx
+?? src/components/settings/sections/privacy/VisitorNoticeCard.tsx
+?? src/components/shared/EmptyState.test.tsx
+?? src/components/shifts/ShiftListSidebar.test.tsx
+?? src/components/shifts/ShiftSelect.tsx
+?? src/components/shifts/WeekdaySelection.tsx
+?? src/components/shifts/lib/auditFixes.test.tsx
+?? src/components/sync/DeviceSyncStatusBanner.test.tsx
+?? src/components/visitors/VisitorCollapsible.tsx
+?? src/components/visitors/hooks/useVisitorClock.ts
+?? src/components/visitors/lib/readerCapability.ts
+?? src/components/visitors/visitorAudit.test.tsx
+?? src/hooks/usePdksAudit.test.tsx
+?? src/lib/deviceBrand.test.ts
+?? src/lib/deviceBrand.ts
+?? src/lib/employees/
+?? src/lib/reports/excel.test.ts
+?? src/lib/reports/reportTransactions.backend.test.ts
+?? src/pages/Alarms.tsx
+?? src/pages/Index.test.tsx
+?? src/pages/VirtualReaders.test.tsx

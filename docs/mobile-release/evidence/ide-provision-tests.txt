@@ -1,0 +1,70 @@
+TAP version 13
+# Subtest: secure provision binds authenticated UUID identity and all event topics, verifies before reboot
+ok 1 - secure provision binds authenticated UUID identity and all event topics, verifies before reboot
+  ---
+  duration_ms: 0.961375
+  type: 'test'
+  ...
+# Subtest: secure provision refuses shared/mismatched/absent identity without writing panel configuration
+ok 2 - secure provision refuses shared/mismatched/absent identity without writing panel configuration
+  ---
+  duration_ms: 0.32875
+  type: 'test'
+  ...
+# Subtest: secure provision refuses plaintext and certificate bypass before any network request
+ok 3 - secure provision refuses plaintext and certificate bypass before any network request
+  ---
+  duration_ms: 0.149167
+  type: 'test'
+  ...
+# Subtest: partial firmware write/readback rejection is failure and never reboots
+ok 4 - partial firmware write/readback rejection is failure and never reboots
+  ---
+  duration_ms: 0.158583
+  type: 'test'
+  ...
+# Subtest: firmware write errors and invalid JSON cannot expose echoed secrets
+ok 5 - firmware write errors and invalid JSON cannot expose echoed secrets
+  ---
+  duration_ms: 0.195708
+  type: 'test'
+  ...
+# Subtest: malformed panel JSON error omits raw body
+ok 6 - malformed panel JSON error omits raw body
+  ---
+  duration_ms: 0.10025
+  type: 'test'
+  ...
+# Subtest: private per-device registry resolves only authenticated panel and forbids shared passwords
+ok 7 - private per-device registry resolves only authenticated panel and forbids shared passwords
+  ---
+  duration_ms: 1.425375
+  type: 'test'
+  ...
+# Subtest: offline credential staging writes private files, no shared user, no overwrite; failed hash conversion cleans up
+ok 8 - offline credential staging writes private files, no shared user, no overwrite; failed hash conversion cleans up
+  ---
+  duration_ms: 2.033958
+  type: 'test'
+  ...
+# Subtest: failed reboot never returns fake provisioning success
+ok 9 - failed reboot never returns fake provisioning success
+  ---
+  duration_ms: 0.257
+  type: 'test'
+  ...
+# Subtest: per-device resolver receives authenticated UUID and missing fleet credential prevents all writes
+ok 10 - per-device resolver receives authenticated UUID and missing fleet credential prevents all writes
+  ---
+  duration_ms: 0.181083
+  type: 'test'
+  ...
+1..10
+# tests 10
+# suites 0
+# pass 10
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 41.351208

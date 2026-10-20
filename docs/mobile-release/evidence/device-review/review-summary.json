@@ -1,0 +1,96 @@
+{
+  "recordedAtUtc": "2026-10-20T06:50:05.554701+00:00",
+  "dependencyUpdates": "dependency-updates.json",
+  "checks": {
+    "baselineMobile": {
+      "pub-restore.txt": 0,
+      "analyze.txt": 0,
+      "flutter-tests.txt": 0,
+      "release-tests.txt": 0
+    },
+    "baselineBackend": {
+      "tsc-app.txt": 0,
+      "tsc-convex.txt": 0,
+      "eslint.txt": 0,
+      "backend-tests.txt": 0
+    },
+    "afterUpdates": {
+      "pub-outdated-after.json": 0,
+      "analyze-updated.txt": 0,
+      "flutter-tests-updated.txt": 0
+    },
+    "postBuild": {
+      "pub-restore-updated.txt": 0,
+      "gen-l10n-updated.txt": 0,
+      "l10n-updated.txt": 0,
+      "pod-restore-updated.txt": 0,
+      "lockProjectDrift": [],
+      "l10nDrift": []
+    },
+    "signedIosDeviceBuild": {
+      "exitCode": 0,
+      "mode": "release",
+      "signing": "existing Apple Development identity; automatic team T9QCW8Q2C3",
+      "version": "1.0.4",
+      "build": "1",
+      "environment": "existing development backend, labeled staging",
+      "backendHost": "notable-tern-4.convex.cloud"
+    },
+    "iosArtifact": {
+      "signatureVerified": true,
+      "bundleId": "com.ngsplus.app",
+      "version": "1.0.4",
+      "build": "1",
+      "minimumOS": "15.0",
+      "team": "T9QCW8Q2C3",
+      "profileDevelopment": true,
+      "profileExpiry": "2027-04-29 11:53:26",
+      "connectedDeviceProvisioned": true,
+      "binarySha256": "be357a966f1221e64dc4d42b837d49ede9dd29090812c3f620700a6aae4d838f",
+      "privacyManifestPresent": true,
+      "cameraDescriptionPresent": true,
+      "galleryDescriptionAbsent": true,
+      "dotenvAbsent": true
+    },
+    "deviceInstall": {
+      "exitCode": 0
+    },
+    "deviceSmoke": {
+      "installationExitCode": 0,
+      "launchSucceeded": true,
+      "processObservedRunning": true,
+      "pid": 10642,
+      "model": "iPhone13",
+      "os": "27.0.1",
+      "uiObserved": "authenticated home screen; attendance error from missing backend API",
+      "initialCapture": "black; subsequent capture showed rendered home",
+      "accountOperationsByAgent": false,
+      "doorOrVisitorMutationByAgent": false,
+      "personalScreenshotPersistedToRepository": false
+    },
+    "simulator": [
+      {
+        "operation": "install",
+        "exitCode": 0
+      },
+      {
+        "operation": "launch",
+        "exitCode": 0
+      }
+    ],
+    "androidUnsignedBuild": {
+      "exitCode": 0,
+      "evidence": "android-build-updated.txt",
+      "sha256": "66fc6ff89f644e5f47cff996f80f214bc6951b182337d40c169f26a502b0f80c"
+    },
+    "simulatorUi": {
+      "renderedLoginVerified": true,
+      "accessibilityTreeVerified": true,
+      "display": "Orca iOS emulator pane",
+      "leftOpenAtUserRequest": true
+    }
+  },
+  "backendProbe": "backend-readonly-probe.json",
+  "backendDeploymentPerformed": false,
+  "storeSubmissionPerformed": false
+}

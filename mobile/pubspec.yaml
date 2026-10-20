@@ -3,25 +3,33 @@ description: NGS Plus Yoklama Takip Sistemi - QR kod tabanlı modern yoklama uyg
 version: 1.0.4+1
 
 environment:
-  sdk: '^3.8.0'
-  flutter: ">=3.5.0"
+  sdk: '>=3.11.0 <4.0.0'
+  flutter: ">=3.38.4 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+  # Font assets also used by adaptive Flutter SDK widgets.
+  cupertino_icons: 1.0.8
   
   # QR Code scanning
-  mobile_scanner: ^7.0.1
+  mobile_scanner: ^7.4.2
   
   # QR Code generation
   qr_flutter: ^4.1.0
   
-  # Local storage
-  shared_preferences: ^2.2.3
+  # Non-sensitive preferences and platform-backed session token storage
+  shared_preferences: ^2.5.6
+  # Durable operation persistence; keep this version explicitly reviewed.
+  path_provider: 2.1.6
+  flutter_secure_storage: 10.3.1
+
+  # Runtime version/build metadata with conservative native requirements
+  package_info_plus: 8.3.1
   
-  # Environment variables
+  # Legacy debug environment adapter; release uses explicit Dart defines
   flutter_dotenv: ^6.0.1
   
   # HTTP requests
@@ -30,23 +38,20 @@ dependencies:
   # Internationalization
   intl: ^0.20.2
   
-  # Fonts
-  google_fonts: ^8.1.0
-  
   # SVG support
-  flutter_svg: ^2.0.10+1
+  flutter_svg: ^2.3.0
   
   # Permissions
-  permission_handler: ^12.0.1
+  permission_handler: ^12.0.3
   
   # State management
   provider: ^6.1.2
 
   # Routing
-  go_router: ^17.2.3
+  go_router: ^17.5.0
 
   # Calendar widget
-  table_calendar: ^3.0.9
+  table_calendar: ^3.3.0
 
   # Charts (used by ProgressHeroCard and future history stats)
   fl_chart: ^1.2.0
@@ -64,17 +69,22 @@ flutter:
 
   # Assets
   assets:
-    - .env
-    - assets/images/
-    # Assets klasörleri oluşturuldukça eklenebilir:
-    # - assets/icons/
+    - assets/branding/
+    # assets/launcher/ yalnız ikon üretim kaynağıdır; uygulamaya paketlenmez.
 
-# App Icon Configuration
+# App Icon Configuration — kaynak: brand/ngsplus-polish-v1
+# Üret: dart run flutter_launcher_icons
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/ngs_app_icon.png"
+  image_path: "assets/launcher/app-icon.png"
   min_sdk_android: 21
-  adaptive_icon_background: "#a0002a"
-  adaptive_icon_foreground: "assets/images/ngs_app_icon.png"
-  remove_alpha_ios: true 
+  adaptive_icon_background: "#B00016"
+  adaptive_icon_foreground: "assets/launcher/android-foreground.png"
+  adaptive_icon_foreground_inset: 0
+  adaptive_icon_monochrome: "assets/launcher/android-monochrome.png"
+  remove_alpha_ios: true
+  background_color_ios: "#B00016"
+  image_path_ios_dark_transparent: "assets/launcher/app-icon-ios-dark.png"
+  image_path_ios_tinted_grayscale: "assets/launcher/app-icon-ios-tinted.png"
+  desaturate_tinted_to_grayscale_ios: true

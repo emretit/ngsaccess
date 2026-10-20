@@ -1,0 +1,17 @@
+00:00 +0: loading /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart
+00:00 +0: /Users/emreaydin/ngsaccess/mobile/test/l10n/catalog_test.dart: TR/EN preserve the release key inventory and placeholder contracts
+00:00 +1: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: empty email and password show validation errors
+00:00 +2: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: empty email and password show validation errors
+00:00 +3: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: invalid email and short password do not submit
+00:00 +4: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: remembered user fills only email and clearly labels the option
+00:00 +5: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: late remembered email cannot replace user input
+00:00 +6: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: late remembered email is ignored after login screen is removed
+00:00 +7: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: failed login shows localized error and enables retry
+00:00 +8: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: submit disables while pending and repeated tap does not duplicate login
+00:00 +9: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: disposed login screen never reads controllers after success
+00:00 +10: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: English remember option states email scope
+00:00 +11: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: password visibility toggles without changing credentials
+00:00 +12: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: small screen with keyboard and large tr text remains usable
+00:01 +13: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: small screen with keyboard and large en text remains usable
+00:01 +14: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: login controls meet Android touch target guidelines
+00:01 +15: All tests passed!

@@ -14,23 +14,24 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasAction = actionLabel != null && onAction != null;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    final action = actionLabel;
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 12,
+      runSpacing: 4,
       children: [
-        Expanded(
+        Semantics(
+          header: true,
           child: Text(
             title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
           ),
         ),
-        if (hasAction)
-          TextButton(
-            onPressed: onAction,
-            child: Text(actionLabel!),
-          ),
+        if (action != null && onAction != null)
+          TextButton(onPressed: onAction, child: Text(action)),
       ],
     );
   }

@@ -1,0 +1,13 @@
+{
+  "installationExitCode": 0,
+  "launchSucceeded": true,
+  "processObservedRunning": true,
+  "pid": 10642,
+  "model": "iPhone13",
+  "os": "27.0.1",
+  "uiObserved": "authenticated home screen; attendance error from missing backend API",
+  "initialCapture": "black; subsequent capture showed rendered home",
+  "accountOperationsByAgent": false,
+  "doorOrVisitorMutationByAgent": false,
+  "personalScreenshotPersistedToRepository": false
+}

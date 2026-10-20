@@ -8,12 +8,22 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/errors.dart';
+import '../core/response_decoder.dart';
+import '../core/safe_diagnostics.dart';
 
 class ConvexConfig {
-  static String get deploymentUrl =>
-      dotenv.env['CONVEX_URL'] ?? 'https://notable-tern-4.convex.cloud';
-
+  static const _definedUrl = String.fromEnvironment('CONVEX_URL');
+  static const _definedEnvironment = String.fromEnvironment('APP_ENV');
+  static const _allowedHost = String.fromEnvironment('CONVEX_ALLOWED_HOST');
   static HttpConvexClient? _client;
+
+  static String get deploymentUrl => resolveDeploymentUrl(
+    definedUrl: _definedUrl,
+    environment: dotenv.isInitialized ? dotenv.env : const {},
+    releaseMode: kReleaseMode,
+    appEnvironment: _definedEnvironment,
+    allowedHost: _allowedHost,
+  );
 
   static HttpConvexClient get client {
     final existing = _client;
@@ -21,29 +31,88 @@ class ConvexConfig {
     throw StateError('ConvexConfig.initialize() must be called first.');
   }
 
+  /// Release always requires --dart-define=CONVEX_URL; debug supports .env.
   static Future<void> initialize() async {
-    try {
-      await dotenv.load(fileName: ".env");
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint(
-          'Warning: .env file not found. Falling back to default CONVEX_URL.',
-        );
+    close();
+    if (!kReleaseMode && _definedUrl.isEmpty) {
+      try {
+        await dotenv.load(fileName: '.env');
+      } catch (_) {
+        // A missing development asset is handled by validation below.
       }
     }
-
     _client = HttpConvexClient(deploymentUrl: deploymentUrl);
   }
+
+  static void close() {
+    _client?.close();
+    _client = null;
+  }
+
+  @visibleForTesting
+  static String resolveDeploymentUrl({
+    required String definedUrl,
+    required Map<String, String> environment,
+    required bool releaseMode,
+    String appEnvironment = '',
+    String allowedHost = '',
+  }) {
+    final value = definedUrl.isNotEmpty
+        ? definedUrl
+        : releaseMode
+        ? ''
+        : environment['CONVEX_URL'] ?? '';
+    final validated = validateDeploymentUrl(value);
+    if (releaseMode &&
+        (!const {'staging', 'production'}.contains(appEnvironment) ||
+            allowedHost.trim().isEmpty)) {
+      throw const ConfigurationError();
+    }
+    if (allowedHost.isNotEmpty &&
+        Uri.parse(validated).host.toLowerCase() != allowedHost.toLowerCase()) {
+      throw const ConfigurationError();
+    }
+    return validated;
+  }
+}
+
+/// Reject credentials, path/query injection and non-TLS targets before any I/O.
+String validateDeploymentUrl(String raw) {
+  final value = raw.trim();
+  final uri = Uri.tryParse(value);
+  if (value.isEmpty ||
+      uri == null ||
+      uri.scheme != 'https' ||
+      uri.host.isEmpty ||
+      uri.userInfo.isNotEmpty ||
+      uri.hasQuery ||
+      uri.hasFragment ||
+      (uri.path.isNotEmpty && uri.path != '/') ||
+      RegExp(r'\s').hasMatch(value) ||
+      !uri.hasAuthority) {
+    throw const ConfigurationError();
+  }
+  final labels = uri.host.toLowerCase().split('.');
+  final labelPattern = RegExp(r'^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$');
+  if (uri.host.length > 253 ||
+      (labels.length < 2 && uri.host != 'localhost') ||
+      labels.any((label) => !labelPattern.hasMatch(label))) {
+    throw const ConfigurationError();
+  }
+  try {
+    if (uri.port < 1 || uri.port > 65535) throw const ConfigurationError();
+  } on FormatException {
+    throw const ConfigurationError();
+  }
+  return uri.replace(path: '').toString();
 }
 
 HttpConvexClient get convex => ConvexConfig.client;
 
 class ConvexSubscriptionHandle {
   ConvexSubscriptionHandle(this._onCancel);
-
   final void Function() _onCancel;
   bool _isCancelled = false;
-
   void cancel() {
     if (_isCancelled) return;
     _isCancelled = true;
@@ -51,8 +120,6 @@ class ConvexSubscriptionHandle {
   }
 }
 
-/// Auth oturumu sona erdiğinde tetiklenen callback. UI tarafı (ör. main.dart)
-/// burada login ekranına yönlendirme yapar. `null` ise sessiz geçer.
 typedef AuthExpiryCallback = void Function();
 
 class HttpConvexClient {
@@ -61,89 +128,122 @@ class HttpConvexClient {
     Duration requestTimeout = const Duration(seconds: 15),
     int maxRetries = 3,
     http.Client? httpClient,
-  }) : _deploymentUrl = deploymentUrl.replaceFirst(RegExp(r'/$'), ''),
+    SafeDiagnostics? diagnostics,
+  }) : _deploymentUrl = validateDeploymentUrl(deploymentUrl),
        _timeout = requestTimeout,
-       _maxRetries = maxRetries,
-       _http = httpClient ?? http.Client();
+       _maxRetries = math.min(10, math.max(1, maxRetries)),
+       _http = httpClient ?? http.Client(),
+       _diagnostics = diagnostics ?? SafeDiagnostics.instance;
 
   final String _deploymentUrl;
   final Duration _timeout;
   final int _maxRetries;
   final http.Client _http;
-
+  final SafeDiagnostics _diagnostics;
+  final Set<ConvexSubscriptionHandle> _subscriptions = {};
   String? _sessionToken;
   AuthExpiryCallback? _onAuthExpired;
+  int _authGeneration = 0;
+  int? _expiredGeneration;
+  bool _closed = false;
 
   String? get sessionToken => _sessionToken;
 
-  /// Auth oturumu sona erdiğinde çağrılacak callback'i ayarlar.
-  /// Birden fazla kez çağrılırsa en son verilen kullanılır.
+  /// Validated origin for account-scoped local preferences; never display it.
+  String get deploymentUrl => _deploymentUrl;
+
   void setOnAuthExpired(AuthExpiryCallback? callback) {
     _onAuthExpired = callback;
   }
 
+  /// An old owner can remove its own handler without clearing a replacement.
+  void clearOnAuthExpired([AuthExpiryCallback? callback]) {
+    if (callback == null || identical(callback, _onAuthExpired)) {
+      _onAuthExpired = null;
+    }
+  }
+
   Future<void> setAuth({required String? token}) async {
-    _sessionToken = token;
+    _ensureOpen();
+    _authGeneration++;
+    _sessionToken = token == null || token.trim().isEmpty ? null : token;
+    _cancelSubscriptions();
   }
 
   Future<void> clearAuth() async {
+    _authGeneration++;
     _sessionToken = null;
+    _cancelSubscriptions();
   }
 
-  /// Auth gerektirmeyen public query (örn. henüz giriş yokken).
-  Future<String> query(String name, Map<String, dynamic> args) {
-    return _call(endpoint: 'query', name: name, args: args, retry: true);
+  void close() {
+    if (_closed) return;
+    _closed = true;
+    _authGeneration++;
+    _sessionToken = null;
+    _onAuthExpired = null;
+    _cancelSubscriptions();
+    _http.close();
   }
 
-  /// Auth gerektirmeyen public mutation (örn. employeeAuth:signIn).
-  ///
-  /// [retry] varsayılan olarak `false` — mutation'lar idempotent olmadıkça
-  /// retry edilmez. Caller idempotent olduğunu biliyorsa `retry: true` geçer.
+  void _cancelSubscriptions() {
+    for (final handle in _subscriptions.toList()) {
+      handle.cancel();
+    }
+    _subscriptions.clear();
+  }
+
+  void _ensureOpen() {
+    if (_closed) {
+      throw const BusinessError(message: '', code: 'CLIENT_CLOSED');
+    }
+  }
+
+  Future<String> query(String name, Map<String, dynamic> args) =>
+      _call(endpoint: 'query', name: name, args: args, retry: true);
+
   Future<String> mutation({
     required String name,
     required Map<String, dynamic> args,
     bool retry = false,
-  }) {
-    return _call(endpoint: 'mutation', name: name, args: args, retry: retry);
-  }
+  }) => _call(endpoint: 'mutation', name: name, args: args, retry: retry);
 
   Future<String> action({
     required String name,
     required Map<String, dynamic> args,
     bool retry = false,
-  }) {
-    return _call(endpoint: 'action', name: name, args: args, retry: retry);
-  }
+  }) => _call(endpoint: 'action', name: name, args: args, retry: retry);
 
-  /// Employee oturumu gerektiren query — `sessionToken` arg'ı otomatik eklenir.
-  Future<String> employeeQuery(String name, Map<String, dynamic> args) {
-    final token = _sessionToken;
-    if (token == null) {
-      throw const AuthExpiredError('Mobil oturum yok');
-    }
-    return _call(
-      endpoint: 'query',
-      name: name,
-      args: {...args, 'sessionToken': token},
-      retry: true,
-    );
-  }
+  Future<String> employeeQuery(String name, Map<String, dynamic> args) =>
+      _employeeCall('query', name, args, true);
 
-  /// Employee oturumu gerektiren mutation — `sessionToken` arg'ı otomatik eklenir.
   Future<String> employeeMutation({
     required String name,
     required Map<String, dynamic> args,
     bool retry = false,
-  }) {
+  }) => _employeeCall('mutation', name, args, retry);
+
+  Future<String> employeeAction({
+    required String name,
+    required Map<String, dynamic> args,
+    bool retry = false,
+  }) => _employeeCall('action', name, args, retry);
+
+  Future<String> _employeeCall(
+    String endpoint,
+    String name,
+    Map<String, dynamic> args,
+    bool retry,
+  ) {
+    _ensureOpen();
     final token = _sessionToken;
-    if (token == null) {
-      throw const AuthExpiredError('Mobil oturum yok');
-    }
+    if (token == null) throw const AuthExpiredError();
     return _call(
-      endpoint: 'mutation',
+      endpoint: endpoint,
       name: name,
       args: {...args, 'sessionToken': token},
       retry: retry,
+      employee: true,
     );
   }
 
@@ -155,71 +255,51 @@ class HttpConvexClient {
     Duration pollingInterval = const Duration(minutes: 1),
     Duration maxPollingInterval = const Duration(minutes: 5),
   }) async {
-    if (pollingInterval <= Duration.zero) {
-      throw ArgumentError.value(
-        pollingInterval,
-        'pollingInterval',
-        'must be greater than zero',
-      );
+    _ensureOpen();
+    if (pollingInterval <= Duration.zero ||
+        maxPollingInterval < pollingInterval) {
+      throw ArgumentError('Invalid polling interval');
     }
-    if (maxPollingInterval < pollingInterval) {
-      throw ArgumentError.value(
-        maxPollingInterval,
-        'maxPollingInterval',
-        'must be at least pollingInterval',
-      );
-    }
-
     Timer? timer;
-    var isCancelled = false;
-    var consecutiveFailures = 0;
-
-    Duration nextPollingInterval() {
-      final exponent = math.min(consecutiveFailures, 10);
-      final multiplier = 1 << exponent;
-      final candidateMilliseconds = pollingInterval.inMilliseconds * multiplier;
-      return Duration(
-        milliseconds: math.min(
-          candidateMilliseconds,
-          maxPollingInterval.inMilliseconds,
-        ),
-      );
-    }
-
+    var cancelled = false;
+    var failures = 0;
+    final generation = _authGeneration;
+    late final ConvexSubscriptionHandle handle;
+    handle = ConvexSubscriptionHandle(() {
+      cancelled = true;
+      timer?.cancel();
+      _subscriptions.remove(handle);
+    });
+    _subscriptions.add(handle);
+    bool isCurrent() => !cancelled && !_closed && generation == _authGeneration;
     late final Future<void> Function() refresh;
-
-    void scheduleNextRefresh() {
-      if (isCancelled) return;
-      timer = Timer(nextPollingInterval(), () {
-        unawaited(refresh());
-      });
-    }
-
     refresh = () async {
-      if (isCancelled) return;
+      if (!isCurrent()) return;
       try {
         final result = await employeeQuery(name, args);
-        if (isCancelled) return;
-        consecutiveFailures = 0;
+        if (!isCurrent()) return;
+        failures = 0;
         onUpdate(result);
       } catch (error, stack) {
-        if (isCancelled) return;
+        if (!isCurrent()) return;
         final mapped = AppError.fromException(error, stack);
-        consecutiveFailures++;
+        failures++;
+        if (mapped is AuthExpiredError) handle.cancel();
         onError(mapped);
-        if (mapped is AuthExpiredError) {
-          isCancelled = true;
-        }
       } finally {
-        scheduleNextRefresh();
+        if (isCurrent()) {
+          final milliseconds = math.min(
+            pollingInterval.inMilliseconds * (1 << math.min(failures, 10)),
+            maxPollingInterval.inMilliseconds,
+          );
+          timer = Timer(Duration(milliseconds: milliseconds), () {
+            unawaited(refresh());
+          });
+        }
       }
     };
-
     await refresh();
-    return ConvexSubscriptionHandle(() {
-      isCancelled = true;
-      timer?.cancel();
-    });
+    return handle;
   }
 
   Future<String> _call({
@@ -227,46 +307,75 @@ class HttpConvexClient {
     required String name,
     required Map<String, dynamic> args,
     required bool retry,
+    bool employee = false,
   }) async {
-    final maxAttempts = retry ? _maxRetries : 1;
-    AppError? lastError;
-
-    for (var attempt = 0; attempt < maxAttempts; attempt++) {
-      try {
-        return await _attempt(endpoint: endpoint, name: name, args: args);
-      } on AuthExpiredError {
-        // Token yoksa veya backend expired dediyse retry etmenin anlamı yok.
-        _onAuthExpired?.call();
-        rethrow;
-      } on BusinessError {
-        // İş kuralı hatası (4xx semantik) — retry edilmez.
-        rethrow;
-      } on TimeoutError catch (e) {
-        lastError = e;
-      } on NetworkError catch (e) {
-        lastError = e;
-      } on ServerError catch (e) {
-        // Sadece 5xx retry edilir.
-        if (e.statusCode < 500) rethrow;
-        lastError = e;
-      } catch (error, stack) {
-        // Beklenmedik istisna — wrap edip dışarı.
-        throw AppError.fromException(error, stack);
-      }
-
-      if (attempt < maxAttempts - 1) {
-        final delayMs = 250 * math.pow(2, attempt).toInt();
-        await Future<void>.delayed(Duration(milliseconds: delayMs));
+    _ensureOpen();
+    final token = _sessionToken;
+    final generation = _authGeneration;
+    // Freeze all arguments once: retries carry the original request/session.
+    final body = jsonEncode({
+      'path': name,
+      'format': 'convex_encoded_json',
+      'args': [encodeConvexValue(args)],
+    });
+    bool current() =>
+        !_closed && generation == _authGeneration && token == _sessionToken;
+    void guard() {
+      _ensureOpen();
+      if (employee && !current()) {
+        throw const BusinessError(message: '', code: 'SESSION_CHANGED');
       }
     }
 
-    throw lastError ?? const UnknownError('retry exhausted');
+    final operation = switch (endpoint) {
+      'query' => DiagnosticOperation.query,
+      'mutation' => DiagnosticOperation.mutation,
+      _ => DiagnosticOperation.action,
+    };
+    final maxAttempts = retry ? _maxRetries : 1;
+    final watch = Stopwatch()..start();
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      guard();
+      try {
+        final result = await _attempt(endpoint: endpoint, body: body);
+        guard();
+        return result;
+      } catch (error, stack) {
+        // A late A-expiry must not become a provider-visible B-expiry either.
+        guard();
+        final mapped = AppError.fromException(error, stack);
+        _diagnostics.record(
+          mapped,
+          stack: stack,
+          operation: operation,
+          elapsed: watch.elapsed,
+          attempt: attempt,
+        );
+        if (mapped is AuthExpiredError) {
+          if (employee && current() && _expiredGeneration != generation) {
+            _expiredGeneration = generation;
+            _onAuthExpired?.call();
+          }
+          throw mapped;
+        }
+        final transient =
+            mapped is NetworkError ||
+            mapped is TimeoutError ||
+            (mapped is ServerError &&
+                mapped.statusCode >= 500 &&
+                mapped.statusCode != 560);
+        if (!transient || attempt == maxAttempts) throw mapped;
+        await Future<void>.delayed(
+          Duration(milliseconds: 250 * (1 << (attempt - 1))),
+        );
+      }
+    }
+    throw const ProtocolError();
   }
 
   Future<String> _attempt({
     required String endpoint,
-    required String name,
-    required Map<String, dynamic> args,
+    required String body,
   }) async {
     final http.Response response;
     try {
@@ -277,126 +386,21 @@ class HttpConvexClient {
               'Content-Type': 'application/json',
               'Convex-Client': 'flutter-http-ngsplus',
             },
-            body: jsonEncode({
-              'path': name,
-              'format': 'convex_encoded_json',
-              'args': [_convexToJson(args)],
-            }),
+            body: body,
           )
           .timeout(_timeout);
     } on TimeoutException {
       throw const TimeoutError();
-    } on SocketException catch (e) {
-      throw NetworkError(e.message);
-    } on HttpException catch (e) {
-      throw NetworkError(e.message);
+    } on SocketException {
+      throw const NetworkError();
+    } on HttpException {
+      throw const NetworkError();
+    } on http.ClientException {
+      throw const NetworkError();
     }
-
-    if (response.statusCode == 401 || response.statusCode == 403) {
-      throw AuthExpiredError('HTTP ${response.statusCode}');
-    }
-
-    if (response.statusCode >= 500) {
-      throw ServerError(statusCode: response.statusCode, body: response.body);
-    }
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw BusinessError(
-        message: 'Convex HTTP ${response.statusCode}: ${response.body}',
-      );
-    }
-
-    final dynamic decoded;
-    try {
-      decoded = jsonDecode(response.body);
-    } catch (e) {
-      throw BusinessError(message: 'Invalid Convex response: ${response.body}');
-    }
-
-    if (decoded is! Map<String, dynamic>) {
-      throw BusinessError(message: 'Invalid Convex response: ${response.body}');
-    }
-
-    final status = decoded['status'];
-    if (status == 'success') {
-      return jsonEncode(_jsonToConvex(decoded['value']));
-    }
-
-    final errorMessage = decoded['errorMessage'] as String? ?? response.body;
-
-    if (_isAuthExpiryMessage(errorMessage)) {
-      throw AuthExpiredError(errorMessage);
-    }
-
-    throw BusinessError(message: errorMessage);
+    return decodeConvexResponse(
+      statusCode: response.statusCode,
+      body: response.body,
+    );
   }
-
-  bool _isAuthExpiryMessage(String message) {
-    final lower = message.toLowerCase();
-    return lower.contains('mobil oturum yok') ||
-        lower.contains('session expired') ||
-        lower.contains('oturum süresi doldu') ||
-        lower.contains('oturum geçersiz') ||
-        lower.contains('unauthorized');
-  }
-}
-
-Object? _convexToJson(Object? value) {
-  if (value == null || value is String || value is num || value is bool) {
-    return value;
-  }
-  if (value is List) {
-    return value.map(_convexToJson).toList();
-  }
-  if (value is Map) {
-    final result = <String, Object?>{};
-    for (final entry in value.entries) {
-      final key = entry.key;
-      if (key is String && entry.value != null) {
-        result[key] = _convexToJson(entry.value);
-      }
-    }
-    return result;
-  }
-  throw ArgumentError('Unsupported Convex value: $value');
-}
-
-Object? _jsonToConvex(Object? value) {
-  if (value == null || value is String || value is num || value is bool) {
-    return value;
-  }
-  if (value is List) {
-    return value.map(_jsonToConvex).toList();
-  }
-  if (value is Map<String, dynamic>) {
-    if (value.length == 1 && value.containsKey(r'$integer')) {
-      return _decodeInt64(value[r'$integer']);
-    }
-    if (value.length == 1 && value.containsKey(r'$float')) {
-      return _decodeFloat64(value[r'$float']);
-    }
-    final result = <String, Object?>{};
-    for (final entry in value.entries) {
-      result[entry.key] = _jsonToConvex(entry.value);
-    }
-    return result;
-  }
-  return value;
-}
-
-Object _decodeInt64(Object? encoded) {
-  if (encoded is! String) return encoded.toString();
-  final bytes = base64Decode(encoded);
-  if (bytes.length != 8) return encoded;
-  final data = ByteData.sublistView(Uint8List.fromList(bytes));
-  final value = data.getInt64(0, Endian.little);
-  return value;
-}
-
-Object _decodeFloat64(Object? encoded) {
-  if (encoded is! String) return encoded.toString();
-  final bytes = base64Decode(encoded);
-  if (bytes.length != 8) return encoded;
-  final data = ByteData.sublistView(Uint8List.fromList(bytes));
-  return data.getFloat64(0, Endian.little);
 }

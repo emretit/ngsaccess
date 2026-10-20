@@ -1,0 +1,52 @@
+00:00 +0: loading /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart
+00:00 +0: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: AppError.fromException zaten AppError ise olduğu gibi döner
+00:00 +1: /Users/emreaydin/ngsaccess/mobile/test/repositories/attendance_repository_test.dart: (setUpAll)
+00:00 +2: /Users/emreaydin/ngsaccess/mobile/test/repositories/attendance_repository_test.dart: (setUpAll)
+00:00 +2: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +3: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +4: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +5: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +6: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +7: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +8: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +9: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +10: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +11: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +12: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +13: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +14: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +15: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +16: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +17: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +18: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +19: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +20: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +21: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +22: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +23: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +23: /Users/emreaydin/ngsaccess/mobile/test/providers/auth_provider_test.dart: signOut repo.signOut hatası logout'u engellemez
+signOut server call failed: NetworkError: offline
+00:00 +24: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +25: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +26: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +27: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +28: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +29: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +30: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:00 +31: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: oturum hatasından sonra polling yeniden zamanlanmaz
+00:00 +32: /Users/emreaydin/ngsaccess/mobile/test/repositories/auth_repository_test.dart: (setUpAll)
+00:00 +32: /Users/emreaydin/ngsaccess/mobile/test/repositories/auth_repository_test.dart: AuthRepository.signIn başarılı yanıtta SignInResult döner
+00:00 +33: /Users/emreaydin/ngsaccess/mobile/test/repositories/auth_repository_test.dart: AuthRepository.signIn eksik token alanı BusinessError fırlatır
+00:00 +34: /Users/emreaydin/ngsaccess/mobile/test/repositories/auth_repository_test.dart: AuthRepository.signIn client AuthExpiredError fırlatırsa repo da fırlatır
+00:00 +35: /Users/emreaydin/ngsaccess/mobile/test/widgets/responsive_container_test.dart: genişlik > maxWidth ise içerik maxWidth'e clamp olur
+00:00 +36: /Users/emreaydin/ngsaccess/mobile/test/widgets/responsive_container_test.dart: genişlik > maxWidth ise içerik maxWidth'e clamp olur
+00:00 +37: /Users/emreaydin/ngsaccess/mobile/test/widgets/responsive_container_test.dart: genişlik > maxWidth ise içerik maxWidth'e clamp olur
+00:00 +38: /Users/emreaydin/ngsaccess/mobile/test/widgets/responsive_container_test.dart: genişlik > maxWidth ise içerik maxWidth'e clamp olur
+00:01 +39: /Users/emreaydin/ngsaccess/mobile/test/widgets/responsive_container_test.dart: genişlik < maxWidth ise içerik tüm genişliği kullanır
+00:04 +40: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: (setUpAll)
+00:04 +40: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: boş email ile validation hatası gösterir
+00:05 +41: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: geçersiz email format hatası gösterir
+00:05 +42: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: kısa şifre hatası gösterir
+00:05 +43: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: signIn başarısız olunca SnackBar gösterir
+00:05 +44: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: (tearDownAll)
+00:05 +44: All tests passed!

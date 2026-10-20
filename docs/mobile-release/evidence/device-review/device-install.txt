@@ -1,0 +1,7 @@
+App installed:
+• bundleID: com.ngsplus.app
+• installationURL: file:///private/var/containers/Bundle/Application/49A6C634-A83C-4FCE-B59D-C8FDC6D13580/Runner.app/
+• launchServicesIdentifier: unknown
+• databaseUUID: B3918ADD-ABF5-4CE8-9148-F3ED8C35124D
+• databaseSequenceNumber: 2428
+• options: 

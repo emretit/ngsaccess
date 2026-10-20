@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/branch_visibility.dart';
+import '../core/error_localizer.dart';
 import '../providers/auth_provider.dart';
 import '../screens/auth/forgot_password_screen.dart';
 import '../screens/auth/login_screen.dart';
@@ -12,70 +16,108 @@ import '../screens/qr_scan/qr_scan_screen.dart';
 import '../screens/settings/select_device_screen.dart';
 import '../screens/splash_screen.dart';
 import '../screens/visitor/visitor_screen.dart';
+import 'route_paths.dart';
 
-/// Tüm ekranlara erişebilen root navigator key. Auth expiry, deep link gibi
-/// global akışlarda router context'i için tutuluyor.
-final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
-  debugLabel: 'root',
-);
+export 'route_paths.dart';
 
-/// Tab içi navigasyonların kullandığı shell navigator key.
-final GlobalKey<NavigatorState> shellNavigatorKey = GlobalKey<NavigatorState>(
-  debugLabel: 'shell',
-);
+// Retained exports for callers that used these keys. Each router owns fresh
+// navigator keys so replacing a root cannot retain another root's navigation.
+final rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+final shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
-/// Path sabitleri — type-safe çağrı için.
-class AppRoute {
-  AppRoute._();
+/// [screenBuilders] replaces screen bodies in integration tests while keeping
+/// the real guards, branch navigators, shell and return-target handling.
+GoRouter buildRouter(
+  AuthProvider authProvider, {
+  String? initialLocation,
+  Map<String, WidgetBuilder> screenBuilders = const {},
+}) {
+  Widget screen(String path, BuildContext context, WidgetBuilder fallback) =>
+      (screenBuilders[path] ?? fallback)(context);
 
-  static const splash = '/splash';
-  static const login = '/login';
-  static const forgotPassword = '/forgot-password';
-  static const home = '/home';
-  static const history = '/history';
-  static const qr = '/qr';
-  static const visitor = '/visitor';
-  static const profile = '/profile';
-  static const selectDevice = '/select-device';
-}
-
-/// AuthProvider'ı dinleyip redirect'i tetikleyen [GoRouter] üretir.
-GoRouter buildRouter(AuthProvider authProvider) {
   return GoRouter(
-    navigatorKey: rootNavigatorKey,
-    initialLocation: AppRoute.splash,
+    navigatorKey: GlobalKey<NavigatorState>(debugLabel: 'app-root'),
+    initialLocation: initialLocation == null
+        ? AppRoute.splash
+        : normalizeAppLocation(Uri.parse(initialLocation)),
+    overridePlatformDefaultLocation: initialLocation != null,
     debugLogDiagnostics: false,
     refreshListenable: authProvider,
     redirect: (context, state) {
-      final loc = state.matchedLocation;
-
-      // Splash kendi navigation'ını yapar (bootstrap + remember-me akışı).
-      if (loc == AppRoute.splash) return null;
-
-      final isAuth = authProvider.isAuthenticated;
-      final isAuthFlow =
-          loc == AppRoute.login || loc == AppRoute.forgotPassword;
-
-      if (!isAuth && !isAuthFlow) return AppRoute.login;
-      if (isAuth && isAuthFlow) return AppRoute.home;
+      final canonical = normalizeAppLocation(state.uri);
+      if (canonical != state.uri.toString()) {
+        return canonical;
+      }
+      final path = state.uri.path;
+      final target = safeReturnTarget(state.uri.queryParameters['from']);
+      final isPublic =
+          path == AppRoute.login || path == AppRoute.forgotPassword;
+      final isSplash = path == AppRoute.splash;
+      if (authProvider.phase == AuthPhase.initializing ||
+          authProvider.phase == AuthPhase.retryableFailure) {
+        return isSplash
+            ? null
+            : withReturnTarget(
+                AppRoute.splash,
+                AppRoute.protectedPaths.contains(path) ? path : target,
+              );
+      }
+      if (authProvider.isAuthenticated) {
+        return isSplash || isPublic ? target ?? AppRoute.home : null;
+      }
+      if (isSplash) {
+        return withReturnTarget(AppRoute.login, target);
+      }
+      if (!isPublic) {
+        return withReturnTarget(AppRoute.login, path);
+      }
       return null;
     },
     routes: [
       GoRoute(
         path: AppRoute.splash,
-        builder: (_, _) => const SplashScreen(),
+        builder: (context, _) => screen(
+          AppRoute.splash,
+          context,
+          (_) => ListenableBuilder(
+            listenable: authProvider,
+            builder: (context, _) => SplashScreen(
+              isFailure: authProvider.phase == AuthPhase.retryableFailure,
+              message: switch (authProvider.bootstrapError) {
+                final error? => localizeAppError(context, error),
+                null => null,
+              },
+              onRetry: () {
+                if (!authProvider.isBootstrapping) {
+                  unawaited(authProvider.bootstrap(force: true));
+                }
+              },
+              // Explicitly abandon restore; the router retains the target.
+              onUseLogin: () => unawaited(authProvider.signOut()),
+            ),
+          ),
+        ),
       ),
       GoRoute(
         path: AppRoute.login,
-        builder: (_, _) => const LoginScreen(),
+        builder: (context, _) =>
+            screen(AppRoute.login, context, (_) => const LoginScreen()),
       ),
       GoRoute(
         path: AppRoute.forgotPassword,
-        builder: (_, _) => const ForgotPasswordScreen(),
+        builder: (context, _) => screen(
+          AppRoute.forgotPassword,
+          context,
+          (_) => const ForgotPasswordScreen(),
+        ),
       ),
       GoRoute(
         path: AppRoute.selectDevice,
-        builder: (_, _) => const SelectDeviceScreen(),
+        builder: (context, _) => screen(
+          AppRoute.selectDevice,
+          context,
+          (_) => const SelectDeviceScreen(),
+        ),
       ),
       StatefulShellRoute.indexedStack(
         builder: (_, _, navigationShell) =>
@@ -85,7 +127,8 @@ GoRouter buildRouter(AuthProvider authProvider) {
             routes: [
               GoRoute(
                 path: AppRoute.home,
-                builder: (_, _) => const HomeScreen(),
+                builder: (context, _) =>
+                    screen(AppRoute.home, context, (_) => const HomeScreen()),
               ),
             ],
           ),
@@ -93,7 +136,11 @@ GoRouter buildRouter(AuthProvider authProvider) {
             routes: [
               GoRoute(
                 path: AppRoute.history,
-                builder: (_, _) => const HistoryScreen(),
+                builder: (context, _) => screen(
+                  AppRoute.history,
+                  context,
+                  (_) => const HistoryScreen(),
+                ),
               ),
             ],
           ),
@@ -101,7 +148,15 @@ GoRouter buildRouter(AuthProvider authProvider) {
             routes: [
               GoRoute(
                 path: AppRoute.qr,
-                builder: (_, _) => const QRScanScreen(),
+                builder: (context, _) => Builder(
+                  builder: (context) => screen(
+                    AppRoute.qr,
+                    context,
+                    (_) => QRScanScreen(
+                      isActive: BranchVisibility.isActive(context, 2),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -109,7 +164,11 @@ GoRouter buildRouter(AuthProvider authProvider) {
             routes: [
               GoRoute(
                 path: AppRoute.visitor,
-                builder: (_, _) => const VisitorScreen(),
+                builder: (context, _) => screen(
+                  AppRoute.visitor,
+                  context,
+                  (_) => const VisitorScreen(),
+                ),
               ),
             ],
           ),
@@ -117,7 +176,11 @@ GoRouter buildRouter(AuthProvider authProvider) {
             routes: [
               GoRoute(
                 path: AppRoute.profile,
-                builder: (_, _) => const ProfileScreen(),
+                builder: (context, _) => screen(
+                  AppRoute.profile,
+                  context,
+                  (_) => const ProfileScreen(),
+                ),
               ),
             ],
           ),

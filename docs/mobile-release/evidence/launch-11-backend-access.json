@@ -1,0 +1,72 @@
+{
+  "id": "33ff943f-d3bd-4a96-be63-0cb1f64ff3e9",
+  "ok": true,
+  "result": {
+    "runId": "run_e525229e4ae5",
+    "taskId": "task_fc7697d06cb3",
+    "dispatchId": "ctx_7f6db59e74bf",
+    "state": "ready",
+    "stage": "input_accepted",
+    "turnStart": "observed",
+    "setup": {
+      "requested": "not_applicable",
+      "effective": "not_applicable",
+      "source": "existing_worktree",
+      "hookFound": false,
+      "startupPolicy": "start-immediately",
+      "state": "not_applicable"
+    },
+    "launch": {
+      "requested": {
+        "agent": "codex",
+        "model": null,
+        "effort": null
+      },
+      "effective": {
+        "agent": "codex",
+        "model": null,
+        "effort": null
+      }
+    },
+    "mode": {
+      "mode": "structured",
+      "preferred": "structured",
+      "reason": "user_default",
+      "detail": "Started a structured chat session worker, the default for new agent tabs in your settings."
+    },
+    "timeoutMs": 60000,
+    "effects": [
+      {
+        "kind": "worktree",
+        "action": "reused",
+        "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess"
+      },
+      {
+        "kind": "setup",
+        "action": "not_applicable",
+        "state": "not_applicable"
+      },
+      {
+        "kind": "terminal",
+        "role": "agent",
+        "action": "created",
+        "id": "structworker_d9459d35-4b03-430d-9d18-cddecc6fd7ed",
+        "surface": "background"
+      },
+      {
+        "kind": "dispatch_input",
+        "role": "agent",
+        "id": "structworker_d9459d35-4b03-430d-9d18-cddecc6fd7ed",
+        "state": "accepted"
+      }
+    ],
+    "residualResources": [],
+    "mutation": {
+      "requestId": "704db93a-0b23-46bd-ab0f-cd1c907ce39e",
+      "replayed": false
+    }
+  },
+  "_meta": {
+    "runtimeId": "5b642016-c141-4069-8a94-1b31653d5eff"
+  }
+}

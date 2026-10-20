@@ -1,0 +1,942 @@
+{
+  "runId": "run_2c7994859fb0",
+  "baselineCommit": "31f58e5da205d696f19a80516d23750f6309e1bc",
+  "workers": [
+    {
+      "module": "01-auth",
+      "title": "Kimlik doğrulama ve oturum",
+      "report": "docs/mobile-audit/modules/01-auth.md",
+      "exitCode": 0,
+      "receipt": {
+        "id": "689bc15c-9b14-490f-b9cc-5281beee6855",
+        "ok": true,
+        "result": {
+          "runId": "run_2c7994859fb0",
+          "taskId": "task_29f8284de5a0",
+          "dispatchId": "ctx_4fdc4987610c",
+          "state": "ready",
+          "stage": "input_accepted",
+          "turnStart": "observed",
+          "setup": {
+            "requested": "not_applicable",
+            "effective": "not_applicable",
+            "source": "existing_worktree",
+            "hookFound": false,
+            "startupPolicy": "start-immediately",
+            "state": "not_applicable"
+          },
+          "launch": {
+            "requested": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            },
+            "effective": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            }
+          },
+          "mode": {
+            "mode": "structured",
+            "preferred": "structured",
+            "reason": "user_default",
+            "detail": "Started a structured chat session worker, the default for new agent tabs in your settings."
+          },
+          "timeoutMs": 60000,
+          "effects": [
+            {
+              "kind": "worktree",
+              "action": "reused",
+              "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess"
+            },
+            {
+              "kind": "setup",
+              "action": "not_applicable",
+              "state": "not_applicable"
+            },
+            {
+              "kind": "terminal",
+              "role": "agent",
+              "action": "created",
+              "id": "structworker_307b06fd-22c3-4dbe-af6b-96c3b2ec8f86",
+              "surface": "background"
+            },
+            {
+              "kind": "dispatch_input",
+              "role": "agent",
+              "id": "structworker_307b06fd-22c3-4dbe-af6b-96c3b2ec8f86",
+              "state": "accepted"
+            }
+          ],
+          "residualResources": [],
+          "mutation": {
+            "requestId": "8094d5b2-894c-4ecc-a054-a13b6dd8a55c",
+            "replayed": false
+          }
+        },
+        "_meta": {
+          "runtimeId": "5b642016-c141-4069-8a94-1b31653d5eff"
+        }
+      }
+    },
+    {
+      "module": "02-home",
+      "title": "Ana sayfa ve dashboard",
+      "report": "docs/mobile-audit/modules/02-home.md",
+      "exitCode": 0,
+      "receipt": {
+        "id": "c5e12ed9-4c9b-4f1a-aef7-0de95de5fb54",
+        "ok": true,
+        "result": {
+          "runId": "run_2c7994859fb0",
+          "taskId": "task_41f512fb1b77",
+          "dispatchId": "ctx_09d9958a56dd",
+          "state": "ready",
+          "stage": "input_accepted",
+          "turnStart": "observed",
+          "setup": {
+            "requested": "not_applicable",
+            "effective": "not_applicable",
+            "source": "existing_worktree",
+            "hookFound": false,
+            "startupPolicy": "start-immediately",
+            "state": "not_applicable"
+          },
+          "launch": {
+            "requested": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            },
+            "effective": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            }
+          },
+          "mode": {
+            "mode": "structured",
+            "preferred": "structured",
+            "reason": "user_default",
+            "detail": "Started a structured chat session worker, the default for new agent tabs in your settings."
+          },
+          "timeoutMs": 60000,
+          "effects": [
+            {
+              "kind": "worktree",
+              "action": "reused",
+              "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess"
+            },
+            {
+              "kind": "setup",
+              "action": "not_applicable",
+              "state": "not_applicable"
+            },
+            {
+              "kind": "terminal",
+              "role": "agent",
+              "action": "created",
+              "id": "structworker_45683ed3-80b7-49e2-8c6a-e2450e6b3331",
+              "surface": "background"
+            },
+            {
+              "kind": "dispatch_input",
+              "role": "agent",
+              "id": "structworker_45683ed3-80b7-49e2-8c6a-e2450e6b3331",
+              "state": "accepted"
+            }
+          ],
+          "residualResources": [],
+          "mutation": {
+            "requestId": "6301a871-adee-4a5d-b129-ca38503989c3",
+            "replayed": false
+          }
+        },
+        "_meta": {
+          "runtimeId": "5b642016-c141-4069-8a94-1b31653d5eff"
+        }
+      }
+    },
+    {
+      "module": "03-attendance-history",
+      "title": "Yoklama verisi ve geçmiş",
+      "report": "docs/mobile-audit/modules/03-attendance-history.md",
+      "exitCode": 0,
+      "receipt": {
+        "id": "1365b0f6-49fd-42d4-823f-a86bbd1373cb",
+        "ok": true,
+        "result": {
+          "runId": "run_2c7994859fb0",
+          "taskId": "task_4417bea6470b",
+          "dispatchId": "ctx_650b180bb762",
+          "state": "ready",
+          "stage": "input_accepted",
+          "turnStart": "observed",
+          "setup": {
+            "requested": "not_applicable",
+            "effective": "not_applicable",
+            "source": "existing_worktree",
+            "hookFound": false,
+            "startupPolicy": "start-immediately",
+            "state": "not_applicable"
+          },
+          "launch": {
+            "requested": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            },
+            "effective": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            }
+          },
+          "mode": {
+            "mode": "structured",
+            "preferred": "structured",
+            "reason": "user_default",
+            "detail": "Started a structured chat session worker, the default for new agent tabs in your settings."
+          },
+          "timeoutMs": 60000,
+          "effects": [
+            {
+              "kind": "worktree",
+              "action": "reused",
+              "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess"
+            },
+            {
+              "kind": "setup",
+              "action": "not_applicable",
+              "state": "not_applicable"
+            },
+            {
+              "kind": "terminal",
+              "role": "agent",
+              "action": "created",
+              "id": "structworker_ac041c39-678a-49e5-beea-6d6f6ba9d50a",
+              "surface": "background"
+            },
+            {
+              "kind": "dispatch_input",
+              "role": "agent",
+              "id": "structworker_ac041c39-678a-49e5-beea-6d6f6ba9d50a",
+              "state": "accepted"
+            }
+          ],
+          "residualResources": [],
+          "mutation": {
+            "requestId": "0508d038-fb76-4300-8d23-2cfd72ea3abd",
+            "replayed": false
+          }
+        },
+        "_meta": {
+          "runtimeId": "5b642016-c141-4069-8a94-1b31653d5eff"
+        }
+      }
+    },
+    {
+      "module": "04-qr",
+      "title": "QR tarama ve fiziksel geçiş",
+      "report": "docs/mobile-audit/modules/04-qr.md",
+      "exitCode": 0,
+      "receipt": {
+        "id": "26161c6f-afe1-4fca-bf65-8bbd0ba657d0",
+        "ok": true,
+        "result": {
+          "runId": "run_2c7994859fb0",
+          "taskId": "task_1fce8e79d35b",
+          "dispatchId": "ctx_e748c8b9f402",
+          "state": "ready",
+          "stage": "input_accepted",
+          "turnStart": "observed",
+          "setup": {
+            "requested": "not_applicable",
+            "effective": "not_applicable",
+            "source": "existing_worktree",
+            "hookFound": false,
+            "startupPolicy": "start-immediately",
+            "state": "not_applicable"
+          },
+          "launch": {
+            "requested": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            },
+            "effective": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            }
+          },
+          "mode": {
+            "mode": "structured",
+            "preferred": "structured",
+            "reason": "user_default",
+            "detail": "Started a structured chat session worker, the default for new agent tabs in your settings."
+          },
+          "timeoutMs": 60000,
+          "effects": [
+            {
+              "kind": "worktree",
+              "action": "reused",
+              "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess"
+            },
+            {
+              "kind": "setup",
+              "action": "not_applicable",
+              "state": "not_applicable"
+            },
+            {
+              "kind": "terminal",
+              "role": "agent",
+              "action": "created",
+              "id": "structworker_44812343-dc86-486f-84b7-fcfec1bb84ae",
+              "surface": "background"
+            },
+            {
+              "kind": "dispatch_input",
+              "role": "agent",
+              "id": "structworker_44812343-dc86-486f-84b7-fcfec1bb84ae",
+              "state": "accepted"
+            }
+          ],
+          "residualResources": [],
+          "mutation": {
+            "requestId": "7146bc37-8e0a-424a-87b3-a39e8b2d4e63",
+            "replayed": false
+          }
+        },
+        "_meta": {
+          "runtimeId": "5b642016-c141-4069-8a94-1b31653d5eff"
+        }
+      }
+    },
+    {
+      "module": "05-visitor",
+      "title": "Ziyaretçi yönetimi",
+      "report": "docs/mobile-audit/modules/05-visitor.md",
+      "exitCode": 0,
+      "receipt": {
+        "id": "4c748793-e6ae-4fd8-8c06-3d26aaa359ec",
+        "ok": true,
+        "result": {
+          "runId": "run_2c7994859fb0",
+          "taskId": "task_4dd532c2d3a6",
+          "dispatchId": "ctx_d9d1a663270d",
+          "state": "ready",
+          "stage": "input_accepted",
+          "turnStart": "observed",
+          "setup": {
+            "requested": "not_applicable",
+            "effective": "not_applicable",
+            "source": "existing_worktree",
+            "hookFound": false,
+            "startupPolicy": "start-immediately",
+            "state": "not_applicable"
+          },
+          "launch": {
+            "requested": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            },
+            "effective": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            }
+          },
+          "mode": {
+            "mode": "structured",
+            "preferred": "structured",
+            "reason": "user_default",
+            "detail": "Started a structured chat session worker, the default for new agent tabs in your settings."
+          },
+          "timeoutMs": 60000,
+          "effects": [
+            {
+              "kind": "worktree",
+              "action": "reused",
+              "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess"
+            },
+            {
+              "kind": "setup",
+              "action": "not_applicable",
+              "state": "not_applicable"
+            },
+            {
+              "kind": "terminal",
+              "role": "agent",
+              "action": "created",
+              "id": "structworker_fe9538cb-3ebb-4864-a3d1-efcaf6fdfb57",
+              "surface": "background"
+            },
+            {
+              "kind": "dispatch_input",
+              "role": "agent",
+              "id": "structworker_fe9538cb-3ebb-4864-a3d1-efcaf6fdfb57",
+              "state": "accepted"
+            }
+          ],
+          "residualResources": [],
+          "mutation": {
+            "requestId": "d7b7d8df-1a52-42b4-833e-5af5a3166ab1",
+            "replayed": false
+          }
+        },
+        "_meta": {
+          "runtimeId": "5b642016-c141-4069-8a94-1b31653d5eff"
+        }
+      }
+    },
+    {
+      "module": "06-profile",
+      "title": "Profil ve kullanıcı ayarları",
+      "report": "docs/mobile-audit/modules/06-profile.md",
+      "exitCode": 0,
+      "receipt": {
+        "id": "c68dd291-742b-49ac-8cfa-d3b333cd11f6",
+        "ok": true,
+        "result": {
+          "runId": "run_2c7994859fb0",
+          "taskId": "task_66905426d636",
+          "dispatchId": "ctx_8a326b79db1c",
+          "state": "ready",
+          "stage": "input_accepted",
+          "turnStart": "observed",
+          "setup": {
+            "requested": "not_applicable",
+            "effective": "not_applicable",
+            "source": "existing_worktree",
+            "hookFound": false,
+            "startupPolicy": "start-immediately",
+            "state": "not_applicable"
+          },
+          "launch": {
+            "requested": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            },
+            "effective": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            }
+          },
+          "mode": {
+            "mode": "structured",
+            "preferred": "structured",
+            "reason": "user_default",
+            "detail": "Started a structured chat session worker, the default for new agent tabs in your settings."
+          },
+          "timeoutMs": 60000,
+          "effects": [
+            {
+              "kind": "worktree",
+              "action": "reused",
+              "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess"
+            },
+            {
+              "kind": "setup",
+              "action": "not_applicable",
+              "state": "not_applicable"
+            },
+            {
+              "kind": "terminal",
+              "role": "agent",
+              "action": "created",
+              "id": "structworker_4877d15b-6671-4800-8b64-1f095b42ccf5",
+              "surface": "background"
+            },
+            {
+              "kind": "dispatch_input",
+              "role": "agent",
+              "id": "structworker_4877d15b-6671-4800-8b64-1f095b42ccf5",
+              "state": "accepted"
+            }
+          ],
+          "residualResources": [],
+          "mutation": {
+            "requestId": "73f263c2-ab8c-41ba-a519-41e7e566b927",
+            "replayed": false
+          }
+        },
+        "_meta": {
+          "runtimeId": "5b642016-c141-4069-8a94-1b31653d5eff"
+        }
+      }
+    },
+    {
+      "module": "07-devices",
+      "title": "Cihaz seçimi ve tercihler",
+      "report": "docs/mobile-audit/modules/07-devices.md",
+      "exitCode": 0,
+      "receipt": {
+        "id": "c36a0366-edf2-4356-8f5a-5131cef1e674",
+        "ok": true,
+        "result": {
+          "runId": "run_2c7994859fb0",
+          "taskId": "task_cb336edcb23d",
+          "dispatchId": "ctx_da61cb263124",
+          "state": "ready",
+          "stage": "input_accepted",
+          "turnStart": "observed",
+          "setup": {
+            "requested": "not_applicable",
+            "effective": "not_applicable",
+            "source": "existing_worktree",
+            "hookFound": false,
+            "startupPolicy": "start-immediately",
+            "state": "not_applicable"
+          },
+          "launch": {
+            "requested": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            },
+            "effective": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            }
+          },
+          "mode": {
+            "mode": "structured",
+            "preferred": "structured",
+            "reason": "user_default",
+            "detail": "Started a structured chat session worker, the default for new agent tabs in your settings."
+          },
+          "timeoutMs": 60000,
+          "effects": [
+            {
+              "kind": "worktree",
+              "action": "reused",
+              "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess"
+            },
+            {
+              "kind": "setup",
+              "action": "not_applicable",
+              "state": "not_applicable"
+            },
+            {
+              "kind": "terminal",
+              "role": "agent",
+              "action": "created",
+              "id": "structworker_72cf430b-35de-47b1-9e93-5a00f5720cdb",
+              "surface": "background"
+            },
+            {
+              "kind": "dispatch_input",
+              "role": "agent",
+              "id": "structworker_72cf430b-35de-47b1-9e93-5a00f5720cdb",
+              "state": "accepted"
+            }
+          ],
+          "residualResources": [],
+          "mutation": {
+            "requestId": "a106e04b-93a0-4689-80f4-c2be00c66466",
+            "replayed": false
+          }
+        },
+        "_meta": {
+          "runtimeId": "5b642016-c141-4069-8a94-1b31653d5eff"
+        }
+      }
+    },
+    {
+      "module": "08-architecture-navigation",
+      "title": "Uygulama mimarisi ve navigasyon",
+      "report": "docs/mobile-audit/modules/08-architecture-navigation.md",
+      "exitCode": 0,
+      "receipt": {
+        "id": "f12e36bd-0bb8-43d0-923a-20635967dc79",
+        "ok": true,
+        "result": {
+          "runId": "run_2c7994859fb0",
+          "taskId": "task_00cb640b1071",
+          "dispatchId": "ctx_5985ff18f96a",
+          "state": "ready",
+          "stage": "input_accepted",
+          "turnStart": "observed",
+          "setup": {
+            "requested": "not_applicable",
+            "effective": "not_applicable",
+            "source": "existing_worktree",
+            "hookFound": false,
+            "startupPolicy": "start-immediately",
+            "state": "not_applicable"
+          },
+          "launch": {
+            "requested": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            },
+            "effective": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            }
+          },
+          "mode": {
+            "mode": "structured",
+            "preferred": "structured",
+            "reason": "user_default",
+            "detail": "Started a structured chat session worker, the default for new agent tabs in your settings."
+          },
+          "timeoutMs": 60000,
+          "effects": [
+            {
+              "kind": "worktree",
+              "action": "reused",
+              "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess"
+            },
+            {
+              "kind": "setup",
+              "action": "not_applicable",
+              "state": "not_applicable"
+            },
+            {
+              "kind": "terminal",
+              "role": "agent",
+              "action": "created",
+              "id": "structworker_f8e8bc64-e436-4971-9a57-2a6200f31745",
+              "surface": "background"
+            },
+            {
+              "kind": "dispatch_input",
+              "role": "agent",
+              "id": "structworker_f8e8bc64-e436-4971-9a57-2a6200f31745",
+              "state": "accepted"
+            }
+          ],
+          "residualResources": [],
+          "mutation": {
+            "requestId": "99585215-eec2-4660-b1f5-e8313d5e84b7",
+            "replayed": false
+          }
+        },
+        "_meta": {
+          "runtimeId": "5b642016-c141-4069-8a94-1b31653d5eff"
+        }
+      }
+    },
+    {
+      "module": "09-network-backend",
+      "title": "HTTP ve Convex sözleşmeleri",
+      "report": "docs/mobile-audit/modules/09-network-backend.md",
+      "exitCode": 0,
+      "receipt": {
+        "id": "a4818dbc-bac2-4917-b9e5-12ef1ada96dc",
+        "ok": true,
+        "result": {
+          "runId": "run_2c7994859fb0",
+          "taskId": "task_4ac96d824f52",
+          "dispatchId": "ctx_6755f03538dd",
+          "state": "ready",
+          "stage": "input_accepted",
+          "turnStart": "observed",
+          "setup": {
+            "requested": "not_applicable",
+            "effective": "not_applicable",
+            "source": "existing_worktree",
+            "hookFound": false,
+            "startupPolicy": "start-immediately",
+            "state": "not_applicable"
+          },
+          "launch": {
+            "requested": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            },
+            "effective": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            }
+          },
+          "mode": {
+            "mode": "structured",
+            "preferred": "structured",
+            "reason": "user_default",
+            "detail": "Started a structured chat session worker, the default for new agent tabs in your settings."
+          },
+          "timeoutMs": 60000,
+          "effects": [
+            {
+              "kind": "worktree",
+              "action": "reused",
+              "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess"
+            },
+            {
+              "kind": "setup",
+              "action": "not_applicable",
+              "state": "not_applicable"
+            },
+            {
+              "kind": "terminal",
+              "role": "agent",
+              "action": "created",
+              "id": "structworker_6a5da691-5ff3-4559-8356-294455ad222e",
+              "surface": "background"
+            },
+            {
+              "kind": "dispatch_input",
+              "role": "agent",
+              "id": "structworker_6a5da691-5ff3-4559-8356-294455ad222e",
+              "state": "accepted"
+            }
+          ],
+          "residualResources": [],
+          "mutation": {
+            "requestId": "95f5e597-9380-408a-8dbb-f9e3c4fd9b49",
+            "replayed": false
+          }
+        },
+        "_meta": {
+          "runtimeId": "5b642016-c141-4069-8a94-1b31653d5eff"
+        }
+      }
+    },
+    {
+      "module": "10-design-accessibility",
+      "title": "Tema, ortak bileşenler ve erişilebilirlik",
+      "report": "docs/mobile-audit/modules/10-design-accessibility.md",
+      "exitCode": 0,
+      "receipt": {
+        "id": "e8836843-d166-4d57-9510-0ee99c0d8ea1",
+        "ok": true,
+        "result": {
+          "runId": "run_2c7994859fb0",
+          "taskId": "task_79062f6faeaa",
+          "dispatchId": "ctx_6454d54e0bb5",
+          "state": "ready",
+          "stage": "input_accepted",
+          "turnStart": "observed",
+          "setup": {
+            "requested": "not_applicable",
+            "effective": "not_applicable",
+            "source": "existing_worktree",
+            "hookFound": false,
+            "startupPolicy": "start-immediately",
+            "state": "not_applicable"
+          },
+          "launch": {
+            "requested": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            },
+            "effective": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            }
+          },
+          "mode": {
+            "mode": "structured",
+            "preferred": "structured",
+            "reason": "user_default",
+            "detail": "Started a structured chat session worker, the default for new agent tabs in your settings."
+          },
+          "timeoutMs": 60000,
+          "effects": [
+            {
+              "kind": "worktree",
+              "action": "reused",
+              "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess"
+            },
+            {
+              "kind": "setup",
+              "action": "not_applicable",
+              "state": "not_applicable"
+            },
+            {
+              "kind": "terminal",
+              "role": "agent",
+              "action": "created",
+              "id": "structworker_e8d76fd7-7eab-4f1f-92d7-4ea1d35c8483",
+              "surface": "background"
+            },
+            {
+              "kind": "dispatch_input",
+              "role": "agent",
+              "id": "structworker_e8d76fd7-7eab-4f1f-92d7-4ea1d35c8483",
+              "state": "accepted"
+            }
+          ],
+          "residualResources": [],
+          "mutation": {
+            "requestId": "fa17ad48-b6e4-4e1c-8288-176bd30f464c",
+            "replayed": false
+          }
+        },
+        "_meta": {
+          "runtimeId": "5b642016-c141-4069-8a94-1b31653d5eff"
+        }
+      }
+    },
+    {
+      "module": "11-localization",
+      "title": "Yerelleştirme ve kullanıcı metinleri",
+      "report": "docs/mobile-audit/modules/11-localization.md",
+      "exitCode": 0,
+      "receipt": {
+        "id": "7b4fcc2d-8551-44a3-92eb-90493117f71c",
+        "ok": true,
+        "result": {
+          "runId": "run_2c7994859fb0",
+          "taskId": "task_d9dd04278a53",
+          "dispatchId": "ctx_98d67b36eb90",
+          "state": "ready",
+          "stage": "input_accepted",
+          "turnStart": "observed",
+          "setup": {
+            "requested": "not_applicable",
+            "effective": "not_applicable",
+            "source": "existing_worktree",
+            "hookFound": false,
+            "startupPolicy": "start-immediately",
+            "state": "not_applicable"
+          },
+          "launch": {
+            "requested": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            },
+            "effective": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            }
+          },
+          "mode": {
+            "mode": "structured",
+            "preferred": "structured",
+            "reason": "user_default",
+            "detail": "Started a structured chat session worker, the default for new agent tabs in your settings."
+          },
+          "timeoutMs": 60000,
+          "effects": [
+            {
+              "kind": "worktree",
+              "action": "reused",
+              "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess"
+            },
+            {
+              "kind": "setup",
+              "action": "not_applicable",
+              "state": "not_applicable"
+            },
+            {
+              "kind": "terminal",
+              "role": "agent",
+              "action": "created",
+              "id": "structworker_c5ec6df6-ac07-4e74-8b24-0274e42468f7",
+              "surface": "background"
+            },
+            {
+              "kind": "dispatch_input",
+              "role": "agent",
+              "id": "structworker_c5ec6df6-ac07-4e74-8b24-0274e42468f7",
+              "state": "accepted"
+            }
+          ],
+          "residualResources": [],
+          "mutation": {
+            "requestId": "751a7421-baf7-4761-b4f8-bf56930d0dbc",
+            "replayed": false
+          }
+        },
+        "_meta": {
+          "runtimeId": "5b642016-c141-4069-8a94-1b31653d5eff"
+        }
+      }
+    },
+    {
+      "module": "12-platform-quality",
+      "title": "Platform, test ve yayın hazırlığı",
+      "report": "docs/mobile-audit/modules/12-platform-quality.md",
+      "exitCode": 0,
+      "receipt": {
+        "id": "d56e66a2-573c-4a03-a3db-24c8a77c5740",
+        "ok": true,
+        "result": {
+          "runId": "run_2c7994859fb0",
+          "taskId": "task_dded99b61d8f",
+          "dispatchId": "ctx_5788863d9621",
+          "state": "ready",
+          "stage": "input_accepted",
+          "turnStart": "observed",
+          "setup": {
+            "requested": "not_applicable",
+            "effective": "not_applicable",
+            "source": "existing_worktree",
+            "hookFound": false,
+            "startupPolicy": "start-immediately",
+            "state": "not_applicable"
+          },
+          "launch": {
+            "requested": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            },
+            "effective": {
+              "agent": "codex",
+              "model": null,
+              "effort": null
+            }
+          },
+          "mode": {
+            "mode": "structured",
+            "preferred": "structured",
+            "reason": "user_default",
+            "detail": "Started a structured chat session worker, the default for new agent tabs in your settings."
+          },
+          "timeoutMs": 60000,
+          "effects": [
+            {
+              "kind": "worktree",
+              "action": "reused",
+              "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess"
+            },
+            {
+              "kind": "setup",
+              "action": "not_applicable",
+              "state": "not_applicable"
+            },
+            {
+              "kind": "terminal",
+              "role": "agent",
+              "action": "created",
+              "id": "structworker_f6fd0e36-00e3-4748-9f58-da302184fa41",
+              "surface": "background"
+            },
+            {
+              "kind": "dispatch_input",
+              "role": "agent",
+              "id": "structworker_f6fd0e36-00e3-4748-9f58-da302184fa41",
+              "state": "accepted"
+            }
+          ],
+          "residualResources": [],
+          "mutation": {
+            "requestId": "36602a1d-2701-47f3-aac8-e61beb8279d0",
+            "replayed": false
+          }
+        },
+        "_meta": {
+          "runtimeId": "5b642016-c141-4069-8a94-1b31653d5eff"
+        }
+      }
+    }
+  ]
+}

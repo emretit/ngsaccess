@@ -1,0 +1,24 @@
+00:00 +0: loading /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart
+00:00 +0: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: retains safe stack location and operation but drops secret/PII markers
+00:00 +1: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: unknown business code and response body never enter local diagnostics
+00:00 +2: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: rate limits identical failures and bounds retained history
+00:00 +3: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: broken diagnostic clock never changes the caller outcome
+00:00 +4: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: support JSON has a versioned allowlist and excludes every raw error field
+00:00 +5: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: retains symbolizer-compatible AOT header and PC offsets without raw context
+00:00 +6: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: retains iOS AOT address grammar and drops arbitrary symbol and loading-unit data
+00:00 +7: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: untrusted large stacks remain bounded and event snapshots cannot be modified
+00:00 +8: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:01 +9: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: failed theme save keeps the picker open with localized error
+00:01 +10: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: runtime version is consistent in profile and About (en)
+00:01 +11: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: runtime version is consistent in profile and About (tr)
+00:01 +12: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: metadata failure has an honest fallback
+00:01 +13: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:01 +14: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: real password change calls backend wrapper and ends session
+00:02 +15: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password failure remains on form with localized safe error
+00:02 +16: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: help and privacy remain readable at large text in dark theme
+00:02 +17: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: already open help follows a runtime locale change
+00:02 +18: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: support export is explicitly copied and local log clears (en)
+00:02 +19: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: support export is explicitly copied and local log clears (tr)
+00:02 +20: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: clipboard rejection has a safe localized failure and keeps local evidence
+00:02 +21: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: leaving Help during clipboard operation does not update a disposed widget
+00:02 +22: All tests passed!

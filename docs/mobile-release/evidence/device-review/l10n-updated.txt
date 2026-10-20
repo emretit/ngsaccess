@@ -1,0 +1,1 @@
+TR/EN catalog key and placeholder parity passed.

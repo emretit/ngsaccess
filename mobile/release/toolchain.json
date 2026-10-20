@@ -1,0 +1,15 @@
+{
+  "flutter": "3.47.2",
+  "dart": "3.13.2",
+  "java": 17,
+  "gradle": "8.14.3",
+  "androidGradlePlugin": "8.11.1",
+  "kotlin": "2.2.21",
+  "iosMinimum": "15.0",
+  "androidCompileSdk": 36,
+  "androidTargetSdk": 36,
+  "androidBuildTools": "36.0.0",
+  "xcodeMajor": 27,
+  "cocoapods": "1.16.2",
+  "nativeDependencyStrategy": "flutter-default-swiftpm-with-cocoapods-fallback"
+}

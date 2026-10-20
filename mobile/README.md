@@ -1,208 +1,72 @@
-# NGS Plus - Yoklama Takip Uygulaması
+# NGS Plus mobile
 
-Modern ve kullanıcı dostu bir Flutter uygulaması ile QR kod tabanlı yoklama takip sistemi.
+Flutter client for employee access and attendance. The web administration application and Convex backend live in the repository root. Employee accounts and initial passwords are provisioned by an authorized administrator; the mobile app does not provide public registration or send password reset emails. Use the organization's established administrator/support process for recovery.
 
-## 🎯 Özellikler
+## Supported targets and capability boundaries
 
-### 🔐 Kimlik Doğrulama
-- E-posta/şifre ile giriş yapma
-- Kullanıcı kaydı oluşturma
-- Şifre sıfırlama
-- Oturum kalıcılığı (uygulamayı yeniden açtığında giriş yapmış kalma)
+| Target | Release scope |
+| --- | --- |
+| Android | Supported mobile target; minimum API23 or the pinned Flutter minimum, whichever is higher; compile/target API36 |
+| iOS | Supported mobile target; minimum iOS15 (required by the pinned Flutter SDK); existing bundle ID preserved |
+| macOS, Windows, Linux, web | Unsupported product targets; retained runner scaffolding is not a support promise and is excluded from release CI |
 
-### 📱 Ana Sayfa
-- Kişiselleştirilmiş karşılama mesajı
-- Günlük yoklama durumu kartı:
-  - Henüz giriş yapmadıysa: "QR Kod Tara - Giriş Yap" butonu
-  - Giriş yapmış ama çıkış yapmamışsa: "QR Kod Tara - Çıkış Yap" butonu
-  - Günlük yoklama tamamlanmışsa: durum özeti
-- Aylık istatistikler (Toplam Gün, Mevcut Günler, Geç Kalma Sayısı)
-- Günlük motivasyon mesajları
+The client has employee login/session handling, attendance history, device selection, camera-based device QR scanning, employee QR display, TR/EN localization and themes. Access permission, command acknowledgement, physical passage and official attendance are separate outcomes: a successful request alone does not prove a door opened. QR camera permission recovery belongs to the scanner; the app requests no storage/gallery access. Camera hardware is optional so non-scanning flows can remain available.
 
-### 📊 QR Kod Tarama
-- Profesyonel kamera arayüzü
-- Tarama çerçevesi ve köşe işaretçileri
-- Flash açma/kapama özelliği
-- Demo tarama özelliği (gerçek kamera entegrasyonu için hazır)
-- Otomatik giriş/çıkış tespiti
-- Başarılı/başarısız tarama bildirimleri
+The mobile release work adds secure session storage, session/request isolation, cursor history and summaries, scoped command/QR APIs, profile/version/localization and host-scoped visitor work across separate modules. See [delivery reports](../docs/mobile-release/reports/) for what each module actually implemented and tested; source presence is not physical device or panel acceptance. There is no claimed push delivery, offline mutation queue, public signup or self-service reset email service. Visitor/panel synchronization and physical entry require their own integration evidence.
 
-### 📈 Geçmiş Kayıtları
-- Son 50 yoklama kaydının listelenmesi
-- Tarih aralığı filtresi
-- Giriş/çıkış durumlarının renkli gösterimi
-- Çek-yenile özelliği
-- Ayrıntılı kayıt bilgileri (tarih, saat, kapı adı)
+## Toolchain and dependency policy
 
-### 👥 Ziyaretçi Yönetimi
-- Ziyaretçi listesi
-- Yeni ziyaretçi ekleme
-- Ziyaretçi durumu takibi (Bekleniyor, İçeride, Çıktı)
-- Ziyaretçi giriş/çıkış işlemleri
-- İstatistiksel özet kartları
+The authoritative release pin is [release/toolchain.json](release/toolchain.json): Flutter **3.47.2**, Dart **3.13.2**, Java **17**, Gradle **8.14.3**, AGP **8.11.1**, Kotlin **2.2.21**, Android build-tools **36.0.0**, Xcode major **27**, CocoaPods fallback **1.16.2**. The pubspec minimum follows the resolved dependency graph (Dart3.11 / Flutter3.38.4); release scripts require the exact pin. Native versions satisfy the pinned Flutter SDK's dependency checks; the Gradle distribution checksum is verified. The supported iOS minimum is **15.0**. Runtime metadata uses package_info_plus8.3.1; secure storage is pinned to10.3.1. Durable operation persistence uses direct path_provider2.1.6, matching the existing locked implementation. Dependency upgrades must include Dart and native graph review.
 
-### 👤 Profil Yönetimi
-- Kullanıcı bilgileri görüntüleme
-- Profil düzenleme seçenekleri
-- Uygulama ayarları
-- Güvenlik ayarları
-- Tema tercihleri
-- Çıkış yapma
+Flutter's default SwiftPM integration is retained, with CocoaPods fallback for plugins that need it. Do not assume every Dart plugin appears in Podfile.lock when SwiftPM handles it. Commit regenerated lock/project/registrant changes only after reviewing the actual pinned-SDK restore/build. macOS native graph is outside supported mobile release acceptance. Do not run Flutter processes concurrently against one SDK lock/cache.
 
-## 🎨 Tasarım Özellikleri
+## Setup
 
-### Renk Paleti
-- **Açık Tema**: Birincil burgundy (#800020), Tab Bar (#F5F5F5)
-- **Koyu Tema**: Birincil burgundy (#9E1B3B), Arka plan (#121212)
-- Inactive gri (#6B6B6B)
+Run from the repository's `mobile/` directory. Install the declared toolchain, Android SDK/API36 or the authorized Apple development tools, then:
 
-### Tipografi
-- **Poppins** font ailesi
-- Modern ve okunabilir font boyutları
-- Tutarlı font ağırlıkları
-
-### UI Bileşenleri
-- Yuvarlatılmış köşeler ve gölgeli kartlar
-- Tutarlı aralık ve padding değerleri
-- Responsive tasarım
-- Accessibility desteği
-- Skeleton loader ve spinner'lar
-
-## 🛠 Teknik Özellikler
-
-### Mimari
-- **State Management**: Provider
-- **Navigasyon**: 5 ana tab (Ana Sayfa, Geçmiş, QR Tarama, Ziyaretçi, Profil)
-- **Veri Katmanı**: Convex entegrasyonu (web admin paneli ile aynı backend)
-- **Yerel Depolama**: SharedPreferences (oturum yönetimi)
-
-### Bağımlılıklar
-Güncel sürümler için [pubspec.yaml](pubspec.yaml) dosyasına bakın. Öne çıkan paketler:
-- `http` — Convex HTTP API istemcisi
-- `provider` — state management
-- `shared_preferences` — yerel oturum
-- `mobile_scanner` — QR tarama
-- `permission_handler` — kamera/depolama izinleri
-- `flutter_dotenv` — env yapılandırması
-
-## 🚀 Kurulum
-
-### Gereksinimler
-- Flutter SDK (3.5.0+)
-- Dart SDK
-- Android Studio / VS Code
-- Çalışan bir Convex deployment (web admin paneli ile aynı)
-
-### Adımlar
-
-1. **Projeyi klonlayın**
-```bash
-git clone [repository-url]
-cd ngsplusapp
-```
-
-2. **Bağımlılıkları yükleyin**
-```bash
+```sh
 flutter pub get
+flutter gen-l10n
+python3 scripts/check_l10n.py
+flutter analyze --no-pub
+flutter test --no-pub
+python3 -m unittest discover -s scripts/tests -v
 ```
 
-3. **Environment dosyasını oluşturun**
-```bash
-cp env.example .env
+Commit the reviewed pubspec.lock. Subsequent clean checkouts and CI use `flutter pub get --enforce-lockfile`; unexpected lock drift fails CI. TR/EN ARB files are authoritative; generated `lib/l10n/` is checked for drift after `flutter gen-l10n`.
+
+The environment example is documentation for **public** compile-time values. It is not an asset or a secret store, and copying it to `.env` is unnecessary. The legacy local `.env` is neither read by release scripts nor bundled. Do not put passwords, tokens, private keys or signing material in Dart defines: compiled values can be recovered from an application.
+
+Choose approved values explicitly in your local shell/CI configuration:
+
+```sh
+export APP_ENV=staging
+export CONVEX_URL=https://your-staging-deployment.convex.cloud
+export CONVEX_ALLOWED_HOST=your-staging-deployment.convex.cloud
+scripts/build_mobile.sh run
 ```
 
-4. **Convex yapılandırması**
-`.env` dosyasını düzenleyerek Convex deployment URL'inizi girin:
-```env
-CONVEX_URL=https://<your-deployment>.convex.cloud
+Replace both host placeholders before running. APP_ENV is `staging` or `production`; the URL must be HTTPS, have the exact approved host and contain no credentials, path, query or fragment. Config preflight prints only environment and a host hash. The runtime config also validates before creating a client. Build scripts provide the three Dart defines consistently. Provision a test employee using your existing administrator workflow; never use real production employee data for smoke tests. No backend deploy is part of mobile setup here.
+
+## Native compilation and distribution
+
+```sh
+scripts/build_mobile.sh android-unsigned
+scripts/build_mobile.sh ios-simulator
+scripts/build_mobile.sh ios-nosign
 ```
 
-**⚠️ Önemli**: `.env` dosyası git'e commit edilmez. Güvenlik için bu dosyayı gizli tutun.
+The unsigned Android APK is for compilation checks, with ELF LOAD16KB alignment, APK zip alignment, API36/identity, forbidden-permission and unsigned-state inspection. It is not a Play upload or installation/signing acceptance. iOS simulator/no-sign compilation likewise does not prove distribution readiness. Standard Android release tasks fail when upload signing is absent; only the explicitly scoped `ngsUnsignedRelease=true` property permits compile-only release output.
 
-5. **Şema ve fonksiyonlar**
-Veri şeması ve query/mutation fonksiyonları repo kökündeki `convex/` klasöründe yer alır (web admin paneli ile paylaşılır). Yeni şema değişikliklerini `npx convex dev` ile deploy edin.
+For authorized signed preparation, configure existing approved identities rather than generating replacement keys:
 
-6. **Uygulamayı çalıştırın**
-```bash
-flutter run
-```
+- Android: `ANDROID_KEYSTORE_PATH`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` (or ignored `android/key.properties` fields `storeFile`, `storePassword`, `keyAlias`, `keyPassword`) plus `ANDROID_EXPECTED_CERT_SHA256`. Relative storeFile is resolved from `android/`. Keep simple unescaped property values; environment variables avoid Java-properties escaping ambiguity. `BUNDLETOOL_JAR` must point to the owner-approved bundletool. Run `scripts/build_mobile.sh android-release` to verify the upload certificate before build and the final AAB signature, manifest and16KB properties afterwards. The expected upload certificate differs from the Play App Signing installation certificate when Play re-signs delivery; preserve both continuity records privately.
+- iOS: `IOS_TEAM_ID` and `IOS_PROFILE_PATH` refer to the existing authorized App Store distribution team/profile and matching installed Apple Distribution identity. Run `scripts/build_mobile.sh ios-archive`. The script generates an ignored, mode0600 ExportOptions.plist for local export, builds/exports with no upload, then checks the archive and final IPA code signature/profile/entitlements/bundle/privacy resources. The existing iOS bundle ID is `com.ngsplus.app`; Android's separate existing ID is `com.ngsplus.app.ngsplusapp`. Do not make them identical as a cleanup.
 
-## 📱 Kullanım
+Signing inputs never belong in this README, release evidence or command output. Do not enable shell tracing. Scripts do not create keystores, upload to a store or deploy a backend. A missing secret/profile/certificate/tool causes a failing preflight. Build receipts in `build/release-evidence/` record artifact hashes, revision/dirty state, public environment host hash, lock hash and toolchain. Retain symbol files and Apple dSYMs privately with their exact artifact/build; CI uploads evidence only.
 
-### İlk Kurulum
-1. Uygulamayı açın
-2. "Kayıt Ol" ile yeni hesap oluşturun
-3. E-posta adresinizi doğrulayın
-4. Giriş yapın
+[The release checklist](release/README.md) names the remaining store, policy, signing and device gates. [The review template](release/store-review-template.md) deliberately leaves legal/store facts for the owner. A checked-in privacy manifest is not a completed privacy label or legal review.
 
-### Günlük Kullanım
-1. Ana sayfada yoklama durumunuzu kontrol edin
-2. QR kod tarama ile giriş/çıkış yapın
-3. Geçmiş sayfasından kayıtlarınızı inceleyin
-4. Profil sayfasından ayarlarınızı yönetin
+## CI
 
-## 🏗 Proje Yapısı
-
-```
-lib/
-├── config/
-│   └── convex_config.dart        # Convex yapılandırması
-├── models/
-│   └── attendance.dart           # Veri modelleri
-├── providers/
-│   ├── auth_provider.dart        # Kimlik doğrulama yönetimi
-│   └── attendance_provider.dart  # Yoklama veri yönetimi
-├── screens/
-│   ├── auth/                     # Giriş/kayıt ekranları
-│   ├── home/                     # Ana sayfa
-│   ├── history/                  # Geçmiş kayıtları
-│   ├── qr_scan/                  # QR tarama
-│   ├── visitor/                  # Ziyaretçi yönetimi
-│   ├── profile/                  # Profil
-│   ├── splash_screen.dart        # Başlangıç ekranı
-│   └── main_navigation.dart      # Ana navigasyon
-├── theme/
-│   └── app_theme.dart           # Tema yapılandırması
-└── main.dart                    # Uygulama giriş noktası
-```
-
-## 🔧 Konfigürasyon
-
-### Tema Özelleştirme
-`lib/theme/app_theme.dart` dosyasından renkleri ve stilleri özelleştirebilirsiniz.
-
-### Notifikasyon Ayarları
-QR tarama sonuçları için bildirim mesajları `lib/screens/qr_scan/qr_scan_screen.dart` dosyasından düzenlenebilir.
-
-### İstatistik Hesaplamaları
-Aylık istatistik hesaplamaları `lib/providers/attendance_provider.dart` dosyasında yapılandırılabilir.
-
-## 🤝 Katkıda Bulunma
-
-1. Fork yapın
-2. Feature branch oluşturun (`git checkout -b feature/AmazingFeature`)
-3. Değişikliklerinizi commit edin (`git commit -m 'Add some AmazingFeature'`)
-4. Branch'inizi push edin (`git push origin feature/AmazingFeature`)
-5. Pull Request oluşturun
-
-## 📄 Lisans
-
-Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için `LICENSE` dosyasına bakın.
-
-## 📞 Destek
-
-Sorularınız için:
-- Issue açın
-- E-posta: support@ngsplus.com
-- Dokümantasyon: [wiki sayfası]
-
-## 🚀 Gelecek Özellikler
-
-- [ ] Gerçek QR kamera entegrasyonu
-- [ ] Push notification'lar
-- [ ] Offline mod desteği
-- [ ] Çoklu dil desteği
-- [ ] Export/import özellikleri
-- [ ] Admin paneli
-- [ ] Gelişmiş raporlama
-- [ ] Biometric authentication 
+[mobile.yml](../.github/workflows/mobile.yml) gates mobile changes on exact-lock restore, generated localization drift, analyze/tests, release preflight tests, unsigned Android artifact inspection and iOS simulator/device no-sign compilation. Compile jobs use a reserved `.invalid` host with no employee credentials. An explicitly requested manual workflow can build and verify the approved Android upload signature using the protected `mobile-release` environment; it never publishes. Missing Xcode27 runner availability, signing secrets or owner-approved bundletool checksum remains an explicit infrastructure blocker, not a skipped successful signing check.

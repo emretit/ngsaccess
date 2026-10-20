@@ -1,0 +1,4 @@
+{"backendHostSha256": "0e7954600da2694db0494c6abbca11bdb1dd5a106c322e285e0b0de5f9d0d8a6", "environment": "staging"}
+{"privacyManifestSyntax": "passed", "sourcePermissions": "passed"}
+{"toolchain": "passed"}
+FLUTTER_VERSION is used by the framework and cannot be set using --dart-define or --dart-define-from-file. Use FlutterVersion to access it in Flutter code

@@ -1,0 +1,65 @@
+
+ RUN  v4.1.12 /Users/emreaydin/ngsaccess
+
+ ❯ convex/lib/visitorPresence.test.ts (33 tests | 15 failed) 10ms
+     × rejects ambiguous or out-of-range ID 0 1ms
+     × rejects ambiguous or out-of-range ID -1 0ms
+     × rejects ambiguous or out-of-range ID NaN 0ms
+     × rejects ambiguous or out-of-range ID Infinity 0ms
+     × rejects ambiguous or out-of-range ID 0x10 0ms
+     × rejects ambiguous or out-of-range ID 1e3 1ms
+     × rejects ambiguous or out-of-range ID +1 0ms
+     × rejects ambiguous or out-of-range ID 1.0 0ms
+     × rejects ambiguous or out-of-range ID 00123 0ms
+     × rejects ambiguous or out-of-range ID 9007199254740992 1ms
+     × rejects ambiguous or out-of-range ID  0ms
+     × rejects ambiguous or out-of-range ID ABC 0ms
+     × accepts canonical in-range decimal 1 0ms
+     × accepts canonical in-range decimal 123456 0ms
+     × accepts canonical in-range decimal 9007199254740991 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 15 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  convex/lib/visitorPresence.test.ts > IDE visitor card spelling and protocol range > rejects ambiguous or out-of-range ID 0
+ FAIL  convex/lib/visitorPresence.test.ts > IDE visitor card spelling and protocol range > rejects ambiguous or out-of-range ID -1
+ FAIL  convex/lib/visitorPresence.test.ts > IDE visitor card spelling and protocol range > rejects ambiguous or out-of-range ID NaN
+ FAIL  convex/lib/visitorPresence.test.ts > IDE visitor card spelling and protocol range > rejects ambiguous or out-of-range ID Infinity
+ FAIL  convex/lib/visitorPresence.test.ts > IDE visitor card spelling and protocol range > rejects ambiguous or out-of-range ID 0x10
+ FAIL  convex/lib/visitorPresence.test.ts > IDE visitor card spelling and protocol range > rejects ambiguous or out-of-range ID 1e3
+ FAIL  convex/lib/visitorPresence.test.ts > IDE visitor card spelling and protocol range > rejects ambiguous or out-of-range ID +1
+ FAIL  convex/lib/visitorPresence.test.ts > IDE visitor card spelling and protocol range > rejects ambiguous or out-of-range ID 1.0
+ FAIL  convex/lib/visitorPresence.test.ts > IDE visitor card spelling and protocol range > rejects ambiguous or out-of-range ID 00123
+ FAIL  convex/lib/visitorPresence.test.ts > IDE visitor card spelling and protocol range > rejects ambiguous or out-of-range ID 9007199254740992
+ FAIL  convex/lib/visitorPresence.test.ts > IDE visitor card spelling and protocol range > rejects ambiguous or out-of-range ID 
+ FAIL  convex/lib/visitorPresence.test.ts > IDE visitor card spelling and protocol range > rejects ambiguous or out-of-range ID ABC
+TypeError: visitorIdeCardError is not a function
+ ❯ convex/lib/visitorPresence.test.ts:75:12
+     73| describe("IDE visitor card spelling and protocol range", () => {
+     74|   it.each(["0", "-1", "NaN", "Infinity", "0x10", "1e3", "+1", "1.0", "…
+     75|     expect(visitorIdeCardError(card)).toBeTruthy();
+       |            ^
+     76|   });
+     77|   it.each(["1", "123456", "9007199254740991"])("accepts canonical in-r…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/15]⎯
+
+ FAIL  convex/lib/visitorPresence.test.ts > IDE visitor card spelling and protocol range > accepts canonical in-range decimal 1
+ FAIL  convex/lib/visitorPresence.test.ts > IDE visitor card spelling and protocol range > accepts canonical in-range decimal 123456
+ FAIL  convex/lib/visitorPresence.test.ts > IDE visitor card spelling and protocol range > accepts canonical in-range decimal 9007199254740991
+TypeError: visitorIdeCardError is not a function
+ ❯ convex/lib/visitorPresence.test.ts:78:12
+     76|   });
+     77|   it.each(["1", "123456", "9007199254740991"])("accepts canonical in-r…
+     78|     expect(visitorIdeCardError(card)).toBeNull();
+       |            ^
+     79|   });
+     80| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/15]⎯
+
+
+ Test Files  1 failed | 218 passed (219)
+      Tests  15 failed | 2311 passed (2326)
+   Start at  21:51:20
+   Duration  21.35s (transform 16.73s, setup 0ms, import 129.12s, tests 22.87s, environment 378ms)
+

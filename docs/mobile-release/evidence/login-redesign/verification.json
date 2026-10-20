@@ -1,0 +1,94 @@
+{
+  "recordedAt": "2026-10-20T07:04:58.156908+00:00",
+  "scope": "NGS Plus mobile login UI adaptation from Pafta and Huggin; no backend or authentication implementation changes.",
+  "references": [
+    "/Users/emreaydin/pafta/apps/mobile/lib/pages/login_page.dart",
+    "/Users/emreaydin/pilates_studio_app/hugging_pilates/lib/features/auth/presentation/login_screen.dart"
+  ],
+  "design": {
+    "background": "NGS burgundy diagonal gradient",
+    "header": "White brand mark, left-aligned localized welcome and attendance subtitle",
+    "form": "28px rounded card; light/dark surfaces; filled fields; minimum 56px submit",
+    "accessibility": "Scrollable with keyboard and 200% type; labeled password toggle; minimum 48px controls",
+    "locales": [
+      "tr",
+      "en"
+    ],
+    "authImplementationUnchanged": true
+  },
+  "verification": {
+    "flutterAnalyze": "passed, no issues",
+    "focusedTests": 15,
+    "fullFlutterTests": 437,
+    "narrowScreen": "320x568, 200% text, 260px keyboard, Turkish/English, dark theme passed",
+    "touchTargets": "Android tap-target and labeled-target guidelines passed",
+    "iosSimulatorBuild": "passed",
+    "iosDeviceReleaseBuild": "passed",
+    "codeSignature": "deep strict verification passed",
+    "simulatorVisualReview": "Screenshot inspected: hero and form align, complete form visible, no clipped copy or controls",
+    "simulatorInteraction": "Orca tap returned OK but no visible focus/validation change; native interaction not established. Widget tests cover form interaction.",
+    "textContrastRatios": {
+      "heroWhiteOnBrightestGradient": 7.85,
+      "heroSubtitleOnBrightestGradient": 5.75,
+      "lightCardBody": 5.74,
+      "lightFieldLabel": 5.3,
+      "darkCardBody": 9.0,
+      "darkFieldLabel": 7.78,
+      "submitText": 10.83,
+      "darkActionText": 9.04
+    }
+  },
+  "device": {
+    "model": "iPhone 13",
+    "bundleId": "com.ngsplus.app",
+    "version": "1.0.4",
+    "build": "1",
+    "signing": "Apple Development, existing team/profile",
+    "executableSha256": "e29b9371b027cd1d5fd37b602f8decb0fb4d1fa03d07a4f1c75ab3e0b8481fa8",
+    "installation": "passed, update in place",
+    "launch": "blocked: device locked; unlock requested",
+    "existingSession": "No logout or app-data reset performed"
+  },
+  "sourceSha256": {
+    "mobile/lib/screens/auth/login_screen.dart": "991a62287300af18e4baa1cbd2c32d2eb40554e4aac789fae81ec131c9f52176",
+    "mobile/lib/l10n/app_tr.arb": "ee2d7978802dab721604bf5be2069964721f82fe3b9fded86a16c1cd660b8b1c",
+    "mobile/lib/l10n/app_en.arb": "d541ca817fb42f528fe3a26e3b35994a453664c808d6d3ff73b9a69537509f31",
+    "mobile/lib/l10n/app_localizations.dart": "b3d52e5871ccd914f2c0b453a8ebf15026ce8aa0364584bfa4f564a9b4de70c4",
+    "mobile/lib/l10n/app_localizations_tr.dart": "64b92d08c185a7c39726fa5cb739a98ffcbd73ff835d48322767fa106c1c1d45",
+    "mobile/lib/l10n/app_localizations_en.dart": "410757bf38a89d877da4d91b36d492b8772cf52cfaeea89bc1288a20b1e6a067",
+    "mobile/test/widgets/login_screen_test.dart": "3f1d9e9fd7580a50e0b41bae21a7c2629bb9ada51d4209d11ea79ee848b34d3e",
+    "mobile/test/l10n/expected_keys.json": "6305267e9c7bcfaf7bd481e821e32c78217a0e85f5f9d5532ab9cc5bc5ff8963"
+  },
+  "screenshots": {
+    "simulatorLight": "simulator-login.png"
+  },
+  "simulatorFollowup": {
+    "recordedAt": "2026-10-20T07:20:10.912591+00:00",
+    "preferredDevice": "iPhone 17 Pro",
+    "udid": "81AAFCAB-9741-4819-B9F7-B9DFA47D6F21",
+    "runtime": "iOS 26.5",
+    "installation": "passed; existing app data preserved",
+    "launch": "passed; redesigned login visible",
+    "orcaPane": "attached and focused; left open for user",
+    "previousIPhone17": "helper stopped and simulator shut down",
+    "screenshot": "Temporary local capture only; user-entered form data not archived"
+  },
+  "simulatorRuntimeUpgrade": {
+    "recordedAt": "2026-10-20T07:27:15.215067+00:00",
+    "device": "iPhone 17 Pro",
+    "udid": "81AAFCAB-9741-4819-B9F7-B9DFA47D6F21",
+    "previousRuntime": "iOS 26.5",
+    "runtime": "iOS 27.0",
+    "runtimeBuild": "24A434",
+    "method": "simctl upgrade; original device identity retained",
+    "backup": {
+      "name": "iPhone 17 Pro - iOS 26.5 Backup",
+      "udid": "B45AC99A-1C62-4E6D-AF81-DD39AF2D7B0D",
+      "state": "Shutdown"
+    },
+    "boot": "passed",
+    "appInstallation": "passed, update in place",
+    "appLaunch": "passed",
+    "orcaPane": "attached and focused; left open"
+  }
+}

@@ -1,154 +1,108 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
-import '../l10n/app_localizations.dart';
-import '../theme/app_theme.dart';
+import '../core/branch_visibility.dart';
+import '../providers/visitor_provider.dart';
+import '../widgets/app_bottom_navigation.dart';
 
-/// Bottom navigation içeren ana shell.
-///
-/// `StatefulShellRoute.indexedStack` ile her tab kendi navigator stack'ini
-/// korur (örn. QR scan ekranındaki token countdown tab değişiminde resetlenmez).
-class MainNavigationShell extends StatelessWidget {
+/// Branch navigators remain mounted; selection only changes resource visibility.
+class MainNavigationShell extends StatefulWidget {
   const MainNavigationShell({super.key, required this.navigationShell});
-
   final StatefulNavigationShell navigationShell;
 
+  @override
+  State<MainNavigationShell> createState() => _MainNavigationShellState();
+}
+
+class _MainNavigationShellState extends State<MainNavigationShell>
+    with WidgetsBindingObserver {
+  VisitorProvider? _visitors;
+  bool _resumed = true;
+  bool _routeVisible = true;
+  int _visibilityRevision = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _resumed =
+        (WidgetsBinding.instance.lifecycleState ?? AppLifecycleState.resumed) ==
+        AppLifecycleState.resumed;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _routeVisible = ModalRoute.isCurrentOf(context) ?? true;
+    final next = context.read<VisitorProvider?>();
+    if (!identical(next, _visitors)) {
+      _visitors?.setVisible(false);
+      _visitors = next;
+    }
+    _scheduleVisibility();
+  }
+
+  @override
+  void didUpdateWidget(MainNavigationShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _scheduleVisibility();
+  }
+
+  void _scheduleVisibility() {
+    final revision = ++_visibilityRevision;
+    // setVisible may start a refresh and notify; never do that inside build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || revision != _visibilityRevision) {
+        return;
+      }
+      _syncVisibility();
+    });
+  }
+
+  void _syncVisibility() => _visitors?.setVisible(
+    _resumed && _routeVisible && widget.navigationShell.currentIndex == 3,
+  );
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _resumed = state == AppLifecycleState.resumed;
+    _syncVisibility();
+  }
+
   void _goBranch(int index) {
-    navigationShell.goBranch(
+    // Stop a hidden branch synchronously, before the next frame.
+    if (index != 3) {
+      _visitors?.setVisible(false);
+    }
+    widget.navigationShell.goBranch(
       index,
-      // Aynı tab'a tekrar tıklanırsa, o branch stack'inin köküne dön.
-      initialLocation: index == navigationShell.currentIndex,
+      initialLocation: index == widget.navigationShell.currentIndex,
     );
   }
 
   @override
+  void dispose() {
+    _visibilityRevision++;
+    _visitors?.setVisible(false);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final l10n = AppLocalizations.of(context);
-    final currentIndex = navigationShell.currentIndex;
-
     return Scaffold(
-      body: navigationShell,
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : AppTheme.tabBarBackground,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 8,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(
-                  context,
-                  index: 0,
-                  icon: Icons.home,
-                  label: l10n.navHome,
-                  isDark: isDark,
-                  selected: currentIndex == 0,
-                ),
-                _buildNavItem(
-                  context,
-                  index: 1,
-                  icon: Icons.history,
-                  label: l10n.navHistory,
-                  isDark: isDark,
-                  selected: currentIndex == 1,
-                ),
-                _buildQRScanButton(context, isDark: isDark),
-                _buildNavItem(
-                  context,
-                  index: 3,
-                  icon: Icons.people,
-                  label: l10n.navVisitor,
-                  isDark: isDark,
-                  selected: currentIndex == 3,
-                ),
-                _buildNavItem(
-                  context,
-                  index: 4,
-                  icon: Icons.person,
-                  label: l10n.navProfile,
-                  isDark: isDark,
-                  selected: currentIndex == 4,
-                ),
-              ],
-            ),
-          ),
-        ),
+      extendBody: true,
+      body: BranchVisibility(
+        activeIndex: _routeVisible ? widget.navigationShell.currentIndex : -1,
+        child: widget.navigationShell,
       ),
-    );
-  }
-
-  Widget _buildNavItem(
-    BuildContext context, {
-    required int index,
-    required IconData icon,
-    required String label,
-    required bool isDark,
-    required bool selected,
-  }) {
-    final color = selected
-        ? (isDark ? AppTheme.primaryBurgundy2 : AppTheme.primaryBurgundy)
-        : AppTheme.inactiveGray;
-
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => _goBranch(index),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: color, size: 24),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 12,
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQRScanButton(BuildContext context, {required bool isDark}) {
-    return GestureDetector(
-      onTap: () => _goBranch(2),
-      child: Container(
-        width: 64,
-        height: 64,
-        decoration: BoxDecoration(
-          color: isDark ? AppTheme.primaryBurgundy2 : AppTheme.primaryBurgundy,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: (isDark ? AppTheme.primaryBurgundy2 : AppTheme.primaryBurgundy)
-                  .withValues(alpha: 0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: const Icon(
-          Icons.qr_code_scanner,
-          color: Colors.white,
-          size: 28,
-        ),
-      ),
+      bottomNavigationBar: MediaQuery.viewInsetsOf(context).bottom == 0
+          ? AppBottomNavigation(
+              selectedIndex: widget.navigationShell.currentIndex,
+              onDestinationSelected: _goBranch,
+            )
+          : null,
     );
   }
 }

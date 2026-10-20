@@ -1,0 +1,64 @@
+TAP version 13
+# Subtest: shipped broker ACL blocks B capturing A command and forging A ACK even with known msx-id
+ok 1 - shipped broker ACL blocks B capturing A command and forging A ACK even with known msx-id
+  ---
+  duration_ms: 1.734584
+  type: 'test'
+  ...
+# Subtest: every event kind isolated; shared event topics denied to panel and bridge
+ok 2 - every event kind isolated; shared event topics denied to panel and bridge
+  ---
+  duration_ms: 1.169583
+  type: 'test'
+  ...
+# Subtest: bridge rejects self-topic with forged foreign body and all unbound topics
+ok 3 - bridge rejects self-topic with forged foreign body and all unbound topics
+  ---
+  duration_ms: 0.574875
+  type: 'test'
+  ...
+# Subtest: bridge binds response topic AND source even when adversary knows correlation id
+ok 4 - bridge binds response topic AND source even when adversary knows correlation id
+  ---
+  duration_ms: 0.233416
+  type: 'test'
+  ...
+# Subtest: identity rejects wildcards, reserved/shared accounts and lossy/noncanonical values
+ok 5 - identity rejects wildcards, reserved/shared accounts and lossy/noncanonical values
+  ---
+  duration_ms: 0.185292
+  type: 'test'
+  ...
+# Subtest: bridge accepts TLS or literal loopback only and never URL-embedded credentials
+ok 6 - bridge accepts TLS or literal loopback only and never URL-embedded credentials
+  ---
+  duration_ms: 0.485042
+  type: 'test'
+  ...
+# Subtest: actual bridge router preserves A pending operation when B sends known A msx-id; only A response ACKs
+ok 7 - actual bridge router preserves A pending operation when B sends known A msx-id; only A response ACKs
+  ---
+  duration_ms: 1.525917
+  type: 'test'
+  ...
+# Subtest: foreign login response cannot consume A waiter or resolve/cache attacker token
+ok 8 - foreign login response cannot consume A waiter or resolve/cache attacker token
+  ---
+  duration_ms: 0.249417
+  type: 'test'
+  ...
+# Subtest: actual bridge drops common events, malformed payload and foreign source then forwards bound event compatibly
+ok 9 - actual bridge drops common events, malformed payload and foreign source then forwards bound event compatibly
+  ---
+  duration_ms: 0.877417
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 60.304667

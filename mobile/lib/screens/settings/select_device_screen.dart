@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/error_localizer.dart';
+import '../../core/errors.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/device.dart';
 import '../../providers/preferred_device_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../repositories/device_repository.dart';
-import '../../theme/app_theme.dart';
+import '../../router/app_router.dart';
 
 class SelectDeviceScreen extends StatefulWidget {
   const SelectDeviceScreen({super.key});
@@ -16,97 +20,202 @@ class SelectDeviceScreen extends StatefulWidget {
 
 class _SelectDeviceScreenState extends State<SelectDeviceScreen> {
   bool _loading = true;
-  String? _error;
+  AppError? _error;
   List<Device> _devices = const [];
   String _query = '';
+  int? _identityGeneration;
+  int _request = 0;
 
   @override
-  void initState() {
-    super.initState();
-    _load();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final generation = context
+        .watch<PreferredDeviceProvider>()
+        .identityGeneration;
+    if (_identityGeneration != generation) {
+      _identityGeneration = generation;
+      _devices = const [];
+      _load();
+    }
   }
 
   Future<void> _load() async {
+    final preferred = context.read<PreferredDeviceProvider>();
+    final generation = preferred.identityGeneration;
+    final request = ++_request;
     setState(() {
       _loading = true;
       _error = null;
     });
+    bool owns() =>
+        mounted &&
+        request == _request &&
+        generation == preferred.identityGeneration;
     try {
-      final repo = context.read<DeviceRepository>();
-      final list = await repo.listForEmployee();
-      if (!mounted) return;
+      final list = await context.read<DeviceRepository>().listForEmployee();
+      if (!owns()) return;
+      await preferred.revalidate(list);
+      if (!owns()) return;
       setState(() {
         _devices = list;
         _loading = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!owns()) return;
       setState(() {
-        _error = error.toString();
+        _error = AppError.fromException(error);
         _loading = false;
       });
     }
   }
 
+  // Normalize Turkish dotted/dotless I without modifying real display labels.
+  String _searchable(String value) => value
+      .replaceAll('İ', 'i')
+      .replaceAll('I', 'ı')
+      .toLowerCase()
+      .replaceAll('ı', 'i');
+
   List<Device> get _filtered {
-    if (_query.isEmpty) return _devices;
-    final q = _query.toLowerCase();
-    return _devices.where((d) {
-      return d.name.toLowerCase().contains(q) ||
-          (d.deviceSerial?.toLowerCase().contains(q) ?? false) ||
-          (d.zoneName?.toLowerCase().contains(q) ?? false) ||
-          (d.doorName?.toLowerCase().contains(q) ?? false);
-    }).toList();
+    final query = _searchable(_query.trim());
+    if (query.isEmpty) return _devices;
+    return _devices
+        .where(
+          (device) =>
+              [
+                device.name,
+                device.deviceSerial,
+                device.zoneName,
+                device.doorName,
+              ].whereType<String>().any(
+                (value) => _searchable(value).contains(query),
+              ),
+        )
+        .toList();
+  }
+
+  void _close() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      context.go(AppRoute.profile);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final preferred = context.watch<PreferredDeviceProvider>();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
+    final colors = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: isDark ? AppTheme.darkBackground : Colors.grey[50],
       appBar: AppBar(
         title: Text(l10n.selectDeviceTitle),
-        backgroundColor: Colors.transparent,
+        leading: IconButton(
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+          icon: const Icon(Icons.arrow_back),
+          onPressed: _close,
+        ),
+        actions: [
+          IconButton(
+            tooltip: l10n.qrRefresh,
+            icon: const Icon(Icons.refresh),
+            onPressed: _loading || preferred.isSaving ? null : _load,
+          ),
+        ],
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: l10n.selectDeviceSearch,
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: isDark ? Colors.white.withValues(alpha: 0.06) : Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Column(
+                  children: [
+                    if (preferred.isSaving) const LinearProgressIndicator(),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: TextField(
+                        decoration: InputDecoration(
+                          labelText: l10n.selectDeviceSearch,
+                          prefixIcon: const Icon(Icons.search),
+                          border: const OutlineInputBorder(),
+                        ),
+                        onChanged: (value) => setState(() => _query = value),
+                      ),
+                    ),
+                    if (preferred.hasDevice)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              preferred.deviceName ?? l10n.historyUnknownDevice,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            Text(l10n.profilePreferredDoor),
+                            TextButton(
+                              onPressed: preferred.isSaving
+                                  ? null
+                                  : () async {
+                                      await preferred.clear();
+                                    },
+                              child: Text(l10n.selectDeviceClear),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (preferred.wasInvalidated)
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(l10n.selectDeviceInvalidated),
+                      ),
+                    if (preferred.error != null || !preferred.hasIdentity)
+                      Semantics(
+                        liveRegion: true,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            !preferred.hasIdentity ||
+                                    preferred.error ==
+                                        PreferenceError.unavailableIdentity
+                                ? l10n.preferenceIdentityUnavailable
+                                : l10n.preferenceSaveFailed,
+                            style: TextStyle(color: colors.error),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              onChanged: (value) => setState(() => _query = value),
-            ),
+              _buildBody(l10n, preferred),
+            ],
           ),
-          Expanded(child: _buildBody(l10n, preferred)),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildBody(AppLocalizations l10n, PreferredDeviceProvider preferred) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(child: CircularProgressIndicator()),
+      );
     }
-    if (_error != null) {
-      return Center(
+    final error = _error;
+    if (error != null) {
+      return SliverFillRemaining(
+        hasScrollBody: false,
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_error!, textAlign: TextAlign.center),
+              Text(
+                localizeAppError(context, error),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 16),
               FilledButton(onPressed: _load, child: Text(l10n.commonRetry)),
             ],
@@ -116,67 +225,82 @@ class _SelectDeviceScreenState extends State<SelectDeviceScreen> {
     }
     final filtered = _filtered;
     if (filtered.isEmpty) {
-      return Center(
+      return SliverFillRemaining(
+        hasScrollBody: false,
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text(
-            _devices.isEmpty ? l10n.selectDeviceEmpty : l10n.selectDeviceNoMatch,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[600],
-                ),
+          child: Center(
+            child: Text(
+              _devices.isEmpty
+                  ? l10n.selectDeviceEmpty
+                  : l10n.selectDeviceNoMatch,
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
       );
     }
-    return ListView.separated(
-      itemCount: filtered.length,
+    return SliverPadding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, i) {
-        final device = filtered[i];
-        final isSelected = preferred.deviceId == device.id;
-        return Card(
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: isSelected ? AppTheme.primaryBurgundy : Colors.transparent,
-              width: isSelected ? 2 : 0,
-            ),
-          ),
-          child: ListTile(
-            leading: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryBurgundy.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate((context, index) {
+          final device = filtered[index];
+          final selected =
+              preferred.deviceId == device.id &&
+              preferred.doorId == device.doorId &&
+              (preferred.targetId == null ||
+                  preferred.targetId == device.targetId);
+          final colors = Theme.of(context).colorScheme;
+          return Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: Semantics(
+              selected: selected,
+              child: ListTile(
+                selected: selected,
+                selectedColor: colors.onSecondaryContainer,
+                selectedTileColor: colors.secondaryContainer,
+                leading: const Icon(Icons.door_front_door_outlined),
+                title: Text(
+                  device.doorName ?? device.name ?? l10n.historyUnknownDevice,
+                ),
+                subtitle: device.canOpen == false
+                    ? Text(_unavailableLabel(l10n, device.reason))
+                    : device.subtitle.isEmpty
+                    ? null
+                    : Text(device.subtitle),
+                trailing: Icon(
+                  selected ? Icons.check_circle : Icons.radio_button_unchecked,
+                ),
+                onTap:
+                    !preferred.hasIdentity ||
+                        preferred.isSaving ||
+                        device.canOpen != true
+                    ? null
+                    : () async {
+                        final saved = await preferred.setDevice(
+                          id: device.id,
+                          name: device.doorName ?? device.name,
+                          doorId: device.doorId,
+                          targetId: device.targetId,
+                        );
+                        if (!mounted || !saved) return;
+                        _close();
+                      },
               ),
-              child: const Icon(
-                Icons.door_front_door_outlined,
-                color: AppTheme.primaryBurgundy,
-              ),
             ),
-            title: Text(
-              device.name,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: device.subtitle.isEmpty ? null : Text(device.subtitle),
-            trailing: isSelected
-                ? const Icon(Icons.check_circle, color: AppTheme.primaryBurgundy)
-                : const Icon(Icons.radio_button_unchecked),
-            onTap: () async {
-              await context.read<PreferredDeviceProvider>().setDevice(
-                    id: device.id,
-                    name: device.name,
-                  );
-              if (!context.mounted) return;
-              Navigator.of(context).pop();
-            },
-          ),
-        );
-      },
+          );
+        }, childCount: filtered.length),
+      ),
     );
   }
+
+  String _unavailableLabel(AppLocalizations l10n, String? code) =>
+      switch (code) {
+        'DEVICE_INACTIVE' || 'DOOR_INACTIVE' => l10n.selectDeviceInactive,
+        'ACCESS_EPOCH_DENIED' => l10n.accessDenied,
+        'SCHEDULE_DENIED' => l10n.selectDeviceOutsideSchedule,
+        'TARGET_UNSUPPORTED' ||
+        'TRANSPORT_UNSUPPORTED' => l10n.selectDeviceUnsupported,
+        _ => l10n.selectDeviceUnavailable,
+      };
 }

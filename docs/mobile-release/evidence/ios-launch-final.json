@@ -1,0 +1,14 @@
+[
+  {
+    "operation": "install",
+    "exitCode": 0
+  },
+  {
+    "operation": "launch",
+    "exitCode": 0
+  },
+  {
+    "operation": "io",
+    "exitCode": 0
+  }
+]

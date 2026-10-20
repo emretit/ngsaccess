@@ -1,0 +1,188 @@
+{
+  "checkedAtUtc": "2026-10-20T06:30:38.966657+00:00",
+  "runId": "run_e525229e4ae5",
+  "decision": "awaiting_distribution_and_external_acceptance",
+  "deploymentPerformed": false,
+  "storeSubmissionPerformed": false,
+  "checks": {
+    "flutterAnalyze": {
+      "exitCode": 0,
+      "evidence": "evidence/flutter-analyze-last.txt"
+    },
+    "flutterTest": {
+      "exitCode": 0,
+      "passed": 433,
+      "evidence": "evidence/flutter-test-last.txt"
+    },
+    "backend": {
+      "tsc-app-final.txt": 0,
+      "tsc-convex-final.txt": 0,
+      "eslint-final.txt": 0,
+      "vitest-final3.txt": 0
+    },
+    "backendTests": {
+      "passed": 2349,
+      "files": 219,
+      "evidence": "evidence/vitest-final3.txt"
+    },
+    "pythonRelease": {
+      "exitCode": 0,
+      "passed": 25,
+      "evidence": "evidence/platform-preflight-tests-final.txt"
+    },
+    "androidUnsignedBuild": {
+      "exitCode": 0,
+      "evidence": "evidence/android-unsigned-final2.txt"
+    },
+    "androidArtifact": {
+      "path": "/Users/emreaydin/ngsaccess/mobile/build/app/outputs/flutter-apk/app-release.apk",
+      "sha256": "9c78b56f9caeed73b3334fdb9aee53505c25a5b980788ae716cc62cf56c528e1",
+      "bytes": 77769939,
+      "signing": "unsigned-compile-only",
+      "environment": "compile-only .invalid host",
+      "manifest": {
+        "package": "com.ngsplus.app.ngsplusapp",
+        "version": "1.0.4",
+        "build": "1",
+        "minimumSdk": "24",
+        "targetSdk": "36",
+        "allowBackup": "false",
+        "permissions": [
+          "android.permission.INTERNET",
+          "android.permission.ACCESS_NETWORK_STATE",
+          "android.permission.CAMERA",
+          "android.permission.VIBRATE",
+          "com.ngsplus.app.ngsplusapp.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+        ]
+      }
+    },
+    "iosSimulator": {
+      "exitCode": 0,
+      "path": "/Users/emreaydin/ngsaccess/mobile/build/ios/iphonesimulator/Runner.app",
+      "bundleId": "com.ngsplus.app",
+      "version": "1.0.4",
+      "build": "1",
+      "minimumOS": "15.0",
+      "executableSha256": "9657a1ec35846552e77bea89d6c4f44f6dc28ef9cafb5f2dc1a122f219a114b1",
+      "privacyManifestPresent": true,
+      "cameraUsagePresent": true,
+      "galleryUsageAbsent": true,
+      "distributionSigned": false,
+      "evidence": "evidence/ios-simulator-final.txt",
+      "privacyManifest": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": [],
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
+          }
+        ]
+      },
+      "dotenvAbsent": true
+    },
+    "iosNoSign": {
+      "exitCode": 0,
+      "path": "/Users/emreaydin/ngsaccess/mobile/build/ios/iphoneos/Runner.app",
+      "bundleId": "com.ngsplus.app",
+      "version": "1.0.4",
+      "build": "1",
+      "minimumOS": "15.0",
+      "executableSha256": "474f50f8706103be8a3b1ad9d32a9372cee9b7a59955dea5b2fed1f13b3581ae",
+      "privacyManifestPresent": true,
+      "cameraUsagePresent": true,
+      "galleryUsageAbsent": true,
+      "distributionSigned": false,
+      "evidence": "evidence/ios-nosign-final.txt",
+      "privacyManifest": {
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": [],
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
+          }
+        ]
+      },
+      "dotenvAbsent": true
+    },
+    "iosSimulatorLaunch": {
+      "exitCode": 0,
+      "evidence": "evidence/ios-launch-final.json",
+      "screenshot": "evidence/ios-simulator-login-final.png",
+      "visuallyVerifiedLogin": true
+    },
+    "iosXCTest": {
+      "exitCode": 0,
+      "evidence": "evidence/ios-xctest-final2.txt",
+      "result": "TEST SUCCEEDED",
+      "initialAttempt": "evidence/ios-xctest-final.txt",
+      "initialFailure": "XCTest runner preparation timeout; no test assertion failure",
+      "recovery": "Boot selected simulator and disable parallel test workers; bounded runner execution",
+      "passed": 2
+    },
+    "postBuild": {
+      "pub-lock-restore-final.txt": 0,
+      "l10n-regenerate-final.txt": 0,
+      "l10n-parity-final.txt": 0,
+      "pod-deployment-final.txt": 0,
+      "flutter-analyze-last.txt": 0,
+      "flutter-test-last.txt": 0,
+      "lockProjectDrift": [],
+      "generatedDrift": []
+    },
+    "sourceSnapshotDrift": {
+      "changed": [],
+      "passed": true
+    },
+    "android16kRuntime": {
+      "status": "external_gate",
+      "runtimeVerified": false,
+      "failure": "Official system image transfer failed: curl28 after bounded recovery; no emulator runtime proof",
+      "staticAlignmentPassed": true,
+      "workerReport": "reports/23-android-16k-runtime.md",
+      "evidence": "evidence/android16k-runtime-result.json",
+      "workerOutcome": "failed",
+      "cleanupVerified": true
+    },
+    "visitorTestAfterTypingFix": {
+      "exitCode": 0,
+      "passed": 24,
+      "evidence": "evidence/vitest-visitors-last.txt"
+    }
+  },
+  "compileOnlyEnvironment": {
+    "environment": "staging",
+    "url": "https://mobile-build.invalid",
+    "liveServiceVerified": false
+  },
+  "sourceFingerprints": "evidence/final-source-sha256.json",
+  "openGates": [
+    "Approved production/staging deployment and runtime contract acceptance",
+    "Existing Android upload identity; Apple distribution profile/identity; monotonic store version",
+    "Physical reader/panel/broker/firmware and late/duplicate effect acceptance",
+    "Physical Android/iOS camera/storage/upgrade/accessibility acceptance",
+    "Public privacy/support/legal/store review inputs",
+    "Protected CI, private symbol/dSYM retention and controlled signed-release symbolication"
+  ],
+  "auditStatus": {
+    "packages": 92,
+    "locallyVerified": 74,
+    "externalGate": 18,
+    "partialImplementation": 0,
+    "ledger": "audit-closure.json"
+  },
+  "orchestration": {
+    "workers": 23,
+    "succeeded": 22,
+    "failed": 1,
+    "released": 23,
+    "active": 0,
+    "reclaimable": 0,
+    "evidence": "evidence/worker-outcomes-final.json"
+  }
+}

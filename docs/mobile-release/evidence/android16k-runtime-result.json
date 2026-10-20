@@ -1,0 +1,68 @@
+{
+  "recordedAtUtc": "2026-10-20T06:26:51.824791+00:00",
+  "outcome": "failed",
+  "gate": "actual ARM64 Android 16 KB runtime smoke not executed",
+  "canonicalApk": {
+    "path": "mobile/build/app/outputs/flutter-apk/app-release.apk",
+    "sha256": "9c78b56f9caeed73b3334fdb9aee53505c25a5b980788ae716cc62cf56c528e1",
+    "expectedSha256": "9c78b56f9caeed73b3334fdb9aee53505c25a5b980788ae716cc62cf56c528e1",
+    "hashMatches": true,
+    "bytes": 77769939,
+    "signing": "unsigned canonical artifact; no signed test copy created",
+    "environment": "compile-only .invalid host",
+    "metadata": [
+      "package: name='com.ngsplus.app.ngsplusapp' versionCode='1' versionName='1.0.4' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'",
+      "sdkVersion:'24'",
+      "targetSdkVersion:'36'"
+    ]
+  },
+  "systemImage": {
+    "package": "system-images;android-36;google_apis_ps16k;arm64-v8a",
+    "revision": 7,
+    "officialUrl": "https://dl.google.com/android/repository/sys-img/google_apis/arm64-v8a-ps16k-36_r07.zip",
+    "expectedBytes": 1875087037,
+    "expectedSha1": "dda632745023567113d9954101709c6526a3c250",
+    "partialBytes": 756547575,
+    "curlExitCode": 28,
+    "error": [
+      "curl: (28) Operation timed out after 951344 milliseconds with 245714727 out of 1364254189 bytes received"
+    ],
+    "licensePromptAccepted": false,
+    "complete": false
+  },
+  "runtime": {
+    "avdCreated": false,
+    "emulatorStarted": false,
+    "pageSizeProven": false,
+    "apkInstalled": false,
+    "appLaunched": false,
+    "pluginRegistrationVerified": false,
+    "loginScreenshotCaptured": false,
+    "crashAnrChecked": false,
+    "backendOrEmployeeOperationsPerformed": false
+  },
+  "cleanup": {
+    "ownedRunningProcesses": [],
+    "userAvdUntouched": "fq_ttt_api35",
+    "partialArchiveRetainedAt": "/tmp/ngs-android16k-image-r07.zip",
+    "ownAvdFilesCreated": false
+  },
+  "checks": {
+    "zipAlignment": {
+      "exitCode": 0,
+      "output": ""
+    },
+    "unsignedVerification": {
+      "exitCode": 1,
+      "output": "DOES NOT VERIFY\nERROR: Missing META-INF/MANIFEST.MF"
+    },
+    "avds": {
+      "exitCode": 0,
+      "output": "fq_ttt_api35"
+    },
+    "adbDevices": {
+      "exitCode": 0,
+      "output": "List of devices attached"
+    }
+  }
+}

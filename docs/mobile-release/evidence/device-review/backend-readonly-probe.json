@@ -1,0 +1,33 @@
+[
+  {
+    "function": "employeeAuth:me",
+    "httpStatus": 200,
+    "status": "error",
+    "code": null,
+    "functionMissing": false,
+    "argumentError": false
+  },
+  {
+    "function": "mobileAccess:listTargets",
+    "httpStatus": 200,
+    "status": "error",
+    "code": null,
+    "functionMissing": true,
+    "argumentError": false
+  },
+  {
+    "function": "mobileVisitors:summary",
+    "httpStatus": 200,
+    "status": "error",
+    "code": null,
+    "functionMissing": true,
+    "argumentError": false
+  },
+  {
+    "function": "mobileAttendance:summary",
+    "httpStatus": 200,
+    "status": "error",
+    "functionMissing": true,
+    "argumentError": false
+  }
+]

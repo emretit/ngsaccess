@@ -1,0 +1,1772 @@
+{
+  "id": "6fa233cf-645a-48a6-a327-d2c1a734ac8b",
+  "ok": true,
+  "result": {
+    "workers": [
+      {
+        "dispatchId": "ctx_85296ab7d57a",
+        "taskId": "task_01b3d73d1c16",
+        "runId": "run_e525229e4ae5",
+        "workerState": "failed",
+        "dispatchStatus": "failed",
+        "agentTerminalHandle": "structworker_e1269f50-8e50-4dfc-a4d5-754a2a0910df",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_0b3fbef9d956",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_e1269f50-8e50-4dfc-a4d5-754a2a0910df",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:663b7dda-cc44-4338-9984-54956e382061",
+          "originDispatchId": "ctx_85296ab7d57a",
+          "ownerDispatchId": "ctx_85296ab7d57a",
+          "releaseRequestedAt": "2026-10-20 06:28:32",
+          "releaseCompletedAt": "2026-10-20 06:28:32",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_85296ab7d57a",
+          "dispatchId": "ctx_85296ab7d57a",
+          "taskId": "task_01b3d73d1c16",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "failed",
+            "dispatch": "failed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "failed",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "failure"
+            ],
+            "requiresAction": true
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_0cdfdc287e0d",
+        "taskId": "task_9135a46a8924",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_93b2aa65-a53d-4c75-b63a-1f1c29af552b",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_a482f377d85a",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_93b2aa65-a53d-4c75-b63a-1f1c29af552b",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:8c3c58a3-c614-46e4-ae59-9ca82bea474c",
+          "originDispatchId": "ctx_0cdfdc287e0d",
+          "ownerDispatchId": "ctx_0cdfdc287e0d",
+          "releaseRequestedAt": "2026-10-19 20:26:08",
+          "releaseCompletedAt": "2026-10-19 20:26:08",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_0cdfdc287e0d",
+          "dispatchId": "ctx_0cdfdc287e0d",
+          "taskId": "task_9135a46a8924",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_1a2ce6669509",
+        "taskId": "task_da386a5e5934",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_fb3998b3-de95-4fb5-b137-7a57929cfd6b",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_0f2f4a929823",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_fb3998b3-de95-4fb5-b137-7a57929cfd6b",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:a0bed3c7-0ff2-42a4-98cc-da4e79734a98",
+          "originDispatchId": "ctx_1a2ce6669509",
+          "ownerDispatchId": "ctx_1a2ce6669509",
+          "releaseRequestedAt": "2026-10-19 19:02:59",
+          "releaseCompletedAt": "2026-10-19 19:02:59",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_1a2ce6669509",
+          "dispatchId": "ctx_1a2ce6669509",
+          "taskId": "task_da386a5e5934",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_3ffbcf193125",
+        "taskId": "task_394944689e3e",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_ddb800f3-fd12-4fe7-b2a1-a01e18d079df",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_ef2c928f57d5",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_ddb800f3-fd12-4fe7-b2a1-a01e18d079df",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:0b7e4ef2-09d0-4f94-ae77-c75872d36c2c",
+          "originDispatchId": "ctx_3ffbcf193125",
+          "ownerDispatchId": "ctx_3ffbcf193125",
+          "releaseRequestedAt": "2026-10-20 06:29:56",
+          "releaseCompletedAt": "2026-10-20 06:29:57",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_3ffbcf193125",
+          "dispatchId": "ctx_3ffbcf193125",
+          "taskId": "task_394944689e3e",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_035dbc7b5716",
+        "taskId": "task_a783110d2d18",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_574461e0-42ad-4bb5-9caf-0466195893a1",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_43c690cdc8cb",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_574461e0-42ad-4bb5-9caf-0466195893a1",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:32711031-0a3d-4c33-b588-fef3029ef6d9",
+          "originDispatchId": "ctx_035dbc7b5716",
+          "ownerDispatchId": "ctx_035dbc7b5716",
+          "releaseRequestedAt": "2026-10-19 19:02:59",
+          "releaseCompletedAt": "2026-10-19 19:02:59",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_035dbc7b5716",
+          "dispatchId": "ctx_035dbc7b5716",
+          "taskId": "task_a783110d2d18",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_a8ea6b1e008d",
+        "taskId": "task_f6ac1b637c76",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_bc3b85f3-b96c-491e-9668-948e67155e1a",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_9e7ebb1d7d07",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_bc3b85f3-b96c-491e-9668-948e67155e1a",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:6e088892-a8c2-4182-9226-5174d396b8a5",
+          "originDispatchId": "ctx_a8ea6b1e008d",
+          "ownerDispatchId": "ctx_a8ea6b1e008d",
+          "releaseRequestedAt": "2026-10-19 18:54:00",
+          "releaseCompletedAt": "2026-10-19 18:54:00",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_a8ea6b1e008d",
+          "dispatchId": "ctx_a8ea6b1e008d",
+          "taskId": "task_f6ac1b637c76",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_055cb9a9ed0b",
+        "taskId": "task_9c82c6b98da7",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_69e3f380-be92-453a-80cb-c01f8eb2d63d",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_3137cd047541",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_69e3f380-be92-453a-80cb-c01f8eb2d63d",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:ea0b355a-ea37-4aab-9022-ac585cf7ca79",
+          "originDispatchId": "ctx_055cb9a9ed0b",
+          "ownerDispatchId": "ctx_055cb9a9ed0b",
+          "releaseRequestedAt": "2026-10-19 18:54:00",
+          "releaseCompletedAt": "2026-10-19 18:54:00",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_055cb9a9ed0b",
+          "dispatchId": "ctx_055cb9a9ed0b",
+          "taskId": "task_9c82c6b98da7",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_37cf22eb54d9",
+        "taskId": "task_9139f80531c8",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_ef6295f7-5674-4bdc-9989-a1cb316e74da",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_a9b49b67829a",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_ef6295f7-5674-4bdc-9989-a1cb316e74da",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:3f169e76-a5a7-42a7-bff8-0d4e601c9012",
+          "originDispatchId": "ctx_37cf22eb54d9",
+          "ownerDispatchId": "ctx_37cf22eb54d9",
+          "releaseRequestedAt": "2026-10-19 18:54:23",
+          "releaseCompletedAt": "2026-10-19 18:54:23",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_37cf22eb54d9",
+          "dispatchId": "ctx_37cf22eb54d9",
+          "taskId": "task_9139f80531c8",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_e7fdcebc8e84",
+        "taskId": "task_075f2f6bdca6",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_0c6279e2-a74e-413a-90d2-b27a3aab2ccc",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_baf26c7a0b0f",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_0c6279e2-a74e-413a-90d2-b27a3aab2ccc",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:afbc3fba-8c09-4f5a-ab53-e2fe26030cde",
+          "originDispatchId": "ctx_e7fdcebc8e84",
+          "ownerDispatchId": "ctx_e7fdcebc8e84",
+          "releaseRequestedAt": "2026-10-19 18:52:43",
+          "releaseCompletedAt": "2026-10-19 18:52:43",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_e7fdcebc8e84",
+          "dispatchId": "ctx_e7fdcebc8e84",
+          "taskId": "task_075f2f6bdca6",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_fe481587fd90",
+        "taskId": "task_9d61e2a97ecc",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_430f208e-58f2-4809-84b4-5daae165beeb",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_d9d33de54223",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_430f208e-58f2-4809-84b4-5daae165beeb",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:a325f8ae-065b-4dbe-909d-969661c214ac",
+          "originDispatchId": "ctx_fe481587fd90",
+          "ownerDispatchId": "ctx_fe481587fd90",
+          "releaseRequestedAt": "2026-10-19 18:54:23",
+          "releaseCompletedAt": "2026-10-19 18:54:23",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_fe481587fd90",
+          "dispatchId": "ctx_fe481587fd90",
+          "taskId": "task_9d61e2a97ecc",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_23860dfa9456",
+        "taskId": "task_f166b696e85e",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_6a081c52-b384-408e-92b7-daad270d182d",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_882827f88cb0",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_6a081c52-b384-408e-92b7-daad270d182d",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:b1d31146-dcfa-4034-85ae-b300b203da25",
+          "originDispatchId": "ctx_23860dfa9456",
+          "ownerDispatchId": "ctx_23860dfa9456",
+          "releaseRequestedAt": "2026-10-19 19:08:10",
+          "releaseCompletedAt": "2026-10-19 19:08:10",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_23860dfa9456",
+          "dispatchId": "ctx_23860dfa9456",
+          "taskId": "task_f166b696e85e",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_3c18938f37b2",
+        "taskId": "task_e82b9085d863",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_c20ded17-e416-46e6-94fe-9455e8117f35",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_ad7b70318f97",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_c20ded17-e416-46e6-94fe-9455e8117f35",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:ddf4133f-f136-4631-bc44-8216af8564b6",
+          "originDispatchId": "ctx_3c18938f37b2",
+          "ownerDispatchId": "ctx_3c18938f37b2",
+          "releaseRequestedAt": "2026-10-19 19:13:17",
+          "releaseCompletedAt": "2026-10-19 19:13:17",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_3c18938f37b2",
+          "dispatchId": "ctx_3c18938f37b2",
+          "taskId": "task_e82b9085d863",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_7f6db59e74bf",
+        "taskId": "task_fc7697d06cb3",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_d9459d35-4b03-430d-9d18-cddecc6fd7ed",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_c3b9ba14556a",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_d9459d35-4b03-430d-9d18-cddecc6fd7ed",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:755e30d1-352d-472a-b02b-4b22985c8327",
+          "originDispatchId": "ctx_7f6db59e74bf",
+          "ownerDispatchId": "ctx_7f6db59e74bf",
+          "releaseRequestedAt": "2026-10-19 18:59:01",
+          "releaseCompletedAt": "2026-10-19 18:59:01",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_7f6db59e74bf",
+          "dispatchId": "ctx_7f6db59e74bf",
+          "taskId": "task_fc7697d06cb3",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_4623b1c338e4",
+        "taskId": "task_28b47844cc9d",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_59e101d6-ba75-427b-8da7-e4de0ab479f4",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_0b0124f85c38",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_59e101d6-ba75-427b-8da7-e4de0ab479f4",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:3e592580-fa81-4fe2-bbd5-244b48038a90",
+          "originDispatchId": "ctx_4623b1c338e4",
+          "ownerDispatchId": "ctx_4623b1c338e4",
+          "releaseRequestedAt": "2026-10-19 18:50:03",
+          "releaseCompletedAt": "2026-10-19 18:50:04",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_4623b1c338e4",
+          "dispatchId": "ctx_4623b1c338e4",
+          "taskId": "task_28b47844cc9d",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_8a7dfab7efbd",
+        "taskId": "task_e36cd4d9b95f",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_8cfa260a-92ab-4dfb-bafa-6069b97e3a02",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_a8fa4b77a733",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_8cfa260a-92ab-4dfb-bafa-6069b97e3a02",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:35bde049-5645-414d-afde-2bc92ebd9b4c",
+          "originDispatchId": "ctx_8a7dfab7efbd",
+          "ownerDispatchId": "ctx_8a7dfab7efbd",
+          "releaseRequestedAt": "2026-10-19 18:47:21",
+          "releaseCompletedAt": "2026-10-19 18:47:21",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_8a7dfab7efbd",
+          "dispatchId": "ctx_8a7dfab7efbd",
+          "taskId": "task_e36cd4d9b95f",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_6a1a259d46a2",
+        "taskId": "task_99341ce592e0",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_90a8c8a8-4528-4881-81c1-100d7c570d1b",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_c2f6967d698b",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_90a8c8a8-4528-4881-81c1-100d7c570d1b",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:19feca82-c8d6-480f-9e07-b93185bd9226",
+          "originDispatchId": "ctx_6a1a259d46a2",
+          "ownerDispatchId": "ctx_6a1a259d46a2",
+          "releaseRequestedAt": "2026-10-19 19:02:59",
+          "releaseCompletedAt": "2026-10-19 19:03:00",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_6a1a259d46a2",
+          "dispatchId": "ctx_6a1a259d46a2",
+          "taskId": "task_99341ce592e0",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_f8e64a93712a",
+        "taskId": "task_fcd8bbc1f544",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_32b76881-29ba-4cc8-98bf-665b4d89db55",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_1a6c55d463a1",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_32b76881-29ba-4cc8-98bf-665b4d89db55",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:dd05f968-ecbc-462c-890f-6934828f03c3",
+          "originDispatchId": "ctx_f8e64a93712a",
+          "ownerDispatchId": "ctx_f8e64a93712a",
+          "releaseRequestedAt": "2026-10-19 18:49:15",
+          "releaseCompletedAt": "2026-10-19 18:49:15",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_f8e64a93712a",
+          "dispatchId": "ctx_f8e64a93712a",
+          "taskId": "task_fcd8bbc1f544",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_1481a69a4ad7",
+        "taskId": "task_13a72672899d",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_5e22648d-d753-49d4-88e5-7b8d58d09f30",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_20b880b9ee01",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_5e22648d-d753-49d4-88e5-7b8d58d09f30",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:a2db2118-b2fa-48f1-b903-778c22b5f7ea",
+          "originDispatchId": "ctx_1481a69a4ad7",
+          "ownerDispatchId": "ctx_1481a69a4ad7",
+          "releaseRequestedAt": "2026-10-19 18:59:34",
+          "releaseCompletedAt": "2026-10-19 18:59:34",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_1481a69a4ad7",
+          "dispatchId": "ctx_1481a69a4ad7",
+          "taskId": "task_13a72672899d",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_6b6d7b9d3314",
+        "taskId": "task_e21cd5fca2ea",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_6f38e8d5-423f-4632-aca9-feac6449d779",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_64e97d8382e2",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_6f38e8d5-423f-4632-aca9-feac6449d779",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:6012f790-a8a9-4029-92eb-c3cbae2457a2",
+          "originDispatchId": "ctx_6b6d7b9d3314",
+          "ownerDispatchId": "ctx_6b6d7b9d3314",
+          "releaseRequestedAt": "2026-10-19 18:50:04",
+          "releaseCompletedAt": "2026-10-19 18:50:04",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_6b6d7b9d3314",
+          "dispatchId": "ctx_6b6d7b9d3314",
+          "taskId": "task_e21cd5fca2ea",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_5996c91dbaf0",
+        "taskId": "task_d84c8d9afc43",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_6e2b3f9b-1635-44c0-9ecc-ddda2c34656a",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_df1b7c687bf0",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_6e2b3f9b-1635-44c0-9ecc-ddda2c34656a",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:fa0b582f-2720-4ae7-bf06-31f7999b9620",
+          "originDispatchId": "ctx_5996c91dbaf0",
+          "ownerDispatchId": "ctx_5996c91dbaf0",
+          "releaseRequestedAt": "2026-10-19 18:47:21",
+          "releaseCompletedAt": "2026-10-19 18:47:21",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_5996c91dbaf0",
+          "dispatchId": "ctx_5996c91dbaf0",
+          "taskId": "task_d84c8d9afc43",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_c4032fb8939a",
+        "taskId": "task_e8a4127c0389",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_5b38e078-f1eb-4b91-a66e-d34b9c209fd8",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_fc0c5e96c8c0",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_5b38e078-f1eb-4b91-a66e-d34b9c209fd8",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:5fdba888-5fdc-450e-8f7e-57fb8d32f1a2",
+          "originDispatchId": "ctx_c4032fb8939a",
+          "ownerDispatchId": "ctx_c4032fb8939a",
+          "releaseRequestedAt": "2026-10-19 18:50:04",
+          "releaseCompletedAt": "2026-10-19 18:50:04",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_c4032fb8939a",
+          "dispatchId": "ctx_c4032fb8939a",
+          "taskId": "task_e8a4127c0389",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_cd97ddff4c43",
+        "taskId": "task_cecbba8aabe4",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_d525e80d-12a7-4f34-9c81-9c141b2ab65f",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_5327a60406d5",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_d525e80d-12a7-4f34-9c81-9c141b2ab65f",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:6b59568f-80d9-4822-a0af-6898ab9596c3",
+          "originDispatchId": "ctx_cd97ddff4c43",
+          "ownerDispatchId": "ctx_cd97ddff4c43",
+          "releaseRequestedAt": "2026-10-19 18:49:15",
+          "releaseCompletedAt": "2026-10-19 18:49:15",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_cd97ddff4c43",
+          "dispatchId": "ctx_cd97ddff4c43",
+          "taskId": "task_cecbba8aabe4",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      },
+      {
+        "dispatchId": "ctx_907b7f591d48",
+        "taskId": "task_942d52640518",
+        "runId": "run_e525229e4ae5",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "agentTerminalHandle": "structworker_a3c1f4bb-2fe0-4e26-a7ac-4fe30161797a",
+        "terminalState": "released",
+        "resource": {
+          "id": "wtr_e91d4f9a6cc0",
+          "ownershipState": "released",
+          "releaseState": "released",
+          "retainedReason": null,
+          "terminalHandle": "structworker_a3c1f4bb-2fe0-4e26-a7ac-4fe30161797a",
+          "worktreeId": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+          "endpointId": "5b642016-c141-4069-8a94-1b31653d5eff",
+          "endpointIncarnation": "structured:802af7a5-ccda-4887-b6c6-4b33b2d7db4f",
+          "originDispatchId": "ctx_907b7f591d48",
+          "ownerDispatchId": "ctx_907b7f591d48",
+          "releaseRequestedAt": "2026-10-19 18:47:21",
+          "releaseCompletedAt": "2026-10-19 18:47:21",
+          "releaseError": null,
+          "recoveryAttemptCount": 0,
+          "lastRecoveryAt": null,
+          "archive": {
+            "source": "transcript",
+            "status": "captured"
+          }
+        },
+        "projection": {
+          "id": "ctx_907b7f591d48",
+          "dispatchId": "ctx_907b7f591d48",
+          "taskId": "task_942d52640518",
+          "runId": "run_e525229e4ae5",
+          "role": "worker",
+          "parent": null,
+          "provider": null,
+          "host": {
+            "kind": "local",
+            "id": "local"
+          },
+          "workspace": {
+            "id": "ef942c62-1c4c-4963-99fc-a59a8e48f99b::/Users/emreaydin/ngsaccess",
+            "kind": "folder_or_worktree"
+          },
+          "stage": {
+            "worker": "succeeded",
+            "dispatch": "completed",
+            "detail": "settled",
+            "activity": "unknown"
+          },
+          "outcome": "succeeded",
+          "liveness": {
+            "verdict": "exited",
+            "source": "resource_release"
+          },
+          "evidence": {
+            "durable": true,
+            "liveStatus": "unavailable",
+            "lastObservedAt": null
+          },
+          "resource": {
+            "state": "released"
+          },
+          "nextAction": {
+            "kind": "none",
+            "argv": []
+          },
+          "attention": {
+            "categories": [
+              "root_completion"
+            ],
+            "requiresAction": false
+          }
+        }
+      }
+    ],
+    "counts": {
+      "released": 23
+    },
+    "page": {
+      "limit": 100,
+      "total": 23,
+      "hasMore": false,
+      "nextCursor": null
+    },
+    "scope": {
+      "run": "run_e525229e4ae5",
+      "source": "flag"
+    }
+  },
+  "_meta": {
+    "runtimeId": "5b642016-c141-4069-8a94-1b31653d5eff"
+  }
+}
