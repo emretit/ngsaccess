@@ -419,7 +419,13 @@ class _QRScanScreenState extends State<QRScanScreen>
                   useAppLifecycleState: false,
                   scanWindow: size > 0 ? scanWindow : null,
                   onDetect: _onDetect,
-                  errorBuilder: (context, error) => _cameraRecovery(),
+                  errorBuilder: (context, error) => _cameraRecovery(
+                    message:
+                        error.errorCode ==
+                            MobileScannerErrorCode.permissionDenied
+                        ? l10n.qrCameraPermissionRequired
+                        : l10n.qrCameraUnavailableRetry,
+                  ),
                 ),
               if (granted && _cameraError == null && size > 0)
                 Positioned.fromRect(
@@ -499,7 +505,7 @@ class _QRScanScreenState extends State<QRScanScreen>
     );
   }
 
-  Widget _cameraRecovery() {
+  Widget _cameraRecovery({String? message}) {
     final permanent =
         _permission == PermissionStatus.permanentlyDenied ||
         _permission == PermissionStatus.restricted;
@@ -516,7 +522,8 @@ class _QRScanScreenState extends State<QRScanScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              _cameraError ??
+              message ??
+                  _cameraError ??
                   AppLocalizations.of(context).qrCameraPermissionRequired,
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.white),

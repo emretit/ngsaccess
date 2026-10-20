@@ -206,6 +206,36 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
+  for (final code in [
+    MobileScannerErrorCode.unsupported,
+    MobileScannerErrorCode.genericError,
+  ]) {
+    testWidgets('granted camera with $code does not ask for permission', (
+      tester,
+    ) async {
+      await tester.pumpWidget(app());
+      await tester.pump();
+      await scanTab(tester);
+      cameraState.value = cameraState.value.copyWith(
+        isInitialized: true,
+        error: MobileScannerException(
+          errorCode: code,
+          errorDetails: const MobileScannerErrorDetails(
+            message: 'private-native-error',
+          ),
+        ),
+      );
+      await tester.pump();
+      expect(find.text('Camera unavailable. Try again.'), findsOneWidget);
+      expect(
+        find.text('Camera permission is required to scan QR codes.'),
+        findsNothing,
+      );
+      expect(find.textContaining('private-native-error'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets(
     'settings return rechecks permission and restarts exactly one camera',
     (tester) async {

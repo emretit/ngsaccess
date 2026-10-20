@@ -134,7 +134,18 @@ Object? encodeConvexValue(Object? value) {
 
 Object? _decodeValue(Object? value) {
   if (value == null || value is String || value is bool) return value;
-  if (value is num && value.isFinite) return value;
+  if (value is num && value.isFinite) {
+    // Convex numbers are float64, so whole-number fields can arrive as 0.0.
+    // Normalize only exact JSON-safe integers; never truncate fractions or
+    // round large values, and preserve the special negative-zero value.
+    if (value is double &&
+        !(value == 0 && value.isNegative) &&
+        value.abs() <= 9007199254740991 &&
+        value.truncateToDouble() == value) {
+      return value.toInt();
+    }
+    return value;
+  }
   if (value is List) return value.map(_decodeValue).toList();
   if (value is Map<String, Object?>) {
     for (final marker in [r'$integer', r'$float', r'$bytes']) {

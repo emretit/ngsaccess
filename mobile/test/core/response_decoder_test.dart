@@ -20,6 +20,26 @@ void main() {
     expect(decode({'status': 'success', 'value': null}), 'null');
   });
 
+  test('Convex float64 whole numbers decode as safe integer fields', () {
+    final value =
+        jsonDecode(
+              decodeConvexResponse(
+                statusCode: 200,
+                body:
+                    '{"status":"success","value":{"total":0.0,'
+                    '"nested":[{"actuator":1.0}],"fraction":1.5,'
+                    '"unsafe":9007199254740992.0,"negativeZero":-0.0}}',
+              ),
+            )
+            as Map<String, dynamic>;
+    expect(value['total'], isA<int>());
+    expect(value['total'], 0);
+    expect(value['nested'][0]['actuator'], isA<int>());
+    expect(value['fraction'], 1.5);
+    expect(value['unsafe'], isA<double>());
+    expect((value['negativeZero'] as double).isNegative, isTrue);
+  });
+
   test(
     '560 structured auth data takes priority over redacted errorMessage',
     () {

@@ -46,6 +46,34 @@ class _VisibilityPage extends StatelessWidget {
       Text(BranchVisibility.isActive(context, 2) ? 'QR active' : 'QR inactive');
 }
 
+// Exercises nested screens whose scroll views and FABs do not own a SafeArea.
+class _ScrollingPage extends StatelessWidget {
+  const _ScrollingPage();
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    floatingActionButton: FloatingActionButton(
+      key: const Key('fixture_create'),
+      onPressed: () {},
+      child: const Icon(Icons.add),
+    ),
+    body: SingleChildScrollView(
+      child: Column(
+        children: [
+          const Text('Visitor target'),
+          for (var i = 0; i < 20; i++) const SizedBox(height: 80),
+          TextButton(
+            key: const Key('fixture_last_action'),
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Reached final action')),
+            ),
+            child: const Text('Final action'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 void main() {
   late FakeAuthRepository repository;
   late FakeSessionStore store;
@@ -73,7 +101,7 @@ void main() {
         AppRoute.home: (_) => const _RetainedPage('Home'),
         AppRoute.history: (_) => const _RetainedPage('History'),
         AppRoute.qr: (_) => const _VisibilityPage(),
-        AppRoute.visitor: (_) => const Text('Visitor target'),
+        AppRoute.visitor: (_) => const _ScrollingPage(),
         AppRoute.profile: (_) => const Text('Profile target'),
       },
     );
@@ -363,6 +391,30 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(AppBottomNavigation), findsOneWidget);
       expect(find.text('History:1'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'floating bar never covers nested screen FAB or final scroll action',
+    (tester) async {
+      initialize();
+      await auth.signIn('fixture@example.test', 'fixture-password');
+      await mount(tester, '/visitor');
+      await tester.pumpAndSettle();
+      final barTop = tester.getTopLeft(find.byType(AppBottomNavigation)).dy;
+      expect(
+        tester.getRect(find.byKey(const Key('fixture_create'))).bottom,
+        lessThanOrEqualTo(barTop),
+      );
+      final lastAction = find.byKey(const Key('fixture_last_action'));
+      await tester.scrollUntilVisible(lastAction, 400);
+      await tester.pumpAndSettle();
+      expect(tester.getRect(lastAction).bottom, lessThanOrEqualTo(barTop));
+      await tester.tap(lastAction);
+      await tester.pump();
+      expect(find.text('Reached final action'), findsOneWidget);
+      expect(location().path, AppRoute.visitor);
       expect(tester.takeException(), isNull);
     },
   );

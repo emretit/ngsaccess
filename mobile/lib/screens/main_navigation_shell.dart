@@ -93,9 +93,12 @@ class _MainNavigationShellState extends State<MainNavigationShell>
   Widget build(BuildContext context) {
     return Scaffold(
       extendBody: true,
-      body: BranchVisibility(
-        activeIndex: _routeVisible ? widget.navigationShell.currentIndex : -1,
-        child: widget.navigationShell,
+      body: SafeArea(
+        top: false,
+        child: BranchVisibility(
+          activeIndex: _routeVisible ? widget.navigationShell.currentIndex : -1,
+          child: widget.navigationShell,
+        ),
       ),
       bottomNavigationBar: MediaQuery.viewInsetsOf(context).bottom == 0
           ? AppBottomNavigation(
