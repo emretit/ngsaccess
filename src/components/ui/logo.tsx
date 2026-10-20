@@ -13,11 +13,11 @@ export default function Logo({ size = 'md', tone = 'light', className = '' }: Lo
       className={`inline-flex items-center gap-[10px] whitespace-nowrap leading-none ${tone === 'light' ? 'text-side-text' : 'text-primary'} ${className}`}
     >
       <img
-        src="/logo.svg"
+        src={tone === 'light' ? '/branding/logo-small-white.svg' : '/branding/logo-small-brand.svg'}
         alt=""
         width={36}
         height={36}
-        className={`${current.logo} object-contain ${tone === 'light' ? 'brightness-0 invert' : ''}`}
+        className={`${current.logo} object-contain`}
       />
       <span className={`font-bold tracking-[-.8px] ${current.text}`}>NGS Plus</span>
     </div>
