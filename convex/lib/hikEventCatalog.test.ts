@@ -37,6 +37,11 @@ describe("hikEventCatalog - classifyHikEvent", () => {
     expect(classifyHikEvent(DEVICE_OPERATION, 80).shouldCreateCardReading).toBe(false);
   });
 
+  it("kapi kilit durum kodlarini etiketli status olarak siniflandirir", () => {
+    expect(classifyHikEvent(DEVICE_EVENT, 21)).toMatchObject({ category: "status", label: "Kapı kilidi açıldı", shouldCreateCardReading: false });
+    expect(classifyHikEvent(DEVICE_EVENT, 22)).toMatchObject({ category: "status", label: "Kapı kilitlendi", shouldCreateCardReading: false });
+  });
+
   it("bilinmeyen DEVICE_EVENT kodunu status olarak siniflandirir", () => {
     const event = classifyHikEvent(DEVICE_EVENT, 9999);
 

@@ -177,6 +177,12 @@ const HIK_ALARM_LABELS: Record<number, string> = {
   1033: "Alarm girişi normale döndü",
 };
 
+// MAJOR_EVENT kapı durum kodları (MINOR_LOCK_OPEN / MINOR_LOCK_CLOSE) — status olarak kalır.
+const HIK_STATUS_LABELS: Record<number, string> = {
+  0x15: "Kapı kilidi açıldı",
+  0x16: "Kapı kilitlendi",
+};
+
 const HIK_OPERATION_LABELS: Record<number, string> = {
   80: "Uzaktan kapı açma",
   90: "Cihaz yeniden başlatma",
@@ -315,7 +321,7 @@ export function classifyHikEvent(
       label:
         subEventType === undefined
           ? majorLabel
-          : `Cihaz durum olayı (${subEventType})`,
+          : HIK_STATUS_LABELS[subEventType] ?? `Cihaz durum olayı (${subEventType})`,
       category: "status",
       severity: "info",
       shouldCreateCardReading: false,
