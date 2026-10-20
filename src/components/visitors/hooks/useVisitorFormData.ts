@@ -5,6 +5,7 @@ import { VisitorDetail } from "@/types/visitor";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { isoToLocalInput, defaultExpiryLocalInput } from "../visitorTime";
+import { isVisitorCardPlaceholder } from "../lib/preRegistration";
 
 export interface VisitorFormData {
   firstName: string;
@@ -56,7 +57,7 @@ export const useVisitorFormData = (visitor?: VisitorDetail | null) => {
 
   const presetRules = (presetRulesData ?? [])
     .filter((r) => r.isActive || r._id === visitor?.presetRuleId)
-    .map((r) => ({ id: r._id, name: r.hasDoors ? r.name : `${r.name} (Kapı yok)`, disabled: !r.hasDoors }));
+    .map((r) => ({ id: r._id, name: !r.isActive ? `${r.name} (Pasif)` : r.hasDoors ? r.name : `${r.name} (Kapı yok)`, disabled: !r.isActive || !r.hasDoors }));
   if (visitor?.presetRuleId && !presetRules.some(rule => rule.id === visitor.presetRuleId)) {
     presetRules.push({ id: visitor.presetRuleId, name: visitor.presetRuleName ?? "Kayıtlı erişim bölgesi", disabled: true });
   }
@@ -74,8 +75,8 @@ export const useVisitorFormData = (visitor?: VisitorDetail | null) => {
         visitorCompany: visitor.visitorCompany || "",
         visitPurpose: visitor.visitPurpose || "",
         hostEmployeeId: visitor.hostEmployeeId ?? null,
-        // Maskeli değer forma girmez; aksi halde kayıtta kart "•••• 1234" ile ezilir.
-        cardNumber: visitor.sensitiveMasked || visitor.cardNumber?.startsWith("IADE:") ? "" : visitor.cardNumber || "",
+        // Maskeli, iade ve ön kayıt değerleri gerçek kart yerine kaydedilmez.
+        cardNumber: visitor.sensitiveMasked || isVisitorCardPlaceholder(visitor.cardNumber) ? "" : visitor.cardNumber || "",
         presetRuleId: visitor.presetRuleId ?? null,
         accessExpiresAt: visitor.visitEnd
           ? isoToLocalInput(visitor.visitEnd)

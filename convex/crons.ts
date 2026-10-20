@@ -67,6 +67,7 @@ crons.interval(
   "expire-visitor-access",
   { minutes: 5 },
   internal.visitors.expireVisitorAccess,
+  {},
 );
 
 // E-posta doğrulama token temizliği: her gün 03:00 UTC — setupToken+tokenExpiresAt sıfırla.

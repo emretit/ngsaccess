@@ -1,3 +1,4 @@
+import { listMobileTargets } from "./lib/mobileAccess";
 import { internalMutation, internalQuery, type MutationCtx } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
@@ -84,69 +85,10 @@ export const list = authedQuery({
   },
 });
 
-/**
- * Mobile: Çalışanın erişim yetkisi olan aktif cihazları döner.
- * Akış: groupMembers (employee → group) → groupDevices (group → device) → devices.
- * Sadece `isActive !== false` cihazlar listelenir.
- */
+/** Compatibility alias for the door-aware employee target list and current capability policy. */
 export const listForEmployee = employeeAuthedQuery({
   args: {},
-  handler: async (ctx) => {
-    const employee = ctx.employee;
-
-    const memberships = await ctx.db
-      .query("groupMembers")
-      .withIndex("by_project_employee", (q) =>
-        q.eq("projectId", employee.projectId).eq("employeeId", employee._id),
-      )
-      .collect();
-
-    if (memberships.length === 0) return [];
-
-    const groupIds = Array.from(new Set(memberships.map((m) => m.groupId)));
-
-    // Sadece aktif erişim kuralları
-    const groups = (
-      await Promise.all(groupIds.map((gid) => ctx.db.get(gid)))
-    ).filter((g): g is NonNullable<typeof g> => g !== null && g.isActive !== false);
-
-    const activeGroupIds = new Set(groups.map((g) => g._id));
-
-    const groupDeviceLinks = await Promise.all(
-      Array.from(activeGroupIds).map((gid) =>
-        ctx.db
-          .query("groupDevices")
-          .withIndex("by_project_group", (q) =>
-            q.eq("projectId", employee.projectId).eq("groupId", gid),
-          )
-          .collect()
-      )
-    );
-
-    const deviceIds = Array.from(
-      new Set(groupDeviceLinks.flat().map((link) => link.deviceId))
-    );
-
-    if (deviceIds.length === 0) return [];
-
-    const devices = (await Promise.all(deviceIds.map((id) => ctx.db.get(id))))
-      .filter((d): d is NonNullable<typeof d> => d !== null && d.isActive !== false);
-
-    return await Promise.all(
-      devices.map(async (device) => {
-        const zone = device.zoneId ? await ctx.db.get(device.zoneId) : null;
-        const door = device.doorId ? await ctx.db.get(device.doorId) : null;
-        return {
-          _id: device._id,
-          name: device.name,
-          deviceSerial: device.deviceSerial ?? null,
-          deviceType: device.deviceType ?? null,
-          zoneName: zone?.name ?? null,
-          doorName: door?.name ?? null,
-        };
-      })
-    );
-  },
+  handler: async (ctx) => await listMobileTargets(ctx, ctx.employee),
 });
 
 export const getById = authedQuery({

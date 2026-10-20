@@ -18,6 +18,7 @@ import { formatVisitorTime } from "./visitorTime";
 import { VisitorCollapsible } from "./VisitorCollapsible";
 import VisitorForm from "./VisitorForm";
 import { useStableQuery } from "./hooks/useStableQuery";
+import { canAssignVisitorPreset } from "./lib/preRegistration";
 
 export default function VisitorSlideOverPanel({ isOpen, onClose, visitor, onSave, now, canManage }: {
   isOpen: boolean; onClose: () => void; visitor: Visitor | null; onSave: (payload?: unknown) => void; now: number; canManage: boolean;
@@ -57,6 +58,7 @@ export function VisitorDetailView({ now, detail, canManage, onEdit, onDeleted }:
   const releaseCard = useMutation(api.visitors.releaseCard);
   const remove = useMutation(api.employees.remove);
   const status = visitorStatusInfo[displayVisitorStatus(detail, now)];
+  const needsCard = detail.cardNumber.startsWith("PRE:");
   const name = `${detail.firstName} ${detail.lastName}`;
   const fields = [
     ["Geçerlilik bitişi (TR)", formatVisitorTime(detail.visitEnd)],
@@ -66,10 +68,10 @@ export function VisitorDetailView({ now, detail, canManage, onEdit, onDeleted }:
     ["Son izinli okuma", formatVisitorTime(detail.lastSeenAt)],
   ];
   return <div className="min-w-0 space-y-5 p-5">
-    <div className="flex flex-wrap items-center justify-between gap-2"><StatusBadge tone={status.tone}>{status.label}</StatusBadge>{canManage && <Button variant="outline" onClick={onEdit}>Düzenle</Button>}</div>
+    <div className="flex flex-wrap items-center justify-between gap-2"><StatusBadge tone={status.tone}>{status.label}</StatusBadge>{canManage && <Button variant="outline" onClick={onEdit}>{canAssignVisitorPreset(detail) ? "Kart ve erişim ata" : "Düzenle"}</Button>}</div>
     <dl className="space-y-4">{fields.map(([label, value]) => <div key={label}><dt className="text-xs text-muted-foreground">{label}</dt><dd className="break-words tabular-nums">{value}</dd></div>)}
-      <div><dt className="text-xs text-muted-foreground">Kart</dt><dd className="break-all tabular-nums">{detail.cardReleased ? "İade edildi" : showCard ? detail.cardNumber : `•••• ${detail.cardNumber.slice(-4)}`}
-        {!detail.cardReleased && <Button variant="ghost" size="sm" onClick={() => setShowCard(previous => !previous)}>{showCard ? "Gizle" : "Tam numarayı göster"}</Button>}</dd></div>
+      <div><dt className="text-xs text-muted-foreground">Kart</dt><dd className="break-all tabular-nums">{detail.cardReleased ? "İade edildi" : needsCard ? "Henüz kart atanmadı" : showCard ? detail.cardNumber : `•••• ${detail.cardNumber.slice(-4)}`}
+        {!detail.cardReleased && !needsCard && <Button variant="ghost" size="sm" onClick={() => setShowCard(previous => !previous)}>{showCard ? "Gizle" : "Tam numarayı göster"}</Button>}</dd></div>
     </dl>
     <p className="text-xs text-muted-foreground">Son konum izinli okumaya dayanır. Sürenin dolması veya manuel sonlandırma fiziksel çıkış okuması oluşturmaz.</p>
     <VisitorCollapsible title="Şirket, iletişim ve ek bilgiler"><dl className="space-y-3">
@@ -82,7 +84,7 @@ export function VisitorDetailView({ now, detail, canManage, onEdit, onDeleted }:
     {canManage && <div className="sticky bottom-0 flex flex-wrap items-center gap-2 border-t bg-surface py-3">
       {detail.isActive && <Button variant="outline" onClick={() => setConfirmation("checkout")}>Ziyareti sonlandır</Button>}
       <RowActions label={`${name} kayıt işlemleri`}>
-        {!detail.isActive && !detail.cardReleased && <DropdownMenuItem onSelect={() => setConfirmation("release")}>Kartı serbest bırak</DropdownMenuItem>}
+        {!detail.isActive && !detail.cardReleased && !needsCard && <DropdownMenuItem onSelect={() => setConfirmation("release")}>Kartı serbest bırak</DropdownMenuItem>}
         <DropdownMenuItem className="text-destructive" onSelect={() => setConfirmation("delete")}>Ziyaretçi kaydını sil</DropdownMenuItem>
       </RowActions>
     </div>}

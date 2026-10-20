@@ -34,6 +34,19 @@ export function visitorExpiryError(value: string | undefined, now = Date.now()):
 export function visitorDetailsError(input: { firstName: string; lastName: string; cardNumber: string; isActive?: boolean; accessExpiresAt?: string }, now = Date.now(), validateExpiry = true): string | null {
   if (!input.firstName.trim()) return "Ad alanı zorunludur";
   if (!input.lastName.trim()) return "Soyad alanı zorunludur";
-  if (!input.cardNumber.trim() || input.cardNumber.trim().startsWith("IADE:")) return "Geçerli yeni bir kart numarası girin";
+  if (!input.cardNumber.trim() || (input.cardNumber.trim().startsWith("IADE:") || input.cardNumber.trim().startsWith("PRE:"))) return "Geçerli yeni bir kart numarası girin";
   return validateExpiry ? visitorExpiryError(input.accessExpiresAt, now) : null;
+}
+
+
+/** IDE protocol user IDs are canonical decimal integers in the JS-safe range.
+ * Reject alternate spellings to avoid two DB cards mapping to one panel user.
+ * Vendor reference: docs/ide-smart/05-crud-data-models-validation.md §5.1.
+ */
+export function visitorIdeCardError(cardNumber: string): string | null {
+  const value = cardNumber.trim();
+  const number = Number(value);
+  return /^[1-9][0-9]*$/.test(value) && Number.isSafeInteger(number) && number >= 1
+    ? null
+    : "IDE kartı 1–9007199254740991 aralığında, başında sıfır olmayan ondalık tam sayı olmalıdır";
 }

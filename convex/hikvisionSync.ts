@@ -1,3 +1,4 @@
+import { mobileOperationId, mobileQueueAllowed } from "./lib/mobileAccess";
 import { assertBiometricAllowed, biometricPayloadProject, isBiometricAddition } from "./lib/biometricGate";
 import { isBiometricEnabled } from "./lib/privacySettings";
 import { v } from "convex/values";
@@ -379,6 +380,7 @@ export const enqueueLocalBridgeOperation = internalMutation({
         .take(HIK_BRIDGE_DEDUPE_SCAN);
       const existing = existingRows.find(
         (op) =>
+          mobileOperationId(op.payload) === undefined &&
           op.runId === args.runId &&
           (!args.runId || stablePayloadKey(op.payload) === stablePayloadKey(args.payload)) &&
           op.operation === args.operation &&
@@ -485,7 +487,7 @@ export const claimLocalBridgeOperations = internalMutation({
         .filter((op) => (op.processingStartedAt ?? op.createdAt) < staleCutoff)
         .map((op) =>
           ctx.db.patch(op._id, {
-            status: "pending",
+            status: mobileOperationId(op.payload) !== undefined ? "failed" : "pending",
             nextRetryAt: now,
             lastError: "Bridge claim timeout; pending'e alındı",
           }),
@@ -504,6 +506,10 @@ export const claimLocalBridgeOperations = internalMutation({
     const due: typeof pending = [];
     for (const op of pending) {
       if ((op.nextRetryAt ?? 0) > now) continue;
+      if (!(await mobileQueueAllowed(ctx, op))) {
+        await ctx.db.patch(op._id, { status: "failed", lastError: "MOBILE_COMMAND_NOT_DELIVERABLE" });
+        continue;
+      }
       if (isBiometricAddition(op.operation) && (!biometricEnabled ||
           !(await isBiometricEnabled(ctx, await biometricPayloadProject(ctx, op.payload))))) {
         // Move blocked additions out of the pending window so removals can progress.
@@ -564,6 +570,7 @@ export const ackLocalBridgeOperation = internalMutation({
     if (!op || op.deviceId !== device._id) {
       return { ok: false, error: "operation not found" };
     }
+    if (mobileOperationId(op.payload) !== undefined && op.status !== "processing") return { ok: false, error: "operation not processing" };
     if (args.ok) {
       await ctx.db.patch(args.opId, {
         status: "done",
@@ -604,7 +611,7 @@ export const requeueStaleLocalBridgeOperations = internalMutation({
     await Promise.all(
       stale.map((op) =>
         ctx.db.patch(op._id, {
-          status: "pending",
+          status: mobileOperationId(op.payload) !== undefined ? "failed" : "pending",
           nextRetryAt: now,
           lastError: "Bridge processing timeout; pending'e alındı",
         }),
@@ -683,7 +690,7 @@ export const listRetryCandidates = internalQuery({
 
     const enriched = await Promise.all(
       failed
-        .filter((f) => f.attemptCount < args.maxAttempts)
+        .filter((f) => f.attemptCount < args.maxAttempts && mobileOperationId(f.payload) === undefined)
         .slice(0, args.limit * 2)
         .map(async (f) => {
           const device = await ctx.db.get(f.deviceId);
@@ -932,6 +939,7 @@ export const retrySyncIssue = adminMutation({
       await assertBiometricAllowed(ctx, device?.projectId);
       await assertBiometricAllowed(ctx, await biometricPayloadProject(ctx, op.payload));
     }
+    if (mobileOperationId(op.payload) !== undefined) return { queued: false };
     if (!canRetrySync(op.status)) return { queued: false };
     if (!device || device.brand !== "hikvision" || device.hikTransport !== "localBridge") throw new Error("Bu cihaz için tek işlem yeniden denemesi desteklenmiyor; cihaz sayfasını kullanın");
     await ctx.db.patch(op._id, {

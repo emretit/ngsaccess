@@ -1,3 +1,4 @@
+import { genericReaderTokenAllowed } from "./lib/mobileAccess";
 import { stream } from "convex-helpers/server/stream";
 import schema from "./schema";
 import { canSeePay } from "./lib/payVisibility";
@@ -957,6 +958,10 @@ export const processCardReading = internalMutation({
       }
     }
 
+    // Reader credentials must never be misinterpreted as native IDE/Hik card identifiers.
+    const isReaderUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(args.cardNo);
+    if (isReaderUuid && (!args.authedDeviceId || device?.brand === "ide_smart" || device?.brand === "hikvision")) return { granted: false };
+
     // Hikvision brand-dispatch: karar cihazda verilir, biz sadece audit yazarız.
     // QR vs. cihazlar aşağıdaki mevcut akışa düşer (Convex DB lookup → granted hesapla).
     if (device?.brand === "hikvision") {
@@ -1068,129 +1073,35 @@ export const processCardReading = internalMutation({
       return { granted };
     }
 
-    // Mobil dinamik QR token branch'i: cihaz QR'ı kart gibi POST'lar.
-    // UUID v4 formatı gerçek kart numaralarıyla çakışmaz (kartlar tiresiz).
+    // Reader-purpose UUIDs can only be consumed by authenticated generic readers.
     const isToken = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(args.cardNo);
     if (isToken) {
-      const tokenRow = await ctx.db
-        .query("checkInTokens")
-        .withIndex("by_token", (q) => q.eq("token", args.cardNo))
-        .first();
-
-      if (!tokenRow) {
-        await ctx.db.insert("cardReadings", {
-          projectId: projectForRow(undefined, device?.projectId),
-          deviceId: device?._id,
-          cardNo: args.cardNo,
-          accessTime,
-          accessStatus: "reddedildi",
-          rawData: args.rawBody,
-          ...hikFields,
-          createdAt: accessTime,
-          updatedAt: accessTime,
-        });
-        return { granted: false };
-      }
-
-      if (tokenRow.usedAt) {
-        await ctx.db.insert("cardReadings", {
-          projectId: projectForRow(undefined, device?.projectId),
-          deviceId: device?._id,
-          employeeId: tokenRow.employeeId,
-          cardNo: args.cardNo,
-          accessTime,
-          accessStatus: "reddedildi",
-          rawData: args.rawBody,
-          ...hikFields,
-          createdAt: accessTime,
-          updatedAt: accessTime,
-        });
-        return { granted: false };
-      }
-
-      if (new Date(accessTime) > new Date(tokenRow.expiresAt)) {
-        await ctx.db.insert("cardReadings", {
-          projectId: projectForRow(undefined, device?.projectId),
-          deviceId: device?._id,
-          employeeId: tokenRow.employeeId,
-          cardNo: args.cardNo,
-          accessTime,
-          accessStatus: "reddedildi",
-          rawData: args.rawBody,
-          ...hikFields,
-          createdAt: accessTime,
-          updatedAt: accessTime,
-        });
-        return { granted: false };
-      }
-
+      const tokenRow = await ctx.db.query("checkInTokens")
+        .withIndex("by_token", q => q.eq("token", args.cardNo)).first();
+      const now = Date.now();
+      if (!device || !tokenRow || tokenRow.purpose !== "reader" || tokenRow.usedAt ||
+          !Number.isFinite(Date.parse(tokenRow.expiresAt)) || Date.parse(tokenRow.expiresAt) <= now) return { granted: false };
+      const session = tokenRow.sessionId ? await ctx.db.get(tokenRow.sessionId) : null;
+      if (!session || session.employeeId !== tokenRow.employeeId ||
+          !Number.isFinite(Date.parse(session.expiresAt)) || Date.parse(session.expiresAt) <= now ||
+          (session.passwordVersion ?? 0) !== tokenRow.authVersion) return { granted: false };
       const tokenEmployee = await ctx.db.get(tokenRow.employeeId);
-      if (!tokenEmployee || !tokenEmployee.isActive) {
-        await ctx.db.insert("cardReadings", {
-          projectId: projectForRow(tokenEmployee?.projectId, device?.projectId),
-          deviceId: device?._id,
-          employeeId: tokenRow.employeeId,
-          cardNo: args.cardNo,
-          accessTime,
-          accessStatus: "reddedildi",
-          rawData: args.rawBody,
-          ...hikFields,
-          createdAt: accessTime,
-          updatedAt: accessTime,
-        });
-        return { granted: false };
-      }
-
-      // Cihaz + grup erişim kontrolü (kart akışıyla aynı kural)
-      let tokenHasAccess = false;
-      if (device) {
-        const deviceGroups = await ctx.db
-          .query("groupDevices")
-          .withIndex("by_project_device", (q) =>
-            q.eq("projectId", device.projectId).eq("deviceId", device._id),
-          )
-          .collect();
-        const deviceGroupIds = deviceGroups.map((gd) => gd.groupId);
-        const employeeAccessGroups = await ctx.db
-          .query("groupMembers")
-          .withIndex("by_project_employee", (q) =>
-            q.eq("projectId", tokenEmployee.projectId).eq("employeeId", tokenEmployee._id),
-          )
-          .collect();
-        const employeeGroupIds = employeeAccessGroups.map((gm) => gm.groupId);
-        const activeRuleIds = await resolveActiveMatchingRuleIds(
-          ctx,
-          deviceGroupIds,
-          employeeGroupIds,
-        );
-        tokenHasAccess = canEmployeeAccessDevice({
-          deviceGroupIds,
-          employeeGroupIds,
-          activeRuleIds,
-        });
-      }
-
-      await ctx.db.patch(tokenRow._id, { usedAt: accessTime });
-      const tokenDirection = await resolveDirection(ctx, {
-        device,
-        employeeId: tokenEmployee._id,
-        nowISO: accessTime,
-      });
+      if (!tokenEmployee || tokenRow.projectId !== tokenEmployee.projectId || tokenRow.projectId !== device.projectId) return { granted: false };
+      const auth = await ctx.db.query("employeeAuth")
+        .withIndex("by_employee", q => q.eq("employeeId", tokenEmployee._id)).first();
+      if (!auth?.passwordHash || tokenRow.authVersion !== (auth.passwordVersion ?? 0) ||
+          !(await genericReaderTokenAllowed(ctx, tokenEmployee, device, now))) return { granted: false };
+      const consumedAt = new Date(now).toISOString();
+      const employeeName = `${tokenEmployee.firstName} ${tokenEmployee.lastName}`;
+      await ctx.db.patch(tokenRow._id, { usedAt: consumedAt, employeeName, locationRecorded: false });
+      const direction = await resolveDirection(ctx, { device, employeeId: tokenEmployee._id, nowISO: consumedAt });
       await ctx.db.insert("cardReadings", {
-        projectId: projectForRow(tokenEmployee.projectId, device?.projectId),
-        deviceId: device?._id,
-        employeeId: tokenEmployee._id,
-        cardNo: tokenEmployee.cardNumber,
-        employeeName: `${tokenEmployee.firstName} ${tokenEmployee.lastName}`,
-        accessTime,
-        accessStatus: tokenHasAccess ? "izin_verildi" : "reddedildi",
-        direction: tokenDirection,
-        rawData: args.rawBody,
-        ...hikFields,
-        createdAt: accessTime,
-        updatedAt: accessTime,
+        projectId: device.projectId, deviceId: device._id, employeeId: tokenEmployee._id,
+        cardNo: tokenEmployee.cardNumber, employeeName, accessTime: consumedAt,
+        accessStatus: "izin_verildi", direction, rawData: JSON.stringify({ source: "qr", protocol: "generic_reader" }),
+        createdAt: consumedAt, updatedAt: consumedAt,
       });
-      return { granted: tokenHasAccess };
+      return { granted: true };
     }
 
     // 2. Çalışanı kart numarasına göre bul
@@ -1378,83 +1289,17 @@ export const listForEmployee = employeeAuthedQuery({
   },
 });
 
-/**
- * Mobile QR check-in. `employeeAuthedMutation` üzerinden çalışana doğrudan
- * `ctx.employee` ile erişir; QR'dan gelen `deviceId` / `deviceSerial` ile
- * cihazı bulur, erişim kuralını değerlendirir ve kayıt atar.
- */
+/** Legacy phone endpoint: a static device identifier is not physical presence evidence. */
 export const selfCheckIn = employeeAuthedMutation({
   args: {
     deviceId: v.optional(v.id("devices")),
     deviceSerial: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
-    const employee = ctx.employee;
-
-    let device: Doc<"devices"> | null = null;
-    if (args.deviceId) {
-      device = (await ctx.db.get(args.deviceId)) as Doc<"devices"> | null;
-    }
-    if (!device && args.deviceSerial?.trim()) {
-      device = await ctx.db
-        .query("devices")
-        .withIndex("by_device_serial", (q) =>
-          q.eq("deviceSerial", args.deviceSerial!.trim())
-        )
-        .first();
-    }
-    if (!device) {
-      throw new Error("Cihaz bulunamadı");
-    }
-
-    const deviceGroups = await ctx.db
-      .query("groupDevices")
-      .withIndex("by_project_device", (q) =>
-        q.eq("projectId", device.projectId).eq("deviceId", device._id),
-      )
-      .collect();
-    const groupIds = deviceGroups.map((g) => g.groupId);
-
-    const employeeGroups = await ctx.db
-      .query("groupMembers")
-      .withIndex("by_project_employee", (q) =>
-        q.eq("projectId", employee.projectId).eq("employeeId", employee._id),
-      )
-      .collect();
-    const employeeGroupIds = new Set(employeeGroups.map((g) => g.groupId));
-    const matching = groupIds.filter((g) => employeeGroupIds.has(g));
-
-    let hasAccess = false;
-    for (const groupId of matching) {
-      const rule = await ctx.db.get(groupId);
-      if (rule?.isActive) {
-        hasAccess = true;
-        break;
-      }
-    }
-
-    const accessTime = new Date().toISOString();
-    const direction = await resolveDirection(ctx, {
-      device,
-      employeeId: employee._id,
-      nowISO: accessTime,
-    });
-    const readingId = await ctx.db.insert("cardReadings", {
-      projectId: employee.projectId ?? device.projectId,
-      deviceId: device._id,
-      employeeId: employee._id,
-      cardNo: employee.cardNumber,
-      employeeName: `${employee.firstName} ${employee.lastName}`,
-      accessTime,
-      accessStatus: hasAccess ? "izin_verildi" : "reddedildi",
-      direction,
-      rawData: JSON.stringify({ source: "mobile_qr" }),
-      createdAt: accessTime,
-      updatedAt: accessTime,
-    });
-
-    return { granted: hasAccess, readingId };
-  },
+  handler: async () => ({
+    granted: false as const,
+    code: "READER_REQUIRED" as const,
+    error: "Fiziksel okuyucu olayı gerekir; kapı komutu için mobileAccess:requestOpen kullanın",
+  }),
 });
 
 /**

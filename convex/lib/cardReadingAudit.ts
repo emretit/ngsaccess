@@ -130,8 +130,11 @@ export async function enrichWithDeviceInfo(
   readings: Doc<"cardReadings">[],
 ) {
   const devicesById = await loadDevicesById(ctx, readings);
-  return readings.map((r) => {
-    const device = r.deviceId ? devicesById.get(r.deviceId) : undefined;
+  const enriched = await Promise.all(readings.map(async (r) => {
+    const candidate = r.deviceId ? devicesById.get(r.deviceId) : undefined;
+    const employee = r.employeeId ? await ctx.db.get(r.employeeId) : null;
+    if (!r.projectId || employee?.projectId !== r.projectId) return null;
+    const device = candidate?.projectId === r.projectId ? candidate : undefined;
     return {
       ...r,
       source: liveReadingSource(r),
@@ -144,5 +147,6 @@ export async function enrichWithDeviceInfo(
           }
         : null,
     };
-  });
+  }));
+  return enriched.filter((row): row is NonNullable<typeof row> => row !== null);
 }

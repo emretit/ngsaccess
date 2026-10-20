@@ -1,7 +1,11 @@
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { employeeAuthedQuery } from "./lib/customFunctions";
-import { verifyEmployeePassword } from "./lib/employeeAuth";
+import { employeeAuthedMutation, employeeAuthedQuery } from "./lib/customFunctions";
+import { hashEmployeePassword, verifyEmployeePassword, writeEmployeePassword } from "./lib/employeeAuth";
+import { mobileErrorData } from "./lib/mobileErrors";
+import { limiter } from "./lib/rateLimit";
+import type { Doc } from "./_generated/dataModel";
+import type { QueryCtx } from "./_generated/server";
 
 const SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const DUMMY_PASSWORD_HASH = "$2b$10$Jv3Xc1iFpPrOXqYPSpBzk.D/Xoqy1q3awkqS3sXEplBuTT5dYe.jW";
@@ -12,6 +16,12 @@ function generateSessionToken(): string {
   return Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+async function employeeDepartment(ctx: QueryCtx, employee: Doc<"employees">): Promise<Doc<"departments"> | null> {
+  if (!employee.projectId || !employee.departmentId) return null;
+  const department = await ctx.db.get(employee.departmentId);
+  return department?.projectId === employee.projectId ? department : null;
 }
 
 export const getByEmployee = internalQuery({
@@ -88,11 +98,20 @@ export const update = internalMutation({
   },
   handler: async (ctx, args) => {
     const { authId, ...updates } = args;
-    const clean: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-    for (const [k, val] of Object.entries(updates)) {
-      if (val !== undefined) clean[k] = val === null ? undefined : val;
+    const clean: Partial<Omit<Doc<"employeeAuth">, "_id" | "_creationTime">> = {
+      updatedAt: new Date().toISOString(),
+      ...(updates.email === undefined ? {} : { email: updates.email }),
+      ...(updates.setupToken === undefined ? {} : { setupToken: updates.setupToken ?? undefined }),
+      ...(updates.tokenExpiresAt === undefined ? {} : { tokenExpiresAt: updates.tokenExpiresAt ?? undefined }),
+      ...(updates.lastLogin === undefined ? {} : { lastLogin: updates.lastLogin }),
+    };
+    if (updates.passwordHash !== undefined) {
+      const auth = await ctx.db.get(authId);
+      if (!auth) throw new Error("Çalışan kimlik kaydı bulunamadı");
+      await writeEmployeePassword(ctx, auth, updates.passwordHash, clean);
+    } else {
+      await ctx.db.patch(authId, clean);
     }
-    await ctx.db.patch(authId, clean);
   },
 });
 
@@ -109,16 +128,11 @@ export const consumeSetupToken = internalMutation({
       .withIndex("by_token", (q) => q.eq("setupToken", args.token))
       .first();
     if (!auth) return { status: "invalid" as const };
-    if (auth.tokenExpiresAt && new Date(auth.tokenExpiresAt) < new Date()) {
+    if (!auth.tokenExpiresAt || !Number.isFinite(Date.parse(auth.tokenExpiresAt)) || Date.parse(auth.tokenExpiresAt) <= Date.now()) {
       return { status: "expired" as const };
     }
 
-    await ctx.db.patch(auth._id, {
-      passwordHash: args.passwordHash,
-      setupToken: undefined,
-      tokenExpiresAt: undefined,
-      updatedAt: new Date().toISOString(),
-    });
+    await writeEmployeePassword(ctx, auth, args.passwordHash);
     return { status: "ok" as const };
   },
 });
@@ -133,11 +147,12 @@ export const signIn = mutation({
     email: v.string(),
     password: v.string(),
   },
-  returns: v.object({
+  returns: v.union(v.object({
     token: v.string(),
     expiresAt: v.string(),
     employee: v.object({
       id: v.id("employees"),
+      projectId: v.union(v.id("projects"), v.null()),
       firstName: v.string(),
       lastName: v.string(),
       email: v.string(),
@@ -145,9 +160,18 @@ export const signIn = mutation({
       departmentId: v.union(v.id("departments"), v.null()),
       cardNumber: v.string(),
     }),
-  }),
+  }), v.object({ error: v.object({
+    code: v.union(v.literal("INVALID_CREDENTIALS"), v.literal("RATE_LIMITED")),
+    message: v.string(),
+    retryAfterMs: v.optional(v.number()),
+  }) })),
   handler: async (ctx, args) => {
     const normalizedEmail = args.email.trim().toLowerCase();
+    // Return expected failures: throwing would roll back the limiter write.
+    const limit = await limiter.limit(ctx, "employeeSignIn", { key: normalizedEmail, throws: false });
+    if (!limit.ok) {
+      return { error: mobileErrorData("RATE_LIMITED", Math.max(1, Math.ceil(limit.retryAfter ?? 1))) };
+    }
     const employee = await ctx.db
       .query("employees")
       .withIndex("by_email", (q) => q.eq("email", normalizedEmail))
@@ -155,7 +179,7 @@ export const signIn = mutation({
 
     if (!employee || employee.isActive === false) {
       await verifyEmployeePassword(args.password, DUMMY_PASSWORD_HASH);
-      throw new Error("E-posta veya şifre hatalı");
+      return { error: mobileErrorData("INVALID_CREDENTIALS") };
     }
 
     const auth = await ctx.db
@@ -165,20 +189,22 @@ export const signIn = mutation({
 
     if (!auth || !auth.passwordHash) {
       await verifyEmployeePassword(args.password, DUMMY_PASSWORD_HASH);
-      throw new Error("E-posta veya şifre hatalı");
+      return { error: mobileErrorData("INVALID_CREDENTIALS") };
     }
 
     const ok = await verifyEmployeePassword(args.password, auth.passwordHash);
     if (!ok) {
-      throw new Error("E-posta veya şifre hatalı");
+      return { error: mobileErrorData("INVALID_CREDENTIALS") };
     }
 
+    const department = await employeeDepartment(ctx, employee);
     const now = new Date();
     const token = generateSessionToken();
     const expiresAt = new Date(now.getTime() + SESSION_TTL_MS).toISOString();
 
     await ctx.db.insert("employeeSessions", {
       employeeId: employee._id,
+      passwordVersion: auth.passwordVersion ?? 0,
       token,
       expiresAt,
       createdAt: now.toISOString(),
@@ -195,11 +221,12 @@ export const signIn = mutation({
       expiresAt,
       employee: {
         id: employee._id,
+        projectId: employee.projectId ?? null,
         firstName: employee.firstName,
         lastName: employee.lastName,
         email: employee.email,
         photoUrl: employee.photoUrl ?? null,
-        departmentId: employee.departmentId ?? null,
+        departmentId: department?._id ?? null,
         cardNumber: employee.cardNumber,
       },
     };
@@ -224,24 +251,71 @@ export const signOut = mutation({
   },
 });
 
+/** Employee identity is supplied by the session wrapper, never a frontend ID. */
+export const changePassword = employeeAuthedMutation({
+  args: { currentPassword: v.string(), newPassword: v.string() },
+  returns: v.union(
+    v.object({ requiresSignIn: v.literal(true) }),
+    v.object({ error: v.object({
+      code: v.union(v.literal("INVALID_CREDENTIALS"), v.literal("RATE_LIMITED"), v.literal("PASSWORD_POLICY")),
+      message: v.string(),
+      retryAfterMs: v.optional(v.number()),
+    }) }),
+  ),
+  handler: async (ctx, args) => {
+    const limit = await limiter.limit(ctx, "employeePasswordChange", {
+      key: ctx.employee._id,
+      throws: false,
+    });
+    if (!limit.ok) {
+      return { error: mobileErrorData("RATE_LIMITED", Math.max(1, Math.ceil(limit.retryAfter ?? 1))) };
+    }
+    if (Array.from(args.newPassword).length < 12 || new TextEncoder().encode(args.newPassword).length > 72 || args.newPassword === args.currentPassword) {
+      return { error: {
+        code: "PASSWORD_POLICY" as const,
+        message: "Yeni şifre en az 12 karakter, en fazla 72 UTF-8 bayt olmalı ve mevcut şifreden farklı olmalı",
+      } };
+    }
+    const auth = await ctx.db.query("employeeAuth")
+      .withIndex("by_employee", (q) => q.eq("employeeId", ctx.employee._id))
+      .first();
+    if (!auth?.passwordHash || !await verifyEmployeePassword(args.currentPassword, auth.passwordHash)) {
+      return { error: mobileErrorData("INVALID_CREDENTIALS") };
+    }
+    const passwordHash = await hashEmployeePassword(args.newPassword);
+    await writeEmployeePassword(ctx, auth, passwordHash);
+    return { requiresSignIn: true as const };
+  },
+});
+
 /**
  * Mobil bootstrap için: token geçerliyse oturumdaki çalışanın profilini döner.
  * `employeeAuthedQuery` `sessionToken` arg'ını otomatik ekler.
  */
 export const me = employeeAuthedQuery({
   args: {},
+  returns: v.object({
+    id: v.id("employees"),
+    projectId: v.union(v.id("projects"), v.null()),
+    firstName: v.string(),
+    lastName: v.string(),
+    email: v.string(),
+    photoUrl: v.union(v.string(), v.null()),
+    departmentId: v.union(v.id("departments"), v.null()),
+    departmentName: v.union(v.string(), v.null()),
+    cardNumber: v.string(),
+  }),
   handler: async (ctx) => {
     const employee = ctx.employee;
-    const department = employee.departmentId
-      ? await ctx.db.get(employee.departmentId)
-      : null;
+    const department = await employeeDepartment(ctx, employee);
     return {
       id: employee._id,
+      projectId: employee.projectId ?? null,
       firstName: employee.firstName,
       lastName: employee.lastName,
       email: employee.email,
       photoUrl: employee.photoUrl ?? null,
-      departmentId: employee.departmentId ?? null,
+      departmentId: department?._id ?? null,
       departmentName: department?.name ?? null,
       cardNumber: employee.cardNumber,
     };
@@ -254,24 +328,21 @@ export const me = employeeAuthedQuery({
  * admin panelinden yeniden mobil setup maili gönderilmeli.
  *
  * `internalMutation` — sadece `npx convex run` ile çalıştırılır, public client'tan
- * erişilemez. Tek seferlik migration için ideal.
+ * erişilemez. Her çağrı en fazla 100 kaydı okur; isDone false ise dönen
+ * continueCursor sonraki çağrıya cursor olarak verilir. wiped sayfa sayacıdır.
  */
 export const wipeLegacyHashes = internalMutation({
-  args: {},
-  returns: v.object({ wiped: v.number() }),
-  handler: async (ctx) => {
-    const all = await ctx.db.query("employeeAuth").collect();
+  args: { cursor: v.optional(v.string()) },
+  returns: v.object({ wiped: v.number(), isDone: v.boolean(), continueCursor: v.string() }),
+  handler: async (ctx, args) => {
+    const page = await ctx.db.query("employeeAuth").paginate({ numItems: 100, cursor: args.cursor ?? null });
     let wiped = 0;
-    const now = new Date().toISOString();
-    for (const row of all) {
+    for (const row of page.page) {
       if (row.passwordHash && !row.passwordHash.startsWith("$2")) {
-        await ctx.db.patch(row._id, {
-          passwordHash: undefined,
-          updatedAt: now,
-        });
+        await writeEmployeePassword(ctx, row, undefined);
         wiped++;
       }
     }
-    return { wiped };
+    return { wiped, isDone: page.isDone, continueCursor: page.continueCursor };
   },
 });

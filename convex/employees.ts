@@ -14,6 +14,7 @@ import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, QueryCtx } from "./_generated/server";
 import { cascadeRemoveEmployeePII } from "./lib/employeeCascade";
 import { resolveEmployeeIdeDeviceIds } from "./lib/accessGraph";
+import { writeEmployeePassword } from "./lib/employeeAuth";
 
 type DuplicateField = "cardNumber" | "email" | "tcNo";
 
@@ -501,6 +502,7 @@ export const createAuthInternal = internalMutation({
       projectId: args.projectId,
       email: args.email,
       passwordHash: args.passwordHash,
+      passwordVersion: 1,
       createdAt: now,
       updatedAt: now,
     });
@@ -514,12 +516,9 @@ export const updateAuthPasswordInternal = internalMutation({
     passwordHash: v.string(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.authId, {
-      passwordHash: args.passwordHash,
-      setupToken: undefined,
-      tokenExpiresAt: undefined,
-      updatedAt: new Date().toISOString(),
-    });
+    const auth = await ctx.db.get(args.authId);
+    if (!auth) throw new Error("Çalışan kimlik kaydı bulunamadı");
+    await writeEmployeePassword(ctx, auth, args.passwordHash);
   },
 });
 

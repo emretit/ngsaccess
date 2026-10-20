@@ -14,19 +14,20 @@ import { formatVisitorTime } from "./visitorTime";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { DateInput } from "@/components/ui/date-picker";
 
-export default function VisitorFormFields({ formData, setFormData, presetRules, hostEmployees, isEditing, kvkkConsentAt, errors = {}, onNewZone }: {
+export default function VisitorFormFields({ formData, setFormData, presetRules, hostEmployees, isEditing, isPreRegistration = false, kvkkConsentAt, errors = {}, onNewZone }: {
   formData: VisitorFormData; setFormData: (data: VisitorFormData) => void;
   presetRules: { id: string; name: string; disabled?: boolean }[]; hostEmployees: { id: string; name: string }[];
-  isEditing: boolean; kvkkConsentAt?: string | null; errors?: Partial<Record<string, string>>; onNewZone: () => void;
+  isEditing: boolean; isPreRegistration?: boolean; kvkkConsentAt?: string | null; errors?: Partial<Record<string, string>>; onNewZone: () => void;
 }) {
   const notice = useQuery(api.visitors.kvkkNotice, formData.projectId ? { projectId: formData.projectId } : "skip");
   const change = <K extends keyof VisitorFormData>(field: K, value: VisitorFormData[K]) => setFormData({ ...formData, [field]: value });
   return <div className="min-w-0 space-y-5 [&_[aria-invalid=true]]:border-destructive">
     <h3 className="text-base font-semibold">Erişim</h3>
-    <FormFieldWrapper htmlFor="v_zone" label="Ziyaretçi erişim bölgesi *" error={errors.presetRuleId} hint={isEditing ? "Mevcut ziyarette erişim bölgesi değiştirilemez. Farklı bölge için yeni ziyaret kaydı oluşturun." : "Kapı, gün ve saat izinleri seçilen erişim bölgesinden gelir."}>
-      <VisitorCombobox id="v_zone" label="Ziyaretçi erişim bölgesi" value={formData.presetRuleId} options={presetRules} disabled={isEditing} error={errors.presetRuleId} onChange={value => change("presetRuleId", value as Id<"accessRules"> | null)} />
+    {isPreRegistration && <p className="rounded-md border bg-muted/40 p-3 text-sm">Bu ziyaretçi için henüz kart ve erişim bölgesi atanmamış. Bölge seçip teslim edeceğiniz kartı okutun veya numarasını girin. Erişimi başlatmak için “Erişim izni ver” seçeneğini işaretleyin.</p>}
+    <FormFieldWrapper htmlFor="v_zone" label="Ziyaretçi erişim bölgesi *" error={errors.presetRuleId} hint={isEditing && !isPreRegistration ? "Mevcut ziyarette erişim bölgesi değiştirilemez. Farklı bölge için yeni ziyaret kaydı oluşturun." : "Kapı, gün ve saat izinleri seçilen erişim bölgesinden gelir."}>
+      <VisitorCombobox id="v_zone" label="Ziyaretçi erişim bölgesi" value={formData.presetRuleId} options={presetRules} disabled={isEditing && !isPreRegistration} error={errors.presetRuleId} onChange={value => change("presetRuleId", value as Id<"accessRules"> | null)} />
     </FormFieldWrapper>
-    {!isEditing && <div className="space-y-1">{!presetRules.length && <p className="text-sm text-muted-foreground">Henüz ziyaretçi erişim bölgesi yok.</p>}<Button variant="outline" type="button" onClick={onNewZone}>Erişim bölgesi oluştur</Button></div>}
+    {(!isEditing || isPreRegistration) && <div className="space-y-1">{!presetRules.length && <p className="text-sm text-muted-foreground">Henüz ziyaretçi erişim bölgesi yok.</p>}<Button variant="outline" type="button" onClick={onNewZone}>Erişim bölgesi oluştur</Button></div>}
     <FormFieldWrapper htmlFor="v_expires" label="Geçerlilik bitişi *" error={errors.accessExpiresAt} hint="Türkiye saati. Sürenin dolması fiziksel çıkış kaydı oluşturmaz; cihaz işlemlerini proje senkronizasyon şeridinden izleyin.">{control => <div className="flex min-w-0 gap-2"><DateInput {...control} required className="min-w-0 flex-1" value={formData.accessExpiresAt.slice(0, 10)} onChange={date => change("accessExpiresAt", `${date}T${formData.accessExpiresAt.slice(11, 16) || "00:00"}`)} /><Input id={`${control.id}-time`} type="time" className="w-28 shrink-0" aria-label="Geçerlilik bitiş saati" aria-invalid={control["aria-invalid"]} value={formData.accessExpiresAt.slice(11, 16)} onChange={e => change("accessExpiresAt", `${formData.accessExpiresAt.slice(0, 10)}T${e.target.value}`)} /></div>}</FormFieldWrapper>
     <FormFieldWrapper htmlFor="v_card" label="Kart numarası *" error={errors.cardNumber}><Input id="v_card" value={formData.cardNumber} onChange={e => change("cardNumber", e.target.value)} placeholder="Okuyucudan alın veya elle girin" /></FormFieldWrapper>
     <VisitorCardCapture currentCard={formData.cardNumber} onCapture={card => change("cardNumber", card)} />

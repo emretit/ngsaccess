@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { VISITOR_PRESENCE_READING_LIMIT, visitorPresence, visitorDetailsError, visitorExpiryError } from "./visitorPresence";
+import { VISITOR_PRESENCE_READING_LIMIT, visitorPresence, visitorDetailsError, visitorExpiryError, visitorIdeCardError } from "./visitorPresence";
 import { toPatch } from "./nullablePatch";
 
 const entry = { accessTime: "2026-10-16T09:00:00Z", accessStatus: "izin_verildi", direction: "entry" };
@@ -58,5 +58,23 @@ describe("ziyaretçi sınırlı okuma ve düzenleme", () => {
     expect(visitorDetailsError(expired, Date.now(), false)).toBeNull();
     expect(visitorExpiryError(expired.accessExpiresAt)).toBe("Geçerlilik bitişi gelecekte olmalıdır");
     expect(visitorExpiryError("invalid")).toBeTruthy();
+  });
+});
+
+
+it("reserved preregistration placeholders never pass web card activation validation", () => {
+  const input = { firstName: "Synthetic", lastName: "Visitor", cardNumber: "PRE:synthetic", accessExpiresAt: "2030-01-01T00:00:00Z" };
+  expect(visitorDetailsError({ ...input, isActive: true }, Date.parse("2026-10-19T00:00:00Z"), false)).toBeTruthy();
+  expect(visitorDetailsError({ ...input, cardNumber: " PRE:synthetic" }, Date.parse("2026-10-19T00:00:00Z"), false)).toBeTruthy();
+  expect(visitorDetailsError({ ...input, cardNumber: "123456", isActive: true }, Date.parse("2026-10-19T00:00:00Z"), false)).toBeNull();
+});
+
+
+describe("IDE visitor card spelling and protocol range", () => {
+  it.each(["0", "-1", "NaN", "Infinity", "0x10", "1e3", "+1", "1.0", "00123", "9007199254740992", "", "ABC"])("rejects ambiguous or out-of-range ID %s", card => {
+    expect(visitorIdeCardError(card)).toBeTruthy();
+  });
+  it.each(["1", "123456", "9007199254740991"])("accepts canonical in-range decimal %s", card => {
+    expect(visitorIdeCardError(card)).toBeNull();
   });
 });

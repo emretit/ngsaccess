@@ -1,6 +1,7 @@
+import { mobileOperationId, mobileQueueAllowed, accessError } from "./lib/mobileAccess";
 import { v } from "convex/values";
 import { internalMutation, internalQuery, query } from "./_generated/server";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { authedMutation, adminMutation } from "./lib/customFunctions";
 import { getCurrentUser, getValidAuthUserId } from "./lib/auth";
@@ -269,11 +270,9 @@ export const enqueueIdeOp = internalMutation({
 });
 
 /** Bridge'in çekeceği pending op'lar (nextRetryAt geçmiş). materialize edilmiş alanlarla. */
-export const listPendingForBridge = internalQuery({
-  args: { max: v.optional(v.number()) },
-  handler: async (ctx, args) => {
+async function pendingForBridge(ctx: QueryCtx, max?: number) {
     const now = Date.now();
-    const limit = Math.min(args.max ?? 10, 50);
+    const limit = Math.min(max ?? 10, 50);
     const candidates = await ctx.db
       .query("idePendingOperations")
       .withIndex("by_status_nextRetry", (q) =>
@@ -283,6 +282,7 @@ export const listPendingForBridge = internalQuery({
 
     const ops = [];
     for (const op of candidates) {
+      if (!(await mobileQueueAllowed(ctx, op))) continue;
       const device = await ctx.db.get(op.deviceId);
       if (!device || device.brand !== "ide_smart" || !device.ideUuid) continue;
       const payload = (op.payload ?? {}) as Record<string, unknown>;
@@ -301,6 +301,33 @@ export const listPendingForBridge = internalQuery({
       });
     }
     return { ops };
+}
+
+export const listPendingForBridge = internalQuery({
+  args: { max: v.optional(v.number()) },
+  handler: async (ctx, args) => await pendingForBridge(ctx, args.max),
+});
+
+/** Production poll makes bounded persisted progress past revoked/expired mobile commands. */
+export const pollForBridge = internalMutation({
+  args: { max: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const candidates = await ctx.db.query("idePendingOperations")
+      .withIndex("by_status_nextRetry", q => q.eq("status", "pending").lte("nextRetryAt", Date.now())).take(50);
+    for (const op of candidates) {
+      if (mobileOperationId(op.payload) !== undefined && !(await mobileQueueAllowed(ctx, op))) {
+        await ctx.db.patch(op._id, { status: "failed", lastError: "MOBILE_COMMAND_NOT_DELIVERABLE" });
+      }
+    }
+    const result = await pendingForBridge(ctx, args.max);
+    // Reserve mobile commands before returning them. Lost poll responses remain
+    // uncertain and cannot make a second bridge publish the same operation.
+    for (const op of result.ops) {
+      if (mobileOperationId(op) !== undefined) {
+        await ctx.db.patch(op.opId, { status: "sent", sentAt: Date.now(), attempts: 1 });
+      }
+    }
+    return result;
   },
 });
 
@@ -309,12 +336,17 @@ export const markSent = internalMutation({
   args: { opId: v.id("idePendingOperations"), msxId: v.number() },
   handler: async (ctx, args): Promise<void> => {
     const op = await ctx.db.get(args.opId);
-    if (!op || op.status !== "pending") return;
+    const mobile = op && mobileOperationId(op.payload) !== undefined;
+    const reserved = mobile && op.status === "sent" && op.msxId === undefined;
+    if (mobile && (!Number.isSafeInteger(args.msxId) || (op.status !== "pending" && !reserved) || !(await mobileQueueAllowed(ctx, op)))) {
+      throw accessError("MOBILE_COMMAND_NOT_DELIVERABLE");
+    }
+    if (!op || (op.status !== "pending" && !reserved)) return;
     await ctx.db.patch(args.opId, {
       status: "sent",
       msxId: args.msxId,
       sentAt: Date.now(),
-      attempts: op.attempts + 1,
+      attempts: reserved ? op.attempts : op.attempts + 1,
     });
   },
 });
@@ -357,6 +389,8 @@ export const markAck = internalMutation({
     // failed op'a gelen ack reddedilir — aksi halde panele HİÇ gitmemiş bir komut
     // (henüz pending) sahte/erken success ile "acked" sayılabilirdi.
     if (op.status !== "sent") return;
+    if (mobileOperationId(op.payload) !== undefined &&
+        (op.msxId === undefined || args.msxId === undefined || op.msxId !== args.msxId)) return;
     // Eski/yinelenen ack'i ele: beklenen msxId ile eşleşmeli (markSent her zaman msxId yazar).
     if (args.msxId != null && op.msxId != null && op.msxId !== args.msxId) return;
 
@@ -436,7 +470,7 @@ export const markAck = internalMutation({
       return;
     }
     // fail / timeout → retry veya terminal failed
-    const maxAttempts = op.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+    const maxAttempts = mobileOperationId(op.payload) !== undefined ? 1 : op.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     if (op.attempts >= maxAttempts) {
       await ctx.db.patch(args.opId, {
         status: "failed",
@@ -470,7 +504,7 @@ export const requeueTimedOut = internalMutation({
     for (const op of stuck) {
       const timeout = DEFAULT_ACK_TIMEOUT_MS;
       if (op.sentAt && op.sentAt + timeout < now) {
-        const maxAttempts = op.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+        const maxAttempts = mobileOperationId(op.payload) !== undefined ? 1 : op.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
         if (op.attempts >= maxAttempts) {
           await ctx.db.patch(op._id, { status: "failed", lastError: "ack timeout (cron)" });
         } else {
@@ -632,6 +666,7 @@ export const retrySyncIssue = adminMutation({
     const op = await ctx.db.get(args.opId);
     if (!op) throw new Error("İşlem bulunamadı");
     const device = await assertSyncScope(ctx, projectIds, op);
+    if (mobileOperationId(op.payload) !== undefined) return { queued: false };
     if (!canRetrySync(op.status)) return { queued: false };
     if (!device || device.brand !== "ide_smart") throw new Error("Cihaz bulunamadı veya IDE Smart değil");
     await ctx.db.patch(op._id, {

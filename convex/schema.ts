@@ -98,6 +98,10 @@ export default defineSchema({
     visitPurpose: v.optional(v.string()),
     // Ziyaret edilen personel.
     hostEmployeeId: v.optional(v.id("employees")),
+    mobileVisitorRequestId: v.optional(v.string()),
+    mobileVisitorRequestFingerprint: v.optional(v.string()),
+    mobileVisitorNoticeUrl: v.optional(v.string()),
+    mobileVisitorNoticeVersion: v.optional(v.string()),
     // UI yaşam döngüsü; cihaz erişimini isActive belirler.
     visitorStatus: v.optional(
       v.union(
@@ -118,6 +122,8 @@ export default defineSchema({
     .index("by_department", ["departmentId"])
     .index("by_photo_storage", ["photoStorageId"])
     .index("by_project_visitor", ["projectId", "isVisitor"])
+    .index("by_project_host_visitor", ["projectId", "hostEmployeeId", "isVisitor"])
+    .index("by_host_mobile_visitor_request", ["hostEmployeeId", "mobileVisitorRequestId"])
     // Ziyaretçi listesi durum filtresi: projede süre aralığına göre cursor tarama (UI audit 2, 06-H1).
     .index("by_project_visitor_expiry", ["projectId", "isVisitor", "accessExpiresAt"])
     // Bitişi ileri taşınmış ama durumu "expired" kalan ziyaretçiler için ikinci tarama aralığı (06-H1).
@@ -129,6 +135,10 @@ export default defineSchema({
 
   checkInTokens: defineTable({
     employeeId: v.id("employees"),
+    purpose: v.optional(v.literal("reader")),
+    projectId: v.optional(v.id("projects")),
+    authVersion: v.optional(v.number()),
+    sessionId: v.optional(v.id("employeeSessions")),
     token: v.string(),
     expiresAt: v.string(),
     usedAt: v.optional(v.string()),
@@ -145,6 +155,7 @@ export default defineSchema({
     email: v.optional(v.string()),
     phone: v.optional(v.string()),
     passwordHash: v.optional(v.string()),
+    passwordVersion: v.optional(v.number()),
     setupToken: v.optional(v.string()),
     tokenExpiresAt: v.optional(v.string()),
     lastLogin: v.optional(v.string()),
@@ -156,6 +167,7 @@ export default defineSchema({
 
   employeeSessions: defineTable({
     employeeId: v.id("employees"),
+    passwordVersion: v.optional(v.number()),
     token: v.string(),
     expiresAt: v.string(),
     createdAt: v.string(),
@@ -163,6 +175,25 @@ export default defineSchema({
   })
     .index("by_token", ["token"])
     .index("by_employee", ["employeeId"]),
+
+  mobileAccessOperations: defineTable({
+    projectId: v.id("projects"),
+    employeeId: v.id("employees"),
+    sessionId: v.id("employeeSessions"),
+    authVersion: v.number(),
+    requestId: v.string(),
+    deviceId: v.id("devices"),
+    doorId: v.optional(v.id("doors")),
+    deviceName: v.string(),
+    requestedAt: v.string(),
+    status: v.union(v.literal("pending"), v.literal("sent"), v.literal("confirmed"), v.literal("failed"), v.literal("unknown")),
+    errorCode: v.optional(v.string()),
+    ideOperationId: v.optional(v.id("idePendingOperations")),
+    hikOperationId: v.optional(v.id("hikPendingOperations")),
+    transport: v.union(v.literal("ide_mqtt"), v.literal("hik_local_bridge"), v.literal("hik_gateway")),
+    actuator: v.number(),
+  })
+    .index("by_employeeId_and_requestId", ["employeeId", "requestId"]),
 
   departments: defineTable({
     name: v.string(),
@@ -500,6 +531,7 @@ export default defineSchema({
     .index("by_project_status_time", ["projectId", "accessStatus", "accessTime"])
     .index("by_status_time", ["accessStatus", "accessTime"])
     .index("by_employee_device_time", ["employeeId", "deviceId", "accessTime"])
+    .index("by_employee_accessTime", ["employeeId", "accessTime"])
     .index("by_device_io_time", ["deviceId", "ideIoId", "accessTime"])
     .index("by_device_hik_serial", ["deviceId", "hikSerialNo"])
     .index("by_project_device_time", ["projectId", "deviceId", "accessTime"])

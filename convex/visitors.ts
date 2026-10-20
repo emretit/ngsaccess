@@ -1,3 +1,4 @@
+import { validateVisitorPresetCard } from "./lib/mobileVisitors";
 import { visitorQueryNow } from "./lib/visitorStatus";
 import { mergedStream, stream } from "convex-helpers/server/stream";
 import schema from "./schema";
@@ -13,7 +14,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { authedQuery, adminMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser, isManager } from "./lib/auth";
+import { isManager, requireEmployeeAccess } from "./lib/auth";
 import { Doc, Id } from "./_generated/dataModel";
 import {
   findDuplicateEmployee,
@@ -286,6 +287,7 @@ export const create = adminMutation({
     if (validationError) throw new Error(validationError);
     const cardNumber = args.cardNumber.trim();
     if (!cardNumber) throw new Error("Kart numarası zorunludur");
+    await validateVisitorPresetCard(ctx, args.projectId, args.presetRuleId, cardNumber);
     const dupCard = await findDuplicateEmployee(ctx, "cardNumber", cardNumber);
     if (dupCard) {
       // İade edilen rozet: SADECE yetkili projedeki pasif bir ziyaretçinin kartıysa serbest
@@ -366,6 +368,7 @@ export const update = adminMutation({
     firstName: v.optional(v.string()),
     lastName: v.optional(v.string()),
     cardNumber: v.optional(v.string()),
+    presetRuleId: v.optional(v.id("accessRules")),
     accessExpiresAt: v.optional(v.string()),
     visitorPhone: v.optional(v.union(v.null(), v.string())),
     visitorCompany: v.optional(v.union(v.null(), v.string())),
@@ -381,12 +384,19 @@ export const update = adminMutation({
     if (!visitor || visitor.isVisitor !== true) throw new Error("Ziyaretçi bulunamadı");
     assertAccessProjectUnchanged(visitor.projectId, args.projectId);
     await resolveProjectScope(ctx, visitor.projectId);
-    await validateVisitorAccessRelations(ctx, visitor.projectId, visitor.accessRuleId,
+    const assigningPreset = args.presetRuleId !== undefined;
+    // Only a ruleless mobile preregistration can receive its first operator
+    // assignment. Existing visitor zone semantics remain unchanged.
+    if (assigningPreset && !(visitor.mobileVisitorRequestId && visitor.isActive === false &&
+        visitor.visitorStatus === "preRegistered" && visitor.cardNumber.startsWith("PRE:") && !visitor.accessRuleId)) {
+      throw new Error("Ziyaretçi bölgesi yalnız mobil ön kayıt aktivasyonunda atanabilir");
+    }
+    await validateVisitorAccessRelations(ctx, visitor.projectId, args.presetRuleId ?? visitor.accessRuleId,
       args.hostEmployeeId === undefined ? visitor.hostEmployeeId : args.hostEmployeeId ?? undefined);
 
     const effective = { ...visitor, ...toPatch(args) };
     // İade edilmiş pasif kayıt kişisel bilgi düzenlemesine açık kalır.
-    if (effective.isActive || args.cardNumber !== undefined) {
+    if (effective.isActive || args.cardNumber !== undefined || assigningPreset) {
       const validationError = visitorDetailsError(effective, Date.now(), false);
       if (validationError) throw new Error(validationError);
     }
@@ -400,6 +410,10 @@ export const update = adminMutation({
       if (!newCard) throw new Error("Kart numarası zorunludur");
       const dup = await findDuplicateEmployee(ctx, "cardNumber", newCard, args.visitorId);
       if (dup) throw new Error(DUPLICATE_MESSAGES.cardNumber);
+    }
+    if (cardChanged || args.isActive === true || assigningPreset) {
+      await validateVisitorPresetCard(ctx, visitor.projectId, args.presetRuleId ?? visitor.accessRuleId,
+        newCard ?? visitor.cardNumber, visitor._id);
     }
     const activeChanged = args.isActive !== undefined && args.isActive !== visitor.isActive;
     const deactivating = activeChanged && args.isActive === false;
@@ -428,11 +442,15 @@ export const update = adminMutation({
       patch.accessExpiresAt = new Date(visitorTime(args.accessExpiresAt)).toISOString();
     }
     if (cardChanged) patch.cardNumber = newCard;
+    if (assigningPreset) patch.accessRuleId = args.presetRuleId;
     if (activeChanged) {
       patch.isActive = args.isActive;
       patch.visitorStatus = args.isActive ? "checkedIn" : "preRegistered";
     }
     await ctx.db.patch(args.visitorId, patch);
+    if (assigningPreset) {
+      await upsertGroupMembership(ctx, args.visitorId, args.presetRuleId, visitor.projectId);
+    }
 
     // Kart değişiminde ESKİ kartı, deaktivasyonda paneldeki kartı IDE panellerinden FİZİKSEL
     // sök (orphan kalmasın). Paneller patch'ten önce çözüldü (ideRemovalPanels).
@@ -470,12 +488,8 @@ export const update = adminMutation({
 export const checkOut = adminMutation({
   args: { visitorId: v.id("employees") },
   handler: async (ctx, args) => {
-    const visitor = await ctx.db.get(args.visitorId);
-    if (!visitor || visitor.isVisitor !== true) throw new Error("Ziyaretçi bulunamadı");
-    const allowed = await getProjectIdsForUser(ctx);
-    if (visitor.projectId && !allowed.some((id) => id === visitor.projectId)) {
-      throw new Error("Bu ziyaretçiye erişim yetkiniz yok");
-    }
+    const visitor = await requireEmployeeAccess(ctx, args.visitorId);
+    if (visitor.isVisitor !== true) throw new Error("Ziyaretçi bulunamadı");
     if (visitor.isActive === false) return args.visitorId;
     // Deaktivasyondan ÖNCE bağlı IDE panellerini çöz; patch sonrası kartı FİZİKSEL sök.
     // syncEmployeeToIdePanels tek başına status=0 yazıp kart kaydını panelde bırakırdı.
@@ -504,12 +518,8 @@ export const checkOut = adminMutation({
 export const releaseCard = adminMutation({
   args: { visitorId: v.id("employees") },
   handler: async (ctx, args) => {
-    const visitor = await ctx.db.get(args.visitorId);
-    if (!visitor || visitor.isVisitor !== true) throw new Error("Ziyaretçi bulunamadı");
-    const allowed = await getProjectIdsForUser(ctx);
-    if (visitor.projectId && !allowed.some((id) => id === visitor.projectId)) {
-      throw new Error("Bu ziyaretçiye erişim yetkiniz yok");
-    }
+    const visitor = await requireEmployeeAccess(ctx, args.visitorId);
+    if (visitor.isVisitor !== true) throw new Error("Ziyaretçi bulunamadı");
     if (visitor.isActive !== false) {
       throw new Error("Önce ziyaretçiyi çıkış yaptırın");
     }
@@ -525,19 +535,19 @@ export const releaseCard = adminMutation({
 
 /** Cron: süresi dolan aktif ziyaretçileri pasife çek → mevcut desync yolu erişimi geri alır. */
 export const expireVisitorAccess = internalMutation({
-  args: {},
-  handler: async (ctx) => {
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, args) => {
     const nowMs = Date.now();
     const now = new Date(nowMs).toISOString();
     // Include legacy Istanbul wall-clock strings in the index window, then compare instants.
     const legacyUpperBound = new Date(nowMs + 3 * 60 * 60 * 1000).toISOString();
-    const candidates = await ctx.db
+    const batch = await ctx.db
       .query("employees")
       .withIndex("by_visitor_active_expiry", (q) =>
         q.eq("isVisitor", true).eq("isActive", true).lte("accessExpiresAt", legacyUpperBound),
       )
-      .collect();
-    const expired = candidates.filter(visitor => visitorTime(visitor.accessExpiresAt) <= nowMs);
+      .paginate({ numItems: 50, cursor: args.cursor ?? null });
+    const expired = batch.page.filter(visitor => visitorTime(visitor.accessExpiresAt) <= nowMs);
     for (const vz of expired) {
       // Deaktivasyondan ÖNCE IDE panellerini çöz; patch sonrası kartı FİZİKSEL sök
       // (status=0 upsert kart kaydını panelde bırakırdı).
@@ -557,6 +567,9 @@ export const expireVisitorAccess = internalMutation({
           { cardNumber: vz.cardNumber, deviceIds: idePanels, projectId: vz.projectId },
         );
       }
+    }
+    if (!batch.isDone) {
+      await ctx.scheduler.runAfter(0, internal.visitors.expireVisitorAccess, { cursor: batch.continueCursor });
     }
     return { expired: expired.length };
   },

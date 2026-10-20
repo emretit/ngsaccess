@@ -1,7 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { consumeSetupToken, getByEmployee, getByToken, getByTokenInternal, signIn } from "./employeeAuth";
+
+// These narrow DTO tests use a fake DB; transaction/limiter behavior is covered
+// separately by employeeAuth.mobile.test.ts with the real component.
+vi.mock("./lib/rateLimit", () => ({ limiter: { limit: async () => ({ ok: true }) } }));
 
 type RegisteredQuery = {
   _handler: (ctx: QueryCtx, args: { token: string }) => Promise<unknown>;
@@ -174,12 +178,12 @@ function signInFixture(options: { employee?: boolean; passwordHash?: string | nu
 describe("employeeAuth signIn errors", () => {
   it("returns the same error for a missing employee, missing password, and wrong password", async () => {
     const args = { email: "employee@example.test", password: "wrong-password" };
-    const expected = "E-posta veya şifre hatalı";
+    const expected = { error: { code: "INVALID_CREDENTIALS", message: "E-posta veya şifre hatalı" } };
 
-    await expect(signInHandler(signInFixture({ employee: false }), args)).rejects.toThrow(expected);
-    await expect(signInHandler(signInFixture({ passwordHash: undefined }), args)).rejects.toThrow(expected);
-    await expect(signInHandler(signInFixture({ passwordHash: null }), args)).rejects.toThrow(expected);
+    await expect(signInHandler(signInFixture({ employee: false }), args)).resolves.toEqual(expected);
+    await expect(signInHandler(signInFixture({ passwordHash: undefined }), args)).resolves.toEqual(expected);
+    await expect(signInHandler(signInFixture({ passwordHash: null }), args)).resolves.toEqual(expected);
     await expect(signInHandler(signInFixture({ passwordHash: "$2b$10$Oc3g9F8bRESoAK3pHZmgg.DudLaDxEGGGIZL4kHrbH1on0BK6pB4a" }), args))
-      .rejects.toThrow(expected);
+      .resolves.toEqual(expected);
   });
 });

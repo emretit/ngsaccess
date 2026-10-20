@@ -349,7 +349,7 @@ http.route({
     const unauth = checkBridgeAuth(request);
     if (unauth) return unauth;
     const { max } = (await request.json().catch(() => ({}))) as { max?: number };
-    const result = await ctx.runQuery(internal.ideSync.listPendingForBridge, {
+    const result = await ctx.runMutation(internal.ideSync.pollForBridge, {
       max: typeof max === "number" ? max : undefined,
     });
     return jsonResponse(result);
