@@ -27,6 +27,8 @@ export const DEFAULT_WORK_SETTINGS: EffectiveWorkSettings = {
 export type NightCombineMode = "max" | "multiply" | "additive";
 
 export interface EffectiveOvertimeRates {
+  overtimeBasis?: "weekly45" | "dailyShift";
+  nightShiftDayMode?: "shiftStart" | "splitAtMidnight";
   nightCombineMode?: NightCombineMode;
   weekdayMultiplier: number;
   weekendMultiplier: number;
@@ -37,6 +39,8 @@ export interface EffectiveOvertimeRates {
 }
 
 export const DEFAULT_OVERTIME_RATES: EffectiveOvertimeRates = {
+  overtimeBasis: "weekly45",
+  nightShiftDayMode: "shiftStart",
   nightCombineMode: "max",
   weekdayMultiplier: 1.5,
   weekendMultiplier: 2.0,
@@ -86,6 +90,8 @@ export async function getEffectiveOvertimeRates(
     .withIndex("by_project", (q) => q.eq("projectId", projectId))
     .first();
   return {
+    overtimeBasis: r?.overtimeBasis ?? "weekly45",
+    nightShiftDayMode: r?.nightShiftDayMode ?? "shiftStart",
     weekdayMultiplier:
       r?.weekdayMultiplier ?? DEFAULT_OVERTIME_RATES.weekdayMultiplier,
     weekendMultiplier:

@@ -170,6 +170,8 @@ export const getOvertimeRates = query({
     return (
       rates ?? {
         projectId: args.projectId,
+        overtimeBasis: "weekly45" as const,
+        nightShiftDayMode: "shiftStart" as const,
         weekdayMultiplier: 1.5,
         weekendMultiplier: 2.0,
         holidayMultiplier: 2.0,

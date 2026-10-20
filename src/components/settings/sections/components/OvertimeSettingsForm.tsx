@@ -22,9 +22,13 @@ export const overtimeSettingsSchema = z.object({
   weekdayMultiplier: multiplier, weekendMultiplier: multiplier, holidayMultiplier: multiplier, nightShiftMultiplier: multiplier,
   nightShiftStart: time, nightShiftEnd: time,
   nightCombineMode: z.enum(["max", "multiply", "additive"]),
+  overtimeBasis: z.enum(["weekly45", "dailyShift"]),
+  nightShiftDayMode: z.enum(["shiftStart", "splitAtMidnight"]),
 }).refine(value => value.nightShiftStart !== value.nightShiftEnd, { message: "Gece başlangıcı ve bitişi farklı olmalı.", path: ["nightShiftEnd"] });
 type Values = z.infer<typeof overtimeSettingsSchema>;
 export const overtimeHints: Partial<Record<keyof Values, string>> = {
+  overtimeBasis: "Örneğin haftalık esasta pazartesi–cuma günde 10 saat çalışılırsa 45 saati aşan 5 saat aşıldığı güne (cuma) yazılır; günlük esasta vardiya bitişini aşan süreler sayılır.",
+  nightShiftDayMode: "Örneğin cuma 22.00–cumartesi 06.00 vardiyası bölünürse 00.00 sonrası cumartesinin gün türü ve çarpanıyla hesaplanır.",
   annualOvertimeLimitHours: "Yıllık fazla mesai toplamı bu sınırla karşılaştırılır; aşım çalışma kaydını engellemez.",
   overtimeStartToleranceMinutes: "Planlanan mesai bitiminden sonraki bu süre fazla mesai başlangıç toleransıdır.",
   monthlyHoursBase: "Aylık ücret bu saat tabanına bölünerek saatlik ücret hesaplanır.",
@@ -51,6 +55,8 @@ export function OvertimeSettingsForm() {
     weekdayMultiplier: rates?.weekdayMultiplier ?? 1.5, weekendMultiplier: rates?.weekendMultiplier ?? 2,
     holidayMultiplier: rates?.holidayMultiplier ?? 2, nightShiftMultiplier: rates?.nightShiftMultiplier ?? 1.5,
     nightCombineMode: rates && "nightCombineMode" in rates ? rates.nightCombineMode ?? "max" : "max",
+    overtimeBasis: rates?.overtimeBasis ?? "weekly45",
+    nightShiftDayMode: rates?.nightShiftDayMode ?? "shiftStart",
     nightShiftStart: rates?.nightShiftStart ?? "22:00", nightShiftEnd: rates?.nightShiftEnd ?? "06:00",
   });
   const { values, change } = draft;
@@ -83,6 +89,28 @@ export function OvertimeSettingsForm() {
       setFailed(!await run(result.data));
     }}>
       <fieldset disabled={pending} className="grid grid-cols-1 gap-4 min-[761px]:grid-cols-2">
+        <FormFieldWrapper htmlFor="overtimeBasis" label="Fazla mesai esası" hint={overtimeHints.overtimeBasis} error={visibleErrors.overtimeBasis}>
+          <Select disabled={pending} value={values.overtimeBasis} onValueChange={basis => {
+            if (basis === "weekly45" || basis === "dailyShift") change({ overtimeBasis: basis });
+          }}>
+            <SelectTrigger id="overtimeBasis"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="weekly45">Haftalık 45 saat (İş Kanunu)</SelectItem>
+              <SelectItem value="dailyShift">Günlük vardiya aşımı</SelectItem>
+            </SelectContent>
+          </Select>
+        </FormFieldWrapper>
+        <FormFieldWrapper htmlFor="nightShiftDayMode" label="Gece yarısını geçen vardiya" hint={overtimeHints.nightShiftDayMode} error={visibleErrors.nightShiftDayMode}>
+          <Select disabled={pending} value={values.nightShiftDayMode} onValueChange={mode => {
+            if (mode === "shiftStart" || mode === "splitAtMidnight") change({ nightShiftDayMode: mode });
+          }}>
+            <SelectTrigger id="nightShiftDayMode"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="shiftStart">Başladığı günün ücreti</SelectItem>
+              <SelectItem value="splitAtMidnight">Gece yarısında böl</SelectItem>
+            </SelectContent>
+          </Select>
+        </FormFieldWrapper>
         {numbers.map(([key, label, min]) => <FormFieldWrapper key={key} htmlFor={key} label={label} hint={overtimeHints[key]} error={visibleErrors[key]}>
           <Input id={key} type="number" min={min} step="any" value={Number.isNaN(values[key]) ? "" : values[key]} onChange={event => change({ [key]: event.target.value === "" ? NaN : Number(event.target.value) })} />
         </FormFieldWrapper>)}

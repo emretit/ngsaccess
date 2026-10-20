@@ -171,6 +171,9 @@ describe("pdksDetail – computeAttendanceDetailDay", () => {
   });
 });
 
+const summaryOptions = {
+  startDate: MONDAY, endDate: "2026-06-28", overtimeBasis: "dailyShift" as const,
+};
 describe("pdksDetail – summarizeAttendanceDays", () => {
   it("statülere göre sayaçları toplar", () => {
     const summary = summarizeAttendanceDays([
@@ -179,25 +182,31 @@ describe("pdksDetail – summarizeAttendanceDays", () => {
       { status: "absent", totalMinutes: 0, overtimeMinutes: 0 },
       { status: "leave", totalMinutes: 0, overtimeMinutes: 0 },
       { status: "weekend", totalMinutes: 0, overtimeMinutes: 0 },
-    ]);
-    expect(summary).toEqual({
+    ].map((d, i) => ({ ...d, date: `2026-06-${22 + i}`, overtimeSegments: [{
+      netMinutes: d.totalMinutes, dailyOvertimeMinutes: d.overtimeMinutes,
+      classification: "workday" as const, multiplier: 1.5, eligible: true,
+    }] })), summaryOptions);
+    expect(summary).toMatchObject({
       totalMinutes: 980,
       workedDays: 2,
       lateDays: 1,
       absentDays: 1,
       leaveDays: 1,
       overtimeMinutes: 20,
+      overtimePayTRY: null, overtimeMultiplier: 1.5, exceedsDaily11h: [],
     });
   });
 
   it("boş liste → sıfır özet", () => {
-    expect(summarizeAttendanceDays([])).toEqual({
+    expect(summarizeAttendanceDays([], summaryOptions)).toEqual({
+      overtimeByDate: {},
       totalMinutes: 0,
       workedDays: 0,
       lateDays: 0,
       absentDays: 0,
       leaveDays: 0,
       overtimeMinutes: 0,
+      overtimePayTRY: null, overtimeMultiplier: 0, exceedsDaily11h: [],
     });
   });
 });

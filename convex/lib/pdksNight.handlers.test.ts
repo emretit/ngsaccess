@@ -262,7 +262,7 @@ describe("08-H2 / 11-H2 real query paths", () => {
       result.table?.overtimeMinutes,
     );
   });
-  it("daily cells agree across all paths while the monthly total retains the weekly rule", async () => {
+  it("daily cells and monthly total agree under the weekly rule", async () => {
     const result = await threePaths(
       [
         reading(`${date}T09:00:00+03:00`, 1),
@@ -271,7 +271,7 @@ describe("08-H2 / 11-H2 real query paths", () => {
       false,
     );
     for (const day of [result.table?.days[0], result.cell, result.detail])
-      expect(day).toMatchObject({ totalMinutes: 600, overtimeMinutes: 105 });
+      expect(day).toMatchObject({ totalMinutes: 600, overtimeMinutes: 0 });
     expect(result.payroll?.totals.overtimeMinutes).toBe(0);
   });
   it("previous overnight shift remains authoritative when today's assignment changes", () => {
@@ -578,12 +578,12 @@ describe("R3B regression paths", () => {
     expect(visits.filter(visit => visit.method === "collect")).toHaveLength(0);
   });
 
-  it("D4: 50-hour week retains 300 minutes weekly overtime, daily cells stay at 105 minutes", async () => {
+  it("D4: 50-hour week allocates all 300 overtime minutes to Friday", async () => {
     const readings = Array.from({ length: 5 }, (_, index) => `2026-06-${22 + index}`).flatMap(day => [reading(`${day}T09:00:00+03:00`, 1), reading(`${day}T20:00:00+03:00`, 2)]);
     const { ctx } = fixture(readings, false);
     const result = await call<FunctionReturnType<typeof api.cardReadings.getMonthlyPayrollSheet>>(getMonthlyPayrollSheet, ctx, { projectId, year: 2026, month: 6 });
     expect(result.rows[0]?.totals).toMatchObject({ totalMinutes: 3000, overtimeMinutes: 300 });
-    expect(result.rows[0]?.cells.filter(cell => cell.totalMinutes > 0).map(cell => cell.overtimeMinutes)).toEqual([105, 105, 105, 105, 105]);
+    expect(result.rows[0]?.cells.filter(cell => cell.totalMinutes > 0).map(cell => cell.overtimeMinutes)).toEqual([0, 0, 0, 0, 300]);
   });
 
   it("D6: N manual rows load shifts once and assignments once per unique employee", async () => {

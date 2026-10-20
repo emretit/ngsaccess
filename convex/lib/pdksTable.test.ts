@@ -88,7 +88,8 @@ const rowParams = (overrides: Partial<RowParams> = {}): RowParams => ({
   holidayMap: new Map(),
   workingDays: WORKING_DAYS,
   workSettings: DEFAULT_WORK_SETTINGS,
-  overtimeRates: DEFAULT_OVERTIME_RATES,
+  // These legacy cell/formatting cases explicitly exercise daily settlement.
+  overtimeRates: { ...DEFAULT_OVERTIME_RATES, overtimeBasis: "dailyShift" },
   resolveShift: () => null,
   manualEditedBy: null,
   ...overrides,
@@ -157,7 +158,7 @@ describe("pdksTable – computePdksTableRow", () => {
       overtime: "0m",
       overtimeHours: 0,
       overtimeMultiplier: 0,
-      overtimePayTRY: null,
+      overtimePayTRY: 0,
       hourlyRate: 100,
       leaveType: "",
       status: "absent",

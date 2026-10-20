@@ -48,6 +48,8 @@ function fixture(role: typeof roles[number], overrides: Doc<"employees">[] = emp
   const tables: Record<string, Record<string, unknown>[]> = {
     employees: overrides, cardReadings: readings, departments,
     projects: [{ _id: projectId, name: "Test Projesi" }],
+    // Exercise nonzero payable overtime so masking assertions stay meaningful.
+    overtimeRates: [{ projectId, overtimeBasis: "dailyShift" }],
   };
   const query = (table: string) => {
     let rows = tables[table] ?? [];

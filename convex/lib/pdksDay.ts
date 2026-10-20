@@ -11,7 +11,8 @@ import {
   type EffectiveOvertimeRates,
   type EffectiveWorkSettings,
 } from "./pdksHelpers";
-import { isOvernightShift, manualPdksTimes } from "./pdksWorkDay";
+import type { OvertimeSegment } from "./overtimeCalc";
+import { addWorkDate, isOvernightShift, manualPdksTimes } from "./pdksWorkDay";
 
 type Interval = { start: number; end: number };
 const overlap = (a: Interval, b: Interval) =>
@@ -51,6 +52,7 @@ export function computePdksDay(params: {
   workSettings: EffectiveWorkSettings;
   workingDays: string[];
   holiday?: Doc<"holidays"> | null;
+  holidayMap?: ReadonlyMap<string, Doc<"holidays">>;
   overtimeRates?: EffectiveOvertimeRates;
   hourlyRate?: number | null;
 }) {
@@ -137,73 +139,83 @@ export function computePdksDay(params: {
     shift?.overtimeStartToleranceMinutes ??
     workSettings.overtimeStartToleranceMinutes;
   const overtimeThreshold = shiftEnd + tolerance;
-  const premiumDay =
-    classification === "weekend" || classification === "holiday";
-  const overtimeWindow = premiumDay
-    ? interval
-    : { start: Math.max(interval.start, overtimeThreshold), end: interval.end };
-  const scheduledOvertimeBreak = scheduledBreaks.reduce(
-    (sum, pause) => sum + overlap(overtimeWindow, pause),
-    0,
-  );
-  const overtimeMinutes =
-    shift?.overtimeEnabled === false
-      ? 0
-      : premiumDay
-        ? totalMinutes
-        : Math.min(
-            totalMinutes,
-            Math.max(
-              0,
-              overlap(interval, overtimeWindow) - scheduledOvertimeBreak,
-            ),
-          );
   const nightWindows = recurringWindows(
-    rates.nightShiftStart,
-    rates.nightShiftEnd,
-    interval.start,
-    interval.end,
+    rates.nightShiftStart, rates.nightShiftEnd, interval.start, interval.end,
   );
   const rawNightMinutes = nightWindows.reduce(
-    (sum, window) => sum + overlap(interval, window),
-    0,
+    (sum, window) => sum + overlap(interval, window), 0,
   );
-  const nightMinutes = Math.min(
-    totalMinutes,
-    Math.round(
-      nightWindows.reduce((sum, window) => sum + netOverlap(window), 0),
-    ),
+  const nightMinutes = Math.min(totalMinutes, Math.round(
+    nightWindows.reduce((sum, window) => sum + netOverlap(window), 0),
+  ));
+  const boundaries = new Set([interval.start, interval.end]);
+  const addBoundary = (minute: number) => {
+    if (minute > interval.start && minute < interval.end) boundaries.add(minute);
+  };
+  addBoundary(overtimeThreshold);
+  for (const window of [...nightWindows, ...scheduledBreaks]) {
+    addBoundary(window.start);
+    addBoundary(window.end);
+  }
+  for (let midnight = (Math.floor(interval.start / 1440) + 1) * 1440;
+    midnight < interval.end; midnight += 1440) addBoundary(midnight);
+  const points = [...boundaries].sort((a, b) => a - b);
+  const portions = points.slice(1).map((end, index) => {
+    const start = points[index];
+    const window = { start, end };
+    const calendarDate = addWorkDate(date, Math.floor(start / 1440));
+    const cls = rates.nightShiftDayMode === "splitAtMidnight"
+      ? classifyDay(calendarDate, params.workingDays,
+          calendarDate === date ? params.holiday : params.holidayMap?.get(calendarDate))
+      : classification;
+    const premium = cls === "weekend" || cls === "holiday";
+    const isNight = nightWindows.some((night) => overlap(window, night) > 0);
+    const dayMultiplier = multiplierForClassification(cls, rates);
+    // Round cumulative boundaries, rather than each portion independently, so
+    // integer minutes are conserved even when an unspecified break is prorated.
+    const netMinutes = Math.max(0,
+      Math.round(netOverlap({ start: interval.start, end })) -
+      Math.round(netOverlap({ start: interval.start, end: start })));
+    // Preserve the daily-cell rule: unspecified legal breaks are deducted from
+    // normal time first; explicitly scheduled breaks are deducted where taken.
+    const dailyCandidate = premium ? netMinutes : start >= overtimeThreshold
+      ? Math.max(0, end - start - scheduledBreaks.reduce(
+          (sum, pause) => sum + overlap(window, pause), 0)) : 0;
+    return {
+      netMinutes,
+      dailyOvertimeMinutes: dailyCandidate,
+      classification: cls,
+      multiplier: isNight
+        ? combineNightMultiplier(dayMultiplier, rates.nightShiftMultiplier, rates.nightCombineMode)
+        : dayMultiplier,
+      eligible: shift?.overtimeEnabled !== false,
+      // A split shift's post-midnight minutes belong to that calendar week.
+      calendarDate: rates.nightShiftDayMode === "splitAtMidnight" ? calendarDate : date,
+      isNight,
+    };
+  });
+  const dailyTotal = shift?.overtimeEnabled === false ? 0 : Math.min(
+    totalMinutes, portions.reduce((sum, p) => sum + p.dailyOvertimeMinutes, 0),
   );
-  const nightOvertimeMinutes =
-    overtimeMinutes === 0
-      ? 0
-      : premiumDay
-        ? nightMinutes
-        : Math.min(
-            overtimeMinutes,
-            nightMinutes,
-            Math.round(
-              nightWindows.reduce((sum, window) => {
-                const portion = {
-                  start: Math.max(
-                    interval.start,
-                    window.start,
-                    overtimeWindow.start,
-                  ),
-                  end: Math.min(interval.end, window.end, overtimeWindow.end),
-                };
-                const raw = Math.max(0, portion.end - portion.start);
-                return (
-                  sum +
-                  raw -
-                  scheduledBreaks.reduce(
-                    (breakSum, pause) => breakSum + overlap(portion, pause),
-                    0,
-                  )
-                );
-              }, 0),
-            ),
-          );
+  // Keep the existing daily rule's night cap: an unspecified break must not
+  // become payable night overtime when the entire attendance is after shift end.
+  let nightRemaining = Math.max(
+    dailyTotal - portions.reduce((sum, p) => sum + (p.isNight ? 0 : p.dailyOvertimeMinutes), 0),
+    Math.min(dailyTotal, nightMinutes,
+      portions.reduce((sum, p) => sum + (p.isNight ? p.dailyOvertimeMinutes : 0), 0)),
+  );
+  let daytimeRemaining = dailyTotal - nightRemaining;
+  for (const portion of [...portions].reverse()) {
+    portion.dailyOvertimeMinutes = portion.eligible
+      ? Math.min(portion.isNight ? nightRemaining : daytimeRemaining, portion.dailyOvertimeMinutes) : 0;
+    if (portion.isNight) nightRemaining -= portion.dailyOvertimeMinutes;
+    else daytimeRemaining -= portion.dailyOvertimeMinutes;
+  }
+  const overtimeSegments: OvertimeSegment[] = portions.map(({ isNight: _isNight, ...portion }) => portion);
+  const overtimeMinutes = portions.reduce((sum, p) => sum + p.dailyOvertimeMinutes, 0);
+  const nightOvertimeMinutes = portions.reduce(
+    (sum, p) => sum + (p.isNight ? p.dailyOvertimeMinutes : 0), 0,
+  );
   const lateTolerance =
     shift?.lateToleranceMinutes ?? workSettings.maxLateMinutes;
   const earlyTolerance =
@@ -212,18 +224,14 @@ export function computePdksDay(params: {
     entry === undefined ? 0 : Math.max(0, entry - shiftStart - lateTolerance);
   const earlyExitMinutes =
     exit === undefined ? 0 : Math.max(0, shiftEnd - earlyTolerance - exit);
-  const dayMultiplier = multiplierForClassification(classification, rates);
-  const weightedOvertimeMinutes =
-    (overtimeMinutes - nightOvertimeMinutes) * dayMultiplier +
-    nightOvertimeMinutes *
-      combineNightMultiplier(
-        dayMultiplier,
-        rates.nightShiftMultiplier,
-        rates.nightCombineMode,
-      );
+  const weightedOvertimeMinutes = overtimeSegments.reduce(
+    (sum, segment) => sum + segment.dailyOvertimeMinutes * segment.multiplier, 0,
+  );
   const multiplier =
     overtimeMinutes > 0 ? weightedOvertimeMinutes / overtimeMinutes : 0;
   return {
+    date,
+    overtimeSegments,
     firstISO,
     lastISO,
     rawTotalMinutes,

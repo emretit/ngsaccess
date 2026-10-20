@@ -1164,6 +1164,8 @@ export default defineSchema({
     nightShiftEnd: v.string(),
     // Gece penceresindeki fazla mesaide gün türü ve gece çarpanının birleşimi (13-H1). Boşsa "max".
     nightCombineMode: v.optional(v.union(v.literal("max"), v.literal("multiply"), v.literal("additive"))),
+    overtimeBasis: v.optional(v.union(v.literal("weekly45"), v.literal("dailyShift"))),
+    nightShiftDayMode: v.optional(v.union(v.literal("shiftStart"), v.literal("splitAtMidnight"))),
     updatedAt: v.string(),
   }).index("by_project", ["projectId"]),
 

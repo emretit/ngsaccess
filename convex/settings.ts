@@ -257,6 +257,8 @@ export const saveOvertime = adminMutation({
     projectId: v.id("projects"), annualOvertimeLimitHours: v.number(), overtimeStartToleranceMinutes: v.number(), monthlyHoursBase: v.number(),
     weekdayMultiplier: v.number(), weekendMultiplier: v.number(), holidayMultiplier: v.number(), nightShiftMultiplier: v.number(), nightShiftStart: v.string(), nightShiftEnd: v.string(),
     nightCombineMode: v.optional(v.union(v.literal("max"), v.literal("multiply"), v.literal("additive"))),
+    overtimeBasis: v.optional(v.union(v.literal("weekly45"), v.literal("dailyShift"))),
+    nightShiftDayMode: v.optional(v.union(v.literal("shiftStart"), v.literal("splitAtMidnight"))),
   },
   handler: async (ctx, args) => {
     await resolveProjectScope(ctx, args.projectId);
@@ -265,12 +267,20 @@ export const saveOvertime = adminMutation({
     const { projectId, annualOvertimeLimitHours, overtimeStartToleranceMinutes, monthlyHoursBase, ...rates } = args;
     const updatedAt = new Date().toISOString();
     const work = { projectId, annualOvertimeLimitHours, overtimeStartToleranceMinutes, monthlyHoursBase, updatedAt };
-    const rate = { ...rates, nightCombineMode: rates.nightCombineMode ?? "max", projectId, updatedAt };
+    const { nightCombineMode, overtimeBasis, nightShiftDayMode, ...requiredRates } = rates;
+    const rate = { ...requiredRates, projectId, updatedAt,
+      ...(nightCombineMode !== undefined ? { nightCombineMode } : {}),
+      ...(overtimeBasis !== undefined ? { overtimeBasis } : {}),
+      ...(nightShiftDayMode !== undefined ? { nightShiftDayMode } : {}),
+    };
     const existingWork = await ctx.db.query("workSettings").withIndex("by_project", q => q.eq("projectId", projectId)).first();
     const existingRates = await ctx.db.query("overtimeRates").withIndex("by_project", q => q.eq("projectId", projectId)).first();
     if (existingWork) await ctx.db.patch(existingWork._id, work);
     else await ctx.db.insert("workSettings", work);
-    const rateId = existingRates?._id ?? await ctx.db.insert("overtimeRates", rate);
+    const rateId = existingRates?._id ?? await ctx.db.insert("overtimeRates", {
+      ...rate, nightCombineMode: nightCombineMode ?? "max",
+      overtimeBasis: overtimeBasis ?? "weekly45", nightShiftDayMode: nightShiftDayMode ?? "shiftStart",
+    });
     if (existingRates) await ctx.db.patch(existingRates._id, rate);
     await writeAudit(ctx, {
       user: ctx.user, projectId, action: existingRates ? "update" : "create",

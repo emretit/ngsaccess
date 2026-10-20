@@ -17,6 +17,7 @@ export function computePayrollCell(params: {
   dayReadings: Doc<"cardReadings">[];
   hasLeave: boolean;
   holiday: Doc<"holidays"> | null | undefined;
+  holidayMap?: ReadonlyMap<string, Doc<"holidays">>;
   workingDays: string[];
   dayShift: Doc<"shifts"> | null;
   workSettings: EffectiveWorkSettings;
@@ -34,6 +35,7 @@ export function computePayrollCell(params: {
     hourlyRate: params.empHourlyRate,
     workingDays: params.workingDays,
     holiday: params.holiday,
+    holidayMap: params.holidayMap,
   });
   const settings = settingsForShift(dayShift, workSettings);
   const status = classifyPdksDay({
@@ -56,6 +58,7 @@ export function computePayrollCell(params: {
   });
   return {
     date,
+    overtimeSegments: day.overtimeSegments,
     status,
     payrollCode:
       status === "future" || status === "noData" || status === "notEmployed"

@@ -9,12 +9,14 @@ import {
 } from "./pdksHelpers";
 import { settingsForShift } from "./shiftResolver";
 import {
+  buildPeriodDateKeys,
   computeBreakViolation,
   formatHoursLabel,
   formatIstanbulTime,
   matchEmployeeKey,
   resolveDayStatus,
 } from "./pdksCalc";
+import { calculatePeriodOvertime, overtimePeriodRange } from "./overtimeCalc";
 import { computePdksDay } from "./pdksDay";
 import { pdksLeaveMatchesProject } from "./pdksAvailability";
 import { groupPdksWorkDays } from "./pdksWorkDay";
@@ -241,7 +243,11 @@ export function computePdksTableRow(params: {
     monthlySalary: employee?.monthlySalary,
     monthlyHoursBase: workSettings.monthlyHoursBase,
   });
-  const calculations = params.periodDateKeys.map((date) => {
+  const sortedDates = [...params.periodDateKeys].sort();
+  const periodStart = sortedDates[0] ?? params.startDate;
+  const periodEnd = sortedDates[sortedDates.length - 1] ?? params.startDate;
+  const range = overtimePeriodRange(periodStart, periodEnd, overtimeRates.overtimeBasis, overtimeRates.nightShiftDayMode);
+  const allCalculations = buildPeriodDateKeys(range.startDate, range.endDate).map((date) => {
     const readings = byDate.get(date) ?? [];
     const shift = empId ? params.resolveShift(empId, date) : null;
     const manual = params.manualPdksByEmpDate.get(`${empKey}__${date}`);
@@ -259,6 +265,7 @@ export function computePdksTableRow(params: {
       hourlyRate,
       workingDays: params.workingDays,
       holiday: params.holidayMap.get(date),
+      holidayMap: params.holidayMap,
     });
     const status = classifyPdksDay({
       date,
@@ -331,20 +338,25 @@ export function computePdksTableRow(params: {
     };
     return { day, cell, manual, leave, readings };
   });
+  const calculationByDate = new Map(allCalculations.map((c) => [c.cell.date, c]));
+  const calculations = params.periodDateKeys.flatMap((date) => {
+    const calculation = calculationByDate.get(date);
+    return calculation ? [calculation] : [];
+  });
+  const periodOvertime = calculatePeriodOvertime(allCalculations.map((c) => c.day), {
+    startDate: periodStart, endDate: periodEnd,
+    overtimeBasis: overtimeRates.overtimeBasis, hourlyRate,
+  });
+  for (const calculation of calculations) {
+    calculation.cell.overtimeMinutes = periodOvertime.overtimeByDate[calculation.cell.date]?.overtimeMinutes ?? 0;
+  }
   const first = calculations.find((c) => c.day.firstISO) ?? calculations[0];
   const last = [...calculations].reverse().find((c) => c.day.lastISO);
   const totalMinutes = calculations.reduce(
     (sum, c) => sum + c.day.totalMinutes,
     0,
   );
-  const overtimeMinutes = calculations.reduce(
-    (sum, c) => sum + c.day.overtimeMinutes,
-    0,
-  );
-  const pay = calculations.reduce(
-    (sum, c) => sum + (c.day.overtimePayTRY ?? 0),
-    0,
-  );
+  const { overtimeMinutes } = periodOvertime;
   const leaveRecord = calculations.find((c) => c.leave)?.leave;
   const status = first?.cell.status ?? "noData";
   return {
@@ -371,15 +383,8 @@ export function computePdksTableRow(params: {
     overtimeMinutes,
     overtime: `${overtimeMinutes}m`,
     overtimeHours: overtimeMinutes / 60,
-    overtimeMultiplier: params.isSingleDay
-      ? (first?.day.multiplier ?? 0)
-      : overtimeMinutes > 0
-        ? calculations.reduce(
-            (sum, c) => sum + c.day.multiplier * c.day.overtimeMinutes,
-            0,
-          ) / overtimeMinutes
-        : 0,
-    overtimePayTRY: hourlyRate !== null && overtimeMinutes > 0 ? pay : null,
+    overtimeMultiplier: periodOvertime.overtimeMultiplier,
+    overtimePayTRY: periodOvertime.overtimePayTRY,
     hourlyRate,
     yearlyOvertimeLimit: workSettings.annualOvertimeLimitHours,
     leaveType: leaveRecord

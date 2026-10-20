@@ -8,6 +8,7 @@ import {
 } from "./pdksHelpers";
 import { settingsForShift } from "./shiftResolver";
 import { formatIstanbulTime, formatHoursLabel } from "./pdksCalc";
+import { calculatePeriodOvertime, type OvertimeDay } from "./overtimeCalc";
 import { computePdksDay } from "./pdksDay";
 
 export function computeAttendanceDetailDay(params: {
@@ -18,6 +19,7 @@ export function computeAttendanceDetailDay(params: {
   manualDay: Doc<"pdksRecords"> | undefined;
   leaves: Doc<"leaves">[];
   holiday: Doc<"holidays"> | null | undefined;
+  holidayMap?: ReadonlyMap<string, Doc<"holidays">>;
   dayShift: Doc<"shifts"> | null;
   workSettings: EffectiveWorkSettings;
   workingDays: string[];
@@ -33,6 +35,7 @@ export function computeAttendanceDetailDay(params: {
     overtimeRates: params.overtimeRates,
     workingDays: params.workingDays,
     holiday: params.holiday,
+    holidayMap: params.holidayMap,
   });
   const leave = params.leaves.find(
     (l) => date >= l.startDate && date <= l.endDate,
@@ -58,6 +61,7 @@ export function computeAttendanceDetailDay(params: {
   });
   return {
     date,
+    overtimeSegments: day.overtimeSegments,
     firstEntry: day.firstISO ? formatIstanbulTime(day.firstISO) : null,
     lastExit: day.lastISO ? formatIstanbulTime(day.lastISO) : null,
     totalMinutes: day.totalMinutes,
@@ -89,36 +93,20 @@ export function computeAttendanceDetailDay(params: {
 
 /** Gün listesinden özet sayaçları (çalışılan/geç/devamsız/izinli + toplam dakika/mesai). */
 export function summarizeAttendanceDays(
-  days: ReadonlyArray<{
-    status: string;
-    totalMinutes: number;
-    overtimeMinutes: number;
-  }>,
-): {
-  totalMinutes: number;
-  workedDays: number;
-  lateDays: number;
-  absentDays: number;
-  leaveDays: number;
-  overtimeMinutes: number;
-} {
-  return days.reduce(
+  days: ReadonlyArray<OvertimeDay & { status: string }>,
+  options: Parameters<typeof calculatePeriodOvertime>[1],
+) {
+  const totals = days.reduce(
     (acc, d) => {
+      if (d.date < options.startDate || d.date > options.endDate) return acc;
       acc.totalMinutes += d.totalMinutes;
       if (d.status === "present" || d.status === "late") acc.workedDays += 1;
       if (d.status === "late") acc.lateDays += 1;
       if (d.status === "absent") acc.absentDays += 1;
       if (d.status === "leave") acc.leaveDays += 1;
-      acc.overtimeMinutes += d.overtimeMinutes;
       return acc;
     },
-    {
-      totalMinutes: 0,
-      workedDays: 0,
-      lateDays: 0,
-      absentDays: 0,
-      leaveDays: 0,
-      overtimeMinutes: 0,
-    },
+    { totalMinutes: 0, workedDays: 0, lateDays: 0, absentDays: 0, leaveDays: 0 },
   );
+  return { ...totals, ...calculatePeriodOvertime(days, options) };
 }

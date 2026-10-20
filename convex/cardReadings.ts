@@ -34,7 +34,7 @@ import {
   buildShiftResolver,
   thresholdsForShift,
 } from "./lib/shiftResolver";
-import { bucketWeeklyOvertime, type DayEntry } from "./lib/overtimeCalc";
+import { calculatePeriodOvertime, overtimePeriodRange } from "./lib/overtimeCalc";
 import { inferAccessStatus, inferDenialReason } from "./lib/hikEventCodes";
 import {
   classifyHikEvent,
@@ -61,7 +61,7 @@ import {
   summarizeAttendanceDays,
 } from "./lib/pdksDetail";
 import { computePayrollCell } from "./lib/pdksPayroll";
-import { buildPdksWorkDateResolver, groupPdksWorkDays, pdksWorkDayRange } from "./lib/pdksWorkDay";
+import { addWorkDate, buildPdksWorkDateResolver, groupPdksWorkDays, pdksWorkDayRange } from "./lib/pdksWorkDay";
 import {
   buildPdksEmployeeReadingMap,
   computePdksTableRow,
@@ -419,7 +419,13 @@ export const getPdksTableData = authedQuery({
     const today = args.date ?? trTodayKey();
     const startDate = args.startDate ?? today;
     const endDate = args.endDate ?? today;
-    const { startISO, endISO } = pdksWorkDayRange(startDate, endDate);
+    const referenceProjectId = args.projectId ?? (
+      ctx.user.role === "super_admin" && !args.projectId
+        ? undefined
+        : allowedProjectIds[0] ?? undefined);
+    const overtimeRates = await getEffectiveOvertimeRates(ctx, referenceProjectId);
+    const overtimeRange = overtimePeriodRange(startDate, endDate, overtimeRates.overtimeBasis, overtimeRates.nightShiftDayMode);
+    const { startISO, endISO } = pdksWorkDayRange(overtimeRange.startDate, overtimeRange.endDate);
     const isSingleDay = startDate === endDate;
     const viewMode = args.viewMode ?? "single";
 
@@ -503,20 +509,15 @@ export const getPdksTableData = authedQuery({
     const employeeMap = buildPdksEmployeeReadingMap({ employees, readings });
 
     // Settings & holidays per project (super_admin için global = undefined)
-    const referenceProjectId = args.projectId ?? (
-      ctx.user.role === "super_admin" && !args.projectId
-        ? undefined
-        : allowedProjectIds[0] ?? undefined);
-    const [workSettings, holidayMap, generalSettings, shiftResolver, overtimeRates] =
+    const [workSettings, holidayMap, generalSettings, shiftResolver] =
       await Promise.all([
         getEffectiveWorkSettings(ctx, referenceProjectId),
-        getHolidaysMap(ctx, referenceProjectId, startDate, endDate),
+        getHolidaysMap(ctx, referenceProjectId, overtimeRange.startDate, addWorkDate(overtimeRange.endDate, 1)),
         ctx.db
           .query("generalSettings")
           .withIndex("by_project", (q) => q.eq("projectId", referenceProjectId))
           .first(),
         buildShiftResolver(ctx, availabilityEmployees),
-        getEffectiveOvertimeRates(ctx, referenceProjectId),
       ]);
     const workingDays =
       generalSettings?.workingDays && generalSettings.workingDays.length > 0
@@ -533,7 +534,7 @@ export const getPdksTableData = authedQuery({
         ctx.db
           .query("pdksRecords")
           .withIndex("by_employee_date", (q) =>
-            q.eq("employeeId", emp._id).gte("date", startDate).lte("date", endDate)
+            q.eq("employeeId", emp._id).gte("date", overtimeRange.startDate).lte("date", overtimeRange.endDate)
           )
           .collect()
       )
@@ -647,7 +648,13 @@ export const getMonthlyPayrollSheet = authedQuery({
     const lastDay = new Date(Date.UTC(args.year, args.month, 0)).getUTCDate();
     const startDate = `${args.year}-${monthStr}-01`;
     const endDate = `${args.year}-${monthStr}-${String(lastDay).padStart(2, "0")}`;
-    const { startISO, endISO } = pdksWorkDayRange(startDate, endDate);
+    const referenceProjectId = args.projectId ?? (
+      ctx.user.role === "super_admin" && !args.projectId
+        ? undefined
+        : allowedProjectIds[0] ?? undefined);
+    const overtimeRates = await getEffectiveOvertimeRates(ctx, referenceProjectId);
+    const overtimeRange = overtimePeriodRange(startDate, endDate, overtimeRates.overtimeBasis, overtimeRates.nightShiftDayMode);
+    const { startISO, endISO } = pdksWorkDayRange(overtimeRange.startDate, overtimeRange.endDate);
 
     let readings;
     let employees: Doc<"employees">[];
@@ -690,19 +697,14 @@ export const getMonthlyPayrollSheet = authedQuery({
 
     readings = filterPdksReadings(readings, args.projectId);
 
-    const referenceProjectId = args.projectId ?? (
-      ctx.user.role === "super_admin" && !args.projectId
-        ? undefined
-        : allowedProjectIds[0] ?? undefined);
-    const [workSettings, holidayMap, generalSettings, overtimeRates, payrollShiftResolver] =
+    const [workSettings, holidayMap, generalSettings, payrollShiftResolver] =
       await Promise.all([
         getEffectiveWorkSettings(ctx, referenceProjectId),
-        getHolidaysMap(ctx, referenceProjectId, startDate, endDate),
+        getHolidaysMap(ctx, referenceProjectId, overtimeRange.startDate, addWorkDate(overtimeRange.endDate, 1)),
         ctx.db
           .query("generalSettings")
           .withIndex("by_project", (q) => q.eq("projectId", referenceProjectId))
           .first(),
-        getEffectiveOvertimeRates(ctx, referenceProjectId),
         buildShiftResolver(ctx, employees),
       ]);
     const workingDays =
@@ -726,7 +728,7 @@ export const getMonthlyPayrollSheet = authedQuery({
     const manualByEmpDate = new Map<string, Doc<"pdksRecords">>();
     const allRecs = await ctx.db
       .query("pdksRecords")
-      .withIndex("by_date", (q) => q.gte("date", startDate).lte("date", endDate))
+      .withIndex("by_date", (q) => q.gte("date", overtimeRange.startDate).lte("date", overtimeRange.endDate))
       .collect();
     const recs = allRecs.filter((r) => empIdSet.has(String(r.employeeId)));
     {
@@ -765,7 +767,7 @@ export const getMonthlyPayrollSheet = authedQuery({
 
         const firstRecordDate = await pdksFirstRecordDate(ctx, emp, payrollEmployeeReadings.get(String(emp._id)) ?? [], payrollManualDates.get(emp._id) ?? [], payrollWorkDate);
         const availableDateKeys = payrollAvailableDates.get(emp.projectId) ?? new Set<string>();
-        const cells = days.map((d) =>
+        const allCells = buildPeriodDateKeys(overtimeRange.startDate, overtimeRange.endDate).map((d) =>
           computePayrollCell({
             availableDateKeys,
             firstRecordDate,
@@ -780,6 +782,7 @@ export const getMonthlyPayrollSheet = authedQuery({
                 d <= l.endDate
             ),
             holiday: holidayMap.get(d),
+            holidayMap,
             workingDays,
             dayShift: scopedPdksShift(payrollShiftResolver.resolve(emp._id, d), args.projectId),
             workSettings,
@@ -788,19 +791,21 @@ export const getMonthlyPayrollSheet = authedQuery({
           })
         );
 
-        const dayEntries: DayEntry[] = cells.map((c) => ({
-          date: c.date,
-          netMinutes: c.totalMinutes,
-          classification: c.classification,
-        }));
-        const buckets = bucketWeeklyOvertime(dayEntries);
-        const monthlyOvertimeMinutes = buckets.reduce((sum, bucket) => sum + bucket.overtimeMinutes + bucket.premiumMinutes, 0);
-        const exceedsDaily11h = buckets.flatMap((b) => b.exceedsDaily11h);
+        const periodOvertime = calculatePeriodOvertime(allCells, {
+          startDate, endDate, overtimeBasis: overtimeRates.overtimeBasis,
+          hourlyRate: empHourlyRate,
+        });
+        const cells = allCells.filter((c) => c.date >= startDate && c.date <= endDate)
+          .map(({ overtimeSegments: _segments, ...cell }) => {
+            const overtime = periodOvertime.overtimeByDate[cell.date];
+            return { ...cell, overtimeMinutes: overtime?.overtimeMinutes ?? 0,
+              overtimePayTRY: overtime?.overtimePayTRY ?? null,
+              multiplier: overtime?.overtimeMultiplier ?? 0 };
+          });
 
         const totals = cells.reduce(
           (acc, c) => {
             acc.totalMinutes += c.totalMinutes;
-            acc.overtimePayTRY += c.overtimePayTRY ?? 0;
             if (c.payrollCode === "İZN") acc.leaveDays += 1;
             if (c.payrollCode === "DV") acc.absentDays += 1;
             if (c.isLate) acc.lateDays += 1;
@@ -808,7 +813,6 @@ export const getMonthlyPayrollSheet = authedQuery({
           },
           {
             totalMinutes: 0,
-            overtimePayTRY: 0,
             leaveDays: 0,
             absentDays: 0,
             lateDays: 0,
@@ -825,9 +829,9 @@ export const getMonthlyPayrollSheet = authedQuery({
           cells,
           totals: {
             ...totals,
-            overtimeMinutes: monthlyOvertimeMinutes,
-            overtimePayTRY: empHourlyRate !== null ? totals.overtimePayTRY : null,
-            exceedsDaily11h,
+            overtimeMinutes: periodOvertime.overtimeMinutes,
+            overtimePayTRY: periodOvertime.overtimePayTRY,
+            exceedsDaily11h: periodOvertime.exceedsDaily11h,
           },
         };
       })
@@ -1327,7 +1331,11 @@ export const getEmployeeAttendanceDetail = authedQuery({
       return null;
     }
 
-    const { startISO, endISO } = pdksWorkDayRange(args.startDate, args.endDate);
+    const referenceProjectId = args.projectId ?? (
+      ctx.user.role === "super_admin" && !args.projectId ? undefined : employee.projectId);
+    const overtimeRates = await getEffectiveOvertimeRates(ctx, referenceProjectId);
+    const overtimeRange = overtimePeriodRange(args.startDate, args.endDate, overtimeRates.overtimeBasis, overtimeRates.nightShiftDayMode);
+    const { startISO, endISO } = pdksWorkDayRange(overtimeRange.startDate, overtimeRange.endDate);
 
     let readings = await ctx.db.query("cardReadings")
       .withIndex("by_project_employee_time", q => q.eq("projectId", employee.projectId).eq("employeeId", employee._id).gte("accessTime", startISO).lte("accessTime", endISO))
@@ -1351,12 +1359,10 @@ export const getEmployeeAttendanceDetail = authedQuery({
         new Date(a.accessTime).getTime() - new Date(b.accessTime).getTime()
     );
 
-    const referenceProjectId = args.projectId ?? (
-      ctx.user.role === "super_admin" && !args.projectId ? undefined : employee.projectId);
-    const [workSettings, holidayMap, generalSettings, manualRecords, leaves, department, company, position, shift, detailShiftResolver, overtimeRates] =
+    const [workSettings, holidayMap, generalSettings, manualRecords, leaves, department, company, position, shift, detailShiftResolver] =
       await Promise.all([
         getEffectiveWorkSettings(ctx, referenceProjectId),
-        getHolidaysMap(ctx, referenceProjectId, args.startDate, args.endDate),
+        getHolidaysMap(ctx, referenceProjectId, overtimeRange.startDate, addWorkDate(overtimeRange.endDate, 1)),
         ctx.db
           .query("generalSettings")
           .withIndex("by_project", (q) => q.eq("projectId", referenceProjectId))
@@ -1366,8 +1372,8 @@ export const getEmployeeAttendanceDetail = authedQuery({
           .withIndex("by_employee_date", (q) => q.eq("employeeId", args.employeeId))
           .filter((q) =>
             q.and(
-              q.gte(q.field("date"), args.startDate),
-              q.lte(q.field("date"), args.endDate)
+              q.gte(q.field("date"), overtimeRange.startDate),
+              q.lte(q.field("date"), overtimeRange.endDate)
             )
           )
           .collect(),
@@ -1381,7 +1387,6 @@ export const getEmployeeAttendanceDetail = authedQuery({
         employee.positionId ? ctx.db.get(employee.positionId) : Promise.resolve(null),
         employee.shiftId ? ctx.db.get(employee.shiftId) : Promise.resolve(null),
         buildShiftResolver(ctx, availabilityEmployees.filter(e => e.isActive)),
-        getEffectiveOvertimeRates(ctx, referenceProjectId),
       ]);
 
     const workingDays =
@@ -1407,7 +1412,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
     const availableDateKeys = await readPdksAvailableDateKeys(ctx, employee.projectId, periodDateKeys, detailWorkDate);
     const firstRecordDate = await pdksFirstRecordDate(ctx, employee, readings, [...manualByDate.keys()], detailWorkDate);
     const scopedLeaves = leaves.filter(l => pdksLeaveMatchesProject(l, employee.projectId));
-    const days = periodDateKeys.map((dk) =>
+    const allDays = buildPeriodDateKeys(overtimeRange.startDate, overtimeRange.endDate).map((dk) =>
       computeAttendanceDetailDay({
         availableDateKeys,
         firstRecordDate,
@@ -1416,6 +1421,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
         manualDay: manualByDate.get(dk),
         leaves: scopedLeaves,
         holiday: holidayMap.get(dk),
+        holidayMap,
         dayShift: scopedPdksShift(detailShiftResolver.resolve(employee._id, dk), args.projectId),
         workSettings,
         overtimeRates,
@@ -1423,7 +1429,16 @@ export const getEmployeeAttendanceDetail = authedQuery({
       })
     );
 
-    const summary = summarizeAttendanceDays(days);
+    const summary = summarizeAttendanceDays(allDays, {
+      startDate: args.startDate, endDate: args.endDate,
+      overtimeBasis: overtimeRates.overtimeBasis,
+      hourlyRate: canSeePay(ctx.user) ? resolveHourlyRate({
+        hourlyRate: employee.hourlyRate, monthlySalary: employee.monthlySalary,
+        monthlyHoursBase: workSettings.monthlyHoursBase,
+      }) : null,
+    });
+    const days = allDays.filter((d) => d.date >= args.startDate && d.date <= args.endDate)
+      .map(({ overtimeSegments: _segments, ...day }) => ({ ...day, overtimeMinutes: summary.overtimeByDate[day.date]?.overtimeMinutes ?? 0 }));
 
     return {
       excludedUnknownReadings,
@@ -1447,6 +1462,8 @@ export const getEmployeeAttendanceDetail = authedQuery({
         absentDays: summary.absentDays,
         leaveDays: summary.leaveDays,
         overtimeMinutes: summary.overtimeMinutes,
+        overtimePayTRY: summary.overtimePayTRY,
+        exceedsDaily11h: summary.exceedsDaily11h,
         overtimeHours: Math.round((summary.overtimeMinutes / 60) * 10) / 10,
       },
       days,
