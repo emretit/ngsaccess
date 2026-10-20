@@ -58,6 +58,8 @@ describe('audit filter and display contracts', () => {
     expect(auditFieldDisplayValue('old', undefined)).toBe('Kaydedilmedi');
     expect(auditFieldDisplayValue('consentType', 'biometric_face')).toBe('Yüz biyometrisi');
     expect(auditFieldDisplayValue('custom', 'biometric_face')).toBe('biometric_face');
+    expect(auditFieldDisplayValue('minSeverity', 'critical')).toBe('Kritik');
+    expect(auditFieldDisplayValue('newValue.minSeverity', 'warning')).toBe('Uyarı');
     expect(auditFieldDisplayValue('grantedAt', '2026-10-17T07:00:00Z')).toContain('10:00:00');
   });
   it('preserves legacy detail props and masks both diff and technical JSON', () => {

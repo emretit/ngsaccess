@@ -1,4 +1,5 @@
 import { notify } from '@/lib/notify';
+import { neutralizeSpreadsheetFormula } from '@/lib/spreadsheetSafety';
 import type { ReportColumn, ReportDefinition, ReportFormat } from './registry';
 import { formatReportDate, type ReportRow } from './rows';
 export const PDF_MAX_ROWS = 2000;
@@ -18,8 +19,7 @@ export function pdfColumnChunks(columns: readonly ReportColumn[], pinnedColumns?
 export interface ReportExportMeta { from: string; to: string; projectName?: string; columns: readonly ReportColumn[] }
 function safeSpreadsheetValue(value: string | number | null): string | number {
   if (typeof value === 'number') return value;
-  const text = value ?? '';
-  return /^[\s]*[=+@-]/.test(text) ? `'${text}` : text;
+  return neutralizeSpreadsheetFormula(value ?? '');
 }
 export function buildCsv(columns: readonly ReportColumn[], rows: readonly ReportRow[]): string {
   const escape = (value: string | number | null) => {

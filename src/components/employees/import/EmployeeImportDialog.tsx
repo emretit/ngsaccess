@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { parseEmployeesXlsx } from "@/lib/employees/parseEmployeesXlsx";
-import type { EmployeeImportIssue, EmployeeImportRow } from "@/lib/employees/employeeExcelTypes";
+import type { EmployeeImportRow } from "@/lib/employees/employeeExcelTypes";
+import { importErrorReportRows, previewEmployeeImport, runEmployeeImport, type ImportChunkFn, type ImportResult } from "@/lib/employees/employeeImportFlow";
 
-type ImportResult = { rowNumber: number; status: "created" | "skippedDuplicate" | "error"; message: string };
 type Stage = "file" | "preview" | "importing" | "done";
 
 async function downloadImportErrors(results: ImportResult[]) {
@@ -16,7 +16,7 @@ async function downloadImportErrors(results: ImportResult[]) {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Hatalı satırlar");
   sheet.addRow(["Excel satırı", "Durum", "Hata mesajı"]);
-  results.filter((result) => result.status === "error").forEach((result) => sheet.addRow([result.rowNumber, "Hata", result.message]));
+  importErrorReportRows(results).forEach((row) => sheet.addRow(row));
   sheet.getRow(1).font = { bold: true };
   sheet.columns.forEach((column) => { column.width = 32; });
   const buffer = await workbook.xlsx.writeBuffer();
@@ -26,12 +26,6 @@ async function downloadImportErrors(results: ImportResult[]) {
   link.download = "kisiler-ice-aktarma-hatalari.xlsx";
   link.click();
   URL.revokeObjectURL(url);
-}
-
-function combineIssues(issues: EmployeeImportIssue[]) {
-  const grouped = new Map<number, string[]>();
-  for (const issue of issues) grouped.set(issue.rowNumber, [...(grouped.get(issue.rowNumber) ?? []), issue.message]);
-  return grouped;
 }
 
 export function EmployeeImportDialog({ open, onOpenChange, projectId }: { open: boolean; onOpenChange: (open: boolean) => void; projectId: Id<"projects"> }) {
@@ -48,6 +42,7 @@ export function EmployeeImportDialog({ open, onOpenChange, projectId }: { open: 
   const [wasCancelled, setWasCancelled] = useState(false);
   const [syncStarted, setSyncStarted] = useState(false);
   const cancelled = useRef(false);
+  const runChunk: ImportChunkFn = (chunk, dryRun) => importChunk({ projectId, rows: chunk, dryRun });
 
   const reset = () => {
     cancelled.current = false;
@@ -63,16 +58,10 @@ export function EmployeeImportDialog({ open, onOpenChange, projectId }: { open: 
     setError(null); setBusy(true);
     try {
       const parsed = await parseEmployeesXlsx(file);
-      const localErrors = combineIssues(parsed.issues);
-      const validRows = parsed.rows.filter((row) => !localErrors.has(row.rowNumber));
-      const previewResults: ImportResult[] = [...localErrors.entries()].map(([rowNumber, messages]) => ({ rowNumber, status: "error", message: messages.join(" ") }));
-      const serverResults: ImportResult[] = [];
-      for (let index = 0; index < validRows.length; index += 100) {
-        serverResults.push(...await importChunk({ projectId, rows: validRows.slice(index, index + 100), dryRun: true }));
-      }
+      const preview = await previewEmployeeImport(parsed, runChunk);
       setRows(parsed.rows);
-      setEligibleRows(validRows.filter((row) => serverResults.find((result) => result.rowNumber === row.rowNumber)?.status === "created"));
-      setResults([...previewResults, ...serverResults].sort((a, b) => a.rowNumber - b.rowNumber));
+      setEligibleRows(preview.eligibleRows);
+      setResults(preview.results);
       setStage("preview");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Dosya okunamadı.");
@@ -80,22 +69,15 @@ export function EmployeeImportDialog({ open, onOpenChange, projectId }: { open: 
   };
   const confirmImport = async () => {
     setError(null); setBusy(true); cancelled.current = false; setStage("importing");
-    const completed: ImportResult[] = [...results.filter((result) => result.status !== "created")];
-    try {
-      for (let index = 0; index < eligibleRows.length; index += 100) {
-        if (cancelled.current) break;
-        completed.push(...await importChunk({ projectId, rows: eligibleRows.slice(index, index + 100), dryRun: false }));
-        setProgress(Math.round(Math.min(index + 100, eligibleRows.length) / eligibleRows.length * 100));
-        setResults([...completed].sort((a, b) => a.rowNumber - b.rowNumber));
-      }
-      setResults(completed.sort((a, b) => a.rowNumber - b.rowNumber));
-      setWasCancelled(cancelled.current);
-      setStage("done");
-    } catch (cause) {
-      setResults(completed.sort((a, b) => a.rowNumber - b.rowNumber));
-      setStage("done");
-      setError(cause instanceof Error ? cause.message : "İçe aktarma sırasında hata oluştu.");
-    } finally { setBusy(false); }
+    const outcome = await runEmployeeImport(eligibleRows, results, runChunk, {
+      isCancelled: () => cancelled.current,
+      onProgress: (percent, partial) => { setProgress(percent); setResults(partial); },
+    });
+    setResults(outcome.results);
+    setWasCancelled(outcome.cancelled);
+    if (outcome.error !== undefined) setError(outcome.error instanceof Error ? outcome.error.message : "İçe aktarma sırasında hata oluştu.");
+    setStage("done");
+    setBusy(false);
   };
   const validCount = results.filter((result) => result.status === "created").length;
   const duplicateCount = results.filter((result) => result.status === "skippedDuplicate").length;

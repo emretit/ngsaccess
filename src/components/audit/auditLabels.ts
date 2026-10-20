@@ -208,13 +208,14 @@ export function redactAuditValue(value: unknown): unknown {
 const auditEnumLabels: Record<string, string> = {
   biometric_face: 'Yüz biyometrisi', biometric_fingerprint: 'Parmak izi biyometrisi',
   explicit_consent: 'Açık rıza', granted: 'Onaylandı', revoked: 'İptal edildi',
+  warning: 'Uyarı', critical: 'Kritik',
 };
 /** Format only recognized field/value combinations; unknown data remains inspectable. */
 export function auditFieldDisplayValue(field: string, value: unknown): string {
   if (value === undefined || value === null) return 'Kaydedilmedi';
   const key = field.split('.').pop() ?? field;
   if (typeof value === 'string') {
-    if ((key === 'consentType' || key === 'status') && auditEnumLabels[value]) return auditEnumLabels[value];
+    if ((key === 'consentType' || key === 'status' || key === 'minSeverity') && auditEnumLabels[value]) return auditEnumLabels[value];
     if (/^\d{4}-\d{2}-\d{2}T\d{2}:/.test(value) && !Number.isNaN(Date.parse(value))) {
       return formatTrDateTime(new Date(value), { seconds: true });
     }

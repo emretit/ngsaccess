@@ -1,6 +1,7 @@
 import { STATUS_FILTER_LABELS } from "@/components/pdks/statusMeta";
 import { formatDuration } from "@/components/pdks/lib/presentation";
 import { toLocalDateString } from "@/lib/date";
+import { neutralizeSpreadsheetFormula } from "@/lib/spreadsheetSafety";
 
 export interface PDKSExportRecord {
   id: string;
@@ -151,8 +152,10 @@ export function exportToCsv(
     "Durum",
   ];
 
-  const escapeCsv = (v: string) =>
-    /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  const escapeCsv = (raw: string) => {
+    const v = neutralizeSpreadsheetFormula(raw);
+    return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  };
 
   const rows = records.map((r) =>
     [
