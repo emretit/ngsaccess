@@ -1,0 +1,953 @@
+{
+  "date": "2026-10-20",
+  "checks": [
+    {
+      "check": "original-preserved",
+      "status": "passed",
+      "detail": "SHA-256 matches supplied SVG"
+    },
+    {
+      "check": "svg-masters",
+      "status": "passed",
+      "detail": "17 files rendered; no bitmap, font, filter or script dependency"
+    },
+    {
+      "check": "ios-catalog",
+      "status": "passed",
+      "detail": "49 entries; dimensions, files and default/dark alpha verified"
+    },
+    {
+      "check": "favicon-ico",
+      "status": "passed",
+      "detail": "16, 32, 48 px entries"
+    },
+    {
+      "check": "flutter/assets/branding/android-foreground.png",
+      "status": "passed",
+      "detail": {
+        "paintedRadius": 299.04,
+        "safeRadius": 312.89
+      }
+    },
+    {
+      "check": "flutter/assets/branding/android-monochrome.png",
+      "status": "passed",
+      "detail": {
+        "paintedRadius": 299.04,
+        "safeRadius": 312.89
+      }
+    },
+    {
+      "check": "pwa-maskable-192",
+      "status": "passed",
+      "detail": {
+        "paintedRadius": 75.82,
+        "safeRadius": 76.80000000000001
+      }
+    },
+    {
+      "check": "pwa-maskable-512",
+      "status": "passed",
+      "detail": {
+        "paintedRadius": 201.54,
+        "safeRadius": 204.8
+      }
+    },
+    {
+      "check": "ios-tinted",
+      "status": "passed",
+      "detail": "Grayscale pixels verified"
+    },
+    {
+      "check": "web-manifest",
+      "status": "passed",
+      "detail": "All four icon references and sizes verified"
+    },
+    {
+      "check": "android-config",
+      "status": "passed",
+      "detail": "Foreground and monochrome references, zero extra inset verified"
+    },
+    {
+      "check": "flutter-svg-compiler",
+      "status": "passed",
+      "detail": "All six Flutter SVGs compiled with vector_graphics_compiler 1.3.2"
+    },
+    {
+      "check": "interactive-review",
+      "status": "passed",
+      "detail": "Browser loaded comparison and icon views; dark selection and 48 px size control worked and were visually inspected"
+    }
+  ],
+  "files": 144,
+  "limitations": [
+    "No application integration or physical-device test",
+    "Interactive review is a simulation of system masks"
+  ],
+  "inventory": [
+    {
+      "path": "README.md",
+      "bytes": 7777
+    },
+    {
+      "path": "build.mjs",
+      "bytes": 8060
+    },
+    {
+      "path": "flutter/assets/branding/android-foreground.png",
+      "bytes": 20965,
+      "width": 1024,
+      "height": 1024,
+      "alpha": true
+    },
+    {
+      "path": "flutter/assets/branding/android-monochrome.png",
+      "bytes": 20965,
+      "width": 1024,
+      "height": 1024,
+      "alpha": true
+    },
+    {
+      "path": "flutter/assets/branding/app-icon-ios-dark.png",
+      "bytes": 26520,
+      "width": 1024,
+      "height": 1024,
+      "alpha": true
+    },
+    {
+      "path": "flutter/assets/branding/app-icon-ios-tinted.png",
+      "bytes": 33479,
+      "width": 1024,
+      "height": 1024,
+      "alpha": false
+    },
+    {
+      "path": "flutter/assets/branding/app-icon.png",
+      "bytes": 46554,
+      "width": 1024,
+      "height": 1024,
+      "alpha": false
+    },
+    {
+      "path": "flutter/assets/branding/ngsplus-mark-brand.svg",
+      "bytes": 770
+    },
+    {
+      "path": "flutter/assets/branding/ngsplus-mark-ink.svg",
+      "bytes": 770
+    },
+    {
+      "path": "flutter/assets/branding/ngsplus-mark-white.svg",
+      "bytes": 770
+    },
+    {
+      "path": "flutter/assets/branding/ngsplus-wordmark-brand.svg",
+      "bytes": 672
+    },
+    {
+      "path": "flutter/assets/branding/ngsplus-wordmark-ink.svg",
+      "bytes": 672
+    },
+    {
+      "path": "flutter/assets/branding/ngsplus-wordmark-white.svg",
+      "bytes": 672
+    },
+    {
+      "path": "flutter/assets/branding/splash-dark.png",
+      "bytes": 32840,
+      "width": 1024,
+      "height": 1024,
+      "alpha": true
+    },
+    {
+      "path": "flutter/assets/branding/splash-light.png",
+      "bytes": 43657,
+      "width": 1024,
+      "height": 1024,
+      "alpha": true
+    },
+    {
+      "path": "flutter/flutter_launcher_icons.yaml",
+      "bytes": 652
+    },
+    {
+      "path": "native/android/res/drawable-hdpi/ic_launcher_foreground.png",
+      "bytes": 6529,
+      "width": 162,
+      "height": 162,
+      "alpha": true
+    },
+    {
+      "path": "native/android/res/drawable-hdpi/ic_launcher_monochrome.png",
+      "bytes": 6529,
+      "width": 162,
+      "height": 162,
+      "alpha": true
+    },
+    {
+      "path": "native/android/res/drawable-mdpi/ic_launcher_foreground.png",
+      "bytes": 4159,
+      "width": 108,
+      "height": 108,
+      "alpha": true
+    },
+    {
+      "path": "native/android/res/drawable-mdpi/ic_launcher_monochrome.png",
+      "bytes": 4159,
+      "width": 108,
+      "height": 108,
+      "alpha": true
+    },
+    {
+      "path": "native/android/res/drawable-xhdpi/ic_launcher_foreground.png",
+      "bytes": 8053,
+      "width": 216,
+      "height": 216,
+      "alpha": true
+    },
+    {
+      "path": "native/android/res/drawable-xhdpi/ic_launcher_monochrome.png",
+      "bytes": 8053,
+      "width": 216,
+      "height": 216,
+      "alpha": true
+    },
+    {
+      "path": "native/android/res/drawable-xxhdpi/ic_launcher_foreground.png",
+      "bytes": 11014,
+      "width": 324,
+      "height": 324,
+      "alpha": true
+    },
+    {
+      "path": "native/android/res/drawable-xxhdpi/ic_launcher_monochrome.png",
+      "bytes": 11014,
+      "width": 324,
+      "height": 324,
+      "alpha": true
+    },
+    {
+      "path": "native/android/res/drawable-xxxhdpi/ic_launcher_foreground.png",
+      "bytes": 14336,
+      "width": 432,
+      "height": 432,
+      "alpha": true
+    },
+    {
+      "path": "native/android/res/drawable-xxxhdpi/ic_launcher_monochrome.png",
+      "bytes": 14336,
+      "width": 432,
+      "height": 432,
+      "alpha": true
+    },
+    {
+      "path": "native/android/res/mipmap-anydpi-v26/ic_launcher.xml",
+      "bytes": 472
+    },
+    {
+      "path": "native/android/res/mipmap-hdpi/ic_launcher.png",
+      "bytes": 3059,
+      "width": 72,
+      "height": 72,
+      "alpha": false
+    },
+    {
+      "path": "native/android/res/mipmap-mdpi/ic_launcher.png",
+      "bytes": 1888,
+      "width": 48,
+      "height": 48,
+      "alpha": false
+    },
+    {
+      "path": "native/android/res/mipmap-xhdpi/ic_launcher.png",
+      "bytes": 4009,
+      "width": 96,
+      "height": 96,
+      "alpha": false
+    },
+    {
+      "path": "native/android/res/mipmap-xxhdpi/ic_launcher.png",
+      "bytes": 5919,
+      "width": 144,
+      "height": 144,
+      "alpha": false
+    },
+    {
+      "path": "native/android/res/mipmap-xxxhdpi/ic_launcher.png",
+      "bytes": 7771,
+      "width": 192,
+      "height": 192,
+      "alpha": false
+    },
+    {
+      "path": "native/android/res/values/colors.xml",
+      "bytes": 120
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Contents.json",
+      "bytes": 7203
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-1024x1024@1x.png",
+      "bytes": 44567,
+      "width": 1024,
+      "height": 1024,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-20x20@2x.png",
+      "bytes": 1505,
+      "width": 40,
+      "height": 40,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-20x20@3x.png",
+      "bytes": 2429,
+      "width": 60,
+      "height": 60,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-29x29@2x.png",
+      "bytes": 2273,
+      "width": 58,
+      "height": 58,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-29x29@3x.png",
+      "bytes": 3554,
+      "width": 87,
+      "height": 87,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-38x38@2x.png",
+      "bytes": 3239,
+      "width": 76,
+      "height": 76,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-38x38@3x.png",
+      "bytes": 4650,
+      "width": 114,
+      "height": 114,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-40x40@2x.png",
+      "bytes": 3287,
+      "width": 80,
+      "height": 80,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-40x40@3x.png",
+      "bytes": 4883,
+      "width": 120,
+      "height": 120,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-60x60@2x.png",
+      "bytes": 4883,
+      "width": 120,
+      "height": 120,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-60x60@3x.png",
+      "bytes": 7331,
+      "width": 180,
+      "height": 180,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-64x64@2x.png",
+      "bytes": 5138,
+      "width": 128,
+      "height": 128,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-64x64@3x.png",
+      "bytes": 7771,
+      "width": 192,
+      "height": 192,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-68x68@2x.png",
+      "bytes": 5830,
+      "width": 136,
+      "height": 136,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-76x76@2x.png",
+      "bytes": 6522,
+      "width": 152,
+      "height": 152,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-83.5x83.5@2x.png",
+      "bytes": 6888,
+      "width": 167,
+      "height": 167,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Dark-1024x1024@1x.png",
+      "bytes": 37549,
+      "width": 1024,
+      "height": 1024,
+      "alpha": true
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Dark-20x20@2x.png",
+      "bytes": 1781,
+      "width": 40,
+      "height": 40,
+      "alpha": true
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Dark-20x20@3x.png",
+      "bytes": 2914,
+      "width": 60,
+      "height": 60,
+      "alpha": true
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Dark-29x29@2x.png",
+      "bytes": 2785,
+      "width": 58,
+      "height": 58,
+      "alpha": true
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Dark-29x29@3x.png",
+      "bytes": 4342,
+      "width": 87,
+      "height": 87,
+      "alpha": true
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Dark-38x38@2x.png",
+      "bytes": 3972,
+      "width": 76,
+      "height": 76,
+      "alpha": true
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Dark-38x38@3x.png",
+      "bytes": 5556,
+      "width": 114,
+      "height": 114,
+      "alpha": true
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Dark-40x40@2x.png",
+      "bytes": 4029,
+      "width": 80,
+      "height": 80,
+      "alpha": true
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Dark-40x40@3x.png",
+      "bytes": 5930,
+      "width": 120,
+      "height": 120,
+      "alpha": true
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Dark-60x60@2x.png",
+      "bytes": 5930,
+      "width": 120,
+      "height": 120,
+      "alpha": true
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Dark-60x60@3x.png",
+      "bytes": 8765,
+      "width": 180,
+      "height": 180,
+      "alpha": true
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Dark-64x64@2x.png",
+      "bytes": 5743,
+      "width": 128,
+      "height": 128,
+      "alpha": true
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Dark-64x64@3x.png",
+      "bytes": 9205,
+      "width": 192,
+      "height": 192,
+      "alpha": true
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Dark-68x68@2x.png",
+      "bytes": 7188,
+      "width": 136,
+      "height": 136,
+      "alpha": true
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Dark-76x76@2x.png",
+      "bytes": 7929,
+      "width": 152,
+      "height": 152,
+      "alpha": true
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Dark-83.5x83.5@2x.png",
+      "bytes": 8159,
+      "width": 167,
+      "height": 167,
+      "alpha": true
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Tinted-1024x1024@1x.png",
+      "bytes": 42938,
+      "width": 1024,
+      "height": 1024,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Tinted-20x20@2x.png",
+      "bytes": 1401,
+      "width": 40,
+      "height": 40,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Tinted-20x20@3x.png",
+      "bytes": 2297,
+      "width": 60,
+      "height": 60,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Tinted-29x29@2x.png",
+      "bytes": 2152,
+      "width": 58,
+      "height": 58,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Tinted-29x29@3x.png",
+      "bytes": 3365,
+      "width": 87,
+      "height": 87,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Tinted-38x38@2x.png",
+      "bytes": 3117,
+      "width": 76,
+      "height": 76,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Tinted-38x38@3x.png",
+      "bytes": 4382,
+      "width": 114,
+      "height": 114,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Tinted-40x40@2x.png",
+      "bytes": 3097,
+      "width": 80,
+      "height": 80,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Tinted-40x40@3x.png",
+      "bytes": 4601,
+      "width": 120,
+      "height": 120,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Tinted-60x60@2x.png",
+      "bytes": 4601,
+      "width": 120,
+      "height": 120,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Tinted-60x60@3x.png",
+      "bytes": 6965,
+      "width": 180,
+      "height": 180,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Tinted-64x64@2x.png",
+      "bytes": 4850,
+      "width": 128,
+      "height": 128,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Tinted-64x64@3x.png",
+      "bytes": 7389,
+      "width": 192,
+      "height": 192,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Tinted-68x68@2x.png",
+      "bytes": 5607,
+      "width": 136,
+      "height": 136,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Tinted-76x76@2x.png",
+      "bytes": 6178,
+      "width": 152,
+      "height": 152,
+      "alpha": false
+    },
+    {
+      "path": "native/ios/AppIcon.appiconset/Icon-App-Tinted-83.5x83.5@2x.png",
+      "bytes": 6505,
+      "width": 167,
+      "height": 167,
+      "alpha": false
+    },
+    {
+      "path": "platform-sources/android-background.svg",
+      "bytes": 166
+    },
+    {
+      "path": "platform-sources/android-foreground.svg",
+      "bytes": 828
+    },
+    {
+      "path": "platform-sources/android-monochrome.svg",
+      "bytes": 828
+    },
+    {
+      "path": "platform-sources/app-icon-default.svg",
+      "bytes": 872
+    },
+    {
+      "path": "platform-sources/app-icon-ios-dark.svg",
+      "bytes": 828
+    },
+    {
+      "path": "platform-sources/app-icon-ios-tinted.svg",
+      "bytes": 872
+    },
+    {
+      "path": "platform-sources/apple-background.png",
+      "bytes": 16048,
+      "width": 1024,
+      "height": 1024,
+      "alpha": false
+    },
+    {
+      "path": "platform-sources/apple-foreground.png",
+      "bytes": 26520,
+      "width": 1024,
+      "height": 1024,
+      "alpha": true
+    },
+    {
+      "path": "png/ngsplus-mark-brand-1024.png",
+      "bytes": 43657,
+      "width": 1024,
+      "height": 1024,
+      "alpha": true
+    },
+    {
+      "path": "png/ngsplus-mark-brand-256.png",
+      "bytes": 7779,
+      "width": 256,
+      "height": 256,
+      "alpha": true
+    },
+    {
+      "path": "png/ngsplus-mark-brand-512.png",
+      "bytes": 17508,
+      "width": 512,
+      "height": 512,
+      "alpha": true
+    },
+    {
+      "path": "png/ngsplus-mark-ink-1024.png",
+      "bytes": 44033,
+      "width": 1024,
+      "height": 1024,
+      "alpha": true
+    },
+    {
+      "path": "png/ngsplus-mark-ink-256.png",
+      "bytes": 7862,
+      "width": 256,
+      "height": 256,
+      "alpha": true
+    },
+    {
+      "path": "png/ngsplus-mark-ink-512.png",
+      "bytes": 17815,
+      "width": 512,
+      "height": 512,
+      "alpha": true
+    },
+    {
+      "path": "png/ngsplus-mark-white-1024.png",
+      "bytes": 32840,
+      "width": 1024,
+      "height": 1024,
+      "alpha": true
+    },
+    {
+      "path": "png/ngsplus-mark-white-256.png",
+      "bytes": 6745,
+      "width": 256,
+      "height": 256,
+      "alpha": true
+    },
+    {
+      "path": "png/ngsplus-mark-white-512.png",
+      "bytes": 14632,
+      "width": 512,
+      "height": 512,
+      "alpha": true
+    },
+    {
+      "path": "png/ngsplus-wordmark-brand-1024.png",
+      "bytes": 15293,
+      "width": 1024,
+      "height": 352,
+      "alpha": true
+    },
+    {
+      "path": "png/ngsplus-wordmark-ink-1024.png",
+      "bytes": 15423,
+      "width": 1024,
+      "height": 352,
+      "alpha": true
+    },
+    {
+      "path": "png/ngsplus-wordmark-white-1024.png",
+      "bytes": 12132,
+      "width": 1024,
+      "height": 352,
+      "alpha": true
+    },
+    {
+      "path": "review/brand-board.png",
+      "bytes": 138601,
+      "width": 1600,
+      "height": 1180,
+      "alpha": true
+    },
+    {
+      "path": "review/brand-board.svg",
+      "bytes": 19354
+    },
+    {
+      "path": "review/index.html",
+      "bytes": 229175
+    },
+    {
+      "path": "review/original.png",
+      "bytes": 30196,
+      "width": 800,
+      "height": 800,
+      "alpha": true
+    },
+    {
+      "path": "review/polished.png",
+      "bytes": 31557,
+      "width": 800,
+      "height": 800,
+      "alpha": true
+    },
+    {
+      "path": "review.mjs",
+      "bytes": 10065
+    },
+    {
+      "path": "source/original.svg",
+      "bytes": 5869
+    },
+    {
+      "path": "svg/ngsplus-mark-black.svg",
+      "bytes": 770
+    },
+    {
+      "path": "svg/ngsplus-mark-brand.svg",
+      "bytes": 770
+    },
+    {
+      "path": "svg/ngsplus-mark-current.svg",
+      "bytes": 785
+    },
+    {
+      "path": "svg/ngsplus-mark-ink.svg",
+      "bytes": 770
+    },
+    {
+      "path": "svg/ngsplus-mark-small-brand.svg",
+      "bytes": 770
+    },
+    {
+      "path": "svg/ngsplus-mark-small-white.svg",
+      "bytes": 770
+    },
+    {
+      "path": "svg/ngsplus-mark-white.svg",
+      "bytes": 770
+    },
+    {
+      "path": "svg/ngsplus-micro-black.svg",
+      "bytes": 245
+    },
+    {
+      "path": "svg/ngsplus-micro-brand.svg",
+      "bytes": 245
+    },
+    {
+      "path": "svg/ngsplus-micro-current.svg",
+      "bytes": 255
+    },
+    {
+      "path": "svg/ngsplus-micro-ink.svg",
+      "bytes": 245
+    },
+    {
+      "path": "svg/ngsplus-micro-white.svg",
+      "bytes": 245
+    },
+    {
+      "path": "svg/ngsplus-wordmark-black.svg",
+      "bytes": 672
+    },
+    {
+      "path": "svg/ngsplus-wordmark-brand.svg",
+      "bytes": 672
+    },
+    {
+      "path": "svg/ngsplus-wordmark-current.svg",
+      "bytes": 682
+    },
+    {
+      "path": "svg/ngsplus-wordmark-ink.svg",
+      "bytes": 672
+    },
+    {
+      "path": "svg/ngsplus-wordmark-white.svg",
+      "bytes": 672
+    },
+    {
+      "path": "web/apple-touch-icon.png",
+      "bytes": 5332,
+      "width": 180,
+      "height": 180,
+      "alpha": false
+    },
+    {
+      "path": "web/favicon-16.png",
+      "bytes": 295,
+      "width": 16,
+      "height": 16,
+      "alpha": true
+    },
+    {
+      "path": "web/favicon-32.png",
+      "bytes": 365,
+      "width": 32,
+      "height": 32,
+      "alpha": true
+    },
+    {
+      "path": "web/favicon-48.png",
+      "bytes": 527,
+      "width": 48,
+      "height": 48,
+      "alpha": true
+    },
+    {
+      "path": "web/favicon.ico",
+      "bytes": 15086
+    },
+    {
+      "path": "web/favicon.svg",
+      "bytes": 328
+    },
+    {
+      "path": "web/icon-192.png",
+      "bytes": 5685,
+      "width": 192,
+      "height": 192,
+      "alpha": false
+    },
+    {
+      "path": "web/icon-512.png",
+      "bytes": 18398,
+      "width": 512,
+      "height": 512,
+      "alpha": false
+    },
+    {
+      "path": "web/icon-maskable-192.png",
+      "bytes": 5729,
+      "width": 192,
+      "height": 192,
+      "alpha": false
+    },
+    {
+      "path": "web/icon-maskable-512.png",
+      "bytes": 18699,
+      "width": 512,
+      "height": 512,
+      "alpha": false
+    },
+    {
+      "path": "web/logo-brand.svg",
+      "bytes": 770
+    },
+    {
+      "path": "web/logo-horizontal-brand.svg",
+      "bytes": 672
+    },
+    {
+      "path": "web/logo-horizontal-ink.svg",
+      "bytes": 672
+    },
+    {
+      "path": "web/logo-horizontal-white.svg",
+      "bytes": 672
+    },
+    {
+      "path": "web/logo-ink.svg",
+      "bytes": 770
+    },
+    {
+      "path": "web/logo-white.svg",
+      "bytes": 770
+    },
+    {
+      "path": "web/og-image.png",
+      "bytes": 29996,
+      "width": 1200,
+      "height": 630,
+      "alpha": false
+    },
+    {
+      "path": "web/site.webmanifest",
+      "bytes": 710
+    }
+  ]
+}

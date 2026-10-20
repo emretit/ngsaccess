@@ -1,0 +1,15 @@
+# Run from the Flutter project after copying assets/branding/ and this file.
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/branding/app-icon.png
+  min_sdk_android: 21
+  adaptive_icon_background: "#B00016"
+  adaptive_icon_foreground: assets/branding/android-foreground.png
+  adaptive_icon_foreground_inset: 0
+  adaptive_icon_monochrome: assets/branding/android-monochrome.png
+  remove_alpha_ios: true
+  background_color_ios: "#B00016"
+  image_path_ios_dark_transparent: assets/branding/app-icon-ios-dark.png
+  image_path_ios_tinted_grayscale: assets/branding/app-icon-ios-tinted.png
+  desaturate_tinted_to_grayscale_ios: true
