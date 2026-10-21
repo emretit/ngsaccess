@@ -30,8 +30,16 @@ const creators = [
 describe("device creation project boundary", () => {
   for (const creator of creators) {
     for (const role of ["project_admin", "project_user"] as const) {
-      it(`${creator.name}: ${role} rejects missing/inaccessible projects and accepts membership`, async () => {
+      it(`${creator.name}: ${role} enforces manager role and project membership`, async () => {
         const { t, caller, projectId, foreignId } = await fixture(role);
+        if (role === "project_user") {
+          await expect(caller.mutation(creator.ref, creator.args)).rejects.toThrow("yetkiniz yok");
+          await expect(caller.mutation(creator.ref, { ...creator.args, projectId: foreignId })).rejects.toThrow("yetkiniz yok");
+          await expect(caller.mutation(creator.ref, { ...creator.args, projectId })).rejects.toThrow("yetkiniz yok");
+          expect(await t.run(ctx => ctx.db.query("devices").collect())).toHaveLength(0);
+          expect(await t.run(ctx => ctx.db.query("zones").collect())).toHaveLength(0);
+          return;
+        }
         await expect(caller.mutation(creator.ref, creator.args)).rejects.toThrow("bir proje seçmelisiniz");
         await expect(caller.mutation(creator.ref, { ...creator.args, projectId: foreignId })).rejects.toThrow("erişim yetkiniz yok");
         expect(await t.run(ctx => ctx.db.query("devices").collect())).toHaveLength(0);

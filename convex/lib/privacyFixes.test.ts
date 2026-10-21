@@ -9,6 +9,7 @@ vi.mock("./customFunctions", () => {
   return { authedMutation: wrap, authedQuery: wrap, authedAction: wrap, adminMutation: wrap, adminQuery: wrap };
 });
 vi.mock("./auth", () => ({
+  isManager: (user: { role: string }) => user.role === "project_admin" || user.role === "super_admin",
   requireSetupSecret: vi.fn(), getProjectIdsForUser: vi.fn(async () => ["project-a"]),
   isProjectAllowed: (ids: string[], id: string) => ids.includes(id),
   requireEmployeeAccess: vi.fn(async () => ({ projectId: "project-a" })),
@@ -46,7 +47,7 @@ describe("KVKK inceleme düzeltmeleri", () => {
     const error = new ConvexError({ code: "BIOMETRIC_DISABLED", message: "Biyometri modülü kapalı." });
     const runQuery = vi.fn().mockResolvedValueOnce(["project-a"])
       .mockResolvedValueOnce({ projectId: "project-a", hikTransport: "gateway", hikDevIndex: "dev" }).mockRejectedValueOnce(error);
-    await expect(handler<ActionCtx>(captureFaceFromDevice)({ runQuery } as unknown as ActionCtx, { deviceId: "device-a" })).rejects.toMatchObject({ data: { code: "BIOMETRIC_DISABLED" } });
+    await expect(handler<ActionCtx>(captureFaceFromDevice)({ runQuery, user: { role: "project_admin" } } as unknown as ActionCtx, { deviceId: "device-a" })).rejects.toMatchObject({ data: { code: "BIOMETRIC_DISABLED" } });
     expect(getFunctionName(runQuery.mock.calls[2][0])).toBe("privacyBiometric:assertBiometricDeviceAllowed");
     expect(mocks.capture).not.toHaveBeenCalled();
   });

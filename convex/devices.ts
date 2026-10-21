@@ -4,7 +4,6 @@ import { ConvexError, v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import {
   authedQuery,
-  authedMutation,
   adminMutation,
   employeeAuthedQuery,
 } from "./lib/customFunctions";
@@ -113,7 +112,7 @@ export const getById = authedQuery({
   },
 });
 
-export const create = authedMutation({
+export const create = adminMutation({
   args: {
     name: v.string(),
     projectId: v.optional(v.id("projects")),
@@ -199,7 +198,7 @@ export const create = authedMutation({
   },
 });
 
-export const update = authedMutation({
+export const update = adminMutation({
   args: {
     deviceId: v.id("devices"),
     name: v.optional(v.string()),
@@ -316,7 +315,7 @@ export const update = authedMutation({
   },
 });
 
-export const remove = authedMutation({
+export const remove = adminMutation({
   args: { deviceId: v.id("devices") },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -545,7 +544,7 @@ export const getPanelDoorByIo = internalQuery({
  * panel kendi adını taşır, bölge mantıksal alandır ve bağımsız adlandırılır.
  * Bölge/kapı üretimi provisionPanelZoneAndDoors helper'ıyla paylaşılır.
  */
-export const createIdePanel = authedMutation({
+export const createIdePanel = adminMutation({
   args: {
     name: v.string(),
     status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
@@ -652,7 +651,7 @@ export const createIdePanel = authedMutation({
  * topolojiyi belirler (createIdePanel deseni). Gateway kaydı (ehome) ayrıca submission
  * tarafında registerDeviceOnGateway ile yapılır — bu mutation panele bağlanmaz.
  */
-export const createHikDevice = authedMutation({
+export const createHikDevice = adminMutation({
   args: {
     name: v.string(),
     projectId: v.optional(v.id("projects")),
@@ -1240,19 +1239,24 @@ export const applyGatewayHeartbeat = internalMutation({
         return false;
       }
     }
-    const patch: Record<string, unknown> = {
-      hikLastSeenAt: Date.now(),
-      updatedAt: new Date().toISOString(),
-    };
-    if (args.online) {
-      patch.hikOfflineHint = undefined;
-      patch.lastSeen = new Date().toISOString();
-    } else {
-      patch.hikOfflineHint = "Gateway: offline";
+    const now = Date.now();
+    const offlineHint = args.online ? undefined : "Gateway çevrimdışı";
+    const deviceIp = device.deviceIp || args.deviceIp || undefined;
+    const model = device.hikModel || args.model || undefined;
+    const changed = device.hikOfflineHint !== offlineHint ||
+      device.deviceIp !== deviceIp || device.hikModel !== model;
+    if (!changed && device.hikLastSeenAt !== undefined && now - device.hikLastSeenAt < 60_000) {
+      return true;
     }
-    if (args.deviceIp && !device.deviceIp) patch.deviceIp = args.deviceIp;
-    if (args.model && !device.hikModel) patch.hikModel = args.model;
-    await ctx.db.patch(device._id, patch);
+    const nowIso = new Date(now).toISOString();
+    await ctx.db.patch(device._id, {
+      hikLastSeenAt: now,
+      updatedAt: nowIso,
+      hikOfflineHint: offlineHint,
+      deviceIp,
+      hikModel: model,
+      ...(args.online ? { lastSeen: nowIso } : {}),
+    });
     return true;
   },
 });

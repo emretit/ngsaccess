@@ -1,4 +1,3 @@
-import { deviceConnection, DEVICE_ONLINE_WINDOW_MS } from "./lib/deviceConnection";
 import { v } from "convex/values";
 import { authedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
@@ -21,8 +20,8 @@ type HikCapabilitySummary = {
   probes: HikProbeSummary[];
 };
 
-type HikQueueStatus = "pending" | "processing" | "done" | "failed";
-type IdeQueueStatus = "pending" | "sent" | "acked" | "failed";
+type HikQueueStatus = "pending" | "processing" | "failed";
+type IdeQueueStatus = "pending" | "sent" | "failed";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -87,21 +86,24 @@ export const getOverview = authedQuery({
       return null;
     }
 
-    const [doors, readers, recentEvents] = await Promise.all([
+    const [doorRows, readerRows, recentEvents] = await Promise.all([
       ctx.db
         .query("doors")
         .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
-        .collect(),
+        .take(257),
       ctx.db
         .query("readers")
         .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
-        .collect(),
+        .take(1025),
       ctx.db
         .query("deviceEvents")
         .withIndex("by_device_and_event_time", (q) => q.eq("deviceId", args.deviceId))
         .order("desc")
         .take(10),
     ]);
+
+    const doors = doorRows.slice(0, 256);
+    const readers = readerRows.slice(0, 1024);
 
     const latestReadings = await Promise.all(
       doors.map(async (door) => {
@@ -120,97 +122,40 @@ export const getOverview = authedQuery({
     );
     const readingByDoorId = new Map(latestReadings.map((item) => [item.doorId, item.reading]));
 
-    const hikStatuses: HikQueueStatus[] = ["pending", "processing", "done", "failed"];
-    const hikQueuePairs = await Promise.all(
-      hikStatuses.map(async (status) => {
-        const rows = await ctx.db
-          .query("hikPendingOperations")
-          .withIndex("by_device_status", (q) => q.eq("deviceId", args.deviceId).eq("status", status))
-          .collect();
-        return [status, rows] as const;
-      }),
-    );
-
-    const ideStatuses: IdeQueueStatus[] = ["pending", "sent", "acked", "failed"];
-    const ideQueuePairs = await Promise.all(
-      ideStatuses.map(async (status) => {
-        const rows = await ctx.db
-          .query("idePendingOperations")
-          .withIndex("by_device_status", (q) => q.eq("deviceId", args.deviceId).eq("status", status))
-          .collect();
-        return [status, rows] as const;
-      }),
-    );
-    const hikRowsByStatus = new Map(hikQueuePairs);
-    const ideRowsByStatus = new Map(ideQueuePairs);
-    const summarizeHikQueue = (status: HikQueueStatus) => {
-      const rows = hikRowsByStatus.get(status) ?? [];
-      return {
-        count: rows.length,
-        latest: rows
-          .sort((a, b) => b.createdAt - a.createdAt)
-          .slice(0, 3)
-          .map((row) => ({
-            _id: row._id,
-            operation: row.operation,
-            attemptCount: row.attemptCount,
-            lastError: row.lastError,
-            createdAt: row.createdAt,
-            completedAt: row.completedAt,
-          })),
-      };
-    };
-    const summarizeIdeQueue = (status: IdeQueueStatus) => {
-      const rows = ideRowsByStatus.get(status) ?? [];
-      return {
-        count: rows.length,
-        latest: rows
-          .sort((a, b) => b.createdAt - a.createdAt)
-          .slice(0, 3)
-          .map((row) => ({
-            _id: row._id,
-            opType: row.opType,
-            attempts: row.attempts,
-            lastError: row.lastError,
-            responseMessage: row.responseMessage,
-            createdAt: row.createdAt,
-            ackedAt: row.ackedAt,
-          })),
-      };
-    };
-
-    const now = Date.now();
-    const onlineWindowMs = DEVICE_ONLINE_WINDOW_MS;
+    const hikStatuses: HikQueueStatus[] = ["pending", "processing", "failed"];
+    const ideStatuses: IdeQueueStatus[] = ["pending", "sent", "failed"];
+    const hikQueuePairs = await Promise.all(hikStatuses.map(async (status) => {
+      const rows = device.brand === "hikvision" ? await ctx.db
+        .query("hikPendingOperations")
+        .withIndex("by_device_status", (q) => q.eq("deviceId", args.deviceId).eq("status", status))
+        .take(101) : [];
+      return [status, { count: Math.min(rows.length, 100), capped: rows.length > 100 }] as const;
+    }));
+    const ideQueuePairs = await Promise.all(ideStatuses.map(async (status) => {
+      const rows = device.brand === "ide_smart" ? await ctx.db
+        .query("idePendingOperations")
+        .withIndex("by_device_status", (q) => q.eq("deviceId", args.deviceId).eq("status", status))
+        .take(101) : [];
+      return [status, { count: Math.min(rows.length, 100), capped: rows.length > 100 }] as const;
+    }));
+    const hikQueue = Object.fromEntries(hikQueuePairs);
+    const ideQueue = Object.fromEntries(ideQueuePairs);
 
     return {
+      limits: { doorsCapped: doorRows.length > 256, readersCapped: readerRows.length > 1024 },
       device: {
         _id: device._id,
         name: device.name,
         brand: device.brand ?? "other",
-        projectId: device.projectId,
-        status: device.status,
-        isActive: device.isActive,
         deviceIp: device.deviceIp,
         deviceSerial: device.deviceSerial,
         lastSeen: device.lastSeen,
-        doorCount: device.doorCount,
         hikTransport: device.hikTransport,
         hikDevIndex: device.hikDevIndex,
-        ehomeID: device.ehomeID,
         hikModel: device.hikModel,
         hikLastSeenAt: device.hikLastSeenAt,
         hikOfflineHint: device.hikOfflineHint,
-        hikDoorCount: device.hikDoorCount,
-        hikCapabilitiesUpdatedAt: device.hikCapabilitiesUpdatedAt,
-        hikWorkStatus: device.hikWorkStatus,
         ideUuid: device.ideUuid,
-        ideDoorCount: device.ideDoorCount,
-        ideHttpPort: device.ideHttpPort,
-      },
-      online: {
-        isOnline: deviceConnection(device, now) === "online",
-        checkedAt: now,
-        windowMs: onlineWindowMs,
       },
       doors: doors.map((door) => {
         const reading = readingByDoorId.get(door._id) ?? null;
@@ -223,8 +168,6 @@ export const getOverview = authedQuery({
           readerName: door.readerName,
           readerDirection: door.readerDirection,
           hikDoorNo: door.hikDoorNo,
-          hikDoorStatusPlan: door.hikDoorStatusPlan,
-          hikVerifyPlan: door.hikVerifyPlan,
           latestReading: reading
             ? {
                 _id: reading._id,
@@ -245,26 +188,24 @@ export const getOverview = authedQuery({
         status: reader.status,
         ioId: reader.ioId,
         hikReaderNo: reader.hikReaderNo,
-        hikVerifyMode: reader.hikVerifyMode,
         hikCardReaderName: reader.hikCardReaderName,
         hikCardReaderPlanTemplateNo: reader.hikCardReaderPlanTemplateNo,
         hikCardReaderAntiSneakEnabled: reader.hikCardReaderAntiSneakEnabled,
-        hikLastCfgAt: reader.hikLastCfgAt,
       })),
-      recentEvents,
+      recentEvents: recentEvents.map(({ _id, label, eventTime, cardNo, category, severity }) => ({
+        _id, label, eventTime, cardNo, category, severity,
+      })),
       capabilities: parseHikCapabilitySummary(device.hikCapabilitiesSnapshot),
       queues: {
         hikvision: {
-          pending: summarizeHikQueue("pending"),
-          processing: summarizeHikQueue("processing"),
-          done: summarizeHikQueue("done"),
-          failed: summarizeHikQueue("failed"),
+          pending: hikQueue.pending,
+          processing: hikQueue.processing,
+          failed: hikQueue.failed,
         },
         ideSmart: {
-          pending: summarizeIdeQueue("pending"),
-          sent: summarizeIdeQueue("sent"),
-          acked: summarizeIdeQueue("acked"),
-          failed: summarizeIdeQueue("failed"),
+          pending: ideQueue.pending,
+          sent: ideQueue.sent,
+          failed: ideQueue.failed,
         },
       },
     };

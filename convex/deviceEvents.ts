@@ -1,7 +1,5 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
-import { authedMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { classifyHikEvent } from "./lib/hikEventCatalog";
 import { toUtcISO } from "./lib/trDate";
 import { notifyAlarmIfNeeded } from "./lib/alarmNotify";
@@ -22,22 +20,17 @@ const truncateRawData = (value: string | undefined): string | undefined => {
   return value.length > 10000 ? value.slice(0, 10000) : value;
 };
 
-export const recordSystemOperation = authedMutation({
+export const recordOperationInternal = internalMutation({
   args: {
     deviceId: v.id("devices"),
     label: v.string(),
     ok: v.boolean(),
-    rawData: v.optional(v.string()),
+    summary: v.optional(v.string()),
   },
   handler: async (ctx, args): Promise<{ inserted: boolean }> => {
     const device = await ctx.db.get(args.deviceId);
     if (!device) {
       throw new Error("Cihaz bulunamadı");
-    }
-
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
-      throw new Error("Bu cihaza erişim yetkiniz yok");
     }
 
     const now = new Date().toISOString();
@@ -49,7 +42,7 @@ export const recordSystemOperation = authedMutation({
       category: "operation",
       severity: args.ok ? "info" : "warning",
       label: trimOptional(args.label) ?? "Cihaz operasyonu",
-      rawData: truncateRawData(args.rawData),
+      rawData: trimOptional(args.summary)?.slice(0, 2000),
       deviceSerial: trimOptional(device.deviceSerial),
       deviceIp: trimOptional(device.deviceIp),
       hikDevIndex: trimOptional(device.hikDevIndex),

@@ -6,9 +6,44 @@ import { v } from "convex/values";
 import type { GenericActionCtx } from "convex/server";
 import type { DataModel } from "../_generated/dataModel";
 import { authedAction } from "../lib/customFunctions";
-import { isProjectAllowed } from "../lib/auth";
+import { isProjectAllowed, isManager } from "../lib/auth";
 import type { Id } from "../_generated/dataModel";
 import { buildIdePermissionRecord, capPermissionNos, outOfRangeIoIds } from "../ideSync";
+
+/** Audit only executed commands; never persist gateway payloads or card lists. */
+async function auditDeviceCommand<T extends { ok: boolean; queued?: boolean; error?: string }>(
+  ctx: GenericActionCtx<DataModel>,
+  deviceId: Id<"devices">,
+  label: string,
+  run: () => Promise<T>,
+  summarize?: (result: T) => string | undefined,
+): Promise<T> {
+  let result: T;
+  try {
+    result = await run();
+  } catch (error: unknown) {
+    try {
+      await ctx.runMutation(internal.deviceEvents.recordOperationInternal, {
+        deviceId, label: `${label}: başarısız`, ok: false,
+        summary: (error instanceof Error ? error.message : "Bilinmeyen hata").replace(/\d{6,}/g, "…").slice(0, 200),
+      });
+    } catch {
+      console.warn("Cihaz komutu audit kaydı yazılamadı", { deviceId, label });
+    }
+    throw error;
+  }
+  try {
+    await ctx.runMutation(internal.deviceEvents.recordOperationInternal, {
+      deviceId,
+      label: `${label}: ${result.ok ? result.queued ? "sıraya alındı" : "komut iletildi" : "başarısız"}`,
+      ok: result.ok,
+      summary: result.ok ? summarize?.(result) : result.error?.replace(/\d{6,}/g, "…").slice(0, 200),
+    });
+  } catch {
+    console.warn("Cihaz komutu audit kaydı yazılamadı", { deviceId, label });
+  }
+  return result;
+}
 
 /**
  * IDE Smart panel action'ları.
@@ -357,13 +392,15 @@ export const openIdeDoor = authedAction({
     const keep: 0 | 1 = args.keep === 0 ? 0 : 1;
 
     // Komut kuyruğa gider, bridge broker'a publish eder (panel LAN'da, MQTT ile bağlı).
-    await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
-      deviceId: device._id,
-      projectId: device.projectId,
-      opType: "openDoor",
-      payload: { ioId: door.ioId, keep },
+    return await auditDeviceCommand(ctx, args.deviceId, "Kapı aç", async () => {
+      await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
+        deviceId: device._id,
+        projectId: device.projectId,
+        opType: "openDoor",
+        payload: { ioId: door.ioId, keep },
+      });
+      return { ok: true, queued: true };
     });
-    return { ok: true, queued: true };
   },
 });
 
@@ -376,17 +413,20 @@ export const triggerPanelSync = authedAction({
     const loaded = await loadIdePanel(ctx, args.deviceId);
     if ("error" in loaded) return { ok: false, error: loaded.error };
     const { device } = loaded;
+    if (!isManager(ctx.user)) return { ok: false, error: "Bu işlem için yönetici yetkisi gerekiyor" };
     if (!device.ideUuid) {
       return { ok: false, error: "Panel UUID tanımsız" };
     }
 
-    await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
-      deviceId: device._id,
-      projectId: device.projectId,
-      opType: "triggerSync",
-      payload: { reset: false },
-    });
+    return await auditDeviceCommand(ctx, args.deviceId, "Panel senkronu", async () => {
+      await ctx.runMutation(internal.ideSync.enqueueIdeOp, {
+        deviceId: device._id,
+        projectId: device.projectId,
+        opType: "triggerSync",
+        payload: { reset: false },
+      });
 
-    return { ok: true, queued: true };
+      return { ok: true, queued: true };
+    });
   },
 });

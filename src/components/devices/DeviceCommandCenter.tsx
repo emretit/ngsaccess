@@ -2,7 +2,7 @@ import { formatTrDateTime } from "@/lib/date";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import {
   Activity,
   AlertCircle,
@@ -113,15 +113,6 @@ function eventCategoryLabel(category: string): string {
   }
 }
 
-function stringifyUnknown(value: unknown): string | undefined {
-  try {
-    const result = JSON.stringify(value);
-    return result === undefined ? undefined : result;
-  } catch {
-    return undefined;
-  }
-}
-
 function getAdapter(device: ServerDevice, hasIdeDoor: boolean): BrandAdapter {
   const brand = device.brand ?? "other";
   if (brand === "hikvision") {
@@ -189,7 +180,6 @@ export function DeviceCommandCenter({ device, onUpdated, onPendingChange }: Devi
   const [clock, setClock] = useState(() => Date.now());
   useEffect(() => { const timer = window.setInterval(() => setClock(Date.now()), 15000); return () => window.clearInterval(timer); }, []);
   const overview = useQuery(api.deviceCenter.getOverview, { deviceId: device._id });
-  const recordOperation = useMutation(api.deviceEvents.recordSystemOperation);
   const fetchCapabilities = useAction(api.actions.hikGatewayDevice.fetchDeviceCapabilities);
   const fetchWorkStatus = useAction(api.actions.hikGatewayDevice.fetchDeviceWorkStatus);
   const reconcile = useAction(api.actions.hikGatewayDevice.reconcileDevice);
@@ -207,15 +197,12 @@ export function DeviceCommandCenter({ device, onUpdated, onPendingChange }: Devi
   const [capturedCard, setCapturedCard] = useState<string | null>(null);
 
   const { run: execute, pending } = useAsyncAction(async (
-    id: string, label: string, run: () => Promise<OperationResult>,
+    id: string, _label: string, run: () => Promise<OperationResult>,
     onSuccess?: (result: OperationResult) => void,
   ) => {
     setBusy(id);
     try {
       const result = await run();
-      try {
-        await recordOperation({ deviceId: device._id, label: `${label}: ${result.queued ? "sıraya alındı" : result.ok ? "sonuç alındı" : "başarısız"}`, ok: result.ok, rawData: stringifyUnknown(result) });
-      } catch (error: unknown) { console.warn("Operation audit kaydı yazılamadı", error); }
       if (!result.ok) throw new Error(result.error ?? "İşlem başarısız");
       notify.success(result.queued ? "Komut sıraya alındı; cihaz onayı bekleniyor." : commandResultMessage(result));
       onSuccess?.(result);
@@ -248,19 +235,17 @@ export function DeviceCommandCenter({ device, onUpdated, onPendingChange }: Devi
     : "Cihaz çevrimdışı — komut ulaşmayabilir";
   const hasIdeDoor = overview.doors.some((door) => typeof door.ioId === "number");
   const adapter = getAdapter(overview.device, hasIdeDoor);
-  const queueRows: { label: string; value: number }[] =
+  const queueRows: { label: string; value: number; capped: boolean }[] =
     device.brand === "ide_smart"
       ? [
-          { label: "Bekleyen", value: overview.queues.ideSmart.pending.count },
-          { label: "Gönderildi", value: overview.queues.ideSmart.sent.count },
-          { label: "Onaylandı", value: overview.queues.ideSmart.acked.count },
-          { label: "Hatalı", value: overview.queues.ideSmart.failed.count },
+          { label: "Bekleyen", value: overview.queues.ideSmart.pending.count, capped: overview.queues.ideSmart.pending.capped },
+          { label: "Gönderildi", value: overview.queues.ideSmart.sent.count, capped: overview.queues.ideSmart.sent.capped },
+          { label: "Hatalı", value: overview.queues.ideSmart.failed.count, capped: overview.queues.ideSmart.failed.capped },
         ]
       : [
-          { label: "Bekleyen", value: overview.queues.hikvision.pending.count },
-          { label: "İşleniyor", value: overview.queues.hikvision.processing.count },
-          { label: "Tamamlandı", value: overview.queues.hikvision.done.count },
-          { label: "Hatalı", value: overview.queues.hikvision.failed.count },
+          { label: "Bekleyen", value: overview.queues.hikvision.pending.count, capped: overview.queues.hikvision.pending.capped },
+          { label: "İşleniyor", value: overview.queues.hikvision.processing.count, capped: overview.queues.hikvision.processing.capped },
+          { label: "Hatalı", value: overview.queues.hikvision.failed.count, capped: overview.queues.hikvision.failed.capped },
         ];
 
   const makeConfirmed = (action: ConfirmedAction) => {
@@ -426,10 +411,10 @@ export function DeviceCommandCenter({ device, onUpdated, onPendingChange }: Devi
         <div>
           <div className="min-w-0 border-b border-line py-3">
             <p className="mb-2 text-xs text-muted-foreground">Yalnız yüklenen kuyruk kayıtları. Tamamlanan işlemler fiziksel kapı açılışını doğrulamaz.</p>
-            <p role="status" className="mb-2 text-sm">{queueRows.filter(row => row.label === "Bekleyen" || row.label === "Gönderildi" || row.label === "İşleniyor").reduce((total, row) => total + row.value, 0)} işlem bekliyor · {queueRows.find(row => row.label === "Hatalı")?.value ?? 0} işlem başarısız</p>
+            <p role="status" className="mb-2 text-sm">{queueRows.filter(row => row.label === "Bekleyen" || row.label === "Gönderildi" || row.label === "İşleniyor").reduce((total, row) => total + row.value, 0)}{queueRows.some(row => row.label !== "Hatalı" && row.capped) ? "+" : ""} işlem bekliyor · {queueRows.find(row => row.label === "Hatalı")?.value ?? 0}{queueRows.find(row => row.label === "Hatalı")?.capped ? "+" : ""} işlem başarısız</p>
             <div className="grid grid-cols-2 gap-2">
               {queueRows.map((row) => (
-                <Metric key={row.label} label={row.label} value={String(row.value)} compact />
+                <Metric key={row.label} label={row.label} value={row.capped ? "100+" : String(row.value)} compact />
               ))}
             </div>
           </div>
