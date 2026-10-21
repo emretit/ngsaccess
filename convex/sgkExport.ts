@@ -1,3 +1,4 @@
+import { employedDuring, employedOn } from "./lib/employment";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { authedQuery } from "./lib/customFunctions";
@@ -72,7 +73,7 @@ export const buildAphbForMonth = authedQuery({
       readingsByEmpDay.set(reading.employeeId, workedDays);
     }
     const employees = projectEmployees.filter(
-      (employee) => employee.isActive === true || employeesWithReadings.has(employee._id),
+      (employee) => employedDuring(employee, startDate, endDate) || employeesWithReadings.has(employee._id),
     );
     const warnings: string[] = [];
     const entries: AphbEmployeeEntry[] = await Promise.all(employees.map(async (employee) => {
@@ -85,7 +86,7 @@ export const buildAphbForMonth = authedQuery({
         leave.startDate <= endDate && leave.endDate >= startDate,
       );
       const result = calculateSgkEksikGun({
-        monthDays,
+        monthDays: employee.employmentEndDate ? monthDays.filter(date => employedOn(employee, date)) : monthDays,
         workingDays: generalSettings?.workingDays,
         holidayMap,
         workedDays: readingsByEmpDay.get(employee._id) ?? new Set<string>(),
@@ -94,7 +95,9 @@ export const buildAphbForMonth = authedQuery({
       return {
         tcKimlikNo: employee.tcNo?.trim() ?? "",
         adSoyad: `${employee.firstName} ${employee.lastName}`.trim(),
-        cumulativeWorkdays: result.primGunu,
+        cumulativeWorkdays: employee.employmentEndDate && employee.employmentEndDate < endDate
+          ? Math.max(0, Math.min(30, monthDays.filter(date => employedOn(employee, date)).length) - result.eksikGunSayisi)
+          : result.primGunu,
         totalOvertimeHours: 0,
         eksikGunSayisi: result.eksikGunSayisi,
         eksikGunNedeni: result.eksikGunNedeni,

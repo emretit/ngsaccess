@@ -9,7 +9,7 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { authedQuery, adminMutation, adminQuery } from "./lib/customFunctions";
-import { getProjectIdsForUser } from "./lib/auth";
+import { getProjectIdsForUser, isManager } from "./lib/auth";
 import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, QueryCtx } from "./_generated/server";
 import { cascadeRemoveEmployeePII } from "./lib/employeeCascade";
@@ -94,6 +94,9 @@ export const list = authedQuery({
           : null;
         return {
           ...emp,
+          terminationReason: isManager(ctx.user) ? emp.terminationReason : undefined,
+          sgkExitCode: isManager(ctx.user) ? emp.sgkExitCode : undefined,
+          terminatedBy: isManager(ctx.user) ? emp.terminatedBy : undefined,
           hourlyRate: maskPay(emp.hourlyRate, canSeePay(ctx.user)),
           monthlySalary: maskPay(emp.monthlySalary, canSeePay(ctx.user)),
           departments: department
@@ -141,6 +144,9 @@ export const getById = authedQuery({
     }
     return {
       ...emp,
+      terminationReason: isManager(ctx.user) ? emp.terminationReason : undefined,
+      sgkExitCode: isManager(ctx.user) ? emp.sgkExitCode : undefined,
+      terminatedBy: isManager(ctx.user) ? emp.terminatedBy : undefined,
       hourlyRate: maskPay(emp.hourlyRate, canSeePay(ctx.user)),
       monthlySalary: maskPay(emp.monthlySalary, canSeePay(ctx.user)),
     };
@@ -283,6 +289,9 @@ export const update = adminMutation({
       updates.cardNumber !== undefined && updates.cardNumber !== emp.cardNumber;
     const activeChanged =
       updates.isActive !== undefined && updates.isActive !== emp.isActive;
+    if (emp.employmentEndDate && updates.isActive === true && emp.isActive !== true) {
+      throw new Error("İşten ayrılan kişiyi aktifleştirmek için 'Geri al' kullanın.");
+    }
 
     // Kart no değiştiyse ESKİ kartı IDE panellerinden sök (yoksa orphan kalır → eski
     // kart hâlâ kapı açar). Paneller groupMembers'tan çözülür (kart değişiminden bağımsız);

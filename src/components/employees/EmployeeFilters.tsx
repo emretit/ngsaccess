@@ -4,7 +4,7 @@ interface Props {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   status: string;
-  statusCounts: { all: number; active: number; inactive: number };
+  statusCounts: { all: number; active: number; inactive: number; terminated?: number };
   onStatusChange: (value: string) => void;
   sort: string;
   onSortChange: (value: string) => void;
@@ -20,6 +20,7 @@ export function EmployeeFilters(p: Props) {
         <SelectItem value="all">Tüm durumlar ({p.statusCounts.all})</SelectItem>
         <SelectItem value="active">Aktif ({p.statusCounts.active})</SelectItem>
         <SelectItem value="inactive">Pasif ({p.statusCounts.inactive})</SelectItem>
+        <SelectItem value="terminated">Ayrılanlar ({p.statusCounts.terminated ?? 0})</SelectItem>
       </SelectContent>
     </Select>
     <div className="min-[760px]:hidden">

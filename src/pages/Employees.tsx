@@ -51,7 +51,7 @@ function EmployeePage() {
   const [privateQuery, setPrivateQuery] = useState<string | null>(null);
   const q = privateQuery ?? safeSearchParam(params.get("q") ?? "");
   const department = params.get("department") ?? "";
-  const status = ["active", "inactive"].includes(params.get("status") ?? "")
+  const status = ["active", "inactive", "terminated"].includes(params.get("status") ?? "")
     ? (params.get("status") ?? "all")
     : "all";
   const requestedSort = params.get("sort") ?? "name:asc";
@@ -137,7 +137,8 @@ function EmployeePage() {
   const statusCounts = {
     all: employees.length,
     active: activeCount,
-    inactive: employees.length - activeCount,
+    inactive: employees.filter(employee => !employee.isActive && !employee.employmentEndDate).length,
+    terminated: employees.filter(employee => !!employee.employmentEndDate).length,
   };
   return (
     <div className="min-w-0 space-y-6">

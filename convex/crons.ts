@@ -94,4 +94,7 @@ crons.cron(
 // KVKK Faz 1: yalnız açıkça saklama süresi tanımlanan projelerde kademeli temizlik.
 crons.interval("purge-expired-card-readings", { hours: 24 }, internal.privacyRetention.purgeExpiredCardReadings, {});
 
+// Her gün 00:05 Türkiye saati; son çalışma günü tamamlananların erişimini kapat.
+crons.cron("close-ended-employments", "5 21 * * *", internal.employeeTermination.closeEndedEmployments, {});
+
 export default crons;

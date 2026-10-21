@@ -9,7 +9,8 @@ import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
-import { Employee } from "@/types/employee";
+import type { EmploymentEmployee as Employee } from "./lib/employment";
+import { EmployeeEmploymentBadge } from "./EmployeeEmploymentBadge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +21,6 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
-import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useEmployeeTable } from "@/hooks/useEmployeeTable";
 import { EmployeeBulkActions } from "./EmployeeBulkActions";
@@ -327,7 +327,7 @@ export default function EmployeeTable({
                 )}
               {column("position", "Pozisyon", "hidden min-[1100px]:table-cell")}
               {column("card", "Kart no", "hidden min-[760px]:table-cell")}
-              {column("status", "Durum", "w-[68px]")}
+              {column("status", "Durum", "w-[180px]")}
               <TableHead className="w-11">
                 <span className="sr-only">İşlemler</span>
               </TableHead>
@@ -395,9 +395,7 @@ export default function EmployeeTable({
                   {employee.cardNumber || "—"}
                 </TableCell>
                 <TableCell className="px-1 py-0">
-                  <StatusBadge tone={employee.isActive ? "success" : "neutral"}>
-                    {employee.isActive ? "Aktif" : "Pasif"}
-                  </StatusBadge>
+                  <EmployeeEmploymentBadge employee={employee} />
                 </TableCell>
                 <TableCell className="px-0 py-0">
                   <div className="max-[759px]:[&_button]:h-11 max-[759px]:[&_button]:w-11">

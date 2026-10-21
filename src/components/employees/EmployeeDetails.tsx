@@ -1,5 +1,8 @@
 import { Link } from "react-router-dom";
-import type { Employee } from "@/types/employee";
+import type { EmploymentEmployee as Employee } from "./lib/employment";
+import { terminationLabels } from "./lib/employment";
+import { EmployeeEmploymentBadge } from "./EmployeeEmploymentBadge";
+import { EmployeeEmploymentActions } from "./EmployeeEmploymentActions";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -24,8 +27,9 @@ export default function EmployeeDetails({
     api.accessRules.list,
     projectId ? { projectId } : "skip",
   );
+  const employees = useQuery(api.employees.list, projectId ? { projectId } : "skip");
   if (!employee) return null;
-  const current = employee;
+  const current = employees?.find(item => item._id === employee._id) ?? employee;
   const memberships = rules?.filter((rule) =>
     rule.groupMembers.some((member) => member.employeeId === current._id),
   );
@@ -48,14 +52,11 @@ export default function EmployeeDetails({
           <p className="my-2 text-xs text-muted-foreground">
             {current.payrollCode || "Bordro kodu yok"}
           </p>
-          <StatusBadge tone={current.isActive ? "success" : "neutral"}>
-            {current.isActive ? "Aktif" : "Pasif"}
-          </StatusBadge>
+          <EmployeeEmploymentBadge employee={current} />
+          {current.employmentEndDate && <p className="mt-2 text-sm text-muted-foreground">{current.terminationType ? terminationLabels[current.terminationType] : "Ayrılış"}{current.terminationReason ? ` · ${current.terminationReason}` : ""}</p>}
         </div>
         {isAdmin && (
-          <Button variant="outline" onClick={onEdit}>
-            Düzenle
-          </Button>
+          <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={onEdit}>Düzenle</Button><EmployeeEmploymentActions key={current._id} employee={current} /></div>
         )}
       </div>
       <section className="border-t pt-5">

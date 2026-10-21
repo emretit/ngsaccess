@@ -1,5 +1,5 @@
-import type { Employee } from "@/types/employee";
-export type EmployeeStatus = "all" | "active" | "inactive";
+import type { EmploymentEmployee as Employee } from "./employment";
+export type EmployeeStatus = "all" | "active" | "inactive" | "terminated";
 export function clampPage(page: number, count: number, size: number) {
   return Math.max(
     1,
@@ -42,7 +42,7 @@ export function filterAndSortEmployees(
             ? !employee.departmentId
             : employee.departmentId === department)) &&
         (status === "all" ||
-          (status === "active" ? !!employee.isActive : !employee.isActive)) &&
+          (status === "terminated" ? !!employee.employmentEndDate : status === "active" ? !!employee.isActive : !employee.isActive && !employee.employmentEndDate)) &&
         (!query ||
           [
             employee.firstName,

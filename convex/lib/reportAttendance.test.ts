@@ -241,3 +241,28 @@ it("11-H1: ortak rapor motoru ilk kayıttan önce devamsızlık veya beklenen g�
   expect(result).toMatchObject({ presentDays: 0, absentDays: 0, leaveDays: 0, expectedDays: 0, devamOrani: null });
   expect(computePdksTableRow(input).days.filter(day => day.date < "2026-01-12" && day.detail?.dayType === "workday").every(day => day.payrollCode === "—")).toBe(true);
 });
+
+it("ay ortasında ayrılan personeli raporda tutar ve son gününden sonra devamsızlık saymaz", async () => {
+  const projectId = "project" as Id<"projects">;
+  const emp = { ...employee("departed"), projectId, isActive: false, employmentEndDate: "2026-01-15" };
+  const ctx = { db: {
+    query: (table: string) => {
+      const rows = table === "employees" ? [emp] : [];
+      const chain = { withIndex: () => chain, order: () => chain, take: async () => rows, collect: async () => rows, first: async () => null };
+      return chain;
+    },
+  } } as unknown as QueryCtx;
+  const report = await loadAttendanceReport(ctx, [projectId], 2026, 1);
+  expect(report.rows.map(row => row.employeeId)).toContain(emp._id);
+  const input = params(emp);
+  input.firstRecordDate = "2026-01-02";
+  input.availableDateKeys = new Set(input.periodDateKeys);
+  input.resolveShift = () => ({ startTime: "09:00", endTime: "18:00" } as Doc<"shifts">);
+  const summary = summarizeAttendance(input, "2026-02-01");
+  const beforeEnd = computePdksTableRow({ ...input, periodDateKeys: input.periodDateKeys.filter(date => date <= emp.employmentEndDate) });
+  const fullMonth = computePdksTableRow(input);
+  expect(summary.absentDays).toBeGreaterThan(0);
+  expect(summary.absentDays).toBe(beforeEnd.days.filter(day => day.payrollCode === "DV").length);
+  expect(summary.absentDays).toBeLessThan(fullMonth.days.filter(day => day.payrollCode === "DV").length);
+  expect((await loadAttendanceReport(ctx, [projectId], 2026, 2)).rows).toHaveLength(0);
+});

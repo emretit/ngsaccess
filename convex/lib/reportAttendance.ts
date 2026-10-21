@@ -1,3 +1,4 @@
+import { employedDuring, employedOn } from "./employment";
 import { pdksAvailableDateKeys, pdksLeaveMatchesProject, pdksFirstRecordDate } from "./pdksAvailability";
 import type { enrichReadingsForList } from "./cardReadingAudit";
 import {
@@ -16,13 +17,13 @@ import { trTodayKey } from "./trDate";
 import { buildPdksWorkDateResolver, pdksWorkDayRange } from "./pdksWorkDay";
 import { readReportReadings, reportPeriod } from "./reportScope";
 
-export const ATTENDANCE_RELIABILITY_NOTE = "Güvenilirlik sınırı: İşe giriş/çıkış tarihleri tutulmadığından dönem, bugün aktif olan personelin tamamına uygulanır; ay ortasında işe başlayanlar ayrıştırılamaz. Günler PDKS tablo motoruyla hesaplanır; yarım tatil günleri PDKS gibi tatil sayılır. Devam oranı, tamamlanmış beklenen günlerden izinler çıkarılarak hesaplanır. Tek izinli okuma veya manuel giriş devam kabul edilir; bu bir bordro onayı değildir.";
+export const ATTENDANCE_RELIABILITY_NOTE = "Güvenilirlik sınırı: İşe giriş tarihi tutulmadığından ay ortasında işe başlayanlar ayrıştırılamaz; ayrılanların son çalışma gününden sonraki günleri hesaplanmaz. Günler PDKS tablo motoruyla hesaplanır; yarım tatil günleri PDKS gibi tatil sayılır. Devam oranı, tamamlanmış beklenen günlerden izinler çıkarılarak hesaplanır. Tek izinli okuma veya manuel giriş devam kabul edilir; bu bir bordro onayı değildir.";
 
 type TableParams = Parameters<typeof computePdksTableRow>[0];
 
 /** Yalnız PDKS hücrelerini birleştirir; yeni gün sınıflandırma kuralı içermez. */
 export function summarizeAttendance(params: TableParams, today: string, issues: string[] = []) {
-  const periodDateKeys = params.periodDateKeys.filter((date) => date < today);
+  const periodDateKeys = params.periodDateKeys.filter((date) => date < today && (!params.employee || employedOn(params.employee, date)));
   const row = computePdksTableRow({ ...params, today, periodDateKeys, isSingleDay: false, viewMode: "matrix" });
   const workDays = row.days.filter((day) => ["N", "DV", "İZN"].includes(day.payrollCode));
   const presentDays = workDays.filter((day) => day.payrollCode === "N").length;
@@ -72,16 +73,16 @@ export async function loadAttendanceReport(ctx: QueryCtx, projectIds: Id<"projec
       getHolidaysMap(ctx, projectId, startDate, endDate),
       ctx.db.query("generalSettings").withIndex("by_project", (q) => q.eq("projectId", projectId)).first(),
     ]);
-    const employees = allEmployees.filter((employee) => employee.isActive === true && employee.isVisitor !== true);
+    const employees = allEmployees.filter((employee) => employedDuring(employee, startDate, endDate) && employee.isVisitor !== true);
     const employeeMap = buildPdksEmployeeReadingMap({ employees, readings });
-    const shiftResolver = await buildShiftResolver(ctx, allEmployees.filter(e => e.isActive));
+    const shiftResolver = await buildShiftResolver(ctx, allEmployees.filter(e => employedDuring(e, startDate, endDate)));
     const workingDays = generalSettings?.workingDays?.length ? generalSettings.workingDays : ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma"];
     const leaveLists = await Promise.all(employees.map(employee => ctx.db.query("leaves")
       .withIndex("by_employee_start", q => q.eq("employeeId", employee._id).lte("startDate", endDate)).collect()));
     const leavesByEmployee = new Map(employees.map((employee, index) => [employee._id,
       leaveLists[index].filter(leave => pdksLeaveMatchesProject(leave, projectId) && leave.status === "approved" && leave.endDate >= startDate)]));
     const calendarIssues = attendanceCalendarIssues(year, periodDateKeys, holidayMap);
-    const workDate = buildPdksWorkDateResolver(allEmployees.filter(e => e.isActive), (id, date) => { const shift = shiftResolver.resolve(id, date); return shift?.projectId === projectId ? shift : null; });
+    const workDate = buildPdksWorkDateResolver(allEmployees.filter(e => employedDuring(e, startDate, endDate)), (id, date) => { const shift = shiftResolver.resolve(id, date); return shift?.projectId === projectId ? shift : null; });
     const availableDateKeys = pdksAvailableDateKeys(readings, workDate);
     return await Promise.all(employees.map(async (employee) => {
       const [records, department, assignments] = await Promise.all([

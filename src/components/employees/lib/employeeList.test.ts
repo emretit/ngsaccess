@@ -67,3 +67,24 @@ it("11 haneli kart bellekte aranabilir, URL arama değeri temizlenir", () => {
   ).toHaveLength(1);
   expect(safeSearchParam("12345678901")).toBe("");
 });
+
+it("Ayrılanlar filtresi ileri tarihli ve kapanmış ayrılıkları aynı sayımda tutar", () => {
+  const terminated = { ...person("A"), employmentEndDate: "2026-10-15", isActive: false };
+  const future = { ...person("B"), employmentEndDate: "2099-10-31" };
+  expect(filterAndSortEmployees([terminated, future, person("C", { isActive: false })], "", "", "terminated", "name:asc").map(row => row.firstName)).toEqual(["A", "B"]);
+});
+
+
+it("Pasif excludes departures while future departures remain active and terminated", () => {
+  const rows = [
+    { ...person("A"), employmentEndDate: "2026-10-15", isActive: false },
+    { ...person("B"), employmentEndDate: "2099-10-31" },
+    person("C", { isActive: false }),
+    person("D"),
+  ];
+  const names = (status: string) => filterAndSortEmployees(rows, "", "", status, "name:asc").map(row => row.firstName);
+  expect(names("inactive")).toEqual(["C"]);
+  expect(names("active")).toEqual(["B", "D"]);
+  expect(names("terminated")).toEqual(["A", "B"]);
+  expect(names("all")).toEqual(["A", "B", "C", "D"]);
+});

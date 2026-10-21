@@ -1,3 +1,4 @@
+import { employedDuring, employedOn } from "./lib/employment";
 import { genericReaderTokenAllowed } from "./lib/mobileAccess";
 import { stream } from "convex-helpers/server/stream";
 import schema from "./schema";
@@ -410,7 +411,6 @@ export const getPdksTableData = authedQuery({
           .collect(),
         ctx.db
           .query("employees")
-          .filter((q) => q.eq(q.field("isActive"), true))
           .collect(),
       ]);
     } else if (allowedProjectIds.length > 0) {
@@ -430,7 +430,6 @@ export const getPdksTableData = authedQuery({
             ctx.db
               .query("employees")
               .withIndex("by_project", (q) => q.eq("projectId", pid))
-              .filter((q) => q.eq(q.field("isActive"), true))
               .collect()
           )
         ),
@@ -441,6 +440,7 @@ export const getPdksTableData = authedQuery({
       return [];
     }
 
+    employees = employees.filter(employee => employedDuring(employee, startDate, endDate));
     const availabilityEmployees = employees;
     if (args.employeeId) employees = employees.filter(e => e._id === args.employeeId);
 
@@ -561,7 +561,7 @@ export const getPdksTableData = authedQuery({
             monthlySalary: payVisible ? employee.monthlySalary : undefined,
           } : null,
           departmentName: department?.projectId === employee?.projectId ? department?.name ?? "" : "",
-          periodDateKeys,
+          periodDateKeys: periodDateKeys.filter(date => !employee || employedOn(employee, date)),
           startDate,
           isSingleDay,
           viewMode,
@@ -635,7 +635,6 @@ export const getMonthlyPayrollSheet = authedQuery({
           .collect(),
         ctx.db
           .query("employees")
-          .filter((q) => q.eq(q.field("isActive"), true))
           .collect(),
       ]);
     } else if (allowedProjectIds.length > 0) {
@@ -653,7 +652,6 @@ export const getMonthlyPayrollSheet = authedQuery({
             ctx.db
               .query("employees")
               .withIndex("by_project", (q) => q.eq("projectId", pid))
-              .filter((q) => q.eq(q.field("isActive"), true))
               .collect()
           )
         ),
@@ -664,6 +662,7 @@ export const getMonthlyPayrollSheet = authedQuery({
       return { days: [], rows: [], year: args.year, month: args.month };
     }
 
+    employees = employees.filter(employee => employedDuring(employee, startDate, endDate));
     readings = filterPdksReadings(readings, args.projectId);
 
     const [workSettings, holidayMap, generalSettings, payrollShiftResolver] =
@@ -736,7 +735,7 @@ export const getMonthlyPayrollSheet = authedQuery({
 
         const firstRecordDate = await pdksFirstRecordDate(ctx, emp, payrollEmployeeReadings.get(String(emp._id)) ?? [], payrollManualDates.get(emp._id) ?? [], payrollWorkDate);
         const availableDateKeys = payrollAvailableDates.get(emp.projectId) ?? new Set<string>();
-        const allCells = buildPeriodDateKeys(overtimeRange.startDate, overtimeRange.endDate).map((d) =>
+        const allCells = buildPeriodDateKeys(overtimeRange.startDate, overtimeRange.endDate).filter(date => employedOn(emp, date)).map((d) =>
           computePayrollCell({
             availableDateKeys,
             firstRecordDate,
@@ -1355,7 +1354,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
         employee.companyId ? ctx.db.get(employee.companyId) : Promise.resolve(null),
         employee.positionId ? ctx.db.get(employee.positionId) : Promise.resolve(null),
         employee.shiftId ? ctx.db.get(employee.shiftId) : Promise.resolve(null),
-        buildShiftResolver(ctx, availabilityEmployees.filter(e => e.isActive)),
+        buildShiftResolver(ctx, availabilityEmployees.filter(e => employedDuring(e, args.startDate, args.endDate))),
       ]);
 
     const workingDays =
@@ -1372,7 +1371,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
 
     const readingsByDate = groupPdksWorkDays(readings, employee._id, (id, date) => scopedPdksShift(detailShiftResolver.resolve(id, date), args.projectId));
 
-    const detailWorkDate = buildPdksWorkDateResolver(availabilityEmployees.filter(e => e.isActive), (id, date) => scopedPdksShift(detailShiftResolver.resolve(id, date), args.projectId));
+    const detailWorkDate = buildPdksWorkDateResolver(availabilityEmployees.filter(e => employedDuring(e, args.startDate, args.endDate)), (id, date) => scopedPdksShift(detailShiftResolver.resolve(id, date), args.projectId));
     const detailPeriodDates = new Set(periodDateKeys);
     const excludedUnknownReadings = countExcludedUnknownPdksReadings(
       sourceReadings.filter(r => detailPeriodDates.has(detailWorkDate(r))),
@@ -1381,7 +1380,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
     const availableDateKeys = await readPdksAvailableDateKeys(ctx, employee.projectId, periodDateKeys, detailWorkDate);
     const firstRecordDate = await pdksFirstRecordDate(ctx, employee, readings, [...manualByDate.keys()], detailWorkDate);
     const scopedLeaves = leaves.filter(l => pdksLeaveMatchesProject(l, employee.projectId));
-    const allDays = buildPeriodDateKeys(overtimeRange.startDate, overtimeRange.endDate).map((dk) =>
+    const allDays = buildPeriodDateKeys(overtimeRange.startDate, overtimeRange.endDate).filter(date => employedOn(employee, date)).map((dk) =>
       computeAttendanceDetailDay({
         availableDateKeys,
         firstRecordDate,

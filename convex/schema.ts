@@ -81,6 +81,15 @@ export default defineSchema({
     photoUrl: v.optional(v.string()),
     photoStorageId: v.optional(v.id("_storage")),
     isActive: v.optional(v.boolean()),
+    employmentEndDate: v.optional(v.string()),
+    terminationType: v.optional(v.union(
+      v.literal("resignation"), v.literal("employerTermination"),
+      v.literal("retirement"), v.literal("contractEnd"), v.literal("other"),
+    )),
+    terminationReason: v.optional(v.string()),
+    sgkExitCode: v.optional(v.string()),
+    terminatedAt: v.optional(v.string()),
+    terminatedBy: v.optional(v.id("users")),
     notes: v.optional(v.string()),
     shift: v.optional(v.string()),
     hourlyRate: v.optional(v.number()),
@@ -114,6 +123,7 @@ export default defineSchema({
     createdAt: v.optional(v.string()),
     updatedAt: v.optional(v.string()),
   })
+    .index("by_active_employment_end", ["isActive", "employmentEndDate"])
     .index("by_project", ["projectId"])
     .index("by_email", ["email"])
     .index("by_card", ["cardNumber"])
