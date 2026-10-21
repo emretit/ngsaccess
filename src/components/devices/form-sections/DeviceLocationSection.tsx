@@ -1,9 +1,29 @@
+import { deviceLabels } from "../deviceLabels";
 import { notify } from "@/lib/notify";
 import { useRef, useState } from "react";
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { UseFormReturn } from "react-hook-form";
 import type { FormValues } from "../hooks/useDeviceFormSchema";
@@ -53,16 +73,22 @@ export function DeviceLocationSection({
       notify.error("Bölge adı gereklidir.");
       return;
     }
-    if (deviceName && trimmedName.toLocaleLowerCase("tr-TR") === deviceName.toLocaleLowerCase("tr-TR")) {
+    if (
+      deviceName &&
+      trimmedName.toLocaleLowerCase("tr-TR") ===
+        deviceName.toLocaleLowerCase("tr-TR")
+    ) {
       notify.error("Bölge adı cihaz adıyla aynı olamaz.");
       return;
     }
 
     form.setValue("zone_id", NEW_ZONE_VALUE, { shouldDirty: true });
-    form.setValue("new_zone_name", trimmedName, { shouldDirty: true, shouldValidate: true });
+    form.setValue("new_zone_name", trimmedName, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
     form.setValue("door_id", undefined);
     setZoneDialogOpen(false);
-
   };
 
   return (
@@ -86,14 +112,15 @@ export function DeviceLocationSection({
 
                 if (value !== field.value) {
                   field.onChange(value);
-                  if (value !== NEW_ZONE_VALUE) form.setValue("new_zone_name", "");
+                  if (value !== NEW_ZONE_VALUE)
+                    form.setValue("new_zone_name", "");
 
                   if (userChangedZone.current) {
                     const currentDoorId = form.getValues("door_id");
 
                     if (currentDoorId) {
                       const doorBelongsToNewZone = filteredDoors.some(
-                        (door) => String(door.id) === String(currentDoorId)
+                        (door) => String(door.id) === String(currentDoorId),
                       );
 
                       if (!doorBelongsToNewZone) {
@@ -108,18 +135,28 @@ export function DeviceLocationSection({
             >
               <FormControl>
                 <SelectTrigger>
-                  <SelectValue placeholder={locationLoading ? "Yükleniyor..." : "Bölge seçiniz"} />
+                  <SelectValue
+                    placeholder={
+                      locationLoading ? "Yükleniyor..." : deviceLabels.zone
+                    }
+                  />
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
-                {form.watch("zone_id") === NEW_ZONE_VALUE && <SelectItem value={NEW_ZONE_VALUE}>{form.watch("new_zone_name")} (taslak)</SelectItem>}
+                {form.watch("zone_id") === NEW_ZONE_VALUE && (
+                  <SelectItem value={NEW_ZONE_VALUE}>
+                    {form.watch("new_zone_name")} (taslak)
+                  </SelectItem>
+                )}
                 {zones.map((zone) => (
                   <SelectItem key={zone.id} value={String(zone.id)}>
                     {zone.name}
                   </SelectItem>
                 ))}
                 {allowCreate && form.watch("zone_id") !== NEW_ZONE_VALUE && (
-                  <SelectItem value={NEW_ZONE_VALUE}>+ Yeni bölge ekle</SelectItem>
+                  <SelectItem value={NEW_ZONE_VALUE}>
+                    {deviceLabels.newZone}
+                  </SelectItem>
                 )}
               </SelectContent>
             </Select>
@@ -137,7 +174,7 @@ export function DeviceLocationSection({
       >
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
-            <DialogTitle>Yeni bölge ekle</DialogTitle>
+            <DialogTitle>Yeni bölge oluştur</DialogTitle>
             <DialogDescription>
               Bölge cihaz kaydedildiğinde oluşturulur.
             </DialogDescription>
@@ -168,7 +205,11 @@ export function DeviceLocationSection({
               >
                 İptal
               </Button>
-              <Button type="button" onClick={() => void handleCreateZone()} disabled={isCreatingZone}>
+              <Button
+                type="button"
+                onClick={() => void handleCreateZone()}
+                disabled={isCreatingZone}
+              >
                 {isCreatingZone ? "Ekleniyor..." : "Ekle"}
               </Button>
             </DialogFooter>
@@ -186,7 +227,9 @@ export function DeviceLocationSection({
               <Select
                 disabled={!allowCreate}
                 value={field.value ? String(field.value) : ""}
-                onValueChange={(value) => field.onChange(value ? Number(value) : undefined)}
+                onValueChange={(value) =>
+                  field.onChange(value ? Number(value) : undefined)
+                }
               >
                 <FormControl>
                   <SelectTrigger>

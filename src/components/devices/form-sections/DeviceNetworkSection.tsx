@@ -1,6 +1,13 @@
+import { deviceLabels } from "../deviceLabels";
 import { PasswordField } from "@/components/shared/PasswordField";
 
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { UseFormReturn } from "react-hook-form";
 import type { FormValues } from "../hooks/useDeviceFormSchema";
@@ -17,9 +24,9 @@ export function DeviceNetworkSection({ form }: DeviceNetworkSectionProps) {
         name="device_ip"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>IP adresi</FormLabel>
+            <FormLabel>{deviceLabels.optionalIp}</FormLabel>
             <FormControl>
-              <Input placeholder="192.168.1.100" {...field} />
+              <Input placeholder={deviceLabels.ipPlaceholder} {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>

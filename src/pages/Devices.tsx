@@ -1,4 +1,4 @@
-
+import { useDeviceDeepLink } from "@/components/devices/useDeviceDeepLink";
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation } from 'convex/react';
@@ -23,7 +23,6 @@ import { DeviceListErrorBoundary } from '@/components/devices/DeviceListErrorBou
 import { readDeviceFilters, writeDeviceFilters, resetDeviceFiltersForProject } from '@/lib/deviceDisplay';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { AccessDenied } from '@/components/shared/AccessDenied';
-
 
 const Devices = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -57,15 +56,11 @@ const Devices = () => {
   });
   const [claimOpen, setClaimOpen] = useState(false);
 
-  useEffect(() => {
-    // The panel owns closing and project changes while a draft is open.
-    if (isLoading || devicePanel.open) return;
-    const device = devices.find((candidate) => candidate._id === requestedDeviceId);
-    if (device) setDevicePanel((previous) => previous.open && previous.device?._id === device._id ? previous : { open: true, device, projectId });
-    else setDevicePanel((previous) => previous.device ? { open: false, device: null, projectId } : previous);
-  }, [devices, isLoading, requestedDeviceId, devicePanel.open, projectId]);
+  const consumeDeviceRequest = useDeviceDeepLink(requestedDeviceId, devices, isLoading, devicePanel.open,
+    device => setDevicePanel({ open: true, device, projectId }),
+    devicePanel.device?._id ?? null, setDeviceUrl);
 
-  const setDeviceUrl = (deviceId: string | null) => {
+  function setDeviceUrl(deviceId: string | null) {
     setSearchParams((previous) => {
       const next = new URLSearchParams(previous);
       if (deviceId) next.set("deviceId", deviceId);
@@ -73,9 +68,6 @@ const Devices = () => {
       return next;
     }, { replace: true });
   };
-
-
-
 
   // QR Dialog
   const { selectedQR, handleQRClick, handleDownloadQR, closeQRDialog } = useQRCodeDialog();
@@ -110,11 +102,13 @@ const Devices = () => {
   };
 
   const handleEditDevice = (device: Device) => {
+    consumeDeviceRequest(device._id);
     setDeviceUrl(device._id);
     setDevicePanel({ open: true, device, projectId });
   };
 
   const handleDevicePanelClose = () => {
+    consumeDeviceRequest(devicePanel.device?._id ?? requestedDeviceId);
     setDeviceUrl(null);
     setDevicePanel({ open: false, device: null, projectId });
   };
@@ -122,13 +116,15 @@ const Devices = () => {
   const handleDevicePanelSuccess = () => {
     setDeviceUrl(null);
     setDevicePanel({ open: false, device: null, projectId });
-
   };
 
+  const liveSelectedDevice = devices.find(device => device._id === devicePanel.device?._id);
   const deviceDetailsPanel = <DeviceDetailsPanel
     open={devicePanel.open}
     onClose={handleDevicePanelClose}
-    selectedDevice={devicePanel.device}
+    deviceUnavailable={devicePanel.open && !!devicePanel.device && !isLoading && !liveSelectedDevice}
+    deviceId={devicePanel.device?._id}
+    selectedDevice={liveSelectedDevice ?? devicePanel.device}
     projectId={devicePanel.projectId}
     onSuccess={handleDevicePanelSuccess}
   />;

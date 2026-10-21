@@ -1,3 +1,4 @@
+import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { useState } from "react";
 import {
@@ -155,7 +156,8 @@ export function EditDoorDialog({
     api.actions.hikGatewayDevice.applyVerifyPlan
   );
 
-  const showHikSection = isHikGateway(device);
+  const { isAdmin } = useProjectAccess();
+  const showHikSection = isAdmin && isHikGateway(device);
 
   const sendPlans = async (keys: PlanKey[]) => {
     const results = await applySelectedDoorPlans(keys, {

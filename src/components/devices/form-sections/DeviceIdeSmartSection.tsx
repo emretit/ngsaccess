@@ -1,5 +1,12 @@
+import { deviceLabels } from "../deviceLabels";
 import { PasswordField } from "@/components/shared/PasswordField";
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { UseFormReturn } from "react-hook-form";
 import type { FormValues } from "../hooks/useDeviceFormSchema";
@@ -17,7 +24,10 @@ interface DeviceIdeSmartSectionProps {
  * Zorunlu: Panel UUID (tek tanımlayıcı) + kullanıcı/şifre (panel MQTT login token'ı
  * bu kimlikle alınır). IP/port yalnızca opsiyonel LAN yedeği için saklanır.
  */
-export function DeviceIdeSmartSection({ form, isEdit }: DeviceIdeSmartSectionProps) {
+export function DeviceIdeSmartSection({
+  form,
+  isEdit,
+}: DeviceIdeSmartSectionProps) {
   return (
     <div className="space-y-4 border-t border-line pt-4">
       <h4 className="text-sm font-semibold">IDE Smart Panel</h4>
@@ -28,8 +38,16 @@ export function DeviceIdeSmartSection({ form, isEdit }: DeviceIdeSmartSectionPro
         render={({ field }) => (
           <FormItem>
             <FormLabel>Panel UUID</FormLabel>
+            <p id="panel-uuid-help" className="text-xs text-muted-foreground">
+              {deviceLabels.uuidHelp}
+            </p>
             <FormControl>
-              <Input placeholder="ör. 289833329732592" {...field} value={field.value ?? ""} />
+              <Input
+                aria-describedby="panel-uuid-help"
+                placeholder="15 haneli SYSTEM.UUID"
+                {...field}
+                value={field.value ?? ""}
+              />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -44,7 +62,11 @@ export function DeviceIdeSmartSection({ form, isEdit }: DeviceIdeSmartSectionPro
             <FormItem>
               <FormLabel>Kullanıcı</FormLabel>
               <FormControl>
-                <Input placeholder="admin" {...field} value={field.value ?? ""} />
+                <Input
+                  placeholder="admin"
+                  {...field}
+                  value={field.value ?? ""}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -57,7 +79,11 @@ export function DeviceIdeSmartSection({ form, isEdit }: DeviceIdeSmartSectionPro
             <FormItem>
               <FormLabel>Şifre</FormLabel>
               <FormControl>
-                <PasswordField placeholder="Panel şifresi" {...field} value={field.value ?? ""} />
+                <PasswordField
+                  placeholder="Panel şifresi"
+                  {...field}
+                  value={field.value ?? ""}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -72,23 +98,37 @@ export function DeviceIdeSmartSection({ form, isEdit }: DeviceIdeSmartSectionPro
           <FormItem>
             <FormLabel>Kapı sayısı</FormLabel>
             <FormControl>
-              <Input disabled={isEdit} type="number" placeholder="4" className="max-w-[10rem]" {...field} value={field.value ?? ""} />
+              <Input
+                disabled={isEdit}
+                type="number"
+                placeholder="4"
+                className="max-w-[10rem]"
+                {...field}
+                value={field.value ?? ""}
+              />
             </FormControl>
             <FormMessage />
           </FormItem>
         )}
       />
 
-      <details className="space-y-4 border-t border-line pt-3"><summary className="cursor-pointer text-sm">İsteğe bağlı LAN bilgileri</summary>
+      <details className="space-y-4 border-t border-line pt-3">
+        <summary className="cursor-pointer text-sm">
+          İsteğe bağlı LAN bilgileri
+        </summary>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="device_ip"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Panel IP adresi</FormLabel>
+                <FormLabel>{deviceLabels.optionalIp}</FormLabel>
                 <FormControl>
-                  <Input placeholder="192.168.1.100" {...field} value={field.value ?? ""} />
+                  <Input
+                    placeholder={deviceLabels.ipPlaceholder}
+                    {...field}
+                    value={field.value ?? ""}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -101,7 +141,12 @@ export function DeviceIdeSmartSection({ form, isEdit }: DeviceIdeSmartSectionPro
               <FormItem>
                 <FormLabel>HTTP portu</FormLabel>
                 <FormControl>
-                  <Input type="number" placeholder="80" {...field} value={field.value ?? ""} />
+                  <Input
+                    type="number"
+                    placeholder="80"
+                    {...field}
+                    value={field.value ?? ""}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

@@ -1,6 +1,19 @@
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { deviceLabels } from "../deviceLabels";
+import {
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { UseFormReturn } from "react-hook-form";
 import type { FormValues } from "../hooks/useDeviceFormSchema";
 
@@ -18,7 +31,11 @@ interface DeviceZoneSectionProps {
  * Panel/cihaz için bölge (mantıksal alan) seçimi. Panel adından bağımsızdır.
  * "+ Yeni bölge oluştur" seçilince ad girişi açılır (new_zone_name).
  */
-export function DeviceZoneSection({ form, zones, allowCreate = true }: DeviceZoneSectionProps) {
+export function DeviceZoneSection({
+  form,
+  zones,
+  allowCreate = true,
+}: DeviceZoneSectionProps) {
   const zoneId = form.watch("zone_id");
   const isNew = zoneId === NEW_ZONE_VALUE;
 
@@ -33,13 +50,14 @@ export function DeviceZoneSection({ form, zones, allowCreate = true }: DeviceZon
             <Select
               onValueChange={(value) => {
                 field.onChange(value);
-                if (value !== NEW_ZONE_VALUE) form.setValue("new_zone_name", "");
+                if (value !== NEW_ZONE_VALUE)
+                  form.setValue("new_zone_name", "");
               }}
               value={field.value ?? undefined}
             >
               <FormControl>
                 <SelectTrigger>
-                  <SelectValue placeholder="Bölge seçin veya oluşturun" />
+                  <SelectValue placeholder={deviceLabels.zone} />
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
@@ -49,7 +67,9 @@ export function DeviceZoneSection({ form, zones, allowCreate = true }: DeviceZon
                   </SelectItem>
                 ))}
                 {allowCreate && (
-                  <SelectItem value={NEW_ZONE_VALUE}>+ Yeni bölge oluştur</SelectItem>
+                  <SelectItem value={NEW_ZONE_VALUE}>
+                    {deviceLabels.newZone}
+                  </SelectItem>
                 )}
               </SelectContent>
             </Select>
@@ -66,7 +86,11 @@ export function DeviceZoneSection({ form, zones, allowCreate = true }: DeviceZon
             <FormItem>
               <FormLabel>Yeni bölge adı</FormLabel>
               <FormControl>
-                <Input placeholder="Örn. Giriş Katı" {...field} value={field.value ?? ""} />
+                <Input
+                  placeholder="Örn. Giriş Katı"
+                  {...field}
+                  value={field.value ?? ""}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>

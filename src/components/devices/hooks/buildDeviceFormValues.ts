@@ -36,10 +36,8 @@ export interface DeviceData {
 
 /**
  * Cihaz formunun değerlerini üretir. "Yeni Cihaz" ve "Düzenle" TEK formdur; tek fark
- * verinin dolu gelmesidir. react-hook-form'un `values` API'siyle kullanılır
- * (useForm({ values })): device değişince form otomatik + deterministik senkronlanır —
- * eski `form.reset`-in-`useEffect` yaklaşımındaki mount/brand yarışı (Select'lerin boş
- * gelmesi) burada hiç oluşmaz, çünkü değerler ilk render'dan itibaren forma bağlıdır.
+ * verinin dolu gelmesidir. useDeviceFormLogic açılış/cihaz kimliği için bu değerlerin
+ * anlık kopyasını tutar; canlı abonelik güncellemeleri formu sıfırlamaz.
  *
  * device yoksa "Yeni Cihaz" default'ları döner (defaultBrand + IDE ön-tanımlı kimliği).
  */
@@ -69,9 +67,9 @@ export function buildDeviceFormValues(
       hik_door_count: undefined,
       hik_port: undefined,
       ide_uuid: "",
-      // IDE Smart paneli ön-tanımlı kimliği (MQTT login token'ı için).
-      ide_user: "admin",
-      ide_password: "admin12345",
+      // Panel kimlik bilgileri kullanıcı tarafından girilir.
+      ide_user: "",
+      ide_password: "",
       ide_http_port: undefined,
       ide_door_count: undefined,
     };
@@ -81,7 +79,7 @@ export function buildDeviceFormValues(
     brand: device.brand ?? "other",
     name: device.name ?? "",
     device_serial: device.deviceSerial ?? "",
-    device_type: (device.deviceType ?? "Kart Okuyucu") as FormValues["device_type"],
+    device_type: device.deviceType ?? (device.brand === "hikvision" ? "" : "Kart Okuyucu"),
     zone_id: device.zoneId as string | undefined,
     door_id: device.doorId as string | undefined,
     door_count: device.doorCount,
@@ -92,7 +90,9 @@ export function buildDeviceFormValues(
     description: device.description ?? "",
     status: (device.status === "active" || device.status === "inactive"
       ? device.status
-      : device.isActive === false ? "inactive" : "active") as "active" | "inactive",
+      : device.isActive === false
+        ? "inactive"
+        : "active") as "active" | "inactive",
     ehome_id: device.ehomeID ?? "",
     ehome_key: device.ehomeKey ?? "",
     // Kayıtlı transport'u olduğu gibi yükle. Eski gateway cihazlarında (hikTransport alanı

@@ -30,12 +30,14 @@ const doorCountField = z.preprocess(
  * tipi değişmez). Diğer tüm zorunluluklar (seri no, ehome, UUID/IP) admin'in de
  * ihtiyacı olduğundan superRefine aynen korunur.
  */
+const deviceTypeSchema = z.enum(["Kontrol Paneli", "Kart Okuyucu", "Parmak İzi Okuyucu", "Yüz Tanıma", "QR Kod Okuyucu", "RFID Okuyucu", "Erişim Terminali", "Erişim Paneli", "Turnike", "Kapı Kontrolörü", "Diğer"]);
+
 export function makeFormSchema(adminMode: boolean, isEdit = false) {
   return z.object({
   brand: z.enum(DEVICE_BRANDS).default("other"),
   name: adminMode ? z.string().default("") : z.string().min(1, "Cihaz adı gereklidir"),
   device_serial: z.string().optional(),
-  device_type: z.enum(["Kontrol Paneli", "Kart Okuyucu", "Parmak İzi Okuyucu", "Yüz Tanıma", "QR Kod Okuyucu", "RFID Okuyucu", "Erişim Terminali", "Erişim Paneli", "Turnike", "Kapı Kontrolörü", "Diğer"]),
+  device_type: z.string(),
   zone_id: z.string().optional(),
   // IDE panel eklerken yeni bölge oluşturma adı (zone_id === "__new__" iken kullanılır).
   new_zone_name: z.string().optional(),
@@ -77,6 +79,10 @@ export function makeFormSchema(adminMode: boolean, isEdit = false) {
   ),
   ide_door_count: doorCountField,
 }).superRefine((data, ctx) => {
+  // Hikvision tipi gizlidir; eski özel değerleri koru, yeni tip modelden türetilir.
+  if (data.brand !== "hikvision" && !deviceTypeSchema.safeParse(data.device_type).success) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["device_type"], message: "Geçerli cihaz tipi seçin" });
+  }
   if (data.zone_id === "__new__" && !data.new_zone_name?.trim()) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,

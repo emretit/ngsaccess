@@ -107,7 +107,9 @@ export function useDeviceFormSubmission({
           projectId: currentProjectId ?? undefined,
           zoneId: pickedZone,
           newZoneName,
-          deviceType: values.device_type,
+          deviceType: modelSpec?.family === "controller"
+            ? "Kapı Kontrolörü"
+            : modelSpec?.family === "terminal" ? "Erişim Terminali" : undefined,
           hikTransport: values.hik_transport,
           // "Diğer (manuel)" gerçek bir model değil → hikModel boş bırakılır.
           hikModel:
@@ -198,7 +200,7 @@ export function useDeviceFormSubmission({
             : {
                 deviceId: device._id,
                 name: values.name,
-                deviceType: values.device_type,
+                deviceType: values.brand === "hikvision" ? values.device_type || undefined : values.device_type,
                 zoneId: (values.zone_id || undefined) as Id<"zones"> | undefined,
                 doorId: (values.door_id || undefined) as Id<"doors"> | undefined,
                 doorCount: device?._id ? undefined : values.door_count || undefined,
