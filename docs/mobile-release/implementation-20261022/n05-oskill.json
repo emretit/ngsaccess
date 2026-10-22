@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-22T19:55:00+03:00",
+  "date": "2026-10-22T20:56:00+03:00",
   "item": "MOB-N05",
   "backendRevision": "eb677f9 (notable-tern-4)",
   "artifact": {
@@ -25,12 +25,39 @@
       "steps": "Fill form -> Save -> kill -9 after 1.0 s -> relaunch -> Visitors list -> open Add",
       "observed": "Backend count 2 (new req 82452405) immediately after kill; after relaunch list shows the record once, total 2, Add form clean (no pending warning). No duplicate create.",
       "status": "passed"
+    },
+    {
+      "id": "A-ios",
+      "platform": "ios",
+      "device": "iPhone 17 Pro simulator iOS 27.0, app 1.0.4 (1) simulator build from a6c5918",
+      "steps": "Fill form -> Save (AXPress) -> kill -9 host pid after 0.6 s -> relaunch",
+      "observed": "Server row committed 20:46:54 TR; after relaunch list total 3 (incl. Android rows), N05C once, Add form clean. No duplicate.",
+      "status": "passed",
+      "note": "First iOS attempt killed before the tap was processed: no intent, no row (inconclusive, not a failure)."
+    },
+    {
+      "id": "mobile-edit",
+      "steps": "Android: edit N05A visit purpose -> Save",
+      "observed": "Mobile detail shows new purpose; web visitor detail shows the same text after reload.",
+      "status": "passed"
+    },
+    {
+      "id": "mobile-cancel",
+      "steps": "Android: N05B -> Cancel invitation -> confirm",
+      "observed": "Mobile 'Access ended'; backend visitorStatus checkedOut; iOS list shows 'Erişim sonlandırıldı'.",
+      "status": "passed"
+    },
+    {
+      "id": "expiry",
+      "steps": "N05A left pre-registered past its 20:52 TR end",
+      "observed": "20:55 TR: Android list 'Expired'; web list 'Süresi doldu'. Backend visitorStatus stays preRegistered (expiry cron only scans active visitors); status is derived from end time on both clients.",
+      "status": "passed"
     }
   ],
   "open": [
-    "C: pending intent + logout + other account (needs second test account)",
-    "Web activation / edit / cancel / expiry on the two test visitors",
-    "iOS simulator run (GUI text input via Device Hub unreliable; see plan)"
+    "C: pending intent + logout + other account",
+    "Activation (card + access rule -> device push) deferred to N08 with operator present"
   ],
-  "pii": "Visitor names are synthetic (Test N05A/N05B); no phone; screenshots kept in /tmp only."
+  "pii": "Visitor names are synthetic (Test N05A/N05B); no phone; screenshots kept in /tmp only.",
+  "webFindings": "Web visitor detail for a pre-registered mobile invitation offers only 'Kart ve erişim ata' (card + access = device push); no web edit/cancel for pre-registration. Activation skipped: it pushes to physical panels in project emre."
 }
