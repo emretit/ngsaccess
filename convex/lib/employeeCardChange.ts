@@ -1,3 +1,4 @@
+import { snapshotEmployeeHikDevices, type HikSnapshot } from "./peopleHikSnapshot";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
@@ -9,6 +10,7 @@ export async function scheduleEmployeeCardChange(
   employeeId: Id<"employees">,
   projectId: Id<"projects"> | undefined,
   previousCardNumber: string,
+  previousHikSnapshot?: HikSnapshot,
 ): Promise<void> {
   await scheduleFingerprintPurge(ctx, employeeId, previousCardNumber, { deleteTemplates: false });
   const ideDeviceIds = await resolveEmployeeIdeDeviceIds(ctx, employeeId, projectId);
@@ -19,7 +21,15 @@ export async function scheduleEmployeeCardChange(
       projectId,
     });
   }
-  await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId });
+  const employee = await ctx.db.get(employeeId);
+  const snapshot = previousHikSnapshot ?? (employee && employee.projectId === projectId ? await snapshotEmployeeHikDevices(ctx, employee) : undefined);
+  if (snapshot) {
+    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
+      employeeId, snapshot: { ...snapshot, cardNumber: previousCardNumber }, syncAfter: true,
+    });
+  } else {
+    await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId });
+  }
   await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncEmployeeToIdePanels, { employeeId });
 }
 

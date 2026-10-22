@@ -1,4 +1,6 @@
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
+import { requireEmployeeAccess } from "./lib/auth";
 import { adminQuery } from "./lib/customFunctions";
 import { paginationOptsValidator } from "convex/server";
 import { resolveProjectScope } from "./lib/projectScope";
@@ -26,20 +28,27 @@ export const getPdksAuditForEmployee = adminQuery({
     endDate: v.string(),
   },
   handler: async (ctx, args) => {
-    const rows = await ctx.db
-      .query("auditLog")
-      .order("desc")
-      .take(500);
-    const filtered = rows.filter((r) => r.targetTable === "pdksRecords");
-
-    const userIds = new Set(filtered.map((r) => String(r.userId)));
-    const users = await Promise.all(
-      [...userIds].map(async (id) => {
-        const u = await ctx.db.get(id as never);
-        return u ? { id, name: (u as { name?: string; email?: string }).name ?? (u as { email?: string }).email ?? id } : null;
-      }),
-    );
-    const userMap = new Map(users.filter((u) => u !== null).map((u) => [u!.id, u!.name]));
+    const employee = await requireEmployeeAccess(ctx, args.employeeId);
+    const records = await ctx.db.query("pdksRecords")
+      .withIndex("by_employee_date", q => q.eq("employeeId", employee._id)
+        .gte("date", args.startDate).lte("date", args.endDate))
+      .order("desc").take(500);
+    // Both employee-targeted history and existing record-targeted manual edits use by_target.
+    // The budget applies only to this employee, never to a global recent-history scan.
+    const filtered: Doc<"auditLog">[] = [];
+    let remaining = 500;
+    for (const targetId of [String(employee._id), ...records.map(record => String(record._id))]) {
+      const rows = await ctx.db.query("auditLog")
+        .withIndex("by_target", q => q.eq("targetTable", "pdksRecords").eq("targetId", targetId))
+        .order("desc").take(remaining);
+      remaining -= rows.length;
+      filtered.push(...rows.filter(row => row.projectId === employee.projectId));
+      if (remaining === 0) break;
+    }
+    filtered.sort((a, b) => b.timestamp - a.timestamp);
+    const userIds = [...new Set(filtered.flatMap(row => row.userId ? [row.userId] : []))];
+    const users = await Promise.all(userIds.map(async id => [id, await ctx.db.get(id)] as const));
+    const userMap = new Map(users.map(([id, user]) => [id, user?.name ?? user?.email ?? "Bilinmeyen"]));
 
     return filtered
       .map((r) => {
@@ -49,21 +58,11 @@ export const getPdksAuditForEmployee = adminQuery({
         if (recordDate && (recordDate < args.startDate || recordDate > args.endDate)) {
           return null;
         }
-        // Filter to this employee: heuristic — targetId starts with the employee
-        // id or oldValue/newValue includes it. Audit log doesn't index by
-        // employee directly, so we accept best-effort matching.
-        const targetIdStr = String(r.targetId);
-        const matchesEmployee =
-          targetIdStr === String(args.employeeId) ||
-          (isPdksPayload(r.newValue) && JSON.stringify(r.newValue).includes(String(args.employeeId))) ||
-          (isPdksPayload(r.oldValue) && JSON.stringify(r.oldValue).includes(String(args.employeeId)));
-        if (!matchesEmployee && targetIdStr !== "bulk-upsert") return null;
-
         return {
           id: String(r._id),
           timestamp: r.timestamp,
           action: r.action,
-          userName: userMap.get(String(r.userId)) ?? "Bilinmeyen",
+          userName: (r.userId ? userMap.get(r.userId) : undefined) ?? "Bilinmeyen",
           date: recordDate,
           oldValue: isPdksPayload(r.oldValue) ? r.oldValue : null,
           newValue: isPdksPayload(r.newValue) ? r.newValue : null,

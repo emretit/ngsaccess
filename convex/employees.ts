@@ -277,6 +277,8 @@ export const update = adminMutation({
         : {};
     await validateEmployeeRelations(ctx, employeeRelationsToValidate(emp, toPatch(updates)));
     validatePay(updates.hourlyRate, updates.monthlySalary);
+    const previousHikSnapshot = updates.cardNumber !== undefined && updates.cardNumber !== emp.cardNumber
+      ? await snapshotEmployeeHikDevices(ctx, emp) : undefined;
     await ctx.db.patch(employeeId, { ...toPatch(updates), ...photo, updatedAt: new Date().toISOString() });
 
     const groupMemberAdded = await upsertGroupMembership(
@@ -299,7 +301,7 @@ export const update = adminMutation({
     // kart hâlâ kapı açar). Paneller groupMembers'tan çözülür (kart değişiminden bağımsız);
     // eski değer (emp.cardNumber) ile, yeni kartı yazacak sync'ten ÖNCE enqueue edilir.
     // Eski kart temizliği yetki kaldırması değildir: employeeId taşımaz.
-    if (cardChanged) await scheduleEmployeeCardChange(ctx, employeeId, emp.projectId, emp.cardNumber);
+    if (cardChanged) await scheduleEmployeeCardChange(ctx, employeeId, emp.projectId, emp.cardNumber, previousHikSnapshot);
 
     if (!cardChanged && (activeChanged || groupMemberAdded)) {
       await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {

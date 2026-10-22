@@ -107,6 +107,7 @@ describe("grant status writes in existing queue transactions", () => {
     await t.run(ctx => ctx.db.patch(opId, { status: "processing" }));
     await t.mutation(internal.hikvisionSync.ackLocalBridgeOperation, { token: "token", opId, ok: true });
     expect(await status(ids.bridgeId)).toMatchObject({ state: "effective", appliedAt: Date.now() });
+    await t.run(ctx => ctx.db.patch(ids.employeeId, { isActive: false }));
     const del = await t.mutation(internal.hikvisionSync.enqueueLocalBridgeOperation, { deviceId: ids.bridgeId, operation: "deleteCard", payload: { employeeId: ids.employeeId, cardNumber: "123" } });
     await t.mutation(internal.hikvisionSync.claimLocalBridgeOperations, { token: "token" });
     await t.mutation(internal.hikvisionSync.ackLocalBridgeOperation, { token: "token", opId: del, ok: true });
@@ -120,6 +121,7 @@ describe("grant status writes in existing queue transactions", () => {
     await t.action(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId: ids.employeeId, targetDeviceIds: [ids.hikId] });
     expect(await status(ids.hikId)).toMatchObject({ state: "failed", lastError: "HTTP başarısız" });
     wire.send.mockResolvedValue({ ok: true });
+    await t.run(ctx => ctx.db.patch(ids.employeeId, { isActive: false }));
     await t.action(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, { employeeId: ids.employeeId, targetDeviceIds: [ids.hikId] });
     expect((await status(ids.hikId))?.state).toBe("removed");
   });

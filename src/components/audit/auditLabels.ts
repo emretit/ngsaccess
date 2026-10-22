@@ -82,6 +82,7 @@ const commonLabels: Record<string, string> = {
   readingsAnonymized: "Anonimleştirilen okumalar",
 };
 const tableLabels: Record<string, Record<string, string>> = {
+  hikPendingOperations: { dismissedAt: "Uyarının kapatılma zamanı" },
   holidays: { name: "Tatil adı", type: "Tatil türü", isHalfDay: "Yarım gün" },
   employees: {
     cardNo: "Kart numarası",

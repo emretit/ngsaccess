@@ -1,6 +1,6 @@
 
 import { ConvexError, v } from "convex/values";
-import { authedQuery, authedMutation } from "./lib/customFunctions";
+import { authedQuery, adminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { resolveProjectScope } from "./lib/projectScope";
 import { zoneDeleteBlocker } from "./lib/doorZoneDelete";
@@ -31,7 +31,7 @@ export const list = authedQuery({
   },
 });
 
-export const create = authedMutation({
+export const create = adminMutation({
   // Bölge = saf mantıksal alan. ideDeviceId KABUL EDİLMEZ (panel↔bölge 1:1 bağı
   // kaldırıldı; kapının paneli doors.deviceId'de). Eski deprecated alanı yazma
   // yüzeyi kapatıldı — aksi halde yeni orphan panel-bölge üretilebilirdi.
@@ -53,7 +53,7 @@ export const create = authedMutation({
   },
 });
 
-export const remove = authedMutation({
+export const remove = adminMutation({
   args: { zoneId: v.id("zones") },
   handler: async (ctx, args) => {
     const allowedProjectIds = await resolveProjectScope(ctx);

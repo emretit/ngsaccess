@@ -14,7 +14,7 @@ import { getEmployeeTargetDevices } from "./lib/peopleHikSnapshot";
 import { writeAudit } from "./lib/audit";
 import { isFreshAlarmEvent, notifyAlarmIfNeeded } from "./lib/alarmNotify";
 import { toUtcISO, trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
-import { internalMutation, type QueryCtx } from "./_generated/server";
+import { internalMutation, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import {
@@ -868,6 +868,14 @@ export const getMonthlyPayrollSheet = authedQuery({
 // resolveDirection, resolveActiveMatchingRuleIds + AccessDirection) lib/cardReadingProcess.ts'e
 // taşındı — saf ikili golden testlerle donduruldu.
 
+/** Kart adaylarını cihazın projesine göre seç; projesiz cihazın legacy davranışını koru. */
+async function findDeviceCardEmployee(ctx: MutationCtx, cardNo: string, projectId?: Id<"projects">) {
+  const candidates = await ctx.db.query("employees")
+    .withIndex("by_card", q => q.eq("cardNumber", cardNo))
+    .take(20);
+  return candidates.find(candidate => !projectId || candidate.projectId === projectId) ?? null;
+}
+
 /**
  * Kart okuyucu cihazlarından gelen istekleri işler (internal - HTTP action'dan çağrılır).
  * Erişim kontrolü yapar ve card_readings kaydı oluşturur.
@@ -998,10 +1006,7 @@ export const processCardReading = internalMutation({
         ? undefined
         : inferDenialReason(args.hikSubEventType);
 
-      const employee = await ctx.db
-        .query("employees")
-        .withIndex("by_card", (q) => q.eq("cardNumber", args.cardNo))
-        .first();
+      const employee = await findDeviceCardEmployee(ctx, args.cardNo, device?.projectId);
 
       const direction = employee
         ? await resolveDirection(ctx, {
@@ -1064,10 +1069,7 @@ export const processCardReading = internalMutation({
       // toplu push edilen event'lerde gerçek okutma anı korunur (sunucu alış anı değil).
       const ideAccessTime = ideTimeToISO(args.ideTime) ?? accessTime;
 
-      const employee = await ctx.db
-        .query("employees")
-        .withIndex("by_card", (q) => q.eq("cardNumber", args.cardNo))
-        .first();
+      const employee = await findDeviceCardEmployee(ctx, args.cardNo, device?.projectId);
 
       const direction = await resolveDirection(ctx, {
         device,
@@ -1127,10 +1129,8 @@ export const processCardReading = internalMutation({
     }
 
     // 2. Çalışanı kart numarasına göre bul
-    const employee = await ctx.db
-      .query("employees")
-      .withIndex("by_card", (q) => q.eq("cardNumber", args.cardNo))
-      .first();
+    // Projesiz legacy cihazlarda ilk kart eşleşmesi davranışı korunur.
+    const employee = await findDeviceCardEmployee(ctx, args.cardNo, device?.projectId);
 
     if (!employee) {
       await ctx.db.insert("cardReadings", {
@@ -1608,14 +1608,9 @@ export const backfillHikEventRow = internalMutation({
       ? undefined
       : inferDenialReason(args.event.minor);
 
-    // cardNo'dan çalışan ara (by_card index — canlı branch ile aynı yol)
-    const employee = await ctx.db
-      .query("employees")
-      .withIndex("by_card", (q) => q.eq("cardNumber", cardNo))
-      .first();
-
-    // projectId: employee'nin projesi > cihazın projesi
-    const projectId = employee?.projectId ?? device.projectId;
+    // Canlı olaylarla aynı cihaz-projesi eşleştirmesini kullan.
+    const employee = await findDeviceCardEmployee(ctx, cardNo, device.projectId);
+    const projectId = device.projectId ?? employee?.projectId;
 
     const employeeName = employee
       ? `${employee.firstName} ${employee.lastName}`

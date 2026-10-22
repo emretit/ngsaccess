@@ -110,20 +110,44 @@ export const bulkUpsertManual = adminMutation({
       }
     }
 
-    await writeAudit(ctx, {
-      user: ctx.user,
-      projectId: null,
-      action: "update",
-      targetTable: "pdksRecords",
-      targetId: "bulk-upsert",
-      newValue: {
-        inserted,
-        updated,
-        errors: errors.length,
-        touched: touchedIds.length,
-      },
-      note: batchNote,
-    });
+    // Keep batch summaries scoped even when a super admin edits multiple projects.
+    const failedIndices = new Set(errors.map(error => error.index));
+    const successfulRows = args.rows.filter((_row, index) => !failedIndices.has(index));
+    if (successfulRows.length === 0) {
+      // Başarısız denemeleri yalnız erişilebilir, bilinen projelere yaz.
+      const errorsByProject = new Map<NonNullable<(typeof employees)[number]["projectId"]>, number>();
+      for (const row of args.rows) {
+        const projectId = employeeById.get(row.employeeId)?.projectId;
+        if (!projectId || (userProjectIds && !userProjectIds.has(String(projectId)))) continue;
+        errorsByProject.set(projectId, (errorsByProject.get(projectId) ?? 0) + 1);
+      }
+      for (const [projectId, errorCount] of [...errorsByProject].slice(0, 20)) {
+        await writeAudit(ctx, {
+          user: ctx.user,
+          projectId,
+          action: "update",
+          targetTable: "pdksRecords",
+          targetId: "bulk-upsert",
+          newValue: { inserted: 0, updated: 0, errors: errorCount, touched: 0 },
+          note: batchNote,
+        });
+      }
+    }
+    const projectIds = [...new Set(successfulRows.map(row => employeeById.get(row.employeeId)?.projectId))];
+    for (const projectId of projectIds) {
+      const touched = successfulRows.filter(row => employeeById.get(row.employeeId)?.projectId === projectId).length;
+      await writeAudit(ctx, {
+        user: ctx.user,
+        projectId: projectId ?? null,
+        action: "update",
+        targetTable: "pdksRecords",
+        targetId: "bulk-upsert",
+        newValue: projectIds.length === 1
+          ? { inserted, updated, errors: errors.length, touched: touchedIds.length }
+          : { touched },
+        note: batchNote,
+      });
+    }
 
     return { inserted, updated, errors };
   },

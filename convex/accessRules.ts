@@ -1,3 +1,4 @@
+import { planRemovedEmployeeHik, reconcileRemovedEmployeeHik, snapshotRuleHikEmployees, resolveRuleDeviceTargets, hikSnapshotValidator, type HikSnapshot } from "./lib/peopleHikSnapshot";
 import { validateScheduleBinding, assertIdeScheduleCapacity } from "./accessScheduleTemplates";
 import { resolveProjectScope } from "./lib/projectScope";
 import { assertAccessProjectUnchanged } from "./lib/accessScope";
@@ -10,7 +11,7 @@ import { createRuleDiffRun } from "./deviceSyncRuns";
 import { internal } from "./_generated/api";
 import { ConvexError, v, type Infer } from "convex/values";
 import { retainedDiffDoorIds, applyRelationDiff, assertLegacyRuleReplacement, ruleDiffSyncPlan, RULE_DETAILS_MEMBER_LIMIT, RULE_DETAILS_RELATION_LIMIT } from "./lib/accessRuleDiff";
-import { authedQuery, authedMutation } from "./lib/customFunctions";
+import { authedQuery, adminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed, canAccessEmployeeProject } from "./lib/auth";
 import {
   resolveRuleIdeDeviceIds,
@@ -21,7 +22,70 @@ import { diffIds, staleGroupDoorIds } from "./lib/reconcileMath";
 import type { Doc, Id } from "./_generated/dataModel";
 import { paginationOptsValidator, type PaginationOptions } from "convex/server";
 import { matchesRuleStatus, matchesRuleType, personnelRuleTypes, ruleTypeStages, pageRuleStages, panelScope, pageRuleCandidates, personSearchTerms, activeRuleCursor } from "./lib/accessRuleSummary";
+import { internalMutation } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
+
+const HIK_RECONCILE_BATCH = 25;
+
+async function ruleHikDevices(ctx: MutationCtx, rule: Doc<"accessRules">): Promise<HikSnapshot["devices"]> {
+  return (await resolveRuleDeviceTargets(ctx, rule, false)).filter(({ device }) => device.brand === "hikvision").map(({ device }) => ({
+    _id: device._id, name: device.name, brand: device.brand, projectId: device.projectId,
+    hikDevIndex: device.hikDevIndex, hikTransport: device.hikTransport, hikDoorCount: device.hikDoorCount,
+  }));
+}
+
+async function reconcileRuleSnapshots(ctx: MutationCtx, snapshots: Map<Id<"employees">, HikSnapshot>, idePanels?: Id<"devices">[]) {
+  if (snapshots.size > HIK_RECONCILE_BATCH) {
+    // Identities and old targets are frozen in the original transaction. No relationship
+    // needs to survive deletion, and later edits are checked by each batch and action.
+    const groups = new Map<string, { projectId: HikSnapshot["projectId"]; devices: HikSnapshot["devices"]; entries: { employeeId: Id<"employees">; cardNumber: string }[] }>();
+    for (const [employeeId, snapshot] of snapshots) {
+      const key = JSON.stringify([snapshot.projectId, snapshot.devices]);
+      const group = groups.get(key) ?? { projectId: snapshot.projectId, devices: snapshot.devices, entries: [] };
+      group.entries.push({ employeeId, cardNumber: snapshot.cardNumber });
+      groups.set(key, group);
+    }
+    for (const group of groups.values()) await ctx.scheduler.runAfter(0, internal.accessRules.reconcileHikRemovalBatch, { ...group, idePanels });
+    return;
+  }
+  for (const [employeeId, snapshot] of snapshots) {
+    await reconcileRemovedEmployeeHik(ctx, employeeId, snapshot);
+    if (idePanels) await reconcileRemovedEmployeeIde(ctx, { employeeId, projectId: snapshot.projectId, candidatePanels: idePanels });
+  }
+}
+
+export const reconcileHikRemovalEntry = internalMutation({
+  args: { employeeId: v.id("employees"), snapshot: hikSnapshotValidator, idePanels: v.optional(v.array(v.id("devices"))) },
+  handler: async (ctx, args) => {
+    await reconcileRemovedEmployeeHik(ctx, args.employeeId, args.snapshot);
+    if (args.idePanels) await reconcileRemovedEmployeeIde(ctx, { employeeId: args.employeeId, projectId: args.snapshot.projectId, candidatePanels: args.idePanels });
+  },
+});
+
+export const reconcileHikRemovalBatch = internalMutation({
+  args: {
+    projectId: hikSnapshotValidator.fields.projectId, devices: hikSnapshotValidator.fields.devices,
+    entries: v.array(v.object({ employeeId: v.id("employees"), cardNumber: v.string() })),
+    idePanels: v.optional(v.array(v.id("devices"))),
+  },
+  handler: async (ctx, args) => {
+    if (args.entries.length > HIK_RECONCILE_BATCH) await ctx.scheduler.runAfter(0, internal.accessRules.reconcileHikRemovalBatch, { ...args, entries: args.entries.slice(HIK_RECONCILE_BATCH) });
+    for (const entry of args.entries.slice(0, HIK_RECONCILE_BATCH)) {
+      try {
+        // Nested mutations isolate each entry's writes (including scheduled jobs).
+        await ctx.runMutation(internal.accessRules.reconcileHikRemovalEntry, {
+          employeeId: entry.employeeId, snapshot: { projectId: args.projectId, devices: args.devices, cardNumber: entry.cardNumber }, idePanels: args.idePanels,
+        });
+      } catch {
+        for (const device of args.devices) await ctx.runMutation(internal.hikvisionSync.recordSyncFailure, {
+          deviceId: device._id, projectId: args.projectId, operation: "deletePerson",
+          payload: { employeeId: entry.employeeId, employeeNo: entry.cardNumber, cardNumber: entry.cardNumber },
+          lastError: "Geri alma girdisi işlenemedi; cihazda kalmış olabilir",
+        });
+      }
+    }
+  },
+});
 
 /**
  * Kuraldan cihaz(lar) çıkarılırken o cihazlara ait (CANLI doors.deviceId) groupDoors
@@ -671,7 +735,7 @@ export const listRuleMembers = authedQuery({
   },
 });
 
-export const create = authedMutation({
+export const create = adminMutation({
   args: {
     scheduleTemplateId: v.optional(v.union(v.id("accessScheduleTemplates"), v.null())),
     name: v.string(),
@@ -706,7 +770,7 @@ export const create = authedMutation({
   },
 });
 
-export const update = authedMutation({
+export const update = adminMutation({
   args: {
     ruleId: v.id("accessRules"),
     scheduleTemplateId: v.optional(v.union(v.id("accessScheduleTemplates"), v.null())),
@@ -737,7 +801,11 @@ export const update = authedMutation({
     await validateScheduleBinding(ctx, rule.projectId, updates.scheduleTemplateId, rule.scheduleTemplateId);
     assertAccessScheduleUpdate(rule, updates);
     if (updates.name !== undefined && !updates.name.trim()) throw new Error("Kural adı zorunludur");
+    const hikMembers = updates.isActive === false ? await ctx.db.query("groupMembers").withIndex("by_project_group", q => q.eq("projectId", rule.projectId).eq("groupId", ruleId)).take(4097) : [];
+    if (hikMembers.length > 4096) throw new Error("Kural üye sınırı aşıldı");
+    const hikSnapshots = await snapshotRuleHikEmployees(ctx, hikMembers.map(member => member.employeeId), rule.projectId, hikMembers.length ? await ruleHikDevices(ctx, rule) : []);
     await ctx.db.patch(ruleId, clean);
+    await reconcileRuleSnapshots(ctx, hikSnapshots);
     if (updates.scheduleTemplateId !== undefined) await assertIdeScheduleCapacity(ctx, rule.projectId, undefined, [ruleId]);
 
     // Plan-ilişkili alanlardan biri değiştiyse week plan'ı cihazlara yeniden yaz.
@@ -750,6 +818,7 @@ export const update = authedMutation({
     if (planAffected) {
       await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, {
         accessRuleId: ruleId,
+        ...(updates.isActive === false ? { targetEmployeeIds: [] } : {}),
       });
       await ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncPermissionToIdePanels, {
         accessRuleId: ruleId,
@@ -795,7 +864,7 @@ export const update = authedMutation({
   },
 });
 
-export const remove = authedMutation({
+export const remove = adminMutation({
   args: { ruleId: v.id("accessRules") },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
@@ -843,9 +912,12 @@ export const remove = authedMutation({
     }
     const candidatePanels = await resolveRuleIdeDeviceIds(ctx, args.ruleId, rule.projectId);
     const affectedEmployeeIds = members.map(m => m.employeeId);
+    const hikSnapshots = await snapshotRuleHikEmployees(ctx, affectedEmployeeIds, rule.projectId, await ruleHikDevices(ctx, rule));
     await Promise.all([...members, ...devices, ...doors].map(link => ctx.db.delete(link._id)));
 
     await ctx.db.delete(args.ruleId);
+
+    await reconcileRuleSnapshots(ctx, hikSnapshots, candidatePanels);
 
     // Etkilenen üyeleri yeniden sync et — kalan kurallarına göre RightPlan
     // güncellensin, hiç kuralı kalmadıysa cihazdan sökülecek (Phase 5 reconcile).
@@ -853,22 +925,11 @@ export const remove = authedMutation({
     // no-op kalır ve kart panelde yaşardı (silinmiş kuralla geçiş). Silme-öncesi
     // candidatePanels ile gerçek orphan'lardan kart sökülür; helper kalan paneller
     // için syncEmployeeToIdePanels'ı zaten kendisi schedule eder.
-    await Promise.all(
-      affectedEmployeeIds.flatMap((empId) => [
-        ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
-          employeeId: empId,
-        }),
-        reconcileRemovedEmployeeIde(ctx, {
-          employeeId: empId,
-          projectId: rule.projectId,
-          candidatePanels,
-        }),
-      ]),
-    );
+
   },
 });
 
-export const createWithGroups = authedMutation({
+export const createWithGroups = adminMutation({
   args: {
     scheduleTemplateId: v.optional(v.union(v.id("accessScheduleTemplates"), v.null())),
     name: v.string(),
@@ -1045,6 +1106,23 @@ async function saveWithGroups(
     await validateScheduleBinding(ctx, rule.projectId, updates.scheduleTemplateId, rule.scheduleTemplateId);
     assertAccessScheduleUpdate(rule, updates);
     if (updates.name !== undefined && !updates.name.trim()) throw new Error("Kural adı zorunludur");
+    // Member removals affect only those members. Scope removals affect only old
+    // devices touched by a removed device/door; resolve the rule graph once.
+    const removedMembers = employeeIds === undefined ? [] : diffIds(oldEmployeeIds, employeeIds).removed;
+    const removedDevices = deviceIds === undefined ? [] : diffIds(oldDevices.map(d => d.deviceId), deviceIds).removed;
+    const removedDoors = doorIds === undefined ? [] : diffIds(oldDoors.map(d => d.doorId), doorIds).removed;
+    const affectedDeviceIds = new Set(removedDevices);
+    for (const link of oldDoors.filter(link => removedDoors.includes(link.doorId))) {
+      const door = await ctx.db.get(link.doorId);
+      if (link.deviceId) affectedDeviceIds.add(link.deviceId);
+      if (door?.deviceId) affectedDeviceIds.add(door.deviceId);
+    }
+    const allHikDevices = removedMembers.length || affectedDeviceIds.size || updates.isActive === false ? await ruleHikDevices(ctx, rule) : [];
+    const affectedMembers = updates.isActive === false || affectedDeviceIds.size ? oldEmployeeIds : removedMembers;
+    const hikSnapshots = await snapshotRuleHikEmployees(ctx, affectedMembers, rule.projectId, allHikDevices);
+    for (const [employeeId, snapshot] of hikSnapshots) {
+      if (updates.isActive !== false && !removedMembers.includes(employeeId)) snapshot.devices = snapshot.devices.filter(device => affectedDeviceIds.has(device._id));
+    }
     await ctx.db.patch(ruleId, { ...toPatch(updates), updatedAt: now });
     const ruleIdePanelsBefore = await resolveRuleIdeDeviceIds(ctx, ruleId, rule.projectId);
 
@@ -1131,19 +1209,25 @@ async function saveWithGroups(
       missingWeekPlan: !rule.hikWeekPlanNo,
     });
     if (relationDiff) {
+      const hikDeletions = [];
+      for (const [employeeId, snapshot] of hikSnapshots) {
+        const plan = hikSnapshots.size > HIK_RECONCILE_BATCH ? { snapshot } : await planRemovedEmployeeHik(ctx, employeeId, snapshot);
+        if (plan?.snapshot.devices.length) hikDeletions.push({ employeeId, snapshot: plan.snapshot });
+      }
       const oldDoorDocs = await Promise.all(oldDoors.map(d => ctx.db.get(d.doorId)));
       const beforeDeviceIds = [...new Set([...oldDevices.map(d => d.deviceId),
         ...oldDoorDocs.flatMap(d => d?.deviceId ? [d.deviceId] : [])])];
       const runId = await createRuleDiffRun(ctx, {
         ruleId, projectId: rule.projectId, startedBy: ctx.user._id,
-        beforeDeviceIds, plan: diffPlan,
+        beforeDeviceIds, plan: diffPlan, hikDeletions,
       });
       return { ruleId, runId };
     }
+    await reconcileRuleSnapshots(ctx, hikSnapshots);
     const syncJobs: Promise<unknown>[] = [];
     if (!relationDiff || diffPlan.syncRule) {
       syncJobs.push(
-        ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, { accessRuleId: ruleId }),
+        ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncWeekPlanToDevicesInternal, { accessRuleId: ruleId, ...(updates.isActive === false ? { targetEmployeeIds: [] } : {}) }),
         ctx.scheduler.runAfter(0, internal.actions.ideGatewayDevice.syncPermissionToIdePanels, { accessRuleId: ruleId }),
       );
     }
@@ -1152,9 +1236,6 @@ async function saveWithGroups(
     // panellerde permissions[] AZALTILIR (kişi silinmez).
     for (const empId of removedEmployeeIds) {
       syncJobs.push(
-        ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
-          employeeId: empId,
-        }),
         reconcileRemovedEmployeeIde(ctx, {
           employeeId: empId,
           projectId: rule.projectId,
@@ -1230,13 +1311,13 @@ async function saveWithGroups(
 }
 
 /** Old clients keep the Id return shape. Diff saves still get durable tracking. */
-export const updateWithGroups = authedMutation({
+export const updateWithGroups = adminMutation({
   args: updateWithGroupsValidator.fields,
   handler: async (ctx, args): Promise<Id<"accessRules">> => (await saveWithGroups(ctx, args)).ruleId,
 });
 
 /** Same transaction, with the run reference for the editor's result link. */
-export const updateWithGroupsTracked = authedMutation({
+export const updateWithGroupsTracked = adminMutation({
   args: updateWithGroupsValidator.fields,
   handler: async (ctx, args): Promise<{ ruleId: Id<"accessRules">; runId: Id<"deviceSyncRuns"> | null }> => {
     if (!args.relationDiff) throw new ConvexError("İzlenen kayıt için ilişki farkı gerekli");

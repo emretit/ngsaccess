@@ -3,6 +3,10 @@ import { convexTest } from "convex-test";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { internal } from "./_generated/api";
 import schema from "./schema";
+import * as actions from "./actions/hikvisionSync";
+import * as queueWorker from "./actions/hikQueueWorker";
+import type { ActionCtx } from "./_generated/server";
+import { getFunctionName, type FunctionArgs } from "convex/server";
 
 const wire = vi.hoisted(() => ({ person: vi.fn(async () => ({ ok: true })), week: vi.fn(async () => ({ ok: true })), template: vi.fn(async () => ({ ok: true })), card: vi.fn(async () => ({ ok: true })), remove: vi.fn(async (): Promise<{ ok: boolean; error?: string }> => ({ ok: true })) }));
 vi.mock("./lib/hikGateway", async original => ({
@@ -75,10 +79,24 @@ describe("Hik employee sync complete rule scope", () => {
     expect(result.errors.join(" ")).toContain("Windows köprüsü kapı başına çoklu planı henüz desteklemiyor");
     const ops = await t.run(ctx => ctx.db.query("hikPendingOperations").take(10));
     expect(ops).toEqual(expect.arrayContaining([
-      expect.objectContaining({ status: "pending", operation: "deleteCard", payload: expect.objectContaining({ employeeId, cardNumber: "123" }) }),
       expect.objectContaining({ status: "failed", operation: "addPerson", lastError: "Windows köprüsü kapı başına çoklu planı henüz desteklemiyor" }),
     ]));
     expect(ops.some(op => op.operation === "addPerson" && op.status === "pending")).toBe(false);
+    // Unwritable live rights cannot preserve the stale device credential.
+    expect(ops).toEqual(expect.arrayContaining([expect.objectContaining({ operation: "deleteCard", status: "pending" })]));
+    expect((await t.run(ctx => ctx.db.query("accessGrantStatus").first()))?.state).not.toBe("removed");
+  });
+  it("still removes the multi-plan bridge credential when no valid target remains", async () => {
+    const { t, employeeId, r1, r2 } = await fixture("localBridge");
+    await t.run(async ctx => {
+      await ctx.db.patch(r1, { isActive: false });
+      await ctx.db.patch(r2, { isActive: false });
+    });
+    await t.action(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId });
+    const ops = await t.run(ctx => ctx.db.query("hikPendingOperations").take(10));
+    expect(ops).toEqual(expect.arrayContaining([
+      expect.objectContaining({ status: "pending", operation: "deleteCard", payload: expect.objectContaining({ employeeId, cardNumber: "123" }) }),
+    ]));
   });
   it("no selected doors retains all-door legacy behavior", async () => {
     const { t, employeeId, projectId, deviceId, r1 } = await fixture();
@@ -247,4 +265,34 @@ it.each([false, true])("sync hook uses one employee query across devices; templa
   await handler({ runQuery, runMutation, scheduler: { runAfter } }, { employeeId: f.employeeId });
   expect(runQuery).toHaveBeenCalledTimes(1);
   expect(runAfter).toHaveBeenCalledTimes(hasTemplates ? 2 : 0);
+});
+
+
+describe("gateway card delivery survives supersession cleanup failure", () => {
+  it.each(["sync", "queue"] as const)("%s still writes the card", async path => {
+    const { t, employeeId, projectId, deviceId } = await fixture();
+    const throwingCleanup = (ctx: ActionCtx): ActionCtx => ({ ...ctx, runMutation: new Proxy(ctx.runMutation, { apply(target, thisArg, args) {
+      if (getFunctionName(args[0]) === "hikvisionSync:supersedePersonDeletions") {
+        if (path === "sync") expect(wire.card).toHaveBeenCalledOnce();
+        throw new Error("Synthetic cleanup limit");
+      }
+      return Reflect.apply(target, thisArg, args);
+    } }) });
+    if (path === "sync") {
+      const handler = (actions.syncEmployeeToDevicesInternal as unknown as { _handler: (ctx: ActionCtx, args: FunctionArgs<typeof internal.actions.hikvisionSync.syncEmployeeToDevicesInternal>) => Promise<{ synced: number }> })._handler;
+      const result = await t.action(ctx => handler(throwingCleanup(ctx), { employeeId }));
+      expect(result.synced).toBe(1);
+    } else {
+      await t.run(async ctx => {
+        await ctx.db.patch(deviceId, { hikLastSeenAt: Date.now() });
+        for (const operation of ["addPerson", "addCard"] as const) await ctx.db.insert("hikPendingOperations", {
+          deviceId, projectId, operation, payload: { employeeId, planTemplateNo: 4 }, status: "failed", attemptCount: 0, createdAt: Date.now(),
+        });
+      });
+      const handler = (queueWorker.processHikQueue as unknown as { _handler: (ctx: ActionCtx, args: Record<string, never>) => Promise<{ failed: number }> })._handler;
+      const result = await t.action(ctx => handler(throwingCleanup(ctx), {}));
+      expect(result.failed).toBe(0);
+    }
+    expect(wire.card).toHaveBeenCalledExactlyOnceWith("synthetic", expect.objectContaining({ cardNo: "123" }));
+  });
 });

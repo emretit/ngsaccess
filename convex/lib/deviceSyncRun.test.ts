@@ -303,12 +303,12 @@ describe("diff operation correlation at the action boundary", () => {
     ]);
   });
   it("stamps the actual Hik delete queue operation using the former-target snapshot", async () => {
-    const runMutation = vi.fn(async (_ref: Ref, _args: object) => "op");
+    const runMutation = vi.fn(async (ref: Ref, _args: object) => getFunctionName(ref) === "hikvisionSync:protectPersonDeletion" ? false : "op");
     await invoke(deleteEmployeeFromDevicesInternal, { runMutation }, {
       employeeId: "old", runId: "run", targetDeviceIds: ["bridge"],
       snapshot: { cardNumber: "123", projectId: "project", devices: [device] },
     });
-    expect(runMutation.mock.calls[0][1]).toMatchObject({ deviceId: "bridge", operation: "deleteCard", runId: "run" });
+    expect(runMutation.mock.calls.find(([ref]) => getFunctionName(ref) === "hikvisionSync:enqueueLocalBridgeOperation")?.[1]).toMatchObject({ deviceId: "bridge", operation: "deleteCard", runId: "run" });
   });
   it("plan-only diff calls avoid every employee, while omitted optional args preserve full sync", async () => {
     const runQuery = vi.fn(async (ref: Ref, args: { employeeIds?: string[] }) => getFunctionName(ref) === "hikvisionSync:getEmployeesWithDevices"

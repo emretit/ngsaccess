@@ -5,7 +5,7 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
-import { authedQuery, authedMutation } from "./lib/customFunctions";
+import { authedQuery, adminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { resolveProjectScope } from "./lib/projectScope";
 import { deleteReadersForDoor } from "./readers";
@@ -156,7 +156,7 @@ export const list = authedQuery({
   },
 });
 
-export const create = authedMutation({
+export const create = adminMutation({
   args: {
     name: v.string(),
     projectId: v.optional(v.id("projects")),
@@ -244,7 +244,7 @@ export const create = authedMutation({
   },
 });
 
-export const update = authedMutation({
+export const update = adminMutation({
   args: {
     doorId: v.id("doors"),
     name: v.optional(v.string()),
@@ -289,6 +289,14 @@ export const update = authedMutation({
         throw new Error("Seçilen bölge bu kapının projesinde değil");
       }
     }
+    const deviceId = args.deviceId ?? door.deviceId;
+    if (deviceId) {
+      const device = await ctx.db.get(deviceId);
+      if (!device) throw new Error("Cihaz bulunamadı");
+      if (device.projectId !== door.projectId) {
+        throw new Error("Seçilen cihaz bu kapının projesinde değil");
+      }
+    }
     const { doorId, ...updates } = args;
     if (updates.hikDoorStatusPlan) updates.hikDoorStatusPlan = normalizeDoorStatusPlan(updates.hikDoorStatusPlan);
     const now = new Date().toISOString();
@@ -311,7 +319,7 @@ export const update = authedMutation({
     if (args.requireSensor !== undefined) {
       await scheduleSensorSync(
         ctx,
-        door.deviceId,
+        deviceId,
         args.ioId ?? door.ioId,
         args.requireSensor,
       );
@@ -319,7 +327,7 @@ export const update = authedMutation({
   },
 });
 
-export const remove = authedMutation({
+export const remove = adminMutation({
   args: { doorId: v.id("doors") },
   handler: async (ctx, args) => {
     const allowedProjectIds = await resolveProjectScope(ctx);
@@ -438,9 +446,11 @@ export const readerStatus = authedQuery({
     //    son-okumayı paylaşır (izin kapı bazlı).
     const perDoor = await Promise.all(
       doors.map(async (door) => {
-        const panel = door.deviceId
+        const linkedPanel = door.deviceId
           ? panelById.get(String(door.deviceId)) ?? null
           : null;
+        const panel = linkedPanel?.projectId === door.projectId ? linkedPanel : null;
+        const invalidPanel = Boolean(door.deviceId && !panel);
 
         let last: Doc<"cardReadings"> | null = null;
         const io = door.ioId;
@@ -453,12 +463,12 @@ export const readerStatus = authedQuery({
             )
             .order("desc")
             .first();
-        } else {
+        } else if (!invalidPanel) {
           const dev = await ctx.db
             .query("devices")
             .filter((q) => q.eq(q.field("doorId"), door._id))
             .first();
-          if (dev) {
+          if (dev && dev.projectId === door.projectId) {
             last = await ctx.db
               .query("cardReadings")
               .withIndex("by_device", (q) => q.eq("deviceId", dev._id))
@@ -467,6 +477,11 @@ export const readerStatus = authedQuery({
           }
         }
 
+        if (last && last.projectId !== door.projectId) last = null;
+        if (last?.employeeId) {
+          const employee = await ctx.db.get(last.employeeId);
+          if (!employee || employee.projectId !== door.projectId) last = null;
+        }
         const base = {
           doorId: door._id,
           lastReadAt: last?.accessTime ?? null,
@@ -492,6 +507,10 @@ export const readerStatus = authedQuery({
           hikCardReaderPlanTemplateNo: r.hikCardReaderPlanTemplateNo ?? null,
           hikCardReaderAntiSneakEnabled: r.hikCardReaderAntiSneakEnabled ?? null,
           ...base,
+          ...(r.projectId !== door.projectId || r.deviceId !== door.deviceId
+            ? { lastReadAt: null, lastCardNo: null, lastEmployeeName: null,
+                lastStatus: null, lastDirection: null, online: false }
+            : {}),
         }));
       })
     );

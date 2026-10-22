@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -50,22 +50,27 @@ const IDE_OP_LABELS: Record<IdeOpType, string> = {
 };
 
 
-function SyncIssueRow({ item, canManage }: { item: UnifiedItem; canManage: boolean }) {
+function SyncIssueRow({ item, canManage, isSuperAdmin }: { item: UnifiedItem; canManage: boolean; isSuperAdmin: boolean }) {
   const dismissHik = useMutation(api.hikvisionSync.dismissSyncIssue);
   const dismissIde = useMutation(api.ideSync.dismissSyncIssue);
   const retryHik = useMutation(api.hikvisionSync.retrySyncIssue);
   const retryIde = useMutation(api.ideSync.retrySyncIssue);
   const { setActiveProjectId } = useActiveProject();
   const [retryConfirm, setRetryConfirm] = useState(false);
+  const [closeReasonOpen, setCloseReasonOpen] = useState(false);
+  const [closeReason, setCloseReason] = useState("");
+  const closeButton = useRef<HTMLButtonElement>(null);
+  const isDeletion = item.source === "hikvision" && ["deletePerson", "deleteCard"].includes(item.issue.operation);
+  const canDismissDeletion = isDeletion && isSuperAdmin && item.source === "hikvision" && item.issue.canDismiss;
   const dismiss = useAsyncAction(async () => {
     if (item.source === "ide") await dismissIde({ opId: item.issue._id });
-    else await dismissHik({ issueId: item.issue._id });
+    else await dismissHik({ issueId: item.issue._id, ...(isDeletion ? { reason: closeReason.trim() } : {}) });
   }, { success: "Uyarı kapatıldı; operasyon sonucu değişmedi" });
   const retry = async () => {
     const result = item.source === "ide"
       ? await retryIde({ opId: item.issue._id })
       : await retryHik({ issueId: item.issue._id });
-    notify.info(result.queued ? "Yeniden deneme sıraya alındı; cihaz onayı bekleniyor" : "İşlem zaten sırada veya tamamlanmış");
+    notify.info(result.queued ? "Yeniden deneme sıraya alındı; cihaz onayı bekleniyor" : "reason" in result && typeof result.reason === "string" ? result.reason : "İşlem zaten sırada veya tamamlanmış");
   };
   const label = item.source === "ide" ? IDE_OP_LABELS[item.issue.opType] : HIK_OPERATION_LABELS[item.issue.operation];
   return <li className="flex items-start gap-3 px-4 py-3 text-sm">
@@ -87,12 +92,27 @@ function SyncIssueRow({ item, canManage }: { item: UnifiedItem; canManage: boole
         <summary className="cursor-pointer">Teknik ayrıntı</summary>
         <p className="break-all">{errorMessage(item.issue.lastError)}</p>
       </details>}
+      {canDismissDeletion && closeReasonOpen && <form className="space-y-2" onSubmit={event => {
+        event.preventDefault();
+        if (closeReason.trim()) void dismiss.run();
+      }}>
+        <label className="block space-y-1">
+          <span>Kapatma gerekçesi (zorunlu)</span>
+          <textarea autoFocus required value={closeReason} onChange={event => setCloseReason(event.target.value)}
+            className="block min-h-20 w-full min-w-0 rounded-md border bg-background p-2" />
+        </label>
+        <p className="text-xs text-muted-foreground">Cihazı silinmiş, proje kapsamından çıkmış, gateway kaydı veya eski kart kimliği eksik işlem kapatılabilir. Gerekçe denetim kaydına yazılır; cihazdan silindiği anlamına gelmez.</p>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" size="sm" disabled={!closeReason.trim() || dismiss.pending}>Gerekçeyle kapat</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => { setCloseReasonOpen(false); closeButton.current?.focus(); }}>Vazgeç</Button>
+        </div>
+      </form>}
       {canManage && item.issue.canRetry && <Button size="sm" variant="outline" disabled={dismiss.pending}
         onClick={() => setRetryConfirm(true)}>Tekrar dene</Button>}
       {canManage && !item.issue.canRetry && <p className="text-xs text-muted-foreground">Yeniden deneme için cihaz ayrıntılarını açın.</p>}
     </div>
-    <Button size="icon" variant="ghost" disabled={dismiss.pending} aria-label={`${item.issue.deviceName} uyarısını kapat`}
-      onClick={() => { void dismiss.run(); }}><X className="h-4 w-4" /></Button>
+    {(!isDeletion || canDismissDeletion) && <Button ref={closeButton} size="icon" variant="ghost" className="shrink-0" disabled={dismiss.pending} aria-label={`${item.issue.deviceName} uyarısını kapat`}
+      onClick={() => { if (isDeletion) setCloseReasonOpen(true); else void dismiss.run(); }}><X className="h-4 w-4" /></Button>}
     <ConfirmDestructive open={retryConfirm} onOpenChange={setRetryConfirm} title="İşlem yeniden denensin mi?"
       objectName={`${item.issue.deviceName} — ${label}`} confirmLabel="Tekrar dene"
       effects={["Bu komut cihaza yeniden gönderilir; fiziksel cihaz işlemleri yeniden uygulanabilir.", "Sıraya alınması cihazın işlemi tamamladığı anlamına gelmez."]}
@@ -142,7 +162,7 @@ export function SyncIssuesBanner() {
     {incomplete && <p className="px-4 pb-2 text-xs text-muted-foreground">Yalnız yüklenen uyarılar gösteriliyor; devamı veya kapsamı çözülemeyen eski kayıtlar var. Kesin toplam bilinmiyor.</p>}
     {expanded && <ul className="max-h-80 overflow-y-auto divide-y bg-background">
       {[...groups].map(([deviceId, group]) => <li key={deviceId}>
-        <ul>{(openDevices.has(deviceId) ? group : group.slice(0, 1)).map((item) => <SyncIssueRow key={item.issue._id} item={item} canManage={scope.isAdmin} />)}</ul>
+        <ul>{(openDevices.has(deviceId) ? group : group.slice(0, 1)).map((item) => <SyncIssueRow key={item.issue._id} item={item} canManage={scope.isAdmin} isSuperAdmin={scope.isSuperAdmin} />)}</ul>
         {group.length > 1 && <Button variant="ghost" size="sm" className="mb-2 ml-4" aria-expanded={openDevices.has(deviceId)}
           onClick={() => setOpenDevices((previous) => { const next = new Set(previous); if (next.has(deviceId)) next.delete(deviceId); else next.add(deviceId); return next; })}>
           {openDevices.has(deviceId) ? "Eski hataları gizle" : `+${group.length - 1} eski hatayı aç`}

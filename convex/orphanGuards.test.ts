@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { getFunctionName } from "convex/server";
 import { ConvexError } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
@@ -35,6 +36,12 @@ vi.mock("./deviceSyncRuns", async importOriginal => ({
   createRuleDiffRun: vi.fn(async () => null),
 }));
 import { createRuleDiffRun } from "./deviceSyncRuns";
+
+vi.mock("./lib/peopleHikSnapshot", async importOriginal => {
+  const original = await importOriginal<typeof import("./lib/peopleHikSnapshot")>();
+  return { ...original, reconcileRemovedEmployeeHik: vi.fn(original.reconcileRemovedEmployeeHik) };
+});
+import { reconcileRemovedEmployeeHik } from "./lib/peopleHikSnapshot";
 
 type Row = Record<string, unknown> & { _id: string; table: string; projectId?: string };
 type Role = Doc<"users">["role"];
@@ -90,7 +97,8 @@ describe.each(operations)("$name project boundary", operation => {
       it(`${role}: ${scope}`, async () => {
         vi.clearAllMocks();
         const f = fixture(role, scope === "orphan" ? undefined : scope === "other" ? "other" : "own", scope === "no-membership" ? [] : ["own"]);
-        const allowed = role === "super_admin" || scope === "own";
+        const allowed = (role === "super_admin" || scope === "own") &&
+          !(operation.name.startsWith("accessRules.") && role === "project_user");
         const result = handler(operation.fn)(f.ctx, operation.args);
         if (allowed) {
           await result;
@@ -145,8 +153,19 @@ describe("access rule relation and sync regressions", () => {
           const groupId = "target";
           f.rows.push({ _id: "member-link", table: "groupMembers", groupId, employeeId: "employee", projectId },
             { _id: "device-link", table: "groupDevices", groupId, deviceId: "device", projectId });
+          if (role === "project_user") {
+            await expect(handler(operation.fn)(f.ctx, operation.args)).rejects.toThrow("yetkiniz yok");
+            expectNoEffects(f);
+            return;
+          }
+          f.rows[1].cardNumber = "OLD";
+          f.rows[3].brand = "hikvision";
+          f.rows[3].hikDevIndex = "synthetic";
           await handler(operation.fn)(f.ctx, operation.args);
-          expect(f.remove).toHaveBeenCalled(); expect(f.schedule).toHaveBeenCalled();
+          expect(f.remove).toHaveBeenCalled();
+          expect(reconcileRemovedEmployeeHik).toHaveBeenCalledWith(f.ctx, "employee", expect.objectContaining({ cardNumber: "OLD", devices: [expect.objectContaining({ _id: "device" })] }));
+          const deletion = f.schedule.mock.calls.find((call: unknown[]) => getFunctionName(call[1] as Parameters<typeof getFunctionName>[0]) === "actions/hikvisionSync:deleteEmployeeFromDevicesInternal");
+          expect(deletion?.[2]).toMatchObject({ employeeId: "employee", snapshot: { cardNumber: "OLD", devices: [{ _id: "device", hikDevIndex: "synthetic" }] } });
           expect(reconcileRemovedEmployeeIde).toHaveBeenCalled();
         });
       }
@@ -193,8 +212,12 @@ describe("deleted relations remain removable", () => {
           await handler(operation.fn)(f.ctx, operation.args);
           expect(f.remove).toHaveBeenCalledWith("target");
           for (const id of ["member-link", "device-link", "door-link"]) expect(f.remove).toHaveBeenCalledWith(id);
-          expect(f.schedule).toHaveBeenCalled();
-          expect(reconcileRemovedEmployeeIde).toHaveBeenCalled();
+          if (missing === "employee") expect(reconcileRemovedEmployeeHik).not.toHaveBeenCalled();
+          else expect(reconcileRemovedEmployeeHik).toHaveBeenCalledWith(f.ctx, "employee", expect.objectContaining({ devices: [] }));
+          // No Hik target survives these IDE/deleted-device fixtures; do not fabricate a delete.
+          expect(f.schedule).not.toHaveBeenCalled();
+          if (missing === "employee" && operation.name === "accessRules.remove") expect(reconcileRemovedEmployeeIde).not.toHaveBeenCalled();
+          else expect(reconcileRemovedEmployeeIde).toHaveBeenCalled();
         });
       }
     }
@@ -216,6 +239,11 @@ describe("zone/door creation requires an accessible project", () => {
       it(`${operation.name}: ${role} creates in an accessible project`, async () => {
         vi.clearAllMocks();
         const f = fixture(role, "own");
+        if (role === "project_user") {
+          await expect(handler(operation.fn)(f.ctx, { name: "Yeni", projectId: "own" })).rejects.toThrow("yetkiniz yok");
+          expectNoEffects(f);
+          return;
+        }
         await handler(operation.fn)(f.ctx, { name: "Yeni", projectId: "own" });
         expect(f.insert).toHaveBeenCalledWith(operation.name === "zone" ? "zones" : "doors",
           expect.objectContaining({ name: "Yeni", projectId: "own" }));
@@ -226,8 +254,14 @@ describe("zone/door creation requires an accessible project", () => {
         vi.clearAllMocks();
         const f = fixture(role, "own");
         f.rows.push({ _id: "zone", table: "zones", projectId: "own" });
-        await handler(doors.create)(f.ctx, { name: "Yeni", zoneId: source !== "device" ? "zone" : undefined,
-          deviceId: source !== "zone" ? "device" : undefined });
+        const args = { name: "Yeni", zoneId: source !== "device" ? "zone" : undefined,
+          deviceId: source !== "zone" ? "device" : undefined };
+        if (role === "project_user") {
+          await expect(handler(doors.create)(f.ctx, args)).rejects.toThrow("yetkiniz yok");
+          expectNoEffects(f);
+          return;
+        }
+        await handler(doors.create)(f.ctx, args);
         expect(f.insert).toHaveBeenCalledWith("doors", expect.objectContaining({ projectId: "own" }));
         expect(f.insert).toHaveBeenCalledWith("readers", expect.objectContaining({ projectId: "own" }));
       });

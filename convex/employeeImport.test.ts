@@ -231,12 +231,11 @@ describe("assignCards", () => {
     expect(state.audit[0]?.searchText?.length).toBeGreaterThan(0);
     expect(JSON.stringify(state.audit)).not.toContain("NEW-123");
   });
-  it("allows the same card in another project and reassigning an employee's own card", async () => {
+  it("rejects another project's card and allows reassigning the employee's own unique card", async () => {
     const f = await fixture(); const employeeId = await f.employee();
     await f.employee(f.otherProjectId, { cardNumber: "NEW" });
-    for (const cardNumber of ["NEW", "NEW"]) {
-      expect(await f.actor.mutation(api.employeeImport.assignCards, { assignments: [{ employeeId, cardNumber }] })).toMatchObject([{ status: "assigned" }]);
-    }
+    expect(await f.actor.mutation(api.employeeImport.assignCards, { assignments: [{ employeeId, cardNumber: "NEW" }] })).toMatchObject([{ status: "error" }]);
+    expect(await f.actor.mutation(api.employeeImport.assignCards, { assignments: [{ employeeId, cardNumber: "EXISTING" }] })).toMatchObject([{ status: "assigned" }]);
   });
   it("schedules old-card deletion and two syncs only when the card changes", async () => {
     const f = await fixture(); const employeeId = await f.employee(f.projectId, { cardNumber: "OLD" });

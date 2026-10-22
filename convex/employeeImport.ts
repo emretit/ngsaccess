@@ -109,7 +109,7 @@ export const assignCards = adminMutation({
       const matches = ctx.db.query("employees").withIndex("by_card", q => q.eq("cardNumber", cardNumber));
       let conflict = false;
       for await (const candidate of matches) {
-        if (candidate.projectId === employee.projectId && candidate._id !== employee._id) { conflict = true; break; }
+        if (candidate._id !== employee._id) { conflict = true; break; }
       }
       if (conflict) {
         results.push({ employeeId: assignment.employeeId, status: "error", message: "Kart numarası başka bir kişide kullanılıyor" });

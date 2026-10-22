@@ -76,6 +76,7 @@ describe("denetim sorgusu", () => {
       "deviceEvents",
       "employeeConsents",
       "employees",
+      "hikPendingOperations",
       "holidays",
       "leaves",
       "overtimeRates",

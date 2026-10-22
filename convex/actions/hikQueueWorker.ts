@@ -59,8 +59,10 @@ export const processHikQueue = internalAction({
 
     const results = await Promise.all(
       candidates.map(async (c) => {
-        const r = await executeOperation(ctx, c);
-        return { id: c._id, ok: r.ok, error: r.error };
+        try {
+          const r = await executeOperation(ctx, c);
+          return { id: c._id, ok: r.ok, error: r.error };
+        } catch { return { id: c._id, ok: false, error: "Cihaz işlemi tamamlanamadı" }; }
       }),
     );
 
@@ -99,6 +101,7 @@ async function executeOperation(
   ctx: ActionCtx,
   c: Candidate,
 ): Promise<{ ok: boolean; error?: string }> {
+  if (["deletePerson", "deleteCard"].includes(c.operation) && await ctx.runMutation(internal.hikvisionSync.protectQueuedDeletion, { id: c._id })) return { ok: true };
   const devIndex = c.device.hikDevIndex;
   if (!devIndex) return { ok: false, error: "Cihaz gateway'e kayıtlı değil" };
 
@@ -117,17 +120,23 @@ async function executeOperation(
             "planTemplateNo eksik — bu kişiyi tekrar push'lamak için Erişim Yönetimi → Cihazlara Push Et",
         };
       }
-      return await upsertPersonToDevice(devIndex, {
+      const result = await upsertPersonToDevice(devIndex, {
         employeeNo: employee.cardNumber,
         name: `${employee.firstName} ${employee.lastName}`,
         planTemplateNo,
         doorCount: c.device.hikDoorCount,
       });
+      if (result.ok) {
+        try {
+          await ctx.runMutation(internal.hikvisionSync.supersedePersonDeletions, { deviceId: c.device._id, cardNumber: employee.cardNumber });
+        } catch { /* Cleanup is optional; it must not block the queued card write. */ }
+      }
+      return result;
     }
     case "deletePerson": {
-      const employee = c.employee;
-      if (!employee?.cardNumber) return { ok: false, error: "Çalışan veya kart numarası yok" };
-      return await deletePersonFromDevice(devIndex, employee.cardNumber);
+      const employeeNo = payload.employeeNo ?? payload.cardNumber;
+      if (typeof employeeNo !== "string" || !employeeNo.trim()) return { ok: false, error: "Silme işi eski kart kimliğini içermiyor" };
+      return await deletePersonFromDevice(devIndex, employeeNo);
     }
     case "addCard": {
       const employee = c.employee;
@@ -142,7 +151,8 @@ async function executeOperation(
       return r;
     }
     case "deleteCard": {
-      const cardNo = (payload.cardNumber ?? c.employee?.cardNumber) as string | undefined;
+      const identity = payload.employeeNo ?? payload.cardNumber;
+      const cardNo = typeof identity === "string" ? identity : undefined;
       if (!cardNo) return { ok: false, error: "Kart numarası yok" };
       return await deleteCardFromDevice(devIndex, cardNo);
     }

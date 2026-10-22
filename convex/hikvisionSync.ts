@@ -1,3 +1,6 @@
+import { writeAudit } from "./lib/audit";
+import { internal } from "./_generated/api";
+import { snapshotEmployeeHikDevices, resolveRuleDeviceTargets, hasWritableHikCredential } from "./lib/peopleHikSnapshot";
 import { grantStatusForOperation } from "./lib/grantStatus";
 import type { ScheduleTemplate } from "./lib/accessSchedule";
 import { mobileOperationId, mobileQueueAllowed } from "./lib/mobileAccess";
@@ -109,39 +112,7 @@ async function employeeWithDevices(ctx: QueryCtx, employeeId: Id<"employees">, s
         const rule = await ctx.db.get(gm.groupId);
         if (!rule || !rule.isActive || rule.projectId !== employee.projectId) return [];
 
-        const groupDevices = await ctx.db
-          .query("groupDevices")
-          .withIndex("by_project_group", (q) =>
-            q.eq("projectId", employee.projectId).eq("groupId", gm.groupId),
-          )
-          .take(4097);
-
-        const doorLinks = await ctx.db.query("groupDoors").withIndex("by_group", q => q.eq("groupId", rule._id)).take(4097);
-        if (groupDevices.length > 4096 || doorLinks.length > 4096) throw new Error("Rule scope limit exceeded");
-        const selectedDoors = await Promise.all(doorLinks.map(link => ctx.db.get(link.doorId)));
-        const byDevice = new Map<Id<"devices">, number[] | undefined>();
-        for (const gd of groupDevices) byDevice.set(gd.deviceId, undefined);
-        const selectedByDevice = new Map<Id<"devices">, number[]>();
-        for (const [index, door] of selectedDoors.entries()) {
-          const snapshotDeviceId = doorLinks[index]?.deviceId;
-          // A stale snapshot can suppress a fallback but must never grant rights.
-          if (snapshotDeviceId && snapshotDeviceId !== door?.deviceId) {
-            if (!selectedByDevice.has(snapshotDeviceId)) selectedByDevice.set(snapshotDeviceId, []);
-          }
-          if (!door?.deviceId) continue;
-          const numbers = selectedByDevice.get(door.deviceId) ?? [];
-          if (door.projectId === employee.projectId) numbers.push(door.hikDoorNo ?? 0);
-          selectedByDevice.set(door.deviceId, numbers);
-        }
-        // Explicit selected doors narrow device membership for that rule/device.
-        // Unknown deleted/unassigned mappings must not reopen the device default.
-        for (const [deviceId, numbers] of selectedByDevice) byDevice.set(deviceId, numbers);
-        for (const [deviceId, doorNos] of byDevice) {
-          const device = await ctx.db.get(deviceId);
-          if (!device || !device.isActive || device.projectId !== employee.projectId) continue;
-
-          if (device.brand !== "hikvision" && !groupDevices.some(link => link.deviceId === deviceId)) continue;
-
+        for (const { device, doorNos } of await resolveRuleDeviceTargets(ctx, rule)) {
           resolved.push({
             ...(doorNos === undefined || device.brand !== "hikvision" ? {} : { doorNos }),
             device: {
@@ -180,6 +151,7 @@ async function employeeWithDevices(ctx: QueryCtx, employeeId: Id<"employees">, s
 
   const hasFingerprintTemplates = (await ctx.db.query("employeeFingerprints").withIndex("by_employee", q => q.eq("employeeId", employeeId)).first()) !== null;
   return {
+    previousDevices: (await snapshotEmployeeHikDevices(ctx, employee)).devices,
     hasFingerprintTemplates,
     employee: {
       _id: employee._id,
@@ -426,6 +398,22 @@ export const recordSyncFailure = internalMutation({
   },
 });
 
+/** Persist identity before network I/O; even a crashed action remains retryable. */
+export const beginPersonDeletion = internalMutation({
+  args: { deviceId: v.id("devices"), employeeId: v.id("employees"), projectId: v.id("projects"), cardNumber: v.string(), runId: v.optional(v.id("deviceSyncRuns")) },
+  handler: async (ctx, args) => {
+    const device = await ctx.db.get(args.deviceId);
+    if (!device || device.projectId !== args.projectId || device.brand !== "hikvision") throw new Error("Silme hedefi proje dışında");
+    const id = await ctx.db.insert("hikPendingOperations", {
+      deviceId: args.deviceId, projectId: args.projectId, runId: args.runId, operation: "deletePerson",
+      payload: { employeeId: args.employeeId, employeeNo: args.cardNumber, cardNumber: args.cardNumber },
+      status: "failed", attemptCount: 0, createdAt: Date.now(), lastError: "Silme onayı bekleniyor — cihazda kalmış olabilir",
+    });
+    await grantStatusForOperation(ctx, { ...args, _id: id, operation: "deletePerson", payload: { employeeId: args.employeeId, cardNumber: args.cardNumber } }, "pending");
+    return id;
+  },
+});
+
 export const enqueueLocalBridgeOperation = internalMutation({
   args: {
     deviceId: v.id("devices"),
@@ -446,6 +434,10 @@ export async function enqueueLocalBridgeOperationInTransaction(ctx: MutationCtx,
     }
     if (device.hikTransport !== "localBridge") {
       throw new Error("Cihaz localBridge transport kullanmıyor");
+    }
+    if (["deletePerson", "deleteCard"].includes(args.operation)) {
+      args = { ...args, projectId: args.projectId ?? device.projectId };
+      if (device.projectId !== args.projectId) throw new Error("Silme hedefi proje dışında");
     }
     if (isBiometricAddition(args.operation)) {
       await assertBiometricAllowed(ctx, device.projectId);
@@ -532,6 +524,7 @@ function localBridgeOperationKey(
 ): string {
   const p = asRecord(payload);
   const primary =
+    (operation === "deletePerson" || operation === "deleteCard" ? asKeyPart(p.employeeNo) ?? asKeyPart(p.cardNumber) : null) ??
     asKeyPart(p.accessRuleId) ??
     asKeyPart(p.employeeId) ??
     asKeyPart(p.cardNumber) ??
@@ -599,6 +592,15 @@ export const claimLocalBridgeOperations = internalMutation({
         await ctx.db.patch(op._id, { status: "failed", attemptCount: 5, lastError: "Biyometri modülü kapalı; işlem gönderilmedi." });
         continue;
       }
+      if (isPersonDeletion(op) && deletionUnresolvableReason(op, device)) {
+        await ctx.db.patch(op._id, { status: "failed", lastError: deletionUnresolvableReason(op, device) });
+        continue;
+      }
+      const cardNumber = deletionIdentity(op);
+      if (isPersonDeletion(op) && cardNumber && await protectCurrentCredential(ctx, op.deviceId, cardNumber)) {
+        await supersedeDeletion(ctx, op._id);
+        continue;
+      }
       due.push(op);
       if (due.length >= max) break;
     }
@@ -634,6 +636,17 @@ export const claimLocalBridgeOperations = internalMutation({
   },
 });
 
+async function resolveAcknowledgedDeletion(ctx: MutationCtx, op: Doc<"hikPendingOperations">): Promise<void> {
+  if (op.operation !== "deletePerson" && op.operation !== "deleteCard") return;
+  const payload = asRecord(op.payload);
+  const cardNumber = payload.employeeNo ?? payload.cardNumber;
+  const employeeId = typeof payload.employeeId === "string" ? ctx.db.normalizeId("employees", payload.employeeId) : null;
+  if (!employeeId || typeof cardNumber !== "string") return;
+  await ctx.runMutation(internal.hikvisionSync.resolveTargetFailures, {
+    deviceId: op.deviceId, operations: ["deletePerson", "deleteCard"], employeeId, cardNumber,
+  });
+}
+
 export const ackLocalBridgeOperation = internalMutation({
   args: {
     token: v.string(),
@@ -656,19 +669,24 @@ export const ackLocalBridgeOperation = internalMutation({
     if (mobileOperationId(op.payload) !== undefined && op.status !== "processing") return { ok: false, error: "operation not processing" };
     // A dedupe may have replaced the in-flight payload; let the bridge fetch it again.
     if (op.status !== "processing") return { ok: true };
+    const deletion = op.operation === "deletePerson" || op.operation === "deleteCard";
+    const message = deletion && !args.ok ? `Silme başarısız — cihazda kalmış olabilir: ${args.message ?? "Cihaz onayı alınamadı"}` : args.message;
     if (["addPerson", "updatePerson", "deletePerson", "deleteCard"].includes(op.operation)) await grantStatusForOperation(ctx, op,
-      args.ok ? (["deletePerson", "deleteCard"].includes(op.operation) ? "removed" : "effective") : "failed", args.message);
+      args.ok ? (deletion ? "removed" : "effective") : "failed", message);
     if (args.ok) {
       await ctx.db.patch(args.opId, {
         status: "done",
         completedAt: Date.now(),
         lastError: undefined,
       });
+      await resolveAcknowledgedDeletion(ctx, op);
+      const identity = deletionIdentity(op);
+      if (["addPerson", "updatePerson"].includes(op.operation) && identity) await supersedeCurrentCredentialDeletions(ctx, op.deviceId, identity);
       return { ok: true };
     }
     await ctx.db.patch(args.opId, {
       status: "failed",
-      lastError: args.message ?? "Bridge operation failed",
+      lastError: message ?? "Bridge operation failed",
     });
     return { ok: true };
   },
@@ -717,7 +735,7 @@ export const listSyncIssues = query({
   args: { projectId: v.optional(v.id("projects")), limit: v.optional(v.number()) },
   handler: async (ctx, args) => {
     if (!(await getValidAuthUserId(ctx))) return { items: [], hasMore: false, unknown: false };
-    await getCurrentUser(ctx);
+    const user = await getCurrentUser(ctx);
     const projectIds = await resolveProjectScope(ctx, args.projectId);
     const scan = await scanHikSync(ctx, projectIds, ["failed"], true);
     const max = Math.min(100, Math.max(1, Math.floor(args.limit ?? 50)));
@@ -732,7 +750,8 @@ export const listSyncIssues = query({
         projectId: op.projectId, projectName: project?.name ?? "Bilinmeyen proje",
         status: op.status, lastError: op.lastError ?? null, createdAt: op.createdAt,
         nextRetryAt: op.nextRetryAt,
-        operation: op.operation, deviceBrand: device?.brand ?? null, attemptCount: op.attemptCount, attempts: op.attemptCount, maxAttempts: 5, canRetry: device?.hikTransport === "localBridge",
+        operation: op.operation, deviceBrand: device?.brand ?? null, attemptCount: op.attemptCount, attempts: op.attemptCount, maxAttempts: 5, canRetry: isPersonDeletion(op) ? deletionUnresolvableReason(op, device) === undefined : device?.hikTransport === "localBridge",
+        canDismiss: !isPersonDeletion(op) || (user.role === "super_admin" && deletionUnresolvableReason(op, device) !== undefined),
       };
     }));
     return { items, hasMore: scan.hasMore || visible.length > max, unknown: scan.unknown };
@@ -743,14 +762,24 @@ export const listSyncIssues = query({
  * Kullanıcı uyarıyı kapatır; operasyon sonucu korunur.
  */
 export const dismissSyncIssue = authedMutation({
-  args: { issueId: v.id("hikPendingOperations") },
+  args: { issueId: v.id("hikPendingOperations"), reason: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const projectIds = await resolveProjectScope(ctx);
     const op = await ctx.db.get(args.issueId);
     if (!op) return;
-    await assertSyncScope(ctx, projectIds, op);
+    const device = await assertSyncScope(ctx, projectIds, op);
+    const now = Date.now();
+    if (isPersonDeletion(op)) {
+      if (ctx.user.role !== "super_admin") throw new Error("Silme uyarısını yalnız süper yönetici kapatabilir");
+      const reason = args.reason?.trim();
+      if (!reason) throw new Error("Kapatma gerekçesi zorunludur");
+      if (!deletionUnresolvableReason(op, device)) throw new Error("Cihaz silme onayı olmadan bu hata kapatılamaz");
+      if (op.status !== "failed" || op.dismissedAt !== undefined) return;
+      await writeAudit(ctx, { user: ctx.user, projectId: op.projectId, action: "update", targetTable: "hikPendingOperations", targetId: op._id,
+        oldValue: { status: op.status }, newValue: { status: op.status, dismissedAt: now }, note: `Çözülemez silme uyarısı açıkça kapatıldı: ${reason}` });
+    }
     if (op.status !== "failed" || op.dismissedAt !== undefined) return;
-    await ctx.db.patch(op._id, syncDismissPatch(ctx.user._id, Date.now()));
+    await ctx.db.patch(op._id, syncDismissPatch(ctx.user._id, now));
   },
 });
 
@@ -777,11 +806,11 @@ export const listRetryCandidates = internalQuery({
 
     const enriched = await Promise.all(
       failed
-        .filter((f) => f.attemptCount < args.maxAttempts && mobileOperationId(f.payload) === undefined)
+        .filter((f) => f.attemptCount < args.maxAttempts && mobileOperationId(f.payload) === undefined && (!(f.operation === "deletePerson" || f.operation === "deleteCard") || f.dismissedAt === undefined))
         .slice(0, args.limit * 2)
         .map(async (f) => {
           const device = await ctx.db.get(f.deviceId);
-          if (!device || device.brand !== "hikvision" || !device.hikDevIndex) {
+          if (!device || device.brand !== "hikvision" || device.hikTransport === "localBridge" || ((f.operation === "deletePerson" || f.operation === "deleteCard") && device.projectId !== f.projectId) || !device.hikDevIndex) {
             return null;
           }
           if (isBiometricAddition(f.operation) && !(await isBiometricEnabled(ctx, device.projectId))) return null;
@@ -841,11 +870,14 @@ export const markOpDone = internalMutation({
   args: { id: v.id("hikPendingOperations") },
   handler: async (ctx, args) => {
     const op = await ctx.db.get(args.id);
+    if (!op || op.status === "done" || op.dismissedAt !== undefined) return;
     if (op && ["addPerson", "updatePerson", "addCard", "deletePerson"].includes(op.operation)) await grantStatusForOperation(ctx, op, op.operation === "deletePerson" ? "removed" : "effective");
     await ctx.db.patch(args.id, {
       status: "done",
       completedAt: Date.now(),
+      lastError: undefined,
     });
+    await resolveAcknowledgedDeletion(ctx, op);
   },
 });
 
@@ -878,6 +910,7 @@ export const resolveTargetFailures = internalMutation({
     employeeId: v.optional(v.id("employees")),
     employeeIds: v.optional(v.array(v.id("employees"))),
     accessRuleId: v.optional(v.id("accessRules")),
+    cardNumber: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const opSet = new Set<string>(args.operations);
@@ -892,14 +925,19 @@ export const resolveTargetFailures = internalMutation({
     const now = Date.now();
     const writes: Promise<unknown>[] = [];
     for (const f of matches) {
-      // Run evidence belongs to that attempt; a later enqueue is not its delivery proof.
-      if (f.runId) continue;
       if (!opSet.has(f.operation)) continue;
       const payload = (f.payload ?? {}) as Record<string, unknown>;
+      if (["deletePerson", "deleteCard"].includes(f.operation) && (!args.cardNumber || (payload.employeeNo ?? payload.cardNumber) !== args.cardNumber)) continue;
       // employeeId/accessRuleId verilmişse sadece eşleşenleri temizle.
       if (args.employeeId && payload.employeeId !== args.employeeId) continue;
       if (args.employeeIds && !args.employeeIds.some(id => payload.employeeId === id)) continue;
       if (args.accessRuleId && payload.accessRuleId !== args.accessRuleId) continue;
+      // Keep the old run's failure evidence, but an exact credential acknowledgement
+      // can hide its now-resolved warning. Enqueue alone never reaches this branch.
+      if (f.runId) {
+        if (args.cardNumber && ["deletePerson", "deleteCard"].includes(f.operation)) writes.push(ctx.db.patch(f._id, { dismissedAt: now }));
+        continue;
+      }
       writes.push(
         ctx.db.patch(f._id, { status: "done", completedAt: now }),
       );
@@ -919,11 +957,14 @@ export const markOpRetried = internalMutation({
   },
   handler: async (ctx, args) => {
     const row = await ctx.db.get(args.id);
-    if (!row) return;
-    if (["addPerson", "updatePerson", "addCard", "deletePerson"].includes(row.operation)) await grantStatusForOperation(ctx, row, "failed", args.lastError);
+    if (!row || row.status === "done" || row.dismissedAt !== undefined) return;
+    const lastError = row.operation === "deletePerson" || row.operation === "deleteCard"
+      ? `Silme başarısız — cihazda kalmış olabilir: ${args.lastError}` : args.lastError;
+    if (["addPerson", "updatePerson", "addCard", "deletePerson"].includes(row.operation)) await grantStatusForOperation(ctx, row, "failed", lastError);
     await ctx.db.patch(args.id, {
+      status: "failed",
       attemptCount: row.attemptCount + 1,
-      lastError: args.lastError,
+      lastError,
       dismissedAt: undefined,
       dismissedBy: undefined,
     });
@@ -945,12 +986,14 @@ export const cleanupStaleSyncIssues = internalMutation({
   args: {},
   handler: async (ctx) => {
     const cutoffAt = Date.now() - 24 * 60 * 60 * 1000;
-    // Bounded scan — birikim olursa sonraki tick devam eder.
-    const failed = await ctx.db
+    // Convex permits one paginate call per execution. Scan a bounded four-batch window
+    // so an initial batch of unresolved deletions cannot hide later terminal failures.
+    const result = await ctx.db
       .query("hikPendingOperations")
       .withIndex("by_status_created", (q) => q.eq("status", "failed"))
       .order("asc")
-      .take(CLEANUP_BATCH_SIZE);
+      .paginate({ numItems: CLEANUP_BATCH_SIZE * 4, cursor: null });
+    const failed = result.page.filter(op => !isPersonDeletion(op));
 
     // Cihaz lookup'unu dedupe et — aynı cihazda biriken birden fazla failure varsa tek get.
     const deviceIds = Array.from(new Set(failed.map((f) => f.deviceId)));
@@ -964,6 +1007,7 @@ export const cleanupStaleSyncIssues = internalMutation({
     const now = Date.now();
     const patches: Promise<unknown>[] = [];
     for (const f of failed) {
+      if (f.operation === "deletePerson" || f.operation === "deleteCard") continue;
       const device = deviceMap.get(f.deviceId);
       const isOrphan = !device;
       const isNonHik = device !== undefined && device.brand !== "hikvision";
@@ -992,7 +1036,7 @@ export const dismissAllSyncIssues = authedMutation({
       : scan.rows;
     // Önizleme ile aynı kimlikler; yeni gelen uyarılar toplu kapatmaya dahil edilmez.
     for (const op of requested) await assertSyncScope(ctx, projectIds, op);
-    const targets = requested.filter((op) => op.status === "failed" && op.dismissedAt === undefined).slice(0, 100);
+    const targets = requested.filter((op) => op.operation !== "deletePerson" && op.operation !== "deleteCard" && op.status === "failed" && op.dismissedAt === undefined).slice(0, 100);
     const now = Date.now();
     for (const op of targets) {
       await ctx.db.patch(op._id, syncDismissPatch(ctx.user._id, now));
@@ -1015,6 +1059,18 @@ export const retrySyncIssue = adminMutation({
     }
     if (mobileOperationId(op.payload) !== undefined) return { queued: false };
     if (!canRetrySync(op.status)) return { queued: false };
+    const unresolved = isPersonDeletion(op) ? deletionUnresolvableReason(op, device) : undefined;
+    if (unresolved) return { queued: false, reason: unresolved };
+    const cardNumber = deletionIdentity(op);
+    if (isPersonDeletion(op) && cardNumber && await protectCurrentCredential(ctx, op.deviceId, cardNumber)) {
+      await supersedeDeletion(ctx, op._id);
+      return { queued: false };
+    }
+    if (device?.brand === "hikvision" && device.hikTransport !== "localBridge" && op.operation === "deletePerson") {
+      await ctx.db.patch(op._id, { status: "failed", attemptCount: 0, dismissedAt: undefined, dismissedBy: undefined });
+      await ctx.scheduler.runAfter(0, internal.actions.hikQueueWorker.processHikQueue, {});
+      return { queued: true };
+    }
     if (!device || device.brand !== "hikvision" || device.hikTransport !== "localBridge") throw new Error("Bu cihaz için tek işlem yeniden denemesi desteklenmiyor; cihaz sayfasını kullanın");
     await ctx.db.patch(op._id, {
       status: "pending", nextRetryAt: Date.now(),
@@ -1041,4 +1097,97 @@ export const assertBiometricSyncAllowed = internalQuery({
     }
     return null;
   },
+});
+
+const SUPERSEDED_DELETION = "Yerine geçildi: bu kartın cihazda güncel erişim yetkisi var";
+const isPersonDeletion = (op: Doc<"hikPendingOperations">) => ["deletePerson", "deleteCard"].includes(op.operation);
+const deletionIdentity = (op: Doc<"hikPendingOperations">) => {
+  const payload = asRecord(op.payload);
+  const value = payload.employeeNo ?? payload.cardNumber;
+  return typeof value === "string" && value.trim() ? value : undefined;
+};
+
+function deletionUnresolvableReason(op: Doc<"hikPendingOperations">, device: Doc<"devices"> | null): string | undefined {
+  if (!device) return "Cihaz bulunamadı";
+  if (device.brand !== "hikvision" || device.projectId !== op.projectId) return "Silme hedefi proje dışında veya cihaz türü değişmiş";
+  if (!deletionIdentity(op)) return "Silme işi eski kart kimliğini içermiyor";
+  if (device.hikTransport !== "localBridge" && !device.hikDevIndex) return "Cihaz gateway'e kayıtlı değil";
+  return undefined;
+}
+
+async function supersedeDeletion(ctx: MutationCtx, id: Id<"hikPendingOperations">) {
+  await ctx.db.patch(id, { status: "done", completedAt: Date.now(), lastError: SUPERSEDED_DELETION });
+}
+
+async function supersedeDeletions(ctx: MutationCtx, deviceId: Id<"devices">, cardNumber: string) {
+  // Pending/processing rows are checked individually at claim/dispatch, not on every add ack.
+  const rows = await ctx.db.query("hikPendingOperations").withIndex("by_device_status", q => q.eq("deviceId", deviceId).eq("status", "failed")).take(4096);
+  for (const op of rows) if (isPersonDeletion(op) && deletionIdentity(op) === cardNumber) {
+    // Supersession is not a device deletion acknowledgement: never mark a grant removed.
+    await supersedeDeletion(ctx, op._id);
+  }
+}
+
+async function protectCurrentCredential(ctx: MutationCtx, deviceId: Id<"devices">, cardNumber: string) {
+  const device = await ctx.db.get(deviceId);
+  if (!device) return false;
+  const employees = await ctx.db.query("employees").withIndex("by_card", q => q.eq("cardNumber", cardNumber)).take(101);
+  if (employees.length > 100) throw new Error("Kart sahibi sınırı aşıldı");
+  for (const employee of employees) {
+    if (employee.projectId !== device.projectId || employee.isActive === false) continue;
+    if (await hasWritableHikCredential(ctx, employee, device)) {
+      await supersedeDeletions(ctx, deviceId, cardNumber);
+      return true;
+    }
+  }
+  return false;
+}
+
+export const protectPersonDeletion = internalMutation({
+  args: { deviceId: v.id("devices"), cardNumber: v.string() },
+  handler: (ctx, args) => protectCurrentCredential(ctx, args.deviceId, args.cardNumber),
+});
+export const protectQueuedDeletion = internalMutation({
+  args: { id: v.id("hikPendingOperations") },
+  handler: async (ctx, args) => {
+    const op = await ctx.db.get(args.id);
+    if (!op || op.status === "done" || op.dismissedAt !== undefined) return true;
+    const cardNumber = deletionIdentity(op);
+    const protectedCredential = isPersonDeletion(op) && cardNumber !== undefined && await protectCurrentCredential(ctx, op.deviceId, cardNumber);
+    if (protectedCredential) await supersedeDeletion(ctx, op._id);
+    return protectedCredential;
+  },
+});
+// Addition cleanup is best-effort: no matching failed deletion means no access-graph read.
+async function supersedeCurrentCredentialDeletions(ctx: MutationCtx, deviceId: Id<"devices">, cardNumber: string) {
+  const failed = await ctx.db.query("hikPendingOperations")
+    .withIndex("by_device_status", q => q.eq("deviceId", deviceId).eq("status", "failed"))
+    .take(4096);
+  if (!failed.some(op => isPersonDeletion(op) && deletionIdentity(op) === cardNumber)) return false;
+  return protectCurrentCredential(ctx, deviceId, cardNumber);
+}
+
+export const supersedePersonDeletions = internalMutation({
+  args: { deviceId: v.id("devices"), cardNumber: v.string() },
+  // A revocation may have committed while the add request was in flight.
+  handler: (ctx, args) => supersedeCurrentCredentialDeletions(ctx, args.deviceId, args.cardNumber),
+});
+
+/** Only durable, project-scoped deletion identities may outlive a person record. */
+export async function pendingPersonDeletions(ctx: Pick<QueryCtx, "db">, args: { projectId: Id<"projects">; employeeId: Id<"employees">; deviceId: Id<"devices"> }) {
+  const rows = (await Promise.all((["failed", "pending", "processing"] as const).map(status =>
+    ctx.db.query("hikPendingOperations").withIndex("by_device_status", q => q.eq("deviceId", args.deviceId).eq("status", status)).take(1001),
+  ))).flat();
+  if (rows.length > 1000) throw new Error("Silme kuyruğu sınırı aşıldı; cihaz kapsamını daraltın");
+  return rows.flatMap(row => {
+    const payload = asRecord(row.payload);
+    const cardNumber = payload.employeeNo ?? payload.cardNumber;
+    return row.dismissedAt === undefined && row.projectId === args.projectId && payload.employeeId === args.employeeId &&
+      ["deletePerson", "deleteCard"].includes(row.operation) && typeof cardNumber === "string" && cardNumber.trim()
+      ? [{ id: row._id, cardNumber }] : [];
+  });
+}
+export const getPendingPersonDeletions = internalQuery({
+  args: { projectId: v.id("projects"), employeeId: v.id("employees"), deviceId: v.id("devices") },
+  handler: pendingPersonDeletions,
 });

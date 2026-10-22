@@ -1,9 +1,30 @@
 import { v } from "convex/values";
-import { query } from "./_generated/server";
+import type { QueryCtx, MutationCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 import { adminMutation, authedQuery } from "./lib/customFunctions";
 import { writeAudit } from "./lib/audit";
-import { getProjectIdsForUser } from "./lib/auth";
+import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { getTurkishHolidaysForYear, hasReligiousData } from "./lib/turkishHolidays";
+
+type HolidayCtx = (QueryCtx | MutationCtx) & { user: Doc<"users"> };
+
+async function requireHolidayScope(ctx: HolidayCtx, projectId: Id<"projects"> | undefined, write = false) {
+  if (ctx.user.role === "super_admin") return;
+  if (!projectId) {
+    if (write) throw new Error("Global tatilleri yalnız süper admin değiştirebilir");
+    return;
+  }
+  if (!isProjectAllowed(await getProjectIdsForUser(ctx), projectId)) {
+    throw new Error("Bu projeye erişim yetkiniz yok");
+  }
+}
+
+async function visibleHolidays(ctx: HolidayCtx) {
+  if (ctx.user.role === "super_admin") return await ctx.db.query("holidays").collect();
+  const projectIds = await getProjectIdsForUser(ctx);
+  return (await Promise.all([undefined, ...projectIds].map(projectId => ctx.db
+    .query("holidays").withIndex("by_project", q => q.eq("projectId", projectId)).collect()))).flat();
+}
 
 export const list = authedQuery({
   args: {
@@ -11,12 +32,13 @@ export const list = authedQuery({
     year: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireHolidayScope(ctx, args.projectId);
     const rows = args.projectId
       ? await ctx.db
           .query("holidays")
           .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
           .collect()
-      : await ctx.db.query("holidays").collect();
+      : await visibleHolidays(ctx);
 
     if (args.year === undefined) return rows;
     const prefix = `${args.year}-`;
@@ -30,29 +52,7 @@ export const listForRange = authedQuery({
     endDate: v.string(),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    let rows;
-    if (ctx.user.role === "super_admin") {
-      rows = await ctx.db.query("holidays").collect();
-    } else if (allowedProjectIds.length > 0) {
-      const [projectRows, globalRows] = await Promise.all([
-        Promise.all(
-          allowedProjectIds.map((pid) =>
-            ctx.db
-              .query("holidays")
-              .withIndex("by_project", (q) => q.eq("projectId", pid))
-              .collect(),
-          ),
-        ),
-        ctx.db
-          .query("holidays")
-          .withIndex("by_project", (q) => q.eq("projectId", undefined))
-          .collect(),
-      ]);
-      rows = [...projectRows.flat(), ...globalRows];
-    } else {
-      return [];
-    }
+    const rows = await visibleHolidays(ctx);
     return rows.filter((r) => r.date >= args.startDate && r.date <= args.endDate);
   },
 });
@@ -65,6 +65,7 @@ export const create = adminMutation({
     isHalfDay: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    await requireHolidayScope(ctx, args.projectId, true);
     const existing = await ctx.db
       .query("holidays")
       .withIndex("by_project_date", (q) =>
@@ -98,6 +99,7 @@ export const remove = adminMutation({
   handler: async (ctx, args) => {
     const old = await ctx.db.get(args.id);
     if (!old) return;
+    await requireHolidayScope(ctx, old.projectId, true);
     await ctx.db.delete(args.id);
     await writeAudit(ctx, {
       user: ctx.user,
@@ -116,6 +118,7 @@ export const seedTurkishHolidays = adminMutation({
     years: v.array(v.number()),
   },
   handler: async (ctx, args) => {
+    await requireHolidayScope(ctx, args.projectId, true);
     let inserted = 0;
     let skipped = 0;
     const missingYears: number[] = [];
@@ -160,9 +163,10 @@ export const seedTurkishHolidays = adminMutation({
   },
 });
 
-export const getOvertimeRates = query({
+export const getOvertimeRates = authedQuery({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
+    await requireHolidayScope(ctx, args.projectId);
     const rates = await ctx.db
       .query("overtimeRates")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))

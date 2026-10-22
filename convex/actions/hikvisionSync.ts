@@ -101,13 +101,21 @@ type SharedSync = {
   grantResults: GrantResult[];
 };
 
-async function removeScopedPerson(ctx: ActionCtx, device: HikDeviceRef, employeeId: Id<"employees">, cardNumber: string, runId?: Id<"deviceSyncRuns">) {
+async function removeScopedPerson(ctx: ActionCtx, device: HikDeviceRef, employeeId: Id<"employees">, cardNumber: string, runId?: Id<"deviceSyncRuns">): Promise<{ ok: boolean; error?: string; queued?: boolean; tracked?: boolean; superseded?: boolean }> {
+  if (await ctx.runMutation(internal.hikvisionSync.protectPersonDeletion, { deviceId: device._id, cardNumber })) return { ok: true, superseded: true };
   if (isLocalBridgeDevice(device)) {
-    await enqueueLocalBridgeOp(ctx, device, "deleteCard", { employeeId, cardNumber }, runId);
-    return { ok: true };
+    await enqueueLocalBridgeOp(ctx, device, "deleteCard", { employeeId, employeeNo: cardNumber, cardNumber }, runId);
+    return { ok: true, queued: true };
   }
-  if (!device.hikDevIndex) return { ok: false, error: "gateway'e kayıtlı değil" };
-  return await deletePersonFromDevice(device.hikDevIndex, cardNumber);
+  if (!device.projectId) return { ok: false, error: "Cihaz projesi bulunamadı" };
+  const id = await ctx.runMutation(internal.hikvisionSync.beginPersonDeletion, { deviceId: device._id, projectId: device.projectId, employeeId, cardNumber, runId });
+  let result: { ok: boolean; error?: string };
+  try {
+    result = device.hikDevIndex ? await deletePersonFromDevice(device.hikDevIndex, cardNumber) : { ok: false, error: "gateway'e kayıtlı değil" };
+  } catch { result = { ok: false, error: "Cihaz silme isteği tamamlanamadı" }; }
+  if (result.ok) await ctx.runMutation(internal.hikvisionSync.markOpDone, { id });
+  else await ctx.runMutation(internal.hikvisionSync.markOpRetried, { id, lastError: result.error ?? "Cihaz silme onayı alınamadı" });
+  return { ...result, tracked: true };
 }
 
 async function syncEmployeeDevices(
@@ -125,13 +133,20 @@ async function syncEmployeeDevices(
     employeeId: args.employeeId,
   });
 
-  if (!data?.employee.cardNumber || data.deviceRules.length === 0) {
+  if (!data?.employee.cardNumber) {
     return { synced: 0, failed: 0, errors: [] };
   }
   if (!isAllowed(data.employee.projectId)) {
     return { synced: 0, failed: 0, errors: ["Bu çalışana erişim yetkiniz yok"] };
   }
 
+  if (data.deviceRules.length === 0 && data.previousDevices.length > 0) {
+    const result = await ctx.runAction(internal.actions.hikvisionSync.deleteEmployeeFromDevicesInternal, {
+      employeeId: args.employeeId, runId: args.runId, targetDeviceIds: args.targetDeviceIds, allowedProjectIds: args.allowedProjectIds,
+      snapshot: { cardNumber: data.employee.cardNumber, projectId: data.employee.projectId, devices: data.previousDevices },
+    });
+    return { synced: result.removed, failed: result.failed, errors: result.errors };
+  }
   // Pasif çalışan cihazlardan silinmeli — cihazda kalırsa erişim 24/7 geçerli kalır
   // (Valid.enable cihazda true olarak yazılıydı). isActive: false olunca delete tetiklenir.
   if (data.employee.isActive === false) {
@@ -229,7 +244,7 @@ async function syncEmployeeDevices(
         const reason = !doorPlans.length
           ? "Kapsanan kapı yok"
           : "Windows köprüsü kapı başına çoklu planı henüz desteklemiyor";
-        return { ok: false, device: t.device, grantRemoved: deletion.ok, operation: deletion.ok ? "addPerson" as const : "deletePerson" as const,
+        return { ok: false, device: t.device, grantRemoved: deletion.ok && !deletion.queued && !deletion.superseded, operation: deletion.ok ? "addPerson" as const : "deletePerson" as const,
           error: deletion.ok
             ? (!doorPlans.length ? `${reason}, kişi cihazdan kaldırıldı` : reason)
             : `${reason}; kişi kaldırılamadı: ${deletion.error ?? "Bilinmeyen hata"}` };
@@ -269,9 +284,6 @@ async function syncEmployeeDevices(
         return { ok: true as const, device: t.device };
       }
       if (!t.device.hikDevIndex) return { ok: false, device: t.device, operation: "addPerson" as const, error: "gateway'e kayıtlı değil" };
-      console.log(
-        `[hik-sync] Kişi → ${employee.cardNumber} → device(${t.device.name})`,
-      );
       const personResult = await upsertPersonToDevice(t.device.hikDevIndex, {
         employeeNo: employee.cardNumber,
         name: `${employee.firstName} ${employee.lastName}`,
@@ -290,6 +302,11 @@ async function syncEmployeeDevices(
         cardNo: employee.cardNumber,
         cardType: "normalCard",
       });
+      if (cardResult.ok || cardResult.alreadyExists) {
+        try {
+          await ctx.runMutation(internal.hikvisionSync.supersedePersonDeletions, { deviceId: t.device._id, cardNumber: employee.cardNumber });
+        } catch { /* Claim/cron still protect deletions; cleanup must not block card delivery. */ }
+      }
       // alreadyExists hata değil (idempotent); diğer hata varsa warn.
       if (!cardResult.ok && !cardResult.alreadyExists) {
         console.warn(
@@ -337,7 +354,7 @@ async function syncEmployeeDevices(
         projectId: r.device.projectId,
         operation: r.operation,
         lastError: r.error,
-        payload: { employeeId: args.employeeId },
+        payload: { employeeId: args.employeeId, ...(r.operation === "deletePerson" ? { cardNumber: employee.cardNumber, employeeNo: employee.cardNumber } : {}) },
       }),
     );
   }
@@ -429,6 +446,7 @@ function resolveSuccesses(
 export const deleteEmployeeFromDevicesInternal = internalAction({
   args: {
     employeeId: v.id("employees"),
+    syncAfter: v.optional(v.boolean()),
     runId: v.optional(v.id("deviceSyncRuns")),
     targetDeviceIds: v.optional(v.array(v.id("devices"))),
     snapshot: v.optional(v.object({
@@ -447,7 +465,7 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
   handler: async (
     ctx,
     args,
-  ): Promise<{ removed: number; failed: number; errors: string[] }> => {
+  ): Promise<{ removed: number; queued: number; failed: number; errors: string[]; superseded?: number }> => {
     const isAllowed = makeProjectGuard(args.allowedProjectIds);
     const data = args.snapshot ? {
       employee: args.snapshot,
@@ -455,92 +473,70 @@ export const deleteEmployeeFromDevicesInternal = internalAction({
     } : await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, {
       employeeId: args.employeeId,
     });
-    if (!data?.employee.cardNumber || data.deviceRules.length === 0) {
-      return { removed: 0, failed: 0, errors: [] };
+    if (!data?.employee.cardNumber) {
+      return { removed: 0, queued: 0, failed: 0, errors: [] };
     }
     if (!isAllowed(data.employee.projectId)) {
-      return { removed: 0, failed: 0, errors: ["Bu çalışana erişim yetkiniz yok"] };
+      return { removed: 0, queued: 0, failed: 0, errors: ["Bu çalışana erişim yetkiniz yok"] };
     }
     const seen = new Set<string>();
     type DelTarget = { device: typeof data.deviceRules[number]["device"]; devIndex?: string };
     const targets: DelTarget[] = [];
-    const skipped: { device: typeof data.deviceRules[number]["device"]; reason: string }[] = [];
-    const hikDeviceRules = data.deviceRules.filter(
+
+    const deletionDevices = args.snapshot?.devices ?? ("previousDevices" in data ? data.previousDevices : []);
+    const hikDeviceRules = deletionDevices.map(device => ({ device })).filter(
       (dr) => dr.device.brand === "hikvision" && (!args.targetDeviceIds || args.targetDeviceIds.includes(dr.device._id)),
     );
     for (const { device } of hikDeviceRules) {
-      if (!isAllowed(device.projectId)) {
-        skipped.push({ device, reason: "bu cihaza erişim yetkiniz yok" });
+      if (!isAllowed(device.projectId) || device.projectId !== data.employee.projectId) {
         continue;
       }
       const key = bridgeDedupeKey(device);
-      if (!key) {
-        skipped.push({ device, reason: "gateway'e kayıtlı değil" });
-        continue;
-      }
-      if (seen.has(key)) continue;
-      seen.add(key);
+      const identity = key ?? device._id;
+      if (seen.has(identity)) continue;
+      seen.add(identity);
       targets.push({ device, devIndex: device.hikDevIndex });
     }
     const results = await Promise.all(
       targets.map(async (t) => {
-        const r = await removeScopedPerson(ctx, t.device, args.employeeId, data.employee.cardNumber, args.runId);
-        return { ...r, target: t };
+        try {
+          const r = await removeScopedPerson(ctx, t.device, args.employeeId, data.employee.cardNumber, args.runId);
+          return { ...r, target: t };
+        } catch {
+          return { ok: false, error: "Silme hedefi işlenemedi; cihazda kalmış olabilir", target: t };
+        }
       }),
     );
 
     const errors: string[] = [];
     let removed = 0;
+    let superseded = 0;
+    let queued = 0;
     let failed = 0;
     const failureWrites: Promise<unknown>[] = [];
-    for (const s of skipped) {
-      failed++;
-      errors.push(`${s.device.name}: ${s.reason}`);
-      failureWrites.push(
-        ctx.runMutation(internal.hikvisionSync.recordSyncFailure, {
-          deviceId: s.device._id,
-          projectId: s.device.projectId,
-          operation: "deletePerson",
-          lastError: s.reason,
-          payload: { employeeId: args.employeeId, cardNumber: data.employee.cardNumber },
-        }),
-      );
-    }
-    const successDeviceIds: Id<"devices">[] = [];
     for (const r of results) {
       if (r.ok) {
-        removed++;
-        successDeviceIds.push(r.target.device._id);
+        if (r.superseded) superseded++;
+        else if (r.queued) queued++;
+        else removed++;
         continue;
       }
       failed++;
       const errMsg = r.error ?? "Bilinmeyen hata";
       errors.push(`${r.target.device.name}: ${errMsg}`);
-      failureWrites.push(
+      if (!r.tracked) failureWrites.push(
         ctx.runMutation(internal.hikvisionSync.recordSyncFailure, {
           deviceId: r.target.device._id,
           projectId: r.target.device.projectId,
           operation: "deletePerson",
           lastError: errMsg,
-          payload: { employeeId: args.employeeId, cardNumber: data.employee.cardNumber },
+          payload: { employeeId: args.employeeId, employeeNo: data.employee.cardNumber, cardNumber: data.employee.cardNumber },
         }),
       );
     }
-    await Promise.all([
-      ...failureWrites,
-      ...resolveSuccesses(
-        ctx,
-        successDeviceIds,
-        ["deletePerson", "deleteCard", "deleteFace", "deleteFingerprint"],
-        { employeeId: args.employeeId },
-      ),
-    ]);
-    const grantResults: GrantResult[] = [
-      ...skipped.filter(entry => !isLocalBridgeDevice(entry.device) && entry.device.projectId && isAllowed(entry.device.projectId)).flatMap(entry => entry.device.projectId ? [{ projectId: entry.device.projectId, employeeId: args.employeeId, deviceId: entry.device._id, state: "failed" as const, lastError: entry.reason, lastRunId: args.runId }] : []),
-      ...results.flatMap(result => !isLocalBridgeDevice(result.target.device) && result.target.device.projectId ? [{ projectId: result.target.device.projectId, employeeId: args.employeeId, deviceId: result.target.device._id, state: result.ok ? "removed" as const : "failed" as const, lastError: result.ok ? undefined : result.error, lastRunId: args.runId }] : []),
-    ];
-    if (grantResults.length) await ctx.runMutation(internal.accessGrantStatus.recordGrantResults, { results: grantResults });
-    return { removed, failed, errors };
+    await Promise.all(failureWrites);
+    if (args.syncAfter) await ctx.runAction(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId: args.employeeId });
+    return { removed, queued, failed, errors, ...(superseded ? { superseded } : {}) };
   },
 });
 

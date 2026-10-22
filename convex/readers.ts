@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { authedMutation } from "./lib/customFunctions";
+import { adminMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { getHikModelSpec } from "./lib/hikModels";
 import { deriveHikReaderNoFromDoorNo } from "./lib/hikReaderNumbers";
@@ -57,7 +57,7 @@ async function countReadersForDevice(
   return rows.length;
 }
 
-export const create = authedMutation({
+export const create = adminMutation({
   args: {
     doorId: v.id("doors"),
     name: v.string(),
@@ -111,7 +111,7 @@ export const create = authedMutation({
   },
 });
 
-export const move = authedMutation({
+export const move = adminMutation({
   args: {
     readerId: v.id("readers"),
     targetDoorId: v.id("doors"),
@@ -158,7 +158,7 @@ export const move = authedMutation({
   },
 });
 
-export const update = authedMutation({
+export const update = adminMutation({
   args: {
     readerId: v.id("readers"),
     name: v.optional(v.string()),
@@ -213,7 +213,7 @@ export const setHikReaderSnapshot = internalMutation({
   },
 });
 
-export const remove = authedMutation({
+export const remove = adminMutation({
   args: { readerId: v.id("readers") },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
