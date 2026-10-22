@@ -2,6 +2,7 @@ import { deviceConnectionBadge } from "./hooks/deviceConnectionBadge";
 import { deviceDisplayName } from "@/lib/deviceDisplay";
 import { deviceBrandLabel } from "@/lib/deviceBrand";
 import { formatTrDateTime } from "@/lib/date";
+import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
 import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useState } from "react";
@@ -83,7 +84,11 @@ export function DeviceTableRow({
   const deviceId = String(device._id ?? "");
 
   return (
-    <TableRow data-state={selected ? "selected" : undefined}>
+    <TableRow
+      data-state={selected ? "selected" : undefined}
+      className={ROW_CLICK_CLASS}
+      onClick={onRowActivate(() => onEditDevice(device))}
+    >
       <TableCell
         className="px-2 py-0 md:px-3"
         onClick={(e) => {
@@ -112,7 +117,7 @@ export function DeviceTableRow({
             type="button"
             onClick={() => onEditDevice(device)}
             title={deviceDisplayName(device)}
-            className="min-h-11 md:min-h-0 max-w-full break-words text-left md:block md:truncate md:whitespace-nowrap rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="min-h-11 md:min-h-0 max-w-full break-words text-left md:block md:truncate md:whitespace-nowrap rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {deviceDisplayName(device)}
           </button>

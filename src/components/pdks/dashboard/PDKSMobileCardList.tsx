@@ -4,6 +4,7 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { displayTime, displayDuration, type PdksRow } from "../lib/presentation";
 import { PdksRowStatus } from "./PdksRowStatus";
+import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
 export function PDKSMobileCardList({
   records,
   selectedIds,
@@ -19,8 +20,13 @@ export function PDKSMobileCardList({
     <ul className="divide-y border-y">
       {records.map((r) => (
         <li
-          className={`min-w-0 py-3 ${selectedIds.has(r.id) ? "bg-selected" : ""}`}
+          className={`min-w-0 py-3 ${onShowDetail ? ROW_CLICK_CLASS : ""} ${selectedIds.has(r.id) ? "bg-selected" : ""}`}
           key={r.id}
+          onClick={
+            onShowDetail
+              ? onRowActivate(() => onShowDetail(r.id as Id<"employees">))
+              : undefined
+          }
         >
           <div className="flex min-w-0 items-start gap-2">
             <Checkbox

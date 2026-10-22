@@ -39,6 +39,7 @@ import {
   useStableAdminPage,
 } from "./components/AdminListParts";
 import { useAdminFormGuard } from "./hooks/useAdminFormGuard";
+import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
 
 type AdminDevice = FunctionReturnType<
   typeof api.adminDevices.adminListPage
@@ -242,10 +243,14 @@ function AdminDevicesContent() {
               </TableHeader>
               <TableBody>
                 {result.page.map((device) => (
-                  <TableRow key={device._id}>
+                  <TableRow
+                    key={device._id}
+                    className={ROW_CLICK_CLASS}
+                    onClick={onRowActivate(() => setDialog({ device }))}
+                  >
                     <TableCell>
                       <button
-                        className="break-words text-left font-medium hover:underline"
+                        className="break-words text-left font-medium"
                         onClick={() => setDialog({ device })}
                       >
                         {device.name}
@@ -278,7 +283,11 @@ function AdminDevicesContent() {
             className="divide-y rounded-md border min-[761px]:hidden"
           >
             {result.page.map((device) => (
-              <li key={device._id} className="flex min-w-0 gap-2 p-3">
+              <li
+                key={device._id}
+                className={`flex min-w-0 gap-2 p-3 ${ROW_CLICK_CLASS}`}
+                onClick={onRowActivate(() => setDialog({ device }))}
+              >
                 <div className="min-w-0 flex-1 space-y-2">
                   <button
                     className="break-words text-left text-sm font-medium"

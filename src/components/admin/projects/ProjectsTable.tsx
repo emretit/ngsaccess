@@ -10,6 +10,7 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { RowActions } from "@/components/shared/RowActions";
 import { adminDate } from "../components/AdminListParts";
+import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
 import type { Project } from "./projectSchema";
 
 export function ProjectsTable({
@@ -58,10 +59,14 @@ export function ProjectsTable({
           </TableHeader>
           <TableBody>
             {projects.map((project) => (
-              <TableRow key={project._id}>
+              <TableRow
+                key={project._id}
+                className={ROW_CLICK_CLASS}
+                onClick={onRowActivate(() => onEdit(project))}
+              >
                 <TableCell>
                   <button
-                    className="text-left font-medium underline-offset-4 hover:underline break-words"
+                    className="text-left font-medium break-words"
                     onClick={() => onEdit(project)}
                   >
                     {project.name}
@@ -85,7 +90,11 @@ export function ProjectsTable({
         className="divide-y rounded-md border min-[761px]:hidden"
       >
         {projects.map((project) => (
-          <li key={project._id} className="flex min-w-0 gap-2 p-3">
+          <li
+            key={project._id}
+            className={`flex min-w-0 gap-2 p-3 ${ROW_CLICK_CLASS}`}
+            onClick={onRowActivate(() => onEdit(project))}
+          >
             <div className="min-w-0 flex-1 space-y-2">
               <button
                 className="break-words text-left text-sm font-medium"

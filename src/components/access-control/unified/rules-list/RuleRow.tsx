@@ -23,6 +23,7 @@ import { formatWeekdaysAbbr } from "../components/weekdays";
 import { AccessRuleDetails } from "../AccessRuleDetails";
 import { loadRuleEditor } from "../lib/loadRuleEditor";
 import { scopeText } from "./accessRulesListModel";
+import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
 import type { Summary } from "./accessRulesListModel";
 import type { Props } from "./types";
 export function RuleRow({
@@ -58,11 +59,14 @@ export function RuleRow({
   );
   return (
     <>
-      <TableRow className="h-16 md:h-[42px] md:[&_td]:py-1">
+      <TableRow
+        className={`h-16 md:h-[42px] md:[&_td]:py-1 ${ROW_CLICK_CLASS}`}
+        onClick={onRowActivate(() => setOpen(true))}
+      >
         <TableCell className="min-w-0">
           <Button
             variant="link"
-            className="h-auto min-h-11 md:min-h-0 w-full max-w-full whitespace-normal break-words p-0 text-left justify-start text-foreground"
+            className="h-auto min-h-11 md:min-h-0 w-full max-w-full whitespace-normal break-words p-0 text-left justify-start text-foreground hover:no-underline"
             onClick={() => setOpen(true)}
           >
             {rule.name}

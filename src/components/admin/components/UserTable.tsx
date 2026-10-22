@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { userName, type User } from "../types/user-types";
+import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
 
 export function UserTable({
   users,
@@ -59,6 +60,11 @@ export function UserTable({
         </DropdownMenuItem>}
       </RowActions>
     );
+  const rowClass = canManage ? ROW_CLICK_CLASS : "";
+  const openUser = (user: User) =>
+    canManage
+      ? onRowActivate(() => onEditUser(user))
+      : undefined;
   const identity = (user: User) => (
     <>
       <p className="break-words font-medium">{userName(user)}</p>
@@ -88,7 +94,7 @@ export function UserTable({
           </TableHeader>
           <TableBody>
             {users.map((user) => (
-              <TableRow key={user._id}>
+              <TableRow key={user._id} className={rowClass} onClick={openUser(user)}>
                 <TableCell>{identity(user)}</TableCell>
                 <TableCell>{role(user)}</TableCell>
                 <TableCell className="break-words">
@@ -105,7 +111,11 @@ export function UserTable({
         className="divide-y rounded-md border min-[761px]:hidden"
       >
         {users.map((user) => (
-          <li key={user._id} className="flex min-w-0 gap-2 p-3">
+          <li
+            key={user._id}
+            className={`flex min-w-0 gap-2 p-3 ${rowClass}`}
+            onClick={openUser(user)}
+          >
             <div className="min-w-0 flex-1 space-y-2">
               {identity(user)}
               {role(user)}

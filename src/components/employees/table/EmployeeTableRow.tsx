@@ -1,4 +1,5 @@
 import { usePermissions } from "@/hooks/usePermissions";
+import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { EmploymentEmployee as Employee } from "../lib/employment";
 import { EmployeeEmploymentBadge } from "../EmployeeEmploymentBadge";
@@ -44,8 +45,11 @@ export function EmployeeTableRow({
   const { can } = usePermissions();
   const canSync = can("accessRules.manage");
   return (
-    <TableRow className="h-[42px]">
-      <TableCell className="px-2 py-0">
+    <TableRow
+      className={`h-[42px] ${ROW_CLICK_CLASS}`}
+      onClick={onRowActivate(() => onViewDetails(employee))}
+    >
+      <TableCell className="px-2 py-0" onClick={(e) => e.stopPropagation()}>
         <Checkbox
           aria-label={`${employee.firstName} ${employee.lastName} seç`}
           disabled={
@@ -69,7 +73,7 @@ export function EmployeeTableRow({
           <div className="min-w-0">
             <button
               type="button"
-              className="max-w-full truncate text-left font-medium hover:underline"
+              className="max-w-full truncate text-left font-medium"
               onClick={() => onViewDetails(employee)}
             >
               {employee.firstName} {employee.lastName}

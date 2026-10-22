@@ -12,6 +12,7 @@ import {
 } from "../lib/presentation";
 import { PdksRowStatus } from "./PdksRowStatus";
 import { PDKSMobileCardList } from "./PDKSMobileCardList";
+import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
 interface Props {
   records: PdksRow[];
   loading?: boolean;
@@ -122,9 +123,14 @@ export function PDKSTableView({
             {rows.map((r) => (
               <tr
                 key={r.id}
-                className={`h-[42px] border-b hover:bg-muted/50 ${selectedIds.has(r.id) ? "bg-selected" : ""}`}
+                className={`h-[42px] border-b hover:bg-muted/50 ${onShowDetail ? ROW_CLICK_CLASS : ""} ${selectedIds.has(r.id) ? "bg-selected" : ""}`}
+                onClick={
+                  onShowDetail
+                    ? onRowActivate(() => onShowDetail(r.id as Id<"employees">))
+                    : undefined
+                }
               >
-                <td className="px-2">
+                <td className="px-2" onClick={(e) => e.stopPropagation()}>
                   <Checkbox
                     checked={selectedIds.has(r.id)}
                     aria-label={`${r.name} seç`}
@@ -133,7 +139,7 @@ export function PDKSTableView({
                 </td>
                 <td className="px-2 py-1">
                   <button
-                    className="text-left font-medium break-words hover:underline"
+                    className="text-left font-medium break-words"
                     onClick={() => onShowDetail?.(r.id as Id<"employees">)}
                   >
                     {r.name}

@@ -3,6 +3,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { formatTrDateTime } from "@/lib/date";
+import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
 import {
   grantBadge,
   pairKey,
@@ -57,7 +58,7 @@ export function GrantRows({
   const cells = (row: GrantRow) => [
     <Button
       variant="link"
-      className="h-auto p-0 whitespace-normal text-left break-words"
+      className="h-auto p-0 whitespace-normal text-left break-words hover:no-underline"
       onClick={() => onEmployee(row)}
     >
       {row.employeeName}
@@ -95,8 +96,16 @@ export function GrantRows({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={pairKey(row)} className="border-t">
-                {canManage && <td className="p-2">{checkbox(row)}</td>}
+              <tr
+                key={pairKey(row)}
+                className={`border-t ${ROW_CLICK_CLASS}`}
+                onClick={onRowActivate(() => onEmployee(row))}
+              >
+                {canManage && (
+                  <td className="p-2" onClick={(e) => e.stopPropagation()}>
+                    {checkbox(row)}
+                  </td>
+                )}
                 {cells(row).map((cell, i) => (
                   <td
                     key={columns[i]}
@@ -114,10 +123,14 @@ export function GrantRows({
         {rows.map((row) => (
           <article
             key={pairKey(row)}
-            className="border rounded-md p-3 min-w-0 space-y-2"
+            className={`border rounded-md p-3 min-w-0 space-y-2 ${ROW_CLICK_CLASS}`}
+            onClick={onRowActivate(() => onEmployee(row))}
           >
             {canManage && (
-              <div className="flex gap-2 items-center">
+              <div
+                className="flex gap-2 items-center"
+                onClick={(e) => e.stopPropagation()}
+              >
                 {checkbox(row)}
                 <span className="text-xs">Seç</span>
               </div>

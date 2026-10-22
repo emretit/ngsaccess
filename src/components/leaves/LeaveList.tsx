@@ -1,6 +1,7 @@
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { RowActions } from "@/components/shared/RowActions";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { onRowActivate, ROW_CLICK_CLASS } from "@/lib/tableRowClick";
 import {
   dateLabel,
   leaveStatuses,
@@ -40,7 +41,7 @@ export function LeaveList({
     <>
       <button
         type="button"
-        className="text-left font-medium hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary break-words"
+        className="text-left font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary break-words"
         onClick={() => onDetails(row)}
       >
         {row.employeeName}
@@ -84,7 +85,8 @@ export function LeaveList({
             {rows.map((row) => (
               <tr
                 key={row._id}
-                className="h-[42px] border-t hover:bg-subtle/50"
+                className={`h-[42px] border-t hover:bg-subtle/50 ${ROW_CLICK_CLASS}`}
+                onClick={onRowActivate(() => onDetails(row))}
               >
                 <td className="px-3 py-1">{person(row)}</td>
                 <td className="px-3 py-1 break-words">
@@ -101,7 +103,11 @@ export function LeaveList({
       </div>
       <ul className="divide-y rounded-md border md:hidden">
         {rows.map((row) => (
-          <li key={row._id} className="min-w-0 p-3 text-sm">
+          <li
+            key={row._id}
+            className={`min-w-0 p-3 text-sm ${ROW_CLICK_CLASS}`}
+            onClick={onRowActivate(() => onDetails(row))}
+          >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 {person(row)}
