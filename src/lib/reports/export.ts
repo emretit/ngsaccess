@@ -21,11 +21,13 @@ function safeSpreadsheetValue(value: string | number | null): string | number {
   if (typeof value === 'number') return value;
   return neutralizeSpreadsheetFormula(value ?? '');
 }
+/** Shared escaping for report and PDKS CSV exports. */
+export function escapeCsvCell(value: string | number | null, delimiter = ';'): string {
+  const text = String(safeSpreadsheetValue(value));
+  return text.includes(delimiter) || /["\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
 export function buildCsv(columns: readonly ReportColumn[], rows: readonly ReportRow[]): string {
-  const escape = (value: string | number | null) => {
-    const text = String(safeSpreadsheetValue(value));
-    return /[;"\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-  };
+  const escape = (value: string | number | null) => escapeCsvCell(value);
   return '\uFEFF' + [columns.map(column => escape(column.label)).join(';'), ...rows.map(row => columns.map(column => escape(column.value(row))).join(';'))].join('\r\n');
 }
 function download(blob: Blob, filename: string) {

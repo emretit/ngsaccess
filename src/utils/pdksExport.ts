@@ -1,7 +1,30 @@
-import { STATUS_FILTER_LABELS } from "@/components/pdks/statusMeta";
-import { formatDuration } from "@/components/pdks/lib/presentation";
 import { toLocalDateString } from "@/lib/date";
 import { neutralizeSpreadsheetFormula } from "@/lib/spreadsheetSafety";
+
+import { defaultPDKSPreferences, selectedPDKSColumns, type CsvDelimiter } from '@/lib/pdksExportColumns';
+import { escapeCsvCell } from '@/lib/reports/export';
+
+export interface PDKSExportOptions {
+  title?: string;
+  dateRange?: string;
+  orderedColumnKeys?: readonly string[];
+  delimiter?: CsvDelimiter;
+  canSeePay?: boolean;
+}
+/** The same ordered cells drive the preview and all three serializers. Formula neutralization
+ * applies only to spreadsheet output; PDF and preview show the raw text. */
+export function buildPDKSExportTable(records: readonly PDKSExportRecord[], options: PDKSExportOptions = {}, neutralize = false) {
+  const columns = selectedPDKSColumns(options.orderedColumnKeys, options.canSeePay);
+  return { columns, headers: columns.map(c => c.label), rows: records.map(r => columns.map(c => {
+    const value = c.value(r);
+    return neutralize && typeof value === 'string' ? neutralizeSpreadsheetFormula(value) : value;
+  })) };
+}
+export function buildPDKSCsv(records: readonly PDKSExportRecord[], options: PDKSExportOptions = {}): string {
+  const { columns } = buildPDKSExportTable([], options);
+  const delimiter = options.delimiter ?? ',';
+  return '\uFEFF' + [columns.map(c => escapeCsvCell(c.label, delimiter)).join(delimiter), ...records.map(r => columns.map(c => escapeCsvCell(c.value(r), delimiter)).join(delimiter))].join('\n');
+}
 
 export interface PDKSExportRecord {
   id: string;
@@ -56,42 +79,11 @@ export interface MonthlyPayrollSheet {
  */
 export async function exportToExcel(
   records: PDKSExportRecord[],
-  options: { title?: string; dateRange?: string } = {},
+  options: PDKSExportOptions = {},
 ): Promise<void> {
   const { dateRange = "" } = options;
 
-  const headers = [
-    "Çalışan",
-    "Kart no",
-    "Bordro Kodu",
-    "Departman",
-    "Gün Kodu",
-    "İlk Giriş",
-    "Son Çıkış",
-    "Toplam Saat",
-    "Mesai",
-    "İzin",
-    "Durum",
-  ];
-
-  const rows = records.map((r) => [
-    r.name,
-    r.cardNumber ?? r.employeeId,
-    r.payrollEmployeeCode ?? "",
-    r.department,
-    r.payrollCode ?? "",
-    r.firstEntry,
-    r.lastExit,
-    r.totalMinutes === undefined
-      ? r.totalHours
-      : formatDuration(r.totalMinutes),
-    r.overtimeMinutes === undefined
-      ? r.overtime
-      : formatDuration(r.overtimeMinutes),
-    r.leaveType,
-    STATUS_FILTER_LABELS[r.status as keyof typeof STATUS_FILTER_LABELS] ??
-      r.status,
-  ]);
+  const { columns, headers, rows } = buildPDKSExportTable(records, options, true);
 
   const { default: ExcelJS } = await import("exceljs");
   const workbook = new ExcelJS.Workbook();
@@ -102,19 +94,7 @@ export async function exportToExcel(
   worksheet.addRow(headers);
   rows.forEach((row) => worksheet.addRow(row));
 
-  worksheet.columns = [
-    { width: 25 },
-    { width: 15 },
-    { width: 14 },
-    { width: 18 },
-    { width: 10 },
-    { width: 10 },
-    { width: 10 },
-    { width: 12 },
-    { width: 10 },
-    { width: 12 },
-    { width: 10 },
-  ];
+  worksheet.columns = columns.map(c => ({ width: c.excelWidth }));
 
   const fileName = `PDKS_Raporu_${dateRange || toLocalDateString()}.xlsx`;
   const buffer = await workbook.xlsx.writeBuffer();
@@ -134,54 +114,11 @@ export async function exportToExcel(
  */
 export function exportToCsv(
   records: PDKSExportRecord[],
-  options: { dateRange?: string } = {},
+  options: PDKSExportOptions = {},
 ): void {
   const { dateRange = "" } = options;
 
-  const headers = [
-    "Çalışan",
-    "Kart no",
-    "Bordro Kodu",
-    "Departman",
-    "Gün Kodu",
-    "İlk Giriş",
-    "Son Çıkış",
-    "Toplam Saat",
-    "Mesai",
-    "İzin",
-    "Durum",
-  ];
-
-  const escapeCsv = (raw: string) => {
-    const v = neutralizeSpreadsheetFormula(raw);
-    return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
-  };
-
-  const rows = records.map((r) =>
-    [
-      r.name,
-      r.cardNumber ?? r.employeeId,
-      r.payrollEmployeeCode ?? "",
-      r.department,
-      r.payrollCode ?? "",
-      r.firstEntry,
-      r.lastExit,
-      r.totalMinutes === undefined
-        ? r.totalHours
-        : formatDuration(r.totalMinutes),
-      r.overtimeMinutes === undefined
-        ? r.overtime
-        : formatDuration(r.overtimeMinutes),
-      r.leaveType,
-      STATUS_FILTER_LABELS[r.status as keyof typeof STATUS_FILTER_LABELS] ??
-        r.status,
-    ]
-      .map((c) => escapeCsv(String(c)))
-      .join(","),
-  );
-
-  const csvContent = [headers.join(","), ...rows].join("\n");
-  const blob = new Blob(["\uFEFF" + csvContent], {
+  const blob = new Blob([buildPDKSCsv(records, options)], {
     type: "text/csv;charset=utf-8",
   });
   const url = URL.createObjectURL(blob);
@@ -197,7 +134,7 @@ export function exportToCsv(
  */
 export async function exportToPdf(
   records: PDKSExportRecord[],
-  options: { title?: string; dateRange?: string } = {},
+  options: PDKSExportOptions = {},
 ): Promise<void> {
   const { title = "PDKS Raporu", dateRange = "" } = options;
 
@@ -205,9 +142,12 @@ export async function exportToPdf(
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 15;
-  const colWidths = [38, 22, 22, 28, 16, 18, 18, 22, 16, 18, 18];
+  const { columns, rows } = buildPDKSExportTable(records, options);
+  const availableWidth = doc.internal.pageSize.getWidth() - margin * 2;
+  const totalWidth = columns.reduce((sum, c) => sum + c.pdfWidth, 0);
+  const colWidths = columns.map(c => c.pdfWidth * Math.min(1, availableWidth / totalWidth));
   const rowHeight = 8;
-  const headerHeight = 10;
+  let headerHeight = 10;
 
   let y = margin;
 
@@ -224,55 +164,34 @@ export async function exportToPdf(
   }
 
   doc.setFontSize(9);
-  const headers = [
-    "Çalışan",
-    "Kart no",
-    "Bordro",
-    "Departman",
-    "Gün",
-    "İlk Giriş",
-    "Son Çıkış",
-    "Toplam",
-    "Mesai",
-    "İzin",
-    "Durum",
-  ];
+  const defaultKeys = defaultPDKSPreferences(options.canSeePay).orderedColumnKeys;
+  const customColumns = columns.length !== defaultKeys.length || columns.some((c, i) => c.key !== defaultKeys[i]);
+  const headers = columns.map(c => customColumns ? c.label : c.pdfLabel ?? c.label);
+  const headerLines = headers.map((h, i) => customColumns ? doc.splitTextToSize(h, colWidths[i] - 4) as string[] : [h]);
+  headerHeight = Math.max(10, ...headerLines.map(lines => lines.length * 4 + 4));
   let x = margin;
 
   headers.forEach((h, i) => {
     doc.setFont("helvetica", "bold");
     doc.rect(x, y, colWidths[i], headerHeight);
-    doc.text(h, x + 2, y + 6);
+    doc.text(customColumns ? headerLines[i] : h, x + 2, y + 6);
     x += colWidths[i];
   });
   y += headerHeight;
 
   doc.setFont("helvetica", "normal");
-  records.forEach((r, _idx) => {
+  rows.forEach((row) => {
     if (y > pageHeight - 25) {
       doc.addPage("a4", "landscape");
       y = margin;
     }
 
     x = margin;
-    const rowData = [
-      r.name.substring(0, 22),
-      r.cardNumber ?? r.employeeId,
-      r.payrollEmployeeCode ?? "",
-      r.department.substring(0, 16),
-      r.payrollCode ?? "",
-      r.firstEntry,
-      r.lastExit,
-      r.totalMinutes === undefined
-        ? r.totalHours
-        : formatDuration(r.totalMinutes),
-      r.overtimeMinutes === undefined
-        ? r.overtime
-        : formatDuration(r.overtimeMinutes),
-      r.leaveType,
-      STATUS_FILTER_LABELS[r.status as keyof typeof STATUS_FILTER_LABELS] ??
-        r.status,
-    ];
+    const rowData = row.map((value, i) => {
+      const key = columns[i].key;
+      const text = String(value);
+      return key === 'name' ? text.substring(0, 22) : key === 'department' ? text.substring(0, 16) : text;
+    });
 
     rowData.forEach((cell, i) => {
       doc.rect(x, y, colWidths[i], rowHeight);

@@ -1,3 +1,8 @@
+import { useAuth } from '@/components/auth/AuthProvider';
+import { capabilities } from '@/lib/capabilities';
+import { readPDKSPreferences, savePDKSPreferences, type PDKSExportPreferences } from '@/lib/pdksExportColumns';
+import type { ColumnScope } from '@/lib/reports/columns';
+import { PDKSExportColumns } from './export/PDKSExportColumns';
 import { pdksToday } from "@/components/pdks/lib/calendar";
 import { useRef, useState } from "react";
 import { useConvex } from "convex/react";
@@ -41,7 +46,14 @@ interface Props {
   totalCount?: number;
   disabled?: boolean;
 }
-export function PDKSEnhancedExportPanel({
+export function PDKSEnhancedExportPanel(props: Props) {
+  const { profile } = useAuth();
+  const { projectId } = useActiveProject();
+  const scope = projectId && profile?._id ? { projectId, userId: profile._id } : undefined;
+  const canSeePay = capabilities(profile?.role).admin;
+  return <ExportPanel key={`${scope?.projectId}:${scope?.userId}:${canSeePay}`} {...props} scope={scope} canSeePay={canSeePay} />;
+}
+function ExportPanel({
   records = [],
   dateRange = "",
   selectedDate = pdksToday(),
@@ -49,9 +61,16 @@ export function PDKSEnhancedExportPanel({
   selectedCount = 0,
   totalCount = records.length,
   disabled,
-}: Props) {
+  scope,
+  canSeePay,
+}: Props & { scope?: ColumnScope; canSeePay: boolean }) {
   const { projectId, activeProject } = useActiveProject();
   const convex = useConvex();
+  const [preferences, setPreferences] = useState(() => readPDKSPreferences(scope, canSeePay));
+  const updatePreferences = (next: PDKSExportPreferences) => {
+    setPreferences(next);
+    savePDKSPreferences(next, scope, canSeePay);
+  };
   const [type, setType] = useState<ExportType | null>(null),
     [pending, setPending] = useState(false),
     [error, setError] = useState("");
@@ -68,6 +87,9 @@ export function PDKSEnhancedExportPanel({
   const choose = (next: ExportType) => {
     setError("");
     setAphb(null);
+    if (next === 'Excel' || next === 'CSV' || next === 'PDF') {
+      updatePreferences({ ...preferences, format: next });
+    }
     setType(next);
   };
   const execute = async () => {
@@ -105,9 +127,9 @@ export function PDKSEnhancedExportPanel({
           },
         );
         await exportMonthlyPayrollSheet(data);
-      } else if (type === "Excel") await exportToExcel(records, { dateRange });
-      else if (type === "CSV") exportToCsv(records, { dateRange });
-      else await exportToPdf(records, { dateRange });
+      } else if (type === "Excel") await exportToExcel(records, { dateRange, ...preferences, canSeePay });
+      else if (type === "CSV") exportToCsv(records, { dateRange, ...preferences, canSeePay });
+      else await exportToPdf(records, { dateRange, ...preferences, canSeePay });
       notify.success("Rapor oluşturuldu");
       setType(null);
     } catch (e) {
@@ -178,6 +200,8 @@ export function PDKSEnhancedExportPanel({
               </dd>
             </div>
           </dl>
+          {!monthly && type && <PDKSExportColumns records={records} preferences={preferences} canSeePay={canSeePay} disabled={pending} onChange={updatePreferences} />}
+          {monthly && <p className="text-xs text-muted-foreground">Aylık bordro ve APHB sabit kolonlarla hazırlanır; kolon seçimi uygulanmaz.</p>}
           {type === "aphb" && (
             <p className="text-xs text-muted-foreground">
               Önce bildirim hazırlanır. Uyarılar indirmeden önce aşağıda
