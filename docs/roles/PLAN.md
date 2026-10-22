@@ -18,9 +18,10 @@ Emre onayı 2026-10-22: 5 sabit rol, 13 yetki; tablo = varsayılan, proje yönet
 - [x] Faz 4c — FIX-1 diff denetimi (Claude opus, ctx_4fafef1e3ea0): `docs/roles/AUDIT-FIX1.md` 0K/0Y/1O/3D (2026-10-22 20:53)
 - [x] FIX-2 (koordinatör): F1-O1 super_admin hedefte son-yönetici kontrolü atlanır (`users.ts removesLastProjectAdmin`), F1-D2 `syncMembershipRoles` setRoleByEmail'de de, F1-D1 taşımada kaynak pay.view, F1-D3 ayırt edici kart + ücret testi; 5/5 geri alınınca kırmızı. Kapı 20:58: tsc 0/0, eslint 0, vitest 323/3639, leak temiz, grep 0
 - [x] FIX-2 Codex salt-okuma denetimi (ctx_bb8cb59ce2c8): `docs/roles/REVIEW-FIX2.md` 1 Orta (F2-O1 terfi→düşürme zinciri) → koordinatör düzeltti: son müşteri yöneticisi super_admin'e terfi ettirilemez (`syncMembershipRoles`), test geri alınınca kırmızı. Kapı 21:05: tsc 0/0, eslint 0, vitest 3639/3640 (tek düşen w5aFix2 yük timeout'u — roller öncesi de flake, 14:44/16:37 loglarında var)
-- [ ] CEO'ya commit paketi — pathspec `/tmp/roles-commit-pathspec.txt` (convex+src 242 dosya + docs/roles + roles spec'leri)
-- [ ] Tarayıcı doğrulaması — Convex yayınından SONRA (roles API canlıda yokken UI açılmaz)
-- [ ] Faz 5 — Yayın (CEO, Emre onayı) + `roles.backfillMemberRoles` bir kez
+- [x] Commit `ce09baf0` (CEO ngsaccess-d6, 2026-10-22 ~21:10; 262 dosya; temiz kapı git archive: tsc 0/0, eslint 0, vitest 323/3637, build OK, leak temiz). Push/yayın YOK
+- [x] Faz 5 — Yayın (CEO ngsaccess-41): CANLI = origin = `343037a1` (ce09baf0 dahil); Convex 21:17:26 → `roles:backfillMemberRoles` updated 4 (2. koşum 0) → web 21:17:58
+- [x] Tarayıcı doğrulaması (canlı, salt okuma, 2026-10-22 ~21:25): Roller tablosu 13×5 = onaylı varsayılanlar birebir, Yönetici kilitli, admin.manage diğer rollerde kapalı; Kullanıcılar ve davetler: süper admin satırı kilitli, davet 5 rol + zorunlu proje (Vazgeç); Admin › Düzenle: yalnız Süper Admin/Normal (Vazgeç); 3 müşteri kullanıcısı Yönetici
+- [ ] UX düzeltmesi (yayın bekliyor): 1231 px ekranda Görüntüleyici sütunu yatay kaydırmada kalıyordu, sağa kayınca yetki adı kayboluyordu → `RolesSettings.tsx` yetki sütunu sticky + buton metni sarılır; localhost'ta 5 sütun sığdı (702/702). Yalnız web.
 
 ## Roller (proje bazında, `userProjects.role`)
 | Anahtar | Etiket | Not |
