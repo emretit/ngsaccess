@@ -290,7 +290,7 @@ export const update = adminMutation({
       updates.cardNumber !== undefined && updates.cardNumber !== emp.cardNumber;
     const activeChanged =
       updates.isActive !== undefined && updates.isActive !== emp.isActive;
-    if (!cardChanged && activeChanged && updates.isActive === false) await scheduleFingerprintPurge(ctx, employeeId, emp.cardNumber);
+    if (activeChanged && updates.isActive === false) await scheduleFingerprintPurge(ctx, employeeId, emp.cardNumber, { deleteTemplates: true });
     if (emp.employmentEndDate && updates.isActive === true && emp.isActive !== true) {
       throw new Error("İşten ayrılan kişiyi aktifleştirmek için 'Geri al' kullanın.");
     }
@@ -315,7 +315,6 @@ export const update = adminMutation({
 });
 
 async function removeEmployeeWithDependencies(ctx: MutationCtx & { user: Doc<"users"> }, emp: Doc<"employees">) {
-    await scheduleFingerprintPurge(ctx, emp._id, emp.cardNumber);
     const snapshot = await snapshotEmployeeHikDevices(ctx, emp);
     await ctx.scheduler.runAfter(
       0,

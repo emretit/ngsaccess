@@ -9,6 +9,8 @@
  */
 import type { QueryCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
+import { fingerprintCapability } from "../fingerprintEnrollment";
+import { isBiometricEnabled } from "./privacySettings";
 import { resolvePanelRuleMembers } from "./accessGraph";
 
 /**
@@ -38,8 +40,14 @@ export async function rosterCardNumbersWithBiometric(
   ctx: QueryCtx,
   authorizedEmpIds: Set<Id<"employees">>,
   biometricTable: "employeeFaces" | "employeeFingerprints",
+  deviceId?: Id<"devices">,
 ): Promise<string[]> {
   const seen = new Set<string>();
+  const device = biometricTable === "employeeFingerprints" && deviceId ? await ctx.db.get(deviceId) : null;
+  if (biometricTable === "employeeFingerprints") {
+    if (!device || device.isActive === false || device.brand !== "hikvision" || device.hikTransport !== "gateway" || !device.hikDevIndex || fingerprintCapability(device.hikCapabilitiesSnapshot) === false || !(await isBiometricEnabled(ctx, device.projectId))) return [];
+  }
+  const projectEnabled = new Map<Id<"projects"> | undefined, boolean>();
   for (const employeeId of authorizedEmpIds) {
     const rec = await ctx.db
       .query(biometricTable)
@@ -47,6 +55,14 @@ export async function rosterCardNumbersWithBiometric(
       .first();
     if (!rec) continue;
     const emp = await ctx.db.get(employeeId);
+    if (biometricTable === "employeeFingerprints") {
+      if (!emp || emp.isActive !== true || !emp.cardNumber?.trim() || emp.projectId !== device?.projectId) continue;
+      let enabled = projectEnabled.get(emp.projectId);
+      if (enabled === undefined) { enabled = await isBiometricEnabled(ctx, emp.projectId); projectEnabled.set(emp.projectId, enabled); }
+      if (!enabled) continue;
+      const consents = await ctx.db.query("employeeConsents").withIndex("by_employee_type", q => q.eq("employeeId", employeeId).eq("consentType", "biometric_fingerprint")).take(201);
+      if (consents.length > 200 || !consents.some(consent => !consent.revokedAt)) continue;
+    }
     const cardNumber = emp?.cardNumber?.trim();
     if (cardNumber) seen.add(cardNumber);
   }

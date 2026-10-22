@@ -40,7 +40,7 @@ const CONSENT_META: Record<
   },
   biometric_fingerprint: {
     label: "Parmak izi",
-    description: "Yalnız kapı erişimi; mesai takibinde kullanılmaz",
+    description: "Yalnız kapı erişimi; şifreli saklanır, mesai takibinde kullanılmaz",
     icon: Fingerprint,
   },
   card: {

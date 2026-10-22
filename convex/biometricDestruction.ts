@@ -137,6 +137,11 @@ export const prepareBatch = internalMutation({
       const employees = await ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", projectId).lte("_creationTime", state.startedAt)).paginate({ numItems: 1, cursor: state.employeeCursor });
       const employee = employees.page[0];
       if (!employee) { await finishKind(); return; }
+      if (state.phase === "fingerprint") {
+        // Source-only captures (central save failed) also need device erasure.
+        const central = await ctx.db.query("employeeFingerprints").withIndex("by_employee", q => q.eq("employeeId", employee._id)).first();
+        if (!central) await ctx.runMutation(internal.fingerprintEnrollment.removeAllForEmployee, { employeeId: employee._id, employeeNo: employee.cardNumber });
+      }
       state.employeeCursor = employees.continueCursor;
       state.legacyEmployeeId = employee._id;
       state.cursor = null;
@@ -260,7 +265,8 @@ export const finishBatch = internalMutation({
     if (item.fingerprintId) {
       const fingerprint = await ctx.db.get(item.fingerprintId);
       if (fingerprint && (fingerprint.projectId === projectId || (fingerprint.projectId === undefined && (await ctx.db.get(fingerprint.employeeId))?.projectId === projectId)) && fingerprint.addedAt === item.addedAt) {
-        await ctx.db.delete(fingerprint._id); state.deletedFingerprints += 1;
+        await ctx.runMutation(internal.fingerprintEnrollment.removeAllForEmployee, { employeeId: fingerprint.employeeId, employeeNo: item.cardNumber, fingerNo: fingerprint.fingerPrintID });
+        state.deletedFingerprints += 1;
       } else if (fingerprint) state.skippedChanged += 1;
     }
     state.deviceOperations += args.deviceOperations;

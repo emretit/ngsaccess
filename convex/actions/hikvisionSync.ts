@@ -19,8 +19,6 @@ import {
   setPlanTemplate,
   addFaceToDevice,
   deleteFaceFromDevice,
-  addFingerprintToDevice,
-  deleteFingerprintFromDevice,
 } from "../lib/hikGateway";
 
 /**
@@ -299,6 +297,12 @@ async function syncEmployeeDevices(
         );
       }
       if (args.runId && !cardResult.ok && !cardResult.alreadyExists) return { ok: false, device: t.device, operation: "addCard" as const, error: cardResult.error ?? "Kart gönderilemedi" };
+      if (data.hasFingerprintTemplates && t.device.hikTransport === "gateway" && (cardResult.ok || cardResult.alreadyExists)) {
+        // Scheduling failures never affect the primary person/card synchronization.
+        try {
+          await ctx.scheduler.runAfter(0, internal.actions.hikFingerprint.pushFingerprintToDevices, { employeeId: args.employeeId, deviceIds: [t.device._id] });
+        } catch { /* Template replay is independently retryable. */ }
+      }
       return { ok: true as const, device: t.device, grantError: !cardResult.ok && !cardResult.alreadyExists ? cardResult.error ?? "Kart gönderilemedi" : undefined };
     }),
   );
@@ -872,69 +876,10 @@ export const syncEmployeeFingerprintToDevicesInternal = internalAction({
     ctx,
     args,
   ): Promise<{ synced: number; failed: number; errors: string[] }> => {
-    await ctx.runQuery(internal.hikvisionSync.assertBiometricSyncAllowed, { employeeId: args.employeeId });
-    const inScope = makeProjectGuard(args.allowedProjectIds);
-    const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, {
-      employeeId: args.employeeId,
-    });
-    if (!data) return { synced: 0, failed: 0, errors: [] };
-
-    const fp = await ctx.runQuery(internal.employeeFingerprints.getOne, {
-      employeeId: args.employeeId,
-      fingerPrintID: args.fingerPrintID,
-    });
-    if (!fp) {
-      return { synced: 0, failed: 0, errors: ["Parmak izi şablonu bulunamadı"] };
-    }
-
-    const seen = new Set<string>();
-    const targets: { device: typeof data.deviceRules[number]["device"] }[] = [];
-    const hikRules = data.deviceRules.filter((dr) => dr.device.brand === "hikvision");
-    for (const { device } of hikRules) {
-      if (!inScope(device.projectId)) continue;
-      if (!device.hikDevIndex || seen.has(device.hikDevIndex)) continue;
-      seen.add(device.hikDevIndex);
-      targets.push({ device });
-    }
-
-    const employeeNo = data.employee.cardNumber;
-    const results = await Promise.all(
-      targets.map(async (t) => {
-        await ctx.runQuery(internal.hikvisionSync.assertBiometricSyncAllowed, { employeeId: args.employeeId, deviceId: t.device._id });
-        const r = await addFingerprintToDevice(t.device.hikDevIndex!, {
-          employeeNo,
-          fingerPrintID: args.fingerPrintID,
-          fingerData: fp.fingerData,
-          fingerType: (fp.fingerType as "normalFP" | undefined) ?? "normalFP",
-        });
-        return { ...r, device: t.device };
-      }),
-    );
-
-    let synced = 0;
-    let failed = 0;
-    const errors: string[] = [];
-    const failureWrites: Promise<unknown>[] = [];
-    for (const r of results) {
-      if (r.ok) {
-        synced++;
-        continue;
-      }
-      failed++;
-      const msg = r.error ?? "Bilinmeyen hata";
-      errors.push(`${r.device.name}: ${msg}`);
-      failureWrites.push(
-        ctx.runMutation(internal.hikvisionSync.recordSyncFailure, {
-          deviceId: r.device._id,
-          projectId: r.device.projectId,
-          operation: "addFingerprint",
-          lastError: msg,
-          payload: { employeeId: args.employeeId, fingerPrintID: args.fingerPrintID },
-        }),
-      );
-    }
-    await Promise.all(failureWrites);
-    return { synced, failed, errors };
+    const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, { employeeId: args.employeeId });
+    if (!data || !makeProjectGuard(args.allowedProjectIds)(data.employee.projectId)) return { synced: 0, failed: 0, errors: [] };
+    await ctx.scheduler.runAfter(0, internal.actions.hikFingerprint.pushFingerprintToDevices, { employeeId: args.employeeId, fingerNo: args.fingerPrintID });
+    return { synced: 0, failed: 0, errors: [] };
   },
 });
 
@@ -948,58 +893,10 @@ export const deleteEmployeeFingerprintFromDevicesInternal = internalAction({
     ctx,
     args,
   ): Promise<{ removed: number; failed: number; errors: string[] }> => {
-    const inScope = makeProjectGuard(args.allowedProjectIds);
-    const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, {
-      employeeId: args.employeeId,
-    });
-    if (!data) return { removed: 0, failed: 0, errors: [] };
-
-    const seen = new Set<string>();
-    const targets: { device: typeof data.deviceRules[number]["device"] }[] = [];
-    const hikRules = data.deviceRules.filter((dr) => dr.device.brand === "hikvision");
-    for (const { device } of hikRules) {
-      if (!inScope(device.projectId)) continue;
-      if (!device.hikDevIndex || seen.has(device.hikDevIndex)) continue;
-      seen.add(device.hikDevIndex);
-      targets.push({ device });
-    }
-
-    const employeeNo = data.employee.cardNumber;
-    const results = await Promise.all(
-      targets.map(async (t) => {
-        const r = await deleteFingerprintFromDevice(
-          t.device.hikDevIndex!,
-          employeeNo,
-          args.fingerPrintID,
-        );
-        return { ...r, device: t.device };
-      }),
-    );
-
-    let removed = 0;
-    let failed = 0;
-    const errors: string[] = [];
-    const failureWrites: Promise<unknown>[] = [];
-    for (const r of results) {
-      if (r.ok) {
-        removed++;
-        continue;
-      }
-      failed++;
-      const msg = r.error ?? "Bilinmeyen hata";
-      errors.push(`${r.device.name}: ${msg}`);
-      failureWrites.push(
-        ctx.runMutation(internal.hikvisionSync.recordSyncFailure, {
-          deviceId: r.device._id,
-          projectId: r.device.projectId,
-          operation: "deleteFingerprint",
-          lastError: msg,
-          payload: { employeeId: args.employeeId, fingerPrintID: args.fingerPrintID },
-        }),
-      );
-    }
-    await Promise.all(failureWrites);
-    return { removed, failed, errors };
+    const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, { employeeId: args.employeeId });
+    if (!data || !makeProjectGuard(args.allowedProjectIds)(data.employee.projectId)) return { removed: 0, failed: 0, errors: [] };
+    await ctx.runMutation(internal.fingerprintEnrollment.removeAllForEmployee, { employeeId: args.employeeId, employeeNo: data.employee.cardNumber, fingerNo: args.fingerPrintID });
+    return { removed: 0, failed: 0, errors: [] };
   },
 });
 

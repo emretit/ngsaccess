@@ -212,3 +212,39 @@ describe("Hik employee sync complete rule scope", () => {
   });
 
 });
+
+
+describe("central fingerprint sync hook", () => {
+  it.each(["gateway", "localBridge"] as const)("%s person/card success replays only gateway fingerprints", async transport => {
+    const f = await fixture(transport);
+    await f.t.run(async ctx => {
+      await ctx.db.patch(f.r2, { isActive: false });
+      await ctx.db.insert("employeeFingerprints", { employeeId: f.employeeId, projectId: f.projectId, fingerPrintID: 2, encData: "encrypted", iv: "iv", keyVersion: "v1", addedAt: Date.now() });
+    });
+    await f.t.action(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, { employeeId: f.employeeId });
+    const jobs = await f.t.run(ctx => ctx.db.system.query("_scheduled_functions").collect());
+    const pushes = jobs.filter(job => job.name === "actions/hikFingerprint:pushFingerprintToDevices");
+    expect(pushes).toHaveLength(transport === "gateway" ? 1 : 0);
+    if (transport === "gateway") expect(pushes[0].args).toEqual([{ employeeId: f.employeeId, deviceIds: [f.deviceId] }]);
+  });
+});
+
+it.each([false, true])("sync hook uses one employee query across devices; templates present: %s", async hasTemplates => {
+  const f = await fixture();
+  await f.t.run(async ctx => {
+    await ctx.db.patch(f.r2, { isActive: false });
+    const deviceId = await ctx.db.insert("devices", { projectId: f.projectId, name: "Second", brand: "hikvision", hikDevIndex: "second", hikTransport: "gateway", hikDoorCount: 1, isActive: true, createdAt: "now", updatedAt: "now" });
+    await ctx.db.insert("groupDevices", { projectId: f.projectId, groupId: f.r1, deviceId, createdAt: "now" });
+    if (hasTemplates) await ctx.db.insert("employeeFingerprints", { employeeId: f.employeeId, fingerPrintID: 2, encData: "cipher", iv: "iv", keyVersion: "v1", addedAt: 1 });
+  });
+  const data = await f.t.query(internal.hikvisionSync.getEmployeeWithDevices, { employeeId: f.employeeId });
+  expect(data?.hasFingerprintTemplates).toBe(hasTemplates);
+  const runQuery = vi.fn(async () => data);
+  const runMutation = vi.fn(async () => null);
+  const runAfter = vi.fn(async () => null);
+  const { syncEmployeeToDevicesInternal } = await import("./actions/hikvisionSync");
+  const handler = (syncEmployeeToDevicesInternal as unknown as { _handler: (ctx: unknown, input: object) => Promise<unknown> })._handler;
+  await handler({ runQuery, runMutation, scheduler: { runAfter } }, { employeeId: f.employeeId });
+  expect(runQuery).toHaveBeenCalledTimes(1);
+  expect(runAfter).toHaveBeenCalledTimes(hasTemplates ? 2 : 0);
+});

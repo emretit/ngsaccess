@@ -178,7 +178,9 @@ async function employeeWithDevices(ctx: QueryCtx, employeeId: Id<"employees">, s
     deviceRules.push(...await scope);
   }
 
+  const hasFingerprintTemplates = (await ctx.db.query("employeeFingerprints").withIndex("by_employee", q => q.eq("employeeId", employeeId)).first()) !== null;
   return {
+    hasFingerprintTemplates,
     employee: {
       _id: employee._id,
       firstName: employee.firstName,
@@ -802,19 +804,6 @@ export const listRetryCandidates = internalQuery({
             }
           }
 
-          let fingerprint: { fingerData: string; fingerType?: string } | null = null;
-          const fingerPrintID = payload.fingerPrintID as number | undefined;
-          if (employeeId && fingerPrintID !== undefined) {
-            const fp = await ctx.db
-              .query("employeeFingerprints")
-              .withIndex("by_employee_fingerprint", (q) =>
-                q.eq("employeeId", employeeId).eq("fingerPrintID", fingerPrintID),
-              )
-              .first();
-            if (fp) {
-              fingerprint = { fingerData: fp.fingerData, fingerType: fp.fingerType };
-            }
-          }
 
           return {
             _id: f._id,
@@ -835,7 +824,6 @@ export const listRetryCandidates = internalQuery({
                 }
               : null,
             accessRule,
-            fingerprint,
           };
         }),
     );

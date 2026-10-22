@@ -1217,6 +1217,7 @@ export const getHikDeviceFingerprintRoster = internalQuery({
       ctx,
       authorizedEmpIds,
       "employeeFingerprints",
+      args.deviceId,
     );
   },
 });

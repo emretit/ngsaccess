@@ -120,7 +120,7 @@ export const revoke = adminMutation({
     if (existing.consentType === "biometric_fingerprint") {
       const enrollments = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_employee", q => q.eq("employeeId", existing.employeeId)).take(100);
       purgeCount = enrollments.length;
-      await scheduleFingerprintPurge(ctx, existing.employeeId, employee.cardNumber);
+      await scheduleFingerprintPurge(ctx, existing.employeeId, employee.cardNumber, { deleteTemplates: true });
     }
     await writeAudit(ctx, {
       user: ctx.user,

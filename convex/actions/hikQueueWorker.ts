@@ -11,7 +11,6 @@ import {
   deletePersonFromDevice,
   deleteCardFromDevice,
   deleteFaceFromDevice,
-  addFingerprintToDevice,
   deleteFingerprintFromDevice,
   rebootDeviceOnGateway,
   setWeekPlanOnDevice,
@@ -153,27 +152,13 @@ async function executeOperation(
       return await deleteFaceFromDevice(devIndex, employeeNo);
     }
     case "addFingerprint": {
-      const employeeNo = c.employee?.cardNumber;
-      const fingerPrintID = payload.fingerPrintID as number | undefined;
-      const fp = c.fingerprint;
-      if (!employeeNo || !fingerPrintID || !fp) {
-        return { ok: false, error: "Fingerprint verileri eksik" };
-      }
       const employeeId = payload.employeeId;
-      if (typeof employeeId !== "string") return { ok: false, error: "Çalışan kimliği eksik" };
+      const fingerNo = payload.fingerPrintID;
+      if (typeof employeeId !== "string" || typeof fingerNo !== "number") return { ok: false, error: "Parmak izi bilgileri eksik" };
       try {
-        await ctx.runQuery(internal.hikvisionSync.assertBiometricSyncAllowed, {
-          employeeId: employeeId as Id<"employees">, deviceId: c.device._id,
-        });
-      } catch {
-        return { ok: false, error: "Biyometri izni doğrulanamadı; parmak izi gönderilmedi." };
-      }
-      return await addFingerprintToDevice(devIndex, {
-        employeeNo,
-        fingerPrintID,
-        fingerData: fp.fingerData,
-        fingerType: (fp.fingerType as "normalFP" | undefined) ?? "normalFP",
-      });
+        await ctx.runQuery(internal.hikvisionSync.assertBiometricSyncAllowed, { employeeId: employeeId as Id<"employees">, deviceId: c.device._id });
+      } catch { return { ok: false, error: "Biyometri izni doğrulanamadı; parmak izi gönderilmedi." }; }
+      return await ctx.runAction(internal.actions.hikFingerprint.pushFingerprintToDevices, { employeeId: employeeId as Id<"employees">, fingerNo, deviceIds: [c.device._id], retrying: true });
     }
     case "deleteFingerprint": {
       const employeeNo = c.employee?.cardNumber;

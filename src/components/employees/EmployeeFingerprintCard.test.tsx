@@ -5,7 +5,7 @@ import { getFunctionName } from "convex/server";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { EmployeeFingerprintCard } from "./EmployeeFingerprintCard";
 
-const mocks = vi.hoisted(() => ({ admin: true, enabled: true, consent: true, scanned: false, active: true, hasDevice: true, fingerNo: 2, statuses: [] as string[], actions: [] as (() => Promise<unknown>)[], begin: vi.fn(), enroll: vi.fn(), buttons: [] as { children?: ReactNode; disabled?: boolean; "aria-label"?: string; "aria-describedby"?: string }[] }));
+const mocks = vi.hoisted(() => ({ admin: true, enabled: true, consent: true, scanned: false, active: true, hasDevice: true, fingerNo: 2, covered: true, statuses: [] as string[], actions: [] as (() => Promise<unknown>)[], begin: vi.fn(), enroll: vi.fn(), buttons: [] as { children?: ReactNode; disabled?: boolean; "aria-label"?: string; "aria-describedby"?: string }[] }));
 vi.mock("react", async original => {
   const react = await original<typeof import("react")>();
   return { ...react, useState: (initial: unknown) => {
@@ -23,7 +23,7 @@ vi.mock("convex/react", () => ({
     const name = getFunctionName(ref);
     if (name.includes("getEmployeeBiometricModule")) return { enabled: mocks.enabled };
     if (name.includes("employeeConsents")) return mocks.consent ? [{ consentType: "biometric_fingerprint" }] : [];
-    return { active: mocks.active, devices: mocks.hasDevice ? [{ _id: "device-a", name: "Panel", capabilitiesScanned: mocks.scanned }] : [], enrollments: [{ _id: "row-a", deviceId: "device-a", deviceName: "Panel", fingerNo: mocks.fingerNo, enrolledAt: "2026-10-22T08:00:00Z" }] };
+    return { templates: [{ fingerNo: mocks.fingerNo, enrolledAt: "2026-10-22T08:00:00Z", deviceIds: mocks.covered ? ["device-a"] : [] }], active: mocks.active, devices: mocks.hasDevice ? [{ _id: "device-a", name: "Panel", capabilitiesScanned: mocks.scanned }] : [], enrollments: [{ _id: "row-a", deviceId: "device-a", deviceName: "Panel", fingerNo: mocks.fingerNo, enrolledAt: "2026-10-22T08:00:00Z" }] };
   },
   useAction: (ref: Parameters<typeof getFunctionName>[0]) => getFunctionName(ref).includes("enrollFingerprintOnDevice") ? mocks.enroll : vi.fn(),
   useMutation: (ref: Parameters<typeof getFunctionName>[0]) => getFunctionName(ref).includes("beginEnrollment") ? mocks.begin : vi.fn(),
@@ -36,7 +36,7 @@ vi.mock("@/components/ui/dialog", () => {
 vi.mock("@/components/shared/ConfirmDestructive", () => ({ ConfirmDestructive: () => null }));
 const employeeId = "employee-a" as Id<"employees">;
 function render() { return renderToStaticMarkup(<EmployeeFingerprintCard employeeId={employeeId} />); }
-beforeEach(() => { mocks.admin = true; mocks.enabled = true; mocks.consent = true; mocks.scanned = false; mocks.active = true; mocks.hasDevice = true; mocks.buttons = []; mocks.fingerNo = 2; mocks.statuses = []; mocks.actions = []; mocks.begin.mockReset(); mocks.enroll.mockReset(); });
+beforeEach(() => { mocks.admin = true; mocks.enabled = true; mocks.consent = true; mocks.scanned = false; mocks.active = true; mocks.hasDevice = true; mocks.covered = true; mocks.buttons = []; mocks.fingerNo = 2; mocks.statuses = []; mocks.actions = []; mocks.begin.mockReset(); mocks.enroll.mockReset(); });
 
 describe("parmak izi kartı", () => {
   it("sensör yönergesi yalnız begin başarılı olunca gösterilir", async () => {
@@ -61,11 +61,12 @@ describe("parmak izi kartı", () => {
   it("bilinmeyen parmak numarasında görünen ad ve erişilebilir ad aynı fallback kullanır", () => {
     mocks.fingerNo = 11;
     const html = render();
-    expect(html).toContain('aria-label="Parmak 11 · Panel kaydını sil"');
-    expect(html).toContain("Kayıtlı: Parmak 11 · Panel");
+    expect(html).toContain('aria-label="Parmak 11 sistemden ve tüm cihazlardan sil"');
+    expect(html).toContain("Parmak 11 · 1/1 cihazda");
     expect(html).not.toContain("undefined");
-    expect(html).toContain("yeniden kayıt gerekir.");
+    expect(html).toContain("sistemden ve tüm cihazlardan sil");
   });
+  it("eksik cihaz için yeniden gönderme düğmesi gösterir", () => { mocks.covered = false; expect(render()).toContain("Cihazlara yeniden gönder"); });
   it.each(["role", "module"])("%s izni yoksa görünmez", condition => {
     if (condition === "role") mocks.admin = false; else mocks.enabled = false;
     expect(render()).toBe("");
@@ -74,9 +75,10 @@ describe("parmak izi kartı", () => {
     const html = render();
     expect(html).toContain("Cihaz özellikleri taranmadı; Cihazlar &gt; cihaz &gt; Özellikleri tara");
     expect(mocks.buttons.find(button => button.children === "Kaydı başlat")?.disabled).toBe(false);
-    expect(html).toContain("Kart numarası değişirse parmak izi kayıtları silinir, yeniden kayıt gerekir");
+    expect(html).toContain("Parmak izi şifreli olarak sistemde saklanır");
     expect(html).toContain("Puantajda kullanılmaz");
-    expect(html).toContain("Sağ işaret · Panel");
+    expect(html).toContain("parmak izi destekleyen erişim cihazları");
+    expect(html).toContain("Sağ işaret · 1/1 cihazda");
     expect(html).toContain('role="status"');
     expect(html.match(/<option/g)?.length).toBe(11);
   });

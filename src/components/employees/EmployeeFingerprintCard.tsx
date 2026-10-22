@@ -22,13 +22,14 @@ function FingerprintControls({ employeeId }: { employeeId: Id<"employees"> }) {
   const data = useQuery(api.fingerprintEnrollment.listForEmployee, { employeeId });
   const consents = useQuery(api.employeeConsents.listForEmployee, { employeeId });
   const enroll = useAction(api.actions.hikFingerprint.enrollFingerprintOnDevice);
-  const remove = useAction(api.actions.hikFingerprint.removeFingerprintFromDevice);
+  const remove = useAction(api.actions.hikFingerprint.removeFingerprint);
+  const resend = useAction(api.actions.hikFingerprint.resendFingerprint);
   const begin = useMutation(api.fingerprintEnrollment.beginEnrollment);
   const cancel = useMutation(api.fingerprintEnrollment.cancelEnrollment);
   const [deviceId, setDeviceId] = useState("");
   const [fingerNo, setFingerNo] = useState(1);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [removeTarget, setRemoveTarget] = useState<Id<"deviceFingerprintEnrollments"> | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<number | null>(null);
   const [attempt, setAttempt] = useState<{ deviceId: Id<"devices">; fingerNo: number; attemptId: string } | null>(null);
   const [status, setStatus] = useState("");
   const reasonId = useId();
@@ -47,7 +48,7 @@ function FingerprintControls({ employeeId }: { employeeId: Id<"employees"> }) {
       setStatus("Cihazda parmağınızı okutun; yaklaşık 30 saniye beklenir.");
       setAttempt({ deviceId: target.deviceId, fingerNo, attemptId });
       await enroll({ ...target, attemptId });
-      setStatus("Parmak izi cihazda kaydedildi.");
+      setStatus("Parmak izi şifreli kaydedildi; diğer cihazlara gönderiliyor.");
     } catch (error) {
       setStatus("Parmak izi işlemi tamamlanamadı. Hata bildirimini kontrol edin.");
       throw error;
@@ -59,10 +60,14 @@ function FingerprintControls({ employeeId }: { employeeId: Id<"employees"> }) {
     setStatus("İptal istendi. Cihazın yanıtı ve gerekiyorsa kaydın temizlenmesi bekleniyor.");
   }, { error: "İptal isteği iletilemedi" });
 
+  const redistribution = useAsyncAction(async (finger: number) => {
+    await resend({ employeeId, fingerNo: finger });
+    setStatus("Parmak izi cihazlara yeniden gönderiliyor.");
+  }, { error: "Parmak izi gönderilemedi" });
+
   return <section className="space-y-3 border-t pt-5" aria-label="Parmak izi">
     <h3 className="text-base font-semibold">Parmak izi</h3>
-    <p className="text-sm text-muted-foreground">Parmak izi yalnız bu cihazda saklanır; sisteme kaydedilmez. Puantajda kullanılmaz.</p>
-    <p className="text-sm text-muted-foreground">Kart numarası değişirse parmak izi kayıtları silinir, yeniden kayıt gerekir.</p>
+    <p className="text-sm text-muted-foreground">Parmak izi şifreli olarak sistemde saklanır ve kişinin erişimi olan Hikvision cihazlarına otomatik gönderilir. Puantajda kullanılmaz.</p>
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-1"><label htmlFor={deviceInputId} className="text-sm">Cihaz</label>
         <select id={deviceInputId} className="max-sm:min-h-11 h-10 w-full rounded-md border bg-background px-3 text-sm focus-visible:outline focus-visible:outline-2" value={device?._id ?? ""} disabled={pending} onChange={event => setDeviceId(event.target.value)}>
@@ -83,15 +88,24 @@ function FingerprintControls({ employeeId }: { employeeId: Id<"employees"> }) {
       {pending && <Button className="max-sm:min-h-11" type="button" variant="outline" disabled={!attempt || cancellation.pending} onClick={() => void cancellation.run()}>İptal</Button>}
     </div>
     <p role="status" aria-live="polite" className="text-sm">{status}</p>
-    <ul className="divide-y">{data?.enrollments.map(row => <li key={row._id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-      <span>Kayıtlı: {fingerNames[row.fingerNo - 1] ?? `Parmak ${row.fingerNo}`} · {row.deviceName} · {formatTrDateTime(new Date(row.enrolledAt))}</span>
-      <Button className="max-sm:min-h-11" type="button" variant="outline" disabled={pending} aria-label={`${fingerNames[row.fingerNo - 1] ?? `Parmak ${row.fingerNo}`} · ${row.deviceName} kaydını sil`} onClick={() => setRemoveTarget(row._id)}>Sil</Button>
-    </li>)}</ul>
-    {data?.enrollments.length === 0 && <p className="text-sm text-muted-foreground">Bu kişi için cihazda kayıtlı parmak izi yok.</p>}
+    <p className="text-xs text-muted-foreground">Cihaz sayısı: parmak izi destekleyen erişim cihazları.</p>
+    <ul className="divide-y">{data?.templates.map(row => {
+      const name = fingerNames[row.fingerNo - 1] ?? `Parmak ${row.fingerNo}`;
+      const deviceNames = row.deviceIds.map(id => data.devices.find(item => item._id === id)?.name ?? data.enrollments.find(item => item.deviceId === id)?.deviceName ?? "Silinmiş cihaz");
+      const covered = data.devices.filter(item => row.deviceIds.includes(item._id)).length;
+      return <li key={row.fingerNo} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+        <div><span>{name} · {covered}/{data.devices.length} cihazda · {formatTrDateTime(new Date(row.enrolledAt))}</span><p className="text-muted-foreground">{deviceNames.join(", ") || "Cihazlara gönderim bekleniyor"}</p></div>
+        <div className="flex flex-wrap gap-2">
+          {covered < data.devices.length && <Button className="max-sm:min-h-11" type="button" variant="outline" disabled={pending || !!reason || redistribution.pending} onClick={() => void redistribution.run(row.fingerNo)}>Cihazlara yeniden gönder</Button>}
+          <Button className="max-sm:min-h-11" type="button" variant="outline" disabled={pending} aria-label={`${name} sistemden ve tüm cihazlardan sil`} onClick={() => setRemoveTarget(row.fingerNo)}>Sil</Button>
+        </div>
+      </li>;
+    })}</ul>
+    {data?.templates.length === 0 && <p className="text-sm text-muted-foreground">Bu kişi için kayıtlı parmak izi yok.</p>}
     <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}><DialogContent>
       <DialogHeader><DialogTitle>Parmak izi kaydını başlat</DialogTitle><DialogDescription>Cihazda parmağınızı okutun; yaklaşık 30 saniye beklenir. {device?.name} · {fingerNames[fingerNo - 1]}</DialogDescription></DialogHeader>
       <DialogFooter><Button className="max-sm:min-h-11" type="button" variant="outline" onClick={() => setConfirmOpen(false)}>Vazgeç</Button><Button className="max-sm:min-h-11" type="button" disabled={pending || !!reason} onClick={() => void run()}>Kaydı başlat</Button></DialogFooter>
     </DialogContent></Dialog>
-    <ConfirmDestructive open={removeTarget !== null} onOpenChange={open => { if (!open) setRemoveTarget(null); }} title="Parmak izi kaydını sil" objectName="Seçili cihazdaki parmak izi" effects={["Parmak izi bu cihazdan silinir; yeniden kayıt gerekir."]} confirmLabel="Sil" onConfirm={async () => { if (removeTarget) await remove({ enrollmentId: removeTarget }); }} />
+    <ConfirmDestructive open={removeTarget !== null} onOpenChange={open => { if (!open) setRemoveTarget(null); }} title="Sistemden ve tüm cihazlardan sil" objectName="Seçili parmak izi" effects={["Parmak izi sistemden ve tüm cihazlardan silinir; yeniden kayıt gerekir."]} confirmLabel="Sil" onConfirm={async () => { if (removeTarget !== null) await remove({ employeeId, fingerNo: removeTarget }); }} />
   </section>;
 }

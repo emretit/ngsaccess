@@ -110,6 +110,7 @@ import type * as lib_digestAuth from "../lib/digestAuth.js";
 import type * as lib_doorZoneDelete from "../lib/doorZoneDelete.js";
 import type * as lib_emailVerification from "../lib/emailVerification.js";
 import type * as lib_employeeAuth from "../lib/employeeAuth.js";
+import type * as lib_fingerprintCrypto from "../lib/fingerprintCrypto.js";
 import type * as lib_employeeCardChange from "../lib/employeeCardChange.js";
 import type * as lib_employeeCascade from "../lib/employeeCascade.js";
 import type * as lib_employeeImportValidation from "../lib/employeeImportValidation.js";
@@ -320,6 +321,7 @@ declare const fullApi: ApiFromModules<{
   "lib/doorZoneDelete": typeof lib_doorZoneDelete;
   "lib/emailVerification": typeof lib_emailVerification;
   "lib/employeeAuth": typeof lib_employeeAuth;
+  "lib/fingerprintCrypto": typeof lib_fingerprintCrypto;
   "lib/employeeCardChange": typeof lib_employeeCardChange;
   "lib/employeeCascade": typeof lib_employeeCascade;
   "lib/employeeImportValidation": typeof lib_employeeImportValidation;

@@ -1,3 +1,4 @@
+import { scheduleFingerprintPurge } from "./employeeCardChange";
 import type { MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { writeAudit } from "./audit";
@@ -38,9 +39,7 @@ export async function cascadeRemoveEmployeePII(
     .query("employeeFingerprints")
     .withIndex("by_employee", (q) => q.eq("employeeId", employeeId))
     .collect();
-  for (const fp of fingerprints) {
-    await ctx.db.delete(fp._id);
-  }
+  await scheduleFingerprintPurge(ctx, employeeId, employee?.cardNumber ?? "", { deleteTemplates: true });
 
   // 3) employeeConsents — revoke (silmiyoruz; history korunur)
   const consents = await ctx.db

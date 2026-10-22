@@ -97,4 +97,6 @@ crons.interval("purge-expired-card-readings", { hours: 24 }, internal.privacyRet
 // Her gün 00:05 Türkiye saati; son çalışma günü tamamlananların erişimini kapat.
 crons.cron("close-ended-employments", "5 21 * * *", internal.employeeTermination.closeEndedEmployments, {});
 
+crons.cron("retry-fingerprint-purges", "30 4 * * *", internal.fingerprintEnrollment.retryStalePurges, {});
+
 export default crons;

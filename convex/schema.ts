@@ -888,12 +888,16 @@ export default defineSchema({
     .index("by_project", ["projectId"]),
 
   // Çalışan başına parmak izi şablonu — `fingerPrintID` (1-10) slot bazlı.
-  // `fingerData` cihazdan capture edilen base64 şablon (cihaz-modeline özgü).
+  // AES-256-GCM encrypted template; decrypt only inside actions.
   employeeFingerprints: defineTable({
     employeeId: v.id("employees"),
     projectId: v.optional(v.id("projects")),
     fingerPrintID: v.number(), // 1-10
-    fingerData: v.string(),    // base64 template
+    encData: v.string(),
+    iv: v.string(),
+    keyVersion: v.string(),
+    sourceDeviceId: v.optional(v.id("devices")),
+    enrolledBy: v.optional(v.id("users")),
     fingerType: v.optional(v.string()), // "normalFP" | "duressFP" | ...
     addedAt: v.number(),
   })
@@ -1201,6 +1205,8 @@ export default defineSchema({
     enrolledAt: v.string(),
     enrolledBy: v.id("users"),
     deletionEmployeeNo: v.optional(v.string()),
+    deletionRequestedAt: v.optional(v.number()),
+    enrolledEmployeeNo: v.optional(v.string()),
     // Short-lived command state makes cancellation server-visible; no biometric data.
     attemptId: v.optional(v.string()),
     pendingUntil: v.optional(v.number()),
@@ -1208,7 +1214,8 @@ export default defineSchema({
   })
     .index("by_employee", ["employeeId"])
     .index("by_device", ["deviceId"])
-    .index("by_employee_device_finger", ["employeeId", "deviceId", "fingerNo"]),
+    .index("by_employee_device_finger", ["employeeId", "deviceId", "fingerNo"])
+    .index("by_device_pendingUntil", ["deviceId", "pendingUntil"]),
 
   employeeConsents: defineTable({
     employeeId: v.id("employees"),
