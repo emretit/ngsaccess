@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-22",
+  "backend": {
+    "commit": "cc93131",
+    "owner": "CEO",
+    "published": false,
+    "receiptEndpointPresentOnTarget": false,
+    "evidence": "visitor-acceptance-20261022.json",
+    "condition": "Explicit publication approval through CEO; verify additive fields and authenticated receipt query before live recovery acceptance."
+  },
+  "signing": {
+    "androidUploadEnvConfigured": false,
+    "androidKeyPropertiesPresent": false,
+    "appleDistributionIdentities": 0,
+    "appleDevelopmentIdentities": 1,
+    "testApkSigningContinuityVerified": true
+  },
+  "ci": {
+    "lastObservedRun": "https://github.com/emretit/ngsaccess/actions/runs/39416160558",
+    "revision": "71163d0",
+    "androidCompile": "passed_historical_revision",
+    "iosCompile": "skipped_missing_pinned_Xcode",
+    "uploadSigning": "skipped",
+    "currentMobileSourceCI": "not_run_uncommitted_sources",
+    "condition": "Current reviewed revision on appropriate runner; skipped iOS job is not compilation evidence."
+  },
+  "remainingDeviceAcceptance": [
+    "Controlled deployed-account create response loss → real OS kill/relaunch → exactly one visitor; web activation/edit/cancel/expiry.",
+    "Physical Android/iPhone camera permission settings/resume and real QR/reader/panel command vs physical passage evidence.",
+    "Final store-signed artifact clean install and previous-version upgrade; low supported OS, VoiceOver and TalkBack."
+  ],
+  "storePreparation": [
+    "Existing store identities/upload keys/distribution team and provisioning continuity.",
+    "Monotonically increasing version/build from actual store history.",
+    "Owner-approved privacy/support URLs, data declarations, review access and store materials.",
+    "Protected symbol/dSYM retention and matching-artifact error recovery."
+  ],
+  "publicationsPerformed": {
+    "backend": false,
+    "web": false,
+    "store": false,
+    "push": false
+  },
+  "notes": "This task produced profile/test APK and iOS simulator app. Neither closes store distribution acceptance."
+}

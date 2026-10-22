@@ -1,0 +1,225 @@
+{
+  "screen": "filtered-empty",
+  "ui": [
+    {
+      "key": "appName",
+      "text": "NGS Plus",
+      "type": "Application",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      }
+    },
+    {
+      "key": "visitorTitle",
+      "text": "Ziyaretçiler",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.0892,
+        "width": 0.2791,
+        "height": 0.0275
+      }
+    },
+    {
+      "key": "commonAdd",
+      "text": "Ekle",
+      "type": "Button",
+      "frame": {
+        "x": 0.7647,
+        "y": 0.0755,
+        "width": 0.1955,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "visitorSearch",
+      "text": "Davetlerde ara",
+      "type": "TextField",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.1487,
+        "width": 0.9204,
+        "height": 0.0595
+      }
+    },
+    {
+      "key": "historyFilterTitle",
+      "text": "Filtrele",
+      "type": "Button",
+      "frame": {
+        "x": 0.8408,
+        "y": 0.151,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "visitorFilterTitle",
+      "text": "Filtrele",
+      "type": "Button",
+      "frame": {
+        "x": 0.8408,
+        "y": 0.151,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "historyEmpty",
+      "text": "Kayıt bulunamadı",
+      "type": "GenericElement",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.2952,
+        "width": 0.9204,
+        "height": 0.3387
+      }
+    },
+    {
+      "key": "historyShowAllRecords",
+      "text": "Tüm kayıtları göster",
+      "type": "Button",
+      "frame": {
+        "x": 0.2723,
+        "y": 0.524,
+        "width": 0.4554,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "visitorAccessActive",
+      "text": "Erişim aktif",
+      "type": "GenericElement",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.2174,
+        "width": 0.9204,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "visitorClearFilters",
+      "text": "Filtreleri temizle",
+      "type": "Button",
+      "frame": {
+        "x": 0.2272,
+        "y": 0.2174,
+        "width": 0.3336,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "navHome",
+      "text": "Ana Sayfa",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "historyTitle",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "qrTabTitle",
+      "text": "QR İşlemleri",
+      "type": "Button",
+      "frame": {
+        "x": 0.4055,
+        "y": 0.8467,
+        "width": 0.1891,
+        "height": 0.0938
+      }
+    },
+    {
+      "key": "navVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "profileTitle",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    }
+  ]
+}

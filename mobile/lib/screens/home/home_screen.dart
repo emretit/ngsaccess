@@ -19,10 +19,10 @@ import '../../providers/preferred_device_provider.dart';
 import '../../router/app_router.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/brand_mark.dart';
+import '../../widgets/door_operation_recovery_dialog.dart';
 import '../../widgets/cards/attendance_status_card.dart';
 import '../../widgets/cards/quick_action_card.dart';
 import '../../widgets/cards/section_header.dart';
-import '../../widgets/cards/door_command_status_card.dart';
 import '../../widgets/responsive_card_grid.dart';
 import '../../widgets/responsive_container.dart';
 
@@ -36,9 +36,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Timer? _clockTimer;
   bool _preparingCommand = false;
+  bool _recoveryOpen = false;
   int? _preparationEpoch;
   int _preparationAttempt = 0;
-  AppError? _preparationError;
   bool _isAppActive = true;
   String _businessDay = AttendanceDate.instantKey(DateTime.now());
   @override
@@ -82,7 +82,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _loadData() async {
     if (!mounted) return;
-    await context.read<AttendanceProvider>().loadDailySummary();
+    final commands = context.read<DoorOperationProvider>();
+    await Future.wait([
+      context.read<AttendanceProvider>().loadDailySummary(),
+      if (commands.hasUnresolvedOperation) commands.checkStatus(),
+    ]);
   }
 
   @override
@@ -204,9 +208,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           builder: (context, preferred, commands, auth, _) {
             final preparing =
                 _preparingCommand && _preparationEpoch == auth.sessionEpoch;
-            final localError = _preparationEpoch == auth.sessionEpoch
-                ? _preparationError
-                : null;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -218,16 +219,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       subtitle: preferred.deviceName,
                       color: AppTheme.primaryBurgundy,
                       isBusy:
-                          preparing || commands.isLoading || preferred.isSaving,
+                          preparing ||
+                          (!commands.hasUnresolvedOperation &&
+                              (commands.isLoading || preferred.isSaving)),
                       busyLabel: preparing && commands.isLoading
                           ? l10n.homeCommandSending
                           : l10n.homeDataLoading,
                       onTap:
                           !auth.isAuthenticated ||
-                              commands.hasUnresolvedOperation ||
                               preparing ||
-                              commands.isLoading ||
-                              preferred.isSaving
+                              (!commands.hasUnresolvedOperation &&
+                                  (commands.isLoading || preferred.isSaving))
                           ? null
                           : () => unawaited(
                               _handleQuickUnlock(preferred, commands),
@@ -239,37 +241,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       color: AppTheme.info,
                       onTap: () => context.go(AppRoute.visitor),
                     ),
-                    QuickActionCard(
-                      icon: Icons.history,
-                      label: l10n.quickActionHistory,
-                      color: AppTheme.success,
-                      onTap: () => context.go(AppRoute.history),
-                    ),
-                    QuickActionCard(
-                      icon: Icons.person_outline,
-                      label: l10n.quickActionProfile,
-                      color: AppTheme.warning,
-                      onTap: () => context.go(AppRoute.profile),
-                    ),
                   ],
                 ),
-                if (commands.operation != null ||
-                    commands.hasUnresolvedOperation ||
-                    commands.error != null ||
-                    localError != null) ...[
-                  const SizedBox(height: 12),
-                  DoorCommandStatusCard(
-                    operation: localError == null ? commands.operation : null,
-                    hasUnresolvedOperation: commands.hasUnresolvedOperation,
-                    isLoading: commands.isLoading,
-                    isSending: preparing,
-                    canRetrySameRequest: commands.canRetrySameRequest,
-                    error: localError ?? commands.error,
-                    onCheckStatus: () => unawaited(commands.checkStatus()),
-                    onRetrySameRequest: () =>
-                        unawaited(commands.retrySameRequest()),
-                  ),
-                ],
               ],
             );
           },
@@ -286,10 +259,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final epoch = auth.sessionEpoch;
     final sessionToken = auth.sessionToken;
     if (!auth.isAuthenticated) return;
-    if ((_preparingCommand && _preparationEpoch == epoch) ||
-        commands.isLoading ||
-        commands.hasUnresolvedOperation ||
-        preferred.isSaving) {
+    if (_preparingCommand && _preparationEpoch == epoch) return;
+    if (commands.hasUnresolvedOperation) {
+      if (_recoveryOpen) return;
+      _recoveryOpen = true;
+      try {
+        await showDialog<void>(
+          context: context,
+          builder: (_) =>
+              DoorOperationRecoveryDialog(commands: commands, auth: auth),
+        );
+      } finally {
+        _recoveryOpen = false;
+      }
+      return;
+    }
+    if (commands.isLoading || preferred.isSaving) {
       return;
     }
     if (!preferred.hasDevice) {
@@ -314,7 +299,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     setState(() {
       _preparationEpoch = epoch;
       _preparingCommand = true;
-      _preparationError = null;
     });
     try {
       final available = await devices.listForEmployee();
@@ -355,7 +339,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
       await commands.open(deviceId: target.id, doorId: target.doorId);
     } catch (error, stack) {
-      if (!owns()) return;
+      if (!mounted || !owns()) return;
       final mapped = AppError.fromException(error, stack);
       if (mapped is AuthExpiredError) {
         await auth.handleAuthExpiry(
@@ -364,7 +348,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         );
         return;
       }
-      setState(() => _preparationError = mapped);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(localizeAppError(context, mapped))),
+      );
     } finally {
       if (owns()) setState(() => _preparingCommand = false);
     }

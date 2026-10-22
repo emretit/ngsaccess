@@ -1,0 +1,100 @@
+{
+  "date": "2026-10-22",
+  "reviewer": "orca_session_id:605c98a0-f46d-4387-8a65-4c952132df61",
+  "taskId": "task_527810ef76b5",
+  "dispatchId": "ctx_bd1cc274c5b1",
+  "status": "review_complete_with_findings",
+  "method": "Independent read-only source and test-source inspection of finalized visitor changes; only this report was written.",
+  "summary": { "P1": 0, "P2": 1, "confirmedSecurityFindings": 0 },
+  "findings": [
+    {
+      "id": "VISITOR-FINAL-01",
+      "priority": "P2",
+      "title": "Recovery continuations can initiate new network reads after foreground ownership is lost",
+      "file": "mobile/lib/providers/visitor_provider.dart",
+      "line": 365,
+      "endLine": 370,
+      "confidence": "high",
+      "evidenceType": "Source-confirmed asynchronous control flow; runtime reproduction not executed",
+      "trigger": [
+        "Open Add Visitor with an unresolved scoped intent and leave its asynchronous store.read pending.",
+        "Background the application so MainNavigationShell calls setForeground(false).",
+        "Complete store.read with the saved request ID while the application remains backgrounded."
+      ],
+      "actual": "_reconcileCreate checks _owns after the disk await, but _owns checks disposal/session/epoch and not foreground state. Backgrounding changes only list/summary/detail request generations, so the continuation starts getCreateReceipt while backgrounded. If recovery returns null, the still-mounted form also proceeds from _prepareCreate to _loadNotice; loadNotice has no foreground guard and starts a further network query.",
+      "impact": "The requested no-background-reads invariant is not met for the newly added recovery flow: pausing the app stops polling but can still launch fresh receipt and notice requests from an existing form. This finding does not imply a duplicate create or cross-account disclosure.",
+      "supportingSources": [
+        { "file": "mobile/lib/providers/visitor_provider.dart", "line": 81, "explanation": "Ownership remains valid across foreground loss for recovery/notice operations." },
+        { "file": "mobile/lib/providers/visitor_provider.dart", "line": 148, "explanation": "Foreground loss invalidates list, summary and detail generations, but does not suspend recovery continuations." },
+        { "file": "mobile/lib/providers/visitor_provider.dart", "line": 316, "explanation": "loadNotice starts its repository query without checking foreground state." },
+        { "file": "mobile/lib/screens/visitor/visitor_form_screen.dart", "line": 77, "explanation": "After recovery, the form checks mount/session only before starting the notice read at line 86." }
+      ],
+      "suggestedFix": "Defer fresh receipt/notice transport when foreground ownership is absent, including after the durable read await, and resume preparation when foreground returns. Preserve the stored request ID and ensure deferred preparation does not remain permanently loading or get treated as an absent receipt.",
+      "suggestedRegression": "Hold store.read, background the mounted Add form, resolve the read with an intent, and assert zero newly started receipt/notice calls until resume; then verify reconciliation continues with the same request ID and no create. Separately hold the receipt query, background, complete it with null, and assert no notice query starts until resume.",
+      "reportedToCoordinator": "msg_7d4df79362e6"
+    }
+  ],
+  "priorFindingResolution": [
+    {
+      "id": "CORE-01",
+      "status": "closed_in_current_source",
+      "evidence": "VisitorFormScreen._save lines 148-150 now restrict createRecoveryLoading/createRecoveryError to create mode. The existing-invitation edit branch and enabled-button guard agree, and visitor_recovery_widgets_test.dart contains a failed-create-recovery -> leave Add -> Edit -> Save regression asserting an update and zero creates."
+    }
+  ],
+  "coverage": [
+    {
+      "area": "List, foreground and detail lifecycle",
+      "result": "No additional confirmed P1/P2 defect. List visibility and foreground state are independent of detail ownership; one timer serves active owners. Foreground loss cancels polling and rejects late list/summary/detail completions. VisitorDetail captures a provider and monotonic lease, releases it in dispose, and releaseDetail only closes the matching current lease, so an older widget cannot clear a newer detail lease. Retain/release/close do not notify; the shell schedules notifying activation after frame. The detail-unmount test keeps the provider alive and advances time to check polling has stopped. Background recovery/notice reads are the finding above."
+    },
+    {
+      "area": "Durable intent storage and recovery races",
+      "result": "No confirmed duplicate-prevention or scope defect. Stored JSON contains only version, employeeId, projectId, deployment and requestId. File store instances in the same isolate serialize reads/claims/removals through the shared effects chain; claim re-reads rather than overwriting, remove compares the matching ID, and interrupted/corrupt pending content fails closed. The claim completes before create transport. Null receipt preserves the ID, retries reuse it, and committed backend fingerprint conflicts prevent a changed payload creating a second visitor. Scope capture plus session/epoch checks reject late old-account claims/receipts before transport or visible state changes."
+    },
+    {
+      "area": "Receipt query and account/project/deployment scope",
+      "result": "No confirmed authorization or DTO defect. Repository uses employeeQuery and validates null or a minimal id/status response. Backend employeeAuthedQuery uses the employee session wrapper; getCreateReceipt validates UUID, indexes by authenticated host and request, and verifies visitor/project ownership. It performs no writes and returns no visitor contact data. Disk scope additionally includes deployment, employee and project. No web-account auth mapping was introduced in this path."
+    },
+    {
+      "area": "Targeted regression test sources",
+      "result": "Inspected lifecycle, create_recovery and recovery_widgets tests, plus relevant provider/backend test sources. Coverage includes actual root modal polling, unmount while provider survives, background/resume of detail, late reads/session changes, provider/client/store recreation after a lost committed HTTP response, null receipt replay/conflict, read/write/remove errors, account switch/auth expiry, delayed persistence claim, metadata-only disk scope/corruption and all four recovery widget scenarios. The background recovery continuation described in VISITOR-FINAL-01 is not covered by these inspected tests."
+    }
+  ],
+  "filesInspected": [
+    "docs/mobile-release/implementation-20261022/review-core.json",
+    "mobile/lib/providers/visitor_provider.dart",
+    "mobile/lib/services/visitor_create_intent_store.dart",
+    "mobile/lib/repositories/visitor_repository.dart",
+    "mobile/lib/widgets/visitor/visitor_detail.dart",
+    "mobile/lib/screens/visitor/visitor_form_screen.dart",
+    "mobile/lib/screens/visitor/visitor_screen.dart",
+    "mobile/lib/screens/main_navigation_shell.dart",
+    "mobile/lib/core/branch_visibility.dart",
+    "mobile/lib/main.dart",
+    "mobile/lib/providers/auth_provider.dart",
+    "mobile/test/visitor_lifecycle_test.dart",
+    "mobile/test/visitor_create_recovery_test.dart",
+    "mobile/test/visitor_recovery_widgets_test.dart",
+    "mobile/test/visitor_provider_test.dart",
+    "convex/_generated/ai/guidelines.md",
+    "convex/mobileVisitors.ts",
+    "convex/lib/mobileVisitors.ts",
+    "convex/lib/customFunctions.ts",
+    "convex/mobileVisitors.test.ts"
+  ],
+  "verification": {
+    "commandsExecutedForValidation": [],
+    "coordinatorReportedChecks": "Dispatch reports 500 suite tests passing with one fixture failure, then all four recovery widget tests passing after fixture-only correction; final 501-test suite/analyze were running. These results were not independently rerun or upgraded to a final passing claim.",
+    "limits": [
+      "Static review only; no SDK, Flutter, Dart, build, test, live query/mutation, deployment, codegen, git mutation or source edit was performed.",
+      "Receipt backend is identified by the dispatch as committed cc93131 and not live; this review does not claim deployed endpoint availability.",
+      "Process recreation and disk races were evaluated from source and synthetic test sources; simultaneous independent OS processes/isolates and filesystem power-loss guarantees were not established.",
+      "Shared working tree can change after the inspected source snapshot."
+    ]
+  },
+  "constraintsRespected": [
+    "Only docs/mobile-release/implementation-20261022/review-visitor-final.json written.",
+    "No existing source/test changes modified.",
+    "No subworkers.",
+    "Findings reported solely through assigned Orca orchestration dispatch."
+  ]
+}

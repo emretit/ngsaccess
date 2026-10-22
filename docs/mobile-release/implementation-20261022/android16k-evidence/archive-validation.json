@@ -1,0 +1,10 @@
+{
+  "bytes": 1875087037,
+  "sha1": "dda632745023567113d9954101709c6526a3c250",
+  "expectedBytes": 1875087037,
+  "expectedSha1": "dda632745023567113d9954101709c6526a3c250",
+  "curlExitCode": 0,
+  "validatedAtUtc": "2026-10-22T06:58:44.768561+00:00",
+  "sizeMatches": true,
+  "sha1Matches": true
+}

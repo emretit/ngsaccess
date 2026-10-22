@@ -419,13 +419,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyTitle => 'History';
 
   @override
-  String get historyTabAll => 'All';
+  String get historyTabAll => 'Records';
 
   @override
-  String get historyTabThisMonth => 'This Month';
+  String get historyTabThisMonth => 'Calendar';
 
   @override
-  String get historyTabStats => 'Stats';
+  String get historyTabStats => 'Overview';
 
   @override
   String get historyLoading => 'Loading data...';
@@ -485,7 +485,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyTotalCheckOuts => 'Total Check-outs';
 
   @override
-  String get historyActiveDays => 'Active Days';
+  String get historyActiveDays => 'Days with entry';
 
   @override
   String get historyGeneralStats => 'General Statistics';
@@ -660,7 +660,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get visitorTitle => 'Visitor Management';
+  String get visitorTitle => 'Visitors';
 
   @override
   String get visitorStatTotal => 'Total';
@@ -675,7 +675,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get visitorEmpty => 'No visitor records yet';
 
   @override
-  String get visitorEmptyHint => 'Tap + to add a new visitor';
+  String get visitorEmptyHint =>
+      'Use Add in the top-right corner to create an invitation.';
 
   @override
   String get visitorStatusExpected => 'Expected';
@@ -1179,7 +1180,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get visitorAllStatuses => 'All access states';
 
   @override
-  String get visitorSummaryTitle => 'Your invitations, all pages';
+  String get visitorSummaryTitle => 'All invitations';
 
   @override
   String get visitorSummaryLimited =>
@@ -1237,4 +1238,116 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get visitorOptionalHint => 'Optional';
+
+  @override
+  String get historyInfoTitle => 'About these records';
+
+  @override
+  String get historyTimeZone => 'Türkiye time · UTC+3';
+
+  @override
+  String get historyAllDates => 'All dates';
+
+  @override
+  String get historyAllDevices => 'All devices';
+
+  @override
+  String get historyApplyFilters => 'Apply filters';
+
+  @override
+  String get historyShowAllRecords => 'Show all records';
+
+  @override
+  String get historyFilteredEmptyHint =>
+      'No records match the selected date or device.';
+
+  @override
+  String get historyCalendarLegend =>
+      'Outline: today · Fill: selected day · Dot: records';
+
+  @override
+  String get historySelectDayHint => 'Select a day to see its records.';
+
+  @override
+  String get historyNoActivity => 'No access events in this period';
+
+  @override
+  String get historyNoActivityHint =>
+      'The summary will appear as events are recorded. This is not an absence calculation.';
+
+  @override
+  String get historyDeniedCount => 'Denied';
+
+  @override
+  String get historyUnknownCount => 'Unknown';
+
+  @override
+  String get historyLoadedDevices =>
+      'Device options come from the loaded records.';
+
+  @override
+  String get historyNoDeviceOptions =>
+      'No devices found in the loaded records.';
+
+  @override
+  String get historyTabThisMonthPeriod => 'This month';
+
+  @override
+  String get visitorPeopleSection => 'Personal details';
+
+  @override
+  String get visitorVisitSection => 'Visit details';
+
+  @override
+  String get visitorActivationHint =>
+      'An authorized operator must activate access after the invitation is saved.';
+
+  @override
+  String get visitorPendingShort => 'Awaiting activation';
+
+  @override
+  String get visitorInvitationsTitle => 'Invitations';
+
+  @override
+  String get visitorFilteredEmptyHint =>
+      'No invitations match the search or access status.';
+
+  @override
+  String get visitorClearFilters => 'Clear filters';
+
+  @override
+  String get visitorNoticeUnavailable =>
+      'The privacy notice could not be loaded. Try again before saving.';
+
+  @override
+  String get profileProject => 'Company / project';
+
+  @override
+  String get profileProjectUnavailable =>
+      'Project information is currently unavailable';
+
+  @override
+  String get doorOperationRecoveryTitle => 'Review door request';
+
+  @override
+  String get doorOperationRecoveryHint =>
+      'The previous request is checked first. Retrying uses the same request and original door. A command result does not confirm physical passage.';
+
+  @override
+  String get visitorRecoveryChecking =>
+      'Checking the previous visitor request…';
+
+  @override
+  String get visitorRecoveryUnresolved =>
+      'The previous request is still unconfirmed. Re-enter the same visitor details to retry the same request. No new request will be created.';
+
+  @override
+  String get visitorRecoveryRetry => 'Retry same request';
+
+  @override
+  String get visitorRecoveryFound => 'The previous visitor record was found.';
+
+  @override
+  String get visitorRecoveryStorageError =>
+      'The visitor request could not be safely saved or read. Check its status again before continuing.';
 }

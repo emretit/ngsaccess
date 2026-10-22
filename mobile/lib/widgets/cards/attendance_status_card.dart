@@ -50,7 +50,7 @@ class AttendanceStatusCard extends StatelessWidget {
     final exit = lastExit;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -58,12 +58,13 @@ class AttendanceStatusCard extends StatelessWidget {
               header: true,
               child: Text(
                 l10n.homeAttendanceStatus,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             if (!hasLoaded) ...[
               _DataNotice(
                 message: error == null
@@ -86,7 +87,7 @@ class AttendanceStatusCard extends StatelessWidget {
                 const SizedBox(height: 16),
               ],
               _StatusBadge(status: status, isKnown: isStatusKnown),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
               _TimeRow(
                 icon: Icons.login,
                 tone: AppStatusTone.success,
@@ -98,7 +99,7 @@ class AttendanceStatusCard extends StatelessWidget {
                     ? l10n.homeExtraMovements(extraEntryCount)
                     : null,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               _TimeRow(
                 icon: Icons.logout,
                 tone: AppStatusTone.danger,
@@ -111,7 +112,7 @@ class AttendanceStatusCard extends StatelessWidget {
                     : null,
               ),
               if (updated != null) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Text(
                   l10n.homeUpdatedAt(
                     DateFormat.yMd(
@@ -124,15 +125,23 @@ class AttendanceStatusCard extends StatelessWidget {
                 ),
               ],
             ],
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: onScan,
-                icon: const Icon(Icons.qr_code_scanner),
+                icon: const Icon(Icons.qr_code_scanner, size: 18),
                 label: Text(l10n.homeScanQr, textAlign: TextAlign.center),
                 style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(48, 56),
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
@@ -231,7 +240,7 @@ class _StatusBadge extends StatelessWidget {
           };
     final colors = AppTheme.statusColors(context, tone);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: colors.background,
         borderRadius: BorderRadius.circular(12),
@@ -240,7 +249,7 @@ class _StatusBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           ExcludeSemantics(
-            child: Icon(icon, color: colors.foreground, size: 20),
+            child: Icon(icon, color: colors.foreground, size: 18),
           ),
           const SizedBox(width: 8),
           Flexible(
@@ -283,12 +292,12 @@ class _TimeRow extends StatelessWidget {
       children: [
         ExcludeSemantics(
           child: Container(
-            padding: const EdgeInsets.all(6),
+            padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
               color: colors.background,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: colors.foreground, size: 18),
+            child: Icon(icon, color: colors.foreground, size: 16),
           ),
         ),
         const SizedBox(width: 12),

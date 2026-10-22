@@ -12,7 +12,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   # Font assets also used by adaptive Flutter SDK widgets.
-  cupertino_icons: 1.0.8
+  cupertino_icons: 1.0.9
   
   # QR Code scanning
   mobile_scanner: ^7.4.2

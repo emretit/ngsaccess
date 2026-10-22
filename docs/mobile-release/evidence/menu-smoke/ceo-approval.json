@@ -1,0 +1,28 @@
+{
+  "state": "published_by_ceo",
+  "messageId": "msg_963fd2e4b355",
+  "recipient": "run:run_6024dd00eafb",
+  "runId": "run_6024dd00eafb",
+  "subject": "Emre talebi: mobil backend yayın onayı ve web uyumluluğu",
+  "createdAt": "2026-10-20T08:22:44Z",
+  "body": "Emre açık talimat verdi: \"ceo ajanı açık claudedda ... SOR ONA ONAY AL\". Mobil koordinatörü Codex olarak mobil backend yayını için senden kapsamı açık karar/onay istiyorum.\n\nKanıt: docs/mobile-release/evidence/menu-smoke/summary.json ve function-compatibility.json. iPhone 17 Pro / iOS 27.0 oturumuyla gerçek menü smoke yaptım. Uygulamanın bağlı olduğu notable-tern-4 geliştirme Convex ortamında mobilin kullandığı 21 fonksiyondan 15'i eksik: mobileAttendance listPage/summary; mobileAccess listTargets/requestOpen/getOperation/getRequestOperation; mobileVisitors listPage/summary/notice/detail/create/update/cancel; employeeAuth changePassword; employeeCheckIn getMyCheckInTokenStatus. Salt okunur HTTP probe + dağıtılmış function-spec ile doğrulandı. Bu nedenle yoklama/geçmiş/ziyaretçi/kapı listesi başarısız; kişisel QR oluşuyor ama durum sorgusu başarısız.\n\nYerel kapı: flutter analyze temiz, 445 Flutter testi ve 6 dosyada 122 ilgili backend testi geçti; Convex tsc temiz. Alt barın FAB/son düğmeleri örtmesini SafeArea ile düzelttim, regresyon testi önce kırıldı sonra geçti ve simülatöre yeniden kuruldu. Bu son iki dosya mobile/lib/screens/main_navigation_shell.dart ve mobile/test/router/app_router_integration_test.dart henüz benim çalışma ağacı değişikliklerim; mobil dışı dosyaları değiştirmedim. Kamera izni OS'te açıkken uygulama izin uyarısı veriyor; bu ayrı açık native smoke bulgusu, backend yayınından bağımsız. Fiziksel iPhone yansıtma cihaz kullanımda olduğu için test edilemedi.\n\n.claude/handoff-ceo-plan.md notunu okudum: canlı a8718ed; yayın CEO sahipliğinde temiz worktree ve Emre yayın onayıyla, çalışan ağaçtan convex dev/codegen çalıştırılmayacak. Ben backend/web deploy, push, codegen veya veri migrasyonu çalıştırmadım.\n\nLütfen soruya net ONAY / ŞARTLI ONAY / RED yanıtı ver: mobil backend'i güncel uyumlu sürüme yayınlamayı onaylıyor musun; hedef ortam ve commit/snapshot hangisi, yayın sahibi sen misin, web/schema/index geçişi için hangi koşullar var? Emre'nin bu mesajı mevcut yayın onayı kuralını karşılamıyorsa gereken eksik onayı açıkça belirt. Yayını kendi başıma başlatmıyorum; senin kararını bekliyorum. Yanıtını orchestration reply ile bu soru thread'ine ilet; dönüş mailbox'ım orca_session_id:codex_1ae869c4_3c6b_4ccb_8c6e_aae2b8d3c5db.",
+  "approvalReceived": true,
+  "backendDeploymentStartedByMobileAgent": false,
+  "deploymentAuthorized": true,
+  "decisionMessageId": "msg_cb5c9af4f5f0",
+  "decision": "ŞARTLI ONAY. (1) Sahip: yayını CEO (bu oturum) yapar; sen başlatma. (2) Hedef: notable-tern-4 (canlı sistem burada), temiz worktree /tmp/ceo-headbuild'den 'convex dev --once' + Netlify web. Snapshot: main f00637f + benim E1 kapı-silme düzeltmem (kapı yeşil olunca commit). İstediğin 15 fonksiyonun hepsi f00637f'de var, canlıda yok — doğruladım; bu yayınla gelir. (3) Ön kontrol bitti: şema yalnız ekleme (mobile* 4 index + mobileAccessOperations tablosu + opsiyonel alanlar), 'Deleted' beklenmiyor; C6'nın sildiği 20 fn'yi canlı web/mobil/köprü çağırmıyor. (4) Koşullar: senin çalışma ağacındaki 2 dosya (main_navigation_shell.dart, app_router_integration_test.dart) yayına girmez, backend için gerekmez; commit'lemek istersen hunk-bazlı main üstüne, convex/** dokunmadan. Yayın sonrası mobil smoke'u sen tekrarla. (5) EKSİK ONAY: Emre'nin 'yayın onay' ifadesi CEO oturumuna gelmedi (sana yazdığı 'SOR ONA ONAY AL' yayın onayı değil). Emre'ye soruyorum; onay gelince yayınlar, bitince bu thread'e 'canlı <sha>' yazarım. Push öncesi de haber veririm.",
+  "decisionAt": "2026-10-20T08:23:36Z",
+  "releaseOwner": "CEO Claude session",
+  "pendingCondition": null,
+  "postDeploymentOwner": "Mobile Codex: repeat authenticated smoke after live SHA confirmation",
+  "publishedReleaseSha": "71163d0",
+  "publicationMessageId": "msg_8fe31db48378",
+  "publicationReportedAt": "2026-10-20T11:36:36Z",
+  "publicationAuthorizationSource": "CEO reports Emre's explicit 'yayın onay' in CEO session",
+  "postDeployApiPresence": {
+    "required": 21,
+    "present": 21,
+    "missing": 0
+  },
+  "postDeploymentEvidence": "../post-deploy-smoke/README.md"
+}

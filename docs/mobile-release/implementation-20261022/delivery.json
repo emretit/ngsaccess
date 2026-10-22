@@ -1,0 +1,208 @@
+{
+  "date": "2026-10-22",
+  "runId": "run_c86ba42e4399",
+  "decision": "local_fixes_and_test_artifact_verified_publication_gates_open",
+  "changes": [
+    "Door response-loss recovery without Home notification cards.",
+    "Visitor root-detail polling, disposal leases and foreground-deferred preparation.",
+    "Istanbul day/week/month transitions preserving record filters.",
+    "Optional canonical mobile projectName in profile and backend DTO, no web/mobile account linking.",
+    "Metadata-only durable visitor intent and same-request receipt recovery.",
+    "One dependency patch; documented major/native upgrade decisions."
+  ],
+  "verification": {
+    "flutterAnalyzeIssues": 0,
+    "flutterTestsPassed": 505,
+    "flutterTestsAddedFromAuditBaseline": 41,
+    "backendTestFilesPassed": 241,
+    "backendTestsPassed": 2450,
+    "appTypeScriptExit": 0,
+    "convexTypeScriptExit": 0,
+    "eslintExit": 0,
+    "releasePythonTestsPassed": 25,
+    "TR_ENParity": "passed",
+    "sourcePreflight": "passed",
+    "mobileDiffCheck": "passed",
+    "androidProfileArm64Build": "passed",
+    "iosSimulatorBuildInstallLaunch": "passed",
+    "actualAndroid16KBProfileSmoke": "passed",
+    "finalSourceFingerprintsUnchanged": true
+  },
+  "reviewFindingsClosed": [
+    {
+      "id": "CORE-01",
+      "fix": "Create-only recovery gates do not block unrelated visitor edits.",
+      "proof": "visitor_recovery_widgets_test.dart: an existing invitation remains editable after leaving a failed create recovery"
+    },
+    {
+      "id": "VISITOR-FINAL-01",
+      "fix": "Foreground wait gate defers receipt/notice/pre-create continuations; logout/dispose cancel waiters.",
+      "proof": "Two held-read/held-receipt widget cases and two waiter-cancellation provider cases in final505suite."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "MOB-N01",
+      "status": "locally_verified",
+      "result": "Existing Unlock opens safe explicit same-request recovery; Home status card remains absent.",
+      "evidence": [
+        "door.json",
+        "evidence/flutter-test.log"
+      ]
+    },
+    {
+      "id": "MOB-N02",
+      "status": "locally_verified",
+      "result": "Root detail lease keeps polling while visible and stops on pause/unmount/logout; stale reads rejected.",
+      "evidence": [
+        "visitor.json",
+        "evidence/flutter-test.log"
+      ]
+    },
+    {
+      "id": "MOB-N03",
+      "status": "locally_verified",
+      "result": "Retained history refreshes Istanbul periods on visibility/resume, preserves record filters.",
+      "evidence": [
+        "history.json",
+        "evidence/flutter-test.log"
+      ]
+    },
+    {
+      "id": "MOB-N04",
+      "status": "implemented_backend_publication_pending",
+      "result": "Profile and personal details show canonical mobile project when additive DTO is available; older live DTO uses localized fallback.",
+      "evidence": [
+        "profile.json"
+      ]
+    },
+    {
+      "id": "MOB-N05",
+      "status": "implemented_live_acceptance_pending",
+      "result": "Metadata-only durable request ID, authenticated receipt lookup and explicit same-ID replay survive modeled provider/client/store recreation; deployed-account OS process-kill acceptance still open.",
+      "evidence": [
+        "visitor.json",
+        "visitor-acceptance-20261022.json"
+      ]
+    },
+    {
+      "id": "MOB-N06",
+      "status": "reviewed_patch_verified",
+      "result": "cupertino_icons1.0.8→1.0.9; five major-version decisions documented; native pins preserved.",
+      "evidence": [
+        "dependency-review.json",
+        "evidence/pub-get.log"
+      ]
+    },
+    {
+      "id": "MOB-N07",
+      "status": "partial",
+      "result": "Final iOS authenticated Home startup passed. New getCreateReceipt query confirmed absent on target; full approved test-account flows wait for CEO deployment.",
+      "evidence": [
+        "ios-simulator.json",
+        "visitor-acceptance-20261022.json"
+      ]
+    },
+    {
+      "id": "MOB-N08",
+      "status": "partial",
+      "result": "Final profile/test APK passed actual ARM64 Android36 16KB cold login smoke with compatibility fallback disabled. Physical camera/reader/panel, accessibility, low-OS and final distribution package tests remain open.",
+      "evidence": [
+        "android16k.json",
+        "ios-simulator.json"
+      ]
+    },
+    {
+      "id": "MOB-N09",
+      "status": "external_inputs_pending",
+      "result": "Android upload key/key.properties/env configuration and Apple Distribution identity absent; store version/privacy/materials and current-revision CI/signing remain open.",
+      "evidence": [
+        "release-gates.json"
+      ]
+    },
+    {
+      "id": "MOB-N10",
+      "status": "pending_dependencies",
+      "result": "Final distribution install/upgrade acceptance and user publication decision follow backend/device/signing gates.",
+      "evidence": [
+        "release-gates.json"
+      ]
+    }
+  ],
+  "androidArtifact": {
+    "path": "/Users/emreaydin/Downloads/NGSPlus-1.0.4-arm64-test-20261022.apk",
+    "sha256": "15a91f31a2b4ed6f1e46f22294b71d360bf013ca13a74887abee0f9357c0b377",
+    "bytes": 41821181,
+    "mode": "profile",
+    "abi": [
+      "arm64-v8a"
+    ],
+    "signatureVerified": true,
+    "testSignerSha256": "6cf7163826d39e38e9f6f95d64f1dbef1210487d8a2cd589004b9d42ba7d7fbf",
+    "sameTestSignerAs20261021": true,
+    "package": "com.ngsplus.app.ngsplusapp",
+    "version": "1.0.4",
+    "flutterBuildNumber": 1,
+    "androidVersionCode": 2001,
+    "versionCodeNote": "Flutter split-per-ABI ARM64 offset produces2001 from pubspec build1. This is a test distribution; final store code must be selected against store history.",
+    "environment": "staging",
+    "storeRelease": false,
+    "dotenvPackaged": false,
+    "packagingNote": "Rebuilt generated profile packaging outputs; earlier incremental APK retained approximately12MB zip padding, final package compacted."
+  },
+  "backendCommit": "cc93131",
+  "mobileSourceCommit": "Existing UI and this fix wave remain uncommitted in shared mobile tree; source fingerprints capture exact tested state.",
+  "iosSimulator": "ios-simulator.json",
+  "android16KB": "android16k.json",
+  "remainingGates": "release-gates.json",
+  "sources": "source-fingerprints.json",
+  "noLiveVisitorOrDoorWritesByCoordinator": true,
+  "noStoreReleaseClaim": true,
+  "orchestration": {
+    "tasks": [
+      {
+        "taskId": "task_527810ef76b5",
+        "dispatchId": "ctx_bd1cc274c5b1",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "terminalState": "released"
+      },
+      {
+        "taskId": "task_eca9be36c157",
+        "dispatchId": "ctx_321815058aeb",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "terminalState": "retained"
+      },
+      {
+        "taskId": "task_caa7f966c015",
+        "dispatchId": "ctx_600ca03bc0e4",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "terminalState": "released"
+      },
+      {
+        "taskId": "task_c7363adfc544",
+        "dispatchId": "ctx_6ee4e0ea0815",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "terminalState": "released"
+      },
+      {
+        "taskId": "task_f3a93902be39",
+        "dispatchId": "ctx_ee7ab2a95b76",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "terminalState": "retained"
+      },
+      {
+        "taskId": "task_1a7885a61abb",
+        "dispatchId": "ctx_c94a61050690",
+        "workerState": "succeeded",
+        "dispatchStatus": "completed",
+        "terminalState": "released"
+      }
+    ],
+    "outcomes": "All6supervised tasks succeeded;4worker surfaces released,2retained by runtime because user took ownership; no reclaimable surface remains."
+  }
+}

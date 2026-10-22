@@ -1,0 +1,107 @@
+[
+  {
+    "function": "cardReadings:listForEmployee",
+    "deployed": true,
+    "type": "Query"
+  },
+  {
+    "function": "cardReadings:selfCheckIn",
+    "deployed": true,
+    "type": "Mutation"
+  },
+  {
+    "function": "employeeAuth:changePassword",
+    "deployed": false,
+    "type": null
+  },
+  {
+    "function": "employeeAuth:me",
+    "deployed": true,
+    "type": "Query"
+  },
+  {
+    "function": "employeeAuth:signIn",
+    "deployed": true,
+    "type": "Mutation"
+  },
+  {
+    "function": "employeeAuth:signOut",
+    "deployed": true,
+    "type": "Mutation"
+  },
+  {
+    "function": "employeeCheckIn:createMyCheckInToken",
+    "deployed": true,
+    "type": "Mutation"
+  },
+  {
+    "function": "employeeCheckIn:getMyCheckInTokenStatus",
+    "deployed": false,
+    "type": null
+  },
+  {
+    "function": "mobileAccess:getOperation",
+    "deployed": false,
+    "type": null
+  },
+  {
+    "function": "mobileAccess:getRequestOperation",
+    "deployed": false,
+    "type": null
+  },
+  {
+    "function": "mobileAccess:listTargets",
+    "deployed": false,
+    "type": null
+  },
+  {
+    "function": "mobileAccess:requestOpen",
+    "deployed": false,
+    "type": null
+  },
+  {
+    "function": "mobileAttendance:listPage",
+    "deployed": false,
+    "type": null
+  },
+  {
+    "function": "mobileAttendance:summary",
+    "deployed": false,
+    "type": null
+  },
+  {
+    "function": "mobileVisitors:cancel",
+    "deployed": false,
+    "type": null
+  },
+  {
+    "function": "mobileVisitors:create",
+    "deployed": false,
+    "type": null
+  },
+  {
+    "function": "mobileVisitors:detail",
+    "deployed": false,
+    "type": null
+  },
+  {
+    "function": "mobileVisitors:listPage",
+    "deployed": false,
+    "type": null
+  },
+  {
+    "function": "mobileVisitors:notice",
+    "deployed": false,
+    "type": null
+  },
+  {
+    "function": "mobileVisitors:summary",
+    "deployed": false,
+    "type": null
+  },
+  {
+    "function": "mobileVisitors:update",
+    "deployed": false,
+    "type": null
+  }
+]

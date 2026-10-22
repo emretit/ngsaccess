@@ -1,0 +1,15 @@
+00:00 +0: loading /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart
+00:00 +0: Convex float64 whole numbers decode as safe integer fields
+00:00 +0 -1: Convex float64 whole numbers decode as safe integer fields [E]
+  Expected: <Instance of 'int'>
+    Actual: <0.0>
+     Which: is not an instance of 'int'
+  
+  package:matcher                                     expect
+  package:flutter_test/src/widget_tester.dart 473:18  expect
+  test/core/response_decoder_test.dart 32:5           main.<fn>
+  
+00:00 +0 -1: Some tests failed.
+
+Failing tests:
+  /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: Convex float64 whole numbers decode as safe integer fields

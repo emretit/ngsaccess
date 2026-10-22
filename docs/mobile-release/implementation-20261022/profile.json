@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-22",
+  "identity": "AUD-04 / MOB-N04",
+  "status": "implemented_locally_verified_backend_not_deployed",
+  "behavior": [
+    "AuthUser optionally decodes projectName; older DTOs remain compatible.",
+    "Profile and personal details display authenticated mobile project name or localized unavailable fallback.",
+    "ProjectId must be present; department and web account are never used as project-name fallback.",
+    "Account/logout updates remove the previous label."
+  ],
+  "verification": {
+    "flutterFullTests": 505,
+    "analyzeIssues": 0,
+    "backendFullTests": 2450,
+    "backendTestFiles": 241,
+    "appTsc": 0,
+    "convexTsc": 0,
+    "eslint": 0,
+    "backendCommit": "cc93131"
+  },
+  "deployment": "CEO owns commit/deploy and confirmed local commit only; old live DTO shows localized fallback until approved publication.",
+  "sourceFiles": [
+    "mobile/lib/repositories/auth_repository.dart",
+    "mobile/lib/screens/profile/profile_screen.dart",
+    "mobile/test/repositories/auth_repository_test.dart",
+    "mobile/test/widgets/profile_screen_test.dart",
+    "convex/employeeAuth.ts",
+    "convex/employeeAuth.mobile.test.ts"
+  ]
+}

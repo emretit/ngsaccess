@@ -49,6 +49,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       user?.lastName.trim() ?? '',
     ].where((value) => value.isNotEmpty).join(' ');
     final initial = firstName.isEmpty ? '?' : firstName.characters.first;
+    final projectName = user?.projectId?.trim().isNotEmpty == true
+        ? user?.projectName?.trim()
+        : null;
     final preferred = context.watch<PreferredDeviceProvider>();
     return Scaffold(
       appBar: AppBar(
@@ -107,6 +110,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               : l10n.profileFallbackEmail,
                           textAlign: TextAlign.center,
                           style: TextStyle(color: colors.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          l10n.profileProject,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(color: colors.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          projectName?.isNotEmpty == true
+                              ? projectName ?? ''
+                              : l10n.profileProjectUnavailable,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         const SizedBox(height: 16),
                         OutlinedButton.icon(
@@ -420,6 +438,9 @@ class _ProfileContentScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final user = context.watch<AuthProvider>().currentUser;
+    final projectName = user?.projectId?.trim().isNotEmpty == true
+        ? user?.projectName?.trim()
+        : null;
     final (title, children) = switch (page) {
       _ProfilePage.details => (
         l10n.profileEditButton,
@@ -429,6 +450,9 @@ class _ProfileContentScreen extends StatelessWidget {
           Text('${l10n.profileFirstName}: ${user?.firstName ?? ''}'),
           Text('${l10n.profileLastName}: ${user?.lastName ?? ''}'),
           Text('${l10n.loginEmailLabel}: ${user?.email ?? ''}'),
+          Text(
+            '${l10n.profileProject}: ${projectName?.isNotEmpty == true ? projectName : l10n.profileProjectUnavailable}',
+          ),
         ],
       ),
       _ProfilePage.notifications => (

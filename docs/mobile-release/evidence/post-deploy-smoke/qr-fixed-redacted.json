@@ -1,0 +1,203 @@
+{
+  "screen": "qr-fixed",
+  "ui": [
+    {
+      "key": "appName",
+      "text": "NGS Plus",
+      "type": "Application",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      }
+    },
+    {
+      "key": "qrTabTitle",
+      "text": "QR İşlemleri",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.3526,
+        "y": 0.0892,
+        "width": 0.2949,
+        "height": 0.0275
+      }
+    },
+    {
+      "key": "qrTabMyQr",
+      "text": "QR Kodum",
+      "type": "GenericElement",
+      "frame": {
+        "x": 0,
+        "y": 0.135,
+        "width": 0.5,
+        "height": 0.0847
+      }
+    },
+    {
+      "key": "qrTabScan",
+      "text": "Tara",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.5,
+        "y": 0.135,
+        "width": 0.5,
+        "height": 0.0847
+      }
+    },
+    {
+      "key": "qrPersonalCode",
+      "text": "Kişisel QR kodunuz",
+      "type": "Image",
+      "frame": {
+        "x": 0.1119,
+        "y": 0.2471,
+        "width": 0.7761,
+        "height": 0.357
+      }
+    },
+    {
+      "key": "qrReaderHint",
+      "text": "Bu kodu desteklenen okuyucuya gösterin. Süre sunucunun bitiş zamanına göre gösterilir. İşlem kaydı kapının açıldığını veya fiziksel geçişi doğrulamaz.",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0597,
+        "y": 0.6819,
+        "width": 0.8806,
+        "height": 0.0915
+      }
+    },
+    {
+      "key": "qrRefresh",
+      "text": "Yenile",
+      "type": "Button",
+      "frame": {
+        "x": 0.3671,
+        "y": 0.7918,
+        "width": 0.2657,
+        "height": 0.0458
+      }
+    },
+    {
+      "key": "visitorRefresh",
+      "text": "Yenile",
+      "type": "Button",
+      "frame": {
+        "x": 0.3671,
+        "y": 0.7918,
+        "width": 0.2657,
+        "height": 0.0458
+      }
+    },
+    {
+      "key": "navHome",
+      "text": "Ana Sayfa",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "historyTitle",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "qrTabTitle",
+      "text": "QR İşlemleri",
+      "type": "Button",
+      "frame": {
+        "x": 0.4055,
+        "y": 0.8467,
+        "width": 0.1891,
+        "height": 0.0938
+      }
+    },
+    {
+      "key": "navVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "profileTitle",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    }
+  ]
+}

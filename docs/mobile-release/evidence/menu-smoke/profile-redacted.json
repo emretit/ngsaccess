@@ -1,0 +1,335 @@
+{
+  "screen": "profile",
+  "ui": [
+    {
+      "key": "appName",
+      "text": "NGS Plus",
+      "type": "Application",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      }
+    },
+    {
+      "key": "navProfile",
+      "text": "Profil",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.4348,
+        "y": 0.0892,
+        "width": 0.1305,
+        "height": 0.0275
+      }
+    },
+    {
+      "key": "profileTitle",
+      "text": "Profil",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.4348,
+        "y": 0.0892,
+        "width": 0.1305,
+        "height": 0.0275
+      }
+    },
+    {
+      "key": "quickActionProfile",
+      "text": "Profil",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.4348,
+        "y": 0.0892,
+        "width": 0.1305,
+        "height": 0.0275
+      }
+    },
+    {
+      "key": "profileHelp",
+      "text": "Yardım & Destek",
+      "type": "Button",
+      "frame": {
+        "x": 0.8806,
+        "y": 0.0755,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "profileHelpDialogTitle",
+      "text": "Yardım & Destek",
+      "type": "Button",
+      "frame": {
+        "x": 0.8806,
+        "y": 0.0755,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "profileEditButton",
+      "text": "Kişisel bilgiler",
+      "type": "Button",
+      "frame": {
+        "x": 0.2997,
+        "y": 0.3867,
+        "width": 0.4007,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "profileTheme",
+      "text": "Tema",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.4966,
+        "width": 0.9005,
+        "height": 0.0824
+      }
+    },
+    {
+      "key": "profileLanguage",
+      "text": "Dil",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.5801,
+        "width": 0.9005,
+        "height": 0.0824
+      }
+    },
+    {
+      "key": "profilePreferredDoor",
+      "text": "Hızlı Erişim Kapısı",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.6636,
+        "width": 0.9005,
+        "height": 0.0824
+      }
+    },
+    {
+      "key": "profileSecurity",
+      "text": "Güvenlik",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.7471,
+        "width": 0.9005,
+        "height": 0.0824
+      }
+    },
+    {
+      "key": "profileNotifications",
+      "text": "Bildirimler",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.8307,
+        "width": 0.9005,
+        "height": 0.0824
+      }
+    },
+    {
+      "key": "profileHelp",
+      "text": "Yardım & Destek",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.9405,
+        "width": 0.9005,
+        "height": 0.0595
+      }
+    },
+    {
+      "key": "profileHelpDialogTitle",
+      "text": "Yardım & Destek",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.9405,
+        "width": 0.9005,
+        "height": 0.0595
+      }
+    },
+    {
+      "key": "profileAboutApp",
+      "text": "Uygulama Hakkında",
+      "type": "Button",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      }
+    },
+    {
+      "key": "profilePrivacy",
+      "text": "Gizlilik bilgileri",
+      "type": "Button",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      }
+    },
+    {
+      "key": "profilePrivacyDialogTitle",
+      "text": "Gizlilik bilgileri",
+      "type": "Button",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      }
+    },
+    {
+      "key": "profileLogout",
+      "text": "Çıkış Yap",
+      "type": "Button",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      }
+    },
+    {
+      "key": "profileLogoutConfirmTitle",
+      "text": "Çıkış Yap",
+      "type": "Button",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      }
+    },
+    {
+      "key": "visitorCheckOut",
+      "text": "Çıkış Yap",
+      "type": "Button",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      }
+    },
+    {
+      "key": "qrTabTitle",
+      "text": "QR İşlemleri",
+      "type": "Button",
+      "frame": {
+        "x": 0.4055,
+        "y": 0.8467,
+        "width": 0.1891,
+        "height": 0.0938
+      }
+    },
+    {
+      "key": "navHome",
+      "text": "Ana Sayfa",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "historyTitle",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "profileTitle",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    }
+  ]
+}

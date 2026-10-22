@@ -1,0 +1,27 @@
+{
+  "device": "iPhone 17 Pro",
+  "udid": "81AAFCAB-9741-4819-B9F7-B9DFA47D6F21",
+  "bundleId": "com.ngsplus.app",
+  "version": "1.0.4",
+  "build": "1",
+  "binarySha256": "67715bf69e73a90e227782d21df0cb2c0bea58a58d2f0d95cfcefee43af64883",
+  "simulatorBuild": "passed",
+  "installExit": 0,
+  "launchExit": 0,
+  "axReadSuccess": true,
+  "visibleLabels": [
+    "Ana Sayfa",
+    "Geçmiş",
+    "QR İşlemleri",
+    "Ziyaretçi",
+    "Profil"
+  ],
+  "knownDataErrorLabels": [],
+  "scope": "Startup/AX only after final install; GUI automation unavailable, no new menu navigation or writes claimed.",
+  "session": "Existing session preserved; no credentials/account operations",
+  "nativeGuiLimitation": "CUA Device Hub returned cgWindowNotFound and Orca app binding timed out; dedicated emulator AX provided read-only confirmation.",
+  "visualHomeVerified": true,
+  "visualResult": "Final build rendered authenticated Home with daily attendance card, exactly Unlock+Visitor quick actions, floating five-destination navigation and no door operation status card. No visible data error in screenshot.",
+  "screenshotLocation": "/tmp/ngs-mobile-ios-final-20261022.png",
+  "screenshotStoredInRepository": false
+}

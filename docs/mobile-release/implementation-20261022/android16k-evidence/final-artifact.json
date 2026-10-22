@@ -1,0 +1,11 @@
+{
+  "sourcePath": "/Users/emreaydin/Downloads/NGSPlus-1.0.4-arm64-test-20261022.apk",
+  "snapshotPath": "/tmp/ngs_release_16k_20261022-final.apk",
+  "sha256": "15a91f31a2b4ed6f1e46f22294b71d360bf013ca13a74887abee0f9357c0b377",
+  "expectedSha256": "15a91f31a2b4ed6f1e46f22294b71d360bf013ca13a74887abee0f9357c0b377",
+  "hashMatches": true,
+  "bytes": 41821181,
+  "expectedBytes": 41821181,
+  "mode": "profile ARM64 test signed, root-provided public staging environment",
+  "verifiedAtUtc": "2026-10-22T07:13:18.637020+00:00"
+}

@@ -1,0 +1,21 @@
+{
+  "path": "/Users/emreaydin/Downloads/NGSPlus-1.0.4-arm64-test-20261022.apk",
+  "sha256": "15a91f31a2b4ed6f1e46f22294b71d360bf013ca13a74887abee0f9357c0b377",
+  "bytes": 41821181,
+  "mode": "profile",
+  "abi": [
+    "arm64-v8a"
+  ],
+  "signatureVerified": true,
+  "testSignerSha256": "6cf7163826d39e38e9f6f95d64f1dbef1210487d8a2cd589004b9d42ba7d7fbf",
+  "sameTestSignerAs20261021": true,
+  "package": "com.ngsplus.app.ngsplusapp",
+  "version": "1.0.4",
+  "flutterBuildNumber": 1,
+  "androidVersionCode": 2001,
+  "versionCodeNote": "Flutter split-per-ABI ARM64 offset produces2001 from pubspec build1. This is a test distribution; final store code must be selected against store history.",
+  "environment": "staging",
+  "storeRelease": false,
+  "dotenvPackaged": false,
+  "packagingNote": "Rebuilt generated profile packaging outputs; earlier incremental APK retained approximately12MB zip padding, final package compacted."
+}

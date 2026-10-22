@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../config/convex_config.dart';
 import '../core/errors.dart';
 import '../core/response_decoder.dart';
@@ -7,6 +9,31 @@ class VisitorRepository {
   VisitorRepository(this._client);
   final HttpConvexClient _client;
   String? get sessionKey => _client.sessionToken;
+  String get deploymentUrl => _client.deploymentUrl;
+
+  /// An authenticated, host/project-scoped receipt; null is still unresolved.
+  Future<String?> getCreateReceipt(String requestId) async {
+    final raw = await _client.employeeQuery('mobileVisitors:getCreateReceipt', {
+      'requestId': requestId,
+    });
+    final Object? json;
+    try {
+      json = jsonDecode(raw);
+    } on FormatException {
+      throw const ProtocolError();
+    }
+    if (json == null) return null;
+    if (json is! Map<String, Object?>) throw const ProtocolError();
+    final id = json['id'];
+    final status = json['status'];
+    if (id is! String ||
+        id.isEmpty ||
+        status is! String ||
+        !VisitorAccessStatus.values.any((value) => value.name == status)) {
+      throw const ProtocolError();
+    }
+    return id;
+  }
 
   Future<VisitorPage> list({
     String? cursor,

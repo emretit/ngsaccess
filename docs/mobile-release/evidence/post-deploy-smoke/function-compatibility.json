@@ -1,0 +1,114 @@
+{
+  "deployment": "notable-tern-4",
+  "reportedReleaseSha": "71163d0",
+  "requiredCount": 21,
+  "presentCount": 21,
+  "missing": [],
+  "functions": [
+    {
+      "name": "cardReadings:listForEmployee",
+      "present": true,
+      "type": "Query"
+    },
+    {
+      "name": "cardReadings:selfCheckIn",
+      "present": true,
+      "type": "Mutation"
+    },
+    {
+      "name": "employeeAuth:changePassword",
+      "present": true,
+      "type": "Mutation"
+    },
+    {
+      "name": "employeeAuth:me",
+      "present": true,
+      "type": "Query"
+    },
+    {
+      "name": "employeeAuth:signIn",
+      "present": true,
+      "type": "Mutation"
+    },
+    {
+      "name": "employeeAuth:signOut",
+      "present": true,
+      "type": "Mutation"
+    },
+    {
+      "name": "employeeCheckIn:createMyCheckInToken",
+      "present": true,
+      "type": "Mutation"
+    },
+    {
+      "name": "employeeCheckIn:getMyCheckInTokenStatus",
+      "present": true,
+      "type": "Query"
+    },
+    {
+      "name": "mobileAccess:getOperation",
+      "present": true,
+      "type": "Query"
+    },
+    {
+      "name": "mobileAccess:getRequestOperation",
+      "present": true,
+      "type": "Query"
+    },
+    {
+      "name": "mobileAccess:listTargets",
+      "present": true,
+      "type": "Query"
+    },
+    {
+      "name": "mobileAccess:requestOpen",
+      "present": true,
+      "type": "Mutation"
+    },
+    {
+      "name": "mobileAttendance:listPage",
+      "present": true,
+      "type": "Query"
+    },
+    {
+      "name": "mobileAttendance:summary",
+      "present": true,
+      "type": "Query"
+    },
+    {
+      "name": "mobileVisitors:cancel",
+      "present": true,
+      "type": "Mutation"
+    },
+    {
+      "name": "mobileVisitors:create",
+      "present": true,
+      "type": "Mutation"
+    },
+    {
+      "name": "mobileVisitors:detail",
+      "present": true,
+      "type": "Query"
+    },
+    {
+      "name": "mobileVisitors:listPage",
+      "present": true,
+      "type": "Query"
+    },
+    {
+      "name": "mobileVisitors:notice",
+      "present": true,
+      "type": "Query"
+    },
+    {
+      "name": "mobileVisitors:summary",
+      "present": true,
+      "type": "Query"
+    },
+    {
+      "name": "mobileVisitors:update",
+      "present": true,
+      "type": "Mutation"
+    }
+  ]
+}

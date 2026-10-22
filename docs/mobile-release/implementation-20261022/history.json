@@ -1,0 +1,66 @@
+{
+  "task": "MOB-N03",
+  "audit": "AUD-03",
+  "date": "2026-10-22",
+  "status": "implemented_focused_tests_passed_pending_integration",
+  "filesModified": [
+    "mobile/lib/screens/history/history_screen.dart",
+    "mobile/test/widgets/history_period_lifecycle_test.dart",
+    "docs/mobile-release/implementation-20261022/history.json"
+  ],
+  "existingChangesPreserved": "HistoryScreen and the existing history widgets/tests already contained uncommitted UI changes. This worker only added the branch/lifecycle period synchronization to the screen, created a separate regression test, and wrote this report; the existing history_screen_test.dart was read but not edited.",
+  "behavior": [
+    "HistoryScreen observes WidgetsBinding lifecycle and subscribes to BranchVisibility inherited updates, treating shell branch 1 as visible and index -1 as hidden behind a root overlay.",
+    "A visibility return or lifecycle resume schedules a post-frame check; the check only runs while mounted, initialized, visible and resumed.",
+    "AttendanceDate.instantKey compares Istanbul business dates using the existing injected HistoryScreen.now clock. A changed date advances the calendar period and reloads both the current month and Monday-based week summaries.",
+    "A day change within the same month/week also refreshes those aggregate totals and the calendar today marker. Same-business-day visibility/resume/provider rebuilds do not reload summaries.",
+    "The period advances synchronously before either asynchronous summary request starts; overlapping visibility and resume signals coalesce and cannot refetch the newly selected day.",
+    "Automatic period changes do not call setFilters or loadAttendanceRecords and preserve selected date, device, calendar selection, active tab and weekly overview selection.",
+    "Summary notifications run outside build, and disposal unregisters the lifecycle observer and makes pending post-frame callbacks harmless. Standalone screens without BranchVisibility remain supported."
+  ],
+  "testPaths": [
+    "mobile/test/widgets/history_period_lifecycle_test.dart",
+    "mobile/test/widgets/history_screen_test.dart"
+  ],
+  "newRegressionScenarios": [
+    "AUD-03: actual HistoryScreen calendar changes from October to November on pause/resume at 2026-10-31 21:00 UTC, which is Istanbul November 1 while still October in UTC.",
+    "A hidden retained screen does not fetch on resume; branch visibility return updates the month without remounting, and a second same-day return adds no queries.",
+    "Sunday November 1 to Monday November 2 at Istanbul midnight updates the selected weekly overview to the new Monday range and summary.",
+    "An ordinary Tuesday-to-Wednesday Istanbul rollover updates calendar.today and refreshes both existing month/week ranges.",
+    "Three pause/resume and hide/show cycles plus provider notifications across UTC midnight within the same Istanbul day add no summary/filter/list requests.",
+    "User-applied October 19 and door-a filters survive an October-to-November transition, a root-overlay visibility gap, a return while paused, and resume; reopening the filter sheet retains both filters with the new today date.",
+    "Disposal before a queued resume callback and subsequent lifecycle changes produce no additional summary request or widget exception."
+  ],
+  "validation": {
+    "executed": [
+      "Read remaining-plan-20261021.json, re-audit-20261021.json, audit_repro_test.dart, BranchVisibility, the shell/router, AttendanceDate, AttendanceProvider and existing history tests.",
+      "git diff --check -- mobile/lib/screens/history/history_screen.dart mobile/test/widgets/history_period_lifecycle_test.dart: passed with no whitespace diagnostics.",
+      "git diff --no-index --check /dev/null mobile/test/widgets/history_period_lifecycle_test.dart: no whitespace diagnostics; exit 1 represents the new-file difference.",
+      "python3 -m json.tool docs/mobile-release/implementation-20261022/history.json: parsed successfully."
+    ],
+    "flutterDartExecution": "Deferred by the coordinator's explicit SDK-slot restriction; no Flutter, Dart, pub, Gradle or Xcode command was run by this worker.",
+    "coordinatorExecutedVerification": {
+      "source": "Coordinator message msg_a615fe1e963a on 2026-10-22",
+      "scope": "history_period_lifecycle_test plus existing history_screen and profile/auth repository focused suite",
+      "passed": 77,
+      "failed": 0,
+      "note": "Executed by the coordinator using its SDK slot, not by this worker. Coordinator also reported source review supports visibility/resume and filter preservation."
+    },
+    "coordinatorCommandsFromMobile": [
+      "dart format lib/screens/history/history_screen.dart test/widgets/history_period_lifecycle_test.dart",
+      "flutter test --no-pub test/widgets/history_period_lifecycle_test.dart test/widgets/history_screen_test.dart",
+      "flutter analyze --no-pub",
+      "flutter test --no-pub"
+    ],
+    "testFixture": "Permanent widget tests exercise the actual HistoryScreen, BranchVisibility and calendar/filter UI using the existing HistoryTestProvider query/filter spies and summary fixture; they do not contact a backend."
+  },
+  "localization": {
+    "newKeysNeeded": [],
+    "filesChanged": []
+  },
+  "knownGaps": [
+    "The coordinator reports 77 focused tests passed, including the new history regressions; full integration, formatting and analysis results remain owned by the coordinator and were not independently executed by this worker.",
+    "This scoped fix checks at visibility return, app resume and the existing manual refresh; it does not add a continuous foreground midnight timer."
+  ],
+  "outOfScopeChanges": "No shell/router/provider/backend/schema/API/localization edits, commits, staging, revert, push, deploy, live mutation, hardware command or subworker was performed."
+}

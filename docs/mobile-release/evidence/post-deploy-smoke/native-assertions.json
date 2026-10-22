@@ -1,0 +1,15 @@
+{
+  "homeShowsLoadedAttendance": true,
+  "historyVisibleReadingRows": 7,
+  "monthSummaryLoaded": true,
+  "weekSummaryLoaded": true,
+  "visitorZeroTotalLoaded": true,
+  "unsupportedDoorTargets": 4,
+  "doorIdentityWarningAbsent": true,
+  "qrImagePresent": true,
+  "qrStatusWarningAbsent": true,
+  "cameraPermissionWarningRemoved": true,
+  "cameraStartupFailureMessageVisible": true,
+  "iosCameraAuthorizedRuntimeValue": 3,
+  "permissionPluginGrantedRuntimeValue": 1
+}

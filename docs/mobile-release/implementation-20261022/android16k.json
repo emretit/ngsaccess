@@ -1,0 +1,304 @@
+{
+  "task": "MOB-N08",
+  "taskId": "task_eca9be36c157",
+  "dispatchId": "ctx_321815058aeb",
+  "recordedAtUtc": "2026-10-22T07:16:57.934715+00:00",
+  "status": "passed",
+  "outcome": "succeeded",
+  "systemImage": {
+    "package": "system-images;android-36;google_apis_ps16k;arm64-v8a",
+    "revision": 7,
+    "officialMetadataUrl": "https://dl.google.com/android/repository/sys-img/google_apis/sys-img2-3.xml",
+    "officialArchiveUrl": "https://dl.google.com/android/repository/sys-img/google_apis/arm64-v8a-ps16k-36_r07.zip",
+    "archive": "/tmp/ngs-android16k-image-r07.zip",
+    "expectedBytes": 1875087037,
+    "expectedSha1": "dda632745023567113d9954101709c6526a3c250",
+    "initialBytes": 756547575,
+    "initialInstallationState": ".installer only; not installed",
+    "fullArchiveValidated": true,
+    "newAgreementAccepted": false,
+    "existingLicenseVerified": true,
+    "installed": true,
+    "installationMethod": "Extracted checksum-validated official ZIP; local package.xml derived from official remotePackage entry, preserving package identity, license, revision, type-details and dependencies.",
+    "downloadAttempts": 1,
+    "downloadExitCode": 0,
+    "archiveValidationEvidence": "android16k-evidence/archive-validation.json",
+    "installedPackageManifestEvidence": "android16k-evidence/installed-package.xml"
+  },
+  "runtime": {
+    "avdName": "ngs_release_16k_20261022",
+    "avdCreated": true,
+    "emulatorStarted": true,
+    "pageSizeProven": true,
+    "apkInstalled": true,
+    "appLaunched": true,
+    "loginUiVerified": true,
+    "crashAnrChecked": true,
+    "pageSize": 16384,
+    "abi": "arm64-v8a",
+    "bootCompleted": true,
+    "adbSerial": "emulator-5568",
+    "port": 5568,
+    "launchState": "COLD",
+    "launchStatus": "ok",
+    "launchTotalMs": 1062,
+    "observationSeconds": 30,
+    "appPidAtStart": "5102",
+    "appPidAtEnd": "5102",
+    "foregroundActivity": "com.ngsplus.app.ngsplusapp/.MainActivity",
+    "nativeCrashMarkers": [],
+    "anrMarkers": [],
+    "pluginRegistrationErrorMarkers": [],
+    "crashBufferEmpty": true,
+    "linker16kbAppCompatEnabled": false,
+    "package16kbAppCompatDisabled": true,
+    "packagePageSizeCompat": 0,
+    "loginScreenshot": "android16k-evidence/final-login.png",
+    "loginUiHierarchy": "android16k-evidence/final-login-ui.xml",
+    "visualReview": "NGS Plus login screen rendered with empty Email and Password fields, Sign In button, remember-email checkbox and Forgot password link; no credential entry or submission.",
+    "pluginValidationScope": "No MissingPluginException or plugin-registration error during startup; authenticated/device/camera plugin workflows were not exercised."
+  },
+  "apk": {
+    "sourcePath": "/Users/emreaydin/Downloads/NGSPlus-1.0.4-arm64-test-20261022.apk",
+    "snapshotPath": "/tmp/ngs_release_16k_20261022-final.apk",
+    "sha256": "15a91f31a2b4ed6f1e46f22294b71d360bf013ca13a74887abee0f9357c0b377",
+    "expectedSha256": "15a91f31a2b4ed6f1e46f22294b71d360bf013ca13a74887abee0f9357c0b377",
+    "hashMatches": true,
+    "bytes": 41821181,
+    "expectedBytes": 41821181,
+    "mode": "profile ARM64 test signed, root-provided public staging environment",
+    "verifiedAtUtc": "2026-10-22T07:13:18.637020+00:00",
+    "package": "com.ngsplus.app.ngsplusapp",
+    "versionName": "1.0.4",
+    "versionCode": 2001,
+    "targetSdk": 36,
+    "abi": "arm64-v8a",
+    "signer": "Android Debug test certificate; APK Signature Scheme v2 verified",
+    "signerCertificateSha256": "6cf7163826d39e38e9f6f95d64f1dbef1210487d8a2cd589004b9d42ba7d7fbf",
+    "installedApkHashIndependentlyVerified": true
+  },
+  "constraints": {
+    "buildCommandsRun": false,
+    "sourceDependenciesSigningCiModified": false,
+    "liveCredentialsUsed": false,
+    "loginMutationsDoorCommandsVisitorWritesPerformed": false,
+    "existingUserAvdModified": false
+  },
+  "cleanup": {
+    "recordedAtUtc": "2026-10-22T07:16:03.509766+00:00",
+    "avdNameVerified": "ngs_release_16k_20261022\nOK",
+    "ownedEmulatorProcessTreeBeforeShutdown": [
+      {
+        "pid": 53488,
+        "ppid": 53487,
+        "executable": "/Users/emreaydin/Library/Android/sdk/emulator/qemu/darwin-aarch64/qemu-system-aarch64-headless"
+      },
+      {
+        "pid": 53498,
+        "ppid": 53488,
+        "executable": "/Users/emreaydin/Library/Android/sdk/emulator/netsimd"
+      }
+    ],
+    "shutdownCommand": [
+      "adb",
+      "-s",
+      "emulator-5568",
+      "emu",
+      "kill"
+    ],
+    "shutdownExitCode": 0,
+    "shutdownOutput": "OK: killing emulator, bye bye\nOK",
+    "shutdownError": "",
+    "ownedProcessIdsStillRunning": [],
+    "existingUserAvdUntouched": "fq_ttt_api35",
+    "ownedAvdPreserved": true,
+    "installedOfficialImagePreserved": true,
+    "archivePreserved": "/tmp/ngs-android16k-image-r07.zip",
+    "adbServerStopped": false,
+    "ownedRunningProcesses": [],
+    "emulatorExitCode": 0,
+    "downloadExitCode": 0
+  },
+  "sources": [
+    "https://developer.android.com/guide/practices/page-sizes",
+    "https://dl.google.com/android/repository/sys-img/google_apis/sys-img2-3.xml",
+    "https://dl.google.com/android/repository/sys-img/google_apis/arm64-v8a-ps16k-36_r07.zip"
+  ],
+  "evidenceDirectory": "docs/mobile-release/implementation-20261022/android16k-evidence",
+  "preparationIssues": [
+    "Homebrew avdmanager initially used its own SDK root; selected approved SDK via toolsdir property.",
+    "Legacy multi-tag source.properties caused invalid generated package.xml; replaced worker-generated manifest with official metadata-derived localPackage.",
+    "First emulator process exited 1 because inherited SDK root pointed to Homebrew; restarted with explicit approved ANDROID_HOME and ANDROID_SDK_ROOT."
+  ],
+  "preliminaryRuntime": {
+    "apkSha256": "06eff862841060988bc1c4fdf28f325c80cd4ec35922f32b336007d040ad2b9a",
+    "apkInstalled": true,
+    "appLaunched": true,
+    "launchState": "COLD",
+    "launchStatus": "ok",
+    "launchTotalMs": 1062,
+    "loginUiVisuallyVerified": true,
+    "screenshot": "android16k-evidence/baseline-login.png",
+    "nativeErrorScanMarkers": [],
+    "finalAcceptance": false
+  },
+  "acceptanceScope": "Actual Android36 ARM64 16KB guest, root-provided profile/test-signed final APK install, cold launch, visually verified empty login UI and 30-second native crash/ANR startup smoke.",
+  "limitations": [
+    "Profile ARM64 build signed with test/debug certificate; this smoke is not release-mode or store-signing acceptance.",
+    "30-second cold-start/login observation only; no employee credentials, authentication submission, door commands, visitor writes, permission/camera workflow or authenticated plugin feature tests.",
+    "Official image and owned AVD preserved on coordinator instruction; owned emulator and its netsimd child exited, existing fq_ttt_api35 AVD untouched.",
+    "Existing pre-task .installer marker preserved; successful installation is established by validated archive, extracted files, metadata-derived local manifest and actual boot, not by that marker."
+  ],
+  "evidenceFiles": [
+    {
+      "path": "android16k-evidence/archive-validation.json",
+      "bytes": 296,
+      "sha256": "58b0534fb2cb84e360cab1d4b17adbaf5c440d8eb8e268be3ba2371fbd8726f1"
+    },
+    {
+      "path": "android16k-evidence/avd-create-final.log",
+      "bytes": 36,
+      "sha256": "69b9f2e1ed25b6e742684d3d28a9e8ad8c12c15d312dc357c72efefe9a18b75d"
+    },
+    {
+      "path": "android16k-evidence/avd-create.log",
+      "bytes": 18910,
+      "sha256": "5a638127c55d2c130a623f3c871aacf96c5e04e66a932f808f87700e5d891150"
+    },
+    {
+      "path": "android16k-evidence/baseline-artifact.json",
+      "bytes": 474,
+      "sha256": "46c2bbd812ad6e07224bae34009492335f0dbd0fa5a42ce0783e3198c9c4bba0"
+    },
+    {
+      "path": "android16k-evidence/baseline-cold-launch.txt",
+      "bytes": 186,
+      "sha256": "5b2415f6ec6e09f8bf0b06ff666c27a271de9c19cab8ae30a892d504e8ad4042"
+    },
+    {
+      "path": "android16k-evidence/baseline-login.png",
+      "bytes": 179052,
+      "sha256": "ab6304c6732bc92d26cd9e4989795cdba5da3215cf1014e1a70bc44c2fba489d"
+    },
+    {
+      "path": "android16k-evidence/baseline-native-error-scan.json",
+      "bytes": 67,
+      "sha256": "81a62919d6475eaceb8e5bfd56a6dbb57faa629f2ba397cce290061662449b6c"
+    },
+    {
+      "path": "android16k-evidence/cleanup.json",
+      "bytes": 902,
+      "sha256": "aebe0594d92e0b559b4f78d9f9a7f7867de6af1e39d58c9bba330d13571679c8"
+    },
+    {
+      "path": "android16k-evidence/download-attempt1.log",
+      "bytes": 22177,
+      "sha256": "5bbd7695d313b20a8ed432eb9ffd6a85254e3f6b63e9862d5fc4173c88c67f48"
+    },
+    {
+      "path": "android16k-evidence/emulator-boot.log",
+      "bytes": 8233,
+      "sha256": "9e88e5bd8f4ab223d0b049c648607317b152c83e4435f854c488256e94e31ada"
+    },
+    {
+      "path": "android16k-evidence/emulator-process.json",
+      "bytes": 680,
+      "sha256": "075080e77d61b202dd038377c4c4525995fa88cf13802a8d808c009f04147b0f"
+    },
+    {
+      "path": "android16k-evidence/emulator.log",
+      "bytes": 653,
+      "sha256": "f9fa3c940053085758bf95a68d4ece49899054be254677b2a1e5212bf6d9f8ff"
+    },
+    {
+      "path": "android16k-evidence/final-apk-metadata.txt",
+      "bytes": 345,
+      "sha256": "5d611e482d477141aa877e1134a3c6f490683c33ffc0cf70aa55d0052bace2c8"
+    },
+    {
+      "path": "android16k-evidence/final-artifact.json",
+      "bytes": 525,
+      "sha256": "a073b5791e6e82dab36e1bb002039d057e1043d5da62ba29a183ed4d4ce74259"
+    },
+    {
+      "path": "android16k-evidence/final-cold-launch.txt",
+      "bytes": 186,
+      "sha256": "0bccaca18a28fe597e293fc82c2e8ad1a7471e3d90e03b7bfba9281d597d81f8"
+    },
+    {
+      "path": "android16k-evidence/final-crash-buffer.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "android16k-evidence/final-exit-info.txt",
+      "bytes": 602,
+      "sha256": "84f7f8feb42b28e6a41d9daa31545e2cab1f68da6ca89a4872d808be18efa08e"
+    },
+    {
+      "path": "android16k-evidence/final-install.txt",
+      "bytes": 36,
+      "sha256": "781a31c82430c97897af612ece5e0ca2205e301cb5ff121ce2660541ea5182c7"
+    },
+    {
+      "path": "android16k-evidence/final-login-ui.xml",
+      "bytes": 7437,
+      "sha256": "a2d1cb99876d7367453d596dee688ff904b82bc6f04f0d6fbdec4787f1c62ca8"
+    },
+    {
+      "path": "android16k-evidence/final-login.png",
+      "bytes": 179543,
+      "sha256": "db3619e7e372f2bede8ad2655d059a16dc9d7339ae572580222e5d2cd193610b"
+    },
+    {
+      "path": "android16k-evidence/final-native-error-markers.txt",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "android16k-evidence/final-pagesize.txt",
+      "bytes": 6,
+      "sha256": "33f50728129313570f6b953c08b559d9cb5f673e981e647cee4dc10d6cd48e99"
+    },
+    {
+      "path": "android16k-evidence/final-runtime-observation.json",
+      "bytes": 1375,
+      "sha256": "ccb22d725f66f36de10d27d799e986585e34cb4e904ab471beeed7d45b6f4575"
+    },
+    {
+      "path": "android16k-evidence/final-signature.txt",
+      "bytes": 955,
+      "sha256": "ecbfae2d277ec01c2a414fb63a85a99274959ed83caf10a6e0a2aaf5e325d4b0"
+    },
+    {
+      "path": "android16k-evidence/final-uiautomator-status.txt",
+      "bytes": 64,
+      "sha256": "f1e1fb1bcc5d4129827ada862ec9909b4fc9d945fe7b572a1448fd992e0457c4"
+    },
+    {
+      "path": "android16k-evidence/guest-environment.json",
+      "bytes": 1551,
+      "sha256": "75974b6ea7a1aa72fe30b92d6c810a23ab1329175d2a21d42e70dc77ec73e49e"
+    },
+    {
+      "path": "android16k-evidence/guest-proof.json",
+      "bytes": 153,
+      "sha256": "dd99ac5e7a2eecb647b5bfd9833b5a5b85612af62e8724858c6911557547a8ea"
+    },
+    {
+      "path": "android16k-evidence/installed-package.xml",
+      "bytes": 18711,
+      "sha256": "61c617e42b5702bc32637dbc1ed80162a3dd556bd9ab58ea76e272292ef535b7"
+    },
+    {
+      "path": "android16k-evidence/license-check.json",
+      "bytes": 430,
+      "sha256": "4280a1d1ababb7a14b772a198983993af343af0054ce25ce1d06ef01152484fc"
+    },
+    {
+      "path": "android16k-evidence/repository2-3.xml",
+      "bytes": 237654,
+      "sha256": "858c1f39632fa98235f13ebfcf2f362d5a19eeaed6c5f9c991425f257809e518"
+    }
+  ]
+}

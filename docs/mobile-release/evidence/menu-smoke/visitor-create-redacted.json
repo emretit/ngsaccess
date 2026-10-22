@@ -1,0 +1,302 @@
+{
+  "screen": "visitor-create",
+  "ui": [
+    {
+      "key": "appName",
+      "text": "NGS Plus",
+      "type": "Application",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      }
+    },
+    {
+      "key": "visitorAddTitle",
+      "text": "Yeni Ziyaretçi",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.3342,
+        "y": 0.0892,
+        "width": 0.3315,
+        "height": 0.0275
+      }
+    },
+    {
+      "key": "visitorPreRegistered",
+      "text": "Yetkili aktivasyonu bekleniyor",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.1579,
+        "width": 0.9005,
+        "height": 0.0229
+      }
+    },
+    {
+      "key": "profileFirstName",
+      "text": "Ad",
+      "type": "TextField",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.1991,
+        "width": 0.9005,
+        "height": 0.1007
+      }
+    },
+    {
+      "key": "visitorFirstName",
+      "text": "Ad",
+      "type": "TextField",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.1991,
+        "width": 0.9005,
+        "height": 0.1007
+      }
+    },
+    {
+      "key": "profileLastName",
+      "text": "Soyad",
+      "type": "TextField",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.2998,
+        "width": 0.9005,
+        "height": 0.1007
+      }
+    },
+    {
+      "key": "visitorLastName",
+      "text": "Soyad",
+      "type": "TextField",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.2998,
+        "width": 0.9005,
+        "height": 0.1007
+      }
+    },
+    {
+      "key": "visitorPhone",
+      "text": "Telefon",
+      "type": "TextField",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.4005,
+        "width": 0.9005,
+        "height": 0.1007
+      }
+    },
+    {
+      "key": "visitorOptionalHint",
+      "text": "İsteğe bağlı",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.4691,
+        "width": 0.1746,
+        "height": 0.0183
+      }
+    },
+    {
+      "key": "visitorFieldPurpose",
+      "text": "Ziyaret Amacı",
+      "type": "TextField",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.5011,
+        "width": 0.9005,
+        "height": 0.1556
+      }
+    },
+    {
+      "key": "visitorNotes",
+      "text": "Notlar",
+      "type": "TextField",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.6568,
+        "width": 0.9005,
+        "height": 0.1556
+      }
+    },
+    {
+      "key": "visitorOptionalHint",
+      "text": "İsteğe bağlı",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.7803,
+        "width": 0.1746,
+        "height": 0.0183
+      }
+    },
+    {
+      "key": "commonRetry",
+      "text": "Tekrar Dene",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.9222,
+        "width": 0.9005,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "errorUnknown",
+      "text": "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.9771,
+        "width": 0.9005,
+        "height": 0.0229
+      }
+    },
+    {
+      "key": "qrRefresh",
+      "text": "Yenile",
+      "type": "Button",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      }
+    },
+    {
+      "key": "visitorRefresh",
+      "text": "Yenile",
+      "type": "Button",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      }
+    },
+    {
+      "key": "visitorSave",
+      "text": "Kaydet",
+      "type": "Button",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      }
+    },
+    {
+      "key": "qrTabTitle",
+      "text": "QR İşlemleri",
+      "type": "Button",
+      "frame": {
+        "x": 0.4055,
+        "y": 0.8467,
+        "width": 0.1891,
+        "height": 0.0938
+      }
+    },
+    {
+      "key": "navHome",
+      "text": "Ana Sayfa",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "historyTitle",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "profileTitle",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    }
+  ]
+}

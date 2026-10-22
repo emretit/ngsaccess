@@ -1,0 +1,192 @@
+{
+  "screen": "camera-fixed",
+  "ui": [
+    {
+      "key": "appName",
+      "text": "NGS Plus",
+      "type": "Application",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      }
+    },
+    {
+      "key": "qrTabTitle",
+      "text": "QR İşlemleri",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.3526,
+        "y": 0.0892,
+        "width": 0.2949,
+        "height": 0.0275
+      }
+    },
+    {
+      "key": "qrTabMyQr",
+      "text": "QR Kodum",
+      "type": "StaticText",
+      "frame": {
+        "x": 0,
+        "y": 0.135,
+        "width": 0.5,
+        "height": 0.0847
+      }
+    },
+    {
+      "key": "qrTabScan",
+      "text": "Tara",
+      "type": "GenericElement",
+      "frame": {
+        "x": 0.5,
+        "y": 0.135,
+        "width": 0.5,
+        "height": 0.0847
+      }
+    },
+    {
+      "key": "qrFrameHint",
+      "text": "QR kodu kare içine yerleştirin",
+      "type": "GenericElement",
+      "frame": {
+        "x": 0,
+        "y": 0.2197,
+        "width": 1,
+        "height": 0.6178
+      }
+    },
+    {
+      "key": "qrCameraUnavailableRetry",
+      "text": "Kamera başlatılamadı. Tekrar deneyin.",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.1773,
+        "y": 0.5172,
+        "width": 0.6454,
+        "height": 0.0229
+      }
+    },
+    {
+      "key": "qrTryAgain",
+      "text": "Tekrar dene",
+      "type": "Button",
+      "frame": {
+        "x": 0.3395,
+        "y": 0.5584,
+        "width": 0.321,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "navHome",
+      "text": "Ana Sayfa",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "historyTitle",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "qrTabTitle",
+      "text": "QR İşlemleri",
+      "type": "Button",
+      "frame": {
+        "x": 0.4055,
+        "y": 0.8467,
+        "width": 0.1891,
+        "height": 0.0938
+      }
+    },
+    {
+      "key": "navVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "profileTitle",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    }
+  ]
+}

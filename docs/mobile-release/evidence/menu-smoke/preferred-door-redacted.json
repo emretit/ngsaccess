@@ -1,0 +1,93 @@
+{
+  "screen": "preferred-door",
+  "ui": [
+    {
+      "key": "appName",
+      "text": "NGS Plus",
+      "type": "Application",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      }
+    },
+    {
+      "key": "selectDeviceTitle",
+      "text": "Kapı Seç",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.3941,
+        "y": 0.0892,
+        "width": 0.2118,
+        "height": 0.0275
+      }
+    },
+    {
+      "key": "qrRefresh",
+      "text": "Yenile",
+      "type": "Button",
+      "frame": {
+        "x": 0.8806,
+        "y": 0.0755,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "visitorRefresh",
+      "text": "Yenile",
+      "type": "Button",
+      "frame": {
+        "x": 0.8806,
+        "y": 0.0755,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "selectDeviceSearch",
+      "text": "Ara...",
+      "type": "TextField",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.1533,
+        "width": 0.9204,
+        "height": 0.0641
+      }
+    },
+    {
+      "key": "preferenceIdentityUnavailable",
+      "text": "Hesap veya proje bilgisi doğrulanamadı. Yeniden giriş yapın.",
+      "type": "GenericElement",
+      "frame": {
+        "x": 0,
+        "y": 0.2357,
+        "width": 1,
+        "height": 0.0824
+      }
+    },
+    {
+      "key": "errorUnknown",
+      "text": "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0618,
+        "y": 0.611,
+        "width": 0.8765,
+        "height": 0.0229
+      }
+    },
+    {
+      "key": "commonRetry",
+      "text": "Tekrar Dene",
+      "type": "Button",
+      "frame": {
+        "x": 0.3377,
+        "y": 0.6522,
+        "width": 0.3247,
+        "height": 0.0549
+      }
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "task": "MOB-N01",
+  "audit": "AUD-01",
+  "date": "2026-10-22",
+  "status": "source_implemented_awaiting_coordinator_integration",
+  "filesModified": [
+    "mobile/lib/screens/home/home_screen.dart",
+    "mobile/lib/widgets/door_operation_recovery_dialog.dart",
+    "mobile/test/widgets/home_screen_test.dart",
+    "mobile/test/widgets/door_operation_recovery_test.dart",
+    "docs/mobile-release/implementation-20261022/door.json"
+  ],
+  "behavior": [
+    "Existing Unlock remains accessible for unresolved operations when command preparation is not active; it opens a dedicated recovery dialog without changing Home layout or adding Home command cards/notifications.",
+    "Dialog entry and Check status perform read-only reconciliation. Opening, refreshing, dismissing or relaunching never retries a command automatically.",
+    "Only the explicit Retry the same request action invokes existing retrySameRequest, which queries again and may resend only the original requestId/deviceId/doorId. Current preferred target is never consulted by recovery.",
+    "Known pending, sent and unknown receipts offer reconciliation only. Terminal and error messages use localized existing command wording; acknowledgement is not presented as physical passage.",
+    "Provider's existing persistence, request/target checks, concurrent-command lock and generation/ownership guards remain unchanged.",
+    "Dialog captures session epoch/token on creation, hides old status and disables recovery on session change; even a new session for the same employee requires closing and reopening the dialog.",
+    "Failed request lookup or failed local restore leaves the protected intent intact and provides further status-check/retry access as applicable. Permission denial from a retry is shown without clearing uncertainty."
+  ],
+  "tests": {
+    "permanentPaths": [
+      "mobile/test/widgets/door_operation_recovery_test.dart",
+      "mobile/test/widgets/home_screen_test.dart"
+    ],
+    "fixture": "Real DoorOperationProvider and shared MemoryOperationStore/FakeOperationRepository fixtures from mobile/test/providers/door_operation_provider_test.dart, matching the audit reproduction.",
+    "correctedBehaviorScenarios": [
+      "First command TimeoutError, request lookup null, Home refresh and provider recreation preserve the original intent while keeping recovery accessible.",
+      "Dialog entry queries before retry; explicit double tap creates only one retry using identical request ID and original target despite a different preferred door.",
+      "In-flight retry blocks another target; terminal confirmation clears persistence without inferring physical passage or displaying a Home status card.",
+      "Failed lookup remains recoverable and an explicit retry whose lookup also fails sends no mutation.",
+      "Retry transitions to pending, hides resend, and terminal failure is reconciled without another command.",
+      "Logout during lookup prevents resend and preserves scoped persistence; new same-employee session cannot reactivate stale dialog but can reopen recovery.",
+      "Revoked permission is displayed while original uncertainty continues to block another target.",
+      "Failed local-store restore exposes read-only checking, then exposes same-request retry only after restoring the original intent.",
+      "An existing pending receipt found during explicit retry is accepted without resubmission.",
+      "TR and EN dialog controls expose semantics and remain usable at 320 logical-pixel width and 2x text."
+    ],
+    "execution": "Deferred: worker was explicitly prohibited from Flutter/Dart/pub/Gradle/Xcode commands and received no SDK slot. No Flutter formatting, analysis or tests were run by this worker.",
+    "checksRun": [
+      "git diff --check -- mobile/lib/screens/home/home_screen.dart mobile/lib/widgets/door_operation_recovery_dialog.dart mobile/test/widgets/home_screen_test.dart mobile/test/widgets/door_operation_recovery_test.dart (passed; new files also reviewed as source)"
+    ],
+    "coordinatorCommandsFromMobile": [
+      "dart format lib/screens/home/home_screen.dart lib/widgets/door_operation_recovery_dialog.dart test/widgets/home_screen_test.dart test/widgets/door_operation_recovery_test.dart",
+      "flutter analyze --no-pub",
+      "flutter test --no-pub test/widgets/door_operation_recovery_test.dart test/widgets/home_screen_test.dart test/providers/door_operation_provider_test.dart",
+      "flutter test --no-pub"
+    ]
+  },
+  "localization": {
+    "owner": "coordinator",
+    "workerEditedCatalogs": false,
+    "reportedMessage": "msg_75d66ddd8f07",
+    "keysRequired": [
+      {
+        "key": "doorOperationRecoveryTitle",
+        "tr": "Kapı işlemini kontrol et",
+        "en": "Review door request"
+      },
+      {
+        "key": "doorOperationRecoveryHint",
+        "tr": "Önce önceki isteğin durumu kontrol edilir. Tekrar denerseniz yalnız aynı istek ve aynı kapı kullanılır; yeni bir kapı seçimi uygulanmaz. Komut sonucu fiziksel geçişi doğrulamaz.",
+        "en": "The previous request is checked first. Retrying uses only the same request and original door; a new door selection is not used. A command result does not confirm physical passage."
+      }
+    ]
+  },
+  "knownGaps": [
+    "Two new localization getters must be added by coordinator before this source compiles; worker did not edit ARB/generated/expected_keys files.",
+    "Coordinator must format and run targeted/full Flutter analysis and tests; authored regressions are not yet execution evidence.",
+    "Real VoiceOver/TalkBack, device and physical door/panel verification remains outside this source-only task."
+  ],
+  "constraints": {
+    "preservedExistingUncommittedChanges": true,
+    "providerBackendSchemaApiChanges": false,
+    "noCommitsStageRevertPushDeployLiveMutationsHardwareCommands": true,
+    "noSubworkers": true,
+    "noSdkCommands": true
+  }
+}

@@ -239,6 +239,52 @@ void main() {
   });
 
   testWidgets(
+    'same-named doors retain panel context even when mobile opening is unavailable',
+    (tester) async {
+      await prepare();
+      repository.onList = () async => [
+        const Device(
+          id: 'gateway-panel',
+          name: 'NGS0001',
+          doorId: 'gateway-door',
+          targetId: 'gateway-panel:gateway-door',
+          doorName: 'Door 1',
+          zoneName: 'Office',
+          canOpen: true,
+        ),
+        const Device(
+          id: 'bridge-panel',
+          name: 'Deneme1',
+          doorId: 'bridge-door',
+          targetId: 'bridge-panel:bridge-door',
+          doorName: 'Door 1',
+          zoneName: 'Test zone',
+          canOpen: false,
+          reason: 'TRANSPORT_UNSUPPORTED',
+        ),
+      ];
+      await mount(tester, scale: 2);
+      expect(find.text('Door 1'), findsNWidgets(2));
+      expect(find.text('NGS0001 • Office'), findsOneWidget);
+      expect(find.text('Deneme1 • Test zone'), findsOneWidget);
+      final disabledTile = tester.widget<ListTile>(
+        find.ancestor(
+          of: find.text('Deneme1 • Test zone'),
+          matching: find.byType(ListTile),
+        ),
+      );
+      expect(disabledTile.onTap, isNull);
+      expect(tester.takeException(), isNull);
+
+      await tester.enterText(find.byType(TextField), 'Deneme1');
+      await tester.pumpAndSettle();
+      expect(find.text('NGS0001 • Office'), findsNothing);
+      expect(find.text('Deneme1 • Test zone'), findsOneWidget);
+      expect(preferred.hasDevice, isFalse);
+    },
+  );
+
+  testWidgets(
     'unavailable target explains its typed reason and cannot be selected',
     (tester) async {
       await prepare();

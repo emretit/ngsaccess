@@ -1,0 +1,236 @@
+{
+  "screen": "security",
+  "ui": [
+    {
+      "key": "appName",
+      "text": "NGS Plus",
+      "type": "Application",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      }
+    },
+    {
+      "key": "profileSecurityDialogTitle",
+      "text": "Güvenlik Ayarları",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.2942,
+        "y": 0.0892,
+        "width": 0.4116,
+        "height": 0.0275
+      }
+    },
+    {
+      "key": "profileSecurityDialogBody",
+      "text": "Mevcut şifrenizi biliyorsanız aşağıdaki formdan yeni bir şifre belirleyebilirsiniz. Şifre değişikliği tüm mobil oturumları sonlandırır. Şifrenizi unuttuysanız kurum yöneticinizden yeni kurulum bağlantısı isteyin. Ortak bir cihazdan ayrılmadan önce Çıkış Yap seçeneğini kullanın.",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0597,
+        "y": 0.1625,
+        "width": 0.8806,
+        "height": 0.1373
+      }
+    },
+    {
+      "key": "passwordResetAdminInfo",
+      "text": "Mobil şifre kurulumunu yöneticiniz yapar. Lütfen yöneticinizle iletişime geçin.",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0597,
+        "y": 0.3181,
+        "width": 0.8806,
+        "height": 0.0458
+      }
+    },
+    {
+      "key": "profileChangePassword",
+      "text": "Şifreyi değiştir",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0597,
+        "y": 0.3913,
+        "width": 0.8806,
+        "height": 0.032
+      }
+    },
+    {
+      "key": "profilePasswordRules",
+      "text": "Yeni şifre en az 8 karakter olmalı; büyük harf, küçük harf ve rakam içermeli, en fazla 72 UTF-8 bayt olmalı ve mevcut şifrenizden farklı olmalıdır. Şifre değişince tüm oturumlar kapanır; yeniden giriş yapmanız gerekir.",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0597,
+        "y": 0.4371,
+        "width": 0.8806,
+        "height": 0.1144
+      }
+    },
+    {
+      "key": "profileCurrentPassword",
+      "text": "Mevcut şifre",
+      "type": "TextField",
+      "frame": {
+        "x": 0.0597,
+        "y": 0.5698,
+        "width": 0.8806,
+        "height": 0.0641
+      }
+    },
+    {
+      "key": "profileNewPassword",
+      "text": "Yeni şifre",
+      "type": "TextField",
+      "frame": {
+        "x": 0.0597,
+        "y": 0.6522,
+        "width": 0.8806,
+        "height": 0.0641
+      }
+    },
+    {
+      "key": "profileRepeatPassword",
+      "text": "Yeni şifreyi tekrar girin",
+      "type": "TextField",
+      "frame": {
+        "x": 0.0597,
+        "y": 0.7346,
+        "width": 0.8806,
+        "height": 0.0641
+      }
+    },
+    {
+      "key": "loginShowPassword",
+      "text": "Şifreyi göster",
+      "type": "CheckBox",
+      "frame": {
+        "x": 0.0597,
+        "y": 0.8078,
+        "width": 0.8806,
+        "height": 0.0297
+      }
+    },
+    {
+      "key": "profileChangePassword",
+      "text": "Şifreyi değiştir",
+      "type": "Button",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      }
+    },
+    {
+      "key": "navHome",
+      "text": "Ana Sayfa",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "historyTitle",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "qrTabTitle",
+      "text": "QR İşlemleri",
+      "type": "Button",
+      "frame": {
+        "x": 0.4055,
+        "y": 0.8467,
+        "width": 0.1891,
+        "height": 0.0938
+      }
+    },
+    {
+      "key": "navVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "profileTitle",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    }
+  ]
+}

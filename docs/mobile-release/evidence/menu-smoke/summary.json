@@ -1,0 +1,137 @@
+{
+  "recordedAt": "2026-10-20T08:00:20.349271+00:00",
+  "device": {
+    "kind": "simulator",
+    "model": "iPhone 17 Pro",
+    "runtime": "iOS 27.0",
+    "bundleId": "com.ngsplus.app",
+    "version": "1.0.4+1"
+  },
+  "physicalDevice": {
+    "model": "iPhone 13",
+    "attempted": true,
+    "result": "not completed",
+    "blocker": "iPhone Mirroring reports iPhone in use; device must be idle/locked to connect. Requested user input; no device actions dependent on that input performed."
+  },
+  "releaseReady": false,
+  "backend": {
+    "deployment": "notable-tern-4",
+    "appEnvironmentLabel": "staging",
+    "actualDeploymentType": "development",
+    "requiredFunctions": 21,
+    "deployedFunctions": 6,
+    "missingFunctions": 15,
+    "confirmation": "Authenticated deployed function metadata plus invalid-session read-only HTTP probes; no account token extracted",
+    "deploymentPerformed": false
+  },
+  "menus": [
+    {
+      "menu": "Ana Sayfa",
+      "result": "blocked",
+      "observation": "Attendance status shows data unavailable / unexpected error",
+      "cause": "mobileAttendance:summary missing"
+    },
+    {
+      "menu": "Geçmiş / Tümü",
+      "result": "blocked",
+      "observation": "List shows unexpected-error state",
+      "cause": "mobileAttendance:listPage missing"
+    },
+    {
+      "menu": "Geçmiş / Bu Ay / İstatistik",
+      "result": "blocked",
+      "observation": "Month and week summaries unavailable",
+      "cause": "mobileAttendance:summary missing"
+    },
+    {
+      "menu": "QR / QR Kodum",
+      "result": "partial",
+      "observation": "Personal QR generated; status verification reports unavailable",
+      "cause": "employeeCheckIn:getMyCheckInTokenStatus missing"
+    },
+    {
+      "menu": "QR / Tara",
+      "result": "unresolved",
+      "observation": "After granting camera permission and rebuilding/relaunching, UI still reports permission required; simulator TCC camera auth_value=2 (allowed)",
+      "cause": "Not yet established; requires focused native permission/hardware verification. Not attributed solely to backend."
+    },
+    {
+      "menu": "Ziyaretçi / Liste / Özet",
+      "result": "blocked",
+      "observation": "List error and summary-refresh error",
+      "cause": "mobileVisitors:listPage and mobileVisitors:summary missing"
+    },
+    {
+      "menu": "Ziyaretçi / Yeni Ziyaretçi",
+      "result": "partial",
+      "observation": "Form opens; notice loading fails; no visitor saved",
+      "cause": "mobileVisitors:notice missing; create/update/cancel/detail also absent in deployed function metadata"
+    },
+    {
+      "menu": "Profil / Hızlı Erişim Kapısı",
+      "result": "blocked",
+      "observation": "Account/project identity unavailable and target-list error",
+      "cause": "mobileAccess:listTargets missing; account/project response needs verification after backend alignment"
+    },
+    {
+      "menu": "Ana Sayfa / Kapıyı Aç",
+      "result": "guard passed",
+      "observation": "Without a selected target, user is prompted to choose a quick-access door in Profile; no hardware request sent"
+    },
+    {
+      "menu": "Profil / Kişisel bilgiler",
+      "result": "passed",
+      "observation": "Read-only employee details screen opens"
+    },
+    {
+      "menu": "Profil / Tema / Dil",
+      "result": "passed",
+      "observation": "Selectors open and close; preferences unchanged"
+    },
+    {
+      "menu": "Profil / Güvenlik",
+      "result": "partial",
+      "observation": "Password-change form opens; no credential entered or changed",
+      "cause": "employeeAuth:changePassword missing in deployed function metadata"
+    },
+    {
+      "menu": "Profil / Bildirimler",
+      "result": "informational only",
+      "observation": "UI explicitly states push delivery and notification preference management are not implemented in this version"
+    },
+    {
+      "menu": "Profil / Yardım / Hakkında / Gizlilik",
+      "result": "passed",
+      "observation": "Information screens open; package version displayed as 1.0.4 build 1"
+    }
+  ],
+  "localFix": {
+    "problem": "Floating navigation covered nested-screen FABs and final scroll actions",
+    "implementation": "Shell body now reserves bottom navigation insets with SafeArea(top:false)",
+    "regression": "New real-shell test failed before fix (FAB bottom 584 > bar top 466), passed after fix",
+    "nativeVerification": {
+      "fabBottom": 0.8192,
+      "qrButtonTop": 0.8467,
+      "fabAboveNavigation": true
+    },
+    "installedOnSimulator": true
+  },
+  "validation": {
+    "flutterAnalyze": "passed, no issues",
+    "flutterTests": 445,
+    "targetedBackendTests": 122,
+    "backendTestFiles": 6,
+    "convexTypecheck": "passed"
+  },
+  "remainingAcceptance": [
+    "Publish the matching reviewed backend/schema/index package to the intended development/staging deployment, then re-run authenticated menu smoke.",
+    "Verify account/project identity with the matching employeeAuth response.",
+    "Resolve native camera permission discrepancy and test a real supported scanner/device.",
+    "Validate actual reader/door acknowledgement and visitor create/update/cancel with designated test data and hardware."
+  ],
+  "sourceSha256": {
+    "mobile/lib/screens/main_navigation_shell.dart": "7edb57f6d47196743da67d7b1f03c3a2a0d864a874d49357a805e90faeae5ef1",
+    "mobile/test/router/app_router_integration_test.dart": "dc95811870b8b5a258754ef446e245f5f521ab1ea7d4ee2bfdf3121e6f4c5f91"
+  },
+  "endState": "Simulator left on Home, signed-in session preserved; raw screenshots and account-bearing AX snapshots remain temporary and are not copied into repository evidence."
+}

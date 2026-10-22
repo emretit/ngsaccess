@@ -1,0 +1,71 @@
+{
+  "screen": "info",
+  "ui": [
+    {
+      "key": "appName",
+      "text": "NGS Plus",
+      "type": "Application",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      }
+    },
+    {
+      "key": "commonClose",
+      "text": "Kapat",
+      "type": "Button",
+      "frame": {
+        "x": 0.4403,
+        "y": 0.6819,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "historyInfoTitle",
+      "text": "Kayıtlar hakkında",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0597,
+        "y": 0.7368,
+        "width": 0.4391,
+        "height": 0.032
+      }
+    },
+    {
+      "key": "historyRawEvents",
+      "text": "Ham erişim hareketleri; resmi PDKS sonucu değildir.",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0597,
+        "y": 0.7826,
+        "width": 0.8806,
+        "height": 0.0458
+      }
+    },
+    {
+      "key": "historyTimeZone",
+      "text": "Türkiye saati · UTC+3",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0597,
+        "y": 0.8375,
+        "width": 0.3649,
+        "height": 0.0229
+      }
+    },
+    {
+      "key": "commonClose",
+      "text": "Kapat",
+      "type": "Button",
+      "frame": {
+        "x": 0.0597,
+        "y": 0.8787,
+        "width": 0.1582,
+        "height": 0.0549
+      }
+    }
+  ]
+}

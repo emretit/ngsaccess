@@ -863,19 +863,19 @@ abstract class AppLocalizations {
   /// No description provided for @historyTabAll.
   ///
   /// In tr, this message translates to:
-  /// **'Tümü'**
+  /// **'Kayıtlar'**
   String get historyTabAll;
 
   /// No description provided for @historyTabThisMonth.
   ///
   /// In tr, this message translates to:
-  /// **'Bu Ay'**
+  /// **'Takvim'**
   String get historyTabThisMonth;
 
   /// No description provided for @historyTabStats.
   ///
   /// In tr, this message translates to:
-  /// **'İstatistik'**
+  /// **'Özet'**
   String get historyTabStats;
 
   /// No description provided for @historyLoading.
@@ -989,7 +989,7 @@ abstract class AppLocalizations {
   /// No description provided for @historyActiveDays.
   ///
   /// In tr, this message translates to:
-  /// **'Aktif Gün'**
+  /// **'Giriş yapılan gün'**
   String get historyActiveDays;
 
   /// No description provided for @historyGeneralStats.
@@ -1277,7 +1277,7 @@ abstract class AppLocalizations {
   /// No description provided for @visitorTitle.
   ///
   /// In tr, this message translates to:
-  /// **'Ziyaretçi Yönetimi'**
+  /// **'Ziyaretçiler'**
   String get visitorTitle;
 
   /// No description provided for @visitorStatTotal.
@@ -1307,7 +1307,7 @@ abstract class AppLocalizations {
   /// No description provided for @visitorEmptyHint.
   ///
   /// In tr, this message translates to:
-  /// **'Yeni ziyaretçi eklemek için + butonuna tıklayın'**
+  /// **'Yeni bir davet oluşturmak için sağ üstteki Ekle düğmesini kullanın.'**
   String get visitorEmptyHint;
 
   /// No description provided for @visitorStatusExpected.
@@ -2201,7 +2201,7 @@ abstract class AppLocalizations {
   /// No description provided for @visitorSummaryTitle.
   ///
   /// In tr, this message translates to:
-  /// **'Davetleriniz, tüm sayfalar'**
+  /// **'Tüm davetlerin özeti'**
   String get visitorSummaryTitle;
 
   /// No description provided for @visitorSummaryLimited.
@@ -2305,6 +2305,204 @@ abstract class AppLocalizations {
   /// In tr, this message translates to:
   /// **'İsteğe bağlı'**
   String get visitorOptionalHint;
+
+  /// No description provided for @historyInfoTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kayıtlar hakkında'**
+  String get historyInfoTitle;
+
+  /// No description provided for @historyTimeZone.
+  ///
+  /// In tr, this message translates to:
+  /// **'Türkiye saati · UTC+3'**
+  String get historyTimeZone;
+
+  /// No description provided for @historyAllDates.
+  ///
+  /// In tr, this message translates to:
+  /// **'Tüm tarihler'**
+  String get historyAllDates;
+
+  /// No description provided for @historyAllDevices.
+  ///
+  /// In tr, this message translates to:
+  /// **'Tüm cihazlar'**
+  String get historyAllDevices;
+
+  /// No description provided for @historyApplyFilters.
+  ///
+  /// In tr, this message translates to:
+  /// **'Filtreleri uygula'**
+  String get historyApplyFilters;
+
+  /// No description provided for @historyShowAllRecords.
+  ///
+  /// In tr, this message translates to:
+  /// **'Tüm kayıtları göster'**
+  String get historyShowAllRecords;
+
+  /// No description provided for @historyFilteredEmptyHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'Seçtiğiniz tarih veya cihaz için kayıt bulunmuyor.'**
+  String get historyFilteredEmptyHint;
+
+  /// No description provided for @historyCalendarLegend.
+  ///
+  /// In tr, this message translates to:
+  /// **'Çerçeve: bugün · Dolgu: seçili gün · Nokta: kayıt var'**
+  String get historyCalendarLegend;
+
+  /// No description provided for @historySelectDayHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kayıtlarını görmek için bir gün seçin.'**
+  String get historySelectDayHint;
+
+  /// No description provided for @historyNoActivity.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu dönemde erişim hareketi yok'**
+  String get historyNoActivity;
+
+  /// No description provided for @historyNoActivityHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kayıtlar oluştukça özet burada görünür. Bu bir devamsızlık hesabı değildir.'**
+  String get historyNoActivityHint;
+
+  /// No description provided for @historyDeniedCount.
+  ///
+  /// In tr, this message translates to:
+  /// **'Reddedilen'**
+  String get historyDeniedCount;
+
+  /// No description provided for @historyUnknownCount.
+  ///
+  /// In tr, this message translates to:
+  /// **'Belirsiz'**
+  String get historyUnknownCount;
+
+  /// No description provided for @historyLoadedDevices.
+  ///
+  /// In tr, this message translates to:
+  /// **'Cihaz seçenekleri yüklenen kayıtlardan alınır.'**
+  String get historyLoadedDevices;
+
+  /// No description provided for @historyNoDeviceOptions.
+  ///
+  /// In tr, this message translates to:
+  /// **'Yüklenen kayıtlarda cihaz bulunmuyor.'**
+  String get historyNoDeviceOptions;
+
+  /// No description provided for @historyTabThisMonthPeriod.
+  ///
+  /// In tr, this message translates to:
+  /// **'Bu ay'**
+  String get historyTabThisMonthPeriod;
+
+  /// No description provided for @visitorPeopleSection.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kişi bilgileri'**
+  String get visitorPeopleSection;
+
+  /// No description provided for @visitorVisitSection.
+  ///
+  /// In tr, this message translates to:
+  /// **'Ziyaret bilgileri'**
+  String get visitorVisitSection;
+
+  /// No description provided for @visitorActivationHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'Davet kaydı oluşturulduktan sonra yetkili aktivasyonu gerekir.'**
+  String get visitorActivationHint;
+
+  /// No description provided for @visitorPendingShort.
+  ///
+  /// In tr, this message translates to:
+  /// **'Aktivasyon bekliyor'**
+  String get visitorPendingShort;
+
+  /// No description provided for @visitorInvitationsTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Davetler'**
+  String get visitorInvitationsTitle;
+
+  /// No description provided for @visitorFilteredEmptyHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'Arama veya durum filtresiyle eşleşen davet bulunamadı.'**
+  String get visitorFilteredEmptyHint;
+
+  /// No description provided for @visitorClearFilters.
+  ///
+  /// In tr, this message translates to:
+  /// **'Filtreleri temizle'**
+  String get visitorClearFilters;
+
+  /// No description provided for @visitorNoticeUnavailable.
+  ///
+  /// In tr, this message translates to:
+  /// **'Aydınlatma bilgisi yüklenemedi. Kaydetmeden önce tekrar deneyin.'**
+  String get visitorNoticeUnavailable;
+
+  /// No description provided for @profileProject.
+  ///
+  /// In tr, this message translates to:
+  /// **'Firma / proje'**
+  String get profileProject;
+
+  /// No description provided for @profileProjectUnavailable.
+  ///
+  /// In tr, this message translates to:
+  /// **'Proje bilgisi şu anda kullanılamıyor'**
+  String get profileProjectUnavailable;
+
+  /// No description provided for @doorOperationRecoveryTitle.
+  ///
+  /// In tr, this message translates to:
+  /// **'Kapı işlemini kontrol et'**
+  String get doorOperationRecoveryTitle;
+
+  /// No description provided for @doorOperationRecoveryHint.
+  ///
+  /// In tr, this message translates to:
+  /// **'Önce önceki isteğin durumu kontrol edilir. Tekrar denerseniz aynı istek ve aynı kapı kullanılır. Komut sonucu fiziksel geçişi doğrulamaz.'**
+  String get doorOperationRecoveryHint;
+
+  /// No description provided for @visitorRecoveryChecking.
+  ///
+  /// In tr, this message translates to:
+  /// **'Önceki ziyaretçi isteği kontrol ediliyor…'**
+  String get visitorRecoveryChecking;
+
+  /// No description provided for @visitorRecoveryUnresolved.
+  ///
+  /// In tr, this message translates to:
+  /// **'Önceki isteğin sonucu henüz doğrulanamadı. Aynı ziyaretçi bilgilerini girip aynı isteği tekrar deneyebilirsiniz. Yeni bir istek oluşturulmayacak.'**
+  String get visitorRecoveryUnresolved;
+
+  /// No description provided for @visitorRecoveryRetry.
+  ///
+  /// In tr, this message translates to:
+  /// **'Aynı isteği tekrar dene'**
+  String get visitorRecoveryRetry;
+
+  /// No description provided for @visitorRecoveryFound.
+  ///
+  /// In tr, this message translates to:
+  /// **'Önceki ziyaretçi kaydı bulundu.'**
+  String get visitorRecoveryFound;
+
+  /// No description provided for @visitorRecoveryStorageError.
+  ///
+  /// In tr, this message translates to:
+  /// **'Ziyaretçi isteği güvenli biçimde saklanamadı veya okunamadı. Devam etmeden önce durumu tekrar kontrol edin.'**
+  String get visitorRecoveryStorageError;
 }
 
 class _AppLocalizationsDelegate

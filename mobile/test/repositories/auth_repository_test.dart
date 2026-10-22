@@ -14,6 +14,7 @@ Map<String, Object?> employeeJson() => {
   'lastName': 'Test',
   'cardNumber': 'test-card',
   'projectId': 'project-a',
+  'projectName': 'Mobile project A',
   'departmentName': null,
   'departmentId': null,
   'photoUrl': null,
@@ -48,6 +49,7 @@ void main() {
       password: 'test-password',
     );
     expect(result.user.projectId, 'project-a');
+    expect(result.user.projectName, 'Mobile project A');
     expect(result.user.firstName, 'A');
     expect(result.token, 'test-session');
     verify(
@@ -63,6 +65,15 @@ void main() {
     expect(AuthUser.fromJson(user).projectId, isNull);
   });
 
+  test('older or missing project name never falls back to department', () {
+    final user = employeeJson()
+      ..remove('projectName')
+      ..['departmentName'] = 'Department is not the project';
+    expect(AuthUser.fromJson(user).projectName, isNull);
+    user['projectName'] = null;
+    expect(AuthUser.fromJson(user).projectName, isNull);
+  });
+
   for (final field in ['id', 'email', 'firstName', 'lastName', 'cardNumber']) {
     test('rejects missing required user field $field', () {
       final user = employeeJson()..remove(field);
@@ -76,6 +87,7 @@ void main() {
 
   for (final field in [
     'projectId',
+    'projectName',
     'photoUrl',
     'departmentId',
     'departmentName',
@@ -132,7 +144,9 @@ void main() {
     when(
       () => client.employeeQuery(any(), any()),
     ).thenAnswer((_) async => jsonEncode(employeeJson()));
-    expect((await repo.me()).projectId, 'project-a');
+    final user = await repo.me();
+    expect(user.projectId, 'project-a');
+    expect(user.projectName, 'Mobile project A');
   });
 
   test(

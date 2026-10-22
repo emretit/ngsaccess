@@ -1,0 +1,7 @@
+Starting: Intent { cmp=com.ngsplus.app.ngsplusapp/.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: com.ngsplus.app.ngsplusapp/.MainActivity
+TotalTime: 1062
+WaitTime: 1066
+Complete

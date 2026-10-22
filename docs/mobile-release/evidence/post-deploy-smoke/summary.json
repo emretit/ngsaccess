@@ -1,0 +1,39 @@
+{
+  "reportedReleaseSha": "71163d0",
+  "backendDeployment": "notable-tern-4",
+  "device": "iPhone 17 Pro",
+  "runtime": "iOS 27.0",
+  "app": "1.0.4+1",
+  "apiPresence": "21/21",
+  "flutterTests": 448,
+  "analysis": "clean",
+  "simulatorBuildAndInstall": "passed",
+  "releaseReady": false,
+  "mobileFixes": [
+    "Normalize exact safe whole-number float64 JSON values into Dart ints without truncating fractions or rounding unsafe values",
+    "Keep native scanner initialization errors distinct from permission denial",
+    "Floating navigation SafeArea inset regression retained"
+  ],
+  "passedMenus": [
+    "Home attendance",
+    "History list",
+    "History monthly summary",
+    "History weekly statistics",
+    "Personal QR generation and status",
+    "Visitor list and summary",
+    "Visitor form read-only",
+    "Profile door target listing",
+    "Security form and 8-character policy text"
+  ],
+  "doorTargetResult": "4 targets, all report mobile opening unsupported; no operation requested",
+  "pending": [
+    "Physical camera QR scan",
+    "End-to-end physical door acknowledgement with supported target",
+    "Physical phone smoke; earlier mirroring was blocked by device in use"
+  ],
+  "mutationCoverage": "No visitor create/update/cancel, password change, or hardware open command; metadata presence does not prove these flows",
+  "ownership": "Backend and web published by CEO; mobile agent changed mobile code only; no mobile store upload",
+  "cameraResult": "Final installed build shows localized camera startup failure, not permission denial; physical QR scan remains unverified",
+  "mobileFixCommit": "305f227",
+  "mobileFixPushed": false
+}

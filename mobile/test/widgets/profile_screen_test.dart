@@ -25,9 +25,12 @@ void main() {
   late LocaleProvider locale;
   late ThemeProvider theme;
   late PreferredDeviceProvider preferred;
-  Future<void> prepare() async {
+  Future<void> prepare({AuthUser? user}) async {
     prefs = TestPreferences();
     repository = FakeAuthRepository();
+    if (user != null) {
+      repository.onSignIn = (_, _) async => authResult(user: user);
+    }
     auth = AuthProvider(
       repository: repository,
       sessionStore: FakeSessionStore(),
@@ -129,6 +132,79 @@ void main() {
       find.widgetWithText(FilledButton, 'Change password'),
     );
   }
+
+  const mobileProjectUser = AuthUser(
+    id: 'employee-a',
+    email: 'a@example.test',
+    firstName: 'A',
+    lastName: 'Test',
+    cardNumber: 'test-card',
+    projectId: 'project-a',
+    projectName: 'Mobile project A',
+    departmentName: 'Department is not the project',
+  );
+
+  testWidgets('profile and personal information show the mobile project', (
+    tester,
+  ) async {
+    await prepare(user: mobileProjectUser);
+    await mount(tester);
+    expect(find.text('Company / project'), findsOneWidget);
+    expect(find.text('Mobile project A'), findsOneWidget);
+    expect(find.text('Department is not the project'), findsNothing);
+    await tester.tap(find.text('Personal details'));
+    await tester.pumpAndSettle();
+    expect(find.text('Company / project: Mobile project A'), findsOneWidget);
+  });
+
+  testWidgets('project label updates after switching mobile accounts', (
+    tester,
+  ) async {
+    await prepare(user: mobileProjectUser);
+    await mount(tester);
+    expect(find.text('Mobile project A'), findsOneWidget);
+    await auth.signOut();
+    await tester.pumpAndSettle();
+    expect(find.text('Mobile project A'), findsNothing);
+    repository.onSignIn = (_, _) async => authResult(user: otherAuthTestUser);
+    await auth.signIn('b@example.test', 'test-password');
+    await tester.pumpAndSettle();
+    expect(find.text('Mobile project A'), findsNothing);
+    expect(
+      find.text('Project information is currently unavailable'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'legacy project fallback is localized and never uses department',
+    (tester) async {
+      await prepare();
+      await mount(tester, language: 'tr');
+      expect(find.text('Firma / proje'), findsOneWidget);
+      expect(find.text('Proje bilgisi şu anda kullanılamıyor'), findsOneWidget);
+    },
+  );
+
+  testWidgets('project header wraps long names with large text', (
+    tester,
+  ) async {
+    await prepare(
+      user: const AuthUser(
+        id: 'employee-a',
+        email: 'a@example.test',
+        firstName: 'A',
+        lastName: 'Test',
+        cardNumber: 'test-card',
+        projectId: 'project-a',
+        projectName:
+            'A long mobile company and project name that should wrap safely',
+      ),
+    );
+    await mount(tester, scale: 2);
+    expect(tester.takeException(), isNull);
+    expect(find.textContaining('A long mobile company'), findsOneWidget);
+  });
 
   testWidgets(
     'language picker changes the live profile and saves the selected locale',

@@ -1,0 +1,38 @@
+{
+  "date": "2026-10-20",
+  "device": "iPhone 17 Pro simulator",
+  "runtime": "iOS 27.0",
+  "implemented": [
+    "Top-right Add action replaces floating button",
+    "Compact search retains 80-character limit and debounced session-safe query",
+    "Single status-filter sheet covers bottom navigation",
+    "Clear filters cancels pending search and resets visible input",
+    "All-invitation summary separate from filtered list; zero summary suppressed",
+    "Status badges and compact date ranges on visitor cards",
+    "Personal and visit sections with responsive name fields, date controls and optional fields",
+    "Creation activation hint no longer presents an unsaved invitation as pending",
+    "Missing privacy-notice data has a contextual retry explanation",
+    "Detail sheet preserves access, physical presence and device-sync distinctions"
+  ],
+  "validation": {
+    "flutterTests": 462,
+    "flutterAnalyze": "no issues",
+    "catalogParity": "passed",
+    "simulatorBuildAndInstall": "passed",
+    "businessFormInitializationDateAndSaveLogicUnchanged": true,
+    "nativeReadOnlySmoke": [
+      "top-right Add and no floating add button",
+      "empty list without zero-status clutter",
+      "status filter and clear/show-all recovery",
+      "Add opens grouped form",
+      "save reachable above floating bottom navigation"
+    ]
+  },
+  "coverageLimits": [
+    "Current native account has no invitations; populated cards, all-invitation summary scope, detail ownership/cancellation and ambiguous save retries verified using synthetic widget fixtures",
+    "English/Turkish, dark/light and 320px at 200-percent text checked in widget tests"
+  ],
+  "backendChangedByThisTask": false,
+  "realVisitorCreatedUpdatedOrCancelledDuringNativeSmoke": false,
+  "rawScreenshotsOrPersonalDataCopiedToRepo": false
+}

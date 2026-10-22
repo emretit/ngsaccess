@@ -24,6 +24,7 @@ import 'repositories/visitor_repository.dart';
 import 'router/app_router.dart';
 import 'screens/splash_screen.dart';
 import 'services/session_store.dart';
+import 'services/visitor_create_intent_store.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -192,7 +193,10 @@ class _MyAppState extends State<MyApp> {
         widget.authProvider ??
         AuthProvider(repository: _authRepo, sessionStore: widget.sessionStore);
     _attendanceProvider = AttendanceProvider(repository: _attendanceRepo);
-    _visitorProvider = VisitorProvider(repository: _visitorRepo);
+    _visitorProvider = VisitorProvider(
+      repository: _visitorRepo,
+      createIntentStore: FileVisitorCreateIntentStore(),
+    );
     _doorProvider = DoorOperationProvider(repository: _doorRepo);
     _authExpired = () {
       if (!mounted || !_composed) {

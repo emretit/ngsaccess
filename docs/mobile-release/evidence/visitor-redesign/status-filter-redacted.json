@@ -1,0 +1,115 @@
+{
+  "screen": "status-filter",
+  "ui": [
+    {
+      "key": "appName",
+      "text": "NGS Plus",
+      "type": "Application",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      }
+    },
+    {
+      "key": "commonClose",
+      "text": "Kapat",
+      "type": "Button",
+      "frame": {
+        "x": 0.4403,
+        "y": 0.508,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "historyFilterTitle",
+      "text": "Filtrele",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.5744,
+        "width": 0.7811,
+        "height": 0.032
+      }
+    },
+    {
+      "key": "visitorFilterTitle",
+      "text": "Filtrele",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.5744,
+        "width": 0.7811,
+        "height": 0.032
+      }
+    },
+    {
+      "key": "commonClose",
+      "text": "Kapat",
+      "type": "Button",
+      "frame": {
+        "x": 0.8308,
+        "y": 0.5629,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "visitorAllStatuses",
+      "text": "Tüm erişim durumları",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.6178,
+        "width": 0.9005,
+        "height": 0.0641
+      }
+    },
+    {
+      "key": "visitorPreRegistered",
+      "text": "Yetkili aktivasyonu bekleniyor",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.6819,
+        "width": 0.9005,
+        "height": 0.0641
+      }
+    },
+    {
+      "key": "visitorAccessActive",
+      "text": "Erişim aktif",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.746,
+        "width": 0.9005,
+        "height": 0.0641
+      }
+    },
+    {
+      "key": "visitorAccessEnded",
+      "text": "Erişim sonlandırıldı",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.8101,
+        "width": 0.9005,
+        "height": 0.0641
+      }
+    },
+    {
+      "key": "visitorExpired",
+      "text": "Süresi doldu",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.8741,
+        "width": 0.9005,
+        "height": 0.0641
+      }
+    }
+  ]
+}

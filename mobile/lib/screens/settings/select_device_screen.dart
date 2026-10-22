@@ -263,11 +263,16 @@ class _SelectDeviceScreenState extends State<SelectDeviceScreen> {
                 title: Text(
                   device.doorName ?? device.name ?? l10n.historyUnknownDevice,
                 ),
-                subtitle: device.canOpen == false
-                    ? Text(_unavailableLabel(l10n, device.reason))
-                    : device.subtitle.isEmpty
+                subtitle: device.subtitle.isEmpty && device.canOpen != false
                     ? null
-                    : Text(device.subtitle),
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (device.subtitle.isNotEmpty) Text(device.subtitle),
+                          if (device.canOpen == false)
+                            Text(_unavailableLabel(l10n, device.reason)),
+                        ],
+                      ),
                 trailing: Icon(
                   selected ? Icons.check_circle : Icons.radio_button_unchecked,
                 ),

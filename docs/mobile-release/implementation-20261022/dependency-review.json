@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-22",
+  "scope": "Current pinned Flutter 3.47.2/Dart 3.13.2 graph; official publisher changelogs reviewed",
+  "decisions": [
+    {
+      "package": "cupertino_icons",
+      "current": "1.0.8",
+      "decision": "Update to 1.0.9 patch; keep major 2 separate",
+      "reason": "1.0.9 removes an empty Dart file and requires Flutter3.35/Dart3.9, satisfied by this project. Major2 changes imports to cupertino_ui and minimum Flutter3.44/Dart3.12; no current icon defect requires that migration.",
+      "source": "https://pub.dev/packages/cupertino_icons/changelog",
+      "status": "updated_to_1.0.9"
+    },
+    {
+      "package": "flutter_secure_storage",
+      "current": "10.3.1",
+      "latestReviewed": "11.2.0",
+      "decision": "Keep10.3.1 for this candidate",
+      "reason": "Major11 removes legacy crypto/backends and namespace options; migration of installed sessions must be verified from actual previously distributed app versions. Existing session store fixes have no new storage requirement. Update needs separate old-version upgrade/device test.",
+      "source": "https://pub.dev/packages/flutter_secure_storage/changelog"
+    },
+    {
+      "package": "go_router",
+      "current": "17.5.0",
+      "latestReviewed": "18.1.1",
+      "decision": "Keep17.5.0 for this candidate",
+      "reason": "Major18 migrates to material_ui/cupertino_ui and raises SDK minimum; reviewed18.1.1 includes shell/observer fixes. Current static route topology has focused regressions; no confirmed audit finding requires new router API. Schedule module migration separately rather than mixing with lifecycle recovery fixes.",
+      "source": "https://pub.dev/packages/go_router/changelog"
+    },
+    {
+      "package": "package_info_plus",
+      "current": "8.3.1",
+      "latestReviewed": "10.2.2",
+      "decision": "Keep8.3.1 under current native pin",
+      "reason": "Major9 minimumAGP8.12.1 exceeds pinned8.11.1; major10 also changes transitive/native graph. Current metadata behavior is tested. Native toolchain upgrade and plugin upgrade need one coordinated reviewed change.",
+      "source": "https://pub.dev/packages/package_info_plus/changelog"
+    },
+    {
+      "package": "permission_handler",
+      "current": "12.0.3",
+      "latestReviewed": "13.0.2",
+      "decision": "Keep12.0.3 under current compileSDK36",
+      "reason": "Major13 moves plugin compileSDK37;13.0.2 changes Android permanent-denial guidance. Application camera uses current supported permission flow; upgrade requiresSDK37/native acceptance before inclusion.",
+      "source": "https://pub.dev/packages/permission_handler/changelog"
+    }
+  ],
+  "nativeToolchain": {
+    "decision": "Keep release/toolchain.json pins for this candidate",
+    "reason": "AGP/Kotlin future Flutter support warnings are recorded; current pinned SDK builds must be rechecked. Upgrade only as coordinated graph/platform change, not to silence a future support warning."
+  },
+  "notAClaim": "New major versions alone are not security vulnerabilities. Dependency decisions do not close physical camera, upgrade or signing acceptance.",
+  "verification": "flutter pub get changed exactly one dependency; final test and native build evidence recorded by coordinator"
+}

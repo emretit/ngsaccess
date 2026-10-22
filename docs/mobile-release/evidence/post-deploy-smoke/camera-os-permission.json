@@ -1,0 +1,10 @@
+{
+  "platform": "iOS simulator 27.0",
+  "cameraAuthorizationRows": [
+    [
+      "kTCCServiceCamera",
+      2
+    ]
+  ],
+  "appStillShowsPermissionRequiredAfterRetry": true
+}

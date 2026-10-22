@@ -1,0 +1,10 @@
+{
+  "licenseId": "android-sdk-arm-dbt-license",
+  "sdkTrimStringAdapterNormalizedSha1": "859f317696f67ef3d7f30a50a5560e7834b43903",
+  "existingAcceptedHashes": [
+    "859f317696f67ef3d7f30a50a5560e7834b43903"
+  ],
+  "alreadyAccepted": true,
+  "newAgreementAccepted": false,
+  "method": "Existing SDK License.checkAccepted compares SHA1 of TrimStringAdapter-normalized XML value; verified adapter bytecode read-only with javap."
+}

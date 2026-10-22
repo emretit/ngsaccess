@@ -1,0 +1,465 @@
+00:00 +0: loading /Users/emreaydin/ngsaccess/mobile/test/l10n/catalog_test.dart
+00:00 +0: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: AppError.fromException zaten AppError ise olduğu gibi döner
+00:00 +1: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: AppError.fromException TimeoutException → TimeoutError
+00:00 +2: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: AppError.fromException SocketException → NetworkError
+00:00 +3: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: AppError.fromException HttpException → NetworkError
+00:00 +4: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: AppError.fromException Bilinmeyen Object → UnknownError
+00:00 +5: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: all error string surfaces exclude sensitive untrusted details
+00:00 +6: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: rate limit metadata remains typed and protocol keeps exhaustive compatibility
+00:00 +7: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: operation denials retain precise codes and safe denial presentation
+00:00 +8: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: operation recovery failures preserve codes without trusting server text
+00:00 +9: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: userMessage Network mesajı non-empty
+00:00 +10: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: userMessage ServerError mesajında status code görünür
+00:00 +11: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: userMessage BusinessError bilinen TR mesajını humanize eder
+00:00 +12: /Users/emreaydin/ngsaccess/mobile/test/core/errors_test.dart: userMessage BusinessError bilinmeyen mesajı güvenli genel metne çevirir
+00:00 +13: /Users/emreaydin/ngsaccess/mobile/test/core/attendance_date_test.dart: UTC calendar selections preserve date components; actual instants use Istanbul day
+00:00 +14: /Users/emreaydin/ngsaccess/mobile/test/core/attendance_date_test.dart: half-open day includes midnight once and excludes next midnight
+00:00 +15: /Users/emreaydin/ngsaccess/mobile/test/core/attendance_date_test.dart: month starts on first; leap year and year boundary are normalized
+00:00 +16: /Users/emreaydin/ngsaccess/mobile/test/core/attendance_date_test.dart: Monday morning belongs to current week and clock time does not shift boundary
+00:00 +17: /Users/emreaydin/ngsaccess/mobile/test/core/attendance_date_test.dart: European DST transition does not change Istanbul modern business offset
+00:00 +18: /Users/emreaydin/ngsaccess/mobile/test/core/attendance_date_test.dart: invalid dates reject rollover instead of normalizing to another day
+00:00 +19: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: retains safe stack location and operation but drops secret/PII markers
+00:00 +20: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: unknown business code and response body never enter local diagnostics
+00:00 +21: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: rate limits identical failures and bounds retained history
+00:00 +22: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: broken diagnostic clock never changes the caller outcome
+00:00 +23: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: support JSON has a versioned allowlist and excludes every raw error field
+00:00 +24: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: retains symbolizer-compatible AOT header and PC offsets without raw context
+00:00 +25: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: retains iOS AOT address grammar and drops arbitrary symbol and loading-unit data
+00:00 +26: /Users/emreaydin/ngsaccess/mobile/test/core/safe_diagnostics_test.dart: untrusted large stacks remain bounded and event snapshots cannot be modified
+00:00 +27: /Users/emreaydin/ngsaccess/mobile/test/l10n/catalog_test.dart: TR/EN preserve the release key inventory and placeholder contracts
+00:00 +28: /Users/emreaydin/ngsaccess/mobile/test/l10n/catalog_test.dart: record count translations preserve zero/singular/plural and Turkish numbers
+00:00 +29: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: success preserves explicit nulls in nested maps and lists
+00:00 +30: /Users/emreaydin/ngsaccess/mobile/test/core/response_decoder_test.dart: Convex float64 whole numbers decode as safe integer fields
+00:00 +31: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +32: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +33: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +34: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +35: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +36: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +37: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +38: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +39: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +40: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +41: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +42: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +43: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +44: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +45: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +46: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +47: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +48: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +49: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +50: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +51: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +52: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +53: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +54: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +55: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +56: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +57: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +58: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +59: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +60: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +61: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +62: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +63: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +64: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +65: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +66: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +67: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +68: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +69: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +70: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +71: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +72: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +73: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +74: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +75: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +76: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +77: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +78: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +79: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +80: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +81: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +82: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +83: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +84: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +85: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +86: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +87: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +88: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +89: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +90: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +91: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +92: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +93: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +94: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +95: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +96: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +97: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +98: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +99: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +100: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +101: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: tr never displays arbitrary backend body or exception text
+00:00 +102: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 503 queries retry only to bound; mutation and action default to one attempt
+00:00 +103: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 503 queries retry only to bound; mutation and action default to one attempt
+00:00 +104: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: 503 queries retry only to bound; mutation and action default to one attempt
+00:00 +105: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: en never displays arbitrary backend body or exception text
+00:00 +106: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: en never displays arbitrary backend body or exception text
+00:00 +107: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: en never displays arbitrary backend body or exception text
+00:00 +108: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: en never displays arbitrary backend body or exception text
+00:00 +109: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: employeeAction injects original token and preserves explicit null arguments
+00:00 +110: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: en maps stable credentials code to localized text
+00:00 +111: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: en maps stable credentials code to localized text
+00:00 +112: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: en maps stable credentials code to localized text
+00:00 +113: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: en maps stable credentials code to localized text
+00:00 +114: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: en maps stable credentials code to localized text
+00:00 +115: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: en maps stable credentials code to localized text
+00:00 +116: /Users/emreaydin/ngsaccess/mobile/test/core/error_localizer_test.dart: en maps stable credentials code to localized text
+00:00 +117: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:01 +118: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: polling yanıt tamamlanmadan yeni istek başlatmaz ve iptal edilir
+00:01 +119: /Users/emreaydin/ngsaccess/mobile/test/config/convex_config_test.dart: oturum hatasından sonra polling yeniden zamanlanmaz
+00:01 +120: /Users/emreaydin/ngsaccess/mobile/test/providers/theme_provider_test.dart: late bootstrap cannot undo an explicit user selection
+00:01 +121: /Users/emreaydin/ngsaccess/mobile/test/providers/theme_provider_test.dart: rapid choices serialize writes and retain the last verified success
+00:01 +122: /Users/emreaydin/ngsaccess/mobile/test/providers/theme_provider_test.dart: a rejected write does not pretend the new choice was saved
+00:01 +123: /Users/emreaydin/ngsaccess/mobile/test/providers/theme_provider_test.dart: bootstrap storage failure and disposal are safe
+00:01 +124: /Users/emreaydin/ngsaccess/mobile/test/providers/theme_provider_test.dart: pending write never notifies after disposal
+00:02 +125: /Users/emreaydin/ngsaccess/mobile/test/providers/door_operation_provider_test.dart: ten concurrent taps capture one durable 128 bit intention before request
+00:02 +126: /Users/emreaydin/ngsaccess/mobile/test/providers/door_operation_provider_test.dart: commit response loss reconciles by request query and never creates another command
+00:02 +127: /Users/emreaydin/ngsaccess/mobile/test/providers/door_operation_provider_test.dart: relaunch queries a stored request; null stays unresolved until explicit same-ID retry
+00:02 +128: /Users/emreaydin/ngsaccess/mobile/test/providers/door_operation_provider_test.dart: relaunch with receipt queries operationId and never resends even unknown
+00:02 +129: /Users/emreaydin/ngsaccess/mobile/test/providers/door_operation_provider_test.dart: initial store failure prevents HTTP and explicit retry retains same intention
+00:02 +130: /Users/emreaydin/ngsaccess/mobile/test/providers/door_operation_provider_test.dart: explicit first-request denial is distinct from response loss and permits later intent
+00:02 +131: /Users/emreaydin/ngsaccess/mobile/test/providers/door_operation_provider_test.dart: expiry ends only the owning auth session and keeps its unresolved receipt
+00:02 +132: /Users/emreaydin/ngsaccess/mobile/test/providers/door_operation_provider_test.dart: late A expiry cannot close a newly authenticated B session
+00:02 +133: /Users/emreaydin/ngsaccess/mobile/test/providers/door_operation_provider_test.dart: failed read cannot silently discard previous pending state
+00:02 +134: /Users/emreaydin/ngsaccess/mobile/test/providers/door_operation_provider_test.dart: logout during persistence prevents command and preserves scoped intent for recovery
+00:02 +135: /Users/emreaydin/ngsaccess/mobile/test/providers/qr_provider_test.dart: server expiry survives phone skew and subtracts network round trip
+00:02 +136: /Users/emreaydin/ngsaccess/mobile/test/providers/qr_provider_test.dart: server expiry survives phone skew and subtracts network round trip
+00:02 +137: /Users/emreaydin/ngsaccess/mobile/test/providers/qr_provider_test.dart: server expiry survives phone skew and subtracts network round trip
+00:02 +138: /Users/emreaydin/ngsaccess/mobile/test/providers/qr_provider_test.dart: server expiry survives phone skew and subtracts network round trip
+00:02 +139: /Users/emreaydin/ngsaccess/mobile/test/providers/qr_provider_test.dart: server expiry survives phone skew and subtracts network round trip
+00:02 +140: /Users/emreaydin/ngsaccess/mobile/test/providers/qr_provider_test.dart: server expiry survives phone skew and subtracts network round trip
+00:02 +141: /Users/emreaydin/ngsaccess/mobile/test/providers/qr_provider_test.dart: duplicate refresh clicks issue one mutation; refresh failure stays visible with old token
+00:02 +142: /Users/emreaydin/ngsaccess/mobile/test/providers/qr_provider_test.dart: A result and finally cannot replace B token or busy state
+00:02 +143: /Users/emreaydin/ngsaccess/mobile/test/providers/qr_provider_test.dart: late result after disposal emits no notification
+00:02 +144: /Users/emreaydin/ngsaccess/mobile/test/providers/qr_provider_test.dart: consumption hides the code and status failure cannot advertise an unverified code
+00:02 +145: /Users/emreaydin/ngsaccess/mobile/test/providers/qr_provider_test.dart: camera gate requires every lifecycle condition; modal and same-code repeats never rearm by time
+00:02 +146: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +147: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +148: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +149: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +150: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +151: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +152: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +153: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +154: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +155: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +156: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +157: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +158: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +159: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +160: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +161: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +162: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +163: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +164: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +165: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +166: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +167: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +168: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +169: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +170: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +171: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +172: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +173: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +174: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +175: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +176: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +177: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +178: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +179: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +180: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +181: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +182: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +183: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +184: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +185: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +186: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +187: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +188: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +189: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +190: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +191: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +192: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +193: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +194: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +195: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +196: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +197: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +198: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +199: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +200: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +201: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +202: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +203: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +204: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +205: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +206: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +207: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:02 +208: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +209: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +210: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +211: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +212: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +213: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +214: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +215: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +216: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +217: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +218: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +219: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +220: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +221: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +222: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +223: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +224: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +225: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +226: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +227: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +228: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +229: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +230: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +231: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +232: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +233: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +234: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +235: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +236: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +237: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +238: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +239: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +240: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +241: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +242: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +243: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +244: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +245: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +246: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +247: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real root restores token once before opening cold history link
+00:03 +248: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real login form auth notification restores history target
+00:03 +249: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real login form auth notification restores history target
+00:03 +250: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real login form auth notification restores history target
+00:03 +251: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real login form auth notification restores history target
+00:03 +252: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:03 +253: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:03 +254: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:03 +255: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:03 +256: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:03 +257: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:03 +258: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:03 +259: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:03 +260: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:03 +261: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:03 +262: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:03 +263: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:03 +264: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:03 +265: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:03 +266: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:03 +267: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:03 +268: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:04 +269: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:04 +270: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:04 +271: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:04 +272: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:04 +273: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:04 +274: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:04 +275: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:04 +276: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: successful empty state supports pull refresh and displays retry after failure
+00:04 +277: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real retained QR and visitor branches stop hidden resources
+00:04 +278: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real retained QR and visitor branches stop hidden resources
+00:04 +279: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real retained QR and visitor branches stop hidden resources
+00:04 +280: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real retained QR and visitor branches stop hidden resources
+00:04 +281: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real retained QR and visitor branches stop hidden resources
+00:04 +282: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real retained QR and visitor branches stop hidden resources
+00:04 +283: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real retained QR and visitor branches stop hidden resources
+00:04 +284: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real retained QR and visitor branches stop hidden resources
+00:04 +285: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real retained QR and visitor branches stop hidden resources
+00:04 +286: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real retained QR and visitor branches stop hidden resources
+00:04 +287: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real retained QR and visitor branches stop hidden resources
+00:04 +288: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real retained QR and visitor branches stop hidden resources
+00:04 +289: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real retained QR and visitor branches stop hidden resources
+00:04 +290: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: real retained QR and visitor branches stop hidden resources
+00:04 +291: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: active access cancellation reports operator requirement without a false success
+00:04 +292: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: visitor polling pauses in background and resumes only on its active branch
+00:04 +293: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: declining cancellation performs no mutation
+00:04 +294: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: owned client closes, expiry callback detaches and diagnostic hooks restore
+00:04 +295: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: ownership rejection never displays visitor contact information
+00:04 +296: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: ownership rejection never displays visitor contact information
+00:04 +297: /Users/emreaydin/ngsaccess/mobile/test/integration/app_composition_test.dart: late factory result after root disposal closes without bootstrap
+00:04 +298: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: ambiguous create locks its details and retries with the same request ID
+00:04 +299: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: ambiguous create locks its details and retries with the same request ID
+00:04 +300: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: ambiguous create locks its details and retries with the same request ID
+00:04 +301: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: ambiguous create locks its details and retries with the same request ID
+00:04 +302: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: ambiguous create locks its details and retries with the same request ID
+00:04 +303: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: ambiguous create locks its details and retries with the same request ID
+00:04 +304: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: ambiguous create locks its details and retries with the same request ID
+00:04 +305: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: ambiguous create locks its details and retries with the same request ID
+00:04 +306: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: ambiguous create locks its details and retries with the same request ID
+00:04 +307: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: ambiguous create locks its details and retries with the same request ID
+00:04 +308: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: ambiguous create locks its details and retries with the same request ID
+00:04 +309: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: ambiguous create locks its details and retries with the same request ID
+00:04 +310: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: ambiguous create locks its details and retries with the same request ID
+00:05 +311: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: search debounces server filtering and summary overflow is explicit
+00:05 +312: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: search debounces server filtering and summary overflow is explicit
+00:05 +313: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: search debounces server filtering and summary overflow is explicit
+00:05 +314: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: search debounces server filtering and summary overflow is explicit
+00:05 +315: /Users/emreaydin/ngsaccess/mobile/test/services/session_store_test.dart: secure write failure leaves restore disabled
+00:05 +316: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: editing clears optional contact and notes with explicit null payloads
+00:05 +317: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: editing clears optional contact and notes with explicit null payloads
+00:05 +318: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: editing clears optional contact and notes with explicit null payloads
+00:05 +319: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: editing clears optional contact and notes with explicit null payloads
+00:05 +320: /Users/emreaydin/ngsaccess/mobile/test/visitor_widgets_test.dart: editing clears optional contact and notes with explicit null payloads
+00:05 +321: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +322: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +323: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +324: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +325: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +326: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +327: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +328: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +329: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +330: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +331: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +332: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +333: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +334: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +335: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +336: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +337: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +338: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +339: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +340: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +341: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +342: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +343: /Users/emreaydin/ngsaccess/mobile/test/widgets/home_screen_test.dart: home requests independent summary and recovers from first-load error
+00:05 +344: /Users/emreaydin/ngsaccess/mobile/test/widgets/qr_scan_screen_test.dart: camera runs only in visible scan tab and pauses in background; caller retains ownership
+00:05 +345: /Users/emreaydin/ngsaccess/mobile/test/widgets/qr_scan_screen_test.dart: camera runs only in visible scan tab and pauses in background; caller retains ownership
+00:05 +346: /Users/emreaydin/ngsaccess/mobile/test/widgets/qr_scan_screen_test.dart: camera runs only in visible scan tab and pauses in background; caller retains ownership
+00:05 +347: /Users/emreaydin/ngsaccess/mobile/test/widgets/qr_scan_screen_test.dart: camera runs only in visible scan tab and pauses in background; caller retains ownership
+00:05 +348: /Users/emreaydin/ngsaccess/mobile/test/widgets/qr_scan_screen_test.dart: camera runs only in visible scan tab and pauses in background; caller retains ownership
+00:05 +349: /Users/emreaydin/ngsaccess/mobile/test/widgets/qr_scan_screen_test.dart: camera runs only in visible scan tab and pauses in background; caller retains ownership
+00:05 +350: /Users/emreaydin/ngsaccess/mobile/test/widgets/qr_scan_screen_test.dart: camera runs only in visible scan tab and pauses in background; caller retains ownership
+00:06 +351: /Users/emreaydin/ngsaccess/mobile/test/widgets/qr_scan_screen_test.dart: camera runs only in visible scan tab and pauses in background; caller retains ownership
+00:06 +352: /Users/emreaydin/ngsaccess/mobile/test/widgets/forgot_password_screen_test.dart: recovery clears stale login error and copies an honest admin request
+00:06 +353: /Users/emreaydin/ngsaccess/mobile/test/widgets/forgot_password_screen_test.dart: recovery clears stale login error and copies an honest admin request
+00:06 +354: /Users/emreaydin/ngsaccess/mobile/test/widgets/forgot_password_screen_test.dart: recovery clears stale login error and copies an honest admin request
+00:06 +355: /Users/emreaydin/ngsaccess/mobile/test/widgets/forgot_password_screen_test.dart: recovery clears stale login error and copies an honest admin request
+00:06 +356: /Users/emreaydin/ngsaccess/mobile/test/widgets/forgot_password_screen_test.dart: recovery clears stale login error and copies an honest admin request
+00:06 +357: /Users/emreaydin/ngsaccess/mobile/test/widgets/forgot_password_screen_test.dart: recovery clears stale login error and copies an honest admin request
+00:06 +358: /Users/emreaydin/ngsaccess/mobile/test/widgets/forgot_password_screen_test.dart: recovery clears stale login error and copies an honest admin request
+00:06 +359: /Users/emreaydin/ngsaccess/mobile/test/widgets/forgot_password_screen_test.dart: recovery clears stale login error and copies an honest admin request
+00:06 +360: /Users/emreaydin/ngsaccess/mobile/test/widgets/responsive_container_test.dart: genişlik > maxWidth ise içerik maxWidth'e clamp olur
+00:06 +361: /Users/emreaydin/ngsaccess/mobile/test/widgets/responsive_container_test.dart: genişlik > maxWidth ise içerik maxWidth'e clamp olur
+00:06 +362: /Users/emreaydin/ngsaccess/mobile/test/widgets/responsive_container_test.dart: genişlik > maxWidth ise içerik maxWidth'e clamp olur
+00:06 +363: /Users/emreaydin/ngsaccess/mobile/test/widgets/responsive_container_test.dart: genişlik > maxWidth ise içerik maxWidth'e clamp olur
+00:06 +364: /Users/emreaydin/ngsaccess/mobile/test/widgets/qr_scan_screen_test.dart: granted camera with MobileScannerErrorCode.genericError does not ask for permission
+00:06 +365: /Users/emreaydin/ngsaccess/mobile/test/widgets/qr_scan_screen_test.dart: granted camera with MobileScannerErrorCode.genericError does not ask for permission
+00:06 +366: /Users/emreaydin/ngsaccess/mobile/test/widgets/qr_scan_screen_test.dart: granted camera with MobileScannerErrorCode.genericError does not ask for permission
+00:06 +367: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:06 +368: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:06 +369: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:06 +370: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:06 +371: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:06 +372: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:06 +373: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:06 +374: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:06 +375: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:06 +376: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:06 +377: /Users/emreaydin/ngsaccess/mobile/test/widgets/select_device_screen_test.dart: localized network failure preserves preference and allows explicit clear
+00:07 +378: /Users/emreaydin/ngsaccess/mobile/test/widgets/app_bottom_navigation_test.dart: 320px navigation remains readable and tappable at 200% tr Brightness.dark
+00:07 +379: /Users/emreaydin/ngsaccess/mobile/test/widgets/app_bottom_navigation_test.dart: 320px navigation remains readable and tappable at 200% tr Brightness.dark
+00:07 +380: /Users/emreaydin/ngsaccess/mobile/test/widgets/app_bottom_navigation_test.dart: 320px navigation remains readable and tappable at 200% tr Brightness.dark
+00:07 +381: /Users/emreaydin/ngsaccess/mobile/test/widgets/app_bottom_navigation_test.dart: 320px navigation remains readable and tappable at 200% tr Brightness.dark
+00:07 +382: /Users/emreaydin/ngsaccess/mobile/test/widgets/app_bottom_navigation_test.dart: 320px navigation remains readable and tappable at 200% tr Brightness.dark
+00:07 +383: /Users/emreaydin/ngsaccess/mobile/test/widgets/app_bottom_navigation_test.dart: 320px navigation remains readable and tappable at 200% tr Brightness.dark
+00:07 +384: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:07 +385: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:07 +386: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:07 +387: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:07 +388: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:07 +389: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:07 +390: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:07 +391: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:07 +392: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: language picker changes the live profile and saves the selected locale
+00:07 +393: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: month and Monday week totals use independent server summaries
+00:07 +394: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: month and Monday week totals use independent server summaries
+00:07 +395: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: month and Monday week totals use independent server summaries
+00:08 +396: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: month and Monday week totals use independent server summaries
+00:08 +397: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: month and Monday week totals use independent server summaries
+00:08 +398: /Users/emreaydin/ngsaccess/mobile/test/widgets/app_bottom_navigation_test.dart: floating navigation leaves the final content action reachable
+00:08 +399: /Users/emreaydin/ngsaccess/mobile/test/widgets/app_bottom_navigation_test.dart: floating navigation leaves the final content action reachable
+00:08 +400: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: calendar day opens server day filter instead of a partial dialog
+00:08 +401: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: calendar day opens server day filter instead of a partial dialog
+00:08 +402: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: calendar day opens server day filter instead of a partial dialog
+00:08 +403: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: password validation blocks mismatched and oversized Unicode input
+00:08 +404: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: empty email and password show validation errors
+00:08 +405: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: empty email and password show validation errors
+00:08 +406: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: empty email and password show validation errors
+00:08 +407: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: empty email and password show validation errors
+00:08 +408: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: empty email and password show validation errors
+00:08 +409: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: empty email and password show validation errors
+00:08 +410: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: empty email and password show validation errors
+00:08 +411: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: empty email and password show validation errors
+00:08 +412: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: empty email and password show validation errors
+00:08 +413: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: cold protected link waits for restore and keeps original target
+00:08 +414: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: cold protected link waits for restore and keeps original target
+00:08 +415: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: cold protected link waits for restore and keeps original target
+00:09 +416: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: cold protected link waits for restore and keeps original target
+00:09 +417: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: cold protected link waits for restore and keeps original target
+00:09 +418: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: cold protected link waits for restore and keeps original target
+00:09 +419: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: cold protected link waits for restore and keeps original target
+00:09 +420: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: cold protected link waits for restore and keeps original target
+00:09 +421: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: cold protected link waits for restore and keeps original target
+00:09 +422: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: cold protected link waits for restore and keeps original target
+00:09 +423: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: cold protected link waits for restore and keeps original target
+00:09 +424: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: cold protected link waits for restore and keeps original target
+00:09 +425: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: cold protected link waits for restore and keeps original target
+00:09 +426: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: cold protected link waits for restore and keeps original target
+00:09 +427: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: one sheet applies date and device together, empty result can clear both
+00:09 +428: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: one sheet applies date and device together, empty result can clear both
+00:09 +429: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: one sheet applies date and device together, empty result can clear both
+00:09 +430: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: one sheet applies date and device together, empty result can clear both
+00:09 +431: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: one sheet applies date and device together, empty result can clear both
+00:09 +432: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: failed login shows localized error and enables retry
+00:09 +433: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: temporary restore failure exposes retry then returns without password login
+00:09 +434: /Users/emreaydin/ngsaccess/mobile/test/widgets/profile_screen_test.dart: leaving Help during clipboard operation does not update a disposed widget
+00:09 +435: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.light
+00:09 +436: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.light
+00:09 +437: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.light
+00:09 +438: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.light
+00:09 +439: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.light
+00:09 +440: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.light
+00:09 +441: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.light
+00:09 +442: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: external or unlisted return target is rejected: /history#fragment
+00:09 +443: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: English remember option states email scope
+00:09 +444: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.dark
+00:09 +445: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.dark
+00:09 +446: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.dark
+00:09 +447: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.dark
+00:09 +448: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.dark
+00:09 +449: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.dark
+00:09 +450: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.dark
+00:09 +451: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.dark
+00:09 +452: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.dark
+00:09 +453: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% en ThemeMode.dark
+00:09 +454: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: navigation exposes five named selected controls; keyboard activates QR
+00:09 +455: /Users/emreaydin/ngsaccess/mobile/test/widgets/login_screen_test.dart: small screen with keyboard and large en text remains usable
+00:09 +456: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% tr ThemeMode.light
+00:09 +457: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% tr ThemeMode.light
+00:09 +458: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% tr ThemeMode.light
+00:09 +459: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% tr ThemeMode.light
+00:09 +460: /Users/emreaydin/ngsaccess/mobile/test/router/app_router_integration_test.dart: floating bar never covers nested screen FAB or final scroll action
+00:09 +461: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: history tabs and filter reflow at 320px / 200% tr ThemeMode.dark
+00:10 +462: /Users/emreaydin/ngsaccess/mobile/test/widgets/history_screen_test.dart: (tearDownAll)
+00:10 +462: All tests passed!

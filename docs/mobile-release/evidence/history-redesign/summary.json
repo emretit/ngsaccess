@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-20",
+  "device": "iPhone 17 Pro simulator",
+  "runtime": "iOS 27.0",
+  "implemented": [
+    "Records / Calendar / Overview navigation",
+    "Compact status-first record rows grouped by Istanbul calendar day",
+    "Single root-navigator filter sheet with local draft date and device choices, Apply and dismiss",
+    "Filtered empty state with show-all action",
+    "Three-letter calendar weekdays, today outline, selected fill, future days disabled and record dots",
+    "Calendar counts include entry, exit, denied and unknown events",
+    "One selected week/month summary with equal-height counters and honest zero-event state",
+    "Record information and time zone moved into info sheet",
+    "TR/EN translations and localization inventory updated"
+  ],
+  "validation": {
+    "flutterTests": 455,
+    "flutterAnalyze": "no issues",
+    "catalogParity": "passed",
+    "iosSimulatorBuild": "passed",
+    "simulatorInstall": "passed",
+    "nativeReadOnlySmoke": [
+      "historical records and denied rows loaded",
+      "root filter sheet covers bottom navigation",
+      "inline date selection and Apply",
+      "filtered empty state and show-all recovery",
+      "calendar day opens selected date filter",
+      "calendar selection persists when returning",
+      "month/week summary ranges",
+      "info sheet and time-zone explanation"
+    ]
+  },
+  "coverageLimits": [
+    "Current account has no records in current calendar month; nonzero mixed calendar counts and independent nonzero period summaries validated with synthetic widget fixtures",
+    "Native screenshots were inspected in light Turkish mode; English/dark/200-percent text layouts exercised by widget tests"
+  ],
+  "backendChangedByThisTask": false,
+  "deploymentPerformedByThisTask": false,
+  "rawScreenshotsOrSessionDataStoredInRepo": false,
+  "singleFilterFollowUp": {
+    "entry": "One Filter button in the records header; removed the two date/device chips and duplicate AppBar action",
+    "appliedSelection": "Noninteractive date/device summary with a separate clear action",
+    "focusedHistoryTests": 14,
+    "analyze": "no issues",
+    "simulatorBuild": "passed"
+  }
+}

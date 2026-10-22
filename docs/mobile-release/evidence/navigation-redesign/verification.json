@@ -1,0 +1,42 @@
+{
+  "recordedAt": "2026-10-20T07:35:05.801887+00:00",
+  "scope": "Huggin-style floating bottom navigation for NGS Plus",
+  "reference": "/Users/emreaydin/pilates_studio_app/hugging_pilates/lib/features/shell/presentation/member_bottom_navigation.dart",
+  "design": {
+    "surface": "Rounded frosted light/dark surface, 28px radius, 14px outer margins, 560px maximum width",
+    "selection": "Burgundy selected pill; light rose in dark mode",
+    "primaryDestination": "64px circular QR control with selected ring",
+    "type": "11px system font; labels wrap at larger accessibility sizes",
+    "keyboard": "Navigation hidden while keyboard is shown; ordered Tab/Enter traversal supported",
+    "motion": "220ms feedback; zero duration when reduced motion is enabled"
+  },
+  "verification": {
+    "analyze": "passed, no issues",
+    "focusedTests": 24,
+    "fullFlutterTests": 444,
+    "iosSimulatorBuild": "passed",
+    "responsive": "320px, 200% type, Turkish/English, light/dark; labels not clipped, all targets at least 48px",
+    "safeArea": "Final scroll content action remains visible above floating bar and tappable",
+    "tabletAndReducedMotion": "passed",
+    "semantics": "Five named buttons; one selected destination; QR keyboard activation passed",
+    "stateRetention": "History/Home state and QR visibility tests passed; keyboard dismissal preserves selection",
+    "visitorLifecycleAndBranchNavigationImplementation": "unchanged"
+  },
+  "simulator": {
+    "device": "iPhone 17 Pro",
+    "udid": "81AAFCAB-9741-4819-B9F7-B9DFA47D6F21",
+    "runtime": "iOS 27.0",
+    "bundleId": "com.ngsplus.app",
+    "install": "passed, existing data preserved",
+    "launch": "passed",
+    "visualReview": "Floating surface, selected home pill and center QR button visually inspected on actual home screen",
+    "leftOpen": true,
+    "screenshot": "Local temporary capture only, because home contains user information"
+  },
+  "sourceSha256": {
+    "mobile/lib/widgets/app_bottom_navigation.dart": "9498e5af55e5785e33b2d76eef6ff34ef6e2ff01a263a73cdec4404d0d37f188",
+    "mobile/lib/screens/main_navigation_shell.dart": "74c5fafa3e10e5acee36559ba42bf29b4a6ed631001101921ac125dda9abff97",
+    "mobile/test/widgets/app_bottom_navigation_test.dart": "84c99ad9552aadb1361119688f3bcea159b8c05907c57a33c6949ccffd2d2da2",
+    "mobile/test/router/app_router_integration_test.dart": "a49d69b9d3ff5a24d5c91e39b9cbd51bb93c2cffa6bb52ca244482af168b4f55"
+  }
+}

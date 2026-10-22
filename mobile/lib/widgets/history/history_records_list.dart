@@ -18,6 +18,8 @@ class HistoryRecordsList extends StatelessWidget {
     this.loadMoreErrorMessage,
     this.hasPreviousData = false,
     this.header,
+    this.emptyHint,
+    this.onClearFilters,
   });
 
   final ScrollController controller;
@@ -32,6 +34,8 @@ class HistoryRecordsList extends StatelessWidget {
   final String? loadMoreErrorMessage;
   final bool hasPreviousData;
   final Widget? header;
+  final String? emptyHint;
+  final VoidCallback? onClearFilters;
 
   @override
   Widget build(BuildContext context) {
@@ -85,9 +89,25 @@ class HistoryRecordsList extends StatelessWidget {
                 padding: const EdgeInsets.all(32),
                 child: Column(
                   children: [
+                    Icon(
+                      Icons.event_note_rounded,
+                      size: 32,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(height: 12),
                     Text(l10n.historyEmpty, textAlign: TextAlign.center),
                     const SizedBox(height: 8),
-                    Text(l10n.historyEmptyHint, textAlign: TextAlign.center),
+                    Text(
+                      emptyHint ?? l10n.historyEmptyHint,
+                      textAlign: TextAlign.center,
+                    ),
+                    if (onClearFilters != null) ...[
+                      const SizedBox(height: 16),
+                      OutlinedButton(
+                        onPressed: onClearFilters,
+                        child: Text(l10n.historyShowAllRecords),
+                      ),
+                    ],
                   ],
                 ),
               ),

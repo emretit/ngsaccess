@@ -23,6 +23,7 @@ class _VisitorFormScreenState extends State<VisitorFormScreen> {
   late final int _sessionEpoch;
   VisitorNotice? _notice;
   bool _noticeLoading = true, _reviewed = false, _uncertain = false;
+  bool _recoveryPreparing = true;
   VisitorDraft? _pending;
 
   @override
@@ -63,8 +64,26 @@ class _VisitorFormScreenState extends State<VisitorFormScreen> {
     if (pending != null) _noticeLoading = false;
     _sessionEpoch = context.read<VisitorProvider>().sessionEpoch;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && pending == null) _loadNotice();
+      if (mounted) _prepareCreate();
     });
+  }
+
+  Future<void> _prepareCreate() async {
+    final state = context.read<VisitorProvider>();
+    setState(() => _recoveryPreparing = true);
+    final receipt = widget.visitor == null
+        ? await state.reconcileCreate()
+        : null;
+    if (!mounted || state.sessionEpoch != _sessionEpoch) return;
+    if (receipt != null) {
+      final messenger = ScaffoldMessenger.of(context);
+      final message = AppLocalizations.of(context).visitorRecoveryFound;
+      Navigator.of(context).pop();
+      messenger.showSnackBar(SnackBar(content: Text(message)));
+      return;
+    }
+    setState(() => _recoveryPreparing = false);
+    if (_notice == null) await _loadNotice();
   }
 
   Future<void> _loadNotice() async {
@@ -123,7 +142,14 @@ class _VisitorFormScreenState extends State<VisitorFormScreen> {
   Future<void> _save() async {
     final state = context.read<VisitorProvider>();
     final notice = _notice;
-    if (state.busy || notice == null) return;
+    if (state.busy ||
+        _recoveryPreparing ||
+        notice == null ||
+        (widget.visitor == null &&
+            (state.createRecoveryLoading ||
+                state.createRecoveryError != null))) {
+      return;
+    }
     if (!_uncertain &&
         (_form.currentState?.validate() != true ||
             !_end.isAfter(_start) ||
@@ -189,7 +215,10 @@ class _VisitorFormScreenState extends State<VisitorFormScreen> {
           });
           return const SizedBox.shrink();
         }
-        final locked = state.busy || _uncertain;
+        final recovering =
+            _recoveryPreparing ||
+            (widget.visitor == null && state.createRecoveryLoading);
+        final locked = state.busy || _uncertain || recovering;
         return Scaffold(
           appBar: AppBar(
             title: Text(
@@ -199,53 +228,134 @@ class _VisitorFormScreenState extends State<VisitorFormScreen> {
           body: Form(
             key: _form,
             child: ListView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               children: [
-                Text(l10n.visitorPreRegistered),
+                if (widget.visitor == null && recovering) ...[
+                  const LinearProgressIndicator(),
+                  Text(l10n.visitorRecoveryChecking),
+                ],
+                if (widget.visitor == null &&
+                    state.hasUnresolvedCreate &&
+                    !_uncertain)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(l10n.visitorRecoveryUnresolved),
+                  ),
+                if (state.createRecoveryError case final recoveryError?
+                    when widget.visitor == null) ...[
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      state.createRecoveryStorageFailed
+                          ? l10n.visitorRecoveryStorageError
+                          : localizeAppError(context, recoveryError),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: recovering || state.busy ? null : _prepareCreate,
+                    child: Text(l10n.commonRetry),
+                  ),
+                ],
+                if (widget.visitor == null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primaryContainer.withValues(alpha: .5),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          size: 20,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onPrimaryContainer,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            l10n.visitorActivationHint,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onPrimaryContainer,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                _section(l10n.visitorPeopleSection, [
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final fields = [
+                        _field(_first, l10n.visitorFirstName, 80, locked),
+                        _field(_last, l10n.visitorLastName, 80, locked),
+                      ];
+                      if (constraints.maxWidth >= 320 &&
+                          MediaQuery.textScalerOf(context).scale(14) < 19) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: fields[0]),
+                            const SizedBox(width: 12),
+                            Expanded(child: fields[1]),
+                          ],
+                        );
+                      }
+                      return Column(children: fields);
+                    },
+                  ),
+                  _field(
+                    _phone,
+                    l10n.visitorPhone,
+                    40,
+                    locked,
+                    keyboard: TextInputType.phone,
+                    isRequired: false,
+                  ),
+                ]),
                 const SizedBox(height: 16),
-                _field(_first, l10n.visitorFirstName, 80, locked),
-                _field(_last, l10n.visitorLastName, 80, locked),
-                _field(
-                  _phone,
-                  l10n.visitorPhone,
-                  40,
-                  locked,
-                  keyboard: TextInputType.phone,
-                  isRequired: false,
-                ),
-                _field(
-                  _purpose,
-                  l10n.visitorFieldPurpose,
-                  500,
-                  locked,
-                  lines: 3,
-                ),
-                _field(
-                  _notes,
-                  l10n.visitorNotes,
-                  1000,
-                  locked,
-                  lines: 3,
-                  isRequired: false,
-                ),
-                OutlinedButton(
-                  onPressed: locked ? null : () => _pickDate(true),
-                  child: Text(
-                    '${l10n.visitorStart}: ${visitorDate(context, _start)}',
+                _section(l10n.visitorVisitSection, [
+                  _field(
+                    _purpose,
+                    l10n.visitorFieldPurpose,
+                    500,
+                    locked,
+                    lines: 2,
                   ),
-                ),
-                OutlinedButton(
-                  onPressed: locked ? null : () => _pickDate(false),
-                  child: Text(
-                    '${l10n.visitorEnd}: ${visitorDate(context, _end)}',
+                  _dateButton(l10n.visitorStart, _start, locked, true),
+                  const SizedBox(height: 10),
+                  _dateButton(l10n.visitorEnd, _end, locked, false),
+                  const SizedBox(height: 16),
+                  _field(
+                    _notes,
+                    l10n.visitorNotes,
+                    1000,
+                    locked,
+                    lines: 2,
+                    isRequired: false,
                   ),
-                ),
+                ]),
+                const SizedBox(height: 16),
                 if (_noticeLoading) const LinearProgressIndicator(),
-                if (!_noticeLoading && _notice == null)
+                if (!_noticeLoading && _notice == null) ...[
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(l10n.visitorNoticeUnavailable),
+                  ),
                   TextButton(
                     onPressed: _loadNotice,
                     child: Text(l10n.commonRetry),
                   ),
+                ],
                 if (_notice?.available == true) ...[
                   const SizedBox(height: 12),
                   Text(l10n.visitorNotice),
@@ -280,14 +390,25 @@ class _VisitorFormScreenState extends State<VisitorFormScreen> {
                 ],
                 const SizedBox(height: 20),
                 FilledButton(
-                  onPressed: state.busy || _notice == null ? null : _save,
+                  onPressed:
+                      state.busy ||
+                          recovering ||
+                          _notice == null ||
+                          (widget.visitor == null &&
+                              state.createRecoveryError != null)
+                      ? null
+                      : _save,
                   child: state.busy
                       ? const SizedBox(
                           height: 24,
                           width: 24,
                           child: CircularProgressIndicator(),
                         )
-                      : Text(l10n.visitorSave),
+                      : Text(
+                          widget.visitor == null && state.hasUnresolvedCreate
+                              ? l10n.visitorRecoveryRetry
+                              : l10n.visitorSave,
+                        ),
                 ),
               ],
             ),
@@ -296,6 +417,72 @@ class _VisitorFormScreenState extends State<VisitorFormScreen> {
       },
     );
   }
+
+  Widget _section(String title, List<Widget> children) => Card(
+    elevation: 0,
+    margin: EdgeInsets.zero,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: BorderSide(
+        color: Theme.of(
+          context,
+        ).colorScheme.outlineVariant.withValues(alpha: .5),
+      ),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            header: true,
+            child: Text(
+              title,
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+          const SizedBox(height: 16),
+          ...children,
+        ],
+      ),
+    ),
+  );
+
+  Widget _dateButton(String label, DateTime value, bool locked, bool start) =>
+      OutlinedButton(
+        onPressed: locked ? null : () => _pickDate(start),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.all(12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.calendar_today_rounded, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 3),
+                  Text(
+                    visitorDate(context, value),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded, size: 18),
+          ],
+        ),
+      );
 
   Widget _field(
     TextEditingController controller,
@@ -314,7 +501,19 @@ class _VisitorFormScreenState extends State<VisitorFormScreen> {
       maxLines: lines,
       keyboardType: keyboard,
       decoration: InputDecoration(
-        labelText: label,
+        labelText: isRequired ? '$label *' : label,
+        counterText: '',
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: Theme.of(
+              context,
+            ).colorScheme.outlineVariant.withValues(alpha: .6),
+          ),
+        ),
         helperText: isRequired
             ? null
             : AppLocalizations.of(context).visitorOptionalHint,

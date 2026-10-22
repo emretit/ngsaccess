@@ -411,13 +411,13 @@ class AppLocalizationsTr extends AppLocalizations {
   String get historyTitle => 'Geçmiş';
 
   @override
-  String get historyTabAll => 'Tümü';
+  String get historyTabAll => 'Kayıtlar';
 
   @override
-  String get historyTabThisMonth => 'Bu Ay';
+  String get historyTabThisMonth => 'Takvim';
 
   @override
-  String get historyTabStats => 'İstatistik';
+  String get historyTabStats => 'Özet';
 
   @override
   String get historyLoading => 'Veriler yükleniyor...';
@@ -480,7 +480,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get historyTotalCheckOuts => 'Toplam Çıkış';
 
   @override
-  String get historyActiveDays => 'Aktif Gün';
+  String get historyActiveDays => 'Giriş yapılan gün';
 
   @override
   String get historyGeneralStats => 'Genel İstatistikler';
@@ -643,7 +643,7 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
-  String get visitorTitle => 'Ziyaretçi Yönetimi';
+  String get visitorTitle => 'Ziyaretçiler';
 
   @override
   String get visitorStatTotal => 'Toplam';
@@ -659,7 +659,7 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get visitorEmptyHint =>
-      'Yeni ziyaretçi eklemek için + butonuna tıklayın';
+      'Yeni bir davet oluşturmak için sağ üstteki Ekle düğmesini kullanın.';
 
   @override
   String get visitorStatusExpected => 'Bekleniyor';
@@ -1164,7 +1164,7 @@ class AppLocalizationsTr extends AppLocalizations {
   String get visitorAllStatuses => 'Tüm erişim durumları';
 
   @override
-  String get visitorSummaryTitle => 'Davetleriniz, tüm sayfalar';
+  String get visitorSummaryTitle => 'Tüm davetlerin özeti';
 
   @override
   String get visitorSummaryLimited =>
@@ -1223,4 +1223,115 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get visitorOptionalHint => 'İsteğe bağlı';
+
+  @override
+  String get historyInfoTitle => 'Kayıtlar hakkında';
+
+  @override
+  String get historyTimeZone => 'Türkiye saati · UTC+3';
+
+  @override
+  String get historyAllDates => 'Tüm tarihler';
+
+  @override
+  String get historyAllDevices => 'Tüm cihazlar';
+
+  @override
+  String get historyApplyFilters => 'Filtreleri uygula';
+
+  @override
+  String get historyShowAllRecords => 'Tüm kayıtları göster';
+
+  @override
+  String get historyFilteredEmptyHint =>
+      'Seçtiğiniz tarih veya cihaz için kayıt bulunmuyor.';
+
+  @override
+  String get historyCalendarLegend =>
+      'Çerçeve: bugün · Dolgu: seçili gün · Nokta: kayıt var';
+
+  @override
+  String get historySelectDayHint => 'Kayıtlarını görmek için bir gün seçin.';
+
+  @override
+  String get historyNoActivity => 'Bu dönemde erişim hareketi yok';
+
+  @override
+  String get historyNoActivityHint =>
+      'Kayıtlar oluştukça özet burada görünür. Bu bir devamsızlık hesabı değildir.';
+
+  @override
+  String get historyDeniedCount => 'Reddedilen';
+
+  @override
+  String get historyUnknownCount => 'Belirsiz';
+
+  @override
+  String get historyLoadedDevices =>
+      'Cihaz seçenekleri yüklenen kayıtlardan alınır.';
+
+  @override
+  String get historyNoDeviceOptions => 'Yüklenen kayıtlarda cihaz bulunmuyor.';
+
+  @override
+  String get historyTabThisMonthPeriod => 'Bu ay';
+
+  @override
+  String get visitorPeopleSection => 'Kişi bilgileri';
+
+  @override
+  String get visitorVisitSection => 'Ziyaret bilgileri';
+
+  @override
+  String get visitorActivationHint =>
+      'Davet kaydı oluşturulduktan sonra yetkili aktivasyonu gerekir.';
+
+  @override
+  String get visitorPendingShort => 'Aktivasyon bekliyor';
+
+  @override
+  String get visitorInvitationsTitle => 'Davetler';
+
+  @override
+  String get visitorFilteredEmptyHint =>
+      'Arama veya durum filtresiyle eşleşen davet bulunamadı.';
+
+  @override
+  String get visitorClearFilters => 'Filtreleri temizle';
+
+  @override
+  String get visitorNoticeUnavailable =>
+      'Aydınlatma bilgisi yüklenemedi. Kaydetmeden önce tekrar deneyin.';
+
+  @override
+  String get profileProject => 'Firma / proje';
+
+  @override
+  String get profileProjectUnavailable =>
+      'Proje bilgisi şu anda kullanılamıyor';
+
+  @override
+  String get doorOperationRecoveryTitle => 'Kapı işlemini kontrol et';
+
+  @override
+  String get doorOperationRecoveryHint =>
+      'Önce önceki isteğin durumu kontrol edilir. Tekrar denerseniz aynı istek ve aynı kapı kullanılır. Komut sonucu fiziksel geçişi doğrulamaz.';
+
+  @override
+  String get visitorRecoveryChecking =>
+      'Önceki ziyaretçi isteği kontrol ediliyor…';
+
+  @override
+  String get visitorRecoveryUnresolved =>
+      'Önceki isteğin sonucu henüz doğrulanamadı. Aynı ziyaretçi bilgilerini girip aynı isteği tekrar deneyebilirsiniz. Yeni bir istek oluşturulmayacak.';
+
+  @override
+  String get visitorRecoveryRetry => 'Aynı isteği tekrar dene';
+
+  @override
+  String get visitorRecoveryFound => 'Önceki ziyaretçi kaydı bulundu.';
+
+  @override
+  String get visitorRecoveryStorageError =>
+      'Ziyaretçi isteği güvenli biçimde saklanamadı veya okunamadı. Devam etmeden önce durumu tekrar kontrol edin.';
 }

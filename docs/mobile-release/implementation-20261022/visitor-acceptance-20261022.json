@@ -1,0 +1,103 @@
+{
+  "date": "2026-10-22T07:14:07.631434+00:00",
+  "origin": "Direct user continuation after settled visitor implementation dispatch; no settled lifecycle IDs reused",
+  "scope": "MOB-N05 release acceptance readiness and current Android artifact identity",
+  "status": "blocked_target_receipt_query_missing",
+  "readOnlyProbe": {
+    "targetHost": "notable-tern-4.convex.cloud",
+    "query": "mobileVisitors:getCreateReceipt",
+    "operation": "read_only_query",
+    "credentialsSent": false,
+    "visitorPiiSent": false,
+    "httpStatus": 200,
+    "classification": "receipt_query_missing_on_target",
+    "responseSha256": "2ba193e488cf122d0e4aa7f66264c3eaca6aad88cdeafee295bd2a666d74c314",
+    "confirmsAuthenticatedRecovery": false,
+    "confirmsDeployedRevision": false
+  },
+  "interpretation": "A function-not-found result confirms the named public receipt query is not exposed on this target at probe time. It does not establish a deployed revision or an authenticated user flow.",
+  "androidArtifactChecks": [
+    {
+      "path": "/Users/emreaydin/Downloads/NGSPlus-1.0.4-arm64-test-20261022.apk",
+      "sha256": "15a91f31a2b4ed6f1e46f22294b71d360bf013ca13a74887abee0f9357c0b377",
+      "matchesCoordinatorArtifactRecord": true
+    },
+    {
+      "path": "mobile/build/app/outputs/flutter-apk/app-arm64-v8a-profile.apk",
+      "sha256": "15a91f31a2b4ed6f1e46f22294b71d360bf013ca13a74887abee0f9357c0b377",
+      "matchesCoordinatorArtifactRecord": true
+    }
+  ],
+  "androidReceiptEndpointStringPresent": true,
+  "actionsPerformed": [
+    "Read current coordinator reports and build logs",
+    "Hash compared Downloads and build APK against coordinator record",
+    "Unauthenticated read-only receipt query presence probe with synthetic UUID",
+    "Sent result to coordinator through Orca"
+  ],
+  "actionsNotPerformed": [
+    "No visitor create/update/cancel",
+    "No backend deployment",
+    "No SDK/build command",
+    "No device/app/hardware control",
+    "No credentials or visitor PII read or transmitted"
+  ],
+  "remainingAcceptance": [
+    {
+      "step": 1,
+      "owner": "CEO/backend deployment owner",
+      "action": "Deploy approved backend revision containing mobileVisitors:getCreateReceipt to the exact target host and record revision/environment evidence."
+    },
+    {
+      "step": 2,
+      "owner": "Authorized test operator and mobile coordinator",
+      "action": "Use an approved isolated employee/project account and exact APK/IPA hash; retain original create requestId without recording visitor PII in evidence."
+    },
+    {
+      "step": 3,
+      "owner": "Authorized test operator and mobile coordinator",
+      "action": "Perform controlled create-response loss, actual OS process termination, relaunch and receipt/list reconciliation; prove one backend visitor record and no automatically generated replacement request."
+    },
+    {
+      "step": 4,
+      "owner": "Authorized test operator and mobile coordinator",
+      "action": "Verify null-receipt explicit same-ID replay, account/project isolation, logout/expiry cleanup and background/resume under that environment."
+    }
+  ],
+  "passingCriteria": "Live N05 acceptance remains open until the approved environment proves one visitor record after actual process death and no silent replacement request ID.",
+  "coordinatorNotified": true,
+  "backendPublicationReview": {
+    "commit": "cc93131453fba066307862347e4aaa1b44bb3ab8",
+    "title": "feat: expose project name to mobile sessions and add visitor create receipt",
+    "targetHost": "notable-tern-4.convex.cloud",
+    "runtimeFiles": [
+      "convex/employeeAuth.ts",
+      "convex/mobileVisitors.ts"
+    ],
+    "testFiles": [
+      "convex/employeeAuth.mobile.test.ts",
+      "convex/mobileVisitors.test.ts"
+    ],
+    "changes": [
+      "Add canonical mobile projectName to signIn/me DTOs",
+      "Add read-only employee/host/project-scoped getCreateReceipt returning only id/status or null"
+    ],
+    "schemaOrIndexChanges": false,
+    "coordinatorValidation": {
+      "backendTestFiles": 241,
+      "backendTestsPassed": 2450,
+      "mobileTestsPassed": 505,
+      "mobileAnalyzerIssues": 0
+    },
+    "deploymentOwner": "CEO/backend owner coordinated by mobile coordinator",
+    "executionRequirement": "Use approved committed revision and isolated clean source; preserve current shared mobile source/artifact freeze.",
+    "authorization": "Not granted in current turn: coordinator explicitly confirmed read-only continuation pending Emre publication approval.",
+    "authorizationScopeToRequest": "Publish reviewed backend revision cc93131 to the exact target; this does not authorize live visitor writes, hardware operations, mobile store upload or unrelated pushes."
+  },
+  "coordinatorState": {
+    "sourceFrozen": true,
+    "android16kFinalArtifact": "same hash verified in worker evidence; runtime final report still pending at inspection",
+    "iOSSimulatorBuild": "coordinator-owned, underway",
+    "noDuplicateSdkOrNativeBuild": true
+  }
+}

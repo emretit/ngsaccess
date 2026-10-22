@@ -1,0 +1,44 @@
+{
+  "startedAtUtc": "2026-10-22T07:14:27.483642+00:00",
+  "serial": "emulator-5568",
+  "observationSeconds": 30,
+  "package": "com.ngsplus.app.ngsplusapp",
+  "pageSize": {
+    "exitCode": 0,
+    "stdout": "16384",
+    "stderr": ""
+  },
+  "linkerCompatEnabled": "false",
+  "packageCompatDisabled": "true",
+  "installedApkSha256": "15a91f31a2b4ed6f1e46f22294b71d360bf013ca13a74887abee0f9357c0b377",
+  "coldLaunch": {
+    "exitCode": 0,
+    "stdout": "Starting: Intent { cmp=com.ngsplus.app.ngsplusapp/.MainActivity }\nStatus: ok\nLaunchState: COLD\nActivity: com.ngsplus.app.ngsplusapp/.MainActivity\nTotalTime: 1062\nWaitTime: 1063\nComplete",
+    "stderr": ""
+  },
+  "pidAfterLaunch": "5102",
+  "actualObservationSeconds": 30.0,
+  "pidAfterObservation": "5102",
+  "uiautomator": {
+    "exitCode": 0,
+    "stdout": "UI hierchary dumped to: /sdcard/ngs_release_16k_20261022-ui.xml",
+    "stderr": ""
+  },
+  "foregroundActivity": [
+    "topResumedActivity=ActivityRecord{111967054 u0 com.ngsplus.app.ngsplusapp/.MainActivity t9}"
+  ],
+  "crashBuffer": {
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "errorMarkers": [],
+  "appProcessErrorMarkers": [],
+  "packageMetadata": [
+    "primaryCpuAbi=arm64-v8a",
+    "versionCode=2001 minSdk=24 targetSdk=36",
+    "versionName=1.0.4",
+    "pageSizeCompat=0"
+  ],
+  "completedAtUtc": "2026-10-22T07:15:01.050546+00:00"
+}

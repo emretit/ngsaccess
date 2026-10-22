@@ -1,0 +1,58 @@
+[
+  {
+    "function": "mobileAttendance:summary",
+    "httpStatus": 200,
+    "status": "error",
+    "code": "SESSION_INVALID",
+    "functionMissing": false,
+    "invalidSessionRejected": true
+  },
+  {
+    "function": "mobileAttendance:listPage",
+    "httpStatus": 200,
+    "status": "error",
+    "code": "SESSION_INVALID",
+    "functionMissing": false,
+    "invalidSessionRejected": true
+  },
+  {
+    "function": "mobileAccess:listTargets",
+    "httpStatus": 200,
+    "status": "error",
+    "code": "SESSION_INVALID",
+    "functionMissing": false,
+    "invalidSessionRejected": true
+  },
+  {
+    "function": "mobileVisitors:listPage",
+    "httpStatus": 200,
+    "status": "error",
+    "code": "SESSION_INVALID",
+    "functionMissing": false,
+    "invalidSessionRejected": true
+  },
+  {
+    "function": "mobileVisitors:summary",
+    "httpStatus": 200,
+    "status": "error",
+    "code": "SESSION_INVALID",
+    "functionMissing": false,
+    "invalidSessionRejected": true
+  },
+  {
+    "function": "mobileVisitors:notice",
+    "httpStatus": 200,
+    "status": "error",
+    "code": "SESSION_INVALID",
+    "functionMissing": false,
+    "invalidSessionRejected": true
+  },
+  {
+    "function": "employeeCheckIn:getMyCheckInTokenStatus",
+    "httpStatus": 200,
+    "status": "error",
+    "code": "SESSION_INVALID",
+    "functionMissing": false,
+    "invalidSessionRejected": true
+  }
+]

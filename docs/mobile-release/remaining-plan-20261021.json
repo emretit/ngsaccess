@@ -1,0 +1,357 @@
+{
+  "title": "NGS Plus mobil kalan işler planı",
+  "date": "2026-10-21",
+  "status": "implementation_local_validation_done_external_acceptance_open",
+  "objective": "Son audit bulgularını kapatmak, önceki gerçek ortam kabul açıklarını doğrulamak ve yayına sunulabilecek imzalı aday paketi hazırlamak.",
+  "baseline": {
+    "audit": "docs/mobile-audit/re-audit-20261021.json",
+    "analysisIssues": 0,
+    "flutterTestsPassed": 464,
+    "releasePythonTestsPassed": 25,
+    "auditFindings": {
+      "P1": 1,
+      "P2": 3
+    },
+    "characterizationScenarios": 3,
+    "note": "Üç karakterizasyon testi hatalı mevcut davranışı kanıtlar; düzeltme değildir. Eski 74/18 kapanış sayımı tarihsel checkpointtir; güncel kabul kanıtıyla yeniden uzlaştırılacaktır."
+  },
+  "productDecisions": [
+    "Ana sayfada kapı işlem bildirim kartı yok.",
+    "Ana sayfa hızlı işlemleri yalnız Kapıyı Aç ve Ziyaretçi.",
+    "Geçmişte tek filtre girişi; ziyaretçi Ekle sağ üstte.",
+    "Web kullanıcıları ve mobil çalışan hesapları ayrı; otomatik e-posta eşleştirme veya proje taşıma yok.",
+    "Yeni audit turu için kapsam mobil Android/iOS; yeni ürün özelliği veya geniş web refaktörü yok."
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Davranış düzeltmeleri ve ziyaretçi kurtarma kabulü",
+      "items": [
+        "MOB-N01",
+        "MOB-N02",
+        "MOB-N03",
+        "MOB-N04",
+        "MOB-N05"
+      ]
+    },
+    {
+      "number": 2,
+      "title": "Bağımlılık ve native uyum",
+      "items": [
+        "MOB-N06"
+      ]
+    },
+    {
+      "number": 3,
+      "title": "Gerçek ortam, cihaz ve donanım kabulü",
+      "items": [
+        "MOB-N07",
+        "MOB-N08"
+      ]
+    },
+    {
+      "number": 4,
+      "title": "İmzalı aday paket ve yayın kararı",
+      "items": [
+        "MOB-N09",
+        "MOB-N10"
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "MOB-N01",
+      "phase": 1,
+      "priority": "P1",
+      "title": "Kapı işlemi kurtarma akışı",
+      "owner": "Mobil",
+      "dependsOn": [],
+      "references": [
+        "AUD-01"
+      ],
+      "work": [
+        "Belirsiz işlem varken Kapıyı Aç üzerinden erişilebilen bir kurtarma diyaloğu tasarla; ana sayfaya durum/bildirim kartı ekleme.",
+        "Önce mevcut requestId durumunu sorgula; tekrar gönderme gerekiyorsa kullanıcı eylemiyle yalnız aynı requestId ve hedefi kullan.",
+        "Mevcut karakterizasyon senaryosunu düzeltilmiş davranışı doğrulayan kalıcı widget/provider regresyonuna dönüştür."
+      ],
+      "acceptance": [
+        "Timeout + null receipt + süreç yeniden açılışı kullanıcıyı kalıcı kilitte bırakmaz.",
+        "Belirsiz işlem çözülmeden yeni requestId/başka hedef ile komut gönderilmez; otomatik yeni komut yok.",
+        "Pending/terminal/izin kaldırılması/logout durumları doğru ayrılır.",
+        "Ana sayfada kapı işlem bildirim kartı görünmez."
+      ]
+    },
+    {
+      "id": "MOB-N02",
+      "phase": 1,
+      "priority": "P2",
+      "title": "Ziyaretçi detayında canlı yenileme",
+      "owner": "Mobil",
+      "dependsOn": [],
+      "references": [
+        "AUD-02"
+      ],
+      "work": [
+        "Liste ve root detay görünürlük sahipliğini ayır.",
+        "Detay görünür ve uygulama resumed iken detay polling çalışsın; kapanış, logout ve dispose sonlandırsın."
+      ],
+      "acceptance": [
+        "Operatör aktivasyonu detay kapatılmadan en geç sonraki 30 saniyelik yenilemede görünür.",
+        "Arka planda/başka hesapta polling ve eski yanıt uygulaması yok.",
+        "Root modal alt navigasyonu örtmeye devam eder; timer çoğalmaz."
+      ]
+    },
+    {
+      "id": "MOB-N03",
+      "phase": 1,
+      "priority": "P2",
+      "title": "Geçmiş dönemini yaşam döngüsüyle güncelleme",
+      "owner": "Mobil",
+      "dependsOn": [],
+      "references": [
+        "AUD-03"
+      ],
+      "work": [
+        "Ekran görünürlüğü ve resume sırasında İstanbul gün/hafta/ay sınırlarını karşılaştır.",
+        "Dönem değiştiyse takvim/özetleri güncelle; kullanıcının kayıt filtrelerini koru."
+      ],
+      "acceptance": [
+        "31 Ekim → 1 Kasım, hafta ve gün sınırı testleri geçer.",
+        "Aynı dönemde gereksiz sorgu döngüsü oluşmaz.",
+        "Seçili tarih/cihaz filtreleri kendiliğinden silinmez."
+      ]
+    },
+    {
+      "id": "MOB-N04",
+      "phase": 1,
+      "priority": "P2",
+      "title": "Profilde mobil firma veya proje adı",
+      "owner": "Mobil + backend sahibi",
+      "dependsOn": [],
+      "references": [
+        "AUD-04"
+      ],
+      "work": [
+        "Auth DTO sözleşmesinde mobil oturumun canonical proje adını ekle; backend değişikliğini CEO sahipliğiyle koordine et.",
+        "Profilde mobil proje adını göster; eksik/eski DTO için güvenli uyum davranışı sağla."
+      ],
+      "acceptance": [
+        "Etiket mobil employees.projectId bağlamından gelir; departman veya web hesabından türetilmez.",
+        "Web ve mobil hesaplar ayrı kalır; e-posta eşleştirme, yetki kopyalama veya kişi taşıma yok.",
+        "Logout/hesap değişiminde eski proje etiketi görünmez."
+      ]
+    },
+    {
+      "id": "MOB-N05",
+      "phase": 1,
+      "priority": "P1 kabul riski",
+      "title": "Ziyaretçi oluşturma yanıt kaybı ve süreç ölümü",
+      "owner": "Mobil + gerekirse backend sahibi",
+      "dependsOn": [],
+      "references": [
+        "docs/mobile-release/reports/12-visitors.md"
+      ],
+      "work": [
+        "Önce kontrollü test hesabında create yanıt kaybı → uygulamayı kapatma → yeniden açma → listeyle uzlaşma senaryosunu doğrula.",
+        "Mevcut bellek içi requestId korumasını süreç ölümüne karşı değerlendir; ikinci kayıt üretilmesini engelleyen kalıcı uzlaşma sözleşmesi belirle.",
+        "Gerekirse hesap kapsamlı en az metadata/requestId sakla ve yetkili receipt sorgusu ekle; gereksiz ziyaretçi PII veya şifresiz taslak saklama."
+      ],
+      "acceptance": [
+        "Yanıt kaybı ve yeniden başlatma sonrası tek ziyaretçi kaydı bulunur.",
+        "Bilinmeyen sonuçta sessizce yeni requestId ile ikinci oluşturma yapılmaz.",
+        "Başka hesap/proje niyeti göremez veya tekrar kullanamaz; logout/expiry temizliği doğrulanır."
+      ],
+      "note": "Önceki raporda açık sınır; bu audit ile yeni doğrulanmış hata sayılmadı. Mevcut davranış kabulü karşılıyorsa ek kalıcılık kodu zorunlu değildir."
+    },
+    {
+      "id": "MOB-N06",
+      "phase": 2,
+      "priority": "Bakım",
+      "title": "Bağımlılık ve native araç zinciri değerlendirmesi",
+      "owner": "Mobil",
+      "dependsOn": [
+        "MOB-N01",
+        "MOB-N02",
+        "MOB-N03",
+        "MOB-N04",
+        "MOB-N05"
+      ],
+      "references": [
+        "docs/mobile-audit/evidence/20261021/outdated.json",
+        "mobile/release/toolchain.json"
+      ],
+      "work": [
+        "Beş yeni major sürümü resmi changelog ve migration gereksinimleriyle değerlendir: cupertino_icons, flutter_secure_storage, go_router, package_info_plus, permission_handler.",
+        "Her paket için yükselt veya gerekçeyle mevcut sürümde kal kararı kaydet; toplu zorunlu major güncelleme yapma.",
+        "AGP/Kotlin gelecek destek uyarılarını Flutter pin ve native plugin uyumuyla birlikte değerlendir; onaylanan yükseltmeleri ayrı küçük değişikliklerle uygula."
+      ],
+      "acceptance": [
+        "Karar verilen grafikte analyze, tam Flutter testleri, l10n ve Python kontrolleri geçer.",
+        "iOS simulator/device ve Android derlemeleri geçer; lock ve generated drift incelenir.",
+        "Yeni major bulunması güvenlik açığı olarak etiketlenmez; yükseltme gerekiyorsa ilgili changelog bağlantısı ve cihaz kabulü vardır."
+      ]
+    },
+    {
+      "id": "MOB-N07",
+      "phase": 3,
+      "priority": "Yayın kabulü",
+      "title": "Güncel backend ile iş akışı kabulü",
+      "owner": "Mobil QA + CEO/backend/web sahibi + test operatörü",
+      "dependsOn": [
+        "MOB-N01",
+        "MOB-N02",
+        "MOB-N03",
+        "MOB-N04",
+        "MOB-N05",
+        "MOB-N06"
+      ],
+      "work": [
+        "Onaylı test ortamı, test çalışanı/operatörü ve yayınlanmış revision/endpoint sözleşmesini sabitle.",
+        "Giriş/yanlış parola/oturum süresi/logout/yeniden açılış/parola değişimi; geçmiş sayfalama/filtre/özet senaryolarını çalıştır.",
+        "Ziyaretçi oluştur → düzenle → web aktivasyon → detay yenileme → iptal veya operatör gereksinimi → süre dolumu ve sync durumunu uçtan uca doğrula.",
+        "Ağ kesintisi, yavaş/tekrar/geç yanıt, hesap/proje değişimi ve yetki kaldırılmasını dene."
+      ],
+      "acceptance": [
+        "Kullanıcıya görünen beklenmeyen veri alınamadı hatası veya başka hesap verisi yok.",
+        "İşlemler doğru test projesinde, tek kayıt/tek niyet ile sonuçlanır; gerçek kayıtla eşleşen kanıt saklanır.",
+        "Yeni projectName DTO gerekiyorsa CEO tarafından hedef ortama yayınlandığı doğrulanır."
+      ],
+      "note": "Mobil API varlığı önceki 21/21 post-deploy kontrolünde doğrulandı. Eski yayımlanmamış backend kaydı güncel açık iş sayılmaz; yeni değişiklikler için ortam/revision doğrulaması gerekir."
+    },
+    {
+      "id": "MOB-N08",
+      "phase": 3,
+      "priority": "Yayın kabulü",
+      "title": "Fiziksel telefon, kamera ve erişim cihazı kabulü",
+      "owner": "Mobil QA + cihaz operatörü",
+      "dependsOn": [
+        "MOB-N07"
+      ],
+      "work": [
+        "iPhone 17 Pro simülatör turunu koruyup Android ve fiziksel iPhone üzerinde cold start, upgrade, izin reddi/ayar dönüşü, kamera resume, QR ve güvenli depo davranışlarını doğrula.",
+        "TR/EN, tema, büyük yazı, VoiceOver/TalkBack ve Android geri/iOS geri hareketlerini dene.",
+        "Yayın kapsamında desteklenen gerçek hedefte operatör eşliğinde kapı komutu, ACK kaybı/tekrarı, offline ve fiziksel geçiş ayrımını gözle.",
+        "Android gerçek 16 KB ortamında getconf PAGESIZE=16384 kanıtı, kurulum/açılış, native plugin ve crash/ANR kontrolü al."
+      ],
+      "acceptance": [
+        "Her senaryo kullanılan sürüm/build/cihaz/artifact hash ile kayıtlıdır.",
+        "Komut ACK fiziksel geçiş olarak sunulmaz; beklenmedik çift komut yok.",
+        "Desteklenmeyen Hik localBridge veya kanıtlanmamış IDE izolasyonu açılmaz; destek sınırları doğru gösterilir.",
+        "16 KB statik hizalama yanında gerçek runtime kanıtı vardır."
+      ]
+    },
+    {
+      "id": "MOB-N09",
+      "phase": 4,
+      "priority": "Yayın kabulü",
+      "title": "İmzalı aday paket ve mağaza hazırlığı",
+      "owner": "Mobil release + mağaza/CI sahibi",
+      "dependsOn": [
+        "MOB-N07"
+      ],
+      "work": [
+        "Mevcut mağaza sürüm geçmişinden artan version/build seç; mevcut Android upload sertifikası ve Apple Distribution/provisioning sürekliliğini doğrula.",
+        "Onaylı production hostunu public build tanımlarıyla sabitle; test/debug profil paketini mağaza paketi sayma.",
+        "Temiz revision üzerinden imzalı AAB/IPA üret; signer, manifest, entitlement, privacy kaynakları ve hash kayıtlarını doğrula.",
+        "Privacy/support URLleri, veri beyanları, hesap silme/recovery akışı, mağaza görselleri ve inceleme hesabını tamamla.",
+        "Gerçek dış CI koşusu al; Xcode adımı skipped ise iOS build kabulünü geçmiş sayma. Symbol/dSYM özel saklama ve eşleşen artifact ile kontrollü hata çözümleme kanıtını al."
+      ],
+      "acceptance": [
+        "Mevcut imza ve uygulama kimlikleri korunur; final AAB/IPA doğrulanır.",
+        "İmza sırları ve symbol/dSYM dosyaları genel rapora/loga girmez.",
+        "Mağaza bilgileri ürünün gerçek davranışına uyar; CI ve artifact kayıtları aynı revision ile eşleşir."
+      ]
+    },
+    {
+      "id": "MOB-N10",
+      "phase": 4,
+      "priority": "Son kabul",
+      "title": "Son aday paket testi ve kapanış kararı",
+      "owner": "Mobil koordinatör + release sahibi",
+      "dependsOn": [
+        "MOB-N08",
+        "MOB-N09"
+      ],
+      "work": [
+        "Dağıtılacak son paket veya aynı AABden üretilen teslim paketi/TestFlight yapısı üzerinde temiz kurulum ve önceki sürümden upgrade smoke çalıştır.",
+        "N01–N05 ve önceki dış kabul koşullarını güncel kanıtlarla kapat; eksikleri açık bırak.",
+        "Release notları, bilinen destek sınırları ve önceki onaylı pakete dönüş prosedürünü hazırla.",
+        "Somut paket, test özeti ve açık risklerle yayın kararını kullanıcıya sun; mağaza gönderimini açık yayın onayından sonra yap."
+      ],
+      "acceptance": [
+        "Yeni audit bulguları ve mükerrer ziyaretçi riski kapalı; desteklenen kapsamda doğrulanmamış kritik davranış yok.",
+        "Son kanıt farklı veya eski APK/IPA üzerinden taşınmamış.",
+        "Test kurulumuna hazır ile mağazaya gönderime hazır kararları ayrı belirtilmiş.",
+        "Mağaza gönderimi açık yayın onayı olmadan yapılmaz."
+      ]
+    }
+  ],
+  "scheduling": {
+    "recommendedStart": "MOB-N01",
+    "independentCodeStreams": [
+      [
+        "MOB-N01"
+      ],
+      [
+        "MOB-N02",
+        "MOB-N05"
+      ],
+      [
+        "MOB-N03"
+      ],
+      [
+        "MOB-N04"
+      ]
+    ],
+    "sharedFileNote": "N02 ve N05 VisitorProvider ortak alanına yazabileceği için aynı sahipte sırayla; ARB/generated/router değişiklikleri tek entegrasyon sahibiyle birleştirilir.",
+    "earlyPreparation": "Mevcut imza/mağaza/CI erişimleri ve test cihazı/operatör hazırlığı Faz 1 sırasında yapılabilir; final artifact ancak kod/native grafik sabitlendikten sonra oluşturulur.",
+    "execution": "Bu tur yalnız plan hazırlandı; worker başlatılmadı, uygulama veya backend değiştirilmedi. Flutter/Dart/pub/native build komutları aynı SDK üzerinde eşzamanlı çalıştırılmaz."
+  },
+  "verification": {
+    "perFix": "İlgili gerçek davranış regresyonu; mevcut audit fixtureları kalıcı doğru-sonuç testlerine dönüştürülür.",
+    "integration": [
+      "flutter analyze --no-pub",
+      "flutter test --no-pub",
+      "python3 scripts/check_l10n.py",
+      "python3 -m unittest discover -s scripts/tests -v",
+      "Lock/generated drift ve iOS/Android derleme kontrolleri"
+    ],
+    "backendIfChanged": [
+      "convex/_generated/ai/guidelines.md önce okunur.",
+      "node_modules/.bin/tsc --noEmit -p tsconfig.app.json",
+      "Convex TS, scoped backend auth/DTO testleri ve node_modules/.bin/eslint src convex",
+      "Canlı veri yazması/deploy paylaşılmış kirli çalışma ağacından yapılmaz; CEO sahipliği korunur."
+    ]
+  },
+  "completionDefinition": {
+    "phoneTestingReady": "N01–N06 kabulü ve güncel test paketinin kurulumu; mağaza onayı değildir.",
+    "releaseCandidateReady": "N07–N10 kabulü, doğru imzalar, dış CI, mağaza bilgileri, gerçek cihaz/panel kanıtı ve final paket testleri.",
+    "storeSubmission": "Kullanıcının somut aday paket için açık yayın onayından sonra."
+  },
+  "sources": [
+    "docs/mobile-audit/re-audit-20261021.json",
+    "docs/mobile-release/audit-closure.json",
+    "docs/mobile-release/reports/12-visitors.md",
+    "docs/mobile-release/reports/23-android-16k-runtime.md",
+    "docs/mobile-release/evidence/post-deploy-smoke/summary.json",
+    "mobile/release/README.md",
+    ".github/workflows/mobile.yml"
+  ],
+  "planningCaveat": "Önceki raporlardaki kapılar tarihsel kabul eksikleridir; bu tur yeni canlı deployment, mağaza kimliği veya donanım durumu sorgulanmadı. Başlamadan ilgili güncel durum tekrar doğrulanır.",
+  "execution": {
+    "updatedAt": "2026-10-22",
+    "report": "docs/mobile-release/implementation-20261022/delivery.json",
+    "taskStatuses": {
+      "MOB-N01": "locally_verified",
+      "MOB-N02": "locally_verified",
+      "MOB-N03": "locally_verified",
+      "MOB-N04": "implemented_backend_publication_pending",
+      "MOB-N05": "implemented_live_acceptance_pending",
+      "MOB-N06": "reviewed_patch_verified",
+      "MOB-N07": "partial",
+      "MOB-N08": "partial",
+      "MOB-N09": "external_inputs_pending",
+      "MOB-N10": "pending_dependencies"
+    }
+  }
+}

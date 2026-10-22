@@ -1,0 +1,9 @@
+{
+  "purpose": "preliminary only; final acceptance requires newest coordinator hash",
+  "originalPath": "/Users/emreaydin/ngsaccess/mobile/build/app/outputs/flutter-apk/app-arm64-v8a-profile.apk",
+  "snapshotPath": "/tmp/ngs_release_16k_20261022-baseline.apk",
+  "sha256": "06eff862841060988bc1c4fdf28f325c80cd4ec35922f32b336007d040ad2b9a",
+  "expectedSha256": "06eff862841060988bc1c4fdf28f325c80cd4ec35922f32b336007d040ad2b9a",
+  "hashMatches": true,
+  "bytes": 53883225
+}

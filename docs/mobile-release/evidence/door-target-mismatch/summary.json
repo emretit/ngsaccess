@@ -1,0 +1,65 @@
+{
+  "date": "2026-10-21",
+  "deployment": "notable-tern-4",
+  "finding": "The same email address resolves to separate web user and mobile employee identities assigned to different projects and physical controllers.",
+  "identityVerification": {
+    "sameEmailInBothVisibleProfiles": true,
+    "matchingWebUsers": 1,
+    "matchingMobileEmployees": 1,
+    "webRole": "project_admin",
+    "webMembershipProjects": ["NGS"],
+    "employeeProject": "emre",
+    "employeeAuthProject": "emre",
+    "webScopeSource": "users + userProjects",
+    "mobileScopeSource": "employees.projectId; signIn and me derive the employee from the employee session",
+    "implicitLinkBetweenWebUserAndEmployee": false
+  },
+  "web": {
+    "source": "Existing Chrome localhost:8081/devices accessibility state, matched to read-only deployment data",
+    "project": "NGS",
+    "device": "NGS0001",
+    "deviceId": "jn7cxdzscn6ytds46a6dnjpzeh8gjtha",
+    "transport": "hik_gateway",
+    "doorCount": 1
+  },
+  "mobile": {
+    "source": "Existing simulator profile identity, matched to read-only employee/group/device/door data",
+    "project": "emre",
+    "ruleName": "NGS",
+    "device": "Deneme1",
+    "deviceId": "jn70ynq164qm6xwkvm1q26pkr1895dhp",
+    "transport": "localBridge",
+    "doorCount": 4,
+    "reason": "TRANSPORT_UNSUPPORTED"
+  },
+  "interpretation": "The access rule name NGS is not the project identity. Repeated door labels do not identify the same physical target. The IDE isolation flag is unrelated to these two Hikvision controllers.",
+  "change": "Preserve device/zone context in the door selector even for unavailable targets, instead of replacing the context with the unavailable reason.",
+  "validation": {
+    "selectorWidgetTests": "8 passed, including same-named targets, unavailable selection guard, panel search, and 200% text scale",
+    "flutterAnalyze": "No issues found",
+    "simulatorBuild": "Passed and installed on iPhone 17 Pro / iOS 27.0",
+    "nativeSmoke": "Existing employee session preserved; all four unavailable rows visibly show Deneme1 • NGS2 above their reason"
+  },
+  "nextStep": "The old employee was deleted at the user's explicit request after the transfer was cancelled. Web and mobile identities remain separate; no replacement employee is created automatically.",
+  "resolution": {
+    "date": "2026-10-21",
+    "userInstruction": "Delete the Talip employee registered under emre",
+    "mutation": "employees:remove",
+    "employeeExistsAfter": false,
+    "matchingEmployeeEmailsAfter": 0,
+    "employeeAuthAfter": 0,
+    "employeeSessionsAfter": 0,
+    "groupMembershipsAfter": 0,
+    "readingsPreservedAndAnonymized": 32,
+    "webUserPreserved": true,
+    "webUserRoleAfter": "project_admin",
+    "simulatorCheck": "The simulator is currently signed in as a different employee (Emre) and displays NGS0001. That active session was preserved. Deleted Talip session revocation is verified by zero server session records, not by a native logout test.",
+    "deviceCleanup": "Standard deletion schedules the existing device cleanup path; physical panel cleanup was not verified",
+    "codeDeployed": false,
+    "projectTransferPerformed": false
+  },
+  "backendMutated": true,
+  "permissionsChanged": true,
+  "doorCommandSent": false,
+  "physicalOpeningVerified": false
+}

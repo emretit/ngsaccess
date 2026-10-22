@@ -1,0 +1,32 @@
+{
+  "recordedAtUtc": "2026-10-22T07:16:03.509766+00:00",
+  "avdNameVerified": "ngs_release_16k_20261022\nOK",
+  "ownedEmulatorProcessTreeBeforeShutdown": [
+    {
+      "pid": 53488,
+      "ppid": 53487,
+      "executable": "/Users/emreaydin/Library/Android/sdk/emulator/qemu/darwin-aarch64/qemu-system-aarch64-headless"
+    },
+    {
+      "pid": 53498,
+      "ppid": 53488,
+      "executable": "/Users/emreaydin/Library/Android/sdk/emulator/netsimd"
+    }
+  ],
+  "shutdownCommand": [
+    "adb",
+    "-s",
+    "emulator-5568",
+    "emu",
+    "kill"
+  ],
+  "shutdownExitCode": 0,
+  "shutdownOutput": "OK: killing emulator, bye bye\nOK",
+  "shutdownError": "",
+  "ownedProcessIdsStillRunning": [],
+  "existingUserAvdUntouched": "fq_ttt_api35",
+  "ownedAvdPreserved": true,
+  "installedOfficialImagePreserved": true,
+  "archivePreserved": "/tmp/ngs-android16k-image-r07.zip",
+  "adbServerStopped": false
+}

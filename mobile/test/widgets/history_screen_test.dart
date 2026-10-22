@@ -9,6 +9,8 @@ import 'package:ngsplusapp/models/attendance.dart';
 import 'package:ngsplusapp/models/attendance_summary.dart';
 import 'package:ngsplusapp/providers/attendance_provider.dart';
 import 'package:ngsplusapp/screens/history/history_screen.dart';
+import 'package:ngsplusapp/theme/app_theme.dart';
+import 'package:ngsplusapp/widgets/history/history_calendar.dart';
 import 'package:provider/provider.dart';
 
 import '../helpers/mocks.dart';
@@ -137,26 +139,34 @@ AttendanceSummary summary(String start, String end, int entries) =>
       ),
     );
 
-Widget screen(HistoryTestProvider provider, {double textScale = 1}) =>
-    ChangeNotifierProvider<AttendanceProvider>.value(
-      value: provider,
-      child: MaterialApp(
-        locale: const Locale('en'),
-        supportedLocales: AppLocalizations.supportedLocales,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(textScaler: TextScaler.linear(textScale)),
-          child: child ?? const SizedBox.shrink(),
-        ),
-        home: HistoryScreen(now: () => DateTime.utc(2026, 10, 21, 12)),
-      ),
-    );
+Widget screen(
+  HistoryTestProvider provider, {
+  double textScale = 1,
+  Locale locale = const Locale('en'),
+  ThemeMode themeMode = ThemeMode.light,
+}) => ChangeNotifierProvider<AttendanceProvider>.value(
+  value: provider,
+  child: MaterialApp(
+    locale: locale,
+    theme: AppTheme.lightTheme,
+    darkTheme: AppTheme.darkTheme,
+    themeMode: themeMode,
+    supportedLocales: AppLocalizations.supportedLocales,
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(
+        context,
+      ).copyWith(textScaler: TextScaler.linear(textScale)),
+      child: child ?? const SizedBox.shrink(),
+    ),
+    home: HistoryScreen(now: () => DateTime.utc(2026, 10, 21, 12)),
+  ),
+);
 
 void main() {
   setUpAll(() async {
     await initializeDateFormatting('en');
+    await initializeDateFormatting('tr');
   });
 
   testWidgets('month and Monday week totals use independent server summaries', (
@@ -177,25 +187,22 @@ void main() {
     addTearDown(provider.dispose);
     await tester.pumpWidget(screen(provider));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Stats'));
+    await tester.tap(find.text('Overview'));
     await tester.pumpAndSettle();
 
     expect(
       provider.ranges,
       containsAll(['2026-10-01/2026-10-31', '2026-10-19/2026-10-25']),
     );
-    expect(find.text('Total Check-ins: 150'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Total Check-ins: 25'),
-      250,
-      scrollable: find
-          .descendant(
-            of: find.byType(ListView).last,
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
-    expect(find.text('Total Check-ins: 25'), findsOneWidget);
+    expect(find.text('150'), findsOneWidget);
+    expect(find.text('25'), findsNothing);
+    await tester.tap(find.text('This Week'));
+    await tester.pumpAndSettle();
+    expect(find.text('25'), findsOneWidget);
+    expect(find.text('150'), findsNothing);
+    await tester.tap(find.text('This month'));
+    await tester.pumpAndSettle();
+    expect(find.text('150'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -211,8 +218,13 @@ void main() {
       addTearDown(provider.dispose);
       await tester.pumpWidget(screen(provider));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('This Month'));
+      await tester.tap(find.text('Calendar'));
       await tester.pumpAndSettle();
+      final calendar = tester.widget<HistoryCalendar>(
+        find.byType(HistoryCalendar),
+      );
+      // Three granted movements plus five denied attempts are eight records.
+      expect(calendar.dayCounts['2026-10-19'], 8);
       final day = find.byKey(const ValueKey('history-day-2026-10-19'));
       await tester.ensureVisible(day);
       await tester.tap(day);
@@ -238,8 +250,6 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Filter'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Device'));
-      await tester.pumpAndSettle();
       provider.deviceFacets = {'door-a': 'Office', 'door-b': 'Office'};
       provider.publish();
       await tester.pumpAndSettle();
@@ -253,6 +263,9 @@ void main() {
         findsOneWidget,
       );
       await tester.tap(find.byKey(const ValueKey('history-device-door-b')));
+      await tester.pumpAndSettle();
+      expect(provider.filters.last.deviceId, isNull);
+      await tester.tap(find.byKey(const Key('history-apply-filters')));
       await tester.pumpAndSettle();
       expect(provider.filters.last.deviceId, 'door-b');
       expect(provider.filters.last.startDate, isNull);
@@ -302,9 +315,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Filter'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Date'));
+    await tester.tap(find.text('Date').first);
     await tester.pumpAndSettle();
-    expect(find.byType(DatePickerDialog), findsOneWidget);
+    expect(find.byType(CalendarDatePicker), findsOneWidget);
     await tester.pumpWidget(const MaterialApp(home: SizedBox.shrink()));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
@@ -327,4 +340,154 @@ void main() {
     expect(find.text('Clear Filters'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('dismissing filter drafts preserves the applied server filter', (
+    tester,
+  ) async {
+    final provider = HistoryTestProvider()..deviceFacets = {'door-a': 'Office'};
+    addTearDown(provider.dispose);
+    await tester.pumpWidget(screen(provider));
+    await tester.pumpAndSettle();
+    final originalRequests = provider.filters.length;
+    await tester.tap(find.byTooltip('Filter'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('history-device-door-a')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+    expect(provider.filters.length, originalRequests);
+    expect(find.byTooltip('Filter'), findsOneWidget);
+    expect(find.text('All devices'), findsNothing);
+    expect(find.text('All dates'), findsNothing);
+  });
+
+  testWidgets('filter sheet covers the outer navigation of a retained branch', (
+    tester,
+  ) async {
+    final provider = HistoryTestProvider();
+    addTearDown(provider.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          bottomNavigationBar: const SizedBox(
+            key: Key('outer-navigation'),
+            height: 80,
+          ),
+          body: Navigator(
+            onGenerateRoute: (_) => MaterialPageRoute<void>(
+              builder: (_) => ChangeNotifierProvider<AttendanceProvider>.value(
+                value: provider,
+                child: HistoryScreen(now: () => DateTime.utc(2026, 10, 21)),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final navTop = tester
+        .getTopLeft(find.byKey(const Key('outer-navigation')))
+        .dy;
+    await tester.tap(find.byTooltip('Filter'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(find.byType(BottomSheet)).bottom,
+      greaterThan(navTop),
+    );
+    await tester.tap(find.byTooltip('Close'));
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets(
+    'one sheet applies date and device together, empty result can clear both',
+    (tester) async {
+      final provider = HistoryTestProvider()
+        ..deviceFacets = {'door-a': 'Office'};
+      addTearDown(provider.dispose);
+      await tester.pumpWidget(screen(provider));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Filter'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('history-device-door-a')));
+      await tester.tap(find.text('Date'));
+      await tester.pumpAndSettle();
+      final day = find.descendant(
+        of: find.byType(CalendarDatePicker),
+        matching: find.text('19'),
+      );
+      await tester.ensureVisible(day);
+      await tester.tap(day);
+      await tester.pumpAndSettle();
+      expect(provider.filters.last.deviceId, isNull);
+      await tester.tap(find.byKey(const Key('history-apply-filters')));
+      await tester.pumpAndSettle();
+      expect(provider.filters.last, (
+        startDate: '2026-10-19',
+        endDate: '2026-10-19',
+        deviceId: 'door-a',
+      ));
+      await tester.tap(find.text('Show all records'));
+      await tester.pumpAndSettle();
+      expect(provider.filters.last, (
+        startDate: null,
+        endDate: null,
+        deviceId: null,
+      ));
+    },
+  );
+
+  for (final locale in [const Locale('en'), const Locale('tr')]) {
+    for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+      testWidgets(
+        'history tabs and filter reflow at 320px / 200% ${locale.languageCode} $mode',
+        (tester) async {
+          tester.view.physicalSize = const Size(320, 700);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final provider = HistoryTestProvider()
+            ..attendanceRecords = [event(1)]
+            ..deviceFacets = {'door-a': 'A long entrance name'}
+            ..summaries['2026-10-01/2026-10-31'] = summary(
+              '2026-10-01',
+              '2026-10-31',
+              150,
+            );
+          addTearDown(provider.dispose);
+          await tester.pumpWidget(
+            screen(provider, textScale: 2, locale: locale, themeMode: mode),
+          );
+          await tester.pumpAndSettle();
+          final l10n = AppLocalizations.of(
+            tester.element(find.byType(HistoryScreen)),
+          );
+          await tester.ensureVisible(find.text(l10n.historyTabThisMonth));
+          await tester.tap(find.text(l10n.historyTabThisMonth));
+          await tester.pumpAndSettle();
+          expect(find.byTooltip(l10n.historyFilterTitle), findsNothing);
+          await tester.ensureVisible(find.text(l10n.historyTabStats));
+          await tester.tap(find.text(l10n.historyTabStats));
+          await tester.pumpAndSettle();
+          expect(find.text('150'), findsOneWidget);
+          await tester.ensureVisible(find.text(l10n.historyTabAll));
+          await tester.tap(find.text(l10n.historyTabAll));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byTooltip(l10n.historyFilterTitle));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(l10n.historyFilterDate).first);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('history-apply-filters')).hitTestable(),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+          await tester.tap(find.byTooltip(l10n.commonClose));
+          await tester.pumpAndSettle();
+        },
+      );
+    }
+  }
 }

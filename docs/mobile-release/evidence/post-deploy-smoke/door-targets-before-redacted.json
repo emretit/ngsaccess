@@ -1,0 +1,137 @@
+{
+  "screen": "door-targets-before",
+  "ui": [
+    {
+      "key": "appName",
+      "text": "NGS Plus",
+      "type": "Application",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      }
+    },
+    {
+      "key": "selectDeviceTitle",
+      "text": "Kapı Seç",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.3941,
+        "y": 0.0892,
+        "width": 0.2118,
+        "height": 0.0275
+      }
+    },
+    {
+      "key": "qrRefresh",
+      "text": "Yenile",
+      "type": "Button",
+      "frame": {
+        "x": 0.8806,
+        "y": 0.0755,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "visitorRefresh",
+      "text": "Yenile",
+      "type": "Button",
+      "frame": {
+        "x": 0.8806,
+        "y": 0.0755,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "selectDeviceSearch",
+      "text": "Ara...",
+      "type": "TextField",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.1533,
+        "width": 0.9204,
+        "height": 0.0641
+      }
+    },
+    {
+      "key": "preferenceIdentityUnavailable",
+      "text": "Hesap veya proje bilgisi doğrulanamadı. Yeniden giriş yapın.",
+      "type": "GenericElement",
+      "frame": {
+        "x": 0,
+        "y": 0.2357,
+        "width": 1,
+        "height": 0.0824
+      }
+    },
+    {
+      "key": "errorProtocol",
+      "text": "Geçerli bir sunucu yanıtı alınamadı. Lütfen yeniden deneyin.",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0597,
+        "y": 0.5995,
+        "width": 0.8806,
+        "height": 0.0458
+      }
+    },
+    {
+      "key": "commonRetry",
+      "text": "Tekrar Dene",
+      "type": "Button",
+      "frame": {
+        "x": 0.3377,
+        "y": 0.6636,
+        "width": 0.3247,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "unlockNoDeviceSelected",
+      "text": "Önce Profil'den hızlı erişim kapısını seç",
+      "type": "GenericElement",
+      "frame": {
+        "x": 0,
+        "y": 0.9062,
+        "width": 1,
+        "height": 0.0938
+      }
+    },
+    {
+      "key": "navProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7609,
+        "y": 0.9062,
+        "width": 0.2093,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "profileTitle",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7609,
+        "y": 0.9062,
+        "width": 0.2093,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "quickActionProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7609,
+        "y": 0.9062,
+        "width": 0.2093,
+        "height": 0.0549
+      }
+    }
+  ]
+}

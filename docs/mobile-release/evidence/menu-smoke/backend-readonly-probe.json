@@ -1,0 +1,92 @@
+[
+  {
+    "function": "employeeAuth:me",
+    "httpStatus": 200,
+    "status": "error",
+    "functionMissing": false,
+    "argumentError": false,
+    "code": null,
+    "invalidSessionRejected": true
+  },
+  {
+    "function": "cardReadings:listForEmployee",
+    "httpStatus": 200,
+    "status": "error",
+    "functionMissing": false,
+    "argumentError": false,
+    "code": null,
+    "invalidSessionRejected": true
+  },
+  {
+    "function": "devices:listForEmployee",
+    "httpStatus": 200,
+    "status": "error",
+    "functionMissing": false,
+    "argumentError": false,
+    "code": null,
+    "invalidSessionRejected": true
+  },
+  {
+    "function": "mobileAttendance:summary",
+    "httpStatus": 200,
+    "status": "error",
+    "functionMissing": true,
+    "argumentError": false,
+    "code": null,
+    "invalidSessionRejected": false
+  },
+  {
+    "function": "mobileAttendance:listPage",
+    "httpStatus": 200,
+    "status": "error",
+    "functionMissing": true,
+    "argumentError": false,
+    "code": null,
+    "invalidSessionRejected": false
+  },
+  {
+    "function": "mobileAccess:listTargets",
+    "httpStatus": 200,
+    "status": "error",
+    "functionMissing": true,
+    "argumentError": false,
+    "code": null,
+    "invalidSessionRejected": false
+  },
+  {
+    "function": "mobileVisitors:listPage",
+    "httpStatus": 200,
+    "status": "error",
+    "functionMissing": true,
+    "argumentError": false,
+    "code": null,
+    "invalidSessionRejected": false
+  },
+  {
+    "function": "mobileVisitors:summary",
+    "httpStatus": 200,
+    "status": "error",
+    "functionMissing": true,
+    "argumentError": false,
+    "code": null,
+    "invalidSessionRejected": false
+  },
+  {
+    "function": "mobileVisitors:notice",
+    "httpStatus": 200,
+    "status": "error",
+    "functionMissing": true,
+    "argumentError": false,
+    "code": null,
+    "invalidSessionRejected": false
+  },
+  {
+    "function": "employeeCheckIn:getMyCheckInTokenStatus",
+    "httpStatus": 200,
+    "status": "error",
+    "functionMissing": true,
+    "argumentError": false,
+    "code": null,
+    "invalidSessionRejected": false
+  }
+]

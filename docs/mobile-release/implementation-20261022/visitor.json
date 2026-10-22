@@ -1,0 +1,198 @@
+{
+  "taskId": "task_f3a93902be39",
+  "dispatchId": "ctx_ee7ab2a95b76",
+  "date": "2026-10-22",
+  "status": "implemented_and_coordinator_sdk_verified_external_acceptance_open",
+  "scope": [
+    "MOB-N02",
+    "AUD-02",
+    "MOB-N05"
+  ],
+  "preservedExistingUncommittedChanges": true,
+  "filesModified": [
+    "mobile/lib/providers/visitor_provider.dart",
+    "mobile/lib/screens/main_navigation_shell.dart",
+    "mobile/lib/screens/visitor/visitor_screen.dart",
+    "mobile/lib/widgets/visitor/visitor_detail.dart",
+    "mobile/lib/repositories/visitor_repository.dart",
+    "mobile/lib/services/visitor_create_intent_store.dart",
+    "mobile/lib/screens/visitor/visitor_form_screen.dart",
+    "mobile/lib/main.dart",
+    "mobile/test/visitor_lifecycle_test.dart",
+    "mobile/test/visitor_create_recovery_test.dart",
+    "mobile/test/visitor_recovery_widgets_test.dart",
+    "mobile/test/visitor_widgets_test.dart",
+    "docs/mobile-release/implementation-20261022/visitor.json"
+  ],
+  "ownership": {
+    "expansion": "Coordinator explicitly approved repository, new intent store/tests, form recovery, main VisitorProvider injection/import hunk and existing visitor widget regression fixtures.",
+    "backendAndLocalization": "Coordinator exclusively owns mobileVisitors:getCreateReceipt query/tests and five new recovery l10n keys; worker changed no backend, ARB, generated or expected_keys file."
+  },
+  "MOB-N02": {
+    "status": "source_and_permanent_regressions_verified_by_coordinator",
+    "rootCause": "Shell root-route visibility previously cancelled a single timer serving both list and detail.",
+    "behavior": [
+      "List visibility, mounted detail lease and app foreground are separate owners of one periodic timer.",
+      "Root detail covers bottom navigation and polls at the next 30-second interval while the covered list remains idle.",
+      "VisitorDetail retains/releases its lease in widget lifecycle; ordinary openDetail reads own no timer.",
+      "Background invalidates in-flight list/summary/detail reads, stops timer and refreshes owned visible resources on resume.",
+      "Session reset clears detail ownership and PII; old epoch/request completions and old lease releases cannot mutate the current owner.",
+      "Modal dismissal, whole-tree disposal, logout and provider disposal stop the corresponding resource."
+    ],
+    "testPaths": [
+      "mobile/test/visitor_lifecycle_test.dart",
+      "mobile/test/visitor_provider_test.dart",
+      "mobile/test/visitor_widgets_test.dart"
+    ],
+    "testCoverage": [
+      "Real buildRouter/root-modal operator activation within 30 seconds",
+      "Bottom navigation remains covered",
+      "Foreground resume with one timer",
+      "Detail-widget unmount while provider stays alive",
+      "Background/dismiss/account-change late response isolation"
+    ],
+    "firstIntegrationFindings": "Coordinator initial run exposed a real detail timer leak on whole-tree disposal and a stale retry label assertion; explicit widget lease ownership and updated same-request assertion address them. No passing final result claimed yet. Subsequent full coordinator run passed all 501 tests; lifecycle and disposal regressions are included. Final post-foreground-follow-up coordinator suite passed 505/505."
+  },
+  "MOB-N05": {
+    "status": "source_and_permanent_regressions_verified_actual_process_death_acceptance_open",
+    "baselineRisk": "PendingVisitorCreate held requestId and draft in memory only; a committed create with lost response could be followed by a new ID after restart. Current list/detail DTOs could not reconcile that ID.",
+    "behavior": [
+      "Production composition injects a file store scoped by employeeId, projectId and canonical deployment; only version, scope IDs and requestId persist.",
+      "An atomic serialized claim flushes a same-directory temporary file and renames/verifies before mutation transport; existing unresolved IDs cannot be overwritten.",
+      "Form opening and each create attempt reconcile the authenticated receipt first; found receipts refresh the list and finish without another create.",
+      "Null receipt never removes metadata and never sends automatically. Explicit recovery re-enters form fields and uses the existing ID; existing backend idempotency/fingerprint prevents a second record or changed-payload replay.",
+      "Transport ambiguity retains the exact in-memory draft for same-process retry; no visitor name, phone, dates, notes, notice payload, email or token is written by the intent store.",
+      "Read/write/corrupt-record or cleanup failure fails closed and exposes a retry. A confirmed receipt or successful response removes only its matching scoped record.",
+      "Logout/expiry/account change clear PII and visible recovery state while unresolved metadata remains scoped for safe same-account relogin. Other employee/project/deployment scopes cannot inspect or reuse it.",
+      "Create recovery errors/loading do not block updating an existing invitation; regression follows Add failure -> back -> own detail -> Edit -> Save.",
+      "Delayed recovery preparation/notice continuations wait for foreground resume; logout, session reset and dispose release waiting futures without sending transport or applying stale state."
+    ],
+    "receiptContract": {
+      "name": "mobileVisitors:getCreateReceipt",
+      "args": {
+        "requestId": "UUID v4 string; session supplied by employeeQuery"
+      },
+      "result": "null | {id: string, status: preRegistered|active|checkedOut|expired}",
+      "authority": "Employee-authenticated host and project isolation using existing by_host_mobile_visitor_request index; root owns backend implementation/tests."
+    },
+    "testPaths": [
+      "mobile/test/visitor_create_recovery_test.dart",
+      "mobile/test/visitor_recovery_widgets_test.dart"
+    ],
+    "testCoverage": [
+      "Real HttpConvexClient/VisitorRepository decoding plus committed lost HTTP response, on-disk intent and provider/client/store/AuthProvider recreation from persisted session",
+      "Null receipt after recreation, explicit same-ID replay and changed-payload conflict preserve one synthetic record",
+      "Read/write/remove failures and fail-closed corrupt temporary files",
+      "Scoped metadata-only file contents and concurrent replacement-store claims",
+      "Logout/relogin, auth expiry, late A receipt and delayed A write during B login",
+      "UI checking gate, receipt-found completion, explicit same-ID retry, storage retry, independent edit regression"
+    ],
+    "knownGaps": [
+      "No actual OS app kill/relaunch or controlled deployed test-account mutation was performed; provider/client/store recreation is an automated regression fixture, not live process-death acceptance.",
+      "Backend receipt query must be deployed to the target environment before receipt recovery can work; missing/unavailable query fails closed.",
+      "No real visitor mutation, device/hardware command, deploy, signing or release build was performed.",
+      "Existing ambiguous intents lost by pre-change app versions cannot be reconstructed retrospectively.",
+      "Flushed file/rename protects normal process termination; Dart cannot fsync the parent directory against sudden power loss. No cross-process locking is claimed.",
+      "Unresolved scoped metadata is deliberately retained rather than expiring into a new request ID; destructive administrative reset is outside this scope."
+    ]
+  },
+  "validation": {
+    "workerExecuted": [
+      {
+        "command": "git diff --check -- <owned modified/new Dart paths>",
+        "result": "passed"
+      }
+    ],
+    "workerSdkCommandsExecuted": false,
+    "reason": "Coordinator retained SDK slot and requested worker source/tests only.",
+    "newPermanentRegressionCount": 20,
+    "coordinatorCommandsNeeded": [
+      "No further visitor SDK rerun needed for unchanged source; native/release/device validation remains coordinator-owned."
+    ],
+    "coordinatorExecuted": [
+      {
+        "check": "Final Flutter analysis",
+        "result": "No issues found",
+        "exitCode": 0,
+        "observedLog": "/tmp/ngs-mobile-analyze-final-20261022.log",
+        "finalLine": "No issues found! (ran in 3.5s)"
+      },
+      {
+        "check": "Final full Flutter test suite",
+        "result": "505 tests passed, 0 failed",
+        "exitCode": 0,
+        "observedLog": "/tmp/ngs-mobile-full-final-20261022.log",
+        "finalLine": "00:12 +505: All tests passed!"
+      },
+      {
+        "check": "Prior focused recovery UI rerun; final full suite also includes four later foreground cases",
+        "result": "4 tests passed, 0 failed",
+        "observedLog": "/tmp/ngs-mobile-visitor-ui-final-20261022.log",
+        "finalLine": "00:01 +4: All tests passed!"
+      },
+      {
+        "check": "Formatting",
+        "result": "Coordinator ran formatter and final checks returned 0",
+        "observedLog": "/tmp/ngs-mobile-format-final-20261022.log"
+      },
+      {
+        "check": "Coordinator exit summary",
+        "result": {
+          "format-final": 0,
+          "analyze-final": 0,
+          "full-final": 0
+        },
+        "observedLog": "/tmp/ngs-mobile-final-checks-20261022.json"
+      }
+    ],
+    "evidenceOwnership": "Worker read the coordinator-produced logs and exit summary; coordinator owns durable global verification evidence and native/release checks. Worker ran no SDK commands.",
+    "coordinatorReportedAdditionalChecks": {
+      "releasePythonTests": "25 passed",
+      "TR_ENParity": "passed",
+      "reportedAt": "2026-10-22 10:00 Europe/Istanbul"
+    },
+    "previousCoordinatorRunScope": "Earlier 501/501 run was superseded by final post-VISITOR-FINAL-01 505/505 with zero analysis issues."
+  },
+  "localizationKeysRequested": [
+    "visitorRecoveryChecking",
+    "visitorRecoveryUnresolved",
+    "visitorRecoveryRetry",
+    "visitorRecoveryFound",
+    "visitorRecoveryStorageError"
+  ],
+  "prohibitedActionsPerformed": false,
+  "remaining": [
+    "Actual OS process-death and controlled deployed test-account acceptance for N05",
+    "Target backend receipt-query revision/deployment verification before release",
+    "Coordinator-owned native/release/device acceptance outside this worker task"
+  ],
+  "reviewFindings": [
+    {
+      "id": "CORE-01",
+      "status": "fixed_and_testpassed",
+      "finding": "A failed or loading create recovery must not block editing an existing invitation.",
+      "fix": "Scope create recovery loading/error gates to widget.visitor == null in save and build; preserve unresolved create ID during update.",
+      "regression": "mobile/test/visitor_recovery_widgets_test.dart: an existing invitation remains editable after leaving a failed create recovery",
+      "validation": "Final post-VISITOR-FINAL-01 coordinator analysis: zero issues; full Flutter suite: 505 passed, zero failed."
+    },
+    {
+      "id": "VISITOR-FINAL-01",
+      "status": "fixed_and_testpassed",
+      "finding": "A local storage read or receipt finishing after backgrounding could start receipt/notice transport while paused.",
+      "fix": "Cancellable foreground gate waits after storage read, receipt and receipt-cleanup completion; notice gates before/after transport; create gates after durable claim. Resume continues the same preparation and request ID; logout/session reset/dispose cancel waiters safely.",
+      "regressions": [
+        "Held store read then background completion starts zero receipt/notice before resume",
+        "Held receipt then background null completion starts zero notice before resume",
+        "Logout and disposal release foreground waiters without transport or stale state"
+      ],
+      "validation": "Final post-VISITOR-FINAL-01 coordinator analysis: zero issues; full Flutter suite: 505 passed, zero failed."
+    }
+  ],
+  "followupAcceptanceEvidence": "docs/mobile-release/implementation-20261022/visitor-acceptance-20261022.json",
+  "targetReceiptAvailability": {
+    "host": "notable-tern-4.convex.cloud",
+    "status": "receipt_query_missing_on_target",
+    "probe": "Unauthenticated read-only public function presence; no credentials or visitor PII",
+    "acceptance": "blocked until backend owner deploys approved receipt-query revision"
+  }
+}

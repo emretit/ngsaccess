@@ -1,0 +1,151 @@
+{
+  "date": "2026-10-22",
+  "reviewer": "orca_session_id:e588e58e-6940-4dc1-b0b0-cece1aa9efe1",
+  "taskId": "task_caa7f966c015",
+  "dispatchId": "ctx_600ca03bc0e4",
+  "status": "review_complete_with_findings",
+  "method": "Independent read-only source and regression-test review of the shared working tree; no tests, Flutter/Dart/pub/native commands, live queries, mutations, deployment, code generation, or git writes executed.",
+  "summary": {
+    "P1": 0,
+    "P2": 1,
+    "confirmedSecurityFindings": 0
+  },
+  "inputs": [
+    "docs/mobile-audit/re-audit-20261021.json",
+    "docs/mobile-release/remaining-plan-20261021.json",
+    "convex/_generated/ai/guidelines.md"
+  ],
+  "findings": [
+    {
+      "id": "CORE-01",
+      "priority": "P2",
+      "title": "An unrelated create-recovery error silently prevents existing visitor edits",
+      "file": "mobile/lib/screens/visitor/visitor_form_screen.dart",
+      "line": 143,
+      "endLine": 144,
+      "confidence": "high",
+      "evidenceType": "Source-confirmed control-flow defect; runtime reproduction intentionally not executed under review constraints",
+      "trigger": [
+        "Open Add Visitor and encounter a durable intent read failure or an existing-request receipt query failure, so VisitorProvider.createRecoveryError is non-null.",
+        "Leave Add without successfully reconciling the error, open a previously existing editable preregistration, and choose Edit.",
+        "Modify valid fields and press the enabled Save button."
+      ],
+      "actual": "_save returns before state.save/update because createRecoveryError is checked without restricting the guard to create mode. Edit initialization intentionally skips reconcileCreate, the recovery error/retry controls are only rendered for create mode, and the enabled-button check already scopes this error to create mode. Therefore no update request occurs and the edit screen gives no explanation or local recovery action.",
+      "impact": "A transient failure of the new creation-recovery path disables editing unrelated existing invitations for the same session until the user first recovers through Add or changes session.",
+      "supportingSources": [
+        {
+          "file": "mobile/lib/providers/visitor_provider.dart",
+          "line": 351,
+          "explanation": "Reconciliation failure persists createRecoveryError in provider state."
+        },
+        {
+          "file": "mobile/lib/screens/visitor/visitor_form_screen.dart",
+          "line": 74,
+          "explanation": "Edit mode skips reconciliation, so opening Edit does not clear that prior create error."
+        },
+        {
+          "file": "mobile/lib/screens/visitor/visitor_form_screen.dart",
+          "line": 232,
+          "explanation": "Recovery error and retry action are shown only in create mode."
+        },
+        {
+          "file": "mobile/lib/screens/visitor/visitor_form_screen.dart",
+          "line": 379,
+          "explanation": "The edit Save button remains enabled because its createRecoveryError gate is correctly restricted to create mode."
+        },
+        {
+          "file": "mobile/lib/providers/visitor_provider.dart",
+          "line": 443,
+          "explanation": "The provider update branch itself is independent of create recovery and would allow the valid edit."
+        }
+      ],
+      "suggestedFix": "In _save, restrict createRecoveryLoading/createRecoveryError gating to widget.visitor == null and keep the local preparation gate as needed. Keep the create-side fail-closed behavior unchanged.",
+      "suggestedRegression": "Cause create reconciliation to fail, leave Add, open Edit on a valid existing visitor, press Save, and assert exactly one update and no create/claim/receipt retry. Confirm that Add remains blocked until its recovery error is resolved.",
+      "reportedToCoordinator": "msg_2786dd9ae5ad",
+      "resolution": "Open when reviewed; source/test fixes are owned by coordinator/writers."
+    }
+  ],
+  "coverage": [
+    {
+      "area": "HomeScreen and DoorOperationRecoveryDialog, door provider/repository/model/store and regression tests",
+      "result": "No additional confirmed P1/P2 issue. Recovery is reachable without a Home status card; checks are read-only, explicit retry queries before sending, and its provider uses the persisted requestId/deviceId/doorId. Pending/sent/unknown stay unresolved; known receipts are not requeued. Session epoch/token guards hide old state and reject old-dialog actions. Command confirmation text remains separate from physical passage/attendance.",
+      "files": [
+        "mobile/lib/screens/home/home_screen.dart",
+        "mobile/lib/widgets/door_operation_recovery_dialog.dart",
+        "mobile/lib/providers/door_operation_provider.dart",
+        "mobile/lib/models/door_operation.dart",
+        "mobile/test/widgets/door_operation_recovery_test.dart",
+        "mobile/test/widgets/home_screen_test.dart",
+        "mobile/test/providers/door_operation_provider_test.dart"
+      ]
+    },
+    {
+      "area": "History lifecycle, visibility and tests",
+      "result": "No confirmed P1/P2 issue. Istanbul business-day comparison also covers new week/month; the period advances before requests and post-frame checks coalesce resume/visibility. Date/device filter state is preserved. Reviewed hidden-branch, day/month/week rollover, same-day, overlay and disposal cases.",
+      "files": [
+        "mobile/lib/screens/history/history_screen.dart",
+        "mobile/lib/core/branch_visibility.dart",
+        "mobile/lib/providers/attendance_provider.dart",
+        "mobile/test/widgets/history_period_lifecycle_test.dart",
+        "mobile/test/widgets/history_screen_test.dart"
+      ]
+    },
+    {
+      "area": "AuthUser/Profile and employeeAuth projectName DTO",
+      "result": "No confirmed P1/P2 issue. projectName is optional for older mobile DTOs, type-checked when present, and shown only with projectId. Missing/deleted project safely returns null/unavailable. Backend reads employees.projectId directly and does not join or copy the same-email web account. AuthProvider replaces/clears currentUser across login/logout; profile reads current user rather than retaining project state.",
+      "files": [
+        "mobile/lib/repositories/auth_repository.dart",
+        "mobile/lib/providers/auth_provider.dart",
+        "mobile/lib/screens/profile/profile_screen.dart",
+        "mobile/test/repositories/auth_repository_test.dart",
+        "mobile/test/widgets/profile_screen_test.dart",
+        "convex/employeeAuth.ts",
+        "convex/employeeAuth.mobile.test.ts"
+      ]
+    },
+    {
+      "area": "Visitor durable create recovery, receipt authorization and form gates",
+      "result": "CORE-01. No confirmed duplicate-prevention or identity-leakage defect in the reviewed paths. Disk intent contains only scoped identifiers and uses serialized claim and matching-ID removal. Null receipt retains the identifier; explicit replay uses that identifier and backend fingerprint conflict prevents changed payload from creating a second visitor. Scope/epoch/session checks reject late reads, claims and receipts after account changes. Receipt returns only id/status and validates employee host/project ownership. New auth-expiry and delayed-claim tests were also inspected after they appeared in the shared tree.",
+      "files": [
+        "mobile/lib/providers/visitor_provider.dart",
+        "mobile/lib/services/visitor_create_intent_store.dart",
+        "mobile/lib/repositories/visitor_repository.dart",
+        "mobile/lib/screens/visitor/visitor_form_screen.dart",
+        "mobile/lib/main.dart",
+        "convex/mobileVisitors.ts",
+        "convex/lib/mobileVisitors.ts",
+        "convex/lib/customFunctions.ts",
+        "convex/mobileVisitors.test.ts",
+        "mobile/test/visitor_create_recovery_test.dart",
+        "mobile/test/visitor_recovery_widgets_test.dart"
+      ]
+    },
+    {
+      "area": "Visitor modal detail lifecycle and shell hooks",
+      "result": "No confirmed P1/P2 issue. Detail polling ownership is independent of covered list visibility and shares a single timer. Foreground false cancels the timer and invalidates in-flight read request generations; resume refreshes retained detail. Close/session reset/dispose clear detail ownership. Root modal continues to cover bottom navigation.",
+      "files": [
+        "mobile/lib/screens/main_navigation_shell.dart",
+        "mobile/lib/providers/visitor_provider.dart",
+        "mobile/lib/screens/visitor/visitor_screen.dart",
+        "mobile/lib/widgets/visitor/visitor_detail.dart",
+        "mobile/test/visitor_lifecycle_test.dart"
+      ]
+    }
+  ],
+  "verification": {
+    "executedByReviewer": [],
+    "testSourcesInspectedOnly": true,
+    "coordinatorReportedChecks": "Coordinator preamble reports 77 focused tests, 2450 backend tests, app/Convex TypeScript checks and lint zero; those results were not independently rerun by this worker.",
+    "limitations": [
+      "Static review does not establish physical device/door/QR acceptance or deployment readiness.",
+      "Shared working tree may receive further writer changes; line references and finding reflect the code observed in this review."
+    ]
+  },
+  "constraintsRespected": [
+    "Only this review JSON was written.",
+    "Existing dirty UI/source/test files preserved.",
+    "No subworkers spawned.",
+    "No test/native/backend/git mutation commands.",
+    "Findings sent through Orca orchestration; no Slack/GitHub messages."
+  ]
+}

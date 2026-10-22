@@ -38,6 +38,7 @@ class _MainNavigationShellState extends State<MainNavigationShell>
     final next = context.read<VisitorProvider?>();
     if (!identical(next, _visitors)) {
       _visitors?.setVisible(false);
+      _visitors?.setForeground(false);
       _visitors = next;
     }
     _scheduleVisibility();
@@ -60,9 +61,12 @@ class _MainNavigationShellState extends State<MainNavigationShell>
     });
   }
 
-  void _syncVisibility() => _visitors?.setVisible(
-    _resumed && _routeVisible && widget.navigationShell.currentIndex == 3,
-  );
+  void _syncVisibility() {
+    _visitors?.setForeground(_resumed);
+    _visitors?.setVisible(
+      _resumed && _routeVisible && widget.navigationShell.currentIndex == 3,
+    );
+  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -85,6 +89,7 @@ class _MainNavigationShellState extends State<MainNavigationShell>
   void dispose() {
     _visibilityRevision++;
     _visitors?.setVisible(false);
+    _visitors?.setForeground(false);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

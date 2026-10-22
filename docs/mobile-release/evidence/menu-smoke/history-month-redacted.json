@@ -1,0 +1,258 @@
+{
+  "screen": "history-month",
+  "ui": [
+    {
+      "key": "appName",
+      "text": "NGS Plus",
+      "type": "Application",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      }
+    },
+    {
+      "key": "navHistory",
+      "text": "Geçmiş",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.0892,
+        "width": 0.1822,
+        "height": 0.0275
+      }
+    },
+    {
+      "key": "quickActionHistory",
+      "text": "Geçmiş",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.0892,
+        "width": 0.1822,
+        "height": 0.0275
+      }
+    },
+    {
+      "key": "historyTitle",
+      "text": "Geçmiş",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.0892,
+        "width": 0.1822,
+        "height": 0.0275
+      }
+    },
+    {
+      "key": "qrRefresh",
+      "text": "Yenile",
+      "type": "Button",
+      "frame": {
+        "x": 0.7612,
+        "y": 0.0755,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "visitorRefresh",
+      "text": "Yenile",
+      "type": "Button",
+      "frame": {
+        "x": 0.7612,
+        "y": 0.0755,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "historyFilterTitle",
+      "text": "Filtrele",
+      "type": "Button",
+      "frame": {
+        "x": 0.8806,
+        "y": 0.0755,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "visitorFilterTitle",
+      "text": "Filtrele",
+      "type": "Button",
+      "frame": {
+        "x": 0.8806,
+        "y": 0.0755,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "historyTabAll",
+      "text": "Tümü",
+      "type": "GenericElement",
+      "frame": {
+        "x": 0.1294,
+        "y": 0.135,
+        "width": 0.1734,
+        "height": 0.0847
+      }
+    },
+    {
+      "key": "historyTabThisMonth",
+      "text": "Bu Ay",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.3027,
+        "y": 0.135,
+        "width": 0.1759,
+        "height": 0.0847
+      }
+    },
+    {
+      "key": "historyTabStats",
+      "text": "İstatistik",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.4786,
+        "y": 0.135,
+        "width": 0.2262,
+        "height": 0.0847
+      }
+    },
+    {
+      "key": "historyMonthSummary",
+      "text": "Bu Ay Özeti",
+      "type": "GenericElement",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.3249,
+        "width": 0.9204,
+        "height": 0.2426
+      }
+    },
+    {
+      "key": "commonRetry",
+      "text": "Tekrar Dene",
+      "type": "Button",
+      "frame": {
+        "x": 0.0896,
+        "y": 0.4897,
+        "width": 0.3297,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "qrTabTitle",
+      "text": "QR İşlemleri",
+      "type": "Button",
+      "frame": {
+        "x": 0.4055,
+        "y": 0.8467,
+        "width": 0.1891,
+        "height": 0.0938
+      }
+    },
+    {
+      "key": "navHome",
+      "text": "Ana Sayfa",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "historyTitle",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "profileTitle",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    }
+  ]
+}

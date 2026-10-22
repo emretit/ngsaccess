@@ -6,17 +6,47 @@ import 'package:ngsplusapp/l10n/app_localizations.dart';
 import 'package:ngsplusapp/models/visitor.dart';
 import 'package:ngsplusapp/providers/visitor_provider.dart';
 import 'package:ngsplusapp/screens/visitor/visitor_screen.dart';
+import 'package:ngsplusapp/theme/app_theme.dart';
+import 'package:ngsplusapp/widgets/visitor/visitor_cards.dart';
+import 'package:ngsplusapp/widgets/visitor/visitor_detail.dart';
 
 import 'visitor_provider_test.dart'
     show FakeVisitorRepository, visitorFixture, visitorPage;
 
-Widget app(VisitorProvider state) => ChangeNotifierProvider.value(
+Widget app(
+  VisitorProvider state, {
+  Locale locale = const Locale('en'),
+  double textScale = 1,
+  ThemeMode themeMode = ThemeMode.light,
+  bool nested = false,
+}) => ChangeNotifierProvider.value(
   value: state,
   child: MaterialApp(
-    locale: const Locale('en'),
+    locale: locale,
+    theme: AppTheme.lightTheme,
+    darkTheme: AppTheme.darkTheme,
+    themeMode: themeMode,
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(
+        context,
+      ).copyWith(textScaler: TextScaler.linear(textScale)),
+      child: child ?? const SizedBox.shrink(),
+    ),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
-    home: const VisitorScreen(),
+    home: nested
+        ? Scaffold(
+            bottomNavigationBar: const SizedBox(
+              key: Key('visitor-outer-nav'),
+              height: 80,
+            ),
+            body: Navigator(
+              onGenerateRoute: (_) => MaterialPageRoute<void>(
+                builder: (_) => const VisitorScreen(),
+              ),
+            ),
+          )
+        : const VisitorScreen(),
   ),
 );
 
@@ -30,6 +60,8 @@ void main() {
       await state.refresh();
       await tester.pumpWidget(app(state));
       expect(find.text('No visitor records yet'), findsOneWidget);
+      expect(find.byType(VisitorSummaryCard), findsNothing);
+      expect(find.byType(FloatingActionButton), findsNothing);
       repo.listResult = () => Future.error(const NetworkError());
       await tester.drag(find.byType(ListView), const Offset(0, 400));
       await tester.pumpAndSettle();
@@ -57,7 +89,13 @@ void main() {
       await tester.pumpWidget(app(state));
       await tester.tap(find.text('Synthetic active'));
       await tester.pumpAndSettle();
-      expect(find.text('Access active'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(VisitorDetail),
+          matching: find.text('Access active'),
+        ),
+        findsOneWidget,
+      );
       expect(find.text('Physical presence unknown'), findsOneWidget);
       expect(find.text('Edit'), findsNothing);
       await tester.tap(find.text('Cancel invitation'));
@@ -152,7 +190,7 @@ void main() {
       expect(state.pendingCreate, isNotNull);
       repo.createResult = () async => 'created';
       await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, 'Save'),
+        find.widgetWithText(FilledButton, 'Retry same request'),
         200,
         scrollable: find
             .descendant(
@@ -162,7 +200,7 @@ void main() {
             .first,
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Retry same request'));
       await tester.pumpAndSettle();
       expect(repo.requests, hasLength(2));
       expect(repo.requests.first, repo.requests.last);
@@ -245,4 +283,173 @@ void main() {
       expect(repo.updatedDraft?.toJson(), containsPair('notes', null));
     },
   );
+
+  testWidgets(
+    'clearing a status filter also cancels pending search and clears its field',
+    (tester) async {
+      final repo = FakeVisitorRepository();
+      final state = VisitorProvider(repository: repo);
+      addTearDown(state.dispose);
+      await state.refresh();
+      await tester.pumpWidget(app(state));
+      await tester.tap(find.byTooltip('Filter'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Access active'));
+      await tester.pumpAndSettle();
+      expect(repo.filters.last.status, VisitorAccessStatus.active);
+      await tester.enterText(find.byType(TextField), 'pending query');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.widgetWithText(TextButton, 'Clear filters'));
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(repo.filters.last.search, '');
+      expect(repo.filters.last.status, isNull);
+      expect(
+        tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+        '',
+      );
+      expect(repo.filters.where((f) => f.search == 'pending query'), isEmpty);
+      expect(repo.createCalls, 0);
+    },
+  );
+
+  testWidgets(
+    'all-invitation totals remain separate from filtered list results',
+    (tester) async {
+      final repo = FakeVisitorRepository()
+        ..summaryResult = () async => const VisitorSummary(
+          total: 2,
+          counts: {
+            VisitorAccessStatus.active: 1,
+            VisitorAccessStatus.preRegistered: 1,
+          },
+          overflow: false,
+        );
+      final state = VisitorProvider(repository: repo);
+      addTearDown(state.dispose);
+      await state.refresh();
+      await tester.pumpWidget(app(state));
+      await tester.tap(find.byTooltip('Filter'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Expired'));
+      await tester.pumpAndSettle();
+      expect(repo.filters.last.status, VisitorAccessStatus.expired);
+      expect(find.text('All invitations'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+      expect(find.text('No records found'), findsOneWidget);
+      expect(find.text('Inside'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'filter and visitor details cover navigation outside a nested branch',
+    (tester) async {
+      final repo = FakeVisitorRepository()
+        ..listResult = () async => visitorPage([visitorFixture('own')]);
+      final state = VisitorProvider(repository: repo);
+      addTearDown(state.dispose);
+      await state.refresh();
+      await tester.pumpWidget(app(state, nested: true));
+      final navTop = tester
+          .getTopLeft(find.byKey(const Key('visitor-outer-nav')))
+          .dy;
+      await tester.tap(find.byTooltip('Filter'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getRect(find.byType(BottomSheet)).bottom,
+        greaterThan(navTop),
+      );
+      await tester.tap(find.byTooltip('Close'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Synthetic own'));
+      await tester.pumpAndSettle();
+      expect(
+        tester.getRect(find.byType(BottomSheet)).bottom,
+        greaterThan(navTop),
+      );
+      expect(find.byType(VisitorDetail), findsOneWidget);
+      await tester.tap(find.byTooltip('Close'));
+      await tester.pumpAndSettle();
+      expect(repo.cancelCalls, 0);
+    },
+  );
+
+  for (final locale in [const Locale('en'), const Locale('tr')]) {
+    for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+      testWidgets(
+        'visitor list, filter and form reflow at 320px / 200% ${locale.languageCode} $mode',
+        (tester) async {
+          tester.view.physicalSize = const Size(320, 700);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          final repo = FakeVisitorRepository();
+          repo.listResult = () async =>
+              visitorPage([visitorFixture('A long synthetic surname')]);
+          repo.summaryResult = () async => const VisitorSummary(
+            total: 2,
+            counts: {
+              VisitorAccessStatus.active: 1,
+              VisitorAccessStatus.preRegistered: 1,
+            },
+            overflow: false,
+          );
+          final state = VisitorProvider(repository: repo);
+          addTearDown(state.dispose);
+          await state.refresh();
+          await tester.pumpWidget(
+            app(state, locale: locale, textScale: 2, themeMode: mode),
+          );
+          await tester.pumpAndSettle();
+          final l10n = AppLocalizations.of(
+            tester.element(find.byType(VisitorScreen)),
+          );
+          await tester.scrollUntilVisible(
+            find.text('Synthetic A long synthetic surname'),
+            300,
+            scrollable: find
+                .descendant(
+                  of: find.byType(ListView),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.byTooltip(l10n.visitorAddButton).hitTestable(),
+            findsOneWidget,
+          );
+          await tester.tap(find.byTooltip(l10n.visitorAddButton));
+          await tester.pumpAndSettle();
+          expect(find.text(l10n.visitorActivationHint), findsOneWidget);
+          expect(find.text(l10n.visitorPreRegistered), findsNothing);
+          await tester.scrollUntilVisible(
+            find.widgetWithText(FilledButton, l10n.visitorSave),
+            250,
+            scrollable: find
+                .descendant(
+                  of: find.byType(Form),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.widgetWithText(FilledButton, l10n.visitorSave).hitTestable(),
+            findsOneWidget,
+          );
+          await tester.tap(find.byType(BackButton));
+          await tester.pumpAndSettle();
+          await tester.drag(find.byType(ListView), const Offset(0, 4000));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byTooltip(l10n.visitorFilterTitle));
+          await tester.pumpAndSettle();
+          expect(find.text(l10n.visitorAllStatuses), findsOneWidget);
+          await tester.tap(find.byTooltip(l10n.commonClose));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          expect(repo.createCalls, 0);
+        },
+      );
+    }
+  }
 }

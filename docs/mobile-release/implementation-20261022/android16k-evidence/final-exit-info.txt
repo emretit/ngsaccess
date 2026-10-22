@@ -1,0 +1,8 @@
+ACTIVITY MANAGER PROCESS EXIT INFO (dumpsys activity exit-info)
+Last Timestamp of Persistence Into Persistent Storage: 1970-01-01 02:00:00.000
+  package: com.ngsplus.app.ngsplusapp
+    Historical Process Exit for uid=10213
+        ApplicationExitInfo #0:
+          timestamp=2026-10-22 10:13:26.460 pid=4935 realUid=10213 packageUid=10213 definingUid=10213 user=0
+          process=com.ngsplus.app.ngsplusapp reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=100 pss=0.00 rss=0.00 description=stop com.ngsplus.app.ngsplusapp due to installPackageLI state=empty trace=null

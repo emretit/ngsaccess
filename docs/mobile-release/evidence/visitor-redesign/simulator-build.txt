@@ -1,0 +1,8 @@
+{"backendHostSha256": "dc03727fb9e1da675704e5ef1259e0d1a5bf1d544097d40d4f60e5725acc6364", "environment": "staging"}
+{"privacyManifestSyntax": "passed", "sourcePermissions": "passed"}
+{"toolchain": "passed"}
+Building com.ngsplus.app for simulator (ios)...
+Running Xcode build...                                          
+Xcode build done.                                            7,7s
+✓ Built build/ios/iphonesimulator/Runner.app
+Build provenance written; distribution approval remains separate.

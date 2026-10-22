@@ -49,7 +49,22 @@ class HistoryRecordTile extends StatelessWidget {
     ).add_Hm().format(AttendanceDate.businessTime(record.timestamp));
     final status = access == null ? direction : '$access · $direction';
 
+    final scale = MediaQuery.textScalerOf(context).scale(14) / 14;
+    final tone = accessState == HistoryAccessState.denied
+        ? colors.error
+        : accessState == HistoryAccessState.unknown
+        ? colors.onSurfaceVariant
+        : colors.primary;
+    final time = DateFormat.Hm(
+      Localizations.localeOf(context).toLanguageTag(),
+    ).format(AttendanceDate.businessTime(record.timestamp));
     return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 6),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: .45)),
+      ),
       clipBehavior: Clip.antiAlias,
       child: Semantics(
         button: true,
@@ -59,28 +74,23 @@ class HistoryRecordTile extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  icon,
-                  color: accessState == HistoryAccessState.denied
-                      ? colors.error
-                      : colors.onSurfaceVariant,
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: tone.withValues(alpha: .08),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(icon, color: tone, size: 18),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        deviceName,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(timestamp),
-                      const SizedBox(height: 8),
                       Text(
                         status,
                         style: TextStyle(
@@ -90,8 +100,38 @@ class HistoryRecordTile extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                      const SizedBox(height: 3),
+                      Text(
+                        deviceName,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                      if (scale > 1.3) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          time,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ],
                     ],
                   ),
+                ),
+                if (scale <= 1.3) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    time,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 18,
+                  color: colors.onSurfaceVariant,
                 ),
               ],
             ),

@@ -1,0 +1,302 @@
+{
+  "screen": "filtered-empty",
+  "ui": [
+    {
+      "key": "appName",
+      "text": "NGS Plus",
+      "type": "Application",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      }
+    },
+    {
+      "key": "navHistory",
+      "text": "Geçmiş",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.087,
+        "width": 0.1822,
+        "height": 0.0275
+      }
+    },
+    {
+      "key": "quickActionHistory",
+      "text": "Geçmiş",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.087,
+        "width": 0.1822,
+        "height": 0.0275
+      }
+    },
+    {
+      "key": "historyTitle",
+      "text": "Geçmiş",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.087,
+        "width": 0.1822,
+        "height": 0.0275
+      }
+    },
+    {
+      "key": "historyInfoTitle",
+      "text": "Kayıtlar hakkında",
+      "type": "Button",
+      "frame": {
+        "x": 0.6418,
+        "y": 0.0732,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "qrRefresh",
+      "text": "Yenile",
+      "type": "Button",
+      "frame": {
+        "x": 0.7612,
+        "y": 0.0732,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "visitorRefresh",
+      "text": "Yenile",
+      "type": "Button",
+      "frame": {
+        "x": 0.7612,
+        "y": 0.0732,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "historyFilterTitle",
+      "text": "Filtrele",
+      "type": "Button",
+      "frame": {
+        "x": 0.8806,
+        "y": 0.0732,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "visitorFilterTitle",
+      "text": "Filtrele",
+      "type": "Button",
+      "frame": {
+        "x": 0.8806,
+        "y": 0.0732,
+        "width": 0.1194,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "historyTabAll",
+      "text": "Kayıtlar",
+      "type": "GenericElement",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.135,
+        "width": 0.3002,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "historyTabThisMonth",
+      "text": "Takvim",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.3499,
+        "y": 0.135,
+        "width": 0.3002,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "historyTabStats",
+      "text": "Özet",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.6501,
+        "y": 0.135,
+        "width": 0.3002,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "historyAllDevices",
+      "text": "Tüm cihazlar",
+      "type": "Button",
+      "frame": {
+        "x": 0.3805,
+        "y": 0.2174,
+        "width": 0.3502,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "historyFilterClear",
+      "text": "Filtreleri Temizle",
+      "type": "Button",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.2815,
+        "width": 0.3396,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "historyEmpty",
+      "text": "Kayıt bulunamadı",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.3545,
+        "y": 0.4233,
+        "width": 0.2909,
+        "height": 0.0229
+      }
+    },
+    {
+      "key": "historyFilteredEmptyHint",
+      "text": "Seçtiğiniz tarih veya cihaz için kayıt bulunmuyor.",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0887,
+        "y": 0.4554,
+        "width": 0.8227,
+        "height": 0.0229
+      }
+    },
+    {
+      "key": "historyShowAllRecords",
+      "text": "Tüm kayıtları göster",
+      "type": "Button",
+      "frame": {
+        "x": 0.2723,
+        "y": 0.4966,
+        "width": 0.4554,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "navHome",
+      "text": "Ana Sayfa",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "historyTitle",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "qrTabTitle",
+      "text": "QR İşlemleri",
+      "type": "Button",
+      "frame": {
+        "x": 0.4055,
+        "y": 0.8467,
+        "width": 0.1891,
+        "height": 0.0938
+      }
+    },
+    {
+      "key": "navVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "profileTitle",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    }
+  ]
+}

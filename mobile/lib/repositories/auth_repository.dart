@@ -16,6 +16,7 @@ class AuthUser {
     this.departmentId,
     this.departmentName,
     this.projectId,
+    this.projectName,
   });
 
   final String id;
@@ -26,6 +27,7 @@ class AuthUser {
   final String? departmentId;
   final String? departmentName;
   final String? projectId;
+  final String? projectName;
   final String cardNumber;
 
   factory AuthUser.fromJson(Map<String, dynamic> doc) {
@@ -54,6 +56,7 @@ class AuthUser {
       departmentId: optionalString('departmentId'),
       departmentName: optionalString('departmentName'),
       projectId: optionalString('projectId'),
+      projectName: optionalString('projectName'),
     );
   }
 }

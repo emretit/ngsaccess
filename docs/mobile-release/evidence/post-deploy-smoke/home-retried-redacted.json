@@ -1,0 +1,368 @@
+{
+  "screen": "home-retried",
+  "ui": [
+    {
+      "key": "appName",
+      "text": "NGS Plus",
+      "type": "Application",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 1,
+        "height": 1
+      }
+    },
+    {
+      "key": "homeAttendanceStatus",
+      "text": "Yoklama Durumu",
+      "type": "GenericElement",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.2197,
+        "width": 0.9204,
+        "height": 0.3524
+      }
+    },
+    {
+      "key": "homeDataUnavailable",
+      "text": "Veriler alınamadı",
+      "type": "GenericElement",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.2197,
+        "width": 0.9204,
+        "height": 0.3524
+      }
+    },
+    {
+      "key": "errorProtocol",
+      "text": "Geçerli bir sunucu yanıtı alınamadı. Lütfen yeniden deneyin.",
+      "type": "GenericElement",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.2197,
+        "width": 0.9204,
+        "height": 0.3524
+      }
+    },
+    {
+      "key": "homeRetry",
+      "text": "Yeniden dene",
+      "type": "Button",
+      "frame": {
+        "x": 0.1294,
+        "y": 0.389,
+        "width": 0.3534,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "startupRetry",
+      "text": "Yeniden dene",
+      "type": "Button",
+      "frame": {
+        "x": 0.1294,
+        "y": 0.389,
+        "width": 0.3534,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "homeScanQr",
+      "text": "QR kod tara",
+      "type": "Button",
+      "frame": {
+        "x": 0.0995,
+        "y": 0.4805,
+        "width": 0.801,
+        "height": 0.0641
+      }
+    },
+    {
+      "key": "homeQuickActions",
+      "text": "Hızlı İşlemler",
+      "type": "StaticText",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.5995,
+        "width": 0.3473,
+        "height": 0.032
+      }
+    },
+    {
+      "key": "quickActionUnlock",
+      "text": "Kapıyı Aç",
+      "type": "Button",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.6453,
+        "width": 0.4453,
+        "height": 0.1304
+      }
+    },
+    {
+      "key": "navVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5149,
+        "y": 0.6453,
+        "width": 0.4453,
+        "height": 0.1304
+      }
+    },
+    {
+      "key": "quickActionVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5149,
+        "y": 0.6453,
+        "width": 0.4453,
+        "height": 0.1304
+      }
+    },
+    {
+      "key": "navHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.7895,
+        "width": 0.4453,
+        "height": 0.0481
+      }
+    },
+    {
+      "key": "quickActionHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.7895,
+        "width": 0.4453,
+        "height": 0.0481
+      }
+    },
+    {
+      "key": "historyTitle",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.0398,
+        "y": 0.7895,
+        "width": 0.4453,
+        "height": 0.0481
+      }
+    },
+    {
+      "key": "navProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.5149,
+        "y": 0.7895,
+        "width": 0.4453,
+        "height": 0.0481
+      }
+    },
+    {
+      "key": "profileTitle",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.5149,
+        "y": 0.7895,
+        "width": 0.4453,
+        "height": 0.0481
+      }
+    },
+    {
+      "key": "quickActionProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.5149,
+        "y": 0.7895,
+        "width": 0.4453,
+        "height": 0.0481
+      }
+    },
+    {
+      "key": "homeQuote5",
+      "text": "Bugün dün düşündüğünüz yarındır.",
+      "type": "StaticText",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      }
+    },
+    {
+      "key": "homeQuoteOfTheDay",
+      "text": "💫 Günün Sözü",
+      "type": "StaticText",
+      "frame": {
+        "x": 0,
+        "y": 0,
+        "width": 0,
+        "height": 0
+      }
+    },
+    {
+      "key": "unlockNoDeviceSelected",
+      "text": "Önce Profil'den hızlı erişim kapısını seç",
+      "type": "GenericElement",
+      "frame": {
+        "x": 0,
+        "y": 0.7826,
+        "width": 1,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "navProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7609,
+        "y": 0.7826,
+        "width": 0.2093,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "profileTitle",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7609,
+        "y": 0.7826,
+        "width": 0.2093,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "quickActionProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7609,
+        "y": 0.7826,
+        "width": 0.2093,
+        "height": 0.0549
+      }
+    },
+    {
+      "key": "navHome",
+      "text": "Ana Sayfa",
+      "type": "Button",
+      "frame": {
+        "x": 0.0498,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionHistory",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "historyTitle",
+      "text": "Geçmiş",
+      "type": "Button",
+      "frame": {
+        "x": 0.2276,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "qrTabTitle",
+      "text": "QR İşlemleri",
+      "type": "Button",
+      "frame": {
+        "x": 0.4055,
+        "y": 0.8467,
+        "width": 0.1891,
+        "height": 0.0938
+      }
+    },
+    {
+      "key": "navVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionVisitor",
+      "text": "Ziyaretçi",
+      "type": "Button",
+      "frame": {
+        "x": 0.5945,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "navProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "profileTitle",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    },
+    {
+      "key": "quickActionProfile",
+      "text": "Profil",
+      "type": "Button",
+      "frame": {
+        "x": 0.7724,
+        "y": 0.8633,
+        "width": 0.1779,
+        "height": 0.0606
+      }
+    }
+  ]
+}

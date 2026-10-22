@@ -5,14 +5,54 @@ import '../../core/error_localizer.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/visitor_provider.dart';
 import '../../screens/visitor/visitor_form_screen.dart';
+import 'visitor_cards.dart';
 import 'visitor_labels.dart';
 
-class VisitorDetail extends StatelessWidget {
+class VisitorDetail extends StatefulWidget {
   const VisitorDetail({super.key, required this.visitorId});
   final String visitorId;
 
   @override
+  State<VisitorDetail> createState() => _VisitorDetailState();
+}
+
+class _VisitorDetailState extends State<VisitorDetail> {
+  VisitorProvider? _provider;
+  int? _lease;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final provider = context.read<VisitorProvider>();
+    if (identical(provider, _provider)) return;
+    _release();
+    _provider = provider;
+    _lease = provider.retainDetail(widget.visitorId);
+  }
+
+  @override
+  void didUpdateWidget(VisitorDetail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.visitorId == widget.visitorId) return;
+    _release();
+    _lease = _provider?.retainDetail(widget.visitorId);
+  }
+
+  void _release() {
+    final lease = _lease;
+    if (lease != null) _provider?.releaseDetail(lease);
+    _lease = null;
+  }
+
+  @override
+  void dispose() {
+    _release();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final visitorId = widget.visitorId;
     final l10n = AppLocalizations.of(context);
     return Consumer<VisitorProvider>(
       builder: (context, state, _) {
@@ -49,7 +89,11 @@ class VisitorDetail extends StatelessWidget {
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 12),
-                  Text(visitorStatusLabel(l10n, visitor.status)),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: VisitorStatusBadge(status: visitor.status),
+                  ),
+                  const SizedBox(height: 8),
                   Text(visitorPresenceLabel(l10n, visitor.presence)),
                   const SizedBox(height: 8),
                   Text(
@@ -83,11 +127,19 @@ class VisitorDetail extends StatelessWidget {
                       onPressed: state.busy
                           ? null
                           : () async {
-                              Navigator.of(context).pop();
-                              Navigator.of(context).push(
+                              final navigator = Navigator.of(context);
+                              navigator.pop();
+                              navigator.push(
                                 MaterialPageRoute<void>(
                                   builder: (_) =>
-                                      VisitorFormScreen(visitor: visitor),
+                                      ChangeNotifierProvider<
+                                        VisitorProvider
+                                      >.value(
+                                        value: state,
+                                        child: VisitorFormScreen(
+                                          visitor: visitor,
+                                        ),
+                                      ),
                                 ),
                               );
                             },

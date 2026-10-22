@@ -24,6 +24,8 @@ class _Commands extends DoorOperationProvider {
     : super(repository: DoorOperationRepository(MockHttpConvexClient()));
   final opens = <({String deviceId, String? doorId})>[];
   bool unresolved = false;
+  bool resolveOnCheck = false;
+  int statusChecks = 0;
   @override
   bool get isLoading => false;
   @override
@@ -32,6 +34,15 @@ class _Commands extends DoorOperationProvider {
   DoorOperation? get operation => null;
   @override
   AppError? get error => null;
+  @override
+  Future<void> checkStatus() async {
+    statusChecks++;
+    if (resolveOnCheck) {
+      unresolved = false;
+      notifyListeners();
+    }
+  }
+
   @override
   Future<void> open({required String deviceId, String? doorId}) async {
     opens.add((deviceId: deviceId, doorId: doorId));
@@ -319,15 +330,37 @@ void main() {
   );
 
   testWidgets(
-    'unresolved operation disables new open without revalidating or resubmitting',
+    'refresh reconciles a pending receipt without sending another door command',
     (tester) async {
       await mount(tester, unresolved: true);
+      expect(commands.statusChecks, 1);
+      commands.resolveOnCheck = true;
+      await tester
+          .widget<RefreshIndicator>(find.byType(RefreshIndicator))
+          .onRefresh();
+      await tester.pump();
+      expect(commands.statusChecks, 2);
+      expect(commands.opens, isEmpty);
+      expect(tester.widget<QuickActionCard>(unlock()).onTap, isNotNull);
+      await unmount(tester);
+    },
+  );
+
+  testWidgets(
+    'unresolved operation opens recovery without validating or submitting a new target',
+    (tester) async {
+      await mount(tester, unresolved: true);
+      attendance.empty();
+      await tester.pump();
       await tester.ensureVisible(unlock());
       await tester.tap(unlock());
+      await tester.pumpAndSettle();
       expect(devices.calls, 0);
       expect(commands.opens, isEmpty);
       final action = tester.widget<QuickActionCard>(unlock());
-      expect(action.onTap, isNull);
+      expect(action.onTap, isNotNull);
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(commands.statusChecks, 2);
       await unmount(tester);
     },
   );
