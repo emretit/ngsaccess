@@ -293,7 +293,7 @@ class AuthProvider extends ChangeNotifier {
       if (!_owns(epoch)) return false;
       final mapped = AppError.fromException(error, stack);
       if (mapped is AuthExpiredError) {
-        await handleAuthExpiry(sessionEpoch: epoch);
+        await handleAuthExpiry(sessionEpoch: epoch, reason: mapped);
       } else {
         _setError(mapped);
       }
@@ -352,6 +352,7 @@ class AuthProvider extends ChangeNotifier {
 
   /// The transport passes captured identity (or suppresses stale callbacks).
   Future<void> handleAuthExpiry({
+    AuthExpiredError reason = const AuthExpiredError(),
     String? sessionToken,
     int? sessionEpoch,
   }) async {
@@ -370,7 +371,7 @@ class AuthProvider extends ChangeNotifier {
     _isInitialized = true;
     _bootstrapFuture = null;
     _bootstrapError = null;
-    _setError(const AuthExpiredError());
+    _setError(reason);
     _notify();
     await _finishLocalLogout(epoch);
   }

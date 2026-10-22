@@ -363,6 +363,7 @@
       }
     }
   },
+  "errorEmploymentEnded": "İşten ayrıldınız. Mobil erişiminiz kapatıldı.",
   "errorAuthExpired": "Oturumunuz sona erdi. Lütfen tekrar giriş yapın.",
   "errorUnknown": "Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.",
   "errorBusinessInvalidCredentials": "E-posta veya şifre hatalı",

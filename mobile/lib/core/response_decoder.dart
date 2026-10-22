@@ -42,7 +42,10 @@ String decodeConvexResponse({required int statusCode, required String body}) {
     if (data is Map<String, Object?>) {
       final code = data['code'];
       if (code is String) {
-        if (_authCodes.contains(code)) throw const AuthExpiredError();
+        if (_authCodes.contains(code)) {
+          if (code == 'EMPLOYMENT_ENDED') throw const EmploymentEndedError();
+          throw const AuthExpiredError();
+        }
         throw BusinessError(
           message: '',
           code: normalizeBusinessCode(code) ?? 'BUSINESS_ERROR',
@@ -60,6 +63,7 @@ String decodeConvexResponse({required int statusCode, required String body}) {
 }
 
 const _authCodes = {
+  'EMPLOYMENT_ENDED',
   'AUTH_EXPIRED',
   'AUTH_REQUIRED',
   'SESSION_EXPIRED',

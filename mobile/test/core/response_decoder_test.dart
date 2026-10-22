@@ -85,7 +85,11 @@ void main() {
     );
   });
 
-  for (final code in ['SESSION_REVOKED', 'EMPLOYEE_INACTIVE']) {
+  for (final code in [
+    'SESSION_REVOKED',
+    'EMPLOYEE_INACTIVE',
+    'EMPLOYMENT_ENDED',
+  ]) {
     test('terminal backend session code $code is auth expiry', () {
       expect(
         () => decode({

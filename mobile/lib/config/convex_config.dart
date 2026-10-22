@@ -120,7 +120,7 @@ class ConvexSubscriptionHandle {
   }
 }
 
-typedef AuthExpiryCallback = void Function();
+typedef AuthExpiryCallback = void Function(AuthExpiredError error);
 
 class HttpConvexClient {
   HttpConvexClient({
@@ -354,7 +354,7 @@ class HttpConvexClient {
         if (mapped is AuthExpiredError) {
           if (employee && current() && _expiredGeneration != generation) {
             _expiredGeneration = generation;
-            _onAuthExpired?.call();
+            _onAuthExpired?.call(mapped);
           }
           throw mapped;
         }

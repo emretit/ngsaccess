@@ -207,7 +207,7 @@ void transportRegressions() {
       );
       addTearDown(client.close);
       await client.setAuth(token: 'synthetic-token');
-      client.setOnAuthExpired(() {
+      client.setOnAuthExpired((_) {
         expiries++;
       });
       await Future.wait([
@@ -240,7 +240,7 @@ void transportRegressions() {
         );
         addTearDown(client.close);
         await client.setAuth(token: 'synthetic-token');
-        client.setOnAuthExpired(() {
+        client.setOnAuthExpired((_) {
           expiries++;
         });
         await expectLater(
@@ -267,7 +267,7 @@ void transportRegressions() {
         }),
       );
       addTearDown(client.close);
-      client.setOnAuthExpired(() => fail('business error cannot expire auth'));
+      client.setOnAuthExpired((_) => fail('business error cannot expire auth'));
       await expectLater(
         client.query('employee:public', {}),
         throwsA(isA<BusinessError>()),
@@ -320,7 +320,7 @@ void transportRegressions() {
         );
         addTearDown(client.close);
         await client.setAuth(token: 'synthetic-token');
-        client.setOnAuthExpired(() {
+        client.setOnAuthExpired((_) {
           expired = true;
         });
         await expectLater(
@@ -377,7 +377,7 @@ void transportRegressions() {
         addTearDown(client.close);
         await client.setAuth(token: 'token-A');
         var expired = false;
-        client.setOnAuthExpired(() {
+        client.setOnAuthExpired((_) {
           expired = true;
         });
         final request = client.employeeQuery('employee:me', {});
@@ -424,7 +424,7 @@ void transportRegressions() {
       );
       addTearDown(client.close);
       await client.setAuth(token: 'same-synthetic-token');
-      client.setOnAuthExpired(() {
+      client.setOnAuthExpired((_) {
         expired = true;
       });
       final checked = expectLater(
@@ -462,7 +462,7 @@ void transportRegressions() {
         }),
       );
       await client.setAuth(token: 'synthetic-token');
-      client.setOnAuthExpired(() => fail('closed callback'));
+      client.setOnAuthExpired((_) => fail('closed callback'));
       final subscription = client.subscribeEmployeeQuery(
         name: 'employee:me',
         args: {},
@@ -490,7 +490,7 @@ void transportRegressions() {
 
   test('old callback owner cannot clear its replacement', () async {
     var newCalled = false;
-    void oldCallback() => fail('old callback');
+    void oldCallback(AuthExpiredError error) => fail('old callback');
     final client = HttpConvexClient(
       deploymentUrl: 'https://example.convex.cloud',
       httpClient: MockClient((_) async => http.Response('', 401)),
@@ -498,7 +498,7 @@ void transportRegressions() {
     addTearDown(client.close);
     await client.setAuth(token: 'synthetic-token');
     client.setOnAuthExpired(oldCallback);
-    client.setOnAuthExpired(() {
+    client.setOnAuthExpired((_) {
       newCalled = true;
     });
     client.clearOnAuthExpired(oldCallback);

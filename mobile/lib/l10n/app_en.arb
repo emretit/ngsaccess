@@ -363,6 +363,7 @@
       }
     }
   },
+  "errorEmploymentEnded": "Your employment has ended. Your mobile access has been disabled.",
   "errorAuthExpired": "Your session has ended. Please sign in again.",
   "errorUnknown": "An unexpected error occurred. Please try again.",
   "errorBusinessInvalidCredentials": "Invalid email or password",

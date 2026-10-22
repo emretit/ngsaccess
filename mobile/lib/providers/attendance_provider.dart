@@ -463,6 +463,7 @@ class AttendanceProvider extends ChangeNotifier with WidgetsBindingObserver {
     if (error is AuthExpiredError && _owns(epoch)) {
       unawaited(
         _authProvider?.handleAuthExpiry(
+              reason: error,
               sessionToken: _sessionToken,
               sessionEpoch: _authEpoch,
             ) ??

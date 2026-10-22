@@ -137,7 +137,11 @@ class DoorOperationProvider extends ChangeNotifier {
       final token = auth?.sessionToken;
       // Capture before any await. A late expiry cannot close a newer session.
       if (auth != null && epoch != null && _owns(scope, generation)) {
-        await auth.handleAuthExpiry(sessionEpoch: epoch, sessionToken: token);
+        await auth.handleAuthExpiry(
+          sessionEpoch: epoch,
+          sessionToken: token,
+          reason: mapped,
+        );
         if (!_disposed &&
             _generation == generation &&
             identical(_auth, auth) &&

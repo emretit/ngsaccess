@@ -16,6 +16,7 @@
   "errorBusinessEmployeeInactive",
   "errorBusinessInvalidCredentials",
   "errorBusinessNoMobilePassword",
+  "errorEmploymentEnded",
   "errorNetwork",
   "errorPasswordPolicy",
   "errorProtocol",

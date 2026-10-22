@@ -732,6 +732,10 @@ class AppLocalizationsTr extends AppLocalizations {
   }
 
   @override
+  String get errorEmploymentEnded =>
+      'İşten ayrıldınız. Mobil erişiminiz kapatıldı.';
+
+  @override
   String get errorAuthExpired =>
       'Oturumunuz sona erdi. Lütfen tekrar giriş yapın.';
 

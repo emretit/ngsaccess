@@ -749,6 +749,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get errorEmploymentEnded =>
+      'Your employment has ended. Your mobile access has been disabled.';
+
+  @override
   String get errorAuthExpired =>
       'Your session has ended. Please sign in again.';
 

@@ -63,6 +63,17 @@ class AuthExpiredError extends AppError {
   String get debugMessage => 'AuthExpiredError';
 }
 
+/// Terminal session denial that retains the safe employment-end reason.
+class EmploymentEndedError extends AuthExpiredError {
+  const EmploymentEndedError();
+  @override
+  String get code => 'EMPLOYMENT_ENDED';
+  @override
+  String get userMessage => 'İşten ayrıldınız. Mobil erişiminiz kapatıldı.';
+  @override
+  String get debugMessage => 'EmploymentEndedError';
+}
+
 class BusinessError extends AppError {
   const BusinessError({required this.message, this.code, this.retryAfterMs});
   // Compatibility field: consumers must use userMessage/localizeAppError.
@@ -99,6 +110,7 @@ class BusinessError extends AppError {
           'MOBILE_PASSWORD_NOT_SET' =>
             'Mobil şifreniz henüz kurulmamış. Yöneticinizden kurulum bağlantısı isteyin.',
           'EMPLOYEE_INACTIVE' => 'Çalışan kaydınız aktif değil',
+          'EMPLOYMENT_ENDED' => const EmploymentEndedError().userMessage,
           'INVALID_QR' => 'Geçersiz QR kod.',
           'INVALID_DEVICE' => 'QR kodda cihaz bilgisi yok.',
           'PASSWORD_POLICY' => 'Yeni şifre güvenlik koşullarını karşılamıyor.',
@@ -141,6 +153,7 @@ class UnknownError extends AppError {
 }
 
 String? normalizeBusinessCode(String? code) => switch (code) {
+  'EMPLOYMENT_ENDED' => 'EMPLOYMENT_ENDED',
   'INVALID_CREDENTIALS' || 'AUTH_INVALID_CREDENTIALS' => 'INVALID_CREDENTIALS',
   'MOBILE_PASSWORD_NOT_SET' ||
   'NO_MOBILE_PASSWORD' ||

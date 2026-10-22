@@ -19,6 +19,24 @@ void main() {
   });
   tearDown(() => auth.dispose());
 
+  test(
+    'employment ended bootstrap removes token and never becomes retryable',
+    () async {
+      store.session = const StoredSession(token: 'saved-session');
+      repo.onMe = () async => throw const EmploymentEndedError();
+      await auth.bootstrap();
+      expect(auth.phase, AuthPhase.unauthenticated);
+      expect(auth.bootstrapError, isNull);
+      expect(auth.lastError, isA<EmploymentEndedError>());
+      expect(auth.sessionToken, isNull);
+      expect(auth.currentUser, isNull);
+      expect(store.session, isNull);
+      expect(repo.clientToken, isNull);
+      await auth.bootstrap();
+      expect(repo.meCalls, 1);
+    },
+  );
+
   test('login commits secure session and remembers only email', () async {
     expect(
       await auth.signIn(

@@ -1430,6 +1430,12 @@ abstract class AppLocalizations {
   /// **'Sunucu hatası ({code}). Lütfen biraz sonra tekrar deneyin.'**
   String errorServer(int code);
 
+  /// No description provided for @errorEmploymentEnded.
+  ///
+  /// In tr, this message translates to:
+  /// **'İşten ayrıldınız. Mobil erişiminiz kapatıldı.'**
+  String get errorEmploymentEnded;
+
   /// No description provided for @errorAuthExpired.
   ///
   /// In tr, this message translates to:

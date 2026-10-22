@@ -198,12 +198,13 @@ class _MyAppState extends State<MyApp> {
       createIntentStore: FileVisitorCreateIntentStore(),
     );
     _doorProvider = DoorOperationProvider(repository: _doorRepo);
-    _authExpired = () {
+    _authExpired = (error) {
       if (!mounted || !_composed) {
         return;
       }
       unawaited(
         _authProvider.handleAuthExpiry(
+          reason: error,
           sessionToken: client.sessionToken,
           sessionEpoch: _authProvider.sessionEpoch,
         ),

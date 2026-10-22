@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/error_localizer.dart';
+import '../../core/errors.dart';
 import '../../core/spacing.dart';
 import '../../l10n/app_localizations.dart';
 import '../../providers/auth_provider.dart';
@@ -84,6 +85,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     final error = auth.lastError;
     final fallback = auth.errorMessage;
+    // EmploymentEndedError is already shown inline above the login card.
+    if (error is EmploymentEndedError) return;
     if (error != null || fallback != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -101,7 +104,8 @@ class _LoginScreenState extends State<LoginScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
-    final busy = context.watch<AuthProvider>().isLoading || _submitting;
+    final auth = context.watch<AuthProvider>();
+    final busy = auth.isLoading || _submitting;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -198,6 +202,16 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             const SizedBox(height: 28),
+                            if (auth.lastError is EmploymentEndedError) ...[
+                              Semantics(
+                                liveRegion: true,
+                                child: Text(
+                                  l10n.errorEmploymentEnded,
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
                             _buildLoginCard(context, busy: busy),
                           ],
                         ),

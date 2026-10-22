@@ -38,6 +38,25 @@ void main() {
     ).thenAnswer((_) async => jsonEncode(value));
   }
 
+  test(
+    'EMPLOYMENT_ENDED login envelope is a safe terminal reason, not protocol',
+    () async {
+      replyWith({
+        'error': {'code': 'EMPLOYMENT_ENDED', 'message': 'untrusted'},
+      });
+      await expectLater(
+        repo.signIn(email: 'a@example.test', password: 'test-password'),
+        throwsA(
+          isA<EmploymentEndedError>().having(
+            (error) => error.userMessage,
+            'safe Turkish message',
+            'İşten ayrıldınız. Mobil erişiminiz kapatıldı.',
+          ),
+        ),
+      );
+    },
+  );
+
   test('valid response decodes strict user and optional project', () async {
     replyWith({
       'token': 'test-session',

@@ -343,6 +343,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final mapped = AppError.fromException(error, stack);
       if (mapped is AuthExpiredError) {
         await auth.handleAuthExpiry(
+          reason: mapped,
           sessionToken: sessionToken,
           sessionEpoch: epoch,
         );

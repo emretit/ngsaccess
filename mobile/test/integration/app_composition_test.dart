@@ -10,6 +10,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:ngsplusapp/config/convex_config.dart';
 import 'package:ngsplusapp/core/safe_diagnostics.dart';
+import 'package:ngsplusapp/core/errors.dart';
+import 'package:ngsplusapp/providers/attendance_provider.dart';
 import 'package:ngsplusapp/main.dart';
 import 'package:ngsplusapp/providers/auth_provider.dart';
 import 'package:ngsplusapp/providers/locale_provider.dart';
@@ -51,11 +53,25 @@ http.Response _success(Object? value) => http.Response(
 
 class _Backend {
   int meCalls = 0;
+  int requests = 0;
+  String? denialCode;
+  String? loginCode;
   int signInCalls = 0;
   int visitorCalls = 0;
   Future<http.Response> Function()? me;
   Map<String, Object?> employee = _employeeA;
   Future<http.Response> handle(http.Request request) async {
+    requests++;
+    if (denialCode != null) {
+      return http.Response(
+        jsonEncode({
+          "status": "error",
+          "errorMessage": "Server Error",
+          "errorData": {"code": denialCode, "message": "untrusted"},
+        }),
+        560,
+      );
+    }
     final Object? body = jsonDecode(request.body);
     if (body is! Map<String, Object?>) {
       throw StateError('Invalid test request');
@@ -75,6 +91,11 @@ class _Backend {
             : await me?.call() ?? _success(employee);
       case 'employeeAuth:signIn':
         signInCalls++;
+        if (loginCode != null) {
+          return _success({
+            'error': {'code': loginCode, 'message': 'untrusted'},
+          });
+        }
         return _success({
           'token': 'fixture-session-b',
           'expiresAt': '2099-01-01T00:00:00Z',
@@ -259,6 +280,99 @@ void main() {
       );
     }
   }
+
+  for (final language in ['tr', 'en']) {
+    final message = language == 'tr'
+        ? 'İşten ayrıldınız. Mobil erişiminiz kapatıldı.'
+        : 'Your employment has ended. Your mobile access has been disabled.';
+    testWidgets('$language real login EMPLOYMENT_ENDED displays safe reason', (
+      tester,
+    ) async {
+      initialize();
+      SharedPreferences.setMockInitialValues({'mobile_locale': language});
+      backend.loginCode = 'EMPLOYMENT_ENDED';
+      await mount(tester);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextFormField).first,
+        'a@example.test',
+      );
+      await tester.enterText(
+        find.byType(TextFormField).last,
+        'fixture-password',
+      );
+      await tester.tap(find.byType(ElevatedButton));
+      await tester.pumpAndSettle();
+      final auth = pageContext(tester).read<AuthProvider>();
+      expect(auth.lastError, isA<EmploymentEndedError>());
+      expect(find.text(message), findsOneWidget);
+      expect(store.session, isNull);
+      expect(client.sessionToken, isNull);
+      await remove(tester);
+    });
+
+    for (final endpoint in ['employeeAuth:me', 'mobileAccess:requestOpen']) {
+      testWidgets(
+        '$language $endpoint employment end clears session, screens and polling',
+        (tester) async {
+          initialize();
+          SharedPreferences.setMockInitialValues({'mobile_locale': language});
+          store.session = const StoredSession(token: 'fixture-session-a');
+          await mount(tester, initial: '/history');
+          await tester.pumpAndSettle();
+          final context = pageContext(tester);
+          final auth = context.read<AuthProvider>();
+          final attendance = context.read<AttendanceProvider>();
+          final preferred = context.read<PreferredDeviceProvider>();
+          expect(attendance.listLoaded, isTrue);
+          GoRouter.of(context).go('/visitor');
+          await tester.pumpAndSettle();
+          expect(backend.visitorCalls, greaterThan(0));
+          await preferred.setDevice(id: 'private-door', name: 'Private door');
+          backend.denialCode = 'EMPLOYMENT_ENDED';
+          final call = endpoint == 'employeeAuth:me'
+              ? client.employeeQuery(endpoint, {})
+              : client.employeeMutation(name: endpoint, args: {});
+          await expectLater(call, throwsA(isA<EmploymentEndedError>()));
+          await tester.pumpAndSettle();
+          expect(auth.currentUser, isNull);
+          expect(auth.sessionToken, isNull);
+          expect(auth.phase, AuthPhase.unauthenticated);
+          expect(auth.bootstrapError, isNull);
+          expect(store.session, isNull);
+          expect(client.sessionToken, isNull);
+          expect(preferred.deviceId, isNull);
+          expect(attendance.attendanceRecords, isEmpty);
+          expect(attendance.listLoaded, isFalse);
+          expect(find.byType(LoginScreen), findsOneWidget);
+          expect(find.text(message), findsOneWidget);
+          expect(find.byType(HistoryScreen), findsNothing);
+          final settledRequests = backend.requests;
+          await tester.pump(const Duration(minutes: 2));
+          expect(backend.requests, settledRequests);
+          await remove(tester);
+        },
+      );
+    }
+  }
+
+  testWidgets(
+    'EMPLOYEE_INACTIVE retains generic expiry and removes stored session',
+    (tester) async {
+      initialize();
+      store.session = const StoredSession(token: 'fixture-session-a');
+      backend.denialCode = 'EMPLOYEE_INACTIVE';
+      await mount(tester);
+      await tester.pumpAndSettle();
+      final auth = pageContext(tester).read<AuthProvider>();
+      expect(auth.lastError, isA<AuthExpiredError>());
+      expect(auth.lastError, isNot(isA<EmploymentEndedError>()));
+      expect(store.session, isNull);
+      expect(find.byType(LoginScreen), findsOneWidget);
+      expect(backend.requests, 1);
+      await remove(tester);
+    },
+  );
 
   testWidgets(
     'real root restores token once before opening cold history link',

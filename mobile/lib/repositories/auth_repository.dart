@@ -163,6 +163,8 @@ class AuthRepository {
       throw _invalidResponse;
     }
     switch (code) {
+      case 'EMPLOYMENT_ENDED':
+        throw const EmploymentEndedError();
       case 'SESSION_INVALID':
       case 'SESSION_EXPIRED':
       case 'SESSION_REVOKED':

@@ -42,6 +42,7 @@ class _Auth extends AuthProvider {
 
   @override
   Future<void> handleAuthExpiry({
+    AuthExpiredError reason = const AuthExpiredError(),
     String? sessionToken,
     int? sessionEpoch,
   }) async {
