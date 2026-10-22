@@ -5,7 +5,7 @@ import type { Employee } from "@/types/employee";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 
-type Rules = FunctionReturnType<typeof api.accessRules.list>;
+type Rules = FunctionReturnType<typeof api.accessRules.listMemberships>;
 type Devices = FunctionReturnType<typeof api.devices.list>;
 /** Mirrors the Hikvision sender: active memberships/devices, one target per bridge key. */
 export function syncTargetCount(employees: Employee[], rules: Rules, devices: Devices) {
@@ -17,7 +17,7 @@ export function syncTargetCount(employees: Employee[], rules: Rules, devices: De
 }
 export function EmployeeSyncConfirmDialog({ employees, onClose, onConfirm }: { employees: Employee[]; onClose: () => void; onConfirm: () => void }) {
   const { projectId } = useActiveProjectScope();
-  const rules = useQuery(api.accessRules.list, projectId ? { projectId } : "skip");
+  const rules = useQuery(api.accessRules.listMemberships, projectId ? { projectId } : "skip");
   const devices = useQuery(api.devices.list, projectId ? { projectId } : "skip");
   const inactiveCount = employees.filter(employee => employee.isActive === false).length;
   const activeCount = employees.length - inactiveCount;

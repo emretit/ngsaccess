@@ -82,3 +82,36 @@ export async function listAccessRules(
     })
   );
 }
+
+/** Membership projection for employee screens; no employee/device document joins. */
+export async function listAccessRuleMemberships(
+  ctx: QueryCtx & { user: Doc<"users"> },
+  args: { projectId?: Id<"projects"> },
+) {
+  const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
+  const rules = (await Promise.all(allowedProjectIds.map(projectId =>
+    ctx.db.query("accessRules").withIndex("by_project", q => q.eq("projectId", projectId)).collect(),
+  ))).flat();
+
+  return await Promise.all(rules.map(async (rule) => {
+    const groupMembers = await ctx.db
+      .query("groupMembers")
+      .withIndex("by_project_group", q =>
+        q.eq("projectId", rule.projectId).eq("groupId", rule._id),
+      )
+      .collect();
+    const groupDevices = await ctx.db
+      .query("groupDevices")
+      .withIndex("by_project_group", q =>
+        q.eq("projectId", rule.projectId).eq("groupId", rule._id),
+      )
+      .collect();
+    return {
+      _id: rule._id,
+      name: rule.name,
+      isActive: rule.isActive,
+      groupMembers: groupMembers.map(({ employeeId }) => ({ employeeId })),
+      groupDevices: groupDevices.map(({ deviceId }) => ({ deviceId })),
+    };
+  }));
+}

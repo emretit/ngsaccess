@@ -1,4 +1,4 @@
-import { listAccessRules } from "./lib/accessRuleRead";
+import { listAccessRules, listAccessRuleMemberships } from "./lib/accessRuleRead";
 import { createAccessRuleWithGroups } from "./lib/accessRuleWrite";
 import { planRemovedEmployeeHik, reconcileRemovedEmployeeHik, snapshotRuleHikEmployees, resolveRuleDeviceTargets, hikSnapshotValidator, type HikSnapshot } from "./lib/peopleHikSnapshot";
 import { validateScheduleBinding, assertIdeScheduleCapacity } from "./accessScheduleTemplates";
@@ -119,6 +119,15 @@ export const list = authedQuery({
   },
   handler: async (ctx, args) => {
     return await listAccessRules(ctx, args);
+  },
+});
+
+export const listMemberships = authedQuery({
+  args: {
+    projectId: v.optional(v.id("projects")),
+  },
+  handler: async (ctx, args) => {
+    return await listAccessRuleMemberships(ctx, args);
   },
 });
 

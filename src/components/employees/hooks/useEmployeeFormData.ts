@@ -1,6 +1,7 @@
 import { departmentPath } from "../lib/departmentPath";
 import { useState, useEffect, type RefObject } from "react";
 import { useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../../convex/_generated/api";
 import { Employee } from "@/types/employee";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
@@ -87,8 +88,8 @@ export const useEmployeeFormData = (employee?: Employee | null, { saving = false
     api.companies.list,
     defaultProjectId ? { projectId: defaultProjectId } : "skip",
   );
-  const accessRulesData = useQuery(
-    api.accessRules.list,
+  const accessRulesData: FunctionReturnType<typeof api.accessRules.listMemberships> | undefined = useQuery(
+    api.accessRules.listMemberships,
     defaultProjectId ? { projectId: defaultProjectId } : "skip",
   );
   const positionsData = useQuery(api.positions.list);

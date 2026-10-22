@@ -1,5 +1,6 @@
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
 import { useEffect, useState, type RefObject } from "react";
 import { Employee } from "@/types/employee";
@@ -46,8 +47,8 @@ export default function EmployeeForm({
   onPendingChange,
 }: EmployeeFormProps) {
   const { projectId } = useActiveProjectScope();
-  const rules = useQuery(
-    api.accessRules.list,
+  const rules: FunctionReturnType<typeof api.accessRules.listMemberships> | undefined = useQuery(
+    api.accessRules.listMemberships,
     projectId ? { projectId } : "skip",
   );
   const memberships = rules?.filter((rule) =>

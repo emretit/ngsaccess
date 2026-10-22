@@ -1,8 +1,8 @@
+import { processCardReadingCore } from "./lib/processCardReadingCore";
 import { getPdksTableData as getPdksTableDataQuery } from "./lib/pdksTableQuery";
 import { getMonthlyPayrollSheet as getMonthlyPayrollSheetQuery } from "./lib/pdksPayrollQuery";
 import { loadPdksPolicies } from "./lib/pdksRules";
 import { employedDuring, employedOn } from "./lib/employment";
-import { genericReaderTokenAllowed } from "./lib/mobileAccess";
 import { stream } from "convex-helpers/server/stream";
 import schema from "./schema";
 import { canSeePay } from "./lib/payVisibility";
@@ -18,7 +18,7 @@ import { isFreshAlarmEvent, notifyAlarmIfNeeded } from "./lib/alarmNotify";
 import { toUtcISO, trDateKey, trTodayKey, trDayRangeISO } from "./lib/trDate";
 import { internalMutation, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { ConvexError, v } from "convex/values";
-import { api, internal } from "./_generated/api";
+import { api } from "./_generated/api";
 import {
   authedQuery,
   adminMutation,
@@ -27,7 +27,6 @@ import {
 } from "./lib/customFunctions";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
-  isoTimeToTRMinutes,
   getEffectiveWorkSettings,
   getEffectiveOvertimeRates,
   getHolidaysMap,
@@ -35,7 +34,6 @@ import {
 } from "./lib/pdksHelpers";
 import {
   buildShiftResolver,
-  thresholdsForShift,
 } from "./lib/shiftResolver";
 import { overtimePeriodRange } from "./lib/overtimeCalc";
 import { inferAccessStatus, inferDenialReason } from "./lib/hikEventCodes";
@@ -43,8 +41,6 @@ import {
   classifyHikEvent,
   shouldCreateCardReadingForHikEvent,
 } from "./lib/hikEventCatalog";
-import { ideResultGranted } from "./lib/cardReaderParse";
-import { canEmployeeAccessDevice } from "./lib/accessDecision";
 import {
   buildPeriodDateKeys,
   formatHoursLabel,
@@ -53,11 +49,6 @@ import {
   enrichReadingsForList,
   enrichWithDeviceInfo,
 } from "./lib/cardReadingAudit";
-import {
-  ideTimeToISO,
-  resolveDirection,
-  resolveActiveMatchingRuleIds,
-} from "./lib/cardReadingProcess";
 import {
   computeAttendanceDetailDay,
   summarizeAttendanceDays,
@@ -473,383 +464,7 @@ export const processCardReading = internalMutation({
     ideTime: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const accessTime = new Date().toISOString();
-    const firstProjectId = (await ctx.db.query("projects").first())?._id;
-    const projectForRow = (
-      employeeProject: typeof firstProjectId,
-      deviceProject: typeof firstProjectId
-    ) => employeeProject ?? deviceProject ?? firstProjectId;
-
-    // Tüm cardReadings insert'lerine spread edilecek Hikvision metadata
-    const hikFields = {
-      hikDevIndex: args.hikDevIndex,
-      hikMajorEventType: args.hikMajorEventType,
-      hikSubEventType: args.hikSubEventType,
-      hikCurrentVerifyMode: args.hikCurrentVerifyMode,
-      hikSerialNo: args.hikSerialNo,
-      hikFrontSerialNo: args.hikFrontSerialNo,
-      hikDateTime: args.hikDateTime,
-      hikPictureURL: args.hikPictureURL,
-      hikMask: args.hikMask,
-      hikHelmet: args.hikHelmet,
-      hikTemperature: args.hikTemperature,
-      hikEventState: args.hikEventState,
-    } as const;
-
-    // 1. Cihazı bul. Token doğrulanmış istekte (authedDeviceId) attribution o cihaza
-    //    SABİTLENİR — body'deki serial/IP/uuid'ye GÜVENİLMEZ. Bu, /card-reader'daki
-    //    localBridge guard-skip + IP-global lookup ile bir token sahibinin BAŞKA tenant'ın
-    //    cihazına forged kart/audit satırı yazmasını engeller. Token yoksa (deprecated
-    //    unauth yol) eski serial→devIndex→ehome→uuid→IP zincirine düşülür.
-    let device = null;
-    if (args.authedDeviceId) {
-      device = await ctx.db.get(args.authedDeviceId);
-    } else {
-      if (args.deviceSerial?.trim()) {
-        device = await ctx.db
-          .query("devices")
-          .withIndex("by_device_serial", (q) =>
-            q.eq("deviceSerial", args.deviceSerial!.trim())
-          )
-          .first();
-      }
-      // Gateway-passthrough event'inde serial yerine devIndex gelir → indexli lookup
-      if (!device && args.hikDevIndex?.trim()) {
-        device = await ctx.db
-          .query("devices")
-          .withIndex("by_hik_dev_index", (q) =>
-            q.eq("hikDevIndex", args.hikDevIndex!.trim())
-          )
-          .first();
-      }
-      // Cihaz event'i `deviceID` field'ında ehomeID gönderir (gateway register'da atadığımız)
-      if (!device && args.hikEhomeID?.trim()) {
-        device = await ctx.db
-          .query("devices")
-          .withIndex("by_ehome_id", (q) =>
-            q.eq("ehomeID", args.hikEhomeID!.trim())
-          )
-          .first();
-      }
-      // IDE Smart panel event'i: serial yerine panel UUID gelebilir.
-      if (!device && args.ideUuid?.trim()) {
-        device = await ctx.db
-          .query("devices")
-          .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", args.ideUuid!.trim()))
-          .first();
-      }
-      if (!device && args.deviceIp?.trim()) {
-        device = await ctx.db
-          .query("devices")
-          .withIndex("by_device_ip", (q) =>
-            q.eq("deviceIp", args.deviceIp!.trim())
-          )
-          .first();
-      }
-    }
-
-    // Reader credentials must never be misinterpreted as native IDE/Hik card identifiers.
-    const isReaderUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(args.cardNo);
-    if (isReaderUuid && (!args.authedDeviceId || device?.brand === "ide_smart" || device?.brand === "hikvision")) return { granted: false };
-
-    // Hikvision brand-dispatch: karar cihazda verilir, biz sadece audit yazarız.
-    // QR vs. cihazlar aşağıdaki mevcut akışa düşer (Convex DB lookup → granted hesapla).
-    if (device?.brand === "hikvision") {
-      const inferred = inferAccessStatus(
-        args.hikMajorEventType,
-        args.hikSubEventType,
-      );
-      const accessStatus: "izin_verildi" | "reddedildi" =
-        inferred ?? "reddedildi";
-      const granted = accessStatus === "izin_verildi";
-      const denialReason = granted
-        ? undefined
-        : inferDenialReason(args.hikSubEventType);
-
-      const employee = await findDeviceCardEmployee(ctx, args.cardNo, device?.projectId);
-
-      const direction = employee
-        ? await resolveDirection(ctx, {
-            device,
-            employeeId: employee._id,
-            nowISO: accessTime,
-          })
-        : undefined;
-
-      // serialNo gap detection — event ardışıklığı bozulduysa AcsEvent backfill için işaretle.
-      // Şimdilik sadece warn log; Phase 5.2'de history backfill kuyruğu eklenecek.
-      if (
-        args.hikSerialNo !== undefined &&
-        args.hikFrontSerialNo !== undefined &&
-        device.hikLastSerialNo !== undefined &&
-        args.hikFrontSerialNo !== device.hikLastSerialNo
-      ) {
-        console.warn(
-          `[hik-event-gap] device=${device.name} expected front=${device.hikLastSerialNo} got=${args.hikFrontSerialNo} current=${args.hikSerialNo}`,
-        );
-      }
-      if (
-        args.hikSerialNo !== undefined &&
-        args.hikSerialNo !== device.hikLastSerialNo
-      ) {
-        await ctx.db.patch(device._id, { hikLastSerialNo: args.hikSerialNo });
-      }
-
-      await ctx.db.insert("cardReadings", {
-        projectId: projectForRow(employee?.projectId, device.projectId),
-        deviceId: device._id,
-        employeeId: employee?._id,
-        cardNo: args.cardNo,
-        employeeName: employee
-          ? `${employee.firstName} ${employee.lastName}`
-          : undefined,
-        accessTime,
-        accessStatus,
-        direction,
-        rawData: args.rawBody,
-        ...hikFields,
-        hikDenialReason: denialReason,
-        createdAt: accessTime,
-        updatedAt: accessTime,
-      });
-      return { granted };
-    }
-
-    // IDE Smart brand-dispatch: erişim kararını PANEL verir (payload.result).
-    // Hikvision gibi: biz sadece audit yazarız, kartı ekrana düşürürüz.
-    // Kayıtlı olmayan kart da yazılır (employee yoksa isim boş, accessStatus panel kararı).
-    if (device?.brand === "ide_smart") {
-      // Erişim kararını PANEL verir; result kodu (1/2/3 = grant, kapı açılır) → ideResultGranted.
-      const granted = ideResultGranted(args.ideResult);
-      const accessStatus: "izin_verildi" | "reddedildi" = granted
-        ? "izin_verildi"
-        : "reddedildi";
-
-      // Panel olay zamanı (payload.time, panel TZ = UTC+3) → UTC ISO. Offline kuyruktan
-      // toplu push edilen event'lerde gerçek okutma anı korunur (sunucu alış anı değil).
-      const ideAccessTime = ideTimeToISO(args.ideTime) ?? accessTime;
-
-      const employee = await findDeviceCardEmployee(ctx, args.cardNo, device?.projectId);
-
-      const direction = await resolveDirection(ctx, {
-        device,
-        employeeId: employee?._id ?? null,
-        nowISO: ideAccessTime,
-        ideIoId: args.ideIoId,
-      });
-
-      await ctx.db.insert("cardReadings", {
-        projectId: projectForRow(employee?.projectId, device.projectId),
-        deviceId: device._id,
-        employeeId: employee?._id,
-        cardNo: args.cardNo,
-        employeeName: employee
-          ? `${employee.firstName} ${employee.lastName}`
-          : undefined,
-        accessTime: ideAccessTime,
-        accessStatus,
-        direction,
-        ideIoId: args.ideIoId,
-        rawData: args.rawBody,
-        createdAt: accessTime,
-        updatedAt: accessTime,
-      });
-      return { granted };
-    }
-
-    // Reader-purpose UUIDs can only be consumed by authenticated generic readers.
-    const isToken = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(args.cardNo);
-    if (isToken) {
-      const tokenRow = await ctx.db.query("checkInTokens")
-        .withIndex("by_token", q => q.eq("token", args.cardNo)).first();
-      const now = Date.now();
-      if (!device || !tokenRow || tokenRow.purpose !== "reader" || tokenRow.usedAt ||
-          !Number.isFinite(Date.parse(tokenRow.expiresAt)) || Date.parse(tokenRow.expiresAt) <= now) return { granted: false };
-      const session = tokenRow.sessionId ? await ctx.db.get(tokenRow.sessionId) : null;
-      if (!session || session.employeeId !== tokenRow.employeeId ||
-          !Number.isFinite(Date.parse(session.expiresAt)) || Date.parse(session.expiresAt) <= now ||
-          (session.passwordVersion ?? 0) !== tokenRow.authVersion) return { granted: false };
-      const tokenEmployee = await ctx.db.get(tokenRow.employeeId);
-      if (!tokenEmployee || tokenRow.projectId !== tokenEmployee.projectId || tokenRow.projectId !== device.projectId) return { granted: false };
-      const auth = await ctx.db.query("employeeAuth")
-        .withIndex("by_employee", q => q.eq("employeeId", tokenEmployee._id)).first();
-      if (!auth?.passwordHash || tokenRow.authVersion !== (auth.passwordVersion ?? 0) ||
-          !(await genericReaderTokenAllowed(ctx, tokenEmployee, device, now))) return { granted: false };
-      const consumedAt = new Date(now).toISOString();
-      const employeeName = `${tokenEmployee.firstName} ${tokenEmployee.lastName}`;
-      await ctx.db.patch(tokenRow._id, { usedAt: consumedAt, employeeName, locationRecorded: false });
-      const direction = await resolveDirection(ctx, { device, employeeId: tokenEmployee._id, nowISO: consumedAt });
-      await ctx.db.insert("cardReadings", {
-        projectId: device.projectId, deviceId: device._id, employeeId: tokenEmployee._id,
-        cardNo: tokenEmployee.cardNumber, employeeName, accessTime: consumedAt,
-        accessStatus: "izin_verildi", direction, rawData: JSON.stringify({ source: "qr", protocol: "generic_reader" }),
-        createdAt: consumedAt, updatedAt: consumedAt,
-      });
-      return { granted: true };
-    }
-
-    // 2. Çalışanı kart numarasına göre bul
-    // Projesiz legacy cihazlarda ilk kart eşleşmesi davranışı korunur.
-    const employee = await findDeviceCardEmployee(ctx, args.cardNo, device?.projectId);
-
-    if (!employee) {
-      await ctx.db.insert("cardReadings", {
-        projectId: projectForRow(undefined, device?.projectId),
-        deviceId: device?._id,
-        cardNo: args.cardNo,
-        accessTime,
-        accessStatus: "reddedildi",
-        rawData: args.rawBody,
-        ...hikFields,
-        createdAt: accessTime,
-        updatedAt: accessTime,
-      });
-      return { granted: false };
-    }
-
-    if (!employee.isActive) {
-      await ctx.db.insert("cardReadings", {
-        projectId: projectForRow(employee.projectId, device?.projectId),
-        deviceId: device?._id,
-        employeeId: employee._id,
-        cardNo: args.cardNo,
-        employeeName: `${employee.firstName} ${employee.lastName}`,
-        accessTime,
-        accessStatus: "reddedildi",
-        rawData: args.rawBody,
-        ...hikFields,
-        createdAt: accessTime,
-        updatedAt: accessTime,
-      });
-      return { granted: false };
-    }
-
-    if (!device) {
-      await ctx.db.insert("cardReadings", {
-        projectId: projectForRow(employee.projectId, undefined),
-        employeeId: employee._id,
-        cardNo: args.cardNo,
-        employeeName: `${employee.firstName} ${employee.lastName}`,
-        accessTime,
-        accessStatus: "reddedildi",
-        rawData: args.rawBody,
-        ...hikFields,
-        createdAt: accessTime,
-        updatedAt: accessTime,
-      });
-      return { granted: false };
-    }
-
-    // 3. Cihazın hiçbir grupta olup olmadığını kontrol et
-    const deviceGroups = await ctx.db
-      .query("groupDevices")
-      .withIndex("by_project_device", (q) =>
-        q.eq("projectId", device.projectId).eq("deviceId", device._id),
-      )
-      .collect();
-
-    if (deviceGroups.length === 0) {
-      const noGroupDirection = await resolveDirection(ctx, {
-        device,
-        employeeId: employee._id,
-        nowISO: accessTime,
-      });
-      await ctx.db.insert("cardReadings", {
-        projectId: projectForRow(employee.projectId, device.projectId),
-        deviceId: device._id,
-        employeeId: employee._id,
-        cardNo: args.cardNo,
-        employeeName: `${employee.firstName} ${employee.lastName}`,
-        accessTime,
-        accessStatus: "reddedildi",
-        direction: noGroupDirection,
-        rawData: args.rawBody,
-        ...hikFields,
-        createdAt: accessTime,
-        updatedAt: accessTime,
-      });
-      return { granted: false };
-    }
-
-    // 4. Çalışanın bu cihaza erişimi var mı? (groupMembers + accessRules)
-    const deviceGroupIds = deviceGroups.map((gd) => gd.groupId);
-    const employeeAccessGroups = await ctx.db
-      .query("groupMembers")
-      .withIndex("by_project_employee", (q) =>
-        q.eq("projectId", employee.projectId).eq("employeeId", employee._id),
-      )
-      .collect();
-    const employeeGroupIds = employeeAccessGroups.map((gm) => gm.groupId);
-    const { activeRuleIds, openRuleIds } = await resolveActiveMatchingRuleIds(
-      ctx,
-      deviceGroupIds,
-      employeeGroupIds,
-      Date.now(),
-    );
-    const hasAccess = canEmployeeAccessDevice({
-      deviceGroupIds,
-      employeeGroupIds,
-      activeRuleIds,
-      openRuleIds,
-    });
-
-    // 5. Kayıt oluştur
-    const cardDirection = await resolveDirection(ctx, {
-      device,
-      employeeId: employee._id,
-      nowISO: accessTime,
-    });
-    await ctx.db.insert("cardReadings", {
-      projectId: projectForRow(employee.projectId, device.projectId),
-      deviceId: device._id,
-      employeeId: employee._id,
-      cardNo: args.cardNo,
-      employeeName: `${employee.firstName} ${employee.lastName}`,
-      accessTime,
-      accessStatus: hasAccess ? "izin_verildi" : "reddedildi",
-      direction: cardDirection,
-      rawData: args.rawBody,
-      ...hikFields,
-      ...(!hasAccess && activeRuleIds.size > 0 ? { hikDenialReason: "Zaman penceresi dışında" } : {}),
-      createdAt: accessTime,
-      updatedAt: accessTime,
-    });
-
-    // 6. Geç kalma bildirimi (hasAccess + geç giriş)
-    if (hasAccess) {
-      const settings = await getEffectiveWorkSettings(ctx, employee.projectId);
-      const dayShiftResolver = await buildShiftResolver(ctx, [employee]);
-      const dayShift = dayShiftResolver.resolve(employee._id, trDateKey(accessTime));
-      const { lateThresholdMin } = thresholdsForShift(dayShift, settings);
-      const isLate = isoTimeToTRMinutes(accessTime) > lateThresholdMin;
-      if (isLate && employee.projectId) {
-        const notifSettings = await ctx.db
-          .query("notificationSettings")
-          .withIndex("by_project", (q) => q.eq("projectId", employee.projectId!))
-          .first();
-        const generalSettings = await ctx.db
-          .query("generalSettings")
-          .withIndex("by_project", (q) => q.eq("projectId", employee.projectId!))
-          .first();
-        const notifyEmail = generalSettings?.email ?? process.env.NOTIFICATION_EMAIL;
-        if (
-          notifSettings?.lateNotifications !== false &&
-          notifyEmail
-        ) {
-          ctx.scheduler.runAfter(0, internal.actions.sendEmail.sendLateNotification, {
-            to: notifyEmail,
-            employeeName: `${employee.firstName} ${employee.lastName}`,
-            lateTime: new Date(accessTime).toLocaleTimeString("tr-TR", {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            projectId: employee.projectId,
-          });
-        }
-      }
-    }
-
-    return { granted: hasAccess };
+    return processCardReadingCore(ctx, args, findDeviceCardEmployee);
   },
 });
 

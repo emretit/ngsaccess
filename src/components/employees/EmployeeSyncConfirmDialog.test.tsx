@@ -6,7 +6,7 @@ import type { Employee } from "@/types/employee";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { EmployeeSyncConfirmDialog, syncTargetCount } from "./EmployeeSyncConfirmDialog";
 const mocks = vi.hoisted(() => ({ rules: [] as unknown[], devices: [] as unknown[], confirm: undefined as (() => void) | undefined, disabled: false }));
-vi.mock("convex/react", () => ({ useQuery: (ref: Parameters<typeof getFunctionName>[0]) => getFunctionName(ref) === "accessRules:list" ? mocks.rules : mocks.devices }));
+vi.mock("convex/react", () => ({ useQuery: (ref: Parameters<typeof getFunctionName>[0]) => getFunctionName(ref) === "accessRules:listMemberships" ? mocks.rules : mocks.devices }));
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "p" }) }));
 vi.mock("@/components/ui/alert-dialog", () => {
   const Part = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
