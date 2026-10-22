@@ -95,18 +95,22 @@ describe("processCardReading HEAD characterization: device and employee resoluti
     const f = await fixture();
     await run(f, args({ deviceSerial: "FOREIGN-SERIAL", deviceIp: "192.0.2.1", ideUuid: "panel-uuid" }), false, [reading(f, { projectId: f.otherProjectId, deviceId: f.foreignDeviceId, employeeId: undefined, employeeName: undefined, direction: undefined, accessStatus: "reddedildi" })]);
   });
-  // 2026-10-22 güvenlik düzeltmesi: terminatedActive/endedNoExpiry/visitorExpired/inactiveDevice
-  // bilinçli olarak izin → ret oldu (token yoluyla aynı kural); endsToday son gün dahil izinli.
-  it.each(["unknownDevice", "unknownCard", "bothUnknown", "inactive", "missingActive", "terminatedInactive", "terminatedActive", "endedNoExpiry", "endsToday", "visitorExpired", "inactiveDevice", "foreignCard", "noGroup", "noMember", "inactiveRule", "deletedRule", "closedSchedule", "grant"] as const)("freezes %s return, row and scheduler", async kind => {
+  // 2026-10-22 güvenlik düzeltmesi: terminatedActive/endedNoExpiry/visitorExpired/realVisitorExpired/
+  // accessNotStarted/inactiveDevice bilinçli olarak izin → ret oldu (erişim penceresi + pasif cihaz token
+  // yoluyla aynı; son çalışma günü yalnız kartta); endsToday son gün, accessStartsNow pencere başı dahil izinli.
+  it.each(["unknownDevice", "unknownCard", "bothUnknown", "inactive", "missingActive", "terminatedInactive", "terminatedActive", "endedNoExpiry", "endsToday", "visitorExpired", "realVisitorExpired", "accessNotStarted", "accessStartsNow", "inactiveDevice", "foreignCard", "noGroup", "noMember", "inactiveRule", "deletedRule", "closedSchedule", "grant"] as const)("freezes %s return, row and scheduler", async kind => {
     const f = await fixture();
     const input = args();
     const expected = reading(f);
-    const granted = kind === "grant" || kind === "endsToday";
+    const granted = kind === "grant" || kind === "endsToday" || kind === "accessStartsNow";
     await f.t.run(async ctx => {
       if (kind === "endedNoExpiry") await ctx.db.patch(f.employeeId, { employmentEndDate: "2026-10-18" });
       if (kind === "endsToday") await ctx.db.patch(f.employeeId, { employmentEndDate: "2026-10-19" });
       if (kind === "visitorExpired") await ctx.db.patch(f.employeeId, { accessExpiresAt: "2026-10-19T08:00:00.000Z" });
       if (kind === "inactiveDevice") await ctx.db.patch(f.deviceId, { isActive: false });
+      if (kind === "realVisitorExpired") await ctx.db.patch(f.employeeId, { isVisitor: true, accessStartsAt: "2026-10-19T06:00:00.000Z", accessExpiresAt: "2026-10-19T08:00:00.000Z" });
+      if (kind === "accessNotStarted") await ctx.db.patch(f.employeeId, { accessStartsAt: "2026-10-19T10:00:00.000Z" });
+      if (kind === "accessStartsNow") await ctx.db.patch(f.employeeId, { accessStartsAt: now });
       if (["unknownDevice", "bothUnknown"].includes(kind)) { input.deviceSerial = "missing"; input.hikDevIndex = undefined; expected.deviceId = undefined; expected.hikDevIndex = undefined; }
       if (["unknownCard", "bothUnknown", "foreignCard"].includes(kind)) { input.cardNo = kind === "foreignCard" ? "FOREIGN" : "missing"; expected.cardNo = input.cardNo; expected.employeeId = undefined; expected.employeeName = undefined; }
       if (kind === "inactive" || kind === "terminatedInactive") await ctx.db.patch(f.employeeId, { isActive: false, ...(kind === "terminatedInactive" ? { employmentEndDate: "2026-10-01" } : {}) });
@@ -118,7 +122,7 @@ describe("processCardReading HEAD characterization: device and employee resoluti
       if (kind === "deletedRule") await ctx.db.delete(f.ruleId);
       if (kind === "closedSchedule") { await ctx.db.patch(f.ruleId, { days: ["Tuesday"] }); expected.hikDenialReason = "Zaman penceresi dışında"; }
     });
-    if (["unknownDevice", "unknownCard", "bothUnknown", "inactive", "missingActive", "terminatedInactive", "terminatedActive", "endedNoExpiry", "visitorExpired", "inactiveDevice", "foreignCard"].includes(kind)) expected.direction = undefined;
+    if (["unknownDevice", "unknownCard", "bothUnknown", "inactive", "missingActive", "terminatedInactive", "terminatedActive", "endedNoExpiry", "visitorExpired", "realVisitorExpired", "accessNotStarted", "inactiveDevice", "foreignCard"].includes(kind)) expected.direction = undefined;
     if (!granted) expected.accessStatus = "reddedildi";
     await run(f, input, granted, [expected]);
   });

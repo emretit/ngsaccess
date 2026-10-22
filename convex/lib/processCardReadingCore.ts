@@ -331,9 +331,10 @@ async function processGenericCardReading(
     return { granted: false };
   }
 
-  // Token yoluyla aynı kurallar: erişim penceresi + son çalışma günü (dahil) sonrası ret
-  // (işten çıkış cron'u isActive'i kapatana kadarki boşlukta kart geçmesin), cihaz yok
-  // ya da pasif cihaz ret. Hepsi aynı ret satırını yazar.
+  // Erişim penceresi (accessStartsAt/accessExpiresAt) ve pasif cihaz reddi token yoluyla aynı.
+  // Karta ayrıca son çalışma günü (TR, dahil) kontrolü: işten çıkış cron'u isActive'i kapatana
+  // kadarki boşlukta kart geçmesin (token yolu employmentEndDate'e bakmaz). Cihaz yoksa da ret.
+  // Hepsi aynı ret satırını yazar.
   if (!employee.isActive || !employeeWithinAccessEpoch(employee, Date.parse(accessTime)) ||
       !employedOn(employee, trDateKey(accessTime)) || !device || device.isActive === false) {
     await ctx.db.insert("cardReadings", {
