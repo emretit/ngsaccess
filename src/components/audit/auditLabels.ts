@@ -60,6 +60,7 @@ const commonLabels: Record<string, string> = {
   grantedBy: "Rızayı kaydeden",
   revokedBy: "İptal eden",
   documentUrl: "Belge bağlantısı",
+  documentStorageId: "Rıza belgesi",
   weekdayMultiplier: "Hafta içi çarpanı",
   weekendMultiplier: "Hafta sonu çarpanı",
   holidayMultiplier: "Tatil çarpanı",

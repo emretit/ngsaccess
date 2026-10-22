@@ -1,6 +1,10 @@
+import { Link } from "react-router-dom";
+import { useConsentDocumentUpload } from "./hooks/useConsentDocumentUpload";
+import { Input } from "@/components/ui/input";
+import type { Doc } from "../../../convex/_generated/dataModel";
 import { BIOMETRIC_NOTICE_TEMPLATE } from "@/lib/consentNotice";
 import { useId, useState } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import { formatTrDateTime } from "@/lib/date";
 import { ShieldCheck, ShieldX, ScanFace, Fingerprint, CreditCard, Camera } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
@@ -27,31 +31,27 @@ type ConsentType = "biometric_face" | "biometric_fingerprint" | "card" | "photo"
 
 const CONSENT_META: Record<
   ConsentType,
-  { label: string; description: string; icon: typeof ScanFace; required: boolean }
+  { label: string; description: string; icon: typeof ScanFace }
 > = {
   biometric_face: {
-    label: "Yüz Tanıma",
-    description: "Yalnız erişim kontrolü — ayrı açık rıza kaydı",
+    label: "Yüz tanıma",
+    description: "Yalnız kapı erişimi; mesai takibinde kullanılmaz",
     icon: ScanFace,
-    required: true,
   },
   biometric_fingerprint: {
-    label: "Parmak İzi",
-    description: "Yalnız erişim kontrolü — ayrı açık rıza kaydı",
+    label: "Parmak izi",
+    description: "Yalnız kapı erişimi; mesai takibinde kullanılmaz",
     icon: Fingerprint,
-    required: true,
   },
   card: {
-    label: "Kart Verisi",
+    label: "Kart verisi",
     description: "Genel veri — sözleşme zemini",
     icon: CreditCard,
-    required: false,
   },
   photo: {
     label: "Fotoğraf",
-    description: "Kişisel veri — açık rıza önerilir",
+    description: "Profil fotoğrafı; isteğe bağlı",
     icon: Camera,
-    required: false,
   },
 };
 
@@ -64,36 +64,38 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
   const canManageConsents = capabilities(profile?.role).admin;
   const consents = useQuery(api.employeeConsents.listForEmployee, { employeeId });
   const biometricModule = useQuery(api.privacyBiometric.getEmployeeBiometricModule, { employeeId });
+  const fingerprints = useQuery(api.fingerprintEnrollment.listForEmployee, canManageConsents ? { employeeId } : "skip");
   const notesId = useId();
-  const [revokeTarget, setRevokeTarget] = useState<{ id: Id<"employeeConsents">; label: string } | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<{ id: Id<"employeeConsents">; label: string; type: ConsentType } | null>(null);
   const grant = useMutation(api.employeeConsents.grant);
   const revoke = useMutation(api.employeeConsents.revoke);
 
-  const [grantingType, setGrantingType] = useState<ConsentType | null>(null);
+  const [grantingType, setGrantingType] = useState<Exclude<ConsentType, "card"> | null>(null);
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const activeByType = new Map<ConsentType, { id: Id<"employeeConsents">; grantedAt: string; notes?: string }>();
+  const convex = useConvex();
+  const document = useConsentDocumentUpload();
+  const documentInputId = useId();
+  const activeByType = new Map<ConsentType, Doc<"employeeConsents">>();
   for (const c of consents ?? []) {
     if (!c.revokedAt) {
-      activeByType.set(c.consentType as ConsentType, {
-        id: c._id,
-        grantedAt: c.grantedAt,
-        notes: c.notes,
-      });
+      if (c.consentType !== "visitor_kvkk") activeByType.set(c.consentType, c);
     }
   }
 
   const handleGrant = async () => {
-    if (!canManageConsents || !grantingType || (grantingType.startsWith("biometric_") && biometricModule?.enabled !== true)) return;
+    if (!canManageConsents || document.pending || document.error || !grantingType || (grantingType.startsWith("biometric_") && biometricModule?.enabled !== true)) return;
     setSubmitting(true);
     try {
       await grant({
         employeeId,
         consentType: grantingType,
+        documentStorageId: document.storageId,
         notes: notes.trim() || undefined,
       });
       notify.success("Rıza alındı", CONSENT_META[grantingType].label);
+      document.reset();
       setGrantingType(null);
       setNotes("");
     } catch (e) {
@@ -116,7 +118,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
     <section className="space-y-3 border-t pt-5">
       <h3 className="text-base font-semibold">KVKK rızaları</h3>
       <p className="text-xs text-muted-foreground">
-        Biyometri yalnız erişim kontrolü için değerlendirilir. Rıza yoksa yüz/parmak izi kaydı eklenemez. Yasal danışmanınıza doğrulatın.
+        Biyometri yalnız erişim kontrolü içindir; rıza yoksa kayıt eklenemez.
       </p>
       <details className="text-xs">
         <summary className="cursor-pointer font-medium">Aydınlatma metni şablonu</summary>
@@ -126,13 +128,13 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
           catch (error: unknown) { notify.error("Şablon kopyalanamadı", error); }
         }}>Şablonu kopyala</Button>
       </details>
-      {biometricModule?.enabled === false && <p className="text-xs text-muted-foreground">Biyometri modülü kapalı; yüz ve parmak izi rızası eklenemez. Mevcut rızalar iptal edilebilir.</p>}
       <Separator />
       <div className="space-y-2">
-        {(Object.keys(CONSENT_META) as ConsentType[]).map((type) => {
+        {(Object.keys(CONSENT_META) as ConsentType[]).filter(type => type !== "card" || activeByType.has("card")).map((type) => {
           const meta = CONSENT_META[type];
           const Icon = meta.icon;
           const active = activeByType.get(type);
+          const moduleClosed = type.startsWith("biometric_") && biometricModule?.enabled === false;
           return (
             <div
               key={type}
@@ -146,25 +148,35 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                     <Badge variant="successSubtle" className="text-xs">
                       Aktif
                     </Badge>
-                  ) : meta.required ? (
-                    <Badge variant="destructive" className="text-xs">
-                      Rıza Yok
-                    </Badge>
                   ) : (
                     <Badge variant="outline" className="text-xs">
-                      Yok
+                      {moduleClosed ? "Kapalı" : type === "photo" ? "İsteğe bağlı" : "Rıza yok"}
                     </Badge>
                   )}
                 </div>
                 <div className="text-[11px] text-muted-foreground mt-0.5">
                   {meta.description}
                 </div>
+                {!active && moduleClosed && <p className="text-xs text-muted-foreground mt-1">
+                  Biyometri modülü kapalı. {canManageConsents && <Link className="underline" to="/settings?tab=privacy">Ayarlar › Gizlilik ve KVKK</Link>}
+                </p>}
                 {active && (
                   <div className="text-[11px] text-muted-foreground mt-1">
                     Alındı: {formatTrDateTime(new Date(active.grantedAt))}
                     {active.notes && <span> · {active.notes}</span>}
                   </div>
                 )}
+                {canManageConsents && active?.documentStorageId && <Button type="button" variant="link" size="sm" className="max-sm:min-h-11 px-0" onClick={async () => {
+                  let tab: Window | null = null;
+                  try {
+                    tab = window.open("", "_blank");
+                    if (!tab) throw new Error("Belge sekmesi açılamadı.");
+                    tab.opener = null;
+                    const url = await convex.query(api.employeeConsents.getDocumentUrl, { id: active._id });
+                    if (!url) throw new Error("Belge bulunamadı.");
+                    tab.location.href = url;
+                  } catch (error: unknown) { tab?.close(); notify.error("Belge açılamadı", error); }
+                }}>Belgeyi aç</Button>}
               </div>
               {canManageConsents && <div className="shrink-0">
                 {active ? (
@@ -172,36 +184,38 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                     size="sm"
                     variant="outline"
                     aria-label={`${meta.label} rızasını iptal et`}
-                    onClick={() => setRevokeTarget({ id: active.id, label: meta.label })}
+                    onClick={() => setRevokeTarget({ id: active._id, label: meta.label, type })}
                     className="max-sm:min-h-11 gap-1.5"
                   >
                     <ShieldX className="h-3.5 w-3.5" />
                     İptal
                   </Button>
-                ) : (
+                ) : !moduleClosed && type !== "card" ? (
                   <Button
                     size="sm"
                     aria-label={`${meta.label} rızası al`}
                     disabled={type.startsWith("biometric_") && biometricModule?.enabled !== true}
-                    onClick={() => setGrantingType(type)}
+                    onClick={() => { document.reset(); setGrantingType(type); }}
                     className="max-sm:min-h-11 gap-1.5"
                   >
                     <ShieldCheck className="h-3.5 w-3.5" />
                     Rıza al
                   </Button>
-                )}
+                ) : null}
               </div>}
             </div>
           );
         })}
       </div>
 
+      <p className="text-xs text-muted-foreground">Kart verisi iş sözleşmesine dayanır; ayrıca rıza gerekmez.</p>
       {canManageConsents && (
         <>
           <Dialog
             open={grantingType !== null}
             onOpenChange={(open) => {
-              if (!open) {
+              if (!open && !submitting) {
+                document.reset();
                 setGrantingType(null);
                 setNotes("");
               }
@@ -210,7 +224,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>
-                  {grantingType ? CONSENT_META[grantingType].label : ""} — Rıza Kaydı
+                  {grantingType ? CONSENT_META[grantingType].label : ""} rızası
                 </DialogTitle>
                 <DialogDescription>
                   Bu işlem çalışanın ayrı alınmış açık rıza beyanını kaydeder. Biyometri yalnız erişim kontrolü içindir.
@@ -218,7 +232,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-2">
-                <label htmlFor={notesId} className="text-xs font-medium">Not (opsiyonel)</label>
+                <label htmlFor={notesId} className="text-xs font-medium">Not (isteğe bağlı)</label>
                 <Textarea id={notesId}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
@@ -226,10 +240,24 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                   rows={3}
                 />
               </div>
+              <div className="space-y-2">
+                <label htmlFor={documentInputId} className="text-xs font-medium">İmzalı rıza formu (önerilir)</label>
+                <Input id={documentInputId} type="file" accept="application/pdf,image/jpeg,image/png" disabled={document.pending || submitting} className="max-sm:min-h-11" onChange={event => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (file) void document.upload(file);
+                }} />
+                <p className="text-xs text-muted-foreground">PDF, JPEG veya PNG; en çok 10 MB.</p>
+                {document.pending && <p role="status" className="text-xs">Belge yükleniyor…</p>}
+                {document.error && <p role="alert" className="text-xs">{document.error}</p>}
+                {document.storageId && <p role="status" className="text-xs">Belge yüklendi.</p>}
+                {(document.storageId || document.error) && <Button type="button" variant="outline" size="sm" className="max-sm:min-h-11" disabled={document.pending || submitting} onClick={document.reset}>Belgeyi kaldır</Button>}
+              </div>
               <DialogFooter>
                 <Button className="max-sm:min-h-11"
                   variant="outline"
                   onClick={() => {
+                    document.reset();
                     setGrantingType(null);
                     setNotes("");
                   }}
@@ -237,15 +265,15 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                 >
                   İptal
                 </Button>
-                <Button className="max-sm:min-h-11" onClick={handleGrant} disabled={submitting || (grantingType?.startsWith("biometric_") === true && biometricModule?.enabled !== true)}>
-                  {submitting ? "Kaydediliyor..." : "Rıza al"}
+                <Button className="max-sm:min-h-11" onClick={handleGrant} disabled={submitting || document.pending || Boolean(document.error) || (grantingType?.startsWith("biometric_") === true && biometricModule?.enabled !== true)}>
+                  {submitting ? "Kaydediliyor..." : "Rızayı kaydet"}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
           <ConfirmDestructive open={revokeTarget !== null} onOpenChange={open => { if (!open) setRevokeTarget(null); }}
             title="Rıza iptal edilsin mi?" objectName={revokeTarget?.label ?? "Rıza"}
-            effects={["Rıza kaydı geri alınmış olarak işaretlenir. Mevcut biyometrik şablonlar bu işlemle silinmez."]}
+            effects={[revokeTarget?.type === "biometric_fingerprint" ? fingerprints && fingerprints.enrollments.length > 0 ? `Cihazlardaki ${fingerprints.enrollments.length} parmak izi kaydı da silinir.` : "Cihazlardaki parmak izi kayıtları da silinir." : "Rıza kaydı geri alınmış olarak işaretlenir; geçmiş korunur."]}
             confirmLabel="Rızayı iptal et" onConfirm={async () => {
               if (!canManageConsents || !revokeTarget) return;
               await revoke({ id: revokeTarget.id });

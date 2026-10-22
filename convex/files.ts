@@ -22,6 +22,8 @@ export const generateUploadUrl = authedMutation({
 export const claimUpload = authedMutation({
   args: { storageId: v.id("_storage") },
   handler: async (ctx, args) => {
+    const consent = await ctx.db.query("employeeConsents").withIndex("by_document_storage", q => q.eq("documentStorageId", args.storageId)).first();
+    if (consent) throw new Error("Dosya zaten bir rızaya bağlı");
     const pending = await findPendingUpload(ctx, args.storageId);
     if (pending) {
       assertUploadOwner(pending.userId, ctx.user._id);
@@ -76,6 +78,12 @@ export const cleanupPendingUploads = internalMutation({
       .withIndex("by_created", q => q.lt("createdAt", Date.now() - 24 * 60 * 60 * 1000))
       .take(PENDING_CLEANUP_BATCH);
     for (const upload of pending) {
+      const consent = await ctx.db.query("employeeConsents")
+        .withIndex("by_document_storage", q => q.eq("documentStorageId", upload.storageId)).first();
+      if (consent) {
+        await ctx.db.delete(upload._id);
+        continue;
+      }
       const employee = await ctx.db.query("employees")
         .withIndex("by_photo_storage", q => q.eq("photoStorageId", upload.storageId)).first();
       const url = employee ? null : await ctx.storage.getUrl(upload.storageId);

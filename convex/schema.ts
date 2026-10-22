@@ -1153,13 +1153,15 @@ export default defineSchema({
     grantedAt: v.string(),
     revokedAt: v.optional(v.string()),
     documentUrl: v.optional(v.string()),
+    documentStorageId: v.optional(v.id("_storage")),
     // Onay anındaki aydınlatma metni sürümü (ziyaretçi KVKK, 06-O5).
     documentVersion: v.optional(v.string()),
     grantedBy: v.optional(v.id("users")),
     notes: v.optional(v.string()),
   })
     .index("by_employee", ["employeeId"])
-    .index("by_employee_type", ["employeeId", "consentType"]),
+    .index("by_employee_type", ["employeeId", "consentType"])
+    .index("by_document_storage", ["documentStorageId"]),
 
   userPreferences: defineTable({
     userId: v.id("users"),
