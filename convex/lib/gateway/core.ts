@@ -212,6 +212,19 @@ function findNestedSubStatusCode(data: unknown): string | undefined {
   return undefined;
 }
 
+function collectNestedSubStatusCodes(data: unknown, out: string[] = []): string[] {
+  if (!data || typeof data !== "object") return out;
+  for (const v of Object.values(data as Record<string, unknown>)) {
+    for (const item of Array.isArray(v) ? v : [v]) {
+      if (!item || typeof item !== "object") continue;
+      const code = (item as Record<string, unknown>).subStatusCode;
+      if (typeof code === "string") out.push(code);
+      else collectNestedSubStatusCodes(item, out);
+    }
+  }
+  return out;
+}
+
 export function parseHikJsonStatus(result: GatewayResponse): {
   ok: boolean;
   alreadyExists: boolean;
@@ -234,6 +247,17 @@ export function parseHikJsonStatus(result: GatewayResponse): {
   // Non-200 ama JSON body parse edilmiş ve subStatusCode alreadyExists ise:
   // gateway "kayıt zaten var" diyor — Convex tarafında bunu hata sayma.
   if (alreadyExists) return { ok: false, alreadyExists: true, error: nestedSub };
+
+  // Toplu yanıt (ör. UserInfo/Record dizi gövdesi): üst düzey statusCode yok, durum
+  // öğe başına iç içe gelir. Tüm iç subStatusCode'lar "ok" ise başarı.
+  if (result.status === 200 && data?.statusCode === undefined && nestedSub !== undefined) {
+    const codes = collectNestedSubStatusCodes(data);
+    if (codes.length > 0 && codes.every(code => code.toLowerCase() === "ok")) {
+      return { ok: true, alreadyExists: false };
+    }
+    const failed = codes.find(code => code.toLowerCase() !== "ok");
+    if (failed !== undefined) return { ok: false, alreadyExists: false, error: failed };
+  }
 
   // Status 200 ama statusCode=1 değil → gateway-level hata
   if (result.status === 200) {

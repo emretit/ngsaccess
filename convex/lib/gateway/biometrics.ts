@@ -8,6 +8,9 @@ import {
   parseHikJsonStatus,
   getCountFromEndpoint,
   pollApplyProgress,
+  DEFAULT_DELETE_TIMEOUT_MS,
+  DEFAULT_POLL_INTERVAL_MS,
+  DEFAULT_POLL_MAX_INTERVAL_MS,
   MAX_FACE_JPEG_BYTES,
   FINGERPRINT_CAPTURE_TIMEOUT_MS,
   MAX_FINGERPRINTS_PER_PERSON,
@@ -172,18 +175,52 @@ export async function addFingerprintToDevice(
   if (!downloadResult.ok) return downloadResult;
 
   // 2. Cihaz async apply eder; FingerPrintProgress polling ile tamamlanmasını bekle.
-  // VERIFY: wrapKey ve statusField DS-K2804 / DS-K1T8 serisinde bu şekilde;
-  //         diğer modellerde farklı olabilir — canlı yanıtla doğrula.
-  return pollApplyProgress(
-    devIndex,
-    "/ISAPI/AccessControl/FingerPrintProgress",
-    {
-      wrapKey: "FingerPrintProgress",
-      statusField: "status",
-      successValue: "success",
-      failValue: "failed",
-    },
-  );
+  return pollFingerprintProgress(devIndex);
+}
+
+/** cardReaderRecvStatus (DS-K1T807 V4.24 capabilities: 0-8); 1 = okuyucuya yazıldı. */
+const FP_RECV_STATUS_ERRORS: Readonly<Record<number, string>> = {
+  0: "fpRecvStatus0: okuyucuya bağlanılamadı",
+  2: "fpRecvStatus2: parmak izi modülü çevrimdışı",
+  3: "fpRecvStatus3: parmak izi kalitesi düşük",
+  4: "fpRecvStatus4: parmak izi belleği dolu",
+  5: "fpRecvStatus5: parmak izi zaten kayıtlı",
+  6: "fpRecvStatus6: parmak numarası zaten kayıtlı",
+  7: "fpRecvStatus7: geçersiz parmak numarası",
+};
+/** Okuyucuda parmak izi modülü yok — o okuyucu için hata değil. */
+const FP_RECV_NOT_APPLICABLE = 8;
+
+/**
+ * Canlı yanıt (LAN probe 2026-10-22):
+ * `{"FingerPrintStatus":{"StatusList":[{"id":1,"cardReaderRecvStatus":1}],"totalStatus":1}}`
+ * totalStatus 0 = sürüyor, 1 = bitti; başarı = en az bir okuyucu 1, kalanlar 1 ya da 8.
+ */
+export function evaluateFingerprintProgress(data: unknown): { done: boolean; ok: boolean; error?: string } {
+  const status = (data as { FingerPrintStatus?: { StatusList?: unknown; totalStatus?: unknown } } | undefined)?.FingerPrintStatus;
+  if (!status || status.totalStatus !== 1) return { done: false, ok: false };
+  const codes = (Array.isArray(status.StatusList) ? status.StatusList : [])
+    .map(item => (item as { cardReaderRecvStatus?: unknown }).cardReaderRecvStatus)
+    .filter((code): code is number => typeof code === "number");
+  const failed = codes.find(code => code !== 1 && code !== FP_RECV_NOT_APPLICABLE);
+  if (failed !== undefined) return { done: true, ok: false, error: FP_RECV_STATUS_ERRORS[failed] ?? `fpRecvStatus${failed}` };
+  if (!codes.includes(1)) return { done: true, ok: false, error: "fpRecvStatus: hiçbir okuyucu kaydı onaylamadı" };
+  return { done: true, ok: true };
+}
+
+async function pollFingerprintProgress(devIndex: string): Promise<{ ok: boolean; error?: string }> {
+  const deadline = Date.now() + DEFAULT_DELETE_TIMEOUT_MS;
+  let intervalMs = DEFAULT_POLL_INTERVAL_MS;
+  while (Date.now() < deadline) {
+    // Progress yanıtında şablon yok; yine de gövde log'lanmaz (core.ts fingerprint maskesi).
+    const result = await gatewayApiCall("/ISAPI/AccessControl/FingerPrintProgress", "GET", null, devIndex);
+    if (result.status !== 200) return { ok: false, error: `HTTP ${result.status}` };
+    const progress = evaluateFingerprintProgress(result.data);
+    if (progress.done) return { ok: progress.ok, error: progress.error };
+    await new Promise(r => setTimeout(r, intervalMs));
+    intervalMs = Math.min(intervalMs * 2, DEFAULT_POLL_MAX_INTERVAL_MS);
+  }
+  return { ok: false, error: `FingerPrintProgress timeout (${DEFAULT_DELETE_TIMEOUT_MS}ms)` };
 }
 
 export async function deleteFingerprintFromDevice(
@@ -191,25 +228,33 @@ export async function deleteFingerprintFromDevice(
   employeeNo: string,
   fingerPrintID?: number,
 ): Promise<{ ok: boolean; error?: string }> {
+  // EmployeeNoDetail cihazda NESNE (dizi → 400 MessageParametersLack, LAN probe 2026-10-22).
   const result = await gatewayApiCallChecked(
     "/ISAPI/AccessControl/FingerPrint/Delete",
     "PUT",
     {
       FingerPrintDelete: {
         mode: "byEmployeeNo",
-        EmployeeNoDetail: [
-          {
-            employeeNo,
-            ...(fingerPrintID !== undefined ? { fingerPrintID: [fingerPrintID] } : {}),
-          },
-        ],
+        EmployeeNoDetail: {
+          employeeNo,
+          ...(fingerPrintID !== undefined ? { fingerPrintID: [fingerPrintID] } : {}),
+        },
       },
     },
     devIndex,
   );
   // Only explicit absent-person/fingerprint status codes are idempotent success.
   const absent = new Set(["employeeNoNotExist", "employeeNotExist", "userNotExist", "deviceUserNotExist", "fingerPrintNotExist", "fingerprintNotExist", "fingerPrintNotFound"]);
-  return !result.ok && result.error && absent.has(result.error) ? { ok: true } : result;
+  if (!result.ok) return result.error && absent.has(result.error) ? { ok: true } : result;
+  // Silme async; cihaz bitene kadar DeleteProcess "processing" döner. Önceki işlemin
+  // bayat durumunu okumamak için ilk sorgudan önce kısa bekle.
+  await new Promise(r => setTimeout(r, DEFAULT_POLL_INTERVAL_MS));
+  return pollApplyProgress(devIndex, "/ISAPI/AccessControl/FingerPrint/DeleteProcess", {
+    wrapKey: "FingerPrintDeleteProcess",
+    statusField: "status",
+    successValue: "success",
+    failValue: "failed",
+  });
 }
 
 export function getFingerprintCount(devIndex: string) {

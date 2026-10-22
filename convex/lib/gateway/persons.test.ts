@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildDoorPlans, buildPersonPayload } from "./persons";
+import { parseHikJsonStatus } from "./core";
 
 const person = { employeeNo: "123", name: "Employee", beginTime: "2026-01-01T00:00:00" };
 describe("Hik door-to-plan payload", () => {
@@ -24,5 +25,24 @@ describe("Hik door-to-plan payload", () => {
     const scope = buildDoorPlans(4, [{ planTemplateNo: 5, doorNos: [undefined] }]);
     expect(() => buildPersonPayload({ ...person, planTemplateNo: 1, ...scope })).toThrow("unauthorized");
     expect(() => buildPersonPayload({ ...person, doorPlans: [] })).toThrow("unauthorized");
+  });
+});
+
+describe("Hik toplu yanıt durumu", () => {
+  it("UserInfo/Record iç içe 'ok' yanıtı başarıdır", () => {
+    const data = { UserInfoOutList: { UserInfoOut: [{ employeeNo: "123", statusCode: 1, statusString: "OK", subStatusCode: "ok" }] } };
+    expect(parseHikJsonStatus({ status: 200, data, raw: JSON.stringify(data) })).toEqual({ ok: true, alreadyExists: false });
+  });
+  it("iç içe hata kodu döner, 'ok' sayılmaz", () => {
+    const data = { UserInfoOutList: { UserInfoOut: [{ subStatusCode: "ok" }, { subStatusCode: "badParameters" }] } };
+    expect(parseHikJsonStatus({ status: 200, data, raw: "" })).toEqual({ ok: false, alreadyExists: false, error: "badParameters" });
+  });
+  it("iç içe 'zaten var' hâlâ alreadyExists'tir", () => {
+    const data = { UserInfoOutList: { UserInfoOut: [{ subStatusCode: "employeeNoAlreadyExist" }] } };
+    expect(parseHikJsonStatus({ status: 200, data, raw: "" })).toMatchObject({ ok: false, alreadyExists: true });
+  });
+  it("üst düzey statusCode hatası iç 'ok' ile örtülmez", () => {
+    const data = { statusCode: 4, statusString: "Invalid Operation", Items: [{ subStatusCode: "ok" }] };
+    expect(parseHikJsonStatus({ status: 200, data, raw: "" }).ok).toBe(false);
   });
 });
