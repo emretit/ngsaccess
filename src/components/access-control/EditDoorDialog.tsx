@@ -1,3 +1,8 @@
+import { DoorGeneralFields } from "./door-dialog/DoorGeneralFields";
+import { DoorGatewayNumberField } from "./door-dialog/DoorGatewayNumberField";
+import { DoorStatusPlanSection } from "./door-dialog/DoorStatusPlanSection";
+import { DoorVerifyPlanSection, type VerifyPlanState } from "./door-dialog/DoorVerifyPlanSection";
+import { DoorSaveResults } from "./door-dialog/DoorSaveResults";
 import { DoorStatusPlanEditor } from "./DoorStatusPlanEditor";
 import { normalizeDoorStatusPlan, type DoorStatusPlan } from "../../../convex/lib/doorStatusPlan";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
@@ -12,21 +17,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { errorMessage, notify } from "@/lib/notify";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { StatusBadge } from "@/components/shared/StatusBadge";
-import { FormFieldWrapper } from "@/components/shared/FormFieldWrapper";
 import { applySelectedDoorPlans, doorPlanTimeSchema, type PlanKey, type PlanResult } from "./doorPlanResult";
 import { useMutation, useAction } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -64,23 +57,6 @@ interface EditDoorDialogProps {
 
 // hikDoorStatusPlan form state tipi — schema shape ile birebir
 type DoorStatusPlanState = DoorStatusPlan;
-
-// hikVerifyPlan form state tipi — schema shape ile birebir
-type VerifyPlanState = {
-  enabled: boolean;
-  beginTime: string;
-  endTime: string;
-  verifyMode: string;
-};
-
-const VERIFY_MODES: { value: string; label: string }[] = [
-  { value: "card", label: "Kart" },
-  { value: "face", label: "Yüz" },
-  { value: "fp", label: "Parmak İzi" },
-  { value: "cardOrFace", label: "Kart veya Yüz" },
-  { value: "cardAndPw", label: "Kart + Şifre" },
-  { value: "cardAndFace", label: "Kart + Yüz" },
-];
 
 const DEFAULT_STATUS_PLAN: DoorStatusPlanState = {
   enabled: false,
@@ -238,33 +214,7 @@ export function EditDoorDialog({
           {Object.keys(timeErrors).length > 0 && <div role="alert" className="mb-4 text-sm text-destructive"><p className="font-medium">Kaydedilemedi. Alanları kontrol edin.</p><ul className="list-disc pl-4">{Object.entries(timeErrors).map(([key, message]) => <li key={key}>{message}</li>)}</ul></div>}
           <fieldset disabled={isSubmitting || saved}>
             <div className="grid gap-4 py-4">
-              {/* Temel alanlar */}
-              <div className="grid gap-2">
-                <Label htmlFor="edit-door-name" >
-                  Ad *
-                </Label>
-                <Input
-                  id="edit-door-name" aria-invalid={!!timeErrors.name} aria-describedby={timeErrors.name ? "edit-door-name-error" : undefined}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-
-                  placeholder="Kapı adı"
-                  required
-                />
-                {timeErrors.name && <p id="edit-door-name-error" className="text-xs text-destructive">{timeErrors.name}</p>}
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-door-code" >
-                  Kapı Kodu
-                </Label>
-                <Input
-                  id="edit-door-code"
-                  value={doorCode}
-                  onChange={(e) => setDoorCode(e.target.value)}
-
-                  placeholder="Kapı kodu (opsiyonel)"
-                />
-              </div>
+              <DoorGeneralFields name={name} setName={setName} doorCode={doorCode} setDoorCode={setDoorCode} timeErrors={timeErrors} />
 
               {/* Hikvision gateway bölümü */}
               {showHikSection && (
@@ -274,133 +224,22 @@ export function EditDoorDialog({
                     Hikvision Zaman Planı
                   </p>
 
-                  {/* hikDoorNo */}
-                  <div className="grid gap-2">
-                    <Label htmlFor="hik-door-no" >
-                      Kapı No *
-                    </Label>
-                    <div >
-                      <Input
-                        id="hik-door-no" aria-invalid={!!timeErrors.hikDoorNo} aria-describedby={timeErrors.hikDoorNo ? "edit-door-number-error" : undefined}
-                        type="number"
-                        min={1}
-                        value={hikDoorNo}
-                        onChange={(e) => setHikDoorNo(e.target.value)}
-                        placeholder="Cihazdaki fiziksel kapı no (1, 2, ...)"
-                        required
-                      />
-                      {timeErrors.hikDoorNo && <p id="edit-door-number-error" className="text-xs text-destructive">{timeErrors.hikDoorNo}</p>}
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Cihazda bu kapıya atanan fiziksel numara (1'den başlar).
-                      </p>
-                    </div>
-                  </div>
+                  <DoorGatewayNumberField hikDoorNo={hikDoorNo} setHikDoorNo={setHikDoorNo} timeErrors={timeErrors} />
 
-                  {/* Kapı Durum Planı */}
-                  <div className="rounded-md border p-3 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="status-enabled" className="text-sm font-medium">Kapı Durum Planı</Label>
-                      <Switch
-                        disabled={isSubmitting || saved}
-                        id="status-enabled"
-                        checked={statusPlan.enabled}
-                        onCheckedChange={(checked) =>
-                          setStatusPlan((p) => ({ ...p, enabled: checked }))
-                        }
-                      />
-                    </div>
+                  <DoorStatusPlanSection statusPlan={statusPlan} setStatusPlan={setStatusPlan} isSubmitting={isSubmitting} saved={saved}>
                     <div id="status-plan" tabIndex={-1} role="group" aria-label="Kapı durum planı aralıkları" aria-invalid={!!timeErrors["status-plan"]} aria-describedby={timeErrors["status-plan"] ? "status-plan-error" : undefined}>
                       <DoorStatusPlanEditor value={statusPlan} onChange={setStatusPlan} />
                       {timeErrors["status-plan"] && <p id="status-plan-error" className="mt-2 text-xs text-destructive">{timeErrors["status-plan"]}</p>}
                     </div>
-                  </div>
+                  </DoorStatusPlanSection>
 
-                  {/* Doğrulama Modu Planı */}
-                  <div className="rounded-md border p-3 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="verify-enabled" className="text-sm font-medium">Doğrulama Modu Planı</Label>
-                      <Switch
-                        disabled={isSubmitting || saved}
-                        id="verify-enabled"
-                        checked={verifyPlan.enabled}
-                        onCheckedChange={(checked) =>
-                          setVerifyPlan((p) => ({ ...p, enabled: checked }))
-                        }
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <FormFieldWrapper htmlFor="verify-beginTime" label="Başlangıç (TR saati)" error={timeErrors["verify-beginTime"]}>
-                        <Input
-                          id="verify-beginTime"
-                          type="time"
-                          step={60}
-                          value={verifyPlan.beginTime.slice(0, 5)}
-                          onChange={(e) =>
-                            setVerifyPlan((p) => ({
-                              ...p,
-                              beginTime: e.target.value,
-                            }))
-                          }
-                        />
-                      </FormFieldWrapper>
-                      <FormFieldWrapper htmlFor="verify-endTime" label="Bitiş (TR saati)" error={timeErrors["verify-endTime"]}>
-                        <Input
-                          id="verify-endTime"
-                          type="time"
-                          step={60}
-                          value={verifyPlan.endTime.slice(0, 5)}
-                          onChange={(e) =>
-                            setVerifyPlan((p) => ({
-                              ...p,
-                              endTime: e.target.value,
-                            }))
-                          }
-                        />
-                      </FormFieldWrapper>
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="verify-mode" className="text-xs">Doğrulama Modu</Label>
-                      <Select
-                        disabled={isSubmitting || saved}
-                        value={verifyPlan.verifyMode}
-                        onValueChange={(v) =>
-                          setVerifyPlan((p) => ({ ...p, verifyMode: v }))
-                        }
-                      >
-                        <SelectTrigger id="verify-mode">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {VERIFY_MODES.map((m) => (
-                            <SelectItem key={m.value} value={m.value}>
-                              {m.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
+                  <DoorVerifyPlanSection verifyPlan={verifyPlan} setVerifyPlan={setVerifyPlan} isSubmitting={isSubmitting} saved={saved} timeErrors={timeErrors} />
                 </>
               )}
             </div>
 
           </fieldset>
-          {saved && (
-            <div className="mb-4 space-y-2 rounded-md border p-3" role="status" aria-live="polite">
-              <StatusBadge tone="success">Kaydedildi</StatusBadge>
-              <p className="text-sm">Ayarlar veritabanına kaydedildi.</p>
-              {planResults.map((result) => (
-                <div key={result.key} className="space-y-1">
-                  <StatusBadge tone={result.ok ? "success" : "warning"}>
-                    {result.key === "status" ? "Kapı durum planı" : "Doğrulama planı"}
-                    {result.ok ? ": Cihaza uygulandı" : ": Cihaza uygulanamadı"}
-                  </StatusBadge>
-                  {!result.ok && <p className="text-sm">{errorMessage(result.error || "Cihazdan başarılı sonuç alınamadı; cihazdaki durum doğrulanamadı.")}</p>}
-                </div>
-              ))}
-              {isSubmitting && <p className="text-sm">Planlar cihaza gönderiliyor…</p>}
-            </div>
-          )}
+          {saved && <DoorSaveResults planResults={planResults} isSubmitting={isSubmitting} />}
           <DialogFooter>
             <Button
               type="button"

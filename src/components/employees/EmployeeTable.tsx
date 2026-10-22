@@ -1,17 +1,14 @@
-import { EmployeeSyncConfirmDialog } from "./EmployeeSyncConfirmDialog";
+import { EmployeeSelectAll } from "./table/EmployeeSelectAll";
+import { EmployeeSortColumn } from "./table/EmployeeSortColumn";
 import { departmentPath } from "./lib/departmentPath";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { errorMessage, notify } from "@/lib/notify";
-
 import { useState } from "react";
 import { useMutation, useAction, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-
 import type { EmploymentEmployee as Employee } from "./lib/employment";
-import { EmployeeEmploymentBadge } from "./EmployeeEmploymentBadge";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -19,17 +16,15 @@ import {
   TableBody,
   TableRow,
   TableHead,
-  TableCell,
 } from "@/components/ui/table";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useEmployeeTable } from "@/hooks/useEmployeeTable";
-import { EmployeeBulkActions } from "./EmployeeBulkActions";
-import { BatchCardAssignDialog } from "./import/BatchCardAssignDialog";
-import { EmployeeDeleteDialog } from "./EmployeeDeleteDialog";
-import { EmployeePasswordResetDialog } from "./EmployeePasswordResetDialog";
-import { RowActions } from "@/components/shared/RowActions";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-
+import { EmployeeTableRow } from "./table/EmployeeTableRow";
+import { EmployeeTableDialogs } from "./table/EmployeeTableDialogs";
+import { EmployeeTableBulkSelection } from "./table/EmployeeTableBulkSelection";
+import {
+  selectedEmployeeNames,
+  employeeSelectionState,
+} from "./table/employeeTableModel";
 interface EmployeeTableProps {
   employees: Employee[];
   sort?: string;
@@ -49,11 +44,16 @@ export default function EmployeeTable({
   showDepartment = true,
 }: EmployeeTableProps) {
   const { isAdmin, projectId } = useActiveProjectScope();
-  const [syncRequest, setSyncRequest] = useState<{ employees: Employee[]; retry?: boolean } | null>(null);
+  const [syncRequest, setSyncRequest] = useState<{
+    employees: Employee[];
+    retry?: boolean;
+  } | null>(null);
   const [failedSyncIds, setFailedSyncIds] = useState<Id<"employees">[]>([]);
   const [syncReport, setSyncReport] = useState<string[]>([]);
   // Diyalog açıldığı andaki seçim; canlı filtre her render'da yeni dizi üretip diyalogun efektini sıfırlar.
-  const [cardAssignEmployees, setCardAssignEmployees] = useState<Employee[] | null>(null);
+  const [cardAssignEmployees, setCardAssignEmployees] = useState<
+    Employee[] | null
+  >(null);
   const [selectedEmployeeForReset, setSelectedEmployeeForReset] =
     useState<Employee | null>(null);
   const [showPasswordResetDialog, setShowPasswordResetDialog] = useState(false);
@@ -89,7 +89,10 @@ export default function EmployeeTable({
           `${employee.firstName} ${employee.lastName} — ${result.synced} cihaza gönderildi.`,
         );
       } else if (result.errors.length > 0) {
-        notify.error("Cihaza gönderilemedi", "Teknik ayrıntıları gönderim sonucunda inceleyebilirsiniz.");
+        notify.error(
+          "Cihaza gönderilemedi",
+          "Teknik ayrıntıları gönderim sonucunda inceleyebilirsiniz.",
+        );
       } else {
         notify.info(
           "Bilgi",
@@ -98,11 +101,11 @@ export default function EmployeeTable({
       }
     } catch (err) {
       setFailedSyncIds([empId]);
-      setSyncReport([
+      setSyncReport(["Cihaza gönderilemedi", errorMessage(err)]);
+      notify.error(
         "Cihaza gönderilemedi",
-        errorMessage(err),
-      ]);
-      notify.error("Cihaza gönderilemedi", "Teknik ayrıntıları gönderim sonucunda inceleyebilirsiniz.");
+        "Teknik ayrıntıları gönderim sonucunda inceleyebilirsiniz.",
+      );
     }
   });
   const handleSyncToDevice = syncAction.run;
@@ -196,7 +199,10 @@ export default function EmployeeTable({
         `${totalSynced} cihaza gönderildi${totalFailed > 0 ? `, ${totalFailed} hata` : ""}.`,
       );
     } else if (allErrors.length > 0) {
-      notify.error("Cihaza gönderilemedi", "Teknik ayrıntıları gönderim sonucunda inceleyebilirsiniz.");
+      notify.error(
+        "Cihaza gönderilemedi",
+        "Teknik ayrıntıları gönderim sonucunda inceleyebilirsiniz.",
+      );
     } else {
       notify.info("Bilgi", "Seçili çalışanlar için bağlı cihaz bulunamadı.");
     }
@@ -204,48 +210,29 @@ export default function EmployeeTable({
   const handleBulkSyncToDevices = bulkSyncAction.run;
 
   const column = (key: string, label: string, className?: string) => (
-    <TableHead
+    <EmployeeSortColumn
+      columnKey={key}
+      label={label}
       className={className}
-      aria-sort={
-        sort.startsWith(`${key}:`)
-          ? sort.endsWith(":desc")
-            ? "descending"
-            : "ascending"
-          : "none"
-      }
-    >
-      <button
-        type="button"
-        className="min-h-9 text-left"
-        onClick={() =>
-          onSortChange?.(`${key}:${sort === `${key}:asc` ? "desc" : "asc"}`)
-        }
-      >
-        {label}
-        {sort.startsWith(`${key}:`)
-          ? sort.endsWith(":desc")
-            ? " ↓"
-            : " ↑"
-          : ""}
-      </button>
-    </TableHead>
+      sort={sort}
+      onSortChange={onSortChange}
+    />
   );
   return (
-    <div className={isAdmin && selectedEmployees.length > 0 ? "space-y-4 pb-[calc(40vh+2rem)]" : "space-y-4"}>
+    <div
+      className={
+        isAdmin && selectedEmployees.length > 0
+          ? "space-y-4 pb-[calc(40vh+2rem)]"
+          : "space-y-4"
+      }
+    >
       {isAdmin && selectedEmployees.length > 0 && (
-        <div className="fixed bottom-4 left-4 right-4 z-40 max-h-[40vh] overflow-y-auto rounded-md border bg-background shadow-lg md:left-auto md:max-w-3xl">
-        <EmployeeBulkActions
+        <EmployeeTableBulkSelection
           onClear={() => {
             if (!departmentPending && !isBulkSyncing && !syncAction.pending)
               clearSelection();
           }}
-          names={employees
-            .filter((emp) => selectedEmployees.includes(emp._id))
-            .map(
-              (emp) =>
-                `${emp.firstName} ${emp.lastName} (${emp.payrollCode || "Bordro kodu yok"})`,
-            )
-            .join(", ")}
+          names={selectedEmployeeNames(employees, selectedEmployees)}
           selectedCount={selectedEmployees.length}
           departments={allDepartments.map((d) => ({
             _id: d._id,
@@ -256,13 +243,20 @@ export default function EmployeeTable({
           onUpdateDepartment={handleBulkDepartmentUpdate}
           onDelete={() => setShowDeleteDialog(true)}
           onSyncToDevices={() => {
-            setSyncRequest({ employees: employees.filter(emp => selectedEmployees.includes(emp._id)) });
+            setSyncRequest({
+              employees: employees.filter((emp) =>
+                selectedEmployees.includes(emp._id),
+              ),
+            });
           }}
-          onAssignCards={() => setCardAssignEmployees(employees.filter((emp) => selectedEmployees.includes(emp._id)))}
+          onAssignCards={() =>
+            setCardAssignEmployees(
+              employees.filter((emp) => selectedEmployees.includes(emp._id)),
+            )
+          }
           isSyncing={isBulkSyncing || syncAction.pending}
           pending={departmentPending || isBulkSyncing || syncAction.pending}
         />
-        </div>
       )}
 
       {syncReport.length > 0 && (
@@ -275,12 +269,24 @@ export default function EmployeeTable({
             Gönderim sonucu cihazda doğrulandığı anlamına gelmez.
           </p>
           <p>{syncReport[0]}</p>
-          {syncReport.length > 1 && <details><summary className="cursor-pointer">Teknik ayrıntı</summary>{syncReport.slice(1).map((line, index) => <p key={index}>{line}</p>)}</details>}
+          {syncReport.length > 1 && (
+            <details>
+              <summary className="cursor-pointer">Teknik ayrıntı</summary>
+              {syncReport.slice(1).map((line, index) => (
+                <p key={index}>{line}</p>
+              ))}
+            </details>
+          )}
           {failedSyncIds.length > 0 && (
             <Button
               disabled={bulkSyncAction.pending}
               onClick={() => {
-                setSyncRequest({ employees: employees.filter(emp => failedSyncIds.includes(emp._id)), retry: true });
+                setSyncRequest({
+                  employees: employees.filter((emp) =>
+                    failedSyncIds.includes(emp._id),
+                  ),
+                  retry: true,
+                });
               }}
             >
               Başarısız kişileri yeniden gönder
@@ -292,29 +298,16 @@ export default function EmployeeTable({
         <Table className="w-full table-fixed text-xs">
           <TableHeader>
             <TableRow className="h-9 bg-muted/50">
-              <TableHead className="w-11 px-2">
-                <Checkbox
-                  aria-label="Bu sayfadaki personeli seç"
-                  className="data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-primary-foreground data-[state=indeterminate]:before:absolute data-[state=indeterminate]:before:inset-x-[3px] data-[state=indeterminate]:before:top-1/2 data-[state=indeterminate]:before:h-0.5 data-[state=indeterminate]:before:-translate-y-1/2 data-[state=indeterminate]:before:bg-current data-[state=indeterminate]:before:content-[''] [&[data-state=indeterminate]_svg]:hidden"
-                  disabled={
-                    !isAdmin ||
-                    departmentPending ||
-                    isBulkSyncing ||
-                    syncAction.pending
-                  }
-                  checked={
-                    employees.length > 0 &&
-                    employees.every((emp) =>
-                      selectedEmployees.includes(emp._id),
-                    )
-                      ? true
-                      : employees.some((emp) => selectedEmployees.includes(emp._id))
-                        ? "indeterminate"
-                        : false
-                  }
-                  onCheckedChange={(checked) => handleSelectAll(checked === true)}
-                />
-              </TableHead>
+              <EmployeeSelectAll
+                disabled={
+                  !isAdmin ||
+                  departmentPending ||
+                  isBulkSyncing ||
+                  syncAction.pending
+                }
+                checked={employeeSelectionState(employees, selectedEmployees)}
+                onSelectAll={handleSelectAll}
+              />
               {column("name", "Ad soyad")}
               {column("email", "E-posta", "hidden min-[1100px]:table-cell")}
               {showDepartment &&
@@ -333,161 +326,48 @@ export default function EmployeeTable({
           </TableHeader>
           <TableBody>
             {sortedEmployees.map((employee) => (
-              <TableRow key={employee._id} className="h-[42px]">
-                <TableCell className="px-2 py-0">
-                  <Checkbox
-                    aria-label={`${employee.firstName} ${employee.lastName} seç`}
-                    disabled={
-                      !isAdmin ||
-                      departmentPending ||
-                      isBulkSyncing ||
-                      syncAction.pending
-                    }
-                    checked={selectedEmployees.includes(employee._id)}
-                    onCheckedChange={(checked) =>
-                      handleSelectEmployee(checked === true, employee._id)
-                    }
-                  />
-                </TableCell>
-                <TableCell className="px-2 py-1">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <Avatar className="hidden h-7 w-7 shrink-0 min-[760px]:flex">
-                      <AvatarImage src={employee.photoUrl ?? ""} alt="" />
-                      <AvatarFallback>
-                        {employee.firstName[0]}
-                        {employee.lastName[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <button
-                        type="button"
-                        className="max-w-full truncate text-left font-medium hover:underline"
-                        onClick={() => onViewDetails(employee)}
-                      >
-                        {employee.firstName} {employee.lastName}
-                      </button>
-                      <p className="truncate text-[11px] text-muted-foreground min-[760px]:hidden">
-                        {[
-                          showDepartment &&
-                            (employee.departments?.name ?? "Atanmamış"),
-                          employee.payrollCode,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </p>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="hidden truncate min-[1100px]:table-cell">
-                  {employee.email}
-                </TableCell>
-                {showDepartment && (
-                  <TableCell className="hidden truncate min-[760px]:table-cell">
-                    {employee.departments?.name ?? "Atanmamış"}
-                  </TableCell>
-                )}
-                <TableCell className="hidden truncate min-[1100px]:table-cell">
-                  {employee.positions?.name ?? "—"}
-                </TableCell>
-                <TableCell className="hidden truncate tabular-nums min-[760px]:table-cell">
-                  {employee.cardNumber || "—"}
-                </TableCell>
-                <TableCell className="px-1 py-0">
-                  <EmployeeEmploymentBadge employee={employee} />
-                </TableCell>
-                <TableCell className="px-0 py-0">
-                  <div className="max-[759px]:[&_button]:h-11 max-[759px]:[&_button]:w-11">
-                    <RowActions
-                      label={`${employee.firstName} ${employee.lastName} işlemleri`}
-                    >
-                      <DropdownMenuItem
-                        onSelect={() => onViewDetails(employee)}
-                      >
-                        {isAdmin ? "Düzenle" : "Ayrıntı"}
-                      </DropdownMenuItem>
-                      {isAdmin && (
-                        <>
-                          <DropdownMenuItem
-                            disabled={
-                              syncAction.pending || bulkSyncAction.pending
-                            }
-                            onSelect={() => {
-                              setSyncRequest({ employees: [employee] });
-                            }}
-                          >
-                            Cihazlara gönder
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={() => handlePasswordResetClick(employee)}
-                          >
-                            Mobil giriş bağlantısı gönder
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onSelect={() =>
-                              handleIndividualDeleteClick(employee)
-                            }
-                          >
-                            Sil
-                          </DropdownMenuItem>
-                        </>
-                      )}
-                    </RowActions>
-                  </div>
-                </TableCell>
-              </TableRow>
+              <EmployeeTableRow
+                key={employee._id}
+                employee={employee}
+                isAdmin={isAdmin}
+                departmentPending={departmentPending}
+                isBulkSyncing={isBulkSyncing}
+                syncPending={syncAction.pending}
+                bulkSyncPending={bulkSyncAction.pending}
+                selectedEmployees={selectedEmployees}
+                handleSelectEmployee={handleSelectEmployee}
+                onViewDetails={onViewDetails}
+                showDepartment={showDepartment}
+                onSync={(employee) => setSyncRequest({ employees: [employee] })}
+                handlePasswordResetClick={handlePasswordResetClick}
+                handleIndividualDeleteClick={handleIndividualDeleteClick}
+              />
             ))}
           </TableBody>
         </Table>
       </div>
 
-      <EmployeeDeleteDialog
-        isOpen={showDeleteDialog}
-        onOpenChange={setShowDeleteDialog}
-        selectedCount={selectedEmployees.length}
-        names={employees
-          .filter((emp) => selectedEmployees.includes(emp._id))
-          .map(
-            (emp) =>
-              `${emp.firstName} ${emp.lastName} (${emp.payrollCode || "Bordro kodu yok"})`,
-          )
-          .join(", ")}
-        onConfirm={handleBulkDelete}
-      />
-
-      <EmployeeDeleteDialog
-        isOpen={showIndividualDeleteDialog}
-        onOpenChange={setShowIndividualDeleteDialog}
-        selectedCount={1}
-        names={
-          selectedEmployeeForDelete
-            ? `${selectedEmployeeForDelete.firstName} ${selectedEmployeeForDelete.lastName} (${selectedEmployeeForDelete.payrollCode || "Bordro kodu yok"})`
-            : ""
-        }
-        onConfirm={handleIndividualDeleteConfirm}
-      />
-
-      {syncRequest && <EmployeeSyncConfirmDialog employees={syncRequest.employees} onClose={() => setSyncRequest(null)} onConfirm={() => {
-        if (syncRequest.employees.length === 1 && !syncRequest.retry) void handleSyncToDevice(syncRequest.employees[0]);
-        else void handleBulkSyncToDevices(syncRequest.retry ?? false);
-        setSyncRequest(null);
-      }} />}
-
-      {cardAssignEmployees && isAdmin && projectId && (
-        <BatchCardAssignDialog
-          open
-          onOpenChange={(next) => {
-            if (!next) setCardAssignEmployees(null);
-          }}
-          projectId={projectId}
-          employees={cardAssignEmployees}
-        />
-      )}
-
-      <EmployeePasswordResetDialog
-        isOpen={showPasswordResetDialog}
-        onOpenChange={setShowPasswordResetDialog}
-        employee={selectedEmployeeForReset}
+      <EmployeeTableDialogs
+        showDeleteDialog={showDeleteDialog}
+        setShowDeleteDialog={setShowDeleteDialog}
+        selectedEmployees={selectedEmployees}
+        employees={employees}
+        handleBulkDelete={handleBulkDelete}
+        showIndividualDeleteDialog={showIndividualDeleteDialog}
+        setShowIndividualDeleteDialog={setShowIndividualDeleteDialog}
+        selectedEmployeeForDelete={selectedEmployeeForDelete}
+        handleIndividualDeleteConfirm={handleIndividualDeleteConfirm}
+        syncRequest={syncRequest}
+        setSyncRequest={setSyncRequest}
+        handleSyncToDevice={handleSyncToDevice}
+        handleBulkSyncToDevices={handleBulkSyncToDevices}
+        cardAssignEmployees={cardAssignEmployees}
+        isAdmin={isAdmin}
+        projectId={projectId}
+        setCardAssignEmployees={setCardAssignEmployees}
+        showPasswordResetDialog={showPasswordResetDialog}
+        setShowPasswordResetDialog={setShowPasswordResetDialog}
+        selectedEmployeeForReset={selectedEmployeeForReset}
       />
     </div>
   );
