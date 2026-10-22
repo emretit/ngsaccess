@@ -1,5 +1,6 @@
 "use node";
 
+import { buildDoorStatusSegments } from "../lib/doorStatusPlan";
 import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import { internalAction, type ActionCtx } from "../_generated/server";
@@ -1163,18 +1164,7 @@ export const applyDoorStatusPlan = authedAction({
         return await linkDoorStatusPlan(devIndex, doorNo, 0);
       }
 
-      // Her gün aynı segment (basit tek-aralık plan)
-      const ALL_WEEKDAYS: Weekday[] = [
-        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
-      ];
-      const segments = ALL_WEEKDAYS.map((week, idx) => ({
-        week,
-        id: idx + 1,
-        enable: true,
-        doorStatus: plan.mode as "remainOpen" | "normal",
-        beginTime: plan.beginTime,
-        endTime: plan.endTime,
-      }));
+      const segments = buildDoorStatusSegments(plan);
 
       const r1 = await setDoorStatusWeekPlan(devIndex, planNo, segments);
       if (!r1.ok) return r1;

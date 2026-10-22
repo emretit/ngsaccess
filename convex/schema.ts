@@ -1,3 +1,4 @@
+import { doorStatusPlanValidator } from "./lib/doorStatusPlan";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
@@ -286,14 +287,7 @@ export default defineSchema({
     // openDoor/setDoorParam ile tutarlı; boşsa 1 default.
     hikDoorNo: v.optional(v.number()),
     // Kapı durum planı (DoorStatusPlan) — mesai saatinde kapıyı otomatik açık/kapalı tutar.
-    hikDoorStatusPlan: v.optional(
-      v.object({
-        enabled: v.boolean(),
-        beginTime: v.string(), // "HH:MM:SS"
-        endTime: v.string(),   // "HH:MM:SS"
-        mode: v.union(v.literal("remainOpen"), v.literal("normal")),
-      })
-    ),
+    hikDoorStatusPlan: v.optional(doorStatusPlanValidator),
     // Doğrulama planı (VerifyWeekPlan) — saate göre doğrulama modunu değiştirir.
     hikVerifyPlan: v.optional(
       v.object({

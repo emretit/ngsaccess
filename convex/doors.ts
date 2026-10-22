@@ -1,3 +1,4 @@
+import { doorStatusPlanValidator, normalizeDoorStatusPlan } from "./lib/doorStatusPlan";
 
 import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
@@ -170,14 +171,7 @@ export const create = authedMutation({
       v.union(v.literal("entry"), v.literal("exit"), v.literal("both"))
     ),
     hikDoorNo: v.optional(v.number()),
-    hikDoorStatusPlan: v.optional(
-      v.object({
-        enabled: v.boolean(),
-        beginTime: v.string(),
-        endTime: v.string(),
-        mode: v.union(v.literal("remainOpen"), v.literal("normal")),
-      })
-    ),
+    hikDoorStatusPlan: v.optional(doorStatusPlanValidator),
     hikVerifyPlan: v.optional(
       v.object({
         enabled: v.boolean(),
@@ -216,9 +210,11 @@ export const create = authedMutation({
         throw new ConvexError("Seçilen cihaz bu kapının projesinde değil");
       }
     }
+    const hikDoorStatusPlan = args.hikDoorStatusPlan ? normalizeDoorStatusPlan(args.hikDoorStatusPlan) : undefined;
     const now = new Date().toISOString();
     const doorId = await ctx.db.insert("doors", {
       ...args,
+      hikDoorStatusPlan,
       projectId,
       status: args.status ?? "active",
       createdAt: now,
@@ -264,14 +260,7 @@ export const update = authedMutation({
       v.union(v.literal("entry"), v.literal("exit"), v.literal("both"))
     ),
     hikDoorNo: v.optional(v.number()),
-    hikDoorStatusPlan: v.optional(
-      v.object({
-        enabled: v.boolean(),
-        beginTime: v.string(),
-        endTime: v.string(),
-        mode: v.union(v.literal("remainOpen"), v.literal("normal")),
-      })
-    ),
+    hikDoorStatusPlan: v.optional(doorStatusPlanValidator),
     hikVerifyPlan: v.optional(
       v.object({
         enabled: v.boolean(),
@@ -301,6 +290,7 @@ export const update = authedMutation({
       }
     }
     const { doorId, ...updates } = args;
+    if (updates.hikDoorStatusPlan) updates.hikDoorStatusPlan = normalizeDoorStatusPlan(updates.hikDoorStatusPlan);
     const now = new Date().toISOString();
     await ctx.db.patch(doorId, { ...updates, updatedAt: now });
     if (args.hikDoorNo !== undefined) {

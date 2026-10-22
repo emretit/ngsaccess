@@ -1,3 +1,5 @@
+import { DoorStatusPlanEditor } from "./DoorStatusPlanEditor";
+import { normalizeDoorStatusPlan, type DoorStatusPlan } from "../../../convex/lib/doorStatusPlan";
 import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { useState } from "react";
@@ -43,12 +45,7 @@ export type DoorForEdit = {
   name: string;
   doorCode?: string;
   hikDoorNo?: number;
-  hikDoorStatusPlan?: {
-    enabled: boolean;
-    beginTime: string;
-    endTime: string;
-    mode: "remainOpen" | "normal";
-  };
+  hikDoorStatusPlan?: DoorStatusPlan;
   hikVerifyPlan?: {
     enabled: boolean;
     beginTime: string;
@@ -66,12 +63,7 @@ interface EditDoorDialogProps {
 }
 
 // hikDoorStatusPlan form state tipi — schema shape ile birebir
-type DoorStatusPlanState = {
-  enabled: boolean;
-  beginTime: string;
-  endTime: string;
-  mode: "remainOpen" | "normal";
-};
+type DoorStatusPlanState = DoorStatusPlan;
 
 // hikVerifyPlan form state tipi — schema shape ile birebir
 type VerifyPlanState = {
@@ -127,14 +119,7 @@ export function EditDoorDialog({
   );
 
   const [statusPlan, setStatusPlan] = useState<DoorStatusPlanState>(
-    door.hikDoorStatusPlan
-      ? {
-          enabled: door.hikDoorStatusPlan.enabled,
-          beginTime: door.hikDoorStatusPlan.beginTime.slice(0, 5),
-          endTime: door.hikDoorStatusPlan.endTime.slice(0, 5),
-          mode: door.hikDoorStatusPlan.mode,
-        }
-      : DEFAULT_STATUS_PLAN
+    door.hikDoorStatusPlan ?? DEFAULT_STATUS_PLAN
   );
 
   const [verifyPlan, setVerifyPlan] = useState<VerifyPlanState>(
@@ -177,11 +162,7 @@ export function EditDoorDialog({
       name: name.trim(),
       doorCode: doorCode.trim() || undefined,
       hikDoorNo: parsedDoorNo,
-      hikDoorStatusPlan: showHikSection ? {
-        ...statusPlan,
-        beginTime: `${statusPlan.beginTime}:00`,
-        endTime: `${statusPlan.endTime}:00`,
-      } : undefined,
+      hikDoorStatusPlan: showHikSection ? normalizeDoorStatusPlan(statusPlan) : undefined,
       hikVerifyPlan: showHikSection ? {
         ...verifyPlan,
         beginTime: `${verifyPlan.beginTime}:00`,
@@ -206,7 +187,7 @@ export function EditDoorDialog({
   }, { error: "Planlar gönderilemedi" });
   const isSubmitting = saveAction.pending || retryAction.pending;
 
-  const guard = useUnsavedChangesGuard(open && (!saved && (name !== door.name || doorCode !== (door.doorCode ?? "") || hikDoorNo !== (door.hikDoorNo !== undefined ? String(door.hikDoorNo) : "") || JSON.stringify(statusPlan) !== JSON.stringify(door.hikDoorStatusPlan ? { ...door.hikDoorStatusPlan, beginTime: door.hikDoorStatusPlan.beginTime.slice(0, 5), endTime: door.hikDoorStatusPlan.endTime.slice(0, 5) } : DEFAULT_STATUS_PLAN) || JSON.stringify(verifyPlan) !== JSON.stringify(door.hikVerifyPlan ? { ...door.hikVerifyPlan, beginTime: door.hikVerifyPlan.beginTime.slice(0, 5), endTime: door.hikVerifyPlan.endTime.slice(0, 5) } : DEFAULT_VERIFY_PLAN))));
+  const guard = useUnsavedChangesGuard(open && (!saved && (name !== door.name || doorCode !== (door.doorCode ?? "") || hikDoorNo !== (door.hikDoorNo !== undefined ? String(door.hikDoorNo) : "") || JSON.stringify(statusPlan) !== JSON.stringify(door.hikDoorStatusPlan ?? DEFAULT_STATUS_PLAN) || JSON.stringify(verifyPlan) !== JSON.stringify(door.hikVerifyPlan ? { ...door.hikVerifyPlan, beginTime: door.hikVerifyPlan.beginTime.slice(0, 5), endTime: door.hikVerifyPlan.endTime.slice(0, 5) } : DEFAULT_VERIFY_PLAN))));
   const close = () => { if (!isSubmitting) guard.requestClose(() => onOpenChange(false)); };
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -224,7 +205,8 @@ export function EditDoorDialog({
     }
     const errors: Record<string, string> = {};
     if (showHikSection) {
-      for (const [key, plan] of [["status", statusPlan], ["verify", verifyPlan]] as const) {
+      try { normalizeDoorStatusPlan(statusPlan); } catch (error: unknown) { errors["status-plan"] = errorMessage(error); }
+      for (const [key, plan] of [["verify", verifyPlan]] as const) {
         const result = doorPlanTimeSchema.safeParse({
           beginTime: plan.beginTime,
           endTime: plan.endTime,
@@ -327,56 +309,9 @@ export function EditDoorDialog({
                         }
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <FormFieldWrapper htmlFor="status-beginTime" label="Başlangıç (TR saati)" error={timeErrors["status-beginTime"]}>
-                        <Input
-                          id="status-beginTime"
-                          type="time"
-                          step={60}
-                          value={statusPlan.beginTime.slice(0, 5)}
-                          onChange={(e) =>
-                            setStatusPlan((p) => ({
-                              ...p,
-                              beginTime: e.target.value,
-                            }))
-                          }
-                        />
-                      </FormFieldWrapper>
-                      <FormFieldWrapper htmlFor="status-endTime" label="Bitiş (TR saati)" error={timeErrors["status-endTime"]}>
-                        <Input
-                          id="status-endTime"
-                          type="time"
-                          step={60}
-                          value={statusPlan.endTime.slice(0, 5)}
-                          onChange={(e) =>
-                            setStatusPlan((p) => ({
-                              ...p,
-                              endTime: e.target.value,
-                            }))
-                          }
-                        />
-                      </FormFieldWrapper>
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="status-mode" className="text-xs">Mod</Label>
-                      <Select
-                        disabled={isSubmitting || saved}
-                        value={statusPlan.mode}
-                        onValueChange={(v) =>
-                          setStatusPlan((p) => ({
-                            ...p,
-                            mode: v as "remainOpen" | "normal",
-                          }))
-                        }
-                      >
-                        <SelectTrigger id="status-mode">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="remainOpen">Sürekli Açık</SelectItem>
-                          <SelectItem value="normal">Normal</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div id="status-plan" tabIndex={-1} role="group" aria-label="Kapı durum planı aralıkları" aria-invalid={!!timeErrors["status-plan"]} aria-describedby={timeErrors["status-plan"] ? "status-plan-error" : undefined}>
+                      <DoorStatusPlanEditor value={statusPlan} onChange={setStatusPlan} />
+                      {timeErrors["status-plan"] && <p id="status-plan-error" className="mt-2 text-xs text-destructive">{timeErrors["status-plan"]}</p>}
                     </div>
                   </div>
 
