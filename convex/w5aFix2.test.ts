@@ -76,4 +76,5 @@ it("W5-A fix2: yıllık 20002 okuma tek yüklenir, ek sorgular yalnız sınır g
       expect(reused.readings).toEqual(direct.readings);
     });
   } finally { vi.useRealTimers(); }
-});
+  // 20002 okumalık yük testi: tam koşuda paralel yük altında 5 sn varsayılanı aşabiliyor (tek başına ~4 sn).
+}, 30_000);
