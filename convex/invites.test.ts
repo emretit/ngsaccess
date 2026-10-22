@@ -63,6 +63,7 @@ function makeQuery(records: Record<string, unknown>[]) {
       return result;
     },
     first: async () => rows()[0] ?? null,
+    unique: async () => rows()[0] ?? null,
     take: async (limit: number) => rows().slice(0, limit),
     collect: async () => rows(),
     async *[Symbol.asyncIterator]() { yield* rows(); },
@@ -246,7 +247,7 @@ describe('invites.claimSetupAccount', () => {
     expect(f.user().setupToken).toBeUndefined();
     expect(f.user().tokenExpiresAt).toBeUndefined();
     await handler(f.mutationCtx, args);
-    expect(f.user()).toMatchObject({ role: 'project_admin', verified: true });
+    expect(f.user()).toMatchObject({ role: 'project_user', verified: true });
     expect(f.memberships).toContainEqual(expect.objectContaining({ userId, projectId }));
   });
   it('does not change credentials or invalidate sessions if the account becomes protected before reset', async () => {
@@ -327,10 +328,10 @@ describe('invites.consume authorization and global role protection', () => {
     expect(f.patch.mock.calls.filter(([id]) => id === userId).every(([, patch]) => !('role' in patch))).toBe(true);
     expect(f.invite().used).toBe(true);
   });
-  it.each(['project_admin', 'project_user'] as const)('assigns %s only to an unverified, roleless, membership-free setup account', async (role) => {
+  it.each(['project_admin', 'project_user'] as const)('keeps a fresh account normal for project invite %s', async (role) => {
     const f = fixture({ user: { verified: false, role: undefined, setupToken: 'old-token' }, invite: { role } });
     await handler(f.ctx, args);
-    expect(f.user()).toMatchObject({ role, verified: true });
+    expect(f.user()).toMatchObject({ role: "project_user", verified: true });
     expect(f.user().setupToken).toBeUndefined();
     expect(f.memberships).toHaveLength(1);
   });
@@ -447,9 +448,15 @@ describe('invites.create internal authorization', () => {
     expect(f.inserted[0]).toMatchObject({ email: 'new.user@example.test', createdBy: f.callerId });
     expect(limiter.limit).toHaveBeenCalledWith(f.ctx, 'inviteCreate', { key: f.callerId, throws: true });
   });
-  it('allows the project owner', async () => {
-    const f = createFixture({ caller: { role: 'project_user' }, owner: attackerId });
-    await expect(createHandler(f.ctx, input(f.callerId))).resolves.toEqual(expect.any(String));
+  it('rejects a project owner without the admin.manage role (ownership alone is not a permission)', async () => {
+    const f = createFixture({ caller: { role: 'project_user' }, owner: attackerId, memberships: [projectId] });
+    await expect(createHandler(f.ctx, input(f.callerId))).rejects.toThrow('yetkin yok');
+    expect(f.inserted).toHaveLength(0);
+  });
+  it('stores legacy invite roles as project roles', async () => {
+    const f = createFixture();
+    await createHandler(f.ctx, input(f.callerId));
+    expect(f.inserted[0]).toMatchObject({ role: 'viewer' });
   });
   it('allows a project_admin who belongs to the project', async () => {
     const f = createFixture({ caller: { role: 'project_admin' }, memberships: [projectId] });

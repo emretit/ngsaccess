@@ -18,12 +18,12 @@ import {
 } from "./lib/leaveState";
 export function LeaveDetails({
   row,
-  isAdmin,
+  canManage,
   onClose,
   onEdit,
 }: {
   row: LeaveRow | null;
-  isAdmin: boolean;
+  canManage: boolean;
   onClose: () => void;
   onEdit: (row: LeaveRow) => void;
 }) {
@@ -114,7 +114,7 @@ export function LeaveDetails({
               </p>
             </div>
             <div className="mt-auto flex flex-wrap gap-2 pt-4">
-              {isAdmin && row.status === "approved" && !row.employeeMissing && (
+              {canManage && row.status === "approved" && !row.employeeMissing && (
                 <Button onClick={() => onEdit(row)}>Düzenle</Button>
               )}
               <Button variant="outline" asChild>

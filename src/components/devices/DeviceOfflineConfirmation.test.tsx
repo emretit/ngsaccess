@@ -1,3 +1,4 @@
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, loading: false }) }));
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
@@ -6,7 +7,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { DeviceCommandCenter } from "./DeviceCommandCenter";
 const mocks = vi.hoisted(() => ({ device: {} as Device, destructive: false }));
 vi.mock("convex/react", () => ({ useQuery: () => ({ device: mocks.device, doors: [], readers: [], capabilities: null, recentEvents: [], queues: { hikvision: { pending: { count: 0 }, processing: { count: 0 }, failed: { count: 0 } }, ideSmart: { pending: { count: 0 }, sent: { count: 0 }, failed: { count: 0 } } } }) }));
-vi.mock("@/hooks/useProjectAccess", () => ({ useProjectAccess: () => ({ isAdmin: true }) }));
+vi.mock("@/hooks/useProjectAccess", () => ({ useProjectAccess: () => ({ canManage: true }) }));
 vi.mock("./useDeviceCommands", () => ({ useDeviceCommands: () => ({ pendingAction: { title: "Onay", description: "İşlem etkisi", destructive: mocks.destructive }, pending: false, setPendingAction: vi.fn(), runConfirmed: vi.fn(), longRunning: false }) }));
 vi.mock("./DeviceActionsSection", () => ({ DeviceActionsSection: () => null }));
 vi.mock("./DeviceConnectionSection", () => ({ DeviceConnectionSection: () => null }));

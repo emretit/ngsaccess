@@ -6,7 +6,7 @@ import { v } from "convex/values";
 import type { GenericActionCtx } from "convex/server";
 import type { DataModel } from "../_generated/dataModel";
 import { authedAction } from "../lib/customFunctions";
-import { isProjectAllowed, isManager } from "../lib/auth";
+import { isProjectAllowed } from "../lib/auth";
 import type { Id } from "../_generated/dataModel";
 import { buildIdePermissionRecord, capPermissionNos, outOfRangeIoIds } from "../ideSync";
 
@@ -103,7 +103,7 @@ async function loadIdePanel(
  *
  * Scheduler'dan/UI mutation'larından tetiklendiği için internalAction (authedAction
  * scheduler context'inde auth identity olmadığından throw ederdi). Yetki, tetikleyen
- * mutation'da (adminMutation) zaten denetlenmiştir.
+ * mutation'da (authorized mutation) zaten denetlenmiştir.
  */
 export const syncEmployeeToIdePanels = internalAction({
   args: { employeeId: v.id("employees"), runId: v.optional(v.id("deviceSyncRuns")), targetDeviceIds: v.optional(v.array(v.id("devices"))) },
@@ -387,6 +387,8 @@ export const openIdeDoor = authedAction({
     const loaded = await loadIdePanel(ctx, args.deviceId);
     if ("error" in loaded) return { ok: false, error: loaded.error };
     const { device } = loaded;
+    const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: device.projectId, permission: "doors.open" });
+    if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
 
     const door = await ctx.runQuery(internal.doors.getByIdInternal, {
       id: args.doorId,
@@ -423,7 +425,8 @@ export const triggerPanelSync = authedAction({
     const loaded = await loadIdePanel(ctx, args.deviceId);
     if ("error" in loaded) return { ok: false, error: loaded.error };
     const { device } = loaded;
-    if (!isManager(ctx.user)) return { ok: false, error: "Bu işlem için yönetici yetkisi gerekiyor" };
+    const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: device.projectId, permission: "devices.manage" });
+    if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
     if (!device.ideUuid) {
       return { ok: false, error: "Panel UUID tanımsız" };
     }

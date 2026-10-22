@@ -1,26 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { capabilities } from "./capabilities";
-describe("sayfa ve işlem yetenekleri", () => {
-  it.each([undefined, "project_user", "unknown"])("%s yetkisiz yönetim sorgularını açmaz", role => {
-    const result = capabilities(role);
-    expect(result.settingsTabs).toEqual([]);
-    expect(result.admin).toBe(false);
-    expect(result.manageUsers).toBe(false);
-    expect(result.auditLog).toBe(false);
+import { permissionCapabilities } from "./capabilities";
+describe("permission capabilities", () => {
+  it("legacy admin metadata cannot open management without permissions", () => {
+    expect(permissionCapabilities(() => false, "project_admin")).toMatchObject({ admin: false, settingsTabs: [], manageUsers: false });
   });
-  it("proje yöneticisi davet eder, rol ve üyelik değiştiremez", () => {
-    const result = capabilities("project_admin");
-    expect(result.inviteUsers).toBe(true);
-    expect(result.manageUsers).toBe(false);
-    expect(result.systemAdmin).toBe(false);
-    expect(result.auditLog).toBe(true);
-    expect(result.settingsTabs).toEqual(["general", "users", "work-payroll", "reports", "integrations", "privacy", "notifications"]);
-  });
-  it("süper admin tüm sekme ve işlemlere erişir", () => {
-    const result = capabilities("super_admin");
-    expect(result.settingsTabs).toHaveLength(8);
-    expect(result.settingsTabs).toContain("mail");
-    expect(result.manageUsers).toBe(true);
-    expect(result.systemAdmin).toBe(true);
+  it("project management and platform management are independent", () => {
+    expect(permissionCapabilities(p => p === "admin.manage", "admin")).toMatchObject({ inviteUsers: true, manageUsers: false });
+    expect(permissionCapabilities(() => true, "super_admin").settingsTabs).toHaveLength(9);
   });
 });

@@ -3,8 +3,8 @@ import { internal } from "./_generated/api";
 import { planNextWake, relayConfig } from "./lib/hikWake";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { adminMutation, adminQuery } from "./lib/customFunctions";
-import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
+import { authedMutation, authedQuery } from "./lib/customFunctions";
+import { requirePermission } from "./lib/permissions";
 
 /**
  * Köprü token yönetimi (hikBridges) + relay uyandırması.
@@ -35,23 +35,11 @@ export async function scheduleBridgeWakeForProject(
 // Admin: bridge token yönetimi (ngsplus ayarları)
 // ────────────────────────────────────────────────────────────
 
-async function assertProjectAccess(
-  ctx: { user: { role?: string }; db: unknown },
-  getAllowed: () => Promise<Id<"projects">[]>,
-  projectId: Id<"projects">,
-) {
-  if (ctx.user.role === "super_admin") return;
-  const allowed = await getAllowed();
-  if (!isProjectAllowed(allowed, projectId)) {
-    throw new Error("Bu projeye erişim yetkiniz yok");
-  }
-}
-
-export const createBridge = adminMutation({
+export const createBridge = authedMutation({
   args: { projectId: v.id("projects"), name: v.optional(v.string()) },
   returns: v.object({ token: v.string(), bridgeId: v.id("hikBridges") }),
   handler: async (ctx, args) => {
-    await assertProjectAccess(ctx, () => getProjectIdsForUser(ctx), args.projectId);
+    await requirePermission(ctx, ctx.user, args.projectId, "devices.manage");
     const token = crypto.randomUUID();
     const bridgeId = await ctx.db.insert("hikBridges", {
       projectId: args.projectId,
@@ -63,10 +51,10 @@ export const createBridge = adminMutation({
   },
 });
 
-export const listBridges = adminQuery({
+export const listBridges = authedQuery({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
-    await assertProjectAccess(ctx, () => getProjectIdsForUser(ctx), args.projectId);
+    await requirePermission(ctx, ctx.user, args.projectId, "devices.manage");
     const bridges = await ctx.db
       .query("hikBridges")
       .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
@@ -82,12 +70,12 @@ export const listBridges = adminQuery({
   },
 });
 
-export const revokeBridge = adminMutation({
+export const revokeBridge = authedMutation({
   args: { bridgeId: v.id("hikBridges") },
   handler: async (ctx, args) => {
     const bridge = await ctx.db.get(args.bridgeId);
     if (!bridge) return;
-    await assertProjectAccess(ctx, () => getProjectIdsForUser(ctx), bridge.projectId);
+    await requirePermission(ctx, ctx.user, bridge.projectId, "devices.manage");
     await ctx.db.delete(args.bridgeId);
   },
 });

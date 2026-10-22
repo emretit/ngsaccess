@@ -1,5 +1,6 @@
+import { getProjectIdsWithPermission, hasPermission, requirePermission } from "./lib/permissions";
 import { scheduleFingerprintPurge, scheduleEmployeeCardChange } from "./lib/employeeCardChange";
-import { canSeePay, maskPay } from "./lib/payVisibility";
+import { canSeePayInProject, maskPay } from "./lib/payVisibility";
 import { claimEmployeePhoto } from "./lib/peoplePhoto";
 import { snapshotEmployeeHikDevices } from "./lib/peopleHikSnapshot";
 import { employeeRelationsToValidate, validateEmployeeRelations } from "./lib/peopleRelations";
@@ -9,8 +10,8 @@ import { assertSameProject, validatePay, employeeDependentTables, assertEmployee
 import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { authedQuery, adminMutation, adminQuery } from "./lib/customFunctions";
-import { getProjectIdsForUser, isManager } from "./lib/auth";
+import { authedQuery, authedMutation } from "./lib/customFunctions";
+import { getProjectIdsForUser } from "./lib/auth";
 import { Doc, Id } from "./_generated/dataModel";
 import { MutationCtx, QueryCtx } from "./_generated/server";
 import { cascadeRemoveEmployeePII } from "./lib/employeeCascade";
@@ -78,7 +79,9 @@ export const list = authedQuery({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
-    const projectIds = await resolveProjectScope(ctx, args.projectId);
+    await resolveProjectScope(ctx, args.projectId);
+    const allowed = await getProjectIdsWithPermission(ctx, ctx.user, "employees.view");
+    const projectIds = args.projectId ? allowed.filter(id => id === args.projectId) : allowed;
     const results = await Promise.all(projectIds.map(projectId =>
       ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", projectId)).collect(),
     ));
@@ -95,11 +98,11 @@ export const list = authedQuery({
           : null;
         return {
           ...emp,
-          terminationReason: isManager(ctx.user) ? emp.terminationReason : undefined,
-          sgkExitCode: isManager(ctx.user) ? emp.sgkExitCode : undefined,
-          terminatedBy: isManager(ctx.user) ? emp.terminatedBy : undefined,
-          hourlyRate: maskPay(emp.hourlyRate, canSeePay(ctx.user)),
-          monthlySalary: maskPay(emp.monthlySalary, canSeePay(ctx.user)),
+          terminationReason: await hasPermission(ctx, ctx.user, emp.projectId, "employees.manage") ? emp.terminationReason : undefined,
+          sgkExitCode: await hasPermission(ctx, ctx.user, emp.projectId, "employees.manage") ? emp.sgkExitCode : undefined,
+          terminatedBy: await hasPermission(ctx, ctx.user, emp.projectId, "employees.manage") ? emp.terminatedBy : undefined,
+          hourlyRate: maskPay(emp.hourlyRate, await canSeePayInProject(ctx, ctx.user, emp.projectId)),
+          monthlySalary: maskPay(emp.monthlySalary, await canSeePayInProject(ctx, ctx.user, emp.projectId)),
           departments: department
             ? { _id: department._id, name: department.name }
             : null,
@@ -112,10 +115,11 @@ export const list = authedQuery({
   },
 });
 
-export const listLightForImport = adminQuery({
+export const listLightForImport = authedQuery({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
     await resolveProjectScope(ctx, args.projectId);
+    await requirePermission(ctx, ctx.user, args.projectId, "employees.manage");
     const employees = await ctx.db.query("employees").withIndex("by_project", q => q.eq("projectId", args.projectId)).collect();
     return employees
       .filter((e) => e.isVisitor !== true)
@@ -143,18 +147,19 @@ export const getById = authedQuery({
     if (!emp.projectId && ctx.user.role !== "super_admin") {
       return null;
     }
+    await requirePermission(ctx, ctx.user, emp.projectId, "employees.view");
     return {
       ...emp,
-      terminationReason: isManager(ctx.user) ? emp.terminationReason : undefined,
-      sgkExitCode: isManager(ctx.user) ? emp.sgkExitCode : undefined,
-      terminatedBy: isManager(ctx.user) ? emp.terminatedBy : undefined,
-      hourlyRate: maskPay(emp.hourlyRate, canSeePay(ctx.user)),
-      monthlySalary: maskPay(emp.monthlySalary, canSeePay(ctx.user)),
+      terminationReason: await hasPermission(ctx, ctx.user, emp.projectId, "employees.manage") ? emp.terminationReason : undefined,
+      sgkExitCode: await hasPermission(ctx, ctx.user, emp.projectId, "employees.manage") ? emp.sgkExitCode : undefined,
+      terminatedBy: await hasPermission(ctx, ctx.user, emp.projectId, "employees.manage") ? emp.terminatedBy : undefined,
+      hourlyRate: maskPay(emp.hourlyRate, await canSeePayInProject(ctx, ctx.user, emp.projectId)),
+      monthlySalary: maskPay(emp.monthlySalary, await canSeePayInProject(ctx, ctx.user, emp.projectId)),
     };
   },
 });
 
-export const create = adminMutation({
+export const create = authedMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     firstName: v.string(),
@@ -177,6 +182,8 @@ export const create = adminMutation({
     monthlySalary: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requirePermission(ctx, ctx.user, args.projectId, "employees.manage");
+    if (args.hourlyRate !== undefined || args.monthlySalary !== undefined) await requirePermission(ctx, ctx.user, args.projectId, "pay.view");
     if (args.projectId) {
       const allowedProjectIds = await getProjectIdsForUser(ctx);
       if (!allowedProjectIds.some((id) => id === args.projectId)) {
@@ -218,7 +225,7 @@ export const create = adminMutation({
   returns: v.id("employees"),
 });
 
-export const update = adminMutation({
+export const update = authedMutation({
   args: {
     employeeId: v.id("employees"),
     projectId: v.optional(v.id("projects")),
@@ -252,6 +259,16 @@ export const update = adminMutation({
     ) {
       throw new Error("Bu çalışana erişim yetkiniz yok");
     }
+    await requirePermission(ctx, ctx.user, emp.projectId, "employees.manage");
+    if (updates.hourlyRate !== undefined || updates.monthlySalary !== undefined) {
+      await requirePermission(ctx, ctx.user, emp.projectId, "pay.view");
+      if (updates.projectId !== undefined) await requirePermission(ctx, ctx.user, updates.projectId, "pay.view");
+    }
+    // Taşıma ücreti hedef projede görünür kılar: kaynakta pay.view'si olmayan kişi ücreti taşıyarak okuyamasın.
+    if (updates.projectId !== undefined && updates.projectId !== emp.projectId && (emp.hourlyRate != null || emp.monthlySalary != null)) {
+      await requirePermission(ctx, ctx.user, emp.projectId, "pay.view");
+    }
+    if (updates.projectId !== undefined) await requirePermission(ctx, ctx.user, updates.projectId, "employees.manage");
     if (
       updates.projectId !== undefined &&
       !allowedProjectIds.some((id) => id === updates.projectId)
@@ -357,11 +374,12 @@ async function removeEmployeeWithDependencies(ctx: MutationCtx & { user: Doc<"us
     await ctx.db.delete(emp._id);
 }
 
-export const remove = adminMutation({
+export const remove = authedMutation({
   args: { employeeId: v.id("employees") },
   handler: async (ctx, args) => {
     const emp = await ctx.db.get(args.employeeId);
     if (!emp) throw new Error("Çalışan bulunamadı");
+    await requirePermission(ctx, ctx.user, emp.projectId, "employees.manage");
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     if (
       (!emp.projectId && ctx.user.role !== "super_admin") ||
@@ -374,7 +392,7 @@ export const remove = adminMutation({
   returns: v.null(),
 });
 
-export const bulkDelete = adminMutation({
+export const bulkDelete = authedMutation({
   args: { employeeIds: v.array(v.id("employees")) },
   handler: async (ctx, args) => {
     assertEmployeeBulkDeleteLimit(args.employeeIds.length);
@@ -383,6 +401,7 @@ export const bulkDelete = adminMutation({
       [...new Set(args.employeeIds)].map((id) => ctx.db.get(id)),
     );
     for (const emp of employees) {
+      if (emp) await requirePermission(ctx, ctx.user, emp.projectId, "employees.manage");
       if (emp && ((!emp.projectId && ctx.user.role !== "super_admin") || (emp.projectId && !allowedProjectIds.some((pid) => pid === emp.projectId)))) {
         throw new Error(`Çalışan ${emp.firstName} ${emp.lastName} için erişim yetkiniz yok`);
       }
@@ -394,11 +413,12 @@ export const bulkDelete = adminMutation({
   returns: v.null(),
 });
 
-export const bulkUpdateDepartment = adminMutation({
+export const bulkUpdateDepartment = authedMutation({
   args: { employeeIds: v.array(v.id("employees")), departmentId: v.id("departments") },
   handler: async (ctx, args) => {
     const dept = await ctx.db.get(args.departmentId);
     if (!dept) throw new Error("Departman bulunamadı");
+    await requirePermission(ctx, ctx.user, dept.projectId, "employees.manage");
     const allowed = await resolveProjectScope(ctx, dept.projectId);
     const employees = await Promise.all([...new Set(args.employeeIds)].map(id => ctx.db.get(id)));
     for (const emp of employees) {

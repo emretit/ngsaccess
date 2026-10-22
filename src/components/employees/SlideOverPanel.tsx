@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { UNSAFE_NavigationContext } from "react-router-dom";
 import {
@@ -9,7 +10,6 @@ import {
 } from "@/components/ui/sheet";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { useActiveProject, useProjectChangeGuard } from "@/contexts/ActiveProjectContext";
-import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { installNavigationGuard } from "@/lib/navigationGuard";
 import type { Employee } from "@/types/employee";
 import type { EmployeeFormDraft } from "./hooks/useEmployeeFormData";
@@ -38,7 +38,8 @@ export default function SlideOverPanel({
   const [pending, setPending] = useState(false);
   // Kaydet/Vazgeç sonrası formu güncel kayıtla yeniden kurar.
   const [formVersion, setFormVersion] = useState(0);
-  const { isAdmin } = useActiveProjectScope();
+  const { can } = usePermissions();
+  const canManage = can("employees.manage");
   const { projectId } = useActiveProject();
   const previousProject = useRef(projectId);
   const guard = useUnsavedChangesGuard(dirty && isOpen);
@@ -108,12 +109,12 @@ export default function SlideOverPanel({
             <SheetTitle ref={titleRef} tabIndex={-1} className="outline-none">
               {!employee && !loadingEmployee
                 ? "Personel ekle"
-                : isAdmin
+                : canManage
                   ? "Personel düzenle"
                   : "Personel ayrıntısı"}
             </SheetTitle>
             <SheetDescription id="employee-drawer-description">
-              {employee && !isAdmin
+              {employee && !canManage
                 ? "Kimlik, erişim ve cihaz bilgileri"
                 : "Zorunlu alanlar * ile işaretlidir."}
             </SheetDescription>

@@ -99,7 +99,9 @@ it("D1: sürüm yokken tablo, dört rapor, dashboard, yıllık mesai ve SGK ayn�
           expect(scope === undefined || scope === ids.projectId).toBe(true);
           expect(read).toEqual(["shifts", ["withIndex", "by_project"], ["eq", "projectId", scope], ["export"], ["take", 1001]]);
         }
-        const normalizedReads = reads.filter(read => !discovery.includes(read)).map(read => JSON.stringify(stable(read))).sort();
+        // yetki meta okuması (docs/roles/PLAN.md), DTO'yu etkilemez
+        const permissionMetadata = (read: unknown[]) => read[0] === "projectRolePermissions" || (read[0] === "userProjects" && read.some(call => Array.isArray(call) && call[0] === "withIndex" && call[1] === "by_user") && read.some(call => Array.isArray(call) && call[0] === "take" && call[1] === 1000));
+        const normalizedReads = reads.filter(read => !discovery.includes(read) && !permissionMetadata(read)).map(read => JSON.stringify(stable(read))).sort();
         const actual = { reads: normalizedReads, result: stable(result) };
         if (otherFlexible) expect(actual, `${name}: başka projedeki esnek atama sabit DTO/DB izini değiştirmez`).toEqual(baseline.get(name));
         else {

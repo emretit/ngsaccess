@@ -1,3 +1,4 @@
+import { requirePermission } from "./lib/permissions";
 import { assertDepartmentAncestors } from "./lib/departmentTree";
 import { assertPeopleProject } from "./lib/peopleScope";
 import { resolveProjectScope } from "./lib/projectScope";
@@ -26,6 +27,7 @@ export const create = authedMutation({
     level: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
+    await requirePermission(ctx, ctx.user, args.projectId, "employees.manage");
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
       throw new Error("Bu projeye erişim yetkiniz yok");
@@ -55,6 +57,7 @@ export const update = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const dept = await ctx.db.get(args.departmentId);
     if (!dept) throw new Error("Departman bulunamadı");
+    await requirePermission(ctx, ctx.user, dept.projectId, "employees.manage");
     if (dept.projectId ? !isProjectAllowed(allowedProjectIds, dept.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu departmana erişim yetkiniz yok");
     }
@@ -88,6 +91,7 @@ export const remove = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const dept = await ctx.db.get(args.departmentId);
     if (!dept) throw new Error("Departman bulunamadı");
+    await requirePermission(ctx, ctx.user, dept.projectId, "employees.manage");
     if (dept.projectId ? !isProjectAllowed(allowedProjectIds, dept.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu departmana erişim yetkiniz yok");
     }

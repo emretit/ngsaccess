@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { RuleScheduleSummary } from "../templates/RuleScheduleSummary";
 import { useState } from "react";
 import { useConvex } from "convex/react";
@@ -16,7 +17,6 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { RowActions } from "@/components/shared/RowActions";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useAccessRuleMutations } from "@/hooks/access-rules/useAccessRuleMutations";
 import { formatWeekdaysAbbr } from "../components/weekdays";
@@ -37,7 +37,8 @@ export function RuleRow({
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const convex = useConvex();
-  const { isAdmin } = useActiveProject();
+  const { can } = usePermissions();
+  const canManage = can("accessRules.manage");
   const { updateAccessRule, deleteAccessRule } = useAccessRuleMutations();
   const toggle = useAsyncAction(
     async () => {
@@ -121,7 +122,7 @@ export function RuleRow({
             <DropdownMenuItem onSelect={() => setOpen(true)}>
               Ayrıntı
             </DropdownMenuItem>
-            {isAdmin && (
+            {canManage && (
               <>
                 <DropdownMenuItem
                   disabled={edit.pending}

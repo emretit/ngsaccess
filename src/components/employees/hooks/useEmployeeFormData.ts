@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { departmentPath } from "../lib/departmentPath";
 import { useState, useEffect, type RefObject } from "react";
 import { useQuery } from "convex/react";
@@ -66,6 +67,7 @@ interface FormDataOptions {
 }
 export const useEmployeeFormData = (employee?: Employee | null, { saving = false, saved = false, draft }: FormDataOptions = {}) => {
   const { projectId } = useActiveProjectScope();
+  const { can } = usePermissions();
   const [defaultProjectId] = useState(projectId);
 
   const identity = `${defaultProjectId ?? ""}/${employee?._id ?? "new"}`;
@@ -90,14 +92,14 @@ export const useEmployeeFormData = (employee?: Employee | null, { saving = false
   );
   const accessRulesData: FunctionReturnType<typeof api.accessRules.listMemberships> | undefined = useQuery(
     api.accessRules.listMemberships,
-    defaultProjectId ? { projectId: defaultProjectId } : "skip",
+    defaultProjectId && can("employees.manage") ? { projectId: defaultProjectId } : "skip",
   );
   const positionsData = useQuery(api.positions.list);
 
   const optionsLoading =
     departmentsData === undefined ||
     companiesData === undefined ||
-    accessRulesData === undefined ||
+    (can("employees.manage") && accessRulesData === undefined) ||
     positionsData === undefined;
 
   const departments = (departmentsData ?? []).map((d) => ({

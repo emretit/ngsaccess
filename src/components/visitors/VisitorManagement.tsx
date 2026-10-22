@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import type { Visitor } from "@/types/visitor";
@@ -20,7 +21,9 @@ import { useStableQuery } from "./hooks/useStableQuery";
 import { PaginationBar } from "@/components/shared/PaginationBar";
 
 export default function VisitorManagement() {
-  const { projectId, loading, isAdmin, isSuperAdmin, activeProject } = useActiveProject();
+  const { projectId, loading, isSuperAdmin, activeProject } = useActiveProject();
+  const { can } = usePermissions();
+  const canManage = can("visitors.manage");
   const [params, setParams] = useSearchParams();
   const search = params.get("q") ?? "";
   const rawStatus = params.get("status");
@@ -42,15 +45,15 @@ export default function VisitorManagement() {
   const resetKey = `${projectId}:${search}:${status}:${pageSize}`;
   return <div className="min-w-0 space-y-5 [overflow-wrap:anywhere]">
     <PageHeader title="Ziyaretçiler" scope={`${activeProject?.name ?? "Proje seçin"} · Geçici erişim kayıtları`}
-      primaryAction={isAdmin && projectId ? { label: "Ziyaretçi kaydet", onClick: () => setPanel({ visitor: null, projectId }) } : undefined} />
+      primaryAction={canManage && projectId ? { label: "Ziyaretçi kaydet", onClick: () => setPanel({ visitor: null, projectId }) } : undefined} />
     {loading ? <SectionSkeleton rows={6} label="Ziyaretçiler yükleniyor" /> : !projectId ? !isSuperAdmin ? <AccessDenied compact /> : <EmptyState title="Proje seçin" description="Ziyaretçileri görmek için erişiminiz olan aktif bir proje seçin." /> : <>
       <QuerySectionBoundary title="Ziyaretçi özeti yüklenemedi" resetKey={projectId}><VisitorStats now={now} onNextExpiry={onNextExpiry} /></QuerySectionBoundary>
       <QuerySectionBoundary title="Cihaz durumu yüklenemedi" resetKey={projectId}><div id="visitor-sync-status" tabIndex={-1} aria-label="Proje cihaz senkronizasyon durumu"><DeviceSyncStatusBanner hideVerified /></div></QuerySectionBoundary>
-      <VisitorFilters searchQuery={search} onSearchChange={q => filter(q, status, true)} statusFilter={status} onStatusFilterChange={value => filter(search, value)} onClear={clear} onNewZone={isAdmin ? () => setZoneOpen(true) : undefined} />
+      <VisitorFilters searchQuery={search} onSearchChange={q => filter(q, status, true)} statusFilter={status} onStatusFilterChange={value => filter(search, value)} onClear={clear} onNewZone={can("devices.manage") ? () => setZoneOpen(true) : undefined} />
       <QuerySectionBoundary title="Ziyaretçiler yüklenemedi" description="Bağlantınızı kontrol edip tekrar deneyin." resetKey={resetKey}>
         <VisitorList key={resetKey} search={search} status={status} pageSize={pageSize} onPageSizeChange={setPageSize} now={now} onOpen={visitor => setPanel({ visitor, projectId })} onClear={clear} />
       </QuerySectionBoundary>
-      {panel && panel.projectId === projectId && <VisitorSlideOverPanel key={`${projectId}:${panel.visitor?._id ?? "new"}`} isOpen onClose={() => setPanel(null)} visitor={panel.visitor} onSave={() => setPanel(null)} now={now} canManage={isAdmin} />}
+      {panel && panel.projectId === projectId && <VisitorSlideOverPanel key={`${projectId}:${panel.visitor?._id ?? "new"}`} isOpen onClose={() => setPanel(null)} visitor={panel.visitor} onSave={() => setPanel(null)} now={now} canManage={canManage} />}
       {zoneOpen && <QuerySectionBoundary title="Erişim bölgeleri yüklenemedi" resetKey={projectId}><VisitorZoneDialog isOpen onClose={() => setZoneOpen(false)} /></QuerySectionBoundary>}
     </>}
   </div>;

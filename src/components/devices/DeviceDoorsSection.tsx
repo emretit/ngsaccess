@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { DoorOpen, Loader2, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { deviceDateTime, formatDirection } from "./deviceAdapter";
@@ -11,7 +12,7 @@ export function DeviceDoorsSection({
   busy,
   handleOpenDoor,
   handleFetchReaderCfg,
-  isAdmin,
+  canManage,
 }: Pick<
   DeviceCenterView,
   | "overview"
@@ -22,8 +23,9 @@ export function DeviceDoorsSection({
   | "busy"
   | "handleOpenDoor"
   | "handleFetchReaderCfg"
-  | "isAdmin"
+  | "canManage"
 >) {
+  const { can } = usePermissions();
   return (
     <section className="min-w-0 py-5 ">
       <div className="mb-3 flex items-center gap-2">
@@ -38,7 +40,7 @@ export function DeviceDoorsSection({
             : ""}{" "}
         {connection === "offline" ? offlineMessage : ""}
       </p>
-      {isAdmin && (
+      {canManage && (
         <p id="device-reader-reasons" className="text-xs text-muted-foreground">
           {busy
             ? "Devam eden işlemin bitmesini bekleyin."
@@ -71,7 +73,7 @@ export function DeviceDoorsSection({
                     </div>
                   )}
                 </div>
-                <Button
+                {can("doors.open") && <Button
                   type="button"
                   size="sm"
                   variant="outline"
@@ -88,7 +90,7 @@ export function DeviceDoorsSection({
                     <DoorOpen className="h-4 w-4" />
                   )}
                   Aç
-                </Button>
+                </Button>}
               </div>
 
               {doorReaders.length > 0 && (
@@ -116,7 +118,7 @@ export function DeviceDoorsSection({
                           </span>
                         )}
                       </div>
-                      {isAdmin && device.brand === "hikvision" && (
+                      {canManage && device.brand === "hikvision" && (
                         <Button
                           type="button"
                           size="sm"

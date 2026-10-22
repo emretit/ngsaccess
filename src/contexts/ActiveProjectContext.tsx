@@ -12,6 +12,7 @@ import {
 import { useQuery, useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { legacyRoleToProjectRole, type ProjectRole } from "../../convex/lib/roleCatalog";
 import type { Id } from "../../convex/_generated/dataModel";
 
 const STORAGE_KEY = "ngs.activeProjectId";
@@ -19,6 +20,7 @@ const STORAGE_KEY = "ngs.activeProjectId";
 interface ProjectSummary {
   _id: Id<"projects">;
   name: string;
+  role?: ProjectRole;
 }
 
 /**
@@ -38,7 +40,7 @@ interface ActiveProjectContextValue {
   /** Kayıt sırasıyla sorulur; ilk `true` dönen guard değişimi durdurur. Dönen fonksiyon kaydı siler. */
   registerProjectChangeGuard: (guard: ProjectChangeGuard) => () => void;
   isSuperAdmin: boolean;
-  /** super_admin VEYA project_admin — cihaz claim/release gibi yönetimsel aksiyonlar için. */
+  /** Compatibility flag: active project admin.manage permission. */
   isAdmin: boolean;
   loading: boolean;
 }
@@ -69,7 +71,6 @@ export function ActiveProjectProvider({ children }: { children: ReactNode }) {
   const { profile, loading: authLoading } = useAuth();
   const { isAuthenticated } = useConvexAuth();
   const isSuperAdmin = profile?.role === "super_admin";
-  const isAdmin = isSuperAdmin || profile?.role === "project_admin";
 
   const userProjects = useQuery(
     api.userProjects.getByCurrentUser,
@@ -87,8 +88,9 @@ export function ActiveProjectProvider({ children }: { children: ReactNode }) {
     return (userProjects ?? []).map((up) => ({
       _id: up.projectId,
       name: up.projectName,
+      role: up.role ?? legacyRoleToProjectRole(profile?.role),
     }));
-  }, [isSuperAdmin, allProjects, userProjects]);
+  }, [isSuperAdmin, allProjects, userProjects, profile?.role]);
 
   const projectIds = useMemo(() => projects.map((p) => p._id), [projects]);
 
@@ -149,6 +151,10 @@ export function ActiveProjectProvider({ children }: { children: ReactNode }) {
     () => projects.find((p) => p._id === activeProjectId) ?? null,
     [projects, activeProjectId]
   );
+
+  const permissions = useQuery(api.roles.myPermissions,
+    isAuthenticated && activeProject ? { projectId: activeProject._id } : "skip");
+  const isAdmin = isSuperAdmin || (permissions?.permissions?.some(permission => permission === "admin.manage") ?? false);
 
   const projectSelectionResolved =
     projectIds.length === 0 ? activeProjectId === null : activeProject !== null;

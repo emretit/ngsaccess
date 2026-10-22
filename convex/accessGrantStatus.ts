@@ -3,14 +3,16 @@ import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx } from "./_generated/server";
 import { internalMutation } from "./_generated/server";
-import { adminMutation, authedQuery } from "./lib/customFunctions";
-import { requireAdmin } from "./lib/auth";
+import { authedMutation, authedQuery } from "./lib/customFunctions";
+import { getCurrentUser } from "./lib/auth";
+import { requirePermission } from "./lib/permissions";
 import { resolveProjectScope } from "./lib/projectScope";
 import { bounded, employeeGrantGraph, grantRuleScope, grantStale, grantState, upsertGrantStatus } from "./lib/grantStatus";
 import { createGrantRun, createRunInTransaction } from "./deviceSyncRuns";
 
 async function authorize(ctx: QueryCtx, projectId: Id<"projects">) {
-  await requireAdmin(ctx);
+  const user = await getCurrentUser(ctx);
+  await requirePermission(ctx, user, projectId, "accessRules.manage");
   await resolveProjectScope(ctx, projectId);
 }
 
@@ -146,10 +148,10 @@ export const counts = authedQuery({
 export const byEmployee = authedQuery({
   args: { employeeId: v.id("employees") },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
     const employee = await ctx.db.get(args.employeeId);
     if (!employee?.projectId) throw new ConvexError("Çalışan veya projesi bulunamadı");
     const projectId = employee.projectId;
+    await requirePermission(ctx, ctx.user, projectId, "accessRules.manage");
     await resolveProjectScope(ctx, projectId);
     const graph = await employeeGrantGraph(ctx, employee);
     const stored = bounded(await ctx.db.query("accessGrantStatus").withIndex("by_project_employee", q => q.eq("projectId", projectId).eq("employeeId", args.employeeId)).take(201), 200);
@@ -177,9 +179,11 @@ export const recordGrantResults = internalMutation({
   },
 });
 
-export const redistribute = adminMutation({
+export const redistribute = authedMutation({
   args: { projectId: v.id("projects"), pairs: v.optional(v.array(v.object({ employeeId: v.id("employees"), deviceId: v.id("devices") }))), onlyFailed: v.optional(v.boolean()) },
   handler: async (ctx, args): Promise<{ runId: Id<"deviceSyncRuns">; pairCount?: number; remainingFailed: number; remainingCapped: boolean }> => {
+    const permission = args.pairs !== undefined || args.onlyFailed ? "accessRules.manage" : "devices.manage";
+    await requirePermission(ctx, ctx.user, args.projectId, permission);
     await resolveProjectScope(ctx, args.projectId);
     if (args.pairs && args.pairs.length > 100) throw new ConvexError("En fazla 100 kişi×cihaz yeniden dağıtılabilir");
     if (args.pairs && args.onlyFailed) throw new ConvexError("Seçili çiftler ile yalnız hatalılar birlikte kullanılamaz");
@@ -195,6 +199,6 @@ export const redistribute = adminMutation({
       pairs = failed.slice(0, 100).map(row => ({ employeeId: row.employeeId, deviceId: row.deviceId }));
     }
     const pairCount = pairs ? new Set(pairs.map(pair => `${pair.employeeId}:${pair.deviceId}`)).size : undefined;
-    return { pairCount, remainingFailed, remainingCapped, runId: pairs ? await createGrantRun(ctx, { projectId: args.projectId, pairs, startedBy: ctx.user._id }) : await createRunInTransaction(ctx, { projectId: args.projectId }) };
+    return { pairCount, remainingFailed, remainingCapped, runId: pairs ? await createGrantRun(ctx, { projectId: args.projectId, pairs, startedBy: ctx.user._id }) : await createRunInTransaction(ctx, { projectId: args.projectId }, "devices.manage") };
   },
 });

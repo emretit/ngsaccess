@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { Copy, Eye, EyeOff } from "lucide-react";
@@ -16,7 +17,8 @@ import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { notify } from "@/lib/notify";
 
 export function BridgeIntegrationCard() {
-  const { projectId, isAdmin, activeProject } = useActiveProjectScope();
+  const { projectId, activeProject } = useActiveProjectScope();
+  const isAdmin = usePermissions().can("devices.manage");
   const bridges = useQuery(api.hikBridge.listBridges, projectId && isAdmin ? { projectId } : "skip");
   const createBridge = useMutation(api.hikBridge.createBridge);
   const revokeBridge = useMutation(api.hikBridge.revokeBridge);

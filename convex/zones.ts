@@ -1,6 +1,7 @@
+import { requirePermission } from "./lib/permissions";
 
 import { ConvexError, v } from "convex/values";
-import { authedQuery, adminMutation } from "./lib/customFunctions";
+import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { resolveProjectScope } from "./lib/projectScope";
 import { zoneDeleteBlocker } from "./lib/doorZoneDelete";
@@ -31,7 +32,7 @@ export const list = authedQuery({
   },
 });
 
-export const create = adminMutation({
+export const create = authedMutation({
   // Bölge = saf mantıksal alan. ideDeviceId KABUL EDİLMEZ (panel↔bölge 1:1 bağı
   // kaldırıldı; kapının paneli doors.deviceId'de). Eski deprecated alanı yazma
   // yüzeyi kapatıldı — aksi halde yeni orphan panel-bölge üretilebilirdi.
@@ -42,6 +43,7 @@ export const create = adminMutation({
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
+    await requirePermission(ctx, ctx.user, args.projectId, "devices.manage");
     if (!args.projectId) {
       throw new ConvexError("Bölge oluşturmak için bir proje seçmelisiniz");
     }
@@ -53,12 +55,13 @@ export const create = adminMutation({
   },
 });
 
-export const remove = adminMutation({
+export const remove = authedMutation({
   args: { zoneId: v.id("zones") },
   handler: async (ctx, args) => {
     const allowedProjectIds = await resolveProjectScope(ctx);
     const zone = await ctx.db.get(args.zoneId);
     if (!zone) throw new ConvexError("Bölge bulunamadı");
+    await requirePermission(ctx, ctx.user, zone.projectId, "devices.manage");
     if (!isProjectAllowed(allowedProjectIds, zone.projectId)) {
       throw new ConvexError("Bu bölgeye erişim yetkiniz yok");
     }

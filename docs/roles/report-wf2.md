@@ -1,0 +1,10 @@
+# W-F2 frontend yetki görünürlüğü — 2026-10-22
+- 69 kaynak/test dosyası değişti (46 kaynak, 23 test); bu raporla 70 dosya. 39 `usePermissions` tüketicisi; 130 eski rol/bayrak referans satırı kaldırıldı (prop aktarımı dahil).
+- Yetki ayrımları: personel CRUD `employees.manage`, cihazlara gönderim `accessRules.manage`, biyometrik kolon/rıza `biometrics.manage`, fotoğraf rızası `employees.manage`, ücret `pay.view`, dışa aktarım `reports.view`; alarm onayı/ayarları ayrı.
+- Davranış: `src/pages/Employees.tsx:31`, `src/pages/Reports.tsx:28` doğrudan URL erişimini ve loading durumunu kapılar; viewer raporları görebilir, personel yazamaz; eski yönetici bayrağı yetki kararına katılmaz.
+- Davranış: `src/components/devices/LocationTree.tsx:78`, `LocationDoorItem.tsx:111` ve `DeviceDoorsSection.tsx:76` kapı açmayı cihaz CRUD'dan ayırır; `src/components/shifts/calendar/CalendarHeader.tsx:8` ve `ShiftDayDetails.tsx:36` atama/düzenlemeyi `schedule.manage` ile gizler.
+- Çok proje: `src/components/sync/SyncIssuesBanner.tsx:133` tek `myPermissionsByProject` sorgusuyla her satırın projesini denetler; toplu kapatma yalnız izinli satırları alır. Çözümsüz silme istisnası super_admin olarak korunur.
+- Kapılar: app tsc 0; convex tsc 0; değişen dosyalarda eslint 0 error/0 warning; kabul grep 0 satır; node-leak çıktısız; git diff --check temiz.
+- Son `vitest run src`: 165 dosya/1108 test geçti; 3 dosya/7 test kırmızı, yalnız dış sahiplik: `src/contexts/ActiveProjectContext.test.tsx` (5), `src/components/audit/auditAudit.test.tsx` (1), `src/components/audit/auditState.test.tsx` (1). W-F2 dosyalarında kırmızı yok.
+- Regresyonlar: personel okuma/loading, içe/dışa aktarma ayrımı, rıza türleri, personel CRUD/biyometri/gönderim ayrımı, kapı yetkisi kaldırma, rapor/loading ve proje bazlı senkron kapatma; mock'lar `usePermissions.can` kullanır, assertion snapshot güncellemesi yok.
+- Kararlar/kalan: koordinatör iki `src/components/reports/*.test.tsx` dosyasını ownership'e ekledi; çekirdek/SAHİPLİ dosyalara dokunulmadı, tarayıcı/codegen/deploy/commit yapılmadı. Dış 7 test W-F1 tarafından tamamlanacak; platform claim/sistem ve üyelik kapsamı istisnaları korundu.

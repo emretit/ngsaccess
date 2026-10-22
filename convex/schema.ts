@@ -1,4 +1,5 @@
 import { doorStatusPlanValidator } from "./lib/doorStatusPlan";
+import { inviteRoleValidator, permissionValidator, projectRoleValidator } from "./lib/roleCatalog";
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
@@ -56,10 +57,22 @@ export default defineSchema({
   userProjects: defineTable({
     userId: v.id("users"),
     projectId: v.id("projects"),
+    // Proje rolü (docs/roles/PLAN.md). Yoksa users.role'den türetilir (lib/permissions.ts).
+    role: v.optional(projectRoleValidator),
     createdAt: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_project", ["projectId"]),
+
+  // Proje bazında rol yetkisi değişikliği. Satır yoksa rol varsayılanı (ROLE_DEFAULTS) geçerli;
+  // "admin" rolü için satır yazılmaz (kilitli).
+  projectRolePermissions: defineTable({
+    projectId: v.id("projects"),
+    role: projectRoleValidator,
+    permissions: v.array(permissionValidator),
+    updatedAt: v.number(),
+    updatedBy: v.id("users"),
+  }).index("by_projectId_and_role", ["projectId", "role"]),
 
   projects: defineTable({
     name: v.string(),
@@ -1379,7 +1392,8 @@ export default defineSchema({
     email: v.string(),
     token: v.string(),
     projectId: v.id("projects"),
-    role: v.union(v.literal("project_admin"), v.literal("project_user")),
+    // Eski davetler project_admin/project_user taşır; yenileri proje rolü (lib/permissions.ts).
+    role: inviteRoleValidator,
     type: v.optional(v.union(v.literal("invite"), v.literal("reset"))),
     createdBy: v.id("users"),
     expiresAt: v.string(),

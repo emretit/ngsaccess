@@ -5,6 +5,7 @@ import { api, internal } from "../_generated/api";
 import { v } from "convex/values";
 import { authedAction } from "../lib/customFunctions";
 import { escapeHtml } from "../lib/escapers";
+import { ROLE_LABELS, inviteRoleValidator, legacyRoleToProjectRole } from "../lib/roleCatalog";
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
@@ -210,16 +211,11 @@ export const sendEmployeeSetupEmail = authedAction({
  * type === "reset" parametresi gelecek için hazır (mevcut kullanıcıya şifre
  * sıfırlama maili) — şu an UI'dan tetiklenmiyor.
  */
-const ROLE_LABELS_TR: Record<"project_admin" | "project_user", string> = {
-  project_admin: "Proje Yöneticisi",
-  project_user: "Kullanıcı",
-};
-
 export const sendUserInviteEmail = authedAction({
   args: {
     email: v.string(),
     projectId: v.id("projects"),
-    role: v.union(v.literal("project_admin"), v.literal("project_user")),
+    role: inviteRoleValidator,
     type: v.optional(v.union(v.literal("invite"), v.literal("reset"))),
   },
   handler: async (ctx, args): Promise<{ success: boolean; error?: string }> => {
@@ -249,7 +245,7 @@ export const sendUserInviteEmail = authedAction({
       ? `NGS+ — Şifre sıfırlama bağlantısı`
       : `${project?.name ?? "NGS+"} — NGS+ davetiniz`;
     const heading = isReset ? "Şifrenizi sıfırlayın" : "NGS+'a davet edildiniz 👋";
-    const roleLabel = ROLE_LABELS_TR[args.role];
+    const roleLabel = ROLE_LABELS[legacyRoleToProjectRole(args.role)];
     const body = isReset
       ? `<strong>${projectName}</strong> hesabınız için yeni şifre belirlemeniz isteniyor. Aşağıdaki butona tıklayarak yeni şifrenizi oluşturabilirsiniz.`
       : `<strong>${projectName}</strong> projesine <strong>${roleLabel}</strong> olarak davet edildiniz. Hesabınızı oluşturmak ve şifrenizi belirlemek için aşağıdaki butona tıklayın.`;

@@ -136,3 +136,5 @@ describe("settings page permission boundary", () => {
     expect(html).not.toContain("Genel ayarları kaydet");
   });
 });
+
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ role: mocks.role === "super_admin" ? "super_admin" : mocks.role === "project_admin" ? "admin" : "viewer", can: (permission: string) => mocks.role !== "project_user" || permission === "reports.view", loading: false }) }));

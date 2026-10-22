@@ -89,7 +89,10 @@ describe("drawer commands authorization and server audit", () => {
       f.caller.action(api.actions.hikGatewayDevice.fetchReaderCfg, { readerId: f.readerId }),
       f.caller.action(api.actions.ideGatewayDevice.triggerPanelSync, { deviceId: f.ideId }),
     ];
-    for (const result of await Promise.all(commands)) expect(result).toMatchObject({ ok: false, error: "Bu işlem için yönetici yetkisi gerekiyor" });
+    for (const result of await Promise.allSettled(commands)) {
+      expect(result.status).toBe("rejected");
+      if (result.status === "rejected") expect(result.reason).toMatchObject({ message: "Bu işlem için yetkiniz yok" });
+    }
     await expect(f.caller.mutation(api.devices.update, { deviceId: f.hikId, name: "Changed" })).rejects.toThrow("yetkiniz");
     await expect(f.caller.mutation(api.devices.remove, { deviceId: f.hikId })).rejects.toThrow("yetkiniz");
     expect(await events(f)).toEqual([]);
@@ -98,15 +101,18 @@ describe("drawer commands authorization and server audit", () => {
   });
   it("rejects project_user from all six additional Hik actions before execution or audit", async () => {
     const f = await fixture("project_user");
-    const results = await Promise.all([
+    const results = await Promise.allSettled([
       f.caller.action(api.actions.hikGatewayDevice.registerDeviceOnGateway, { deviceId: f.hikId }),
       f.caller.action(api.actions.hikGatewayDevice.removeDeviceFromGateway, { deviceId: f.hikId }),
       f.caller.action(api.actions.hikGatewayDevice.captureFaceFromDevice, { deviceId: f.hikId }),
       f.caller.action(api.actions.hikGatewayDevice.applyDoorStatusPlan, { doorId: f.doorId }),
       f.caller.action(api.actions.hikGatewayDevice.applyVerifyPlan, { doorId: f.doorId }),
     ]);
-    for (const result of results) expect(result).toEqual({ ok: false, error: "Bu işlem için yönetici yetkisi gerekiyor" });
-    await expect(f.caller.action(api.actions.hikGatewayDevice.refreshGatewayDeviceStatus, {})).rejects.toThrow("yönetici yetkisi");
+    for (const result of results) {
+      expect(result.status).toBe("rejected");
+      if (result.status === "rejected") expect(result.reason).toMatchObject({ message: "Bu işlem için yetkiniz yok" });
+    }
+    await expect(f.caller.action(api.actions.hikGatewayDevice.refreshGatewayDeviceStatus, {})).rejects.toThrow("Bu işlem için yetkiniz yok");
     expect(await events(f)).toEqual([]);
     expect(gateway.addDeviceToGateway).not.toHaveBeenCalled();
     expect(gateway.deleteDeviceFromGateway).not.toHaveBeenCalled();

@@ -1,3 +1,4 @@
+import { getProjectRole, requirePermission } from "./permissions";
 import type { QueryCtx } from "../_generated/server";
 import { accessBlockReason } from "./accountAccess";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -68,6 +69,7 @@ export const projectDeletionCleanupTables = [
   "leaveBalances",
   "chatConversations",
   "projectPrivacySettings",
+  "projectRolePermissions",
   "invites",
 ] as const;
 
@@ -113,7 +115,7 @@ const cleanupLabels: Record<typeof projectDeletionCleanupTables[number], string>
   workSettings: "Çalışma ayarları", overtimeRates: "Fazla mesai oranları",
   holidays: "Tatiller", reportScheduleSettings: "Rapor zamanlamaları",
   leaveBalances: "İzin bakiyeleri", chatConversations: "Sohbetler",
-  projectPrivacySettings: "Gizlilik ayarları", invites: "Davetler",
+  projectPrivacySettings: "Gizlilik ayarları", projectRolePermissions: "Rol yetkileri", invites: "Davetler",
 };
 
 export function projectDeletionImpactRows(counts: Readonly<Partial<Record<string, number>>>) {
@@ -145,7 +147,9 @@ export function projectDeletionCleanupQuery(
 ) {
   return table === "invites"
     ? ctx.db.query(table).filter(q => q.eq(q.field("projectId"), projectId))
-    : ctx.db.query(table).withIndex("by_project", q => q.eq("projectId", projectId));
+    : table === "projectRolePermissions"
+      ? ctx.db.query(table).withIndex("by_projectId_and_role", q => q.eq("projectId", projectId))
+      : ctx.db.query(table).withIndex("by_project", q => q.eq("projectId", projectId));
 }
 
 /** Stop after two active admins; fail closed if the bounded scan is exhausted. */
@@ -175,11 +179,12 @@ export async function requireAccountAccessTarget(
   const target = await ctx.db.get(userId);
   if (!target) throw new Error("Kullanıcı bulunamadı");
   if (caller.role !== "super_admin") {
-    if (caller.role !== "project_admin" || target.role !== "project_user") throw new Error("Bu işlem için yetkiniz yok");
-    const own = await ctx.db.query("userProjects").withIndex("by_user", q => q.eq("userId", caller._id)).take(1001);
+    if (target.role === "super_admin") throw new Error("Bu işlem için yetkiniz yok");
     const memberships = await ctx.db.query("userProjects").withIndex("by_user", q => q.eq("userId", userId)).take(1001);
-    if (memberships.length === 0 || own.length > 1000 || memberships.length > 1000 || memberships.some(row => !own.some(p => p.projectId === row.projectId))) {
-      throw new Error("Bu kullanıcı başka projelerde de üye; yalnız sistem yöneticisi işlem yapabilir");
+    if (memberships.length === 0 || memberships.length > 1000) throw new Error("Bu kullanıcı başka projelerde de üye; yalnız sistem yöneticisi işlem yapabilir");
+    for (const { projectId } of memberships) {
+      if (await getProjectRole(ctx, target, projectId) === "admin") throw new Error("Bu işlem için yetkiniz yok");
+      await requirePermission(ctx, caller, projectId, "admin.manage");
     }
   }
   if (restrictAccess && target.role === "super_admin" && await activeSuperAdminCount(ctx, {

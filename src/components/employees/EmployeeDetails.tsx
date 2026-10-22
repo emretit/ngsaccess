@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { EmploymentEmployee as Employee } from "./lib/employment";
@@ -29,7 +30,9 @@ export default function EmployeeDetails({
   /** Yöneticide Genel bilgiler bölümü güncel kayıtla yerinde düzenleme formu olur. */
   renderEditForm?: (current: FormEmployee) => ReactNode;
 }) {
-  const { isAdmin, projectId } = useActiveProjectScope();
+  const { projectId } = useActiveProjectScope();
+  const { can } = usePermissions();
+  const canManage = can("employees.manage");
   const employees = useQuery(api.employees.list, projectId ? { projectId } : "skip");
   const record = useQuery(api.employees.getById, employee ? { employeeId: employee._id } : "skip");
   const listed = employee ? employees?.find(item => item._id === employee._id) : undefined;
@@ -38,7 +41,7 @@ export default function EmployeeDetails({
     if (gone) onGone?.();
   }, [gone, onGone]);
   if (!employee) return null;
-  const editing = isAdmin && !!renderEditForm;
+  const editing = canManage && !!renderEditForm;
   if (gone) {
     return (
       <div className="[&_button]:max-sm:min-h-11">
@@ -74,7 +77,7 @@ export default function EmployeeDetails({
           </p>
           {current.employmentEndDate && <p className="mt-1 text-xs text-muted-foreground">{current.terminationType ? terminationLabels[current.terminationType] : "Ayrılış"}{current.terminationReason ? ` · ${current.terminationReason}` : ""}</p>}
         </div>
-        {isAdmin && (
+        {canManage && (
           <div className="flex flex-wrap gap-2"><EmployeeEmploymentActions key={current._id} employee={current} /></div>
         )}
       </div>
@@ -149,7 +152,8 @@ export default function EmployeeDetails({
 }
 
 function EmployeeAccessSection({ employeeId }: { employeeId: Employee["_id"] }) {
-  const { projectId, isAdmin } = useActiveProjectScope();
+  const { projectId } = useActiveProjectScope();
+  const { can } = usePermissions();
   const rules: FunctionReturnType<typeof api.accessRules.listMemberships> | undefined = useQuery(
     api.accessRules.listMemberships,
     projectId ? { projectId } : "skip",
@@ -182,7 +186,7 @@ function EmployeeAccessSection({ employeeId }: { employeeId: Employee["_id"] }) 
           </ul>
         )}
         <Link className="inline-flex items-center max-sm:min-h-11 text-sm underline" to="/access-control">
-          Geçiş Kontrol{isAdmin ? " · Üyelikleri yönet" : ""}
+          Geçiş Kontrol{can("accessRules.manage") ? " · Üyelikleri yönet" : ""}
         </Link>
       </section>
   );

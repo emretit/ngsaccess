@@ -111,8 +111,8 @@ describe("C3 general settings partial patch", () => {
 // Exercise the actual transaction handlers without external auth or database writes.
 vi.mock("./lib/customFunctions", () => {
   const register = (definition: { handler: unknown }) => ({ _handler: definition.handler });
-  return { superAdminMutation: register, adminMutation: register, authedMutation: register,
-    optionalAuthQuery: register, authedQuery: register, adminQuery: register, superAdminQuery: register };
+  return { superAdminMutation: register, authedMutation: register,
+    optionalAuthQuery: register, authedQuery: register, superAdminQuery: register };
 });
 vi.mock("./lib/projectScope", () => ({ resolveProjectScope: async () => ["project-a"] }));
 
@@ -141,7 +141,7 @@ describe("C3 transaction contracts", () => {
   it("does not reintroduce companyName on a phone-only settings update", async () => {
     const patch = vi.fn();
     const query = { withIndex: () => query, first: async () => ({ _id: "settings" }) };
-    const ctx = { db: { query: () => query, patch } } as unknown as MutationCtx;
+    const ctx = { user: { _id: "actor", role: "super_admin" }, db: { query: () => query, patch } } as unknown as MutationCtx;
     await generalHandler(ctx, { projectId: "project-a" as Id<"projects">, phone: "456" });
     expect(patch).toHaveBeenCalledWith("settings", { projectId: "project-a", phone: "456", updatedAt: expect.any(String) });
     await generalHandler(ctx, { projectId: "project-a" as Id<"projects">, phone: null, companyName: " Şirket " });

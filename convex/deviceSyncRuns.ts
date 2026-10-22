@@ -1,3 +1,4 @@
+import { requirePermission } from "./lib/permissions";
 import type { HikSnapshot } from "./lib/peopleHikSnapshot";
 import { hikSnapshotValidator } from "./lib/peopleHikSnapshot";
 import { templateRules, scheduleRuleDevices, boundedScheduleRows, ideScheduleImpact } from "./accessScheduleTemplates";
@@ -12,7 +13,7 @@ import { internalAction, internalMutation, internalQuery } from "./_generated/se
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { authedAction, authedQuery } from "./lib/customFunctions";
-import { requireAdmin } from "./lib/auth";
+import { getCurrentUser } from "./lib/auth";
 import { resolveProjectScope } from "./lib/projectScope";
 import { refreshDelay, summaryChanged, operationStatus, skippedReason, skipReasons, summarizeRun, targetStatus } from "./lib/deviceSyncRun";
 
@@ -74,14 +75,15 @@ async function refreshRun(ctx: MutationCtx, runId: Id<"deviceSyncRuns">) {
 /** Auth remains inside the transaction; public callers cannot supply startedBy. */
 export const createRun = internalMutation({
   args: { projectId: v.optional(v.id("projects")), ruleId: v.optional(v.id("accessRules")) },
-  handler: createRunInTransaction,
+  handler: (ctx, args) => createRunInTransaction(ctx, args),
 });
-export async function createRunInTransaction(ctx: MutationCtx, args: { projectId?: Id<"projects">; ruleId?: Id<"accessRules"> }): Promise<Id<"deviceSyncRuns">> {
-    const user = await requireAdmin(ctx);
+export async function createRunInTransaction(ctx: MutationCtx, args: { projectId?: Id<"projects">; ruleId?: Id<"accessRules"> }, permission: "devices.manage" | "accessRules.manage" = args.ruleId ? "accessRules.manage" : "devices.manage"): Promise<Id<"deviceSyncRuns">> {
+    const user = await getCurrentUser(ctx);
     const rule = args.ruleId ? await ctx.db.get(args.ruleId) : null;
     if (args.ruleId && !rule) throw new ConvexError("Kural bulunamadı");
     const projectId = rule?.projectId ?? args.projectId;
     if (!projectId) throw new ConvexError("Önce bir proje seçin");
+    await requirePermission(ctx, user, projectId, permission);
     await resolveProjectScope(ctx, projectId);
     const devices = await ctx.db.query("devices").withIndex("by_project", q => q.eq("projectId", projectId)).take(MAX_DEVICES + 1);
     const rules = rule ? [rule] : await ctx.db.query("accessRules").withIndex("by_project", q => q.eq("projectId", projectId)).take(MAX_RULES + 1);

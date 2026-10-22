@@ -1,3 +1,4 @@
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => mocks.admin, loading: false }) }));
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";

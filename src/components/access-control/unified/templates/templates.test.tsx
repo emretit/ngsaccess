@@ -1,3 +1,4 @@
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => state.admin, loading: false }) }));
 import type { ReactNode, MouseEventHandler } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -52,7 +53,7 @@ vi.mock("react-router-dom", () => ({
   useSearchParams: () => [new URLSearchParams(state.params), vi.fn()],
 }));
 vi.mock("@/contexts/ActiveProjectContext", () => ({
-  useActiveProject: () => ({ projectId: "p", isAdmin: state.admin }),
+  useActiveProject: () => ({ projectId: "p", canManage: state.admin }),
   useProjectChangeGuard: () => undefined,
 }));
 vi.mock("@/components/shared/UnsavedChangesDialog", () => ({

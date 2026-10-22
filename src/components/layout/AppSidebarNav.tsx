@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton, useSidebar } from "@/components/ui/sidebar";
-import { useAuth } from "@/components/auth/AuthProvider";
+import { usePermissions } from "@/hooks/usePermissions";
 import { visibleRoutes } from "@/lib/routeMeta";
 import { REPORT_GROUPS, REPORTS_BASE_PATH, reportGroupPath } from "@/lib/reports/groups";
 
@@ -8,9 +8,9 @@ const isUnder = (pathname: string, href: string) => pathname === href || pathnam
 
 export function AppSidebarNav() {
   const location = useLocation();
-  const { profile } = useAuth();
+  const { role, can } = usePermissions();
   const { isMobile, setOpenMobile } = useSidebar();
-  const routes = visibleRoutes(profile?.role);
+  const routes = visibleRoutes(role ?? undefined, false, can);
   const closeMobile = () => { if (isMobile) setOpenMobile(false); };
   return <nav aria-label="Ana menü" className="space-y-4">
     {(["main", "attendance", "management"] as const).map(group => {

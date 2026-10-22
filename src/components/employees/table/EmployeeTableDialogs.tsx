@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import {
   selectedEmployeeNames,
   employeeSelectionName,
@@ -25,7 +26,7 @@ type Props = {
   handleSyncToDevice: (employee: Employee) => unknown;
   handleBulkSyncToDevices: (retry: boolean) => unknown;
   cardAssignEmployees: Employee[] | null;
-  isAdmin: boolean;
+  canManage: boolean;
   projectId: Id<"projects"> | null | undefined;
   setCardAssignEmployees: (employees: Employee[] | null) => void;
   showPasswordResetDialog: boolean;
@@ -47,13 +48,14 @@ export function EmployeeTableDialogs({
   handleSyncToDevice,
   handleBulkSyncToDevices,
   cardAssignEmployees,
-  isAdmin,
+  canManage,
   projectId,
   setCardAssignEmployees,
   showPasswordResetDialog,
   setShowPasswordResetDialog,
   selectedEmployeeForReset,
 }: Props) {
+  const { can } = usePermissions();
   return (
     <>
       <EmployeeDeleteDialog
@@ -76,7 +78,7 @@ export function EmployeeTableDialogs({
         onConfirm={handleIndividualDeleteConfirm}
       />
 
-      {syncRequest && (
+      {syncRequest && can("accessRules.manage") && (
         <EmployeeSyncConfirmDialog
           employees={syncRequest.employees}
           onClose={() => setSyncRequest(null)}
@@ -89,7 +91,7 @@ export function EmployeeTableDialogs({
         />
       )}
 
-      {cardAssignEmployees && isAdmin && projectId && (
+      {cardAssignEmployees && canManage && projectId && (
         <BatchCardAssignDialog
           open
           onOpenChange={(next) => {

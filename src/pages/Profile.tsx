@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 
 import { useAuth } from '@/components/auth/AuthProvider';
 import ProfilePhoto from '@/components/profile/ProfilePhoto';
@@ -8,6 +9,7 @@ import { useProfileUtils } from '@/hooks/useProfileUtils';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 export default function Profile() {
+  const { role } = usePermissions();
   const { user, profile, refreshProfile, signOut } = useAuth();
   const { formData, getUserInitials } = useProfileUtils();
 
@@ -33,7 +35,7 @@ export default function Profile() {
         <ProfileForm 
           email={formData.email}
           fullName={formData.fullName}
-          role={profile?.role || 'Kullanıcı'}
+          role={role || 'Kullanıcı'}
           userId={user._id}
           onProfileUpdated={refreshProfile}
           onSignOut={signOut}

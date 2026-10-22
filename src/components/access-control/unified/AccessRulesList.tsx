@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useCallback, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -13,7 +14,9 @@ import { RulesFilters } from "./rules-list/RulesFilters";
 import { RulesPage } from "./rules-list/RulesPage";
 import type { Props } from "./rules-list/types";
 export default function AccessRulesList(props: Props) {
-  const { projectId, activeProject, loading, isAdmin } = useActiveProject();
+  const { projectId, activeProject, loading } = useActiveProject();
+  const { can } = usePermissions();
+  const canManage = can("accessRules.manage");
   const [params, setParams] = useSearchParams();
   const { search, searchBy, status, type } = readRuleFilters(params);
   const change = (key: string, value: string) => {
@@ -49,12 +52,12 @@ export default function AccessRulesList(props: Props) {
         title="Geçiş Kontrol"
         scope={`${activeProject?.name ?? "Proje seçilmedi"} · Erişim kuralları`}
         primaryAction={
-          isAdmin && projectId
+          canManage && projectId
             ? { label: "Yeni kural", onClick: props.onCreateRule }
             : undefined
         }
       >
-        {isAdmin && projectId && (
+        {canManage && projectId && (
           <QuerySectionBoundary resetKey={projectId}>
             <ProjectSyncButton projectId={projectId} />
           </QuerySectionBoundary>

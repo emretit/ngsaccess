@@ -52,3 +52,5 @@ describe("13-H1 night overtime rate policy", () => {
    expect(overtimeSettingsSchema.safeParse({ ...payload, overtimeBasis: "monthly" }).success).toBe(false);
    expect(overtimeSettingsSchema.safeParse({ ...payload, nightShiftDayMode: "calendar" }).success).toBe(false);
  });
+
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, role: "hr", loading: false }) }));

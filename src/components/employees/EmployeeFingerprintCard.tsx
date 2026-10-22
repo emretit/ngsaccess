@@ -1,8 +1,8 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useId, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { Button } from "@/components/ui/button";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
@@ -12,9 +12,10 @@ import { fingerName, fingerNames } from "./lib/fingerNames";
 
 
 export function EmployeeFingerprintCard({ employeeId }: { employeeId: Id<"employees"> }) {
-  const { isAdmin } = useActiveProjectScope();
-  const module = useQuery(api.privacyBiometric.getEmployeeBiometricModule, isAdmin ? { employeeId } : "skip");
-  if (!isAdmin || module?.enabled !== true) return null;
+  const { can } = usePermissions();
+  const canManage = can("biometrics.manage");
+  const module = useQuery(api.privacyBiometric.getEmployeeBiometricModule, canManage ? { employeeId } : "skip");
+  if (!canManage || module?.enabled !== true) return null;
   return <FingerprintControls key={employeeId} employeeId={employeeId} />;
 }
 

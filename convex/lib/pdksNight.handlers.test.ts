@@ -31,7 +31,7 @@ vi.mock("./customFunctions", () => {
   const register = (config: unknown) => config;
   return {
     authedQuery: register,
-    adminMutation: register,
+    authedMutation: register,
     employeeAuthedQuery: register,
     employeeAuthedMutation: register,
   };

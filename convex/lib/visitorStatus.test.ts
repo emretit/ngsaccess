@@ -71,13 +71,13 @@ it("detail enforces role masking and both endpoints return normalized expiry", a
   const visitor = { _id: "visitor", _creationTime: 1, projectId: "project", isVisitor: true, firstName: "Ada", lastName: "Test", email: "",
     cardNumber: "12345678", tcNo: "12345678901", accessStartsAt: "2026-10-17T09:00", accessExpiresAt: "2026-10-17T10:00" };
   const query = (table: string) => {
-    const chain = { withIndex: () => chain, order: () => chain, first: async () => null, take: async () => [],
+    const chain = { withIndex: () => chain, order: () => chain, unique: async () => null, first: async () => null, take: async () => table === "userProjects" ? [{ userId: "admin", projectId: "project" }] : [],
       paginate: async () => ({ page: [visitor], isDone: true, continueCursor: "done" }),
       async *[Symbol.asyncIterator]() { if (table === "employees") yield visitor; },
     };
     return chain;
   };
-  const ctx = { user: { role: "member" }, db: { get: async () => visitor, query } };
+  const ctx = { user: { _id: "admin", role: "member" }, db: { get: async () => visitor, query } };
   const detail = (getDetail as unknown as { _handler: (ctx: QueryCtx, args: { visitorId: Id<"employees"> }) => Promise<Record<string, unknown>> })._handler;
   for (const role of ["member", "project_admin", "super_admin"]) {
     ctx.user.role = role;
@@ -122,7 +122,7 @@ it("expiry cron includes legacy TR and UTC records at the same instant without e
 
 // A small indexed database transport exercises the real stream cursor/filter implementation.
 function visitorQueryFixture(employees: Record<string, unknown>[], extra: Record<string, Record<string, unknown>[]> = {}) {
-  const tables: Record<string, Record<string, unknown>[]> = { employees, ...extra };
+  const tables: Record<string, Record<string, unknown>[]> = { employees, userProjects: [{ _id: "membership", userId: "admin", projectId: "project" }], ...extra };
   const queriedTables: string[] = [];
   const indexes: string[] = [];
   const query = (table: string) => {
@@ -147,6 +147,7 @@ function visitorQueryFixture(employees: Record<string, unknown>[], extra: Record
         for (const field of fields) { const diff = typeof a[field] === "number" && typeof b[field] === "number" ? Number(a[field]) - Number(b[field]) : compare(a[field], b[field]); if (diff) return direction === "desc" ? -diff : diff; }
         return 0;
       }); return chain; },
+      unique: async () => rows[0] ?? null,
       first: async () => rows[0] ?? null,
       take: async (count: number) => rows.slice(0, count),
       collect: async () => [...rows],

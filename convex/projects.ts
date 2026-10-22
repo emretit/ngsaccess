@@ -1,3 +1,4 @@
+import { getProjectRole, requirePermission } from "./lib/permissions";
 import { writeAudit } from "./lib/audit";
 import { upsertPrivacySettings } from "./lib/privacySettings";
 import { paginationOptsValidator } from "convex/server";
@@ -9,7 +10,7 @@ import { ConvexError, v } from "convex/values";
 import { projectDeletionBlockers, projectDeletionCleanupTables, projectDeletionError } from "./lib/adminGuards";
 import { query } from "./_generated/server";
 import { getCurrentUser, getValidAuthUserId } from "./lib/auth";
-import { adminQuery, authedMutation, authedQuery, superAdminQuery, superAdminMutation } from "./lib/customFunctions";
+import { authedMutation, authedQuery, superAdminQuery, superAdminMutation } from "./lib/customFunctions";
 
 export const list = authedQuery({
   args: {},
@@ -17,7 +18,7 @@ export const list = authedQuery({
     if (ctx.user.role === "super_admin") {
       return await ctx.db.query("projects").collect();
     }
-    // project_admin / project_user sadece kendi projelerini görür
+    // Üyeler sadece kendi projelerini görür
     const rows = await ctx.db
       .query("userProjects")
       .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
@@ -72,6 +73,7 @@ export const create = superAdminMutation({
       createdAt: now,
       updatedAt: now,
     });
+    await ctx.db.insert("userProjects", { userId: ctx.user._id, projectId: id, role: "admin", createdAt: now });
     await upsertPrivacySettings(ctx, id, { biometricEnabled: false });
     await writeAudit(ctx, { user: ctx.user, projectId: id, action: "create",
       targetTable: "projectPrivacySettings", targetId: id, newValue: { biometricEnabled: false } });
@@ -110,11 +112,7 @@ export const remove = authedMutation({
   handler: async (ctx, args) => {
     const project = await ctx.db.get(args.id);
     if (!project) throw new Error("Proje bulunamadı");
-    const isSuperAdmin = ctx.user.role === "super_admin";
-    const isOwner = project.ownerId === ctx.user._id;
-    if (!isSuperAdmin && !isOwner) {
-      throw new Error("Sadece proje sahibi veya süper admin silebilir");
-    }
+    await requirePermission(ctx, ctx.user, args.id, "admin.manage");
     // Sayım proje index'inde 101'de durur; büyük kümeler alt sınır olarak gösterilir.
     const counts = await projectDeletionCounts(ctx, args.id);
     const deletionError = projectDeletionError(projectDeletionBlockers(counts));
@@ -161,35 +159,30 @@ export const adminList = superAdminQuery({
   },
 });
 
-/** Owner-or-super-admin, identical to remove; no writes or lock promises. */
+/** Same permission as remove; no writes or lock promises. */
 export const getDeletionImpact = authedQuery({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
     const project = await ctx.db.get(args.projectId);
     if (!project) throw new Error("Proje bulunamadı");
-    if (ctx.user.role !== "super_admin" && project.ownerId !== ctx.user._id) {
-      throw new Error("Sadece proje sahibi veya süper admin silebilir");
-    }
+    await requirePermission(ctx, ctx.user, args.projectId, "admin.manage");
     return await projectDeletionImpact(ctx, args.projectId);
   },
 });
 
 /** İlk gerçek kart geçişine kadar seçili projenin kurulum durumu. */
-export const getSetupStatus = adminQuery({
+export const getSetupStatus = authedQuery({
   args: { projectId: v.id("projects") },
   handler: async (ctx, { projectId }) => {
     if (!(await ctx.db.get(projectId))) throw new Error("Proje bulunamadı");
-    // by_project üye rolünü içermez; ilk uygun üyede durur, diğer projeleri okumaz.
-    const memberships = stream(ctx.db, schema).query("userProjects")
-      .withIndex("by_project", q => q.eq("projectId", projectId));
-    if (ctx.user.role !== "super_admin") {
-      const membership = await memberships.filterWith(async row => row.userId === ctx.user._id).first();
-      if (!membership) throw new Error("Bu projeye erişim yetkiniz yok");
-    }
+    await requirePermission(ctx, ctx.user, projectId, "admin.manage");
     const [administrator, connectedDevice, cardholder, rule, reading] = await Promise.all([
       stream(ctx.db, schema).query("userProjects")
         .withIndex("by_project", q => q.eq("projectId", projectId))
-        .filterWith(async row => (await ctx.db.get(row.userId))?.role === "project_admin").first(),
+        .filterWith(async row => {
+          const member = await ctx.db.get(row.userId);
+          return member !== null && (row.role === "admin" || (member.role !== "super_admin" && await getProjectRole(ctx, member, projectId) === "admin"));
+        }).first(),
       // lastSeen ve aktif/kart koşullarının birleşik indeksi yok: proje aralığında erken dur.
       stream(ctx.db, schema).query("devices")
         .withIndex("by_project", q => q.eq("projectId", projectId))

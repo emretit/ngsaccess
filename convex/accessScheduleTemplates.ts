@@ -1,8 +1,9 @@
+import { requirePermission } from "./lib/permissions";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { authedQuery, adminMutation } from "./lib/customFunctions";
+import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { resolveProjectScope } from "./lib/projectScope";
 import { effectiveSchedule, normalizeWeek, toIdePermissionSegments, WEEKDAYS, type WeekSchedule } from "./lib/accessSchedule";
 
@@ -78,7 +79,7 @@ export async function assertIdeScheduleCapacity(ctx: QueryCtx, projectId: Id<"pr
 }
 export async function validateScheduleBinding(ctx: MutationCtx & { user: Doc<"users"> }, projectId: Id<"projects">, templateId: Id<"accessScheduleTemplates"> | null | undefined, previous?: Id<"accessScheduleTemplates">) {
   if (templateId === undefined) return;
-  if (ctx.user.role !== "super_admin" && ctx.user.role !== "project_admin") throw new Error("Bu işlem için yetkiniz yok");
+  await requirePermission(ctx, ctx.user, projectId, "accessRules.manage");
   if (templateId === null) return;
   const template = await ctx.db.get(templateId);
   if (!template || template.projectId !== projectId) throw new Error("Şablon bu projeye ait değil");
@@ -101,9 +102,10 @@ export const list = authedQuery({
 });
 export const get = authedQuery({ args: { templateId: v.id("accessScheduleTemplates") }, handler: readTemplateArg });
 async function readTemplateArg(ctx: QueryCtx, args: { templateId: Id<"accessScheduleTemplates"> }) { return await readTemplate(ctx, args.templateId); }
-export const create = adminMutation({
+export const create = authedMutation({
   args: { projectId: v.id("projects"), name: v.string(), description: v.optional(v.string()), week: weekValidator },
   handler: async (ctx, args) => {
+    await requirePermission(ctx, ctx.user, args.projectId, "accessRules.manage");
     await resolveProjectScope(ctx, args.projectId);
     const name = await uniqueName(ctx, args.projectId, args.name);
     const week = normalizeWeek(args.week);
@@ -113,10 +115,11 @@ export const create = adminMutation({
     return await ctx.db.insert("accessScheduleTemplates", { ...args, name, week, version: 1, createdAt: now, updatedAt: now });
   },
 });
-export const update = adminMutation({
+export const update = authedMutation({
   args: { templateId: v.id("accessScheduleTemplates"), name: v.optional(v.string()), description: v.optional(v.union(v.string(), v.null())), week: v.optional(weekValidator) },
   handler: async (ctx, args) => {
     const template = await readTemplate(ctx, args.templateId);
+    await requirePermission(ctx, ctx.user, template.projectId, "accessRules.manage");
     const week = normalizeWeek(args.week ?? template.week);
     toIdePermissionSegments(week);
     await templateRules(ctx, template._id);
@@ -131,27 +134,30 @@ export const update = adminMutation({
     return template._id;
   },
 });
-export const duplicate = adminMutation({
+export const duplicate = authedMutation({
   args: { templateId: v.id("accessScheduleTemplates"), name: v.string() },
   handler: async (ctx, args) => {
     const template = await readTemplate(ctx, args.templateId);
+    await requirePermission(ctx, ctx.user, template.projectId, "accessRules.manage");
     const name = await uniqueName(ctx, template.projectId, args.name);
     const now = new Date().toISOString();
     return await ctx.db.insert("accessScheduleTemplates", { projectId: template.projectId, name, description: template.description, week: template.week, version: 1, createdAt: now, updatedAt: now });
   },
 });
-export const setArchived = adminMutation({
+export const setArchived = authedMutation({
   args: { templateId: v.id("accessScheduleTemplates"), isArchived: v.boolean() },
   handler: async (ctx, args) => {
     const template = await readTemplate(ctx, args.templateId);
+    await requirePermission(ctx, ctx.user, template.projectId, "accessRules.manage");
     await ctx.db.patch(template._id, { isArchived: args.isArchived, updatedAt: new Date().toISOString() });
     return template._id;
   },
 });
-export const remove = adminMutation({
+export const remove = authedMutation({
   args: { templateId: v.id("accessScheduleTemplates") },
   handler: async (ctx, args) => {
     const template = await readTemplate(ctx, args.templateId);
+    await requirePermission(ctx, ctx.user, template.projectId, "accessRules.manage");
     const rules = await templateRules(ctx, template._id);
     if (rules.length) throw new Error(`${rules.length} kural kullanıyor`);
     if (template.pendingSyncJobId) await ctx.scheduler.cancel(template.pendingSyncJobId);

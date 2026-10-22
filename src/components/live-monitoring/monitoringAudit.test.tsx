@@ -1,3 +1,4 @@
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => false, loading: false }) }));
 import { getFunctionName } from "convex/server";
 import { MemoryRouter } from "react-router-dom";
 import CardReadings from "../access-control/CardReadings";

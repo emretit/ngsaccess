@@ -1,8 +1,8 @@
+import { resolveProjectScope } from "./lib/projectScope";
+import { getProjectIdsWithPermission } from "./lib/permissions";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { authedQuery } from "./lib/customFunctions";
-import { isManager } from "./lib/auth";
-import { resolveProjectScope } from "./lib/projectScope";
 
 /** Proje başına okunan biyometri satırı üst sınırı (kişi başına 1 yüz + en fazla 10 parmak). */
 const MAX_ROWS_PER_PROJECT = 5000;
@@ -20,8 +20,9 @@ export const summary = authedQuery({
     fingerNos: v.array(v.number()),
   })),
   handler: async (ctx, args) => {
-    if (!isManager(ctx.user)) return [];
-    const projectIds = await resolveProjectScope(ctx, args.projectId);
+    await resolveProjectScope(ctx, args.projectId);
+    const allowed = await getProjectIdsWithPermission(ctx, ctx.user, "biometrics.manage");
+    const projectIds = args.projectId ? allowed.filter(id => id === args.projectId) : allowed;
     const byEmployee = new Map<Id<"employees">, { face: boolean; fingerNos: number[] }>();
     const entry = (employeeId: Id<"employees">) => {
       let current = byEmployee.get(employeeId);

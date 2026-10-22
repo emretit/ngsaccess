@@ -1,8 +1,9 @@
+import { requirePermission } from "./lib/permissions";
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { adminMutation } from "./lib/customFunctions";
+import { authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { getHikModelSpec } from "./lib/hikModels";
 import { deriveHikReaderNoFromDoorNo } from "./lib/hikReaderNumbers";
@@ -57,7 +58,7 @@ async function countReadersForDevice(
   return rows.length;
 }
 
-export const create = adminMutation({
+export const create = authedMutation({
   args: {
     doorId: v.id("doors"),
     name: v.string(),
@@ -70,6 +71,7 @@ export const create = adminMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const door = await ctx.db.get(args.doorId);
     if (!door) throw new Error("Kapı bulunamadı");
+    await requirePermission(ctx, ctx.user, door.projectId, "devices.manage");
     if (!isProjectAllowed(allowedProjectIds, door.projectId)) {
       throw new Error("Bu kapıya erişim yetkiniz yok");
     }
@@ -111,7 +113,7 @@ export const create = adminMutation({
   },
 });
 
-export const move = adminMutation({
+export const move = authedMutation({
   args: {
     readerId: v.id("readers"),
     targetDoorId: v.id("doors"),
@@ -121,6 +123,7 @@ export const move = adminMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const reader = await ctx.db.get(args.readerId);
     if (!reader) throw new Error("Okuyucu bulunamadı");
+    await requirePermission(ctx, ctx.user, reader.projectId, "devices.manage");
     if (!isProjectAllowed(allowedProjectIds, reader.projectId)) {
       throw new Error("Bu okuyucuya erişim yetkiniz yok");
     }
@@ -158,7 +161,7 @@ export const move = adminMutation({
   },
 });
 
-export const update = adminMutation({
+export const update = authedMutation({
   args: {
     readerId: v.id("readers"),
     name: v.optional(v.string()),
@@ -172,6 +175,7 @@ export const update = adminMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const reader = await ctx.db.get(args.readerId);
     if (!reader) throw new Error("Okuyucu bulunamadı");
+    await requirePermission(ctx, ctx.user, reader.projectId, "devices.manage");
     if (!isProjectAllowed(allowedProjectIds, reader.projectId)) {
       throw new Error("Bu okuyucuya erişim yetkiniz yok");
     }
@@ -213,12 +217,13 @@ export const setHikReaderSnapshot = internalMutation({
   },
 });
 
-export const remove = adminMutation({
+export const remove = authedMutation({
   args: { readerId: v.id("readers") },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const reader = await ctx.db.get(args.readerId);
     if (!reader) throw new Error("Okuyucu bulunamadı");
+    await requirePermission(ctx, ctx.user, reader.projectId, "devices.manage");
     if (!isProjectAllowed(allowedProjectIds, reader.projectId)) {
       throw new Error("Bu okuyucuya erişim yetkiniz yok");
     }

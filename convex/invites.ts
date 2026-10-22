@@ -8,6 +8,8 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { superAdminQuery } from "./lib/customFunctions";
 import { limiter } from "./lib/rateLimit";
 import { getValidAuthUserId, verifyUser } from "./lib/auth";
+import { hasPermission } from "./lib/permissions";
+import { inviteRoleValidator, legacyRoleToProjectRole, projectRoleValidator } from "./lib/roleCatalog";
 
 /** Kurulumda tüketilebilecek davet: kullanılmamış, süresi dolmamış, "reset" olmayan. */
 async function getOpenSetupInvite(ctx: QueryCtx | MutationCtx, token: string) {
@@ -36,8 +38,9 @@ async function isFreshSetupAccount(ctx: QueryCtx | MutationCtx, user: Doc<"users
 }
 
 /**
- * Yetkili kullanıcı (super_admin / proje sahibi / proje admin) bir kullanıcıyı
+ * Yetkili kullanıcı (super_admin / projede `admin.manage` yetkisi olan) bir kullanıcıyı
  * projeye davet eder. Token yalnız e-posta action'ında kalır, istemciye dönmez.
+ * Rol proje rolü olarak saklanır; eski project_admin/project_user girdisi dönüştürülür.
  *
  * type === "reset" → mevcut kullanıcıya şifre sıfırlama maili (henüz Convex
  * Auth password reset entegrasyonu yok; bu field gelecek PR için hazırlık).
@@ -47,7 +50,7 @@ export const create = internalMutation({
     callerId: v.id("users"),
     email: v.string(),
     projectId: v.id("projects"),
-    role: v.union(v.literal("project_admin"), v.literal("project_user")),
+    role: inviteRoleValidator,
     type: v.optional(v.union(v.literal("invite"), v.literal("reset"))),
   },
   returns: v.string(),
@@ -56,22 +59,11 @@ export const create = internalMutation({
     if (!caller || caller.verified === false) {
       throw new Error("Giriş yapmanız gerekiyor");
     }
-    // Yetki: super_admin veya projenin owner'ı veya o projeye admin olarak atanmış
+    // Yetki: super_admin veya projede admin.manage (yalnız Yönetici rolünde; sahiplik tek başına yetmez)
     const project = await ctx.db.get(args.projectId);
     if (!project) throw new Error("Proje bulunamadı");
 
-    const isSuperAdmin = caller.role === "super_admin";
-    const isOwner = project.ownerId === caller._id;
-    let isProjectAdmin = false;
-    if (!isSuperAdmin && !isOwner && caller.role === "project_admin") {
-      const membership = await ctx.db
-        .query("userProjects")
-        .withIndex("by_user", (q) => q.eq("userId", caller._id))
-        .filter((q) => q.eq(q.field("projectId"), args.projectId))
-        .first();
-      isProjectAdmin = membership !== null;
-    }
-    if (!isSuperAdmin && !isOwner && !isProjectAdmin) {
+    if (!(await hasPermission(ctx, caller, args.projectId, "admin.manage"))) {
       throw new Error("Bu projeye davet gönderme yetkin yok");
     }
 
@@ -93,7 +85,7 @@ export const create = internalMutation({
       email: args.email.toLowerCase(),
       token,
       projectId: args.projectId,
-      role: args.role,
+      role: legacyRoleToProjectRole(args.role),
       type: args.type ?? "invite",
       createdBy: args.callerId,
       expiresAt,
@@ -114,7 +106,7 @@ export const verify = query({
     v.object({
       email: v.string(),
       projectId: v.id("projects"),
-      role: v.union(v.literal("project_admin"), v.literal("project_user")),
+      role: projectRoleValidator,
       type: v.union(v.literal("invite"), v.literal("reset")),
       expiresAt: v.string(),
     }),
@@ -133,7 +125,7 @@ export const verify = query({
     return {
       email: invite.email,
       projectId: invite.projectId,
-      role: invite.role,
+      role: legacyRoleToProjectRole(invite.role),
       type: invite.type ?? "invite",
       expiresAt: invite.expiresAt,
     };
@@ -215,7 +207,8 @@ export const claimSetupAccount = action({
 /**
  * Daveti yalnız oturumu davet e-postasıyla eşleşen hesap tüketebilir.
  * Doğrulanmamış yeni hesaba bu dar yolda izin verilir; genel auth guard değişmez.
- * Mevcut hesapların global rolü korunur, yalnız proje üyeliği eklenir.
+ * Proje rolü üyeliğe yazılır; mevcut üyeliğin rolü değişmez. Mevcut hesapların users.role'ü korunur
+ * (başka projede yükseltme olmasın); yeni kurulum hesabı platformda her zaman normal kalır.
  */
 export const consume = mutation({
   args: {
@@ -237,9 +230,10 @@ export const consume = mutation({
       throw new ConvexError({ code: "INVITE_EMAIL_MISMATCH" });
     }
 
+    const projectRole = legacyRoleToProjectRole(invite.role);
     if (await isFreshSetupAccount(ctx, user)) {
       await ctx.db.patch(user._id, {
-        role: invite.role,
+        role: "project_user",
         updatedAt: new Date().toISOString(),
       });
     }
@@ -260,6 +254,7 @@ export const consume = mutation({
       await ctx.db.insert("userProjects", {
         userId: user._id,
         projectId: invite.projectId,
+        role: projectRole,
         createdAt: new Date().toISOString(),
       });
     }
@@ -282,7 +277,7 @@ export const listExpired = superAdminQuery({
       _id: v.id("invites"),
       email: v.string(),
       projectId: v.id("projects"),
-      role: v.union(v.literal("project_admin"), v.literal("project_user")),
+      role: inviteRoleValidator,
       expiresAt: v.string(),
     })
   ),
@@ -315,7 +310,7 @@ export const list = superAdminQuery({
       _id: v.id("invites"),
       email: v.string(),
       projectId: v.id("projects"),
-      role: v.union(v.literal("project_admin"), v.literal("project_user")),
+      role: inviteRoleValidator,
       expiresAt: v.string(),
       used: v.optional(v.boolean()),
       createdAt: v.string(),
@@ -343,7 +338,7 @@ export const adminListByEmail = internalMutation({
     _id: v.id("invites"),
     email: v.string(),
     projectId: v.id("projects"),
-    role: v.union(v.literal("project_admin"), v.literal("project_user")),
+    role: inviteRoleValidator,
     type: v.union(v.literal("invite"), v.literal("reset")),
     expiresAt: v.string(),
     used: v.boolean(),

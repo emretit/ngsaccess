@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
-import { useAuth } from "@/components/auth/AuthProvider";
-import { capabilities } from "@/lib/capabilities";
+import { usePermissions } from "@/hooks/usePermissions";
+import { legacyRoleToProjectRole, isProjectRole } from "../../../../convex/lib/roleCatalog";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { errorMessage } from "@/lib/notify";
 import {
@@ -19,13 +19,13 @@ export type {
 } from "../types/user-types";
 const emptyForm = (): UserFormData => ({
   email: "",
-  role: "project_user",
+  role: "viewer",
   projectIds: [],
 });
 export const useUserManagement = () => {
-  const { profile } = useAuth();
+  const { can, role } = usePermissions();
   const { projectId } = useActiveProjectScope();
-  const permissions = capabilities(profile?.role);
+  const permissions = { admin: can("admin.manage"), manageUsers: role === "super_admin" };
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserFormData>(emptyForm);
   const [baseline, setBaseline] = useState<UserFormData>(emptyForm);
@@ -63,6 +63,7 @@ export const useUserManagement = () => {
     try {
       if (!editReady) throw new Error("Üyelikler yükleniyor.");
       if (currentUser) {
+        if (isProjectRole(formData.role)) throw new Error("Proje rolünü Ayarlar → Kullanıcılar bölümünden değiştirin.");
         await updateRole({
           userId: currentUser._id,
           role: formData.role,
@@ -76,7 +77,7 @@ export const useUserManagement = () => {
         if (!parsed.projectId) throw new Error("Bir proje seçin.");
         const result = await sendInvite({
           email: parsed.email.toLowerCase(),
-          role: parsed.role,
+          role: legacyRoleToProjectRole(parsed.role),
           projectId: parsed.projectId,
         });
         if (!result.success)
@@ -100,7 +101,8 @@ export const useUserManagement = () => {
     handleEditUser: (user: User) => {
       const data = {
         email: user.email ?? "",
-        role: user.role ?? "project_user",
+        // Platform account editing does not mirror or overwrite project roles.
+        role: user.role === "super_admin" ? "super_admin" as const : "project_user" as const,
       };
       setCurrentUser(user);
       setFormData(data);

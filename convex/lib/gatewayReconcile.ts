@@ -2,7 +2,7 @@
 
 import { internal } from "../_generated/api";
 import { type ActionCtx } from "../_generated/server";
-import { isProjectAllowed, isManager } from "./auth";
+import { isProjectAllowed } from "./auth";
 import type { Doc, Id } from "../_generated/dataModel";
 import {
   searchCardsOnDevice,
@@ -143,9 +143,8 @@ export async function runReconcileDevice(
   if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
     return { ok: false, ...emptyDiff(), error: "Bu cihaza erişim yetkiniz yok" };
   }
-  if (!isManager(ctx.user)) {
-    return { ok: false, ...emptyDiff(), error: "Bu işlem için yönetici yetkisi gerekiyor" };
-  }
+  const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: device.projectId, permission: "devices.manage" });
+  if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
   if (device.hikTransport !== "gateway") {
     return { ok: false, ...emptyDiff(), error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
   }

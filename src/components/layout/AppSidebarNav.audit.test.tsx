@@ -14,3 +14,5 @@ it("keeps the destination and upcoming badge on one line, with space reserved fo
   expect(link).toContain('class="min-w-0 flex-1 whitespace-nowrap">Sanal Okuyucular</span>');
   expect(link).toMatch(/class="[^"]*shrink-0 whitespace-nowrap[^"]*">Yakında<\/span>/);
 });
+
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, role: "admin", loading: false }) }));

@@ -17,8 +17,7 @@ vi.mock("./lib/customFunctions", () => {
       return (definition.handler as Handler)(ctx, args);
     },
   });
-  return { adminQuery: register, authedQuery: register, authedMutation: register, authedAction: register,
-    adminMutation: (definition: { handler: unknown }) => register(definition, true) };
+  return { authedQuery: register, authedMutation: register, authedAction: register,};
 });
 vi.mock("./lib/auth", async importOriginal => {
   const original = await importOriginal<typeof import("./lib/auth")>();
@@ -67,7 +66,7 @@ function fixture(role: Role, projectId: string | undefined, memberships = ["own"
     const selected = () => rows.filter(row => row.table === table && filters.every(([key, value]) => row[key] === value));
     const chain = {
       withIndex: (_name: string, index: (builder: typeof q) => unknown) => { index(q); return chain; },
-      collect: async () => selected(), take: async (n: number) => selected().slice(0, n), order: () => chain,
+      collect: async () => selected(), take: async (n: number) => selected().slice(0, n), unique: async () => selected()[0] ?? null, order: () => chain,
     };
     return chain;
   };
@@ -98,7 +97,7 @@ describe.each(operations)("$name project boundary", operation => {
         vi.clearAllMocks();
         const f = fixture(role, scope === "orphan" ? undefined : scope === "other" ? "other" : "own", scope === "no-membership" ? [] : ["own"]);
         const allowed = (role === "super_admin" || scope === "own") &&
-          !(operation.name.startsWith("accessRules.") && role === "project_user");
+          !(role === "project_user" && (operation.name.startsWith("accessRules.") || operation.name.startsWith("shifts.") || operation.name.startsWith("departments.")));
         const result = handler(operation.fn)(f.ctx, operation.args);
         if (allowed) {
           await result;

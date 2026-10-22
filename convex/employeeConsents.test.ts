@@ -94,10 +94,10 @@ describe("KVKK rızaları", () => {
     expect(await f.t.run(ctx => ctx.db.query("employeeConsents").collect())).toHaveLength(0);
     expect(await f.t.run(ctx => ctx.db.query("pendingUploads").collect())).toHaveLength(pending ? 1 : 0);
   });
-  it("project_user listeleyebilir, grant/revoke/belge URL alamaz", async () => {
+  it("project_user hassas rızaları göremez, grant/revoke/belge URL alamaz", async () => {
     const f = await fixture("project_user");
     const id = await f.t.run(ctx => ctx.db.insert("employeeConsents", { employeeId: f.employeeId, consentType: "photo", grantedAt: "now" }));
-    expect(await f.caller.query(api.employeeConsents.listForEmployee, { employeeId: f.employeeId })).toHaveLength(1);
+    expect(await f.caller.query(api.employeeConsents.listForEmployee, { employeeId: f.employeeId })).toHaveLength(0);
     await expect(f.caller.mutation(api.employeeConsents.grant, { employeeId: f.employeeId, consentType: "photo" })).rejects.toThrow("yetkiniz yok");
     await expect(f.caller.mutation(api.employeeConsents.revoke, { id })).rejects.toThrow("yetkiniz yok");
     await expect(f.caller.query(api.employeeConsents.getDocumentUrl, { id })).rejects.toThrow("yetkiniz yok");

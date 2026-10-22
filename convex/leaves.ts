@@ -1,3 +1,4 @@
+import { requirePermission } from "./lib/permissions";
 import { stream } from "convex-helpers/server/stream";
 import schema from "./schema";
 import { resolveProjectScope } from "./lib/projectScope";
@@ -5,7 +6,7 @@ import { ConvexError, v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { authedQuery, adminMutation } from "./lib/customFunctions";
+import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { approvedLeaveFields, canManageLeaves } from "./lib/leaveRules";
 import { toPatch } from "./lib/nullablePatch";
 import { calendarDays, LEAVE_ERRORS, leaveError, overlaps, validateLeaveRange } from "./lib/leaveValidation";
@@ -123,7 +124,7 @@ export const listPage = authedQuery({
     calendarDays(args.rangeStart, args.rangeEnd);
     if (!Number.isInteger(args.paginationOpts.numItems) || args.paginationOpts.numItems < 1 || args.paginationOpts.numItems > 200) return leaveError("LEAVE_INVALID_PAGE_SIZE");
     const result = await filteredLeaves(ctx, args).paginate(args.paginationOpts);
-    return { ...result, page: await enrichLeavePage(ctx, result.page, args.projectId, !canManageLeaves(ctx.user.role)) };
+    return { ...result, page: await enrichLeavePage(ctx, result.page, args.projectId, !(await canManageLeaves(ctx, ctx.user, args.projectId))) };
   },
 });
 
@@ -155,6 +156,7 @@ export const employeeOptions = authedQuery({
   args: { projectId: v.id("projects"), search: v.optional(v.string()), selectedId: v.optional(v.id("employees")) },
   handler: async (ctx, args) => {
     await resolveProjectScope(ctx, args.projectId);
+    await requirePermission(ctx, ctx.user, args.projectId, "employees.view");
     const selectedEmployee = args.selectedId ? await ctx.db.get(args.selectedId) : null;
     const selected = selectedEmployee?.projectId === args.projectId ? { _id: selectedEmployee._id, employeeName: `${selectedEmployee.firstName} ${selectedEmployee.lastName}`.trim() } : null;
     const search = args.search?.trim().toLocaleLowerCase("tr-TR") ?? "";
@@ -175,7 +177,7 @@ export const employeeOptions = authedQuery({
   },
 });
 
-export const create = adminMutation({
+export const create = authedMutation({
   args: {
     employeeId: v.id("employees"),
     projectId: v.optional(v.id("projects")),
@@ -186,20 +188,21 @@ export const create = adminMutation({
   },
   handler: async (ctx, args) => {
     const emp = await requireLeaveEmployee(ctx, args.employeeId, args.projectId);
+    await requirePermission(ctx, ctx.user, emp.projectId, "attendance.approve");
     validateLeaveRange(args.startDate, args.endDate);
     await assertNoLeaveOverlap(ctx, args.employeeId, args.startDate, args.endDate);
     const now = new Date().toISOString();
     return await ctx.db.insert("leaves", {
       ...args,
       projectId: emp.projectId,
-      ...approvedLeaveFields(ctx.user),
+      ...await approvedLeaveFields(ctx, ctx.user, emp.projectId),
       createdAt: now,
       updatedAt: now,
     });
   },
 });
 
-export const update = adminMutation({
+export const update = authedMutation({
   args: {
     leaveId: v.id("leaves"),
     leaveType: v.optional(leaveTypeValidator),
@@ -212,7 +215,7 @@ export const update = adminMutation({
     const leave = await ctx.db.get(args.leaveId);
     if (!leave) return leaveError("LEAVE_NOT_FOUND");
     if (!leave.projectId) return leaveError("LEAVE_PROJECT_MISMATCH");
-    await resolveProjectScope(ctx, leave.projectId);
+    await requirePermission(ctx, ctx.user, leave.projectId, "attendance.approve");
     await requireLeaveEmployee(ctx, leave.employeeId, leave.projectId);
     if (leave.status !== "approved") return leaveError("LEAVE_READ_ONLY");
     if (leave.updatedAt !== args.expectedUpdatedAt) return leaveError("LEAVE_STALE");

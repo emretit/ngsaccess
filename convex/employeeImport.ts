@@ -1,5 +1,6 @@
+import { requirePermission } from "./lib/permissions";
 import { v } from "convex/values";
-import { adminMutation } from "./lib/customFunctions";
+import { authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { findDuplicateImportRows, normalizeEmployeeImportName, validateEmployeeImportRow } from "./lib/employeeImportValidation";
 import { writeAudit } from "./lib/audit";
@@ -21,12 +22,13 @@ const duplicateMessages = {
   cardNumber: "Bu kart numarası başka bir personelde kullanılıyor",
 } as const;
 
-export const importChunk = adminMutation({
+export const importChunk = authedMutation({
   args: { projectId: v.id("projects"), rows: v.array(rowValidator), dryRun: v.boolean() },
   handler: async (ctx, args) => {
     if (args.rows.length > 100) throw new Error("Bir çağrıda en fazla 100 satır içe aktarılabilir");
     const allowed = await getProjectIdsForUser(ctx);
     if (!isProjectAllowed(allowed, args.projectId)) throw new Error("Bu projeye erişim yetkiniz yok");
+    await requirePermission(ctx, ctx.user, args.projectId, "employees.manage");
     const inFileDuplicates = findDuplicateImportRows(args.rows);
     const results: { rowNumber: number; status: "created" | "skippedDuplicate" | "error"; message: string }[] = [];
     const departments = await ctx.db.query("departments").withIndex("by_project", q => q.eq("projectId", args.projectId)).take(500);
@@ -87,7 +89,7 @@ export const importChunk = adminMutation({
   },
 });
 
-export const assignCards = adminMutation({
+export const assignCards = authedMutation({
   args: { assignments: v.array(v.object({ employeeId: v.id("employees"), cardNumber: v.string() })) },
   handler: async (ctx, args) => {
     if (args.assignments.length > 200) throw new Error("Bir çağrıda en fazla 200 kart atanabilir");
@@ -101,6 +103,7 @@ export const assignCards = adminMutation({
         results.push({ employeeId: assignment.employeeId, status: "error", message: "Kişiye erişim yetkiniz yok" });
         continue;
       }
+      await requirePermission(ctx, ctx.user, employee.projectId, "employees.manage");
       if (employee.projectId) projectIds.add(employee.projectId);
       if (!cardNumber || cardNumber.length > 128 || !/^[\w-]+$/.test(cardNumber)) {
         results.push({ employeeId: assignment.employeeId, status: "error", message: "Kart numarası biçimi geçersiz" });
@@ -133,7 +136,7 @@ export const assignCards = adminMutation({
   },
 });
 
-export const logExport = adminMutation({
+export const logExport = authedMutation({
   args: { projectId: v.id("projects"), rowCount: v.number() },
   handler: async (ctx, args) => {
     if (!Number.isInteger(args.rowCount) || args.rowCount < 0 || args.rowCount > 5000) {
@@ -141,6 +144,7 @@ export const logExport = adminMutation({
     }
     const allowed = await getProjectIdsForUser(ctx);
     if (!isProjectAllowed(allowed, args.projectId)) throw new Error("Bu projeye erişim yetkiniz yok");
+    await requirePermission(ctx, ctx.user, args.projectId, "reports.view");
     await writeAudit(ctx, {
       user: ctx.user, projectId: args.projectId, action: "update", targetTable: "employees",
       targetId: String(args.projectId), newValue: { exported: args.rowCount }, note: "Excel dışa aktarma",

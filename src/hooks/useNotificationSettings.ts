@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -11,7 +12,8 @@ interface NotificationSettingsInput {
 }
 
 export function useNotificationSettings() {
-  const { projectId, loading: projectLoading, isAdmin } = useActiveProjectScope();
+  const { projectId, loading: projectLoading } = useActiveProjectScope();
+  const isAdmin = usePermissions().can("admin.manage");
 
   const notificationSettings = useQuery(
     api.settings.getNotification,

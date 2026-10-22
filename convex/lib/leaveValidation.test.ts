@@ -7,7 +7,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { create, employeeOptions, listForRange, listPage, summary, update } from "../leaves";
 import { calendarDays, LEAVE_ERRORS, overlaps, validateLeaveRange } from "./leaveValidation";
 
-// No convex-test package is installed. Keep the real authedQuery/adminMutation wrappers;
+// No convex-test package is installed. Keep the real authedQuery/authedMutation wrappers;
 // replace identity/project lookup and database transport, as in liveReadings.test.ts.
 vi.mock("./auth", async (importOriginal) => ({
   ...await importOriginal<typeof import("./auth")>(),
@@ -34,6 +34,7 @@ type Row = Record<string, unknown>;
 function fixture(leaves: Doc<"leaves">[] = []) {
   const user = { _id: "admin", role: "project_admin" };
   const tables: Record<string, Row[]> = {
+    userProjects: [{ _id: "membership", userId: "admin", projectId }],
     leaves,
     employees: [{ _id: employeeId, projectId, firstName: "Ada", lastName: "Test", departmentId, isActive: true }],
     departments: [{ _id: departmentId, projectId, name: "Üretim" }],
@@ -69,6 +70,7 @@ function fixture(leaves: Doc<"leaves">[] = []) {
         return chain;
       },
       filterWith: (fn: typeof predicate) => { predicate = fn; return chain; },
+      unique: async () => selected[0] ?? null,
       first: async () => (await matching())[0] ?? null,
       take: async (n: number) => (await matching()).slice(0, n),
       collect: async () => selected,

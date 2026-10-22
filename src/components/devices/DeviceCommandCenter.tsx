@@ -1,10 +1,10 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { DeviceActionsSection } from "./DeviceActionsSection";
 import { DeviceEventsSection } from "./DeviceEventsSection";
 import { DeviceDoorsSection } from "./DeviceDoorsSection";
 import { DeviceQueueSection } from "./DeviceQueueSection";
 import { DeviceConnectionSection } from "./DeviceConnectionSection";
 import { useQuery } from "convex/react";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { useNow } from "@/hooks/useNow";
 import { deviceConnection, capabilityLabel } from "@/lib/deviceStatus";
 import { errorMessage } from "@/lib/notify";
@@ -49,7 +49,8 @@ function DeviceCenter({
 }) {
   const device = overview.device;
   const clock = useNow(15_000);
-  const { isAdmin } = useProjectAccess();
+  const { can } = usePermissions();
+  const canManage = can("devices.manage");
   const commands = useDeviceCommands(device, onPendingChange);
   const {
     pending,
@@ -114,7 +115,7 @@ function DeviceCenter({
     offlineMessage,
     adapter,
     queueRows,
-    isAdmin,
+    canManage,
     ...commands,
   };
   return (
@@ -187,7 +188,7 @@ function DeviceCenter({
       </details>
       <DeviceEventsSection {...view} />
 
-      {isAdmin && <DeviceActionsSection {...view} />}
+      {canManage && <DeviceActionsSection {...view} />}
 
       <ConfirmDestructive
         open={pendingAction?.destructive === true}

@@ -1,8 +1,9 @@
+import { getProjectIdsWithPermission, requirePermission } from "./lib/permissions";
 import { paginationOptsValidator } from "convex/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { ConvexError, v } from "convex/values";
-import { adminMutation, adminQuery, employeeAuthedMutation, employeeAuthedQuery } from "./lib/customFunctions";
+import { authedMutation, authedQuery, employeeAuthedMutation, employeeAuthedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed, canAccessEmployeeProject } from "./lib/auth";
 import { findManualPdksRecord, validateManualPdksForEmployee, writeManualPdksRecord } from "./lib/pdksManualWrite";
 import { writeAudit } from "./lib/audit";
@@ -52,10 +53,12 @@ export const listMine = employeeAuthedQuery({
   },
 });
 
-export const listPending = adminQuery({
+export const listPending = authedQuery({
   args: { paginationOpts: paginationOptsValidator, projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
-    const allowed = await getProjectIdsForUser(ctx);
+    const memberships = await getProjectIdsForUser(ctx);
+    if (args.projectId && !isProjectAllowed(memberships, args.projectId)) throw new ConvexError("Bu projeye erişim yetkiniz yok");
+    const allowed = await getProjectIdsWithPermission(ctx, ctx.user, "attendance.approve");
     if (args.projectId && !isProjectAllowed(allowed, args.projectId)) throw new ConvexError("Bu projeye erişim yetkiniz yok");
     const projects = args.projectId ? [args.projectId] : allowed;
     // Proje başına en fazla 200 kayıt okunur; sınıra ulaşan projeler için hasMore kesilmeyi bildirir.
@@ -72,6 +75,7 @@ export const listPending = adminQuery({
 async function decision(ctx: MutationCtx & { user: Doc<"users"> }, id: Id<"attendanceCorrections">, approve: boolean, note?: string) {
   const row = await ctx.db.get(id);
   if (!row || !row.projectId) throw new ConvexError("Düzeltme talebi bulunamadı");
+  await requirePermission(ctx, ctx.user, row.projectId, "attendance.approve");
   const allowed = await getProjectIdsForUser(ctx);
   const employee = await ctx.db.get(row.employeeId);
   if (!isProjectAllowed(allowed, row.projectId) || !employee || !canAccessEmployeeProject(ctx.user.role, allowed, employee.projectId) || employee.projectId !== row.projectId) throw new ConvexError("Bu düzeltme talebine erişim yetkiniz yok");
@@ -87,5 +91,5 @@ async function decision(ctx: MutationCtx & { user: Doc<"users"> }, id: Id<"atten
   await writeAudit(ctx, { user: ctx.user, projectId: row.projectId, action: "update", targetTable: "attendanceCorrections", targetId: id, oldValue: { status: row.status }, newValue: { status: approve ? "approved" : "rejected", date: row.date }, note });
 }
 
-export const approve = adminMutation({ args: { id: v.id("attendanceCorrections"), note: v.optional(v.string()) }, handler: async (ctx, args) => { await decision(ctx, args.id, true, args.note); return null; } });
-export const reject = adminMutation({ args: { id: v.id("attendanceCorrections"), note: v.string() }, handler: async (ctx, args) => { if (args.note.trim().length < 3 || args.note.length > 500) throw new ConvexError("Red gerekçesi en az 3 karakter olmalı"); await decision(ctx, args.id, false, args.note.trim()); return null; } });
+export const approve = authedMutation({ args: { id: v.id("attendanceCorrections"), note: v.optional(v.string()) }, handler: async (ctx, args) => { await decision(ctx, args.id, true, args.note); return null; } });
+export const reject = authedMutation({ args: { id: v.id("attendanceCorrections"), note: v.string() }, handler: async (ctx, args) => { if (args.note.trim().length < 3 || args.note.length > 500) throw new ConvexError("Red gerekçesi en az 3 karakter olmalı"); await decision(ctx, args.id, false, args.note.trim()); return null; } });

@@ -1,8 +1,9 @@
+import { requirePermission } from "./lib/permissions";
 import { paginationOptsValidator } from "convex/server";
 import { stream } from "convex-helpers/server/stream";
 import schema from "./schema";
 import { v } from "convex/values";
-import { adminMutation, adminQuery, authedQuery } from "./lib/customFunctions";
+import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
@@ -63,7 +64,7 @@ export const summary = authedQuery({
   },
 });
 
-export const acknowledge = adminMutation({
+export const acknowledge = authedMutation({
   args: { ids: v.array(v.id("deviceEvents")), note: v.optional(v.string()) },
   handler: async (ctx, args) => {
     if (args.ids.length < 1 || args.ids.length > 50) throw new Error("En fazla 50 olay seçilebilir");
@@ -73,6 +74,7 @@ export const acknowledge = adminMutation({
     for (const id of [...new Set(args.ids)]) {
       const event = await ctx.db.get(id);
       if (!event || !event.projectId || !isProjectAllowed(allowed, event.projectId)) throw new Error("Olay bulunamadı veya erişim yetkiniz yok");
+      await requirePermission(ctx, ctx.user, event.projectId, "alarms.ack");
       if (event.category !== "alarm" && event.category !== "exception") throw new Error("Yalnızca alarm ve istisna olayları onaylanabilir");
       if (event.ackedAt) continue;
       await ctx.db.patch(id, { ackedAt: now, ackedBy: ctx.user._id, ackNote: args.note?.trim() || undefined, updatedAt: now });
@@ -83,10 +85,11 @@ export const acknowledge = adminMutation({
   },
 });
 
-export const getSettings = adminQuery({
+export const getSettings = authedQuery({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args) => {
     if (!isProjectAllowed(await getProjectIdsForUser(ctx), args.projectId)) throw new Error("Bu projeye erişim yetkiniz yok");
+    await requirePermission(ctx, ctx.user, args.projectId, "admin.manage");
     const settings = await ctx.db.query("alarmSettings").withIndex("by_project", q => q.eq("projectId", args.projectId)).unique();
     const last = settings?.lastEmailEventId ? await ctx.db.get(settings.lastEmailEventId) : null;
     return {
@@ -97,10 +100,11 @@ export const getSettings = adminQuery({
   },
 });
 
-export const saveSettings = adminMutation({
+export const saveSettings = authedMutation({
   args: { projectId: v.id("projects"), emailEnabled: v.boolean(), recipients: v.array(v.string()), minSeverity: v.union(v.literal("warning"), v.literal("critical")) },
   handler: async (ctx, args) => {
     if (!isProjectAllowed(await getProjectIdsForUser(ctx), args.projectId)) throw new Error("Bu projeye erişim yetkiniz yok");
+    await requirePermission(ctx, ctx.user, args.projectId, "admin.manage");
     const recipients = [...new Set(args.recipients.map(email => email.trim().toLowerCase()).filter(email => email.length > 0))];
     if (args.recipients.length > 8 || args.recipients.some(email => email.length > 254) || recipients.some(email => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw new Error("En fazla 8 geçerli e-posta adresi girin");
     const existing = await ctx.db.query("alarmSettings").withIndex("by_project", q => q.eq("projectId", args.projectId)).unique();
@@ -127,10 +131,11 @@ export const emailPayload = internalQuery({
 });
 
 /** Test requests share the normal delivery pipeline, but never appear as an alarm. */
-export const testEmail = adminMutation({
+export const testEmail = authedMutation({
   args: { projectId: v.id("projects") },
   handler: async (ctx, args): Promise<{ queued: boolean }> => {
     if (!isProjectAllowed(await getProjectIdsForUser(ctx), args.projectId)) throw new Error("Bu projeye erişim yetkiniz yok");
+    await requirePermission(ctx, ctx.user, args.projectId, "admin.manage");
     const settings = await ctx.db.query("alarmSettings").withIndex("by_project", q => q.eq("projectId", args.projectId)).unique();
     if (!settings?.emailEnabled || settings.recipients.length === 0) throw new Error("Önce alarm e-postasını açıp en az bir alıcı kaydedin");
     const nowMs = Date.now();

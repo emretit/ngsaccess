@@ -1,8 +1,9 @@
+import { requirePermission } from "./lib/permissions";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { adminMutation, adminQuery } from "./lib/customFunctions";
+import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import { getPrivacyRow, getPrivacySettings, upsertPrivacySettings } from "./lib/privacySettings";
 import { writeAudit } from "./lib/audit";
@@ -15,19 +16,19 @@ async function requireProject(ctx: QueryCtx | MutationCtx, projectId: Id<"projec
   if (!allowed.includes(projectId)) throw new ConvexError({ code: "FORBIDDEN", message: "Bu projeye erişim yetkiniz yok." });
 }
 
-export const getRetentionAndAssistant = adminQuery({
+export const getRetentionAndAssistant = authedQuery({
   args: { projectId: v.id("projects") },
   handler: async (ctx, { projectId }) => {
-    await requireProject(ctx, projectId);
+    await requirePermission(ctx, ctx.user, projectId, "admin.manage");
     const { cardReadingRetentionDays, aiMaskNames } = await getPrivacySettings(ctx, projectId);
     return { cardReadingRetentionDays, aiMaskNames };
   },
 });
 
-export const setCardReadingRetention = adminMutation({
+export const setCardReadingRetention = authedMutation({
   args: { projectId: v.id("projects"), days: v.union(v.number(), v.null()) },
   handler: async (ctx, { projectId, days }): Promise<null> => {
-    await requireProject(ctx, projectId);
+    await requirePermission(ctx, ctx.user, projectId, "admin.manage");
     if (!validRetentionDays(days)) throw new ConvexError({ code: "INVALID_RETENTION", message: "Saklama süresi 1825–3650 arasında tam gün olmalıdır." });
     const oldValue = (await getPrivacySettings(ctx, projectId)).cardReadingRetentionDays;
     await upsertPrivacySettings(ctx, projectId, { cardReadingRetentionDays: days });
@@ -36,10 +37,10 @@ export const setCardReadingRetention = adminMutation({
   },
 });
 
-export const setAssistantMasking = adminMutation({
+export const setAssistantMasking = authedMutation({
   args: { projectId: v.id("projects"), enabled: v.boolean() },
   handler: async (ctx, { projectId, enabled }): Promise<null> => {
-    await requireProject(ctx, projectId);
+    await requirePermission(ctx, ctx.user, projectId, "admin.manage");
     const oldValue = (await getPrivacySettings(ctx, projectId)).aiMaskNames;
     await upsertPrivacySettings(ctx, projectId, { aiMaskNames: enabled });
     await writeAudit(ctx, { user: ctx.user, projectId, action: "update", targetTable: "projectPrivacySettings", targetId: projectId, oldValue: { aiMaskNames: oldValue }, newValue: { aiMaskNames: enabled } });
@@ -106,19 +107,19 @@ export const purgeProjectBatch = internalMutation({
 });
 
 
-export const getVisitorNotice = adminQuery({
+export const getVisitorNotice = authedQuery({
   args: { projectId: v.id("projects") },
   handler: async (ctx, { projectId }) => {
-    await requireProject(ctx, projectId);
+    await requirePermission(ctx, ctx.user, projectId, "admin.manage");
     const row = await getPrivacyRow(ctx, projectId);
     return { visitorKvkkUrl: row?.visitorKvkkUrl ?? "", visitorKvkkVersion: row?.visitorKvkkVersion ?? "" };
   },
 });
 
-export const setVisitorNotice = adminMutation({
+export const setVisitorNotice = authedMutation({
   args: { projectId: v.id("projects"), visitorKvkkUrl: v.string(), visitorKvkkVersion: v.string() },
   handler: async (ctx, { projectId, visitorKvkkUrl, visitorKvkkVersion }): Promise<null> => {
-    await requireProject(ctx, projectId);
+    await requirePermission(ctx, ctx.user, projectId, "admin.manage");
     const url = visitorKvkkUrl.trim();
     const version = visitorKvkkVersion.trim();
     if (url.length > 2048 || version.length > 100 || Boolean(url) !== Boolean(version)) {

@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { todayInTurkey } from "@/lib/date";
@@ -11,12 +12,11 @@ import { derivePdksRecordsView, type RecordsSelection, type RecordsDrilldown } f
 export function usePdksRecordsView(filters: FilterValues, setFilters: (values: FilterValues) => void) {
   const navigate = useNavigate();
   const { departments, companies, positions, shifts } = usePdksFilterOptions();
-  const {
-    projectId,
+  const { projectId,
     activeProject,
-    isAdmin,
-    loading: projectLoading,
-  } = useActiveProject();
+    loading: projectLoading } = useActiveProject();
+  const { can } = usePermissions();
+  const canManage = can("attendance.approve");
   const [ai, setAi] = useState(false),
     [importOpen, setImport] = useState(false),
     [datesOpen, setDatesOpen] = useState(false),
@@ -44,6 +44,6 @@ export function usePdksRecordsView(filters: FilterValues, setFilters: (values: F
     setDetailTrigger(document.activeElement instanceof HTMLElement ? document.activeElement : null);
     setDrilldown({ scope, employeeId: employeeId as Id<"employees">, date });
   };
-  return { ...derived, filters, setFilters, navigate, projectId, activeProject, isAdmin, projectLoading, ai, setAi, importOpen, setImport, datesOpen, setDatesOpen, analysis, setAnalysis, warningsOpen, setWarningsOpen, rangeError, setRangeError, setSmartPreset, setSelection, setDrilldown, isLoading, selectedDate, dateRangeLabel, startDate, endDate, detailTrigger, openDetail };
+  return { ...derived, filters, setFilters, navigate, projectId, activeProject, canManage, projectLoading, ai, setAi, importOpen, setImport, datesOpen, setDatesOpen, analysis, setAnalysis, warningsOpen, setWarningsOpen, rangeError, setRangeError, setSmartPreset, setSelection, setDrilldown, isLoading, selectedDate, dateRangeLabel, startDate, endDate, detailTrigger, openDetail };
 }
 export type PdksRecordsView = ReturnType<typeof usePdksRecordsView>;

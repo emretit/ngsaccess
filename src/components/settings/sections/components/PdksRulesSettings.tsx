@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -35,7 +36,8 @@ export type {
 } from "./pdksRulesModel";
 
 export function PdksRulesSettings() {
-  const { projectId, isAdmin } = useActiveProjectScope();
+  const { projectId } = useActiveProjectScope();
+  const isAdmin = usePermissions().can("schedule.manage");
   const rules = useQuery(
     api.pdksRules.getRules,
     isAdmin && projectId ? { projectId } : "skip",

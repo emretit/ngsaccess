@@ -7,7 +7,7 @@ import { listReportTransactions } from '../../../convex/cardReadings';
 import type { TransactionPage } from './transactions';
 vi.mock('../../../convex/lib/customFunctions', () => {
   const pass = (config: unknown) => config;
-  return { authedQuery: pass, adminMutation: pass, employeeAuthedQuery: pass, employeeAuthedMutation: pass };
+  return { authedMutation: pass, authedQuery: pass, employeeAuthedQuery: pass, employeeAuthedMutation: pass };
 });
 vi.mock('../../../convex/lib/auth', () => ({ getProjectIdsForUser: async () => ['project'] }));
 const projectId = 'project' as Id<'projects'>;

@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { restorePdksFocus } from "../lib/focus";
 import { Component, useState, type ReactNode } from "react";
 import { PdksExcludedReadingsNotice } from "./PdksExcludedReadingsNotice";
@@ -94,7 +95,9 @@ function Detail({
   endDate,
   highlightDate,
 }: Props & { employeeId: Id<"employees"> }) {
-  const { projectId, isAdmin } = useActiveProject();
+  const { projectId } = useActiveProject();
+  const { can } = usePermissions();
+  const canManage = can("attendance.approve");
   const detail = useQuery(api.cardReadings.getEmployeeAttendanceDetail, {
     projectId,
     employeeId,
@@ -210,7 +213,7 @@ function Detail({
               endDate={day.date}
             />
           </details>
-          {isAdmin && day.status !== "future" && (
+          {canManage && day.status !== "future" && (
             <Button onClick={event => { setManualTrigger(event.currentTarget); setEditing(day.date); }}>Manuel düzelt</Button>
           )}
           {editing === day.date && day.status !== "future" && (

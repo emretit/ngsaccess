@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { Link } from "react-router-dom";
 import { useConsentDocumentUpload } from "./hooks/useConsentDocumentUpload";
 import { Input } from "@/components/ui/input";
@@ -23,8 +24,6 @@ import {
 } from "@/components/ui/dialog";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
-import { useAuth } from "@/components/auth/AuthProvider";
-import { capabilities } from "@/lib/capabilities";
 import { notify } from "@/lib/notify";
 
 type ConsentType = "biometric_face" | "biometric_fingerprint" | "card" | "photo";
@@ -60,11 +59,12 @@ interface PDKSEmployeeConsentsCardProps {
 }
 
 export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardProps) {
-  const { profile } = useAuth();
-  const canManageConsents = capabilities(profile?.role).admin;
+  const { can } = usePermissions();
+  const canManageConsent = (type: ConsentType) => can(type.startsWith("biometric_") ? "biometrics.manage" : "employees.manage");
+  const canManageConsents = can("biometrics.manage") || can("employees.manage");
   const consents = useQuery(api.employeeConsents.listForEmployee, { employeeId });
   const biometricModule = useQuery(api.privacyBiometric.getEmployeeBiometricModule, { employeeId });
-  const fingerprints = useQuery(api.fingerprintEnrollment.listForEmployee, canManageConsents ? { employeeId } : "skip");
+  const fingerprints = useQuery(api.fingerprintEnrollment.listForEmployee, can("biometrics.manage") ? { employeeId } : "skip");
   const notesId = useId();
   const [revokeTarget, setRevokeTarget] = useState<{ id: Id<"employeeConsents">; label: string; type: ConsentType } | null>(null);
   const grant = useMutation(api.employeeConsents.grant);
@@ -85,7 +85,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
   }
 
   const handleGrant = async () => {
-    if (!canManageConsents || document.pending || document.error || !grantingType || (grantingType.startsWith("biometric_") && biometricModule?.enabled !== true)) return;
+    if (!grantingType || !canManageConsent(grantingType) || document.pending || document.error || (grantingType.startsWith("biometric_") && biometricModule?.enabled !== true)) return;
     setSubmitting(true);
     try {
       await grant({
@@ -131,6 +131,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
       <Separator />
       <div className="space-y-2">
         {(Object.keys(CONSENT_META) as ConsentType[]).filter(type => type !== "card" || activeByType.has("card")).map((type) => {
+          const canManageType = canManageConsent(type);
           const meta = CONSENT_META[type];
           const Icon = meta.icon;
           const active = activeByType.get(type);
@@ -158,7 +159,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                   {meta.description}
                 </div>
                 {!active && moduleClosed && <p className="text-xs text-muted-foreground mt-1">
-                  Biyometri modülü kapalı. {canManageConsents && <Link className="underline" to="/settings?tab=privacy">Ayarlar › Gizlilik ve KVKK</Link>}
+                  Biyometri modülü kapalı. {can("admin.manage") && <Link className="underline" to="/settings?tab=privacy">Ayarlar › Gizlilik ve KVKK</Link>}
                 </p>}
                 {active && (
                   <div className="text-[11px] text-muted-foreground mt-1">
@@ -166,7 +167,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                     {active.notes && <span> · {active.notes}</span>}
                   </div>
                 )}
-                {canManageConsents && active?.documentStorageId && <Button type="button" variant="link" size="sm" className="max-sm:min-h-11 px-0" onClick={async () => {
+                {canManageType && active?.documentStorageId && <Button type="button" variant="link" size="sm" className="max-sm:min-h-11 px-0" onClick={async () => {
                   let tab: Window | null = null;
                   try {
                     tab = window.open("", "_blank");
@@ -178,7 +179,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
                   } catch (error: unknown) { tab?.close(); notify.error("Belge açılamadı", error); }
                 }}>Belgeyi aç</Button>}
               </div>
-              {canManageConsents && <div className="shrink-0">
+              {canManageType && <div className="shrink-0">
                 {active ? (
                   <Button
                     size="sm"
@@ -275,7 +276,7 @@ export function EmployeeConsentsCard({ employeeId }: PDKSEmployeeConsentsCardPro
             title="Rıza iptal edilsin mi?" objectName={revokeTarget?.label ?? "Rıza"}
             effects={[revokeTarget?.type === "biometric_fingerprint" ? fingerprints && fingerprints.enrollments.length > 0 ? `Cihazlardaki ${fingerprints.enrollments.length} parmak izi kaydı da silinir.` : "Cihazlardaki parmak izi kayıtları da silinir." : "Rıza kaydı geri alınmış olarak işaretlenir; geçmiş korunur."]}
             confirmLabel="Rızayı iptal et" onConfirm={async () => {
-              if (!canManageConsents || !revokeTarget) return;
+              if (!revokeTarget || !canManageConsent(revokeTarget.type)) return;
               await revoke({ id: revokeTarget.id });
               notify.success("Rıza iptal edildi", revokeTarget.label);
             }} />

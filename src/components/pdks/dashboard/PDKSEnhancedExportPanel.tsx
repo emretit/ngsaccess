@@ -1,5 +1,5 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from '@/components/auth/AuthProvider';
-import { capabilities } from '@/lib/capabilities';
 import { readPDKSPreferences, savePDKSPreferences, type PDKSExportPreferences } from '@/lib/pdksExportColumns';
 import type { ColumnScope } from '@/lib/reports/columns';
 import { PDKSExportColumns } from './export/PDKSExportColumns';
@@ -53,9 +53,11 @@ interface Props {
 }
 export function PDKSEnhancedExportPanel(props: Props) {
   const { profile } = useAuth();
+  const { can } = usePermissions();
   const { projectId } = useActiveProject();
   const scope = projectId && profile?._id ? { projectId, userId: profile._id } : undefined;
-  const canSeePay = capabilities(profile?.role).admin;
+  const canSeePay = can("pay.view");
+  if (!can("reports.view")) return null;
   return <ExportPanel key={`${scope?.projectId}:${scope?.userId}:${canSeePay}`} {...props} scope={scope} canSeePay={canSeePay} />;
 }
 function ExportPanel({

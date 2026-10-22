@@ -2,7 +2,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { resolveProjectScope } from "./projectScope";
 
-/** Called only by accessRules.list after authedQuery authenticates the caller. */
+/** Membership-level read per roles inventory; writes require accessRules.manage in accessRules. */
 export async function listAccessRules(
   ctx: QueryCtx & { user: Doc<"users"> },
   args: { projectId?: Id<"projects"> },

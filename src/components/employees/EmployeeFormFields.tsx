@@ -13,6 +13,7 @@ interface Option {
   name: string;
 }
 interface Props {
+  canViewPay?: boolean;
   formData: EmployeeFormData;
   setFormData: (data: EmployeeFormData) => void;
   companies: Option[];
@@ -28,6 +29,7 @@ interface Props {
 }
 export default function EmployeeFormFields({
   formData,
+  canViewPay = false,
   setFormData,
   companies,
   departments,
@@ -44,8 +46,8 @@ export default function EmployeeFormFields({
     if (errors.hourlyRate || errors.monthlySalary) setOtherOpen(true);
   }, [errors.hourlyRate, errors.monthlySalary]);
   const filledOther = [
-    formData.hourlyRate != null,
-    formData.monthlySalary != null,
+    canViewPay && formData.hourlyRate != null,
+    canViewPay && formData.monthlySalary != null,
     !!formData.shift?.trim(),
     !!formData.notes?.trim(),
   ].filter(Boolean).length;
@@ -229,7 +231,7 @@ export default function EmployeeFormFields({
         className="border-t pt-3"
       >
         <summary className="max-sm:min-h-11 cursor-pointer py-2 text-sm font-semibold">
-          Ücret ve diğer bilgiler
+          {canViewPay ? "Ücret ve diğer bilgiler" : "Diğer bilgiler"}
           {filledOther > 0 && (
             <span className="ml-1 font-normal text-muted-foreground">
               ({filledOther} dolu)
@@ -238,7 +240,7 @@ export default function EmployeeFormFields({
         </summary>
         <div className="mt-3 space-y-3">
           <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
-            {(["hourlyRate", "monthlySalary"] as const).map((key) => (
+            {canViewPay && (["hourlyRate", "monthlySalary"] as const).map((key) => (
               <div key={key}>
                 <Label htmlFor={`employee-${key}`}>
                   {key === "hourlyRate"
@@ -271,9 +273,9 @@ export default function EmployeeFormFields({
               </div>
             ))}
           </div>
-          <p id="employee-pay-hint" className="-mt-2 text-xs text-muted-foreground">
+          {canViewPay && <p id="employee-pay-hint" className="-mt-2 text-xs text-muted-foreground">
             İki ücret de boşsa mesai TL hesabı yapılmaz.
-          </p>
+          </p>}
           <div>
             <Label htmlFor="employee-shift">Eski vardiya notu</Label>
             <Input

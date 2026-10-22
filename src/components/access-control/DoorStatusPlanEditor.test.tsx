@@ -1,3 +1,4 @@
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, loading: false }) }));
 import { isValidElement, type ReactNode, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi, beforeEach } from "vitest";
@@ -36,7 +37,7 @@ vi.mock("convex/react", () => ({
   useAction: () => state.apply,
 }));
 vi.mock("@/hooks/useProjectAccess", () => ({
-  useProjectAccess: () => ({ isAdmin: true }),
+  useProjectAccess: () => ({ canManage: true }),
 }));
 vi.mock("@/hooks/useAsyncAction", () => ({
   useAsyncAction: (run: (...args: unknown[]) => Promise<unknown>) => ({

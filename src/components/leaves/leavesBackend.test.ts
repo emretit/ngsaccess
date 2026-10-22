@@ -4,7 +4,7 @@ import type { QueryCtx } from "../../../convex/_generated/server";
 import { filteredLeaves, conflictFor } from "../../../convex/leaves";
 
 const fixture = vi.hoisted(() => ({ rows: [] as Record<string, unknown>[], indexes: [] as string[] }));
-vi.mock("../../../convex/lib/customFunctions", () => ({ authedQuery: (x: unknown) => x, adminMutation: (x: unknown) => x }));
+vi.mock("../../../convex/lib/customFunctions", () => ({ authedQuery: (x: unknown) => x, authedMutation: (x: unknown) => x }));
 vi.mock("../../../convex/lib/projectScope", () => ({ resolveProjectScope: vi.fn() }));
 vi.mock("convex-helpers/server/stream", () => ({ stream: () => ({ query: () => {
   let rows = [...fixture.rows];

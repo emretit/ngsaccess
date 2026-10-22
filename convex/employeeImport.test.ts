@@ -14,9 +14,8 @@ const row = (overrides: Partial<EmployeeImportRow> = {}): EmployeeImportRow => (
 type TestCtx = MutationCtx & { user: Doc<"users">; memberships: Id<"projects">[] };
 type Handler = (ctx: TestCtx, args: unknown) => Promise<unknown>;
 vi.mock("./lib/customFunctions", () => ({
-  adminMutation: (definition: { handler: Handler }) => ({ _handler: async (ctx: TestCtx, args: unknown) => {
+  authedMutation: (definition: { handler: Handler }) => ({ _handler: async (ctx: TestCtx, args: unknown) => {
     if (!ctx.user) throw new Error("Giriş yapmanız gerekiyor");
-    if (ctx.user.role !== "super_admin" && ctx.user.role !== "project_admin") throw new Error("Bu işlem için yetkiniz yok");
     return definition.handler(ctx, args);
   } }),
 }));
@@ -41,7 +40,7 @@ async function fixture(role: Doc<"users">["role"] = "project_admin") {
     const selected = () => table(name).filter(item => filters.every(([key, value]) => item[key] === value));
     const chain = {
       withIndex: (_index: string, callback: (q: typeof builder) => unknown) => { callback(builder); return chain; },
-      collect: async () => selected(), take: async (limit: number) => selected().slice(0, limit),
+      unique: async () => selected()[0] ?? null, collect: async () => selected(), take: async (limit: number) => selected().slice(0, limit),
       [Symbol.asyncIterator]: async function* () { yield* selected(); },
     };
     return chain;
@@ -52,6 +51,7 @@ async function fixture(role: Doc<"users">["role"] = "project_admin") {
   const userId = await insert("users", { name: "Yönetici", role }) as Id<"users">;
   const projectId = await insert("projects", { name: "Yetkili" }) as Id<"projects">;
   const otherProjectId = await insert("projects", { name: "Diğer" }) as Id<"projects">;
+  await insert("userProjects", { userId, projectId });
   const schedule = vi.fn();
   const ctx = { db, user: await get(userId), memberships: [projectId], scheduler: { runAfter: schedule } } as unknown as TestCtx;
   const mutate = async <Ref extends FunctionReference<"mutation">>(fn: Ref, args: FunctionArgs<Ref>, authenticated = true): Promise<FunctionReturnType<Ref>> => {

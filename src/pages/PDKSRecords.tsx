@@ -45,7 +45,7 @@ function PDKSContent({
 }) {
   const view = usePdksRecordsView(filters, setFilters);
   const {
-    projectId, activeProject, isAdmin, setImport, setWarningsOpen, setAi,
+    projectId, activeProject, canManage, setImport, setWarningsOpen, setAi,
     exportRows, dateRangeLabel, selectedDate, filterSummary, selectedIds,
     records, isLoading, setDatesOpen, analysis, setAnalysis, setSmartPreset,
     effectiveSmartPreset, detailTrigger, detail, setDrilldown,
@@ -62,7 +62,7 @@ function PDKSContent({
               <Button variant="outline">Diğer</Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {isAdmin && <DropdownMenuItem onClick={() => setImport(true)}>İçe aktar</DropdownMenuItem>}
+              {canManage && <DropdownMenuItem onClick={() => setImport(true)}>İçe aktar</DropdownMenuItem>}
               <DropdownMenuItem onClick={() => setWarningsOpen(true)}>
                 Uyarılar
               </DropdownMenuItem>
@@ -94,7 +94,7 @@ function PDKSContent({
         <Button variant={!analysis || filters.reportType === "daily" ? "secondary" : "ghost"} aria-pressed={!analysis || filters.reportType === "daily"} onClick={() => setAnalysis(false)}>Kayıtlar</Button>
         <Button disabled={filters.reportType === "daily"} variant={analysis && filters.reportType !== "daily" ? "secondary" : "ghost"} aria-pressed={analysis && filters.reportType !== "daily"} onClick={() => setAnalysis(true)}>Analiz</Button>
       </div>
-      {isAdmin && projectId && (
+      {canManage && projectId && (
         <CorrectionRequestsEntry key={projectId} projectId={projectId} />
       )}
       <PDKSFilterBar

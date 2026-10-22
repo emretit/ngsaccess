@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import type { EmploymentEmployee as Employee } from "../lib/employment";
 import { EmployeeEmploymentBadge } from "../EmployeeEmploymentBadge";
@@ -9,7 +10,7 @@ import { RowActions } from "@/components/shared/RowActions";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 interface Props {
   employee: Employee;
-  isAdmin: boolean;
+  canManage: boolean;
   departmentPending: boolean;
   isBulkSyncing: boolean;
   syncPending: boolean;
@@ -26,7 +27,7 @@ interface Props {
 }
 export function EmployeeTableRow({
   employee,
-  isAdmin,
+  canManage,
   departmentPending,
   isBulkSyncing,
   syncPending,
@@ -40,13 +41,15 @@ export function EmployeeTableRow({
   handlePasswordResetClick,
   handleIndividualDeleteClick,
 }: Props) {
+  const { can } = usePermissions();
+  const canSync = can("accessRules.manage");
   return (
     <TableRow className="h-[42px]">
       <TableCell className="px-2 py-0">
         <Checkbox
           aria-label={`${employee.firstName} ${employee.lastName} seç`}
           disabled={
-            !isAdmin || departmentPending || isBulkSyncing || syncPending
+            !(canManage || canSync) || departmentPending || isBulkSyncing || syncPending
           }
           checked={selectedEmployees.includes(employee._id)}
           onCheckedChange={(checked) =>
@@ -110,10 +113,9 @@ export function EmployeeTableRow({
             label={`${employee.firstName} ${employee.lastName} işlemleri`}
           >
             <DropdownMenuItem onSelect={() => onViewDetails(employee)}>
-              {isAdmin ? "Düzenle" : "Ayrıntı"}
+              {canManage ? "Düzenle" : "Ayrıntı"}
             </DropdownMenuItem>
-            {isAdmin && (
-              <>
+            {canSync && (<>
                 <DropdownMenuItem
                   disabled={syncPending || bulkSyncPending}
                   onSelect={() => {
@@ -122,6 +124,9 @@ export function EmployeeTableRow({
                 >
                   Cihazlara gönder
                 </DropdownMenuItem>
+            </>)}
+            {canManage && (
+              <>
                 <DropdownMenuItem
                   onSelect={() => handlePasswordResetClick(employee)}
                 >

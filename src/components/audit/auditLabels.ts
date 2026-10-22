@@ -83,6 +83,8 @@ const commonLabels: Record<string, string> = {
 };
 const tableLabels: Record<string, Record<string, string>> = {
   hikPendingOperations: { dismissedAt: "Uyarının kapatılma zamanı" },
+  userProjects: { role: "Proje rolü" },
+  projectRolePermissions: { permissions: "Rol yetkileri", default: "Varsayılan yetkiler" },
   holidays: { name: "Tatil adı", type: "Tatil türü", isHalfDay: "Yarım gün" },
   employees: {
     cardNo: "Kart numarası",

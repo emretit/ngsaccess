@@ -3,13 +3,15 @@ import { filterNavigationRoutes, normalizeNavigationSearch } from "./navigationS
 import { visibleRoutes } from "@/lib/routeMeta";
 
 describe("navigation visibility and Turkish search", () => {
-  it.each([["super_admin", 15], ["project_admin", 14], ["project_user", 11]])("%s has %i menu routes", (role, count) => {
+  it.each([["super_admin", 15], ["project_admin", 14], ["project_user", 13]])("%s has %i menu routes", (role, count) => {
     expect(visibleRoutes(String(role))).toHaveLength(Number(count));
   });
   it("includes profile but not hidden engineering or unauthorized routes", () => {
     const hrefs = filterNavigationRoutes("project_user", "").map(route => route.href);
     expect(hrefs).toContain("/profile");
-    for (const href of ["/system-admin", "/settings", "/audit-log", "/engineering-department"]) expect(hrefs).not.toContain(href);
+    expect(hrefs).toContain("/settings");
+    expect(hrefs).toContain("/alarms");
+    for (const href of ["/system-admin", "/audit-log", "/engineering-department"]) expect(hrefs).not.toContain(href);
   });
   it.each(["İZİNLER", "izinler", "ızınler", "IZINLER"])("folds Turkish letters: %s", query => {
     expect(filterNavigationRoutes("project_user", query).map(route => route.href)).toEqual(["/leaves"]);

@@ -54,6 +54,10 @@ export const syncEmployeeToDevices = authedAction({
       internal.users.listProjectIdsForCurrentUser,
       {},
     );
+    const employee = await ctx.runQuery(internal.devices.getEmployeeByIdInternal, { employeeId: args.employeeId });
+    if (!employee) throw new Error("Çalışan bulunamadı");
+    const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: employee.projectId, permission: "accessRules.manage" });
+    if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
     return await ctx.runAction(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
       employeeId: args.employeeId,
       allowedProjectIds,

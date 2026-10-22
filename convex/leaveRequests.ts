@@ -1,3 +1,4 @@
+import { requirePermission } from "./lib/permissions";
 import { paginationOptsValidator } from "convex/server";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -7,8 +8,8 @@ import { leaveDecisionPatch } from "./lib/leaveRules";
 import { assertNoLeaveOverlap } from "./leaves";
 import { v, ConvexError } from "convex/values";
 import {
-  adminMutation,
-  adminQuery,
+  authedMutation,
+  authedQuery,
   employeeAuthedMutation,
   employeeAuthedQuery,
 } from "./lib/customFunctions";
@@ -66,15 +67,17 @@ async function requireProject(
     if (ctx.user.role === "super_admin") {
       if (!(await ctx.db.get(projectId)))
         throw new Error("Proje bulunamadı");
+      await requirePermission(ctx, ctx.user, projectId, "attendance.approve");
       return;
     }
     await resolveProjectScope(ctx, projectId);
   } catch {
     throw new ConvexError("Bu projeye erişim yetkiniz yok");
   }
+  await requirePermission(ctx, ctx.user, projectId, "attendance.approve");
 }
 
-export const listPending = adminQuery({
+export const listPending = authedQuery({
   args: {
     projectId: v.id("projects"),
     paginationOpts: paginationOptsValidator,
@@ -119,7 +122,7 @@ export const listPending = adminQuery({
   },
 });
 
-export const pendingCount = adminQuery({
+export const pendingCount = authedQuery({
   args: {
     projectId: v.id("projects"),
     kind: v.union(v.literal("leaves"), v.literal("corrections")),
@@ -167,8 +170,8 @@ async function decideLeave(
   const now = new Date().toISOString();
   // Do not pass the decision note to leaveDecisionPatch: its legacy notes argument is the employee note.
   const patch = {
-    ...leaveDecisionPatch(
-      ctx.user.role,
+    ...await leaveDecisionPatch(
+      ctx, ctx.user, leave.projectId,
       leave.status,
       status,
       ctx.user._id,
@@ -191,12 +194,12 @@ async function decideLeave(
   return null;
 }
 
-export const approve = adminMutation({
+export const approve = authedMutation({
   args: { leaveId: v.id("leaves"), note: v.optional(v.string()) },
   handler: async (ctx, args) =>
     decideLeave(ctx, args.leaveId, "approved", args.note),
 });
-export const reject = adminMutation({
+export const reject = authedMutation({
   args: { leaveId: v.id("leaves"), note: v.string() },
   handler: async (ctx, args) => {
     if (args.note.trim().length < 3 || args.note.trim().length > 500)

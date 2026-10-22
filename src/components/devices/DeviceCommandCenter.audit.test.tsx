@@ -1,5 +1,6 @@
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: (permission: string) => (permission === "doors.open" ? mocks.doors : mocks.admin), loading: false }) }));
 vi.mock("@/hooks/useProjectAccess", () => ({
-  useProjectAccess: () => ({ isAdmin: mocks.admin }),
+  useProjectAccess: () => ({ canManage: mocks.admin }),
 }));
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it, vi } from "vitest";
@@ -8,6 +9,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { DeviceCommandCenter } from "./DeviceCommandCenter";
 const mocks = vi.hoisted(() => ({
   admin: true,
+  doors: true,
   capped: false,
   limited: false,
   device: {} as Device,
@@ -108,4 +110,14 @@ it("sınırlandırılmış sayaçları 100+ ve liste sınırını bir uyarıyla 
   );
   mocks.capped = false;
   mocks.limited = false;
+});
+
+it("cihaz yöneticisi kapı açma yetkisi kaldırıldığında açma düğmesini görmez", () => {
+  mocks.admin = true;
+  mocks.doors = false;
+  mocks.device = { _id: "d" as Id<"devices">, name: "Panel", brand: "hikvision", hikTransport: "gateway", hikDevIndex: "index" };
+  const html = renderToStaticMarkup(<DeviceCommandCenter deviceId={mocks.device._id} />);
+  expect(html).not.toContain("Aç</button>");
+  expect(html).toContain("Yeniden başlat");
+  mocks.doors = true;
 });

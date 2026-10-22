@@ -1,10 +1,11 @@
+import { getProjectIdsWithPermission, requirePermission } from "./lib/permissions";
 import { writeAudit } from "./lib/audit";
 import { validateSettingsNumbers } from "./lib/settingsUx";
 import { resolveProjectScope } from "./lib/projectScope";
 import { toPatch } from "./lib/nullablePatch";
 
 import { v } from "convex/values";
-import { authedQuery, adminMutation, optionalAuthQuery } from "./lib/customFunctions";
+import { authedQuery, authedMutation, optionalAuthQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import type { Id } from "./_generated/dataModel";
 
@@ -31,7 +32,7 @@ export const getGeneral = authedQuery({
     projectId: v.optional(v.id("projects")),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const allowedProjectIds = await getProjectIdsWithPermission(ctx, ctx.user, "admin.manage");
     const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
     if (!projectId) return null;
     return await ctx.db
@@ -41,7 +42,7 @@ export const getGeneral = authedQuery({
   },
 });
 
-export const upsertGeneral = adminMutation({
+export const upsertGeneral = authedMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     companyName: v.optional(v.string()),
@@ -69,6 +70,7 @@ export const upsertGeneral = adminMutation({
     const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
     const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
     if (!projectId) throw new Error("Bu projeye erişim yetkiniz yok");
+    await requirePermission(ctx, ctx.user, projectId, "admin.manage");
     const now = new Date().toISOString();
     const existing = await ctx.db
       .query("generalSettings")
@@ -93,7 +95,7 @@ export const upsertGeneral = adminMutation({
 export const getNotification = authedQuery({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const allowedProjectIds = await getProjectIdsWithPermission(ctx, ctx.user, "admin.manage");
     const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
     if (!projectId) return null;
     return await ctx.db
@@ -103,7 +105,7 @@ export const getNotification = authedQuery({
   },
 });
 
-export const upsertNotification = adminMutation({
+export const upsertNotification = authedMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     emailNotifications: v.optional(v.boolean()),
@@ -115,6 +117,7 @@ export const upsertNotification = adminMutation({
     const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
     const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
     if (!projectId) throw new Error("Bu projeye erişim yetkiniz yok");
+    await requirePermission(ctx, ctx.user, projectId, "admin.manage");
     const now = new Date().toISOString();
     const existing = await ctx.db
       .query("notificationSettings")
@@ -138,7 +141,7 @@ export const upsertNotification = adminMutation({
 export const getWork = authedQuery({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
+    const allowedProjectIds = await getProjectIdsWithPermission(ctx, ctx.user, "schedule.manage");
     const projectId = resolveSettingsProjectId(allowedProjectIds, args.projectId);
     if (!projectId) return null;
     return await ctx.db
@@ -168,7 +171,7 @@ export const getDarkMode = optionalAuthQuery({
   },
 });
 
-export const saveOvertime = adminMutation({
+export const saveOvertime = authedMutation({
   args: {
     projectId: v.id("projects"), annualOvertimeLimitHours: v.number(), overtimeStartToleranceMinutes: v.number(), monthlyHoursBase: v.number(),
     weekdayMultiplier: v.number(), weekendMultiplier: v.number(), holidayMultiplier: v.number(), nightShiftMultiplier: v.number(), nightShiftStart: v.string(), nightShiftEnd: v.string(),
@@ -177,7 +180,7 @@ export const saveOvertime = adminMutation({
     nightShiftDayMode: v.optional(v.union(v.literal("shiftStart"), v.literal("splitAtMidnight"))),
   },
   handler: async (ctx, args) => {
-    await resolveProjectScope(ctx, args.projectId);
+    await requirePermission(ctx, ctx.user, args.projectId, "schedule.manage");
     validateSettingsNumbers(args);
     if (args.nightShiftStart === args.nightShiftEnd) throw new Error("Gece başlangıcı ve bitişi farklı olmalı.");
     const { projectId, annualOvertimeLimitHours, overtimeStartToleranceMinutes, monthlyHoursBase, ...rates } = args;

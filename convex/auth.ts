@@ -28,7 +28,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       // set edilir — companyName yokluğuna GÜVENİLMEZ. Aksi halde saldırgan
       // companyName'siz signUp atıp verified=undefined hesap alır, login guard'ını
       // (getCurrentUser: verified===false) atlar ve ensureProjectForNewUser ile
-      // otomatik project_admin olur (authentication_bypass).
+      // ilk proje üyeliğinde admin olur (authentication_bypass).
       //
       // verified=true'ya yükselten YALNIZCA güvenilir, doğrulanmış kanallardır:
       //   - Self-signup (Register): e-posta doğrulama → emailVerification.confirm

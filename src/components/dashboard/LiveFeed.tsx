@@ -1,12 +1,11 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { Link } from "react-router-dom";
 import { CreditCard } from "lucide-react";
-import { useAuth } from "@/components/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { useDashboardReadings } from "@/hooks/useDashboard";
 import { useNow } from "@/hooks/useNow";
-import { capabilities } from "@/lib/capabilities";
 import { formatTrDateTime } from "@/lib/date";
 import { feedTimeTr } from "@/lib/relativeTime";
 import { cn } from "@/lib/utils";
@@ -22,7 +21,7 @@ function initials(name: string) {
 /** Son kart okumaları; yeni okuma geldikçe üstte belirir. */
 export default function LiveFeed() {
   const { readings, loading } = useDashboardReadings(FEED_SIZE);
-  const { profile } = useAuth();
+  const { can } = usePermissions();
   const now = useNow(30_000);
   const latestTime = Math.max(...readings.map(reading => Date.parse(reading.accessTime)).filter(Number.isFinite));
   const hasLatest = Number.isFinite(latestTime);
@@ -50,7 +49,7 @@ export default function LiveFeed() {
           <EmptyState
             compact
             title="Henüz kart okuması yok"
-            description={capabilities(profile?.role).admin ? "Cihaz ve personel bağlantılarını kontrol edin. İlk okuma burada görünür." : "Cihaz ve personel bağlantılarını yöneticinizle kontrol edin."}
+            description={can("devices.manage") ? "Cihaz ve personel bağlantılarını kontrol edin. İlk okuma burada görünür." : "Cihaz ve personel bağlantılarını yöneticinizle kontrol edin."}
           />
           <div className="flex flex-wrap justify-center gap-2 px-4">
             <Button asChild variant="outline"><Link to="/devices">Cihazları görüntüle</Link></Button>

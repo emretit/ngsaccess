@@ -1,3 +1,4 @@
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, loading: false }) }));
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getFunctionName } from "convex/server";

@@ -1,6 +1,6 @@
 import { AuditExportButton } from '@/components/audit/AuditExportButton';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { capabilities } from '@/lib/capabilities';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useActiveProjectScope } from '@/hooks/useActiveProjectScope';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -36,7 +36,8 @@ function AuthorizedAuditLog() {
 }
 
 export default function AuditLog() {
-  const { profile } = useAuth();
-  if (!capabilities(profile?.role).auditLog) return <div role="status" className="space-y-3 py-8"><h1 className="text-base font-semibold">Denetim kaydını görüntüleme yetkiniz yok.</h1><p className="text-sm text-muted-foreground">Bu sayfa yöneticiler içindir.</p><Button variant="outline" asChild><Link to="/">Ana Sayfa’ya dön</Link></Button></div>;
+  const { can, loading } = usePermissions();
+  if (loading) return <SectionSkeleton label="Yetkiler yükleniyor" />;
+  if (!can("admin.manage")) return <div role="status" className="space-y-3 py-8"><h1 className="text-base font-semibold">Denetim kaydını görüntüleme yetkiniz yok.</h1><p className="text-sm text-muted-foreground">Bu sayfa yöneticiler içindir.</p><Button variant="outline" asChild><Link to="/">Ana Sayfa’ya dön</Link></Button></div>;
   return <AuthorizedAuditLog />;
 }

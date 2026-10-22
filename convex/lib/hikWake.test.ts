@@ -16,8 +16,8 @@ import {
 } from "./hikWake";
 
 vi.mock("./customFunctions", () => ({
-  adminMutation: (config: unknown) => config,
-  adminQuery: (config: unknown) => config,
+  authedMutation: (config: unknown) => config,
+  authedQuery: (config: unknown) => config,
 }));
 
 afterEach(() => {

@@ -1,10 +1,12 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 
 export const useGeneralSettings = () => {
-  const { projectId, loading: projectLoading, isAdmin } = useActiveProjectScope();
+  const { projectId, loading: projectLoading } = useActiveProjectScope();
+  const isAdmin = usePermissions().can("admin.manage");
 
   const settings = useQuery(
     api.settings.getGeneral,

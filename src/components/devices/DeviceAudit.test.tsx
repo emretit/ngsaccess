@@ -1,5 +1,6 @@
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, loading: false }) }));
 vi.mock("@/hooks/useProjectAccess", () => ({
-  useProjectAccess: () => ({ isAdmin: true }),
+  useProjectAccess: () => ({ canManage: true }),
 }));
 import type { MouseEvent, ReactNode } from "react";
 import type { FunctionReference } from "convex/server";
@@ -308,6 +309,7 @@ describe("cihaz audit görünümü", () => {
           onSelect={noop}
           readers={[reader]}
           canAddReader={false}
+          canManage
           fetchingReaderId={null}
           onAction={noop}
         />

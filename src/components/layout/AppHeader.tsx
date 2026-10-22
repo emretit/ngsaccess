@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { ProjectSwitcher } from "./ProjectSwitcher";
 import { CommandPalette } from "./CommandPalette";
-import { capabilities } from "@/lib/capabilities";
+import { permissionCapabilities } from "@/lib/capabilities";
+import { usePermissions } from "@/hooks/usePermissions";
 import { roleLabel } from "@/lib/roleLabels";
 import { Link } from "react-router-dom";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -14,6 +15,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 interface AppHeaderProps { title?: string; className?: string; children?: React.ReactNode }
 export function AppHeader({ title, className, children }: AppHeaderProps) {
   const { user, profile, signOut } = useAuth();
+  const { role, can } = usePermissions();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const name = profile?.fullName || profile?.name || "Kullanıcı";
@@ -37,9 +39,9 @@ export function AppHeader({ title, className, children }: AppHeaderProps) {
         <Avatar className="h-7 w-7"><AvatarImage src={profile?.photoUrl || profile?.image || ""} alt="" /><AvatarFallback className="border bg-subtle text-[11px] font-medium text-muted-foreground">{initials}</AvatarFallback></Avatar>
       </Button></DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
-        <div className="px-2 py-2"><p className="font-medium">{name}</p><p className="break-words text-xs text-muted-foreground">{user?.email}</p>{profile?.role && <p className="mt-1 text-xs text-muted-foreground">{roleLabel(profile.role)}</p>}</div>
+        <div className="px-2 py-2"><p className="font-medium">{name}</p><p className="break-words text-xs text-muted-foreground">{user?.email}</p>{role && <p className="mt-1 text-xs text-muted-foreground">{roleLabel(role)}</p>}</div>
         <DropdownMenuSeparator /><DropdownMenuItem asChild><Link to="/profile">Profil</Link></DropdownMenuItem>
-        {capabilities(profile?.role).admin && <DropdownMenuItem asChild><Link to="/settings">Ayarlar</Link></DropdownMenuItem>}
+        {permissionCapabilities(can, role).settingsTabs.length > 0 && <DropdownMenuItem asChild><Link to="/settings">Ayarlar</Link></DropdownMenuItem>}
         <DropdownMenuSeparator />
         {error && <p role="alert" className="px-2 py-2 text-xs text-destructive">{error}</p>}
         <DropdownMenuItem disabled={pending} onSelect={event => { event.preventDefault(); void logout(); }} className="text-destructive focus:text-destructive">{pending ? "Çıkış yapılıyor…" : "Çıkış yap"}</DropdownMenuItem>

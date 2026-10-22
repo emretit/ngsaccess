@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useCallback, useRef, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -12,7 +13,9 @@ import { AssignReadingCardForm } from "./AssignReadingCardForm";
 import { personLabel, sourceLabel, resultLabel, trTime, physicalCard } from "./lib/readings";
 export function Detail({ id, onDirty, onPending, onClose }: { onClose: () => void; id: Id<"cardReadings">; onDirty: (v: boolean) => void; onPending: (v: boolean) => void }) {
   const reading = useQuery(api.cardReadings.getReading, { readingId: id });
-  const { isAdmin, projectId } = useActiveProjectScope();
+  const { projectId } = useActiveProjectScope();
+  const { can } = usePermissions();
+  const canManage = can("employees.manage");
   if (reading === undefined) return <SectionSkeleton rows={6} label="Okuma ayrıntısı yükleniyor" />;
   if (!reading || reading.projectId !== projectId) return <EmptyState title="Bu okuma artık görüntülenemiyor" description="Kayıt kaldırılmış olabilir veya bu projede erişiminiz olmayabilir." action={{ label: "Listeye dön", onClick: onClose }} />;
   const fields = [["Zaman (TR)", trTime(reading.accessTime)], ["Kişi", personLabel(reading)], ...(reading.source === "biometric" ? [] : [["Kart numarası", reading.cardNo]]), ["Kapı", reading.door?.name || "Kapı eşleşmedi"], ["Okuyucu", reading.door?.readerName || (reading.ideIoId !== undefined ? `IO ${reading.ideIoId}` : "Okuyucu bilinmiyor")], ["Cihaz", reading.devices?.name || "Cihaz bilinmiyor"], ["Yön", reading.direction === "entry" ? "Giriş" : reading.direction === "exit" ? "Çıkış" : "Bilinmiyor"], ["Departman", reading.employees?.departments?.name || "—"], ["Sonuç", resultLabel(reading)], ["Kaynak", sourceLabel(reading.source)]];
@@ -20,7 +23,7 @@ export function Detail({ id, onDirty, onPending, onClose }: { onClose: () => voi
     {reading.accessStatus === "reddedildi" && <p className="text-xs [overflow-wrap:anywhere]">Ret sebebi: {reading.hikDenialReason || "Neden bilinmiyor"}</p>}
     {reading.source === "biometric" && <p className="text-xs">Bu olay erişim izleme içindir; PDKS hesabına dahil edilmez.</p>}
     <details className="text-xs"><summary className="cursor-pointer">Teknik ayrıntı</summary><p className="mt-2 break-all">Okuma: {reading._id} · Olay kodu: {reading.hikMajorEventType ?? "—"}/{reading.hikSubEventType ?? "—"}</p></details>
-    {isAdmin && !reading.employeeId && reading.source === "card" && physicalCard(reading.cardNo) && <QuerySectionBoundary resetKey={reading._id} description="Kart atama formu yüklenemedi."><AssignReadingCardForm reading={reading} onDirty={onDirty} onPending={onPending} /></QuerySectionBoundary>}
+    {canManage && !reading.employeeId && reading.source === "card" && physicalCard(reading.cardNo) && <QuerySectionBoundary resetKey={reading._id} description="Kart atama formu yüklenemedi."><AssignReadingCardForm reading={reading} onDirty={onDirty} onPending={onPending} /></QuerySectionBoundary>}
   </div>;
 }
 export function ReadingDetailPanel({ readingId, onClose, trigger, onDirtyChange, onPendingChange }: { readingId: string; onClose: () => void; trigger: React.RefObject<HTMLElement | null>; onDirtyChange: (dirty: boolean) => void; onPendingChange: (pending: boolean) => void }) {

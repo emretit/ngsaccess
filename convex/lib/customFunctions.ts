@@ -42,34 +42,6 @@ export const optionalAuthQuery = customQuery(
 );
 
 /**
- * Sadece super_admin veya project_admin için.
- */
-export const adminQuery = customQuery(
-  query,
-  customCtx(async (ctx) => {
-    const user = await getCurrentUser(ctx);
-    if (user.role !== "super_admin" && user.role !== "project_admin") {
-      throw new Error("Bu işlem için yetkiniz yok");
-    }
-    return { user };
-  })
-);
-
-/**
- * Sadece super_admin veya project_admin için mutation.
- */
-export const adminMutation = customMutation(
-  mutation,
-  customCtx(async (ctx) => {
-    const user = await getCurrentUser(ctx);
-    if (user.role !== "super_admin" && user.role !== "project_admin") {
-      throw new Error("Bu işlem için yetkiniz yok");
-    }
-    return { user };
-  })
-);
-
-/**
  * Sadece super_admin için query.
  */
 export const superAdminQuery = customQuery(

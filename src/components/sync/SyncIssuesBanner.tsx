@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation } from "convex/react";
@@ -111,7 +112,7 @@ function SyncIssueRow({ item, canManage, isSuperAdmin }: { item: UnifiedItem; ca
         onClick={() => setRetryConfirm(true)}>Tekrar dene</Button>}
       {canManage && !item.issue.canRetry && <p className="text-xs text-muted-foreground">Yeniden deneme için cihaz ayrıntılarını açın.</p>}
     </div>
-    {(!isDeletion || canDismissDeletion) && <Button ref={closeButton} size="icon" variant="ghost" className="shrink-0" disabled={dismiss.pending} aria-label={`${item.issue.deviceName} uyarısını kapat`}
+    {((!isDeletion && canManage) || canDismissDeletion) && <Button ref={closeButton} size="icon" variant="ghost" className="shrink-0" disabled={dismiss.pending} aria-label={`${item.issue.deviceName} uyarısını kapat`}
       onClick={() => { if (isDeletion) setCloseReasonOpen(true); else void dismiss.run(); }}><X className="h-4 w-4" /></Button>}
     <ConfirmDestructive open={retryConfirm} onOpenChange={setRetryConfirm} title="İşlem yeniden denensin mi?"
       objectName={`${item.issue.deviceName} — ${label}`} confirmLabel="Tekrar dene"
@@ -122,12 +123,18 @@ function SyncIssueRow({ item, canManage, isSuperAdmin }: { item: UnifiedItem; ca
 
 export function SyncIssuesBanner() {
   const scope = useActiveProjectScope();
+  const { can } = usePermissions();
   const [allProjects, setAllProjects] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [openDevices, setOpenDevices] = useState<Set<string>>(new Set());
   const [confirmation, setConfirmation] = useState<{ items: UnifiedItem[]; projectId: typeof scope.projectId; name: string } | null>(null);
   const showAll = allProjects && scope.projectIds.length > 1;
   const projectId = showAll ? undefined : scope.projectId;
+  const projectPermissions = useQuery(api.roles.myPermissionsByProject, showAll && !scope.loading ? {} : "skip");
+  const permissionsByProject = new Map((projectPermissions ?? []).map(row => [row.projectId, new Set(row.permissions)]));
+  const canManageProject = (id: typeof scope.projectId) => showAll
+    ? !!id && permissionsByProject.get(id)?.has("devices.manage") === true
+    : id === scope.projectId && can("devices.manage");
   const args = !scope.loading && scope.projectId ? { projectId, limit: 50 } : "skip";
   const hik = useQuery(api.hikvisionSync.listSyncIssues, args);
   const ide = useQuery(api.ideSync.listSyncIssues, args);
@@ -137,6 +144,7 @@ export function SyncIssuesBanner() {
     ...(hik?.items ?? []).map((issue) => ({ source: "hikvision" as const, issue })),
     ...(ide?.items ?? []).map((issue) => ({ source: "ide" as const, issue })),
   ].sort((a, b) => b.issue.createdAt - a.issue.createdAt), [hik, ide]);
+  const dismissibleItems = items.filter(item => canManageProject(item.issue.projectId));
   const groups = new Map<string, UnifiedItem[]>();
   for (const item of items) groups.set(item.issue.deviceId, [...(groups.get(item.issue.deviceId) ?? []), item]);
   const incomplete = hik?.hasMore || ide?.hasMore || hik?.unknown || ide?.unknown;
@@ -156,13 +164,13 @@ export function SyncIssuesBanner() {
           <option value="active">Aktif proje</option><option value="all">Tüm projeler</option>
         </select>
       </label>}
-      {items.length > 0 && <Button variant="ghost" size="sm" disabled={!hik || !ide}
-        onClick={() => setConfirmation({ items, projectId, name: scopeName })}>Hepsini kapat ({items.length})</Button>}
+      {dismissibleItems.length > 0 && <Button variant="ghost" size="sm" disabled={!hik || !ide}
+        onClick={() => setConfirmation({ items: dismissibleItems, projectId, name: scopeName })}>Hepsini kapat ({dismissibleItems.length})</Button>}
     </div>
     {incomplete && <p className="px-4 pb-2 text-xs text-muted-foreground">Yalnız yüklenen uyarılar gösteriliyor; devamı veya kapsamı çözülemeyen eski kayıtlar var. Kesin toplam bilinmiyor.</p>}
     {expanded && <ul className="max-h-80 overflow-y-auto divide-y bg-background">
       {[...groups].map(([deviceId, group]) => <li key={deviceId}>
-        <ul>{(openDevices.has(deviceId) ? group : group.slice(0, 1)).map((item) => <SyncIssueRow key={item.issue._id} item={item} canManage={scope.isAdmin} isSuperAdmin={scope.isSuperAdmin} />)}</ul>
+        <ul>{(openDevices.has(deviceId) ? group : group.slice(0, 1)).map((item) => <SyncIssueRow key={item.issue._id} item={item} canManage={canManageProject(item.issue.projectId)} isSuperAdmin={scope.isSuperAdmin} />)}</ul>
         {group.length > 1 && <Button variant="ghost" size="sm" className="mb-2 ml-4" aria-expanded={openDevices.has(deviceId)}
           onClick={() => setOpenDevices((previous) => { const next = new Set(previous); if (next.has(deviceId)) next.delete(deviceId); else next.add(deviceId); return next; })}>
           {openDevices.has(deviceId) ? "Eski hataları gizle" : `+${group.length - 1} eski hatayı aç`}

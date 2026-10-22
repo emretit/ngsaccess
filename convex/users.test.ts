@@ -7,7 +7,7 @@ vi.mock("./lib/customFunctions", () => {
   const register = (definition: { handler: unknown }) => ({ _handler: definition.handler });
   return {
     optionalAuthQuery: register,
-    adminQuery: register,
+    authedQuery: register,
     superAdminQuery: register,
     authedMutation: register,
     superAdminMutation: register,
@@ -51,6 +51,7 @@ function queryResult(records: Record<string, unknown>[]) {
       } });
       return result;
     },
+    take: async (limit: number) => (await result.collect()).slice(0, limit),
     collect: async () => records.filter((row) =>
       (userIdFilter === undefined || row.userId === userIdFilter) &&
       (projectIdFilter === undefined || row.projectId === projectIdFilter)),

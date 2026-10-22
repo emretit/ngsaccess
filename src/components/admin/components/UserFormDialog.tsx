@@ -1,3 +1,4 @@
+import { PROJECT_ROLES, ROLE_LABELS } from "../../../../convex/lib/roleCatalog";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { roleLabel } from "@/lib/roleLabels";
@@ -27,8 +28,8 @@ import {
 import type { Id } from "../../../../convex/_generated/dataModel";
 
 const roleRank: Record<UserRole, number> = {
+  admin: 1, hr: 0, security: 0, technician: 0, viewer: 0,
   project_user: 0,
-  project_admin: 1,
   super_admin: 2,
 };
 export function UserFormDialog({
@@ -147,7 +148,7 @@ export function UserFormDialog({
             <FormFieldWrapper
               htmlFor="admin-user-role"
               label="Rol"
-              hint="Rol hesabın tamamı için geçerlidir; proje erişimi aşağıda seçilir."
+              hint={currentUser ? "Platform hesap rolü; proje rolleri Ayarlar → Kullanıcılar bölümündedir." : "Rol yalnız davet edilen proje için geçerlidir."}
             >
               <select
                 className="h-9 w-full rounded-md border bg-background px-3 text-sm"
@@ -171,12 +172,9 @@ export function UserFormDialog({
                     {roleLabel("super_admin")}
                   </option>
                 )}
-                <option value="project_admin">
-                  {roleLabel("project_admin")}
-                </option>
-                <option value="project_user">
-                  {roleLabel("project_user")}
-                </option>
+                {currentUser ? <>
+                  <option value="project_user">Normal</option>
+                </> : PROJECT_ROLES.map(role => <option key={role} value={role}>{ROLE_LABELS[role]}</option>)}
               </select>
             </FormFieldWrapper>
             {currentUser && "isSelf" in currentUser && currentUser.isSelf && (

@@ -38,8 +38,8 @@ describe("kart okuma saklama planı", () => {
 const auth = vi.hoisted(() => ({ allowed: ["project-a"] }));
 vi.mock("./auth", () => ({ getProjectIdsForUser: async () => auth.allowed }));
 vi.mock("./customFunctions", () => ({
-  adminMutation: (definition: { handler: unknown }) => ({ _handler: definition.handler }),
-  adminQuery: (definition: { handler: unknown }) => ({ _handler: definition.handler }),
+  authedMutation: (definition: { handler: unknown }) => ({ _handler: definition.handler }),
+  authedQuery: (definition: { handler: unknown }) => ({ _handler: definition.handler }),
 }));
 
 import { purgeExpiredCardReadings, purgeProjectBatch, setCardReadingRetention, setAssistantMasking, getAssistantContext, getAssistantPrivacy } from "../privacyRetention";
@@ -58,7 +58,8 @@ function retentionContext({ days = 1825 as number | undefined, count = 200, allo
     db: { query: (_table: string) => ({
       withIndex: (_name: string, range: (q: typeof compare) => unknown) => {
         range(compare);
-        return { first: async () => ({ _id: "privacy-a", cardReadingRetentionDays: days, aiMaskNames: true }), take };
+        return { first: async () => ({ _id: "privacy-a", cardReadingRetentionDays: days, aiMaskNames: true }),
+          take: _table === "userProjects" ? async () => auth.allowed.map(projectId => ({ projectId, userId: "admin", role: "admin" })) : take };
       },
       paginate: async () => page,
     }), delete: deleted, patch, insert }, scheduler: { runAfter: schedule },
@@ -74,8 +75,8 @@ describe("saklama handler sınırları", () => {
   });
   it("proje izni olmayan yazmaları reddeder", async () => {
     const { ctx, patch, insert } = retentionContext({ allowed: false });
-    await expect(handler(setCardReadingRetention)(ctx, { projectId: "project-a", days: 1825 })).rejects.toThrow("Bu projeye erişim yetkiniz yok.");
-    await expect(handler(setAssistantMasking)(ctx, { projectId: "project-a", enabled: false })).rejects.toThrow("Bu projeye erişim yetkiniz yok.");
+    await expect(handler(setCardReadingRetention)(ctx, { projectId: "project-a", days: 1825 })).rejects.toThrow("Bu işlem için yetkiniz yok");
+    await expect(handler(setAssistantMasking)(ctx, { projectId: "project-a", enabled: false })).rejects.toThrow("Bu işlem için yetkiniz yok");
     expect(patch).not.toHaveBeenCalled(); expect(insert).not.toHaveBeenCalled();
   });
   it("asistan bağlamı ve gizlilik okumasında yabancı projeyi reddeder", async () => {

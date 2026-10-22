@@ -141,7 +141,7 @@ function memoryContext(seed: Record<string, MemoryRow[]>) {
       writes++; Object.assign(row, patch);
     },
   };
-  return { queryCtx: { db } as unknown as QueryCtx, mutationCtx: { db } as unknown as MutationCtx,
+  return { queryCtx: { db, user: { _id: "admin", role: "super_admin" } } as unknown as QueryCtx, mutationCtx: { db, user: { _id: "admin", role: "super_admin" } } as unknown as MutationCtx,
     reads, tables, writes: () => writes };
 }
 const projectId = "project" as Id<"projects">;

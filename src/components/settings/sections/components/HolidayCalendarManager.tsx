@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useMutation, useQuery } from "convex/react";
@@ -37,7 +38,8 @@ export function countMissingHolidays(year: number, existing: readonly { date: st
 }
 
 function HolidayCalendarContent() {
-  const { projectId, loading, isAdmin } = useActiveProjectScope();
+  const { projectId, loading } = useActiveProjectScope();
+  const isAdmin = usePermissions().can("schedule.manage");
   const [year, setYear] = useState(Number(todayInTurkey().slice(0, 4)));
   const [yearText, setYearText] = useState(String(year));
   useEffect(() => { setYearText(String(year)); }, [year]);

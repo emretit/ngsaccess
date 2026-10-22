@@ -1,11 +1,13 @@
-import type { Doc } from "../_generated/dataModel";
-import { isManager } from "./auth";
+import type { Doc, Id } from "../_generated/dataModel";
+import type { QueryCtx } from "../_generated/server";
+import { hasPermission } from "./permissions";
 
-/** Pay is visible only to the two manager roles. Mask response data, never storage. */
-export function canSeePay(user: Doc<"users">): boolean {
-  return isManager(user);
+/** Mask response data using the row's project; never alter storage. */
+export async function canSeePayInProject(ctx: Pick<QueryCtx, "db">, user: Doc<"users">, projectId: Id<"projects"> | undefined): Promise<boolean> {
+  return await hasPermission(ctx, user, projectId, "pay.view");
 }
 
 export function maskPay<T>(value: T, canSee: boolean): T | null {
   return canSee ? value : null;
 }
+

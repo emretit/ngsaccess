@@ -1,3 +1,4 @@
+import { requirePermission, hasPermission } from "./lib/permissions";
 import { recordConnectivityTransition, deviceLastSignal, DEVICE_ONLINE_WINDOW_MS, hasFreshIsupStatus } from "./lib/deviceConnection";
 import { internal } from "./_generated/api";
 import { notifyAlarmIfNeeded } from "./lib/alarmNotify";
@@ -7,10 +8,10 @@ import { ConvexError, v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import {
   authedQuery,
-  adminMutation,
+  authedMutation,
   employeeAuthedQuery,
 } from "./lib/customFunctions";
-import { getProjectIdsForUser, isProjectAllowed, isManager } from "./lib/auth";
+import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { resolvePanelAuthorizedCards } from "./lib/accessGraph";
 import { resolveHikModelSpec } from "./lib/hikModels";
 import {
@@ -71,9 +72,9 @@ export const list = authedQuery({
     // herhangi bir proje kullanıcısına açık olduğundan, role-gate olmadan tüm üyelere sızardı.
     // Cihaz yönetimi UI'da zaten isAdmin ile gated; admin tam veriyle pre-fill eder, izleyici
     // sır almaz. update yazma-gate'iyle AYNI DEVICE_SECRET_FIELDS listesi (drift yok).
-    const manager = isManager(ctx.user);
     return await Promise.all(
       devices.map(async (device) => {
+        const manager = await hasPermission(ctx, ctx.user, device.projectId, "devices.manage");
         const zone = device.zoneId ? await ctx.db.get(device.zoneId) : null;
         const door = device.doorId ? await ctx.db.get(device.doorId) : null;
         const ownedDoors = await ctx.db.query("doors").withIndex("by_device", (q) => q.eq("deviceId", device._id)).collect();
@@ -108,14 +109,14 @@ export const getById = authedQuery({
     // authedQuery her proje üyesine açık; public query'ler frontend çağırmasa da
     // client'tan doğrudan çağrılabildiğinden role-gate olmadan sır sızardı.
     const result = { ...device, zone, door };
-    if (!isManager(ctx.user)) {
+    if (!(await hasPermission(ctx, ctx.user, device.projectId, "devices.manage"))) {
       for (const f of DEVICE_SECRET_FIELDS) result[f] = undefined;
     }
     return result;
   },
 });
 
-export const create = adminMutation({
+export const create = authedMutation({
   args: {
     name: v.string(),
     projectId: v.optional(v.id("projects")),
@@ -156,6 +157,7 @@ export const create = adminMutation({
     if (!args.projectId && ctx.user.role !== "super_admin") {
       throw new ConvexError("Cihaz oluşturmak için bir proje seçmelisiniz");
     }
+    await requirePermission(ctx, ctx.user, args.projectId, "devices.manage");
     if (args.projectId && !isProjectAllowed(allowedProjectIds, args.projectId)) {
       throw new ConvexError("Bu projeye erişim yetkiniz yok");
     }
@@ -201,7 +203,7 @@ export const create = adminMutation({
   },
 });
 
-export const update = adminMutation({
+export const update = authedMutation({
   args: {
     deviceId: v.id("devices"),
     name: v.optional(v.string()),
@@ -239,6 +241,7 @@ export const update = adminMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const device = await ctx.db.get(args.deviceId);
     if (!device) throw new Error("Cihaz bulunamadı");
+    await requirePermission(ctx, ctx.user, device.projectId, "devices.manage");
     // super_admin tüm cihazları (havuzdaki atanmamış = projectId undefined dahil) düzenleyebilir;
     // isProjectAllowed undefined'ı reddettiği için bypass gerekir (list/regenerateApiToken ile tutarlı).
     if (ctx.user.role !== "super_admin" && !isProjectAllowed(allowedProjectIds, device.projectId)) {
@@ -278,7 +281,7 @@ export const update = adminMutation({
     // gönderir (localBridge'de boş=temizle); manager-olmayanın yazmasını engellemezsek bu
     // paneli sessizce silerdi. UI gating'e güvenmeyiz — sunucu otoritedir. (apiToken zaten
     // update arg'larında yok → DEVICE_SECRET_FIELD_SET'te durması bu loop'ta etkisiz.)
-    const manager = isManager(ctx.user);
+    const manager = await hasPermission(ctx, ctx.user, device.projectId, "devices.manage");
     for (const [k, v] of Object.entries(updates)) {
       if (v === undefined) continue;
       if (!manager && DEVICE_SECRET_FIELD_SET.has(k)) continue;
@@ -325,12 +328,13 @@ export const update = adminMutation({
   },
 });
 
-export const remove = adminMutation({
+export const remove = authedMutation({
   args: { deviceId: v.id("devices") },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const device = await ctx.db.get(args.deviceId);
     if (!device) throw new Error("Cihaz bulunamadı");
+    await requirePermission(ctx, ctx.user, device.projectId, "devices.manage");
     // super_admin havuzdaki atanmamış cihazı (projectId undefined) da silebilir;
     // isProjectAllowed undefined'ı reddettiği için bypass gerekir (update ile tutarlı).
     if (ctx.user.role !== "super_admin" && !isProjectAllowed(allowedProjectIds, device.projectId)) {
@@ -454,12 +458,13 @@ async function issueApiToken(
   return { token, createdAt };
 }
 
-export const regenerateApiToken = adminMutation({
+export const regenerateApiToken = authedMutation({
   args: { deviceId: v.id("devices") },
   returns: v.object({ token: v.string(), createdAt: v.string() }),
   handler: async (ctx, args) => {
     const device = await ctx.db.get(args.deviceId);
     if (!device) throw new Error("Cihaz bulunamadı");
+    await requirePermission(ctx, ctx.user, device.projectId, "devices.manage");
     if (ctx.user.role !== "super_admin") {
       const allowedProjectIds = await getProjectIdsForUser(ctx);
       if (
@@ -559,7 +564,7 @@ export const getPanelDoorByIo = internalQuery({
  * panel kendi adını taşır, bölge mantıksal alandır ve bağımsız adlandırılır.
  * Bölge/kapı üretimi provisionPanelZoneAndDoors helper'ıyla paylaşılır.
  */
-export const createIdePanel = adminMutation({
+export const createIdePanel = authedMutation({
   args: {
     name: v.string(),
     status: v.optional(v.union(v.literal("active"), v.literal("inactive"))),
@@ -587,6 +592,7 @@ export const createIdePanel = adminMutation({
     if (!args.projectId && ctx.user.role !== "super_admin") {
       throw new ConvexError("Cihaz oluşturmak için bir proje seçmelisiniz");
     }
+    await requirePermission(ctx, ctx.user, args.projectId, "devices.manage");
     if (args.projectId && !isProjectAllowed(allowedProjectIds, args.projectId)) {
       throw new ConvexError("Bu projeye erişim yetkiniz yok");
     }
@@ -666,7 +672,7 @@ export const createIdePanel = adminMutation({
  * topolojiyi belirler (createIdePanel deseni). Gateway kaydı (ehome) ayrıca submission
  * tarafında registerDeviceOnGateway ile yapılır — bu mutation panele bağlanmaz.
  */
-export const createHikDevice = adminMutation({
+export const createHikDevice = authedMutation({
   args: {
     name: v.string(),
     projectId: v.optional(v.id("projects")),
@@ -704,6 +710,7 @@ export const createHikDevice = adminMutation({
     if (!args.projectId && ctx.user.role !== "super_admin") {
       throw new ConvexError("Cihaz oluşturmak için bir proje seçmelisiniz");
     }
+    await requirePermission(ctx, ctx.user, args.projectId, "devices.manage");
     if (args.projectId && !isProjectAllowed(allowedProjectIds, args.projectId)) {
       throw new ConvexError("Bu projeye erişim yetkiniz yok");
     }
@@ -779,9 +786,9 @@ export const createHikDevice = adminMutation({
  * adminDevices kaydı SİLİNMEZ — assignedDeviceId + assignedProjectId set edilir.
  * devices tablosuna projectId + adminDeviceId ile yeni kayıt eklenir.
  * Zone + door atama anında üretilir (provisionPanelZoneAndDoors).
- * adminMutation: claim yönetimsel iş (project_user değil).
+ * authedMutation: claim yönetimsel iş (viewer değil).
  */
-export const claimDevice = adminMutation({
+export const claimDevice = authedMutation({
   args: {
     adminDeviceId: v.id("adminDevices"),
     expectedAssignedProjectId: v.optional(v.union(v.id("projects"), v.null())),
@@ -801,6 +808,7 @@ export const claimDevice = adminMutation({
   }),
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
+    await requirePermission(ctx, ctx.user, args.projectId, "devices.manage");
     if (!allowedProjectIds.some((id) => id === args.projectId)) {
       throw new Error("Bu projeye erişim yetkiniz yok");
     }
@@ -838,9 +846,9 @@ export const claimDevice = adminMutation({
  *   davranışına girilmez) → kimlik/ad kaybolmaz.
  * - Hedef proje undefined ise cihaz yalnızca havuza döner (atama temizlenir).
  * - Proje değişmiyorsa yalnızca isim güncellenir (havuz + atanmış device).
- * adminMutation: yönetimsel + yıkıcı.
+ * authedMutation: yönetimsel + yıkıcı.
  */
-export const reassignDevice = adminMutation({
+export const reassignDevice = authedMutation({
   args: {
     adminDeviceId: v.id("adminDevices"),
     expectedAssignedProjectId: v.optional(v.union(v.id("projects"), v.null())),
@@ -851,6 +859,8 @@ export const reassignDevice = adminMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const adminDevice = await ctx.db.get(args.adminDeviceId);
     if (!adminDevice) throw new Error("Cihaz bulunamadı");
+    await requirePermission(ctx, ctx.user, adminDevice.assignedProjectId, "devices.manage");
+    if (args.projectId) await requirePermission(ctx, ctx.user, args.projectId, "devices.manage");
     if (args.expectedAssignedProjectId !== undefined &&
         (adminDevice.assignedProjectId ?? null) !== args.expectedAssignedProjectId) {
       throw new ConvexError({ code: "DEVICE_ASSIGNMENT_CHANGED", message: "Cihazın ataması başka bir oturumda değişti. Listeyi yenileyip tekrar deneyin." });
@@ -878,6 +888,7 @@ export const reassignDevice = adminMutation({
     if (adminDevice.assignedDeviceId) {
       const assigned = await ctx.db.get(adminDevice.assignedDeviceId);
       if (assigned) {
+        await requirePermission(ctx, ctx.user, assigned.projectId, "devices.manage");
         if (!isProjectAllowed(allowedProjectIds, assigned.projectId)) {
           throw new Error("Mevcut projeye erişim yetkiniz yok");
         }
@@ -908,14 +919,15 @@ export const reassignDevice = adminMutation({
 /**
  * Cihazı projeden çıkarır ve adminDevices havuzuna geri koyar.
  * groupDevices ve panelin kapıları silinir; bölge ve kart okuma geçmişi korunur.
- * adminMutation: yıkıcı + claim ile simetrik (project_user değil).
+ * authedMutation: yıkıcı + claim ile simetrik (viewer değil).
  */
-export const releaseDevice = adminMutation({
+export const releaseDevice = authedMutation({
   args: { deviceId: v.id("devices") },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const device = await ctx.db.get(args.deviceId);
     if (!device) throw new Error("Cihaz bulunamadı");
+    await requirePermission(ctx, ctx.user, device.projectId, "devices.manage");
     if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
       throw new Error("Bu cihaza erişim yetkiniz yok");
     }

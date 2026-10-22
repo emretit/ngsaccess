@@ -1,10 +1,11 @@
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: (permission: string) => mocks.permissions === null || mocks.permissions.includes(permission), loading: false }) }));
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { Employee } from "@/types/employee";
 import type { Id } from "../../../convex/_generated/dataModel";
 import EmployeeTable from "./EmployeeTable";
-const mocks = vi.hoisted(() => ({ states: [] as unknown[], cursor: 0, selected: [] as string[], items: [] as { children?: ReactNode; onSelect?: () => void }[], sync: vi.fn(), confirm: undefined as (() => void) | undefined, bulkSend: undefined as (() => void) | undefined }));
+const mocks = vi.hoisted(() => ({ permissions: null as string[] | null, states: [] as unknown[], cursor: 0, selected: [] as string[], items: [] as { children?: ReactNode; onSelect?: () => void }[], sync: vi.fn(), confirm: undefined as (() => void) | undefined, bulkSend: undefined as (() => void) | undefined }));
 vi.mock("react", async original => ({ ...await original<typeof import("react")>(), useState: (initial: unknown) => { const i = mocks.cursor++; if (!(i in mocks.states)) mocks.states[i] = initial; return [mocks.states[i], (next: unknown) => { mocks.states[i] = next; }]; } }));
 vi.mock("convex/react", () => ({ useQuery: () => [], useAction: () => mocks.sync, useMutation: () => vi.fn() }));
 vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "p", isAdmin: true }) }));
@@ -18,7 +19,7 @@ vi.mock("./EmployeeBulkActions", () => ({ EmployeeBulkActions: ({ onSyncToDevice
 vi.mock("./EmployeeSyncConfirmDialog", () => ({ EmployeeSyncConfirmDialog: ({ onConfirm }: { onConfirm: () => void }) => { mocks.confirm = onConfirm; return <div>Gönderim onayı</div>; } }));
 const employee: Employee = { _id: "e" as Id<"employees">, firstName: "Ada", lastName: "Test", email: "ada@test.test", cardNumber: "1", isActive: true };
 function render(employees = [employee]) { mocks.cursor = 0; mocks.items = []; return renderToStaticMarkup(<EmployeeTable employees={employees} onViewDetails={() => {}} />); }
-beforeEach(() => { vi.clearAllMocks(); mocks.states = []; mocks.selected = []; mocks.confirm = undefined; mocks.sync.mockResolvedValue({ synced: 1, failed: 0, errors: [] }); });
+beforeEach(() => { mocks.permissions = null; vi.clearAllMocks(); mocks.states = []; mocks.selected = []; mocks.confirm = undefined; mocks.sync.mockResolvedValue({ synced: 1, failed: 0, errors: [] }); });
 it("02-O2: row send opens confirmation and calls device action only after confirmation", () => {
   render();
   mocks.items.find(item => item.children === "Cihazlara gönder")?.onSelect?.();
@@ -63,4 +64,17 @@ it("biyometrik kolonu yöneticiye yüz ve parmak izi durumunu gösterir", () => 
   expect(html).toContain("Biyometrik");
   expect(html).toContain("Yüz kaydı yok");
   expect(html).toContain("Parmak izi kaydı yok");
+});
+
+it.each([
+  [["employees.manage"], true, false, false],
+  [["accessRules.manage"], false, true, false],
+  [["biometrics.manage"], false, false, true],
+  [[], false, false, false],
+] as const)("personel işlemleri ayrı yetkilerle görünür: %j", (permissions, manage, sync, biometric) => {
+  mocks.permissions = [...permissions];
+  const html = render();
+  expect(mocks.items.some(item => item.children === "Sil")).toBe(manage);
+  expect(mocks.items.some(item => item.children === "Cihazlara gönder")).toBe(sync);
+  expect(html.includes("Biyometrik")).toBe(biometric);
 });

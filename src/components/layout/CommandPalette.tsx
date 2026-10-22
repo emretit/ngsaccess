@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
-import { useAuth } from "@/components/auth/AuthProvider";
+import { usePermissions } from "@/hooks/usePermissions";
+import { visibleRoutes } from "@/lib/routeMeta";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { Command, CommandInput, CommandList, CommandItem, CommandEmpty, CommandGroup } from "@/components/ui/command";
-import { filterNavigationRoutes } from "./navigationSearch";
+import { normalizeNavigationSearch } from "./navigationSearch";
 
 export function CommandPalette() {
-  const { profile } = useAuth();
+  const { role, can } = usePermissions();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -41,7 +42,7 @@ export function CommandPalette() {
       <Command shouldFilter={false}>
         <CommandInput aria-label="Sayfa adı" placeholder="Sayfa adı yazın…" value={query} onValueChange={setQuery} />
         <CommandList><CommandEmpty>Sonuç bulunamadı. Başka bir sayfa adı deneyin.</CommandEmpty><CommandGroup>
-          {filterNavigationRoutes(profile?.role, query).map(route => <CommandItem key={route.href} value={route.href} onSelect={() => { setOpen(false); navigate(route.href); }} className="gap-3 py-3"><route.icon className="h-4 w-4" aria-hidden="true" />{route.name}</CommandItem>)}
+          {visibleRoutes(role ?? undefined, true, can).filter(route => normalizeNavigationSearch(query).split(/\s+/).every(term => normalizeNavigationSearch(route.name).includes(term))).map(route => <CommandItem key={route.href} value={route.href} onSelect={() => { setOpen(false); navigate(route.href); }} className="gap-3 py-3"><route.icon className="h-4 w-4" aria-hidden="true" />{route.name}</CommandItem>)}
         </CommandGroup></CommandList>
       </Command>
     </DialogContent>

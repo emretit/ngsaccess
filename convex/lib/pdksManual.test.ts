@@ -27,7 +27,7 @@ describe("zorunlu manuel düzeltme gerekçesi", () => {
 
 // Real mutation handler with auth/audit adapters replaced; no DB/network access.
 vi.mock("./customFunctions", () => ({
-  adminMutation: (config: unknown) => config, authedQuery: (config: unknown) => config,
+  authedMutation: (config: unknown) => config, authedQuery: (config: unknown) => config,
 }));
 vi.mock("./audit", () => ({ writeAudit: vi.fn() }));
 const bulkHandler = (bulkUpsertManual as unknown as {

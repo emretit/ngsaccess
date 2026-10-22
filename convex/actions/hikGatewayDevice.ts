@@ -1,5 +1,7 @@
 "use node";
 
+import { internal } from "../_generated/api";
+
 import { v } from "convex/values";
 import { internalAction } from "../_generated/server";
 import { authedAction } from "../lib/customFunctions";
@@ -99,12 +101,18 @@ export const refreshGatewayDeviceStatus = authedAction({
  */
 export const pingHikGateway = authedAction({
   args: {},
-  handler: async (): Promise<{
+  handler: async (ctx): Promise<{
     ok: boolean;
     model?: string;
     version?: string;
     error?: string;
   }> => {
+    const projectIds = await ctx.runQuery(internal.users.listProjectIdsForCurrentUser, {});
+    const permissions = await Promise.all(projectIds.map(async projectId => {
+      const ok: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId, permission: "devices.manage" });
+      return ok;
+    }));
+    if (ctx.user.role !== "super_admin" && !permissions.some(Boolean)) throw new Error("Bu işlem için yetkiniz yok");
     return await runPingHikGateway();
   },
 });

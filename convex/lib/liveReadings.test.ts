@@ -8,7 +8,7 @@ import { update as updateEmployee } from "../employees";
 import { getCurrentUser } from "./auth";
 import { assignmentPrecondition, isPhysicalCardNumber, liveReadingSource, liveReadingWindow, matchesReadingResult, mergeLiveReadings } from "./liveReadings";
 
-// Keep both real adminMutation wrappers, including the nested employees.update role check.
+// Keep both real authentication wrappers, including the nested employees.update role check.
 // Only authentication identity/project lookup and the DB/scheduler transport are substituted.
 vi.mock("./auth", async (importOriginal) => ({
   ...await importOriginal<typeof import("./auth")>(),
@@ -86,6 +86,7 @@ function context(rows: Doc<"cardReadings">[] = [reading()]) {
   const employee: Row = { _id: employeeId, _creationTime: 1, projectId, firstName: "Ada", lastName: "Test", cardNumber: "old", email: "a@example.test", isActive: true };
   const user = { _id: "admin", role: "project_admin" };
   const tables: Record<string, Row[]> = {
+    userProjects: [{ _id: "membership", userId: "admin", projectId }],
     cardReadings: rows, employees: [employee], auditLog: [],
     devices: [{ _id: deviceId, projectId, name: "Panel", deviceSerial: "SERIAL" }],
     doors: [{ _id: doorId, projectId, deviceId, ioId: 0, name: "Kapı" }],
@@ -108,6 +109,7 @@ function context(rows: Doc<"cardReadings">[] = [reading()]) {
       withSearchIndex: (name: string, apply: (q: typeof index) => unknown) => { indexes.push(name); apply(index); return chain; },
       [Symbol.asyncIterator]: async function* () { yield* selected; },
       collect: async () => selected,
+      unique: async () => selected[0] ?? null,
       first: async () => selected[0] ?? null,
       take: async (n: number) => selected.slice(0, n),
       paginate: async (opts: { numItems: number; cursor: string | null; maximumRowsRead?: number }) => {
@@ -153,7 +155,7 @@ describe("public handlers through real auth wrappers", () => {
     expect(f.tables.auditLog[0]).toMatchObject({ targetTable: "employees", oldValue: { cardNumber: "old" }, newValue: { cardNumber: "001234", readingId } });
     expect(row).toEqual(reading());
   });
-  it("both outer and nested adminMutation reject members", async () => {
+  it("both outer and nested permission checks reject members", async () => {
     const f = context();
     f.ctx.user.role = "member";
     await expect(invoke(assignCardFromReading, f.ctx, { readingId, employeeId, expectedCurrentCard: "old" })).rejects.toThrow("Bu işlem için yetkiniz yok");

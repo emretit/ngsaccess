@@ -1,3 +1,4 @@
+import { requirePermission, getProjectIdsWithPermission } from "./lib/permissions";
 import { writeAudit } from "./lib/audit";
 import { internal } from "./_generated/api";
 import { snapshotEmployeeHikDevices, resolveRuleDeviceTargets, hasWritableHikCredential } from "./lib/peopleHikSnapshot";
@@ -11,7 +12,7 @@ import { scheduleBridgeWakeForProject } from "./hikBridge";
 import { internalQuery, internalMutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { authedMutation, adminMutation } from "./lib/customFunctions";
+import { authedMutation } from "./lib/customFunctions";
 import { getCurrentUser, getValidAuthUserId } from "./lib/auth";
 import { resolveProjectScope } from "./lib/projectScope";
 import { scanHikSync, assertSyncScope } from "./lib/syncStatusScope";
@@ -729,7 +730,7 @@ export const requeueStaleLocalBridgeOperations = internalMutation({
 /**
  * UI banner için: çözümlenmemiş (status=failed) sync hatalarını döner.
  * payload field'ı UI'ya **döndürülmez** (PII leak vektörünü kapatmak için).
- * Detay gerekiyorsa adminQuery yazılmalı.
+ * Detay gerekiyorsa authedQuery yazılmalı.
  */
 export const listSyncIssues = query({
   args: { projectId: v.optional(v.id("projects")), limit: v.optional(v.number()) },
@@ -768,6 +769,7 @@ export const dismissSyncIssue = authedMutation({
     const op = await ctx.db.get(args.issueId);
     if (!op) return;
     const device = await assertSyncScope(ctx, projectIds, op);
+    await requirePermission(ctx, ctx.user, op.projectId ?? device?.projectId, "devices.manage");
     const now = Date.now();
     if (isPersonDeletion(op)) {
       if (ctx.user.role !== "super_admin") throw new Error("Silme uyarısını yalnız süper yönetici kapatabilir");
@@ -1027,7 +1029,8 @@ export const cleanupStaleSyncIssues = internalMutation({
 export const dismissAllSyncIssues = authedMutation({
   args: { projectId: v.optional(v.id("projects")), issueIds: v.optional(v.array(v.id("hikPendingOperations"))) },
   handler: async (ctx, args) => {
-    const projectIds = await resolveProjectScope(ctx, args.projectId);
+    if (args.projectId) await requirePermission(ctx, ctx.user, args.projectId, "devices.manage");
+    const projectIds = args.projectId ? await resolveProjectScope(ctx, args.projectId) : await getProjectIdsWithPermission(ctx, ctx.user, "devices.manage");
     if (args.issueIds && args.issueIds.length > 100) throw new Error("Bir seferde en fazla 100 uyarı kapatılabilir");
     const scan = await scanHikSync(ctx, projectIds, ["failed"], true);
     const requested = args.issueIds
@@ -1035,7 +1038,10 @@ export const dismissAllSyncIssues = authedMutation({
         .filter((op): op is NonNullable<typeof op> => op !== null)
       : scan.rows;
     // Önizleme ile aynı kimlikler; yeni gelen uyarılar toplu kapatmaya dahil edilmez.
-    for (const op of requested) await assertSyncScope(ctx, projectIds, op);
+    for (const op of requested) {
+      const device = await assertSyncScope(ctx, projectIds, op);
+      await requirePermission(ctx, ctx.user, op.projectId ?? device?.projectId, "devices.manage");
+    }
     const targets = requested.filter((op) => op.operation !== "deletePerson" && op.operation !== "deleteCard" && op.status === "failed" && op.dismissedAt === undefined).slice(0, 100);
     const now = Date.now();
     for (const op of targets) {
@@ -1046,13 +1052,14 @@ export const dismissAllSyncIssues = authedMutation({
 });
 
 /** Tek op yeniden sıraya alınır; bridge claim/ack akışı değişmez. */
-export const retrySyncIssue = adminMutation({
+export const retrySyncIssue = authedMutation({
   args: { issueId: v.id("hikPendingOperations") },
   handler: async (ctx, args) => {
     const projectIds = await resolveProjectScope(ctx);
     const op = await ctx.db.get(args.issueId);
     if (!op) throw new Error("İşlem bulunamadı");
     const device = await assertSyncScope(ctx, projectIds, op);
+    await requirePermission(ctx, ctx.user, op.projectId ?? device?.projectId, "devices.manage");
     if (isBiometricAddition(op.operation)) {
       await assertBiometricAllowed(ctx, device?.projectId);
       await assertBiometricAllowed(ctx, await biometricPayloadProject(ctx, op.payload));

@@ -71,7 +71,7 @@ export function StatusResults({
         selected={selected}
         onToggle={toggle}
         onEmployee={setEmployee}
-        isAdmin
+        canManage
       />
       {cursor && (
         <Button variant="outline" disabled={busy} onClick={() => void more()}>

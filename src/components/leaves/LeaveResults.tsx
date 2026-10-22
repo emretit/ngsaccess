@@ -24,7 +24,7 @@ function LeaveSummary({ filters, onProjectRecords }: { filters: LeaveQueryFilter
 export function LeaveResults({
   filters,
   pageSize,
-  isAdmin,
+  canManage,
   onCreate,
   onClear,
   onDetails,
@@ -35,7 +35,7 @@ export function LeaveResults({
 }: {
   filters: LeaveQueryFilters;
   pageSize: number;
-  isAdmin: boolean;
+  canManage: boolean;
   onCreate: () => void;
   onClear: () => void;
   onDetails: (row: LeaveRow) => void;
@@ -103,14 +103,14 @@ export function LeaveResults({
       {rows.length ? (
         <LeaveList
           rows={rows}
-          isAdmin={isAdmin}
+          canManage={canManage}
           onDetails={onDetails}
           onEdit={onEdit}
         />
       ) : (
         <EmptyState title={projectHasRecords ? "Bu filtrelerle eşleşen izin yok." : "Henüz izin kaydı yok."}
           description={projectHasRecords ? "Kişi, tür veya dönemi değiştirin." : "Bu proje için izin kaydı eklenmedi."}
-          action={projectHasRecords ? { label: "Filtreleri temizle", onClick: onClear } : isAdmin ? { label: "İzin ekle", onClick: onCreate } : undefined} />
+          action={projectHasRecords ? { label: "Filtreleri temizle", onClick: onClear } : canManage ? { label: "İzin ekle", onClick: onCreate } : undefined} />
       )}
 
       <PaginationBar

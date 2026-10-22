@@ -14,7 +14,7 @@ afterEach(() => vi.useRealTimers());
 
 vi.mock("./customFunctions", () => {
   const register = (config: unknown) => config;
-  return { authedQuery: register, adminQuery: register, optionalAuthQuery: register, adminMutation: register, employeeAuthedQuery: register, employeeAuthedMutation: register };
+  return { authedQuery: register, optionalAuthQuery: register, authedMutation: register, employeeAuthedQuery: register, employeeAuthedMutation: register };
 });
 vi.mock("./auth", async (original) => ({
   ...(await original<typeof import("./auth")>()), getProjectIdsForUser: async () => ["p"],

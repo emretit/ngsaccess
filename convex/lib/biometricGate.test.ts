@@ -6,7 +6,7 @@ import { assertBiometricAllowed, biometricPayloadProject, biometricReason, isBio
 
 const destruction = vi.hoisted(() => ({ active: true }));
 vi.mock("./biometricDestructionState", () => ({ hasActiveDestructionRun: vi.fn(async () => destruction.active) }));
-vi.mock("./customFunctions", () => ({ adminMutation: (config: unknown) => config, adminQuery: (config: unknown) => config, authedQuery: (config: unknown) => config }));
+vi.mock("./customFunctions", () => ({ authedMutation: (config: unknown) => config, authedQuery: (config: unknown) => config }));
 vi.mock("./auth", () => ({ getProjectIdsForUser: vi.fn(async () => ["project"]), requireEmployeeAccess: vi.fn() }));
 
 const projectId = "project" as Id<"projects">;
@@ -86,7 +86,7 @@ describe("biyometri yönetimi / imha kilidi", () => {
     destruction.active = false;
     const fixture = context(null);
     const insert = vi.fn().mockResolvedValue("new-row");
-    const ctx = { ...fixture.ctx, user: { _id: "admin" }, db: { ...fixture.ctx.db, insert } } as unknown as MutationCtx;
+    const ctx = { ...fixture.ctx, user: { _id: "admin", role: "super_admin" }, db: { ...fixture.ctx.db, insert } } as unknown as MutationCtx;
     await handler(ctx, { projectId, enabled: true, reason: "  Kritik alan  " });
     expect(insert).toHaveBeenCalledWith("projectPrivacySettings", expect.objectContaining({ biometricEnabled: true, biometricReason: "Kritik alan" }));
     expect(insert).toHaveBeenCalledWith("auditLog", expect.objectContaining({ newValue: expect.objectContaining({ biometricReason: "Kritik alan" }) }));

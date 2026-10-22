@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -47,6 +48,7 @@ export default function EmployeeForm({
   onPendingChange,
 }: EmployeeFormProps) {
   const { projectId } = useActiveProjectScope();
+  const { can } = usePermissions();
   const rules: FunctionReturnType<typeof api.accessRules.listMemberships> | undefined = useQuery(
     api.accessRules.listMemberships,
     projectId ? { projectId } : "skip",
@@ -160,7 +162,7 @@ export default function EmployeeForm({
       )}
       {isLoading && <p role="status" className="sr-only">Kaydediliyor</p>}
       <fieldset
-        disabled={isLoading || uploading || stages.length > 0}
+        disabled={!can("employees.manage") || isLoading || uploading || stages.length > 0}
         className={
           embedded
             ? "min-w-0"
@@ -178,6 +180,7 @@ export default function EmployeeForm({
             <SectionSkeleton label="Form bilgileri yükleniyor" />
           ) : (
             <EmployeeFormFields
+              canViewPay={can("pay.view")}
               autoFocusFirstName={autoFocusFirstName}
               isEditing={!!employee}
               memberships={memberships}

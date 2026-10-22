@@ -1,3 +1,4 @@
+import { requirePermission, getProjectIdsWithPermission } from "./lib/permissions";
 import { grantStatusForOperation } from "./lib/grantStatus";
 import { effectiveSchedule, toIdePermissionSegments, type ScheduleRule, type ScheduleTemplate } from "./lib/accessSchedule";
 import { boundedScheduleRows, scheduleRuleDevices } from "./accessScheduleTemplates";
@@ -6,7 +7,7 @@ import { v } from "convex/values";
 import { internalMutation, internalQuery, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { authedMutation, adminMutation } from "./lib/customFunctions";
+import { authedMutation } from "./lib/customFunctions";
 import { getCurrentUser, getValidAuthUserId } from "./lib/auth";
 import { resolveProjectScope } from "./lib/projectScope";
 import { scanIdeSync, assertSyncScope } from "./lib/syncStatusScope";
@@ -697,7 +698,8 @@ export const dismissSyncIssue = authedMutation({
     const projectIds = await resolveProjectScope(ctx);
     const op = await ctx.db.get(args.opId);
     if (!op) return;
-    await assertSyncScope(ctx, projectIds, op);
+    const device = await assertSyncScope(ctx, projectIds, op);
+    await requirePermission(ctx, ctx.user, op.projectId ?? device?.projectId, "devices.manage");
     if (op.status !== "failed" || op.dismissedAt !== undefined) return;
     await ctx.db.patch(op._id, syncDismissPatch(ctx.user._id, Date.now()));
   },
@@ -707,7 +709,8 @@ export const dismissSyncIssue = authedMutation({
 export const dismissAllSyncIssues = authedMutation({
   args: { projectId: v.optional(v.id("projects")), issueIds: v.optional(v.array(v.id("idePendingOperations"))) },
   handler: async (ctx, args) => {
-    const projectIds = await resolveProjectScope(ctx, args.projectId);
+    if (args.projectId) await requirePermission(ctx, ctx.user, args.projectId, "devices.manage");
+    const projectIds = args.projectId ? await resolveProjectScope(ctx, args.projectId) : await getProjectIdsWithPermission(ctx, ctx.user, "devices.manage");
     if (args.issueIds && args.issueIds.length > 100) throw new Error("Bir seferde en fazla 100 uyarı kapatılabilir");
     const scan = await scanIdeSync(ctx, projectIds, ["failed"], true);
     const requested = args.issueIds
@@ -715,7 +718,10 @@ export const dismissAllSyncIssues = authedMutation({
         .filter((op): op is NonNullable<typeof op> => op !== null)
       : scan.rows;
     // Önizleme ile aynı kimlikler; yeni gelen uyarılar toplu kapatmaya dahil edilmez.
-    for (const op of requested) await assertSyncScope(ctx, projectIds, op);
+    for (const op of requested) {
+      const device = await assertSyncScope(ctx, projectIds, op);
+      await requirePermission(ctx, ctx.user, op.projectId ?? device?.projectId, "devices.manage");
+    }
     const targets = requested.filter((op) => op.status === "failed" && op.dismissedAt === undefined).slice(0, 100);
     const now = Date.now();
     for (const op of targets) {
@@ -726,13 +732,14 @@ export const dismissAllSyncIssues = authedMutation({
 });
 
 /** Tek op yeniden sıraya alınır; bridge claim/ack akışı değişmez. */
-export const retrySyncIssue = adminMutation({
+export const retrySyncIssue = authedMutation({
   args: { opId: v.id("idePendingOperations") },
   handler: async (ctx, args) => {
     const projectIds = await resolveProjectScope(ctx);
     const op = await ctx.db.get(args.opId);
     if (!op) throw new Error("İşlem bulunamadı");
     const device = await assertSyncScope(ctx, projectIds, op);
+    await requirePermission(ctx, ctx.user, op.projectId ?? device?.projectId, "devices.manage");
     if (mobileOperationId(op.payload) !== undefined) return { queued: false };
     if (!canRetrySync(op.status)) return { queued: false };
     if (!device || device.brand !== "ide_smart") throw new Error("Cihaz bulunamadı veya IDE Smart değil");

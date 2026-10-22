@@ -1,3 +1,4 @@
+import { hasPermission, requirePermission } from "./lib/permissions";
 import { validateVisitorPresetCard } from "./lib/mobileVisitors";
 import { visitorQueryNow } from "./lib/visitorStatus";
 import { mergedStream, stream } from "convex-helpers/server/stream";
@@ -13,8 +14,8 @@ import { internalMutation } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
-import { authedQuery, adminMutation } from "./lib/customFunctions";
-import { isManager, requireEmployeeAccess } from "./lib/auth";
+import { authedQuery, authedMutation } from "./lib/customFunctions";
+import { requireEmployeeAccess } from "./lib/auth";
 import { Doc, Id } from "./_generated/dataModel";
 import {
   findDuplicateEmployee,
@@ -240,7 +241,7 @@ export const getDetail = authedQuery({
     return {
       ...row,
       projectId: visitor.projectId,
-      ...visitorSensitiveFields(visitor, isManager(ctx.user)),
+      ...visitorSensitiveFields(visitor, await hasPermission(ctx, ctx.user, visitor.projectId, "visitors.manage")),
       cardReleased: visitor.cardNumber.startsWith("IADE:"),
       isActive: visitor.isActive ?? false,
       hostEmployeeId: visitor.hostEmployeeId ?? null,
@@ -259,7 +260,7 @@ export const getDetail = authedQuery({
 });
 
 /** Ziyaretçi oluştur: employees(isVisitor=true) + preset kuralına üyelik + cihaz sync. */
-export const create = adminMutation({
+export const create = authedMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     firstName: v.string(),
@@ -279,6 +280,7 @@ export const create = adminMutation({
     kvkkDocumentVersion: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requirePermission(ctx, ctx.user, args.projectId, "visitors.manage");
     await resolveProjectScope(ctx, args.projectId);
     await validateVisitorAccessRelations(ctx, args.projectId, args.presetRuleId, args.hostEmployeeId);
     const inAllowed = (projectId: Id<"projects"> | undefined) => projectId === args.projectId;
@@ -361,7 +363,7 @@ export const create = adminMutation({
  * oluştur. Kart değişiminde eski kart IDE panellerinden sökülür (employees.update deseni).
  * accessExpiresAt değişimi cihaz sync gerektirmez (süre dolumu cron işidir).
  */
-export const update = adminMutation({
+export const update = authedMutation({
   args: {
     visitorId: v.id("employees"),
     projectId: v.optional(v.id("projects")),
@@ -382,6 +384,7 @@ export const update = adminMutation({
   handler: async (ctx, args) => {
     const visitor = await ctx.db.get(args.visitorId);
     if (!visitor || visitor.isVisitor !== true) throw new Error("Ziyaretçi bulunamadı");
+    await requirePermission(ctx, ctx.user, visitor.projectId, "visitors.manage");
     assertAccessProjectUnchanged(visitor.projectId, args.projectId);
     await resolveProjectScope(ctx, visitor.projectId);
     const assigningPreset = args.presetRuleId !== undefined;
@@ -485,10 +488,11 @@ export const update = adminMutation({
 });
 
 /** Manuel çıkış: erişimi geri al (isActive=false → cihazdan söker), durumu checkedOut yap. */
-export const checkOut = adminMutation({
+export const checkOut = authedMutation({
   args: { visitorId: v.id("employees") },
   handler: async (ctx, args) => {
     const visitor = await requireEmployeeAccess(ctx, args.visitorId);
+    await requirePermission(ctx, ctx.user, visitor.projectId, "visitors.manage");
     if (visitor.isVisitor !== true) throw new Error("Ziyaretçi bulunamadı");
     if (visitor.isActive === false) return args.visitorId;
     // Deaktivasyondan ÖNCE bağlı IDE panellerini çöz; patch sonrası kartı FİZİKSEL sök.
@@ -515,10 +519,11 @@ export const checkOut = adminMutation({
 });
 
 /** Pasif ziyaretçinin kartını elle serbest bırak (rozet iadesi). Saf DB — cihaz işlemi yok. */
-export const releaseCard = adminMutation({
+export const releaseCard = authedMutation({
   args: { visitorId: v.id("employees") },
   handler: async (ctx, args) => {
     const visitor = await requireEmployeeAccess(ctx, args.visitorId);
+    await requirePermission(ctx, ctx.user, visitor.projectId, "visitors.manage");
     if (visitor.isVisitor !== true) throw new Error("Ziyaretçi bulunamadı");
     if (visitor.isActive !== false) {
       throw new Error("Önce ziyaretçiyi çıkış yaptırın");

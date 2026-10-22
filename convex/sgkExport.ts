@@ -1,3 +1,4 @@
+import { requirePermission } from "./lib/permissions";
 import { employedDuring, employedOn } from "./lib/employment";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
@@ -23,6 +24,7 @@ export const buildAphbForMonth = authedQuery({
     const targetProjectId = args.projectId ??
       (ctx.user.role === "super_admin" ? undefined : allowedProjectIds[0]);
     if (!targetProjectId) throw new Error("Proje seçin");
+    await requirePermission(ctx, ctx.user, targetProjectId, "reports.view");
     if (!allowedProjectIds.includes(targetProjectId)) {
       throw new Error("Bu projeye erişim yetkiniz yok");
     }

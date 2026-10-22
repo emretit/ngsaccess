@@ -15,8 +15,9 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { QuerySectionBoundary } from "@/components/shared/QuerySectionBoundary";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
-import { useAuth } from "@/components/auth/AuthProvider";
-import { capabilities, type SettingsTab } from "@/lib/capabilities";
+import { usePermissions } from "@/hooks/usePermissions";
+import { RolesSettings } from "@/components/settings/sections/RolesSettings";
+import { permissionCapabilities, type SettingsTab } from "@/lib/capabilities";
 import { AccessDenied } from "@/components/shared/AccessDenied";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useProjectChangeGuard } from "@/contexts/ActiveProjectContext";
@@ -26,12 +27,12 @@ import { installNavigationGuard } from "@/lib/navigationGuard";
 export default function Settings() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { can, role, loading } = usePermissions();
+  const permissions = permissionCapabilities(can, role);
   const requestedTab = searchParams.get("tab");
-  const section = SETTINGS_SECTIONS.find(item => item.key === requestedTab) ?? SETTINGS_SECTIONS[0];
+  const section = SETTINGS_SECTIONS.find(item => item.key === requestedTab) ?? SETTINGS_SECTIONS.find(item => permissions.settingsTabs.includes(item.key)) ?? SETTINGS_SECTIONS[0];
   const activeTab = section.key;
-  const { profile, loading } = useAuth();
   const scope = useActiveProjectScope();
-  const permissions = capabilities(profile?.role);
   const [forms, setForms] = useState<Record<string, FormState>>({});
   const reportForm = useCallback((id: string, state: FormState | null) => setForms(previous => {
     if (state && previous[id]?.dirty === state.dirty && previous[id]?.pending === state.pending) return previous;
@@ -69,8 +70,9 @@ export default function Settings() {
   if (!permissions.settingsTabs.includes(activeTab)) return <><AccessDenied message="Bu ayar bölümünü görüntüleme yetkiniz yok." /><Link className="inline-flex min-h-11 items-center text-sm underline" to="/profile">Profilimi aç</Link></>;
   const content = () => {
     switch (activeTab) {
+      case "roles": return <RolesSettings />;
       case "general": return <GeneralSettings />;
-      case "users": return <div className="min-w-0 max-w-full overflow-x-auto"><AdminUsersPanel /></div>;
+      case "users": return <div className="min-w-0 max-w-full overflow-x-auto"><AdminUsersPanel projectScoped /></div>;
       case "work-payroll": return <WorkAndPayrollSettings />;
       case "reports": return <ReportsSettings requestedReport={searchParams.get("report")} />;
       case "integrations": return <IntegrationsSettings />;

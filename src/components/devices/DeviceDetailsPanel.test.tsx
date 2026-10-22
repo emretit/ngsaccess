@@ -1,5 +1,6 @@
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => mocks.admin, loading: false }) }));
 vi.mock("@/hooks/useProjectAccess", () => ({
-  useProjectAccess: () => ({ isAdmin: mocks.admin }),
+  useProjectAccess: () => ({ canManage: mocks.admin }),
 }));
 import { UNSAFE_NavigationContext, type Navigator } from "react-router-dom";
 import type { ReactNode } from "react";

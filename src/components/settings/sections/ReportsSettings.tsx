@@ -1,5 +1,4 @@
-import { useAuth } from "@/components/auth/AuthProvider";
-import { capabilities } from "@/lib/capabilities";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "convex/react";
@@ -46,8 +45,8 @@ export function linkedReportType(value: string | null | undefined): ReportType {
 }
 
 function ReportDownloadSettings({ requestedReport }: { requestedReport?: string | null }) {
-  const { profile } = useAuth();
-  const canSeePay = capabilities(profile?.role).admin;
+  const { can } = usePermissions();
+  const canSeePay = can("pay.view");
   const section = useRef<HTMLElement>(null);
   const { projectId: activeProjectId, projectIds, activeProject, loading: accessLoading } = useActiveProjectScope();
   const [scopeSelection, setScopeSelection] = useState("active");
@@ -232,7 +231,8 @@ function ReportDownloadSettings({ requestedReport }: { requestedReport?: string 
 }
 
 export function ReportsSettings({ requestedReport }: { requestedReport?: string | null }) {
-  const { isAdmin, projectId } = useActiveProjectScope();
+  const { projectId } = useActiveProjectScope();
+  const isAdmin = usePermissions().can("reports.view");
   return <div className="min-w-0 space-y-8">
     <QuerySectionBoundary resetKey={projectId} title="Raporlar yüklenemedi"><ReportDownloadSettings requestedReport={requestedReport} /></QuerySectionBoundary>
     {isAdmin && <QuerySectionBoundary resetKey={projectId} title="Hatırlatma yüklenemedi"><ReportReminderSettings /></QuerySectionBoundary>}

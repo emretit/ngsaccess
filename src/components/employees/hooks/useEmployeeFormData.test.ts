@@ -72,3 +72,5 @@ it("yerel form hatası sonrası yeniden kurulum drawer'daki taslağı korur", ()
   expect(retried.formData.firstName).toBe("Korunan taslak");
   expect(retried.initialData).not.toBe(JSON.stringify(retried.formData));
 });
+
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, role: "hr", loading: false }) }));

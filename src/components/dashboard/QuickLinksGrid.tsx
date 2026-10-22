@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
-import { useAuth } from "@/components/auth/AuthProvider";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useDashboardStats } from "@/hooks/useDashboard";
-import { visibleRoutes } from "@/lib/routeMeta";
+import { routeMeta } from "@/lib/routeMeta";
 import { DashboardPanel } from "./DashboardPanel";
 
 type Stats = ReturnType<typeof useDashboardStats>["stats"];
@@ -16,9 +16,14 @@ const links: { href: string; description: (stats: Stats) => string }[] = [
 ];
 
 export default function QuickLinksGrid() {
-  const { profile } = useAuth();
+  const { can } = usePermissions();
   const { stats } = useDashboardStats();
-  const routes = visibleRoutes(profile?.role);
+  const routes = routeMeta.filter(route => {
+    if (route.href === "/employees") return can("employees.view");
+    if (route.href === "/reports") return can("reports.view");
+    if (route.href === "/settings") return can("admin.manage") || can("schedule.manage") || can("devices.manage") || can("reports.view");
+    return true;
+  });
   return (
     <DashboardPanel title="Hızlı erişim">
       <ul className="divide-y">

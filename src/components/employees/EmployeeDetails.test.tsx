@@ -84,3 +84,5 @@ it("parmak izi ve salt okunur erişim sorguları yerel hata sınırındadır", (
   expect(scope.boundaries).toContain("Erişim yetkileri");
   expect(EmployeeActivityBoundary).toBeDefined();
 });
+
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => scope.isAdmin, role: "hr", loading: false }) }));

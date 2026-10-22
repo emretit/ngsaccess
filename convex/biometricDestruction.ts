@@ -1,8 +1,9 @@
+import { requirePermission } from "./lib/permissions";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { adminMutation, adminQuery } from "./lib/customFunctions";
+import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import { writeAudit } from "./lib/audit";
 import { isBiometricEnabled } from "./lib/privacySettings";
@@ -12,7 +13,8 @@ const kind = v.union(v.literal("face"), v.literal("fingerprint"));
 const STATE_TABLE = "biometricDestructionRun";
 const WATCHDOG_MS = 10 * 60 * 1000;
 
-async function requireProject(ctx: QueryCtx | MutationCtx, projectId: Id<"projects">) {
+async function requireProject(ctx: (QueryCtx | MutationCtx) & { user: Doc<"users"> }, projectId: Id<"projects">) {
+  await requirePermission(ctx, ctx.user, projectId, "biometrics.manage");
   const allowed = await getProjectIdsForUser(ctx);
   if (!allowed.includes(projectId)) throw new ConvexError({ code: "FORBIDDEN", message: "Bu projeye erişim yetkiniz yok." });
   const project = await ctx.db.get(projectId);
@@ -20,7 +22,7 @@ async function requireProject(ctx: QueryCtx | MutationCtx, projectId: Id<"projec
   return project;
 }
 
-async function latestRun(ctx: QueryCtx | MutationCtx, projectId: Id<"projects">) {
+async function latestRun(ctx: (QueryCtx | MutationCtx) & { user: Doc<"users"> }, projectId: Id<"projects">) {
   const rows = await ctx.db.query("auditLog").withIndex("by_project_table_timestamp", q => q.eq("projectId", projectId).eq("targetTable", STATE_TABLE)).order("desc").take(1);
   return rows[0] ?? null;
 }
@@ -48,7 +50,7 @@ async function settleIfReady(ctx: MutationCtx, row: Doc<"auditLog">, state: Dest
   await saveState(ctx, row, state, state.status === "completed" ? "Biyometrik imha tutanağı" : "Biyometrik imha ilerlemesi");
 }
 
-export const previewBiometricDestruction = adminQuery({
+export const previewBiometricDestruction = authedQuery({
   args: { projectId: v.id("projects"), kinds: v.array(kind) },
   handler: async (ctx, args) => {
     const project = await requireProject(ctx, args.projectId);
@@ -73,7 +75,7 @@ export const previewBiometricDestruction = adminQuery({
   },
 });
 
-export const startBiometricDestruction = adminMutation({
+export const startBiometricDestruction = authedMutation({
   args: { projectId: v.id("projects"), kinds: v.array(kind), confirmText: v.string(), reason: v.string() },
   handler: async (ctx, args): Promise<Id<"auditLog">> => {
     const project = await requireProject(ctx, args.projectId);
@@ -96,7 +98,7 @@ export const startBiometricDestruction = adminMutation({
   },
 });
 
-export const getDestructionRun = adminQuery({
+export const getDestructionRun = authedQuery({
   args: { projectId: v.id("projects"), runId: v.optional(v.id("auditLog")) },
   handler: async (ctx, args) => {
     await requireProject(ctx, args.projectId);

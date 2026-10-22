@@ -1,6 +1,6 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import StatusPage from "./status/StatusPage";
 import TemplatesPage from "./templates/TemplatesPage";
 import { useState } from "react";
@@ -12,9 +12,10 @@ import type { AccessRule } from "@/types/access-control";
 
 const ProjectAccessControl = () => {
   const [params, setParams] = useSearchParams();
-  const { isAdmin } = useActiveProject();
+  const { can } = usePermissions();
+  const canManage = can("accessRules.manage");
   const tab =
-    params.get("tab") === "status" && isAdmin
+    params.get("tab") === "status" && canManage
       ? "status"
       : params.get("tab") === "templates"
         ? "templates"
@@ -61,9 +62,9 @@ const ProjectAccessControl = () => {
         <TabsList className="h-auto flex flex-wrap w-fit max-w-full">
           <TabsTrigger value="rules">Kurallar</TabsTrigger>
           <TabsTrigger value="templates">Zaman Şablonları</TabsTrigger>
-          {isAdmin && <TabsTrigger value="status">Yetki Durumu</TabsTrigger>}
+          {canManage && <TabsTrigger value="status">Yetki Durumu</TabsTrigger>}
         </TabsList>
-        {isAdmin && (
+        {canManage && (
           <TabsContent value="status">
             <StatusPage />
           </TabsContent>

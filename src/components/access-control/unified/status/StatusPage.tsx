@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useConvex } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
@@ -29,8 +30,10 @@ import { useRedistribution } from "./useRedistribution";
 export { StatusFilter } from "./StatusFilters";
 
 export default function StatusPage() {
-  const { projectId, isAdmin } = useActiveProject();
-  if (!isAdmin) return null;
+  const { projectId } = useActiveProject();
+  const { can } = usePermissions();
+  const canManage = can("accessRules.manage");
+  if (!canManage) return null;
   if (!projectId) return <p>Önce bir proje seçin.</p>;
   return <StatusContent key={projectId} projectId={projectId} />;
 }

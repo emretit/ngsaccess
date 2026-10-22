@@ -1,12 +1,14 @@
+import { resolveProjectScope } from "./projectScope";
+import { getCurrentUser } from "./auth";
+import { getProjectIdsWithPermission, requirePermission } from "./permissions";
 import { hasVersionedPdksPolicy, loadPdksPolicies, type PdksProjectPolicies } from "./pdksRules";
 import { buildBoundedShiftResolver } from "./shiftResolver";
 import { buildPdksWorkDateResolver, addWorkDate } from "./pdksWorkDay";
 import { trDateKey } from "./trDate";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
-import { resolveProjectScope, selectProjectScope } from "./projectScope";
+import { selectProjectScope } from "./projectScope";
 import { filterPdksReadings } from "./pdksSource";
-import { isManager } from "./auth";
 
 export function reportPeriod(year: number, month?: number) {
   if (!Number.isInteger(year) || year < 1900 || year > 2100 ||
@@ -25,8 +27,13 @@ export async function reportScopeLabel(ctx: QueryCtx, projectIds: Id<"projects">
   return `${all ? "Tüm erişilebilir projeler: " : ""}${projects.map((p) => p.name).join(", ") || "Erişilebilir proje yok"}`;
 }
 
-export async function resolveReportScope(ctx: QueryCtx, projectId?: Id<"projects">) {
-  const projectIds = await resolveProjectScope(ctx, projectId);
+export async function resolveReportScope(ctx: QueryCtx & { user?: Doc<"users"> }, projectId?: Id<"projects">) {
+  const user = ctx.user ?? await getCurrentUser(ctx);
+  if (!user) throw new Error("Bu işlem için yetkiniz yok");
+  await resolveProjectScope(ctx, projectId);
+  if (projectId) await requirePermission(ctx, user, projectId, "reports.view");
+  const allowed = await getProjectIdsWithPermission(ctx, user, "reports.view");
+  const projectIds = selectProjectScope(allowed, projectId);
   return { projectIds, scopeLabel: await reportScopeLabel(ctx, projectIds, projectId === undefined) };
 }
 
@@ -64,7 +71,7 @@ export async function readReportReadings(ctx: QueryCtx, projectIds: Id<"projects
 }
 
 export function selectScheduleProjectIds(user: Doc<"users"> | null, allowed: Id<"projects">[], projectId?: Id<"projects">) {
-  if (!user || user.verified === false || !isManager(user)) return null;
+  if (!user || user.verified === false) return null;
   if (projectId && !allowed.includes(projectId)) return null;
   const projectIds = selectProjectScope(allowed, projectId);
   return projectIds.length ? projectIds : null;
@@ -73,10 +80,8 @@ export function selectScheduleProjectIds(user: Doc<"users"> | null, allowed: Id<
 /** Cron'da oturum yoktur: kayıt sahibinin güncel rolü ve üyelikleri DB'den doğrulanır. */
 export async function resolveScheduleScope(ctx: QueryCtx, schedule: Doc<"reportScheduleSettings">) {
   const user = await ctx.db.get(schedule.userId);
-  if (!user || user.verified === false || !isManager(user)) return null;
-  const allowed = user.role === "super_admin"
-    ? (await ctx.db.query("projects").collect()).map((p) => p._id)
-    : (await ctx.db.query("userProjects").withIndex("by_user", (q) => q.eq("userId", user._id)).collect()).map((p) => p.projectId);
+  if (!user || user.verified === false) return null;
+  const allowed = await getProjectIdsWithPermission({ ...ctx, user }, user, "reports.view");
   const projectIds = selectScheduleProjectIds(user, allowed, schedule.projectId);
   if (!projectIds) return null;
   return { projectIds, scopeLabel: await reportScopeLabel(ctx, projectIds, schedule.projectId === undefined) };

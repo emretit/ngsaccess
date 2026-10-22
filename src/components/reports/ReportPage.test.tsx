@@ -1,3 +1,4 @@
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => mocks.reportsAllowed, loading: mocks.permissionsLoading }) }));
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -10,7 +11,7 @@ import { dailyCell, dailySource, monthlySheet, transactionPage } from '@/lib/rep
 import { flattenDailyRows } from '@/lib/reports/rows';
 import { REPORTS, type ReportDefinition } from '@/lib/reports/registry';
 import Reports from '@/pages/Reports';
-const mocks = vi.hoisted(() => ({ role: 'project_user', scoped: false, query: vi.fn() }));
+const mocks = vi.hoisted(() => ({ permissionsLoading: false, reportsAllowed: true, role: 'project_user', scoped: false, query: vi.fn() }));
 vi.mock('@/components/auth/AuthProvider', () => ({ useAuth: () => ({ profile: { role: mocks.role, _id: 'user-a' } }) }));
 vi.mock('@/hooks/useActiveProjectScope', () => ({ useActiveProjectScope: () => ({ loading: false, projectId: mocks.scoped ? 'project-a' : null }) }));
 vi.mock('convex/react', () => ({ useQuery: mocks.query }));
@@ -18,7 +19,7 @@ const definition: ReportDefinition = { slug: 'example', group: 'gunluk', title: 
   { key: 'name', label: 'Ad Soyad', defaultVisible: true, value: row => row.kind === 'daily' ? row.name : null },
   { key: 'department', label: 'Departman', defaultVisible: true, value: row => row.kind === 'daily' ? row.department : null },
 ] };
-afterEach(() => { vi.unstubAllGlobals(); mocks.role = 'project_user'; mocks.scoped = false; mocks.query.mockReset(); });
+afterEach(() => { vi.unstubAllGlobals(); mocks.permissionsLoading = false; mocks.reportsAllowed = true; mocks.role = 'project_user'; mocks.scoped = false; mocks.query.mockReset(); });
 describe('generic report display', () => {
   it('honors saved column hiding for both the header and data', () => {
     const hidden = toggleHiddenColumn([], 'department');
@@ -114,8 +115,20 @@ describe('report routes', () => {
   it('renders the four groups and sixteen reports in the hub', () => { const html = route('/reports'); expect(html).toContain('Kayıtlar'); expect(html).toContain('Resmi'); for (const report of REPORTS) expect(html).toContain(`/reports/${report.group}/${report.slug}`); });
   it('provides recovery for unknown groups, mismatched slugs and official slugs', () => { for (const path of ['/reports/invalid', '/reports/gunluk/ham-okutmalar', '/reports/resmi/sgk']) expect(route(path)).toContain('Rapor bulunamadı'); });
   it('gates official settings links and skips all queries when no project is selected', () => {
-    expect(route('/reports/resmi')).toContain('Bu raporlar yöneticiler içindir.'); mocks.role = 'project_admin';
+    mocks.reportsAllowed = false;
+    expect(route('/reports/resmi')).toContain('Proje erişimi yok');
+    expect(mocks.query).not.toHaveBeenCalled();
+    mocks.reportsAllowed = true;
     expect(route('/reports/resmi')).toContain('/settings?tab=reports');
     for (const report of REPORTS) expect(route(`/reports/${report.group}/${report.slug}`)).toContain('Bir proje seçin'); expect(mocks.query).not.toHaveBeenCalled();
   });
+});
+
+it("rapor yetkisi yüklenirken erişim reddi yerine iskelet gösterir ve veri sorgulamaz", () => {
+  mocks.reportsAllowed = false;
+  mocks.permissionsLoading = true;
+  const html = renderToStaticMarkup(<MemoryRouter><Reports /></MemoryRouter>);
+  expect(html).toContain("Raporlar yükleniyor");
+  expect(html).not.toContain("Proje erişimi yok");
+  expect(mocks.query).not.toHaveBeenCalled();
 });

@@ -1,3 +1,4 @@
+import { requirePermission } from "./lib/permissions";
 import { doorStatusPlanValidator, normalizeDoorStatusPlan } from "./lib/doorStatusPlan";
 
 import { ConvexError, v } from "convex/values";
@@ -5,7 +6,7 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
-import { authedQuery, adminMutation } from "./lib/customFunctions";
+import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { resolveProjectScope } from "./lib/projectScope";
 import { deleteReadersForDoor } from "./readers";
@@ -156,7 +157,7 @@ export const list = authedQuery({
   },
 });
 
-export const create = adminMutation({
+export const create = authedMutation({
   args: {
     name: v.string(),
     projectId: v.optional(v.id("projects")),
@@ -188,6 +189,7 @@ export const create = adminMutation({
     if (args.zoneId && !targetZone) throw new ConvexError("Bölge bulunamadı");
     if (args.deviceId && !targetDevice) throw new ConvexError("Cihaz bulunamadı");
     const projectId = args.projectId ?? targetZone?.projectId ?? targetDevice?.projectId;
+    await requirePermission(ctx, ctx.user, projectId, "devices.manage");
     if (!projectId) {
       throw new ConvexError("Kapı oluşturmak için bir proje seçmelisiniz");
     }
@@ -244,7 +246,7 @@ export const create = adminMutation({
   },
 });
 
-export const update = adminMutation({
+export const update = authedMutation({
   args: {
     doorId: v.id("doors"),
     name: v.optional(v.string()),
@@ -274,6 +276,7 @@ export const update = adminMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const door = await ctx.db.get(args.doorId);
     if (!door) throw new Error("Kapı bulunamadı");
+    await requirePermission(ctx, ctx.user, door.projectId, "devices.manage");
     if (!isProjectAllowed(allowedProjectIds, door.projectId)) {
       throw new Error("Bu kapıya erişim yetkiniz yok");
     }
@@ -327,12 +330,13 @@ export const update = adminMutation({
   },
 });
 
-export const remove = adminMutation({
+export const remove = authedMutation({
   args: { doorId: v.id("doors") },
   handler: async (ctx, args) => {
     const allowedProjectIds = await resolveProjectScope(ctx);
     const door = await ctx.db.get(args.doorId);
     if (!door) throw new ConvexError("Kapı bulunamadı");
+    await requirePermission(ctx, ctx.user, door.projectId, "devices.manage");
     if (!isProjectAllowed(allowedProjectIds, door.projectId)) {
       throw new ConvexError("Bu kapıya erişim yetkiniz yok");
     }

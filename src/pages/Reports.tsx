@@ -1,7 +1,8 @@
+import { AccessDenied } from '@/components/shared/AccessDenied';
+import { SectionSkeleton } from '@/components/shared/SectionSkeleton';
+import { usePermissions } from "@/hooks/usePermissions";
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowUpRight, FileText, FolderOpen } from 'lucide-react';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { capabilities } from '@/lib/capabilities';
 import { REPORT_GROUPS, REPORTS_BASE_PATH, isReportGroupKey, reportGroupPath } from '@/lib/reports/groups';
 import { getReport, reportsInGroup } from '@/lib/reports/registry';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -14,8 +15,8 @@ function MissingReport() {
   return <div className="space-y-4"><EmptyState title="Rapor bulunamadı" description="Bağlantıdaki grup veya rapor geçerli değil." /><Button asChild variant="outline"><Link to={REPORTS_BASE_PATH}>Raporlara dön</Link></Button></div>;
 }
 function OfficialReports() {
-  const { profile } = useAuth();
-  const canView = capabilities(profile?.role).settingsTabs.includes('reports');
+  const { can } = usePermissions();
+  const canView = can("reports.view");
   return <div className="space-y-5"><PageHeader title="Muhasebe Raporları" scope="Ayarlar → Raporlar" />{canView ? <div className="divide-y divide-line border-y border-line">{[['sgk', 'SGK Aylık Özet (Excel/PDF)'], ['overtime', 'Fazla Mesai Özeti'], ['dept-cost', 'Departman Maliyet']].map(([key, title]) => <Link key={key} to={`/settings?tab=reports&report=${key}`} className="flex min-h-16 items-center justify-between gap-3 px-3 py-4 text-sm font-medium hover:bg-subtle focus-visible:outline focus-visible:outline-ring">{title}<ArrowUpRight aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" /></Link>)}</div> : <EmptyState title="Bu raporlar yöneticiler içindir." description="Günlük ve aylık raporları ilgili gruplardan inceleyebilirsiniz." />}</div>;
 }
 function ReportsHub() {
@@ -24,6 +25,9 @@ function ReportsHub() {
 export default function Reports() {
   const { group, slug } = useParams<{ group: string; slug: string }>();
   const navigate = useNavigate();
+  const { can, loading } = usePermissions();
+  if (loading) return <SectionSkeleton label="Raporlar yükleniyor…" />;
+  if (!can("reports.view")) return <AccessDenied message="Rapor görüntüleme yetkiniz yok. Proje yöneticinizle iletişime geçin." />;
   if (!group) return <ReportsHub />;
   if (!isReportGroupKey(group)) return <MissingReport />;
   const reports = reportsInGroup(group);

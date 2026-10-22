@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useQuery } from "convex/react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "../../../../../convex/_generated/api";
@@ -15,7 +16,9 @@ export function TemplatePicker({
   onChange: (value: string) => void;
   onEdit?: (navigate: () => void) => void;
 }) {
-  const { projectId, isAdmin } = useActiveProject();
+  const { projectId } = useActiveProject();
+  const { can } = usePermissions();
+  const canManage = can("accessRules.manage");
   const rows = useQuery(
     api.accessScheduleTemplates.list,
     projectId ? { projectId, includeArchived: true } : "skip",
@@ -46,7 +49,7 @@ export function TemplatePicker({
       {selected && (
         <>
           <WeekPreview week={selected.week} />
-          {isAdmin && (
+          {canManage && (
             <Button
               type="button"
               variant="link"

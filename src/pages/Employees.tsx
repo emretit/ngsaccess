@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useActiveProjectScope } from "@/hooks/useActiveProjectScope";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -27,6 +28,9 @@ import { EMPLOYEE_EXPORT_MAX_ROWS } from "@/lib/employees/exportEmployeesXlsx";
 import { downloadEmployeeImportTemplate } from "@/lib/employees/importTemplate";
 export default function Employees() {
   const { projectId } = useActiveProjectScope();
+  const { can, loading } = usePermissions();
+  if (loading) return <SectionSkeleton label="Personel bilgileri yükleniyor…" />;
+  if (!can("employees.view")) return <AccessDenied message="Personel görüntüleme yetkiniz yok. Proje yöneticinizle iletişime geçin." />;
   return (
     <QuerySectionBoundary
       resetKey={projectId}
@@ -38,11 +42,11 @@ export default function Employees() {
   );
 }
 function EmployeePage() {
-  const {
-    isAdmin,
-    projectId,
-    loading: projectLoading,
-  } = useActiveProjectScope();
+  const { projectId,
+    loading: projectLoading } = useActiveProjectScope();
+  const { can } = usePermissions();
+  const canManage = can("employees.manage");
+  const canExport = can("reports.view");
   const { activeProject } = useActiveProject();
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -150,7 +154,7 @@ function EmployeePage() {
       <PageHeader
         title="Kişiler"
         primaryAction={
-          isAdmin
+          canManage
             ? { label: "Personel ekle", onClick: () => open(null) }
             : undefined
         }
@@ -180,10 +184,10 @@ function EmployeePage() {
               update({ q: "", department: "", status: "" });
             }}
           />
-          {isAdmin && <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={() => setImportDialogOpen(true)}>İçe aktar</Button>
-            <Button variant="outline" disabled={exportTooLarge} title={exportTooLarge ? `Dışa aktarma en fazla ${EMPLOYEE_EXPORT_MAX_ROWS} kişi içerebilir.` : undefined} onClick={() => { setExportError(null); setExportDialogOpen(true); }}>Dışa aktar</Button>
-            <Button variant="ghost" onClick={() => void downloadEmployeeImportTemplate().catch((cause: unknown) => setExportError(cause instanceof Error ? cause.message : "Şablon indirilemedi."))}>Şablon indir</Button>
+          {(canManage || canExport) && <div className="flex flex-wrap items-center gap-2">
+            {canManage && <Button variant="outline" onClick={() => setImportDialogOpen(true)}>İçe aktar</Button>}
+            {canExport && <Button variant="outline" disabled={exportTooLarge} title={exportTooLarge ? `Dışa aktarma en fazla ${EMPLOYEE_EXPORT_MAX_ROWS} kişi içerebilir.` : undefined} onClick={() => { setExportError(null); setExportDialogOpen(true); }}>Dışa aktar</Button>}
+            {canManage && <Button variant="ghost" onClick={() => void downloadEmployeeImportTemplate().catch((cause: unknown) => setExportError(cause instanceof Error ? cause.message : "Şablon indirilemedi."))}>Şablon indir</Button>}
             {exportError && <span role="alert" className="text-sm text-destructive">{exportError}</span>}
           </div>}
           {isLoading ? (
@@ -245,8 +249,8 @@ function EmployeePage() {
           if (!editingEmployee) close();
         }}
       />
-      {importDialogOpen && isAdmin && <EmployeeImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} projectId={projectId} />}
-      {exportDialogOpen && isAdmin && <EmployeeExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} projectId={projectId} employees={filtered} onError={setExportError} />}
+      {importDialogOpen && canManage && <EmployeeImportDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} projectId={projectId} />}
+      {exportDialogOpen && canExport && <EmployeeExportDialog open={exportDialogOpen} onOpenChange={setExportDialogOpen} projectId={projectId} employees={filtered} onError={setExportError} />}
     </div>
   );
 }

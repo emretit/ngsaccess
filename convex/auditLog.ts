@@ -1,9 +1,9 @@
+import { requirePermission } from "./lib/permissions";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { requireEmployeeAccess } from "./lib/auth";
-import { adminQuery } from "./lib/customFunctions";
+import { authedQuery } from "./lib/customFunctions";
 import { paginationOptsValidator } from "convex/server";
-import { resolveProjectScope } from "./lib/projectScope";
 import { normalizeAuditSearch } from "./lib/auditSearch";
 import { auditDateRange, auditPageMatches } from "./lib/auditLogQuery";
 
@@ -21,7 +21,7 @@ function isPdksPayload(value: unknown): value is PdksAuditPayload {
   return typeof value === "object" && value !== null;
 }
 
-export const getPdksAuditForEmployee = adminQuery({
+export const getPdksAuditForEmployee = authedQuery({
   args: {
     employeeId: v.id("employees"),
     startDate: v.string(),
@@ -29,6 +29,7 @@ export const getPdksAuditForEmployee = adminQuery({
   },
   handler: async (ctx, args) => {
     const employee = await requireEmployeeAccess(ctx, args.employeeId);
+    await requirePermission(ctx, ctx.user, employee.projectId, "admin.manage");
     const records = await ctx.db.query("pdksRecords")
       .withIndex("by_employee_date", q => q.eq("employeeId", employee._id)
         .gte("date", args.startDate).lte("date", args.endDate))
@@ -73,7 +74,7 @@ export const getPdksAuditForEmployee = adminQuery({
   },
 });
 
-export const list = adminQuery({
+export const list = authedQuery({
   args: {
     projectId: v.optional(v.id("projects")),
     allProjects: v.optional(v.boolean()),
@@ -89,8 +90,8 @@ export const list = adminQuery({
   handler: async (ctx, args) => {
     if (args.allProjects && ctx.user.role !== "super_admin") throw new Error("Tüm projeler görünümü süper admin gerektirir; bir proje seçin");
     if (!args.allProjects && !args.projectId) throw new Error("Denetim kaydı için bir proje seçin");
-    const scope = await resolveProjectScope(ctx, args.allProjects ? undefined : args.projectId);
-    const projectId = args.allProjects ? undefined : scope[0];
+    const projectId = args.allProjects ? undefined : args.projectId;
+    await requirePermission(ctx, ctx.user, projectId, "admin.manage");
     const { startTimestamp: start, endTimestamp: end } = auditDateRange(args.startDate, args.endDate);
     const { targetTable, userId, action } = args;
     const search = normalizeAuditSearch(args.search);
@@ -140,7 +141,7 @@ export const list = adminQuery({
 });
 
 /** Bounded recent-history picker, not a cursor-paginated query. */
-export const actorOptions = adminQuery({
+export const actorOptions = authedQuery({
   args: {
     projectId: v.optional(v.id("projects")),
     allProjects: v.optional(v.boolean()),
@@ -150,8 +151,8 @@ export const actorOptions = adminQuery({
   handler: async (ctx, args) => {
     if (args.allProjects && ctx.user.role !== "super_admin") throw new Error("Tüm projeler görünümü süper admin gerektirir; bir proje seçin");
     if (!args.allProjects && !args.projectId) throw new Error("Denetim kaydı için bir proje seçin");
-    const scope = await resolveProjectScope(ctx, args.allProjects ? undefined : args.projectId);
-    const projectId = args.allProjects ? undefined : scope[0];
+    const projectId = args.allProjects ? undefined : args.projectId;
+    await requirePermission(ctx, ctx.user, projectId, "admin.manage");
     // Accepted for caller compatibility; no cursor contract is advertised by this picker.
     if (args.paginationOpts?.cursor) throw new Error("Aktör seçenekleri cursor ile sayfalanmaz");
     const requested = args.paginationOpts?.numItems ?? AUDIT_ACTOR_SCAN_LIMIT;

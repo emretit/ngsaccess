@@ -2,7 +2,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { loadPdksPolicies } from "./pdksRules";
 import { employedDuring, employedOn } from "./employment";
-import { canSeePay } from "./payVisibility";
+import { canSeePayInProject } from "./payVisibility";
 import { resolveProjectScope } from "./projectScope";
 import { getEffectiveWorkSettings, getEffectiveOvertimeRates, getHolidaysMap } from "./pdksHelpers";
 import { buildShiftResolver } from "./shiftResolver";
@@ -40,7 +40,6 @@ export async function getPdksTableData(
   },
 ) {
   const { scopedPdksShift, flexiblePreviousReadings } = helpers;
-  const payVisible = canSeePay(ctx.user);
   const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
 
   const today = args.date ?? trTodayKey();
@@ -224,8 +223,8 @@ export async function getPdksTableData(
         // Stored pay fields are optional numbers; absent inputs resolve to null pay.
         employee: employee ? {
           ...employee,
-          hourlyRate: payVisible ? employee.hourlyRate : undefined,
-          monthlySalary: payVisible ? employee.monthlySalary : undefined,
+          hourlyRate: await canSeePayInProject(ctx, ctx.user, employee.projectId) ? employee.hourlyRate : undefined,
+          monthlySalary: await canSeePayInProject(ctx, ctx.user, employee.projectId) ? employee.monthlySalary : undefined,
         } : null,
         departmentName: department?.projectId === employee?.projectId ? department?.name ?? "" : "",
         periodDateKeys: periodDateKeys.filter(date => !employee || employedOn(employee, date)),

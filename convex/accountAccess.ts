@@ -1,12 +1,12 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { adminMutation } from "./lib/customFunctions";
+import { authedMutation } from "./lib/customFunctions";
 import { requireAccountAccessTarget } from "./lib/adminGuards";
 import { revokeSessionTokens, revokeUserSessions } from "./lib/sessionRevoke";
 import { writeAudit } from "./lib/audit";
 
-export const freezeUser = adminMutation({
+export const freezeUser = authedMutation({
   args: { userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, { userId }) => {
@@ -20,7 +20,7 @@ export const freezeUser = adminMutation({
   },
 });
 
-export const unfreezeUser = adminMutation({
+export const unfreezeUser = authedMutation({
   args: { userId: v.id("users") },
   returns: v.null(),
   handler: async (ctx, { userId }) => {
@@ -33,7 +33,7 @@ export const unfreezeUser = adminMutation({
   },
 });
 
-export const setAccessExpiry = adminMutation({
+export const setAccessExpiry = authedMutation({
   args: { userId: v.id("users"), accessExpiresAt: v.union(v.number(), v.null()) },
   returns: v.null(),
   handler: async (ctx, { userId, accessExpiresAt }) => {

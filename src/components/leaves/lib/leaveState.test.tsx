@@ -248,7 +248,7 @@ function renderResults() {
           rangeEnd: "2026-10-31",
         }}
         pageSize={25}
-        isAdmin={false}
+        canManage={false}
         onCreate={() => {}}
         onClear={() => {}}
         onDetails={() => {}}
@@ -281,7 +281,7 @@ describe("bounded list presentation", () => {
             status: "pending",
           },
         ]}
-        isAdmin
+        canManage
         onDetails={() => {}}
         onEdit={() => {}}
       />,
@@ -299,7 +299,7 @@ describe("bounded list presentation", () => {
       <MemoryRouter>
         <LeaveDetails
           row={{ ...row, notesHidden: true, notes: "Gizli açıklama" }}
-          isAdmin={false}
+          canManage={false}
           onClose={() => {}}
           onEdit={() => {}}
         />

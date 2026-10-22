@@ -3,7 +3,7 @@
 import { buildDoorStatusSegments } from "./doorStatusPlan";
 import { internal } from "../_generated/api";
 import { type ActionCtx } from "../_generated/server";
-import { canAccessEmployeeProject, isProjectAllowed, isManager } from "./auth";
+import { canAccessEmployeeProject, isProjectAllowed } from "./auth";
 import { deriveHikReaderNoFromDoorNo } from "./hikReaderNumbers";
 import { withDeviceToken } from "./cardReaderAuth";
 import type { Doc, Id } from "../_generated/dataModel";
@@ -82,7 +82,8 @@ export async function runRegisterDeviceOnGateway(
   if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
     return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
   }
-  if (!isManager(ctx.user)) return { ok: false, error: "Bu işlem için yönetici yetkisi gerekiyor" };
+  const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: device.projectId, permission: "devices.manage" });
+  if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
   if (!device.ehomeID) {
     return { ok: false, error: "ehomeID tanımlı değil (cihazın Device ID'si)" };
   }
@@ -184,7 +185,8 @@ export async function runRemoveDeviceFromGateway(
   if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
     return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
   }
-  if (!isManager(ctx.user)) return { ok: false, error: "Bu işlem için yönetici yetkisi gerekiyor" };
+  const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: device.projectId, permission: "devices.manage" });
+  if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
   if (!device.hikDevIndex) return { ok: true };
 
   const devIndex = device.hikDevIndex;
@@ -212,7 +214,12 @@ export async function runRefreshGatewayDeviceStatus(
   if (allowedProjectIds.length === 0) {
     return { scanned: 0, updated: 0, offline: 0 };
   }
-  if (!isManager(ctx.user)) throw new Error("Bu işlem için yönetici yetkisi gerekiyor");
+  const permitted = await Promise.all(allowedProjectIds.map(async projectId => {
+    const ok: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId, permission: "devices.manage" });
+    return ok ? projectId : null;
+  }));
+  const manageableIds = permitted.filter((id): id is Id<"projects"> => id !== null);
+  if (!manageableIds.length) throw new Error("Bu işlem için yetkiniz yok");
   const list = await listGatewayDevices();
   const results = await Promise.all(
     list
@@ -223,7 +230,7 @@ export async function runRefreshGatewayDeviceStatus(
           online: gw.online ?? false,
           deviceIp: gw.ipAddress,
           model: gw.model,
-          allowedProjectIds,
+          allowedProjectIds: manageableIds,
         }).then((patched) => ({ patched, online: gw.online ?? false })),
       ),
   );
@@ -262,9 +269,8 @@ export async function runFetchDeviceCapabilities(
   if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
     return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
   }
-  if (!isManager(ctx.user)) {
-    return { ok: false, error: "Bu işlem için yönetici yetkisi gerekiyor" };
-  }
+  const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: device.projectId, permission: "devices.manage" });
+  if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
   if (device.hikTransport !== "gateway") {
     return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
   }
@@ -302,6 +308,8 @@ export async function runRemoteOpenDoor(
   if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
     return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
   }
+  const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: device.projectId, permission: "doors.open" });
+  if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
   return await auditDeviceCommand(ctx, args.deviceId, "Kapı aç", async (): Promise<{ ok: boolean; queued?: boolean; error?: string }> => {
     if (device.hikTransport === "localBridge") {
       await ctx.runMutation(internal.hikvisionSync.enqueueLocalBridgeOperation, {
@@ -337,9 +345,8 @@ export async function runRebootDevice(
   if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
     return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
   }
-  if (!isManager(ctx.user)) {
-    return { ok: false, error: "Bu işlem için yönetici yetkisi gerekiyor" };
-  }
+  const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: device.projectId, permission: "devices.manage" });
+  if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
   if (device.hikTransport !== "gateway") {
     return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
   }
@@ -389,9 +396,8 @@ export async function runFetchDeviceWorkStatus(
   if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
     return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
   }
-  if (!isManager(ctx.user)) {
-    return { ok: false, error: "Bu işlem için yönetici yetkisi gerekiyor" };
-  }
+  const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: device.projectId, permission: "devices.manage" });
+  if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
   if (device.hikTransport !== "gateway") {
     return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
   }
@@ -450,9 +456,8 @@ export async function runCaptureCardFromDevice(
   if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
     return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
   }
-  if (!isManager(ctx.user)) {
-    return { ok: false, error: "Bu işlem için yönetici yetkisi gerekiyor" };
-  }
+  const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: device.projectId, permission: "employees.manage" });
+  if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
   if (device.hikTransport !== "gateway") {
     return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
   }
@@ -499,7 +504,8 @@ export async function runCaptureFaceFromDevice(
     employeeNo = employee.cardNumber?.trim() ?? undefined;
   }
 
-  if (!isManager(ctx.user)) return { ok: false, error: "Bu işlem için yönetici yetkisi gerekiyor" };
+  const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: device.projectId, permission: "biometrics.manage" });
+  if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
   await ctx.runQuery(internal.privacyBiometric.assertBiometricDeviceAllowed, { deviceId: args.deviceId });
   if (device.hikTransport !== "gateway") {
     return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
@@ -534,7 +540,8 @@ export async function runApplyDoorStatusPlan(
   if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
     return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
   }
-  if (!isManager(ctx.user)) return { ok: false, error: "Bu işlem için yönetici yetkisi gerekiyor" };
+  const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: device.projectId, permission: "devices.manage" });
+  if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
   if (device.hikTransport !== "gateway") {
     return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
   }
@@ -587,9 +594,8 @@ export async function runFetchReaderCfg(
     return { ok: false, error: "Bu okuyucuya erişim yetkiniz yok" };
   }
 
-  if (!isManager(ctx.user)) {
-    return { ok: false, error: "Bu işlem için yönetici yetkisi gerekiyor" };
-  }
+  const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: reader.projectId, permission: "devices.manage" });
+  if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
   const door = await ctx.runQuery(internal.doors.getByIdInternal, { id: reader.doorId });
   if (!door) return { ok: false, error: "Kapı bulunamadı" };
   const deviceId = reader.deviceId ?? door.deviceId;
@@ -648,7 +654,8 @@ export async function runApplyVerifyPlan(
   if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
     return { ok: false, error: "Bu cihaza erişim yetkiniz yok" };
   }
-  if (!isManager(ctx.user)) return { ok: false, error: "Bu işlem için yönetici yetkisi gerekiyor" };
+  const permitted: boolean = await ctx.runQuery(internal.roles.checkPermission, { userId: ctx.user._id, projectId: device.projectId, permission: "devices.manage" });
+  if (!permitted) throw new Error("Bu işlem için yetkiniz yok");
   if (device.hikTransport !== "gateway") {
     return { ok: false, error: "Bu işlem yalnızca gateway transport'ta desteklenir" };
   }

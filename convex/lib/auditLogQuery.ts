@@ -21,6 +21,8 @@ export const AUDIT_TARGET_LABELS: Record<string, string> = {
   attendanceCorrections: "PDKS düzeltme talebi",
   alarmSettings: "Alarm bildirim ayarı",
   leaves: "İzin",
+  userProjects: "Proje üyeliği",
+  projectRolePermissions: "Rol yetkileri",
 };
 
 export function auditDateRange(startDate?: string, endDate?: string) {

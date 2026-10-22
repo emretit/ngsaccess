@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useDeviceDeepLink, useDeviceUrlSync } from "@/components/devices/useDeviceDeepLink";
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -38,7 +39,9 @@ const Devices = () => {
     }
     previousProject.current = nextProject;
   }, [projectId, scopeLoading, syncDeviceUrl]);
-  const { loading: projectLoading, isAdmin } = useProjectAccess();
+  const { loading: projectLoading } = useProjectAccess();
+  const { can } = usePermissions();
+  const canManage = can("devices.manage");
   const { devices, isLoading, hasProjectAccess } = useProjectFilteredDevices();
   const { zones, doors } = useZonesAndDoors();
   const { zoneId: selectedZoneId, doorId: selectedDoorId } = readDeviceFilters(searchParams);
@@ -148,7 +151,7 @@ const Devices = () => {
             selectedDoorId={selectedDoorId}
             onSelectZone={setSelectedZoneId}
             onSelectDoor={setSelectedDoorId}
-            canManage={isAdmin}
+            canManage={canManage}
           />}
           devices={devices}
           isLoading={isLoading}
@@ -161,8 +164,8 @@ const Devices = () => {
           onAddNew={handleNewDevice}
           onAddFromCloud={handleClaimFromCloud}
           onQRClick={handleQRClick}
-          onReleaseDevice={isAdmin ? handleReleaseDevice : undefined}
-          canManage={isAdmin}
+          onReleaseDevice={canManage ? handleReleaseDevice : undefined}
+          canManage={canManage}
         />}
       </div>
 

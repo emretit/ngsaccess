@@ -70,13 +70,13 @@ describe("account access management", () => {
     for (const name of ["freezeUser", "unfreezeUser"] as const) await expect(admin.caller.mutation(api.accountAccess[name], { userId: admin.ids.caller })).rejects.toThrow("Kendi hesabınız");
     await expect(admin.caller.mutation(api.accountAccess.setAccessExpiry, { userId: admin.ids.caller, accessExpiresAt: null })).rejects.toThrow("Kendi hesabınız");
   });
-  it("rejects mixed project membership and non-project-user targets", async () => {
+  it("rejects targets without permission in every project and administrator targets", async () => {
     const { t, caller, ids } = await setup("project_admin");
     await t.run(async ctx => {
       const other = await ctx.db.insert("projects", { name: "Başka" });
       await ctx.db.insert("userProjects", { userId: ids.target, projectId: other });
     });
-    await expect(caller.mutation(api.accountAccess.freezeUser, { userId: ids.target })).rejects.toThrow("başka projelerde");
+    await expect(caller.mutation(api.accountAccess.freezeUser, { userId: ids.target })).rejects.toThrow("Bu işlem için yetkiniz yok");
     await t.run(ctx => ctx.db.patch(ids.target, { role: "project_admin" }));
     await expect(caller.mutation(api.accountAccess.freezeUser, { userId: ids.target })).rejects.toThrow("yetkiniz yok");
   });
@@ -298,7 +298,9 @@ describe("audit regressions", () => {
   });
   it.each(["expiry", "freeze", "role", "delete"] as const)("keeps an admin across concurrent crossed %s requests", async method => {
     const { t, caller, target, ids } = await setup();
-    await t.run(ctx => ctx.db.patch(ids.target, { role: "super_admin" }));
+    await t.run(async ctx => {
+      await ctx.db.patch(ids.target, { role: "super_admin" });
+    });
     const expiry = Date.now() + 300_000;
     const operation = (actor: typeof caller, userId: typeof ids.target) => method === "expiry"
       ? actor.mutation(api.accountAccess.setAccessExpiry, { userId, accessExpiresAt: expiry })

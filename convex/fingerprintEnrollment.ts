@@ -1,9 +1,10 @@
+import { requirePermission } from "./lib/permissions";
 import { scheduleFingerprintPurge } from "./lib/employeeCardChange";
 import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
-import { adminMutation, adminQuery } from "./lib/customFunctions";
+import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { canAccessEmployeeProject, getProjectIdsForUser, requireEmployeeAccess } from "./lib/auth";
 import { internal } from "./_generated/api";
 import { writeAudit } from "./lib/audit";
@@ -71,7 +72,7 @@ export async function enrollmentTarget(ctx: QueryCtx, employeeId: Id<"employees"
   return { employee, device };
 }
 
-export const listForEmployee = adminQuery({
+export const listForEmployee = authedQuery({
   args: { employeeId: v.id("employees") },
   returns: v.object({
     devices: v.array(v.object({ _id: v.id("devices"), name: v.string(), capabilitiesScanned: v.boolean() })),
@@ -81,6 +82,7 @@ export const listForEmployee = adminQuery({
   }),
   handler: async (ctx, { employeeId }) => {
     const employee = await requireEmployeeAccess(ctx, employeeId);
+    await requirePermission(ctx, ctx.user, employee.projectId, "biometrics.manage");
     const devices = await employeeDevices(ctx, employee);
     const rows = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_employee", q => q.eq("employeeId", employeeId)).take(1000);
     const enrollments = await Promise.all(rows.filter(row => !!row.enrolledAt).map(async row => ({
@@ -107,11 +109,13 @@ export const getTargetInternal = internalQuery({
   returns: v.object({ employee: employeeValidator, device: deviceValidator }),
   handler: async (ctx, args) => {
     const user = await ctx.db.get(args.userId);
-    if (!user || (user.role !== "super_admin" && user.role !== "project_admin")) throw new ConvexError("Yönetici yetkisi gerekiyor.");
+    if (!user) throw new ConvexError("Bu işlem için yetkiniz yok");
     const allowed = await getProjectIdsForUser({ ...ctx, user });
     const employee = await ctx.db.get(args.employeeId);
     const device = await ctx.db.get(args.deviceId);
     if (!employee || !device) throw new ConvexError("Kişi veya cihaz bulunamadı.");
+    await requirePermission(ctx, user, employee.projectId, "biometrics.manage");
+    await requirePermission(ctx, user, device.projectId, "biometrics.manage");
     if (!canAccessEmployeeProject(user.role, allowed, employee.projectId) || !canAccessEmployeeProject(user.role, allowed, device.projectId) || employee.projectId !== device.projectId) throw new ConvexError("Bu kişi veya cihaza erişim yetkiniz yok.");
     if (args.removing) {
       if (device.brand !== "hikvision" || device.hikTransport !== "gateway" || !device.hikDevIndex) throw new ConvexError("Cihazın Hik gateway bağlantısı yok.");
@@ -121,12 +125,13 @@ export const getTargetInternal = internalQuery({
   },
 });
 
-export const beginEnrollment = adminMutation({
+export const beginEnrollment = authedMutation({
   args: targetArgs,
   returns: v.string(),
   handler: async (ctx, args) => {
     validateFingerNo(args.fingerNo);
-    await requireEmployeeAccess(ctx, args.employeeId);
+    const permittedEmployee = await requireEmployeeAccess(ctx, args.employeeId);
+    await requirePermission(ctx, ctx.user, permittedEmployee.projectId, "biometrics.manage");
     const { employee } = await enrollmentTarget(ctx, args.employeeId, args.deviceId);
     const pending = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_device_pendingUntil", q => q.eq("deviceId", args.deviceId).gt("pendingUntil", Date.now())).first();
     if (pending) throw new ConvexError("Bu cihazda başka bir parmak izi işlemi sürüyor; bitmesini bekleyin.");
@@ -139,11 +144,12 @@ export const beginEnrollment = adminMutation({
   },
 });
 
-export const cancelEnrollment = adminMutation({
+export const cancelEnrollment = authedMutation({
   args: { ...targetArgs, attemptId: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await requireEmployeeAccess(ctx, args.employeeId);
+    const permittedEmployee = await requireEmployeeAccess(ctx, args.employeeId);
+    await requirePermission(ctx, ctx.user, permittedEmployee.projectId, "biometrics.manage");
     const row = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_employee_device_finger", q => q.eq("employeeId", args.employeeId).eq("deviceId", args.deviceId).eq("fingerNo", args.fingerNo)).unique();
     if (row?.attemptId === args.attemptId) await ctx.db.patch(row._id, { cancelRequested: true });
     return null;
@@ -209,8 +215,9 @@ export const authorizeEmployee = internalQuery({
   returns: v.null(),
   handler: async (ctx, args) => {
     const user = await ctx.db.get(args.userId);
-    if (!user || (user.role !== "super_admin" && user.role !== "project_admin")) throw new ConvexError("Yönetici yetkisi gerekiyor.");
-    await requireEmployeeAccess({ ...ctx, user }, args.employeeId);
+    if (!user) throw new ConvexError("Bu işlem için yetkiniz yok");
+    const employee = await requireEmployeeAccess({ ...ctx, user }, args.employeeId);
+    await requirePermission(ctx, user, employee.projectId, "biometrics.manage");
     return null;
   },
 });
@@ -256,12 +263,13 @@ export const recordPush = internalMutation({
   },
 });
 
-export const removeFingerprint = adminMutation({
+export const removeFingerprint = authedMutation({
   args: { employeeId: v.id("employees"), fingerNo: v.number() },
   returns: v.null(),
   handler: async (ctx, args) => {
     validateFingerNo(args.fingerNo);
     const employee = await requireEmployeeAccess(ctx, args.employeeId);
+    await requirePermission(ctx, ctx.user, employee.projectId, "biometrics.manage");
     const rows = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_employee", q => q.eq("employeeId", args.employeeId)).collect();
     await scheduleFingerprintPurge(ctx, args.employeeId, employee.cardNumber, { deleteTemplates: true, fingerNo: args.fingerNo });
     const deviceCount = new Set(rows.filter(row => row.fingerNo === args.fingerNo).map(row => row.deviceId)).size;
@@ -316,12 +324,13 @@ export const retryStalePurges = internalMutation({
   },
 });
 
-export const auditResend = adminMutation({
+export const auditResend = authedMutation({
   args: { employeeId: v.id("employees"), fingerNo: v.number() },
   returns: v.null(),
   handler: async (ctx, args) => {
     validateFingerNo(args.fingerNo);
     const employee = await requireEmployeeAccess(ctx, args.employeeId);
+    await requirePermission(ctx, ctx.user, employee.projectId, "biometrics.manage");
     const devices = await employeeDevices(ctx, employee);
     const deviceCount = devices.filter(device => fingerprintCapability(device.hikCapabilitiesSnapshot) !== false).length;
     await writeAudit(ctx, { user: ctx.user, projectId: employee.projectId, action: "update", targetTable: "employees", targetId: args.employeeId, newValue: { employeeId: args.employeeId }, note: `Parmak izi yeniden gönderimi istendi; parmak no: ${args.fingerNo}; cihaz sayısı: ${deviceCount}` });

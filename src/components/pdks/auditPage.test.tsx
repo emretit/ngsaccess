@@ -1,3 +1,4 @@
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => state.admin, loading: false }) }));
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -6,7 +7,7 @@ import type { FilterValues } from "./dashboard/PDKSFilterBar";
 const state = vi.hoisted(() => ({ admin: false, reportType: "daily" as FilterValues["reportType"] }));
 vi.mock("convex/react", () => ({ useQuery: () => ({ leaves: 0, corrections: 0, capped: false }), useMutation: () => vi.fn() }));
 vi.mock("react-router-dom", () => ({ useNavigate: () => vi.fn() }));
-vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ projectId: "p", activeProject: { name: "Merkez" }, isAdmin: state.admin, loading: false }) }));
+vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ projectId: "p", activeProject: { name: "Merkez" }, canManage: state.admin, loading: false }) }));
 vi.mock("@/hooks/usePdksFilterParams", () => ({ usePdksFilterParams: () => ({ filters: { reportType: state.reportType, statusFilter: "all", person: "", dateRange: {} }, setFilters: vi.fn() }) }));
 vi.mock("@/hooks/usePdksFilterOptions", () => ({ usePdksFilterOptions: () => ({ departments: [], companies: [], positions: [], shifts: [] }) }));
 vi.mock("@/hooks/usePdksTableData", () => ({ usePdksTableData: () => {

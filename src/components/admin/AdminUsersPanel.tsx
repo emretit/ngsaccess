@@ -1,3 +1,5 @@
+import { ProjectMembersContent } from "./ProjectMembersContent";
+import { PROJECT_ROLES, legacyRoleToProjectRole } from "../../../convex/lib/roleCatalog";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useAdminPrimaryAction } from "./hooks/useAdminPrimaryAction";
 import { useState } from "react";
@@ -50,7 +52,7 @@ function ExpiredInvites({
         const result = await send({
           email: invite.email,
           projectId: invite.projectId,
-          role: invite.role,
+          role: legacyRoleToProjectRole(invite.role),
         });
         if (!result.success)
           throw new Error(result.error ?? "Davet gönderilemedi.");
@@ -174,7 +176,7 @@ export function AdminUsersContent() {
           }
         >
           <option value="all">Tüm roller</option>
-          {(["super_admin", "project_admin", "project_user"] as const).map(
+          {(["super_admin", ...PROJECT_ROLES] as const).map(
             (role) => (
               <option key={role} value={role}>
                 {roleLabel(role)}
@@ -294,11 +296,11 @@ export function AdminUsersContent() {
     </div>
   );
 }
-export default function AdminUsersPanel() {
+export default function AdminUsersPanel({ projectScoped = false }: { projectScoped?: boolean }) {
   return (
     <ProjectFilter requiredRole="admin">
       <AdminDataBoundary label="Kullanıcılar">
-        <AdminUsersContent />
+        {projectScoped ? <ProjectMembersContent /> : <AdminUsersContent />}
       </AdminDataBoundary>
     </ProjectFilter>
   );

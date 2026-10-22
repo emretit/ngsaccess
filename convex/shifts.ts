@@ -1,3 +1,4 @@
+import { requirePermission } from "./lib/permissions";
 import { writeAudit } from "./lib/audit";
 import { assertPeopleProject } from "./lib/peopleScope";
 import { resolveProjectScope } from "./lib/projectScope";
@@ -153,6 +154,7 @@ export const updateAssignment = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const assignment = await ctx.db.get(args.assignmentId);
     if (!assignment) throw new Error("Atama bulunamadı");
+    await requirePermission(ctx, ctx.user, assignment.projectId, "schedule.manage");
     if (assignment.projectId && !allowedProjectIds.some((id) => id === assignment.projectId)) {
       throw new Error("Bu atamaya erişim yetkiniz yok");
     }
@@ -244,6 +246,7 @@ export const bulkAssignShift = authedMutation({
     }
     const shift = await ctx.db.get(args.shiftId);
     if (!shift) throw new ConvexError("Vardiya bulunamadı");
+    await requirePermission(ctx, ctx.user, shift.projectId, "schedule.manage");
     const now = new Date().toISOString();
     const results: BulkApplyResult[] = [];
     const skipped: { employeeId: string; reason: string }[] = [];
@@ -279,6 +282,7 @@ export const removeAssignment = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const assignment = await ctx.db.get(args.assignmentId);
     if (!assignment) throw new Error("Atama bulunamadı");
+    await requirePermission(ctx, ctx.user, assignment.projectId, "schedule.manage");
     if (assignment.projectId ? !allowedProjectIds.some(id => id === assignment.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu atamaya erişim yetkiniz yok");
     }
@@ -407,6 +411,7 @@ export const create = authedMutation({
   },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
+    await requirePermission(ctx, ctx.user, args.projectId, "schedule.manage");
     if (args.projectId ? !allowedProjectIds.some((id) => id === args.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu vardiyayı oluşturma yetkiniz yok");
     }
@@ -446,6 +451,7 @@ export const update = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const shift = await ctx.db.get(args.shiftId);
     if (!shift) throw new Error("Vardiya bulunamadı");
+    await requirePermission(ctx, ctx.user, shift.projectId, "schedule.manage");
     if (shift.projectId ? !allowedProjectIds.some(id => id === shift.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu vardiyaya erişim yetkiniz yok");
     }
@@ -465,6 +471,7 @@ export const remove = authedMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const shift = await ctx.db.get(args.shiftId);
     if (!shift) throw new Error("Vardiya bulunamadı");
+    await requirePermission(ctx, ctx.user, shift.projectId, "schedule.manage");
     if (shift.projectId ? !allowedProjectIds.some(id => id === shift.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu vardiyaya erişim yetkiniz yok");
     }
@@ -487,7 +494,7 @@ const clearArgs = {
 };
 type ClearInput = { projectId: Id<"projects">; employeeIds: Id<"employees">[]; startDate: string; endDate: string };
 async function prepareClear(ctx: ReadCtx & { user: Doc<"users"> }, args: ClearInput) {
-  if (ctx.user.role !== "super_admin" && ctx.user.role !== "project_admin") throw new ConvexError("Bu işlem için yetkiniz yok");
+  await requirePermission(ctx, ctx.user, args.projectId, "schedule.manage");
   validateAssignRange(args);
   if (!args.employeeIds.length || args.employeeIds.length > 500) throw new ConvexError("1–500 çalışan seçin");
   if (new Set(args.employeeIds).size !== args.employeeIds.length) throw new ConvexError("Aynı çalışan birden fazla seçilemez");

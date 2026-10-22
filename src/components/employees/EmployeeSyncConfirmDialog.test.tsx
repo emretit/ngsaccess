@@ -37,3 +37,5 @@ it("pasif kişilerin kaldırılacağını ve karma seçimde iki işlemi de açı
   expect(render([inactive])).not.toContain("bilgileri 1 cihaza gönderilecek");
   expect(render([inactive, { ...employee, _id: "e2" as Id<"employees"> }])).toContain("1 pasif kişinin kaydı kaldırılacak. 1 aktif kişinin bilgileri gönderilecek.");
 });
+
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, role: "hr", loading: false }) }));

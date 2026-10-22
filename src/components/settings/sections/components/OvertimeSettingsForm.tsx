@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useState } from "react";
 import { z } from "zod";
 import { useMutation, useQuery } from "convex/react";
@@ -43,7 +44,8 @@ const numbers = [
   ["weekendMultiplier", "Hafta tatili çarpanı", 1], ["holidayMultiplier", "Resmi tatil çarpanı", 1], ["nightShiftMultiplier", "Gece çarpanı", 1],
 ] as const;
 export function OvertimeSettingsForm() {
-  const { projectId, loading, isAdmin } = useActiveProjectScope();
+  const { projectId, loading } = useActiveProjectScope();
+  const isAdmin = usePermissions().can("schedule.manage");
   const work = useQuery(api.settings.getWork, !loading && projectId && isAdmin ? { projectId } : "skip");
   const rates = useQuery(api.holidays.getOvertimeRates, !loading && projectId && isAdmin ? { projectId } : "skip");
   const save = useMutation(api.settings.saveOvertime);

@@ -1,14 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FolderKanban, ShieldCheck } from "lucide-react";
-import { useAuth } from "@/components/auth/AuthProvider";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import { roleLabel as formatRole } from "@/lib/roleLabels";
 
 export default function UserProjectsCard() {
-  const { profile } = useAuth();
+  const { role } = usePermissions();
   const { projects, isSuperAdmin, loading } = useActiveProject();
-  const roleLabel = formatRole(profile?.role);
+  const roleLabel = formatRole(role);
 
   return (
     <Card className="mt-6">
@@ -44,7 +44,7 @@ export default function UserProjectsCard() {
               >
                 <span className="truncate font-medium">{p.name}</span>
                 <Badge variant="outline" className="text-xs">
-                  {roleLabel}
+                  {formatRole(p.role)}
                 </Badge>
               </li>
             ))}

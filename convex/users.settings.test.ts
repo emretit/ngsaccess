@@ -5,9 +5,9 @@ import { adminList } from './users';
 const state = vi.hoisted(() => ({ allowed: ['p1'], rows: [] as Record<string, unknown>[], pagination: vi.fn() }));
 vi.mock('./lib/customFunctions', () => {
   const register = (config: unknown) => config;
-  return { adminQuery: register, superAdminQuery: register, superAdminMutation: register, optionalAuthQuery: register, authedMutation: register };
+  return { authedQuery: register, superAdminQuery: register, superAdminMutation: register, optionalAuthQuery: register, authedMutation: register };
 });
-vi.mock('./lib/auth', async importOriginal => ({ ...await importOriginal<typeof import('./lib/auth')>(), getProjectIdsForUser: async () => state.allowed }));
+vi.mock('./lib/permissions', async importOriginal => ({ ...await importOriginal<typeof import('./lib/permissions')>(), getProjectIdsWithPermission: async () => state.allowed }));
 vi.mock('convex-helpers/server/stream', () => ({ stream: () => ({ query: () => ({ order: () => ({ filterWith: (predicate: (row: Record<string, unknown>) => Promise<boolean>) => ({ paginate: async (options: { numItems: number; cursor: string | null }) => {
   state.pagination(options);
   const rows = [];
@@ -41,10 +41,10 @@ async function invoke(ctx: QueryCtx, args: object): Promise<{ page: { displayNam
 describe('13-D9 project administrator directory pagination', () => {
   it('filters before paging and exposes only the shared project names', async () => {
     const ctx = fixture();
-    const args = { search: 'ada', role: 'project_user', paginationOpts: { numItems: 1, cursor: null } };
+    const args = { search: 'ada', role: 'viewer', paginationOpts: { numItems: 1, cursor: null } };
     const first = await invoke(ctx, args);
     expect(first.page.map(row => row.displayName)).toEqual(['Ada']);
-    expect(first.page[0].projects).toEqual([{ _id: p1, name: 'Merkez', isActive: true }]);
+    expect(first.page[0].projects).toEqual([{ _id: p1, name: 'Merkez', isActive: true, role: 'viewer' }]);
     expect(first.isDone).toBe(false);
     const next = await invoke(ctx, { ...args, paginationOpts: { numItems: 1, cursor: first.continueCursor } });
     expect(next.page.map(row => row.displayName)).toEqual(['Aday']);

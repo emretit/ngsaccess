@@ -1,8 +1,9 @@
+import { resolveProjectScope } from "./lib/projectScope";
+import { requirePermission } from "./lib/permissions";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
-import { adminMutation, adminQuery } from "./lib/customFunctions";
-import { resolveProjectScope } from "./lib/projectScope";
+import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { writeAudit } from "./lib/audit";
 import { trTodayKey } from "./lib/trDate";
 import { addWorkDate } from "./lib/pdksWorkDay";
@@ -19,10 +20,11 @@ export function checkpointDoorReason(device: Doc<"devices"> | null, door: Pick<D
   if (device.brand === "ide_smart") return door.ioId === undefined ? "Kapının fiziksel IO eşlemesi eksik" : null;
   return Math.max(device.doorCount ?? 0, device.hikDoorCount ?? 0, linkedDoorCount) === 1 ? null : "Çok kapılı cihazda okumalar kapı numarası taşımıyor; cihazın tüm geçişlerini seçin";
 }
-export const getRules = adminQuery({
+export const getRules = authedQuery({
   args: { projectId: v.id("projects") },
   handler: async (ctx, { projectId }) => {
     await resolveProjectScope(ctx, projectId);
+    await requirePermission(ctx, ctx.user, projectId, "schedule.manage");
     const today = trTodayKey();
     const [past, future] = await Promise.all([
       ctx.db.query("pdksRuleVersions").withIndex("by_projectId_and_effectiveFrom", q => q.eq("projectId", projectId).lte("effectiveFrom", today)).order("desc").take(21),
@@ -33,10 +35,11 @@ export const getRules = adminQuery({
     return { current: past[0] ? await enrich(past[0]) : null, future: await Promise.all(future.map(enrich)), history: await Promise.all(past.slice(1).map(enrich)) };
   },
 });
-export const listCheckpointTargets = adminQuery({
+export const listCheckpointTargets = authedQuery({
   args: { projectId: v.id("projects") },
   handler: async (ctx, { projectId }) => {
     await resolveProjectScope(ctx, projectId);
+    await requirePermission(ctx, ctx.user, projectId, "schedule.manage");
     const [devices, doors] = await Promise.all([
       ctx.db.query("devices").withIndex("by_project", q => q.eq("projectId", projectId)).take(1001),
       ctx.db.query("doors").withIndex("by_project", q => q.eq("projectId", projectId)).take(2001),
@@ -55,10 +58,11 @@ export const listCheckpointTargets = adminQuery({
     };
   },
 });
-export const publishRuleVersion = adminMutation({
+export const publishRuleVersion = authedMutation({
   args: { projectId: v.id("projects"), effectiveFrom: v.string(), punchMode: v.union(v.literal("legacy"), v.literal("requirements")), requireCheckIn: v.optional(v.boolean()), requireCheckOut: v.optional(v.boolean()), missingRequiredPunch: v.optional(choice), noPunch: v.optional(choice), checkpointMode: v.union(v.literal("all"), v.literal("selected")), targets: v.optional(v.array(target)) },
   handler: async (ctx, args) => {
     await resolveProjectScope(ctx, args.projectId);
+    await requirePermission(ctx, ctx.user, args.projectId, "schedule.manage");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(args.effectiveFrom) || !Number.isFinite(Date.parse(args.effectiveFrom)) || new Date(args.effectiveFrom).toISOString().slice(0, 10) !== args.effectiveFrom || args.effectiveFrom < addWorkDate(trTodayKey(), 1)) throw new Error("Yürürlük tarihi en erken yarın olmalıdır");
     if (args.punchMode === "requirements" && [args.requireCheckIn, args.requireCheckOut, args.missingRequiredPunch, args.noPunch].some(value => value === undefined)) throw new Error("Giriş, çıkış ve eksik okutma tercihleri zorunludur");
     if ((args.targets?.length ?? 0) > 500) throw new Error("En fazla 500 kontrol noktası seçilebilir");
@@ -91,12 +95,13 @@ export const publishRuleVersion = adminMutation({
     return id;
   },
 });
-export const deleteFutureRuleVersion = adminMutation({
+export const deleteFutureRuleVersion = authedMutation({
   args: { ruleVersionId: v.id("pdksRuleVersions") },
   handler: async (ctx, { ruleVersionId }) => {
     const version = await ctx.db.get(ruleVersionId);
     if (!version) throw new Error("Kural sürümü bulunamadı");
     await resolveProjectScope(ctx, version.projectId);
+    await requirePermission(ctx, ctx.user, version.projectId, "schedule.manage");
     if (version.effectiveFrom <= trTodayKey()) throw new Error("Yürürlüğe girmiş kural silinemez");
     for (const row of await selections(ctx, ruleVersionId)) await ctx.db.delete(row._id);
     await ctx.db.delete(ruleVersionId);

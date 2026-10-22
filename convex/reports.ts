@@ -1,9 +1,8 @@
-import { canSeePay, maskPay } from "./lib/payVisibility";
+import { canSeePayInProject, maskPay } from "./lib/payVisibility";
 import { v } from "convex/values";
 import { internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { authedQuery, authedMutation } from "./lib/customFunctions";
-import { requireAdmin } from "./lib/auth";
 import { resolveReportScope, reportPeriod, resolveScheduleScope } from "./lib/reportScope";
 import { loadAttendanceReport, loadRuleReportDays } from "./lib/reportAttendance";
 import {
@@ -139,8 +138,8 @@ export const getOvertimeSummaryReport = authedQuery({
     month: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const payVisible = canSeePay(ctx.user);
     const { projectIds, scopeLabel } = await resolveReportScope(ctx, args.projectId);
+    const payVisible = (await Promise.all(projectIds.map(id => canSeePayInProject(ctx, ctx.user, id)))).every(Boolean);
     reportPeriod(args.year, args.month);
     const year = args.year;
     const month = args.month;
@@ -197,7 +196,7 @@ export const getOvertimeSummaryReport = authedQuery({
       const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
       totalOvertimeHours += overtimeHours;
 
-      const empHourlyRate = payVisible && employee
+      const empHourlyRate = await canSeePayInProject(ctx, ctx.user, first.projectId) && employee
         ? resolveHourlyRate({
             hourlyRate: employee.hourlyRate,
             monthlySalary: employee.monthlySalary,
@@ -262,8 +261,8 @@ export const getDepartmentCostReport = authedQuery({
     hourlyRate: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const payVisible = canSeePay(ctx.user);
     const { projectIds, scopeLabel } = await resolveReportScope(ctx, args.projectId);
+    const payVisible = (await Promise.all(projectIds.map(id => canSeePayInProject(ctx, ctx.user, id)))).every(Boolean);
     reportPeriod(args.year, args.month);
     const startDate = `${args.year}-${String(args.month).padStart(2, "0")}-01`;
     const endDate = `${args.year}-${String(args.month).padStart(2, "0")}-${String(new Date(args.year, args.month, 0).getDate()).padStart(2, "0")}`;
@@ -285,7 +284,7 @@ export const getDepartmentCostReport = authedQuery({
     const fallbackRate = args.hourlyRate;
     const byDept = new Map<
       string,
-      { overtimeHours: number; cost: number; employeeCount: number }
+      { overtimeHours: number; cost: number; employeeCount: number; payVisible: boolean }
     >();
 
     for (const [empKey, empReadings] of employeeMap) {
@@ -308,7 +307,8 @@ export const getDepartmentCostReport = authedQuery({
       const overtimeHours = Math.round((overtimeMinutes / 60) * 10) / 10;
 
       if (overtimeHours > 0) {
-        const empRate = payVisible ? (
+        const rowPayVisible = await canSeePayInProject(ctx, ctx.user, first.projectId);
+        const empRate = rowPayVisible ? (
           (employee
             ? resolveHourlyRate({
                 hourlyRate: employee.hourlyRate,
@@ -323,7 +323,8 @@ export const getDepartmentCostReport = authedQuery({
         });
 
         const existing =
-          byDept.get(deptName) ?? { overtimeHours: 0, cost: 0, employeeCount: 0 };
+          byDept.get(deptName) ?? { overtimeHours: 0, cost: 0, employeeCount: 0, payVisible: true };
+        existing.payVisible = existing.payVisible && rowPayVisible;
         existing.overtimeHours += overtimeHours;
         existing.cost += payTRY ?? 0;
         existing.employeeCount += 1;
@@ -336,6 +337,7 @@ export const getDepartmentCostReport = authedQuery({
       overtimeHours: Math.round(data.overtimeHours * 10) / 10,
       employeeCount: data.employeeCount,
       cost: Math.round(data.cost * 100) / 100,
+      payVisible: data.payVisible,
     }));
 
     return {
@@ -347,7 +349,7 @@ export const getDepartmentCostReport = authedQuery({
       overtimeMultiplier: null,
       rows: rows
         .sort((a, b) => payVisible ? b.cost - a.cost : a.department.localeCompare(b.department, "tr"))
-        .map((row) => ({ ...row, cost: maskPay(row.cost, payVisible) })),
+        .map(({ payVisible: rowPayVisible, ...row }) => ({ ...row, cost: maskPay(row.cost, rowPayVisible) })),
     };
   },
 });
@@ -358,7 +360,6 @@ export const getDepartmentCostReport = authedQuery({
 export const getReportSchedule = authedQuery({
   args: { projectId: v.optional(v.id("projects")) },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
     await resolveReportScope(ctx, args.projectId);
     return await ctx.db.query("reportScheduleSettings")
       .withIndex("by_user_project", (q) => q.eq("userId", ctx.user._id).eq("projectId", args.projectId)).first();
@@ -373,7 +374,6 @@ export const saveReportSchedule = authedMutation({
     enabled: v.boolean(),
   },
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
     const scope = await resolveReportScope(ctx, args.projectId);
     if (!scope.projectIds.length) throw new Error("Erişilebilir proje bulunamadı");
     const email = args.email.trim();

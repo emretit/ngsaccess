@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { UNSAFE_NavigationContext } from "react-router-dom";
 import { installNavigationGuard } from "@/lib/navigationGuard";
 import { deviceConnection } from "@/lib/deviceStatus";
@@ -6,7 +7,6 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { deviceBrandLabel } from "@/lib/deviceBrand";
 import { deviceConnectionBadge } from "./hooks/deviceConnectionBadge";
 import { DeviceGatewayDanger } from "./DeviceGatewayDanger";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   useActiveProject,
@@ -52,7 +52,8 @@ export function DeviceDetailsPanel({
   projectId: draftProjectId,
 }: DeviceDetailsPanelProps) {
   const { projectId } = useActiveProject();
-  const { isAdmin } = useProjectAccess();
+  const { can } = usePermissions();
+  const canManage = can("devices.manage");
   const deviceId = requestedId ?? selectedDevice?._id;
   const liveDevice = useQuery(
     api.deviceCenter.getOverview,
@@ -63,10 +64,10 @@ export function DeviceDetailsPanel({
   const connectionStatus = liveDevice?.device ? deviceConnection(liveDevice.device, clock) : selectedDevice?.connectionStatus;
   const initialBrand = selectedDevice?.brand ?? "other";
   const projectChanged = open && projectId !== draftProjectId;
-  const [tab, setTab] = useState(isAdmin ? "settings" : "overview");
+  const [tab, setTab] = useState(canManage ? "settings" : "overview");
   const [step, setStep] = useState<"picker" | "form">("picker");
-  const [settingsVisited, setSettingsVisited] = useState(isAdmin);
-  const [operationsVisited, setOperationsVisited] = useState(!isAdmin);
+  const [settingsVisited, setSettingsVisited] = useState(canManage);
+  const [operationsVisited, setOperationsVisited] = useState(!canManage);
   const needsProjects = open && (!selectedDevice || settingsVisited);
   const queriedProjects = useQuery(api.projects.list, needsProjects ? {} : "skip");
   const [projectCache, setProjectCache] = useState(queriedProjects);
@@ -106,10 +107,10 @@ export function DeviceDetailsPanel({
     setDraftBrands([]);
     setFormStates({});
     setCommandPending(false);
-    setSettingsVisited(isAdmin);
-    setOperationsVisited(!isAdmin);
-    setTab(isAdmin ? "settings" : "overview");
-  }, [resetKey, deviceId, initialBrand, isAdmin]);
+    setSettingsVisited(canManage);
+    setOperationsVisited(!canManage);
+    setTab(canManage ? "settings" : "overview");
+  }, [resetKey, deviceId, initialBrand, canManage]);
   const pending =
     commandPending || tokenPending || gatewayPending || Object.values(formStates).some((state) => state?.pending);
   const dirty = Object.values(formStates).some((state) => state?.dirty);
@@ -170,7 +171,7 @@ export function DeviceDetailsPanel({
         >
           <SheetHeader className="shrink-0 space-y-1 border-b border-line px-5 py-3 pr-12 text-left">
             <SheetTitle ref={titleRef} tabIndex={-1} className="break-words outline-none">
-              {deviceId ? isAdmin ? "Cihaz düzenle" : "Cihaz ayrıntısı" : step === "picker" ? "Yeni cihaz" : `Yeni cihaz · ${BRAND_LABELS[brand]}`}
+              {deviceId ? canManage ? "Cihaz düzenle" : "Cihaz ayrıntısı" : step === "picker" ? "Yeni cihaz" : `Yeni cihaz · ${BRAND_LABELS[brand]}`}
             </SheetTitle>
             {currentDevice && (
               <div className="flex min-w-0 items-center gap-2 text-sm">
@@ -180,7 +181,7 @@ export function DeviceDetailsPanel({
               </div>
             )}
             <SheetDescription>
-              {deviceId && !isAdmin
+              {deviceId && !canManage
                 ? "Bağlantı, kapılar ve cihaz bilgileri"
                 : !deviceId && step === "picker"
                   ? "Önce cihazın markasını seçin."
@@ -229,7 +230,7 @@ export function DeviceDetailsPanel({
                       onPendingChange={setCommandPending}
                     />
                   </QuerySectionBoundary>
-                  {isAdmin && <section aria-label="Yönetim" className="mt-4 space-y-4">
+                  {canManage && <section aria-label="Yönetim" className="mt-4 space-y-4">
                     <h3 className="text-sm font-medium">Yönetim</h3>
                     <DeviceApiTokenCard
                       key={selectedDevice._id} deviceId={selectedDevice._id}
@@ -246,7 +247,7 @@ export function DeviceDetailsPanel({
                     forceMount
                     className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 data-[state=inactive]:hidden"
                   >
-                    {!isAdmin && (
+                    {!canManage && (
                       <p
                         id="device-readonly-reason"
                         className="text-sm text-muted-foreground"
@@ -263,7 +264,7 @@ export function DeviceDetailsPanel({
                         projectIdOverride={draftProjectId}
                         open={open}
                         device={selectedDevice}
-                        disabled={!isAdmin}
+                        disabled={!canManage}
                         projects={projects}
                         defaultBrand={selectedDevice.brand ?? "other"}
                         onSuccess={() => {

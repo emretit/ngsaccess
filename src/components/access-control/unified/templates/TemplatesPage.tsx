@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { notify } from "@/lib/notify";
 import { visibleTemplates } from "./model";
 import { useState } from "react";
@@ -20,7 +21,9 @@ import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { TemplateEditor, type Template } from "./TemplateEditor";
 import { formatSchedule } from "./schedule";
 export default function TemplatesPage() {
-  const { projectId, isAdmin } = useActiveProject();
+  const { projectId } = useActiveProject();
+  const { can } = usePermissions();
+  const canManage = can("accessRules.manage");
   const [params, setParams] = useSearchParams();
   const [archived, setArchived] = useState(false);
   const rows = useQuery(
@@ -70,7 +73,7 @@ export default function TemplatesPage() {
     <div className="space-y-4 min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Zaman Şablonları</h1>
-        {isAdmin && projectId && (
+        {canManage && projectId && (
           <Button onClick={() => { setError(""); setCreating(true); }}>Yeni şablon</Button>
         )}
       </div>
@@ -108,7 +111,7 @@ export default function TemplatesPage() {
               {t.description && (
                 <p className="text-sm break-words">{t.description}</p>
               )}
-              {isAdmin && (
+              {canManage && (
                 <div className="flex flex-wrap gap-2">
                   <Button variant="outline" onClick={() => select(t._id)}>
                     Düzenle
@@ -167,7 +170,7 @@ export default function TemplatesPage() {
           ))}
         </div>
       )}
-      {isAdmin && projectId && (creating || selected) && (
+      {canManage && projectId && (creating || selected) && (
         <TemplateEditor
           key={selected?._id ?? "new"}
           projectId={projectId}
@@ -179,7 +182,7 @@ export default function TemplatesPage() {
         />
       )}
       <Dialog
-        open={isAdmin && !!projectId && !!rows && !!params.get("template") && !selected && !creating}
+        open={canManage && !!projectId && !!rows && !!params.get("template") && !selected && !creating}
         onOpenChange={(open) => { if (!open) select(); }}
       >
         <DialogContent className="w-[calc(100%-2rem)]">

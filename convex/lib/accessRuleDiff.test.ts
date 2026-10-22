@@ -66,7 +66,7 @@ const graph = vi.hoisted(() => ({ removed: vi.fn(), roster: vi.fn(), tracked: vi
 vi.mock("../deviceSyncRuns", () => ({ createRuleDiffRun: graph.tracked }));
 vi.mock("./customFunctions", () => {
   const register = (definition: { handler: unknown }) => ({ _handler: definition.handler });
-  return { adminQuery: register, adminMutation: register, authedAction: register, authedMutation: register, authedQuery: register };
+  return { authedAction: register, authedMutation: register, authedQuery: register };
 });
 vi.mock("./auth", () => ({ getProjectIdsForUser: async () => ["project"] }));
 vi.mock("./projectScope", () => ({ resolveProjectScope: async () => ["project"] }));
@@ -112,7 +112,7 @@ function transaction(memberIds: string[], deviceCount = 0, doorCount = 0) {
     insert: vi.fn(async (table: string, row: FakeRow) => { rows[table].push({ ...row, _id: `new-${rows[table].length}` }); }),
   };
   const runAfter = vi.fn(async () => undefined);
-  return { ctx: { db, user: { _id: "admin" }, scheduler: { runAfter } } as unknown as MutationCtx, db, rule, rows, take, collect, runAfter };
+  return { ctx: { db, user: { _id: "admin", role: "super_admin" }, scheduler: { runAfter } } as unknown as MutationCtx, db, rule, rows, take, collect, runAfter };
 }
 
 describe("actual updateWithGroups transaction contract", () => {

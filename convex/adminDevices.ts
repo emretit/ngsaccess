@@ -1,3 +1,4 @@
+import { getProjectIdsWithPermission } from "./lib/permissions";
 import { paginationOptsValidator } from "convex/server";
 import { stream } from "convex-helpers/server/stream";
 import schema from "./schema";
@@ -7,7 +8,7 @@ import { deviceConnection } from "./lib/deviceConnection";
 import { deviceIdentityError } from "./lib/deviceIdentity";
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
-import { superAdminQuery, superAdminMutation, adminQuery } from "./lib/customFunctions";
+import { superAdminQuery, superAdminMutation, authedQuery } from "./lib/customFunctions";
 import { purgeDeviceCascade } from "./lib/deviceHelpers";
 
 /**
@@ -33,9 +34,9 @@ export const list = superAdminQuery({
 
 /**
  * Claim picker için: sadece atanmamış (assignedDeviceId yok) ve havuzdan gelen cihazlar.
- * adminQuery: project_admin da kendi projesine claim yapabilir.
+ * authedQuery: project administrator da kendi projesine claim yapabilir.
  */
-export const listForClaim = adminQuery({
+export const listForClaim = authedQuery({
   args: {},
   returns: v.array(
     v.object({
@@ -52,6 +53,7 @@ export const listForClaim = adminQuery({
     })
   ),
   handler: async (ctx) => {
+    if (ctx.user.role !== "super_admin" && !(await getProjectIdsWithPermission(ctx, ctx.user, "devices.manage")).length) throw new Error("Bu işlem için yetkiniz yok");
     const rows = await ctx.db.query("adminDevices").collect();
     return rows
       .filter((d) => !d.assignedDeviceId && !d.createdFromDevice)

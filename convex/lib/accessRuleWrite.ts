@@ -1,3 +1,4 @@
+import { requirePermission } from "./permissions";
 import { internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
@@ -23,13 +24,14 @@ type CreateAccessRuleWithGroupsArgs = {
   doorIds?: Id<"doors">[];
 };
 
-/** Called only by accessRules.createWithGroups after adminMutation checks the role. */
+/** Called only by accessRules.createWithGroups after authorization. */
 export async function createAccessRuleWithGroups(
   ctx: MutationCtx & { user: Doc<"users"> },
   args: CreateAccessRuleWithGroupsArgs,
 ): Promise<Id<"accessRules">> {
   await resolveProjectScope(ctx, args.projectId);
   if (!args.projectId) throw new Error("Önce bir proje seçin");
+  await requirePermission(ctx, ctx.user, args.projectId, "accessRules.manage");
   await validateAccessRelations(ctx, args.projectId, args);
   const { employeeIds, deviceIds, doorIds, ...ruleData } = args;
   await validateScheduleBinding(ctx, args.projectId, args.scheduleTemplateId);

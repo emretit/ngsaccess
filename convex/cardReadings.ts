@@ -1,3 +1,4 @@
+import { requirePermission } from "./lib/permissions";
 import { processCardReadingCore } from "./lib/processCardReadingCore";
 import { getPdksTableData as getPdksTableDataQuery } from "./lib/pdksTableQuery";
 import { getMonthlyPayrollSheet as getMonthlyPayrollSheetQuery } from "./lib/pdksPayrollQuery";
@@ -5,7 +6,7 @@ import { loadPdksPolicies } from "./lib/pdksRules";
 import { employedDuring, employedOn } from "./lib/employment";
 import { stream } from "convex-helpers/server/stream";
 import schema from "./schema";
-import { canSeePay } from "./lib/payVisibility";
+import { canSeePayInProject } from "./lib/payVisibility";
 import { classifyReadingSource, countExcludedUnknownPdksReadings, filterPdksReadings } from "./lib/pdksSource";
 import { matchesReadingSources, toReportTransactionRow } from "./lib/reportAttendance";
 import { paginationOptsValidator, type PaginationResult } from "convex/server";
@@ -21,7 +22,7 @@ import { ConvexError, v } from "convex/values";
 import { api } from "./_generated/api";
 import {
   authedQuery,
-  adminMutation,
+  authedMutation,
   employeeAuthedQuery,
   employeeAuthedMutation,
 } from "./lib/customFunctions";
@@ -276,7 +277,7 @@ export const getReading = authedQuery({
   },
 });
 
-export const assignCardFromReading = adminMutation({
+export const assignCardFromReading = authedMutation({
   args: {
     readingId: v.id("cardReadings"),
     employeeId: v.id("employees"),
@@ -293,6 +294,7 @@ export const assignCardFromReading = adminMutation({
     if (!employee || !employee.projectId || !allowed.includes(employee.projectId)) {
       throw new ConvexError({ code: "EMPLOYEE_NOT_FOUND", message: ASSIGN_CARD_ERRORS.EMPLOYEE_NOT_FOUND });
     }
+    await requirePermission(ctx, ctx.user, employee.projectId, "employees.manage");
     const preconditions = {
       reading,
       employeeProjectId: employee.projectId,
@@ -638,7 +640,7 @@ export const getEmployeeAttendanceDetail = authedQuery({
     const summary = summarizeAttendanceDays(allDays, {
       startDate: args.startDate, endDate: args.endDate,
       overtimeBasis: overtimeRates.overtimeBasis,
-      hourlyRate: canSeePay(ctx.user) ? resolveHourlyRate({
+      hourlyRate: (await canSeePayInProject(ctx, ctx.user, employee.projectId)) ? resolveHourlyRate({
         hourlyRate: employee.hourlyRate, monthlySalary: employee.monthlySalary,
         monthlyHoursBase: workSettings.monthlyHoursBase,
       }) : null,

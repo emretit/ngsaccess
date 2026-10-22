@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "convex/react";
@@ -21,21 +22,23 @@ function isHidden(key: string) {
 }
 
 export default function SetupChecklist() {
-  const { projectId, isAdmin, loading } = useActiveProject();
+  const { projectId, loading } = useActiveProject();
+  const { can } = usePermissions();
+  const canManage = can("admin.manage");
   const storageKey = `ngs.setupChecklist.hidden.${projectId ?? ""}`;
   const doneKey = `ngs.setupChecklist.done.${projectId ?? ""}`;
   const [completedKey, setCompletedKey] = useState<string | null>(null);
   const completed = completedKey === doneKey || isHidden(doneKey);
   const [hiddenKey, setHiddenKey] = useState<string | null>(null);
   const hidden = hiddenKey === storageKey || isHidden(storageKey);
-  const status = useQuery(api.projects.getSetupStatus, !loading && isAdmin && projectId && !hidden && !completed ? { projectId } : "skip");
+  const status = useQuery(api.projects.getSetupStatus, !loading && canManage && projectId && !hidden && !completed ? { projectId } : "skip");
   useEffect(() => {
-    if (!loading && isAdmin && projectId && !hidden && !completed && status?.complete) {
+    if (!loading && canManage && projectId && !hidden && !completed && status?.complete) {
       try { window.localStorage.setItem(doneKey, "1"); } catch { /* Bu oturumda abonelik kapalı kalır. */ }
       setCompletedKey(doneKey);
     }
-  }, [loading, isAdmin, projectId, hidden, completed, status?.complete, doneKey]);
-  if (loading || !isAdmin || !projectId || hidden || completed || !status || status.complete) return null;
+  }, [loading, canManage, projectId, hidden, completed, status?.complete, doneKey]);
+  if (loading || !canManage || !projectId || hidden || completed || !status || status.complete) return null;
   const dismiss = () => {
     try { window.localStorage.setItem(storageKey, "1"); } catch { /* Bu oturumda gizleme devam eder. */ }
     setHiddenKey(storageKey);

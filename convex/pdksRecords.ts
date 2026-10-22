@@ -1,5 +1,6 @@
+import { getProjectIdsWithPermission, requirePermission } from "./lib/permissions";
 import { v } from "convex/values";
-import { adminMutation, authedQuery } from "./lib/customFunctions";
+import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { validateManualPdksInput, validateManualPdksNote } from "./lib/pdksManual";
 import { findManualPdksRecord, validateManualPdksForEmployee, writeManualPdksRecord } from "./lib/pdksManualWrite";
 import { buildShiftResolver } from "./lib/shiftResolver";
@@ -7,7 +8,7 @@ import { resolveProjectScope } from "./lib/projectScope";
 import { isOvernightShift } from "./lib/pdksWorkDay";
 import { writeAudit } from "./lib/audit";
 
-export const upsertManual = adminMutation({
+export const upsertManual = authedMutation({
   args: {
     employeeId: v.id("employees"),
     date: v.string(),
@@ -19,19 +20,7 @@ export const upsertManual = adminMutation({
     const employee = await ctx.db.get(args.employeeId);
     if (!employee) throw new Error("Çalışan bulunamadı");
 
-    if (ctx.user.role === "project_admin" && employee.projectId) {
-      const userProjects = await ctx.db
-        .query("userProjects")
-        .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
-        .collect();
-      const hasAccess = userProjects.some(
-        (up) => up.projectId === employee.projectId
-      );
-      if (!hasAccess) {
-        throw new Error("Bu çalışanın projesine erişim yetkiniz yok");
-      }
-    }
-
+    await requirePermission(ctx, ctx.user, employee.projectId, "attendance.approve");
     const input = await validateManualPdksForEmployee(ctx, employee, args);
     const existing = await findManualPdksRecord(ctx, args.employeeId, args.date);
     const { id } = await writeManualPdksRecord(ctx, { user: ctx.user, employee, date: args.date, existing, input, audit: true });
@@ -39,7 +28,7 @@ export const upsertManual = adminMutation({
   },
 });
 
-export const bulkUpsertManual = adminMutation({
+export const bulkUpsertManual = authedMutation({
   args: {
     note: v.string(),
     rows: v.array(
@@ -60,17 +49,7 @@ export const bulkUpsertManual = adminMutation({
       throw new Error("Tek seferde en fazla 500 satır gönderebilirsiniz");
     }
 
-    const userProjectIds =
-      ctx.user.role === "project_admin"
-        ? new Set(
-            (
-              await ctx.db
-                .query("userProjects")
-                .withIndex("by_user", (q) => q.eq("userId", ctx.user._id))
-                .collect()
-            ).map((up) => String(up.projectId)),
-          )
-        : null;
+    const userProjectIds = ctx.user.role === "super_admin" ? null : new Set((await getProjectIdsWithPermission(ctx, ctx.user, "attendance.approve")).map(String));
 
     let inserted = 0;
     let updated = 0;
@@ -88,6 +67,7 @@ export const bulkUpsertManual = adminMutation({
       try {
         const employee = employeeById.get(row.employeeId);
         if (!employee) throw new Error("Çalışan bulunamadı");
+        await requirePermission(ctx, ctx.user, employee.projectId, "attendance.approve");
         if (userProjectIds && employee.projectId) {
           if (!userProjectIds.has(String(employee.projectId))) {
             throw new Error("Projeye erişim yetkiniz yok");

@@ -8,9 +8,8 @@ vi.mock("./customFunctions", () => {
   const register = (config: unknown) => config;
   return {
     authedQuery: register,
-    adminQuery: register,
     optionalAuthQuery: register,
-    adminMutation: register,
+    authedMutation: register,
   };
 });
 vi.mock("./auth", () => ({ getProjectIdsForUser: async () => ["p"] }));

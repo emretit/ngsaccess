@@ -9,7 +9,7 @@ vi.mock("./lib/customFunctions", () => {
     if (ctx.user.role === "project_user") throw new Error("Bu işlem için yetkiniz yok");
     return (definition.handler as Handler)(ctx, args);
   } });
-  return { employeeAuthedMutation: pass, employeeAuthedQuery: pass, adminMutation: admin, adminQuery: admin };
+  return { employeeAuthedMutation: pass, employeeAuthedQuery: pass, authedMutation: pass, authedQuery: pass, };
 });
 vi.mock("./lib/auth", async importOriginal => {
   const original = await importOriginal<typeof import("./lib/auth")>();
@@ -36,10 +36,10 @@ function fixture(role: User["role"] = "project_admin", memberships: Id<"projects
   const query = (table: string) => {
     const filters: Array<(row: Row) => boolean> = [];
     const q = { eq: (field: string, value: unknown) => { filters.push(row => row[field] === value); return q; }, gte: (field: string, value: string) => { filters.push(row => String(row[field]) >= value); return q; } };
-    const selected = () => rows.filter(row => row.table === table && filters.every(filter => filter(row)));
+    const selected = () => (table === "userProjects" ? memberships.map(projectId => ({ _id: `m-${projectId}`, _creationTime: 1, table, userId: user._id, projectId })) : rows).filter(row => row.table === table && filters.every(filter => filter(row)));
     const chain = {
       withIndex: (_name: string, build: (builder: typeof q) => unknown) => { build(q); return chain; }, order: () => chain,
-      take: async (count: number) => selected().slice(0, count), first: async () => selected()[0] ?? null,
+      take: async (count: number) => selected().slice(0, count), first: async () => selected()[0] ?? null, unique: async () => selected()[0] ?? null,
     };
     return chain;
   };

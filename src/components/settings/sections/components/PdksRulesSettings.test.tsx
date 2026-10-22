@@ -472,3 +472,5 @@ it("APHB boş XML inceleme yoksa mevcut veri yok hatasını gösterir", async ()
     "Bildirim için veri bulunamadı",
   );
 });
+
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => state.admin, role: state.admin ? "hr" : "viewer", loading: false }) }));

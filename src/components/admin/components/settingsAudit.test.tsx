@@ -24,7 +24,7 @@ function findElement<P>(node: React.ReactNode, component: unknown): React.ReactE
 
 describe("settings user directory", () => {
   it("O4 displays an email once in each responsive layout and lists real project names", () => {
-    const user = { _id: 'u', displayName: 'u@example.com', email: 'u@example.com', role: 'project_user', projects: [{ _id: 'p', name: 'Merkez', isActive: true }], isSelf: false, pendingSetup: false } as User;
+    const user = { _id: 'u', displayName: 'u@example.com', email: 'u@example.com', role: 'viewer', projects: [{ _id: 'p', name: 'Merkez', isActive: true, role: 'viewer' }], isSelf: false, pendingSetup: false, disabledAt: undefined, accessExpiresAt: undefined, accessExpired: false, setupExpiresAt: undefined } as User;
     const html = renderToStaticMarkup(<UserTable users={[user]} onEditUser={vi.fn()} onDeleteUser={vi.fn()} />);
     expect(html.match(/>u@example.com</g)).toHaveLength(2);
     expect(html.match(/Merkez/g)).toHaveLength(2);
@@ -41,7 +41,7 @@ describe("settings user directory", () => {
       const select = findElement<React.ComponentProps<typeof AdminSelect>>(tree, AdminSelect);
       if (!bar || !select) throw new Error('Missing filters');
       if (step === 0) { bar.props.onSearchChange('yeni arama'); setStep(1); }
-      else if (step === 1) { select.props.onChange('project_user'); setStep(2); }
+      else if (step === 1) { select.props.onChange('viewer'); setStep(2); }
       else search = bar.props.search;
       return null;
     }
@@ -50,3 +50,5 @@ describe("settings user directory", () => {
     expect(state.query.mock.calls.some(([, args]) => args && args !== 'skip' && 'paginationOpts' in args)).toBe(true);
   });
 });
+
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, role: "admin", loading: false }) }));

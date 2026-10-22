@@ -1,7 +1,8 @@
+import { requirePermission } from "./lib/permissions";
 import { v } from "convex/values";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { adminMutation, authedQuery } from "./lib/customFunctions";
+import { authedMutation, authedQuery } from "./lib/customFunctions";
 import { writeAudit } from "./lib/audit";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { getTurkishHolidaysForYear, hasReligiousData } from "./lib/turkishHolidays";
@@ -9,6 +10,7 @@ import { getTurkishHolidaysForYear, hasReligiousData } from "./lib/turkishHolida
 type HolidayCtx = (QueryCtx | MutationCtx) & { user: Doc<"users"> };
 
 async function requireHolidayScope(ctx: HolidayCtx, projectId: Id<"projects"> | undefined, write = false) {
+  if (write) await requirePermission(ctx, ctx.user, projectId, "schedule.manage");
   if (ctx.user.role === "super_admin") return;
   if (!projectId) {
     if (write) throw new Error("Global tatilleri yalnız süper admin değiştirebilir");
@@ -57,7 +59,7 @@ export const listForRange = authedQuery({
   },
 });
 
-export const create = adminMutation({
+export const create = authedMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     date: v.string(),
@@ -94,7 +96,7 @@ export const create = adminMutation({
   },
 });
 
-export const remove = adminMutation({
+export const remove = authedMutation({
   args: { id: v.id("holidays") },
   handler: async (ctx, args) => {
     const old = await ctx.db.get(args.id);
@@ -112,7 +114,7 @@ export const remove = adminMutation({
   },
 });
 
-export const seedTurkishHolidays = adminMutation({
+export const seedTurkishHolidays = authedMutation({
   args: {
     projectId: v.optional(v.id("projects")),
     years: v.array(v.number()),

@@ -42,7 +42,7 @@ const NEW_ZONE = "__new__";
 /**
  * Cihazlar sayfası: havuzdaki (atanmamış) cihazlardan birini aktif projeye claim eder.
  * Atama anında zone + door üretilir (backend claimDevice). super_admin başka projeye de
- * atayabilir; project_admin aktif projesine kilitli.
+ * atayabilir; proje yöneticisi aktif projesine kilitli.
  */
 export function ClaimDeviceDialog({ open, onClose, onSuccess }: ClaimDeviceDialogProps) {
   const { isSuperAdmin } = useProjectAccess();

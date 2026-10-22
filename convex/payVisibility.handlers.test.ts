@@ -13,8 +13,7 @@ import { getDepartmentCostReport, getOvertimeSummaryReport } from "./reports";
 vi.mock("./lib/customFunctions", () => {
   const passThrough = (config: unknown) => config;
   return {
-    authedQuery: passThrough, authedMutation: passThrough, adminQuery: passThrough,
-    adminMutation: passThrough, optionalAuthQuery: passThrough, superAdminQuery: passThrough,
+    authedQuery: passThrough, authedMutation: passThrough, optionalAuthQuery: passThrough, superAdminQuery: passThrough,
     superAdminMutation: passThrough, authedAction: passThrough,
     employeeAuthedQuery: passThrough, employeeAuthedMutation: passThrough,
   };
@@ -48,6 +47,7 @@ function fixture(role: typeof roles[number], overrides: Doc<"employees">[] = emp
   const tables: Record<string, Record<string, unknown>[]> = {
     employees: overrides, cardReadings: readings, departments,
     projects: [{ _id: projectId, name: "Test Projesi" }],
+    userProjects: [{ _id: "membership", userId: "user", projectId }],
     // Exercise nonzero payable overtime so masking assertions stay meaningful.
     overtimeRates: [{ projectId, overtimeBasis: "dailyShift" }],
   };
@@ -60,7 +60,7 @@ function fixture(role: typeof roles[number], overrides: Doc<"employees">[] = emp
     const chain = {
       withIndex: (_name: string, configure: (range: typeof index) => unknown) => { configure(index); return chain; },
       filter: () => chain, order: () => chain,
-      take: async (limit: number) => rows.slice(0, limit), collect: async () => [...rows], first: async () => rows[0] ?? null,
+      take: async (limit: number) => rows.slice(0, limit), collect: async () => [...rows], first: async () => rows[0] ?? null, unique: async () => rows[0] ?? null,
     };
     return chain;
   };

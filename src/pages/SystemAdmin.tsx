@@ -9,7 +9,6 @@ import { AccessDenied } from "@/components/shared/AccessDenied";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { capabilities } from "@/lib/capabilities";
 import AdminUsersPanel from "@/components/admin/AdminUsersPanel";
 import AdminProjectsPanel from "@/components/admin/AdminProjectsPanel";
 import { AdminDevicesPanel } from "@/components/admin/AdminDevicesPanel";
@@ -27,7 +26,7 @@ export default function SystemAdmin() {
   }, [loading, user, navigate]);
   if (loading || (user && !profile))
     return <SectionSkeleton label="Yetkiler yükleniyor" />;
-  if (!user || !capabilities(profile?.role).systemAdmin)
+  if (!user || profile?.role !== "super_admin")
     return (
       <AccessDenied message="Bu sayfa için süper admin yetkisi gerekli." />
     );

@@ -71,3 +71,5 @@ describe("Kabuk denetimi", () => {
     expect(html).toMatch(/class="[^"]*bg-subtle[^"]*text-muted-foreground[^"]*">Yakında/);
   });
 });
+
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, role: "admin", loading: false }) }));

@@ -49,9 +49,9 @@ import type { MutationCtx, ActionCtx } from "../_generated/server";
 import * as runs from "../deviceSyncRuns";
 vi.mock("./customFunctions", () => {
   const register = (definition: { handler: unknown }) => ({ _handler: definition.handler });
-  return { adminQuery: register, authedAction: register, authedQuery: register, authedMutation: register, adminMutation: register };
+  return { authedAction: register, authedQuery: register, authedMutation: register, };
 });
-vi.mock("./auth", () => ({ requireAdmin: async () => ({ _id: "admin" }), getProjectIdsForUser: async () => ["project"] }));
+vi.mock("./auth", () => ({ getCurrentUser: async () => ({ _id: "admin", role: "super_admin" }), getProjectIdsForUser: async () => ["project"] }));
 
 type Row = Record<string, unknown>;
 type Ref = Parameters<typeof getFunctionName>[0];

@@ -51,6 +51,8 @@ interface LocationDoorItemProps {
   /** undefined → okuyucular yükleniyor. */
   readers: ReaderRow[] | undefined;
   canAddReader: boolean;
+  canManage?: boolean;
+  canOpenDoor?: boolean;
   fetchingReaderId: string | null;
   /** Verilmezse satır salt okunur (yönetici değil). */
   onAction?: (action: DoorAction) => void;
@@ -66,6 +68,8 @@ export function LocationDoorItem({
   onSelect,
   readers,
   canAddReader,
+  canManage = false,
+  canOpenDoor = false,
   fetchingReaderId,
   onAction,
 }: LocationDoorItemProps) {
@@ -95,21 +99,21 @@ export function LocationDoorItem({
         >
           {door.name}
         </button>
-        {onAction && (
+        {onAction && (canManage || (isIde && canOpenDoor)) && (
           <div className={TREE_ROW_ACTIONS}>
             <RowActions label={`${door.name} kapı işlemleri`}>
               {deviceName && (
                 <DropdownMenuLabel className="max-w-64 truncate text-xs font-normal text-muted-foreground">{deviceName}</DropdownMenuLabel>
               )}
-              <DropdownMenuItem onSelect={() => onAction({ type: "editDoor", door })}>
+              {canManage && <DropdownMenuItem onSelect={() => onAction({ type: "editDoor", door })}>
                 <Settings2 className="mr-2 h-4 w-4" />Kapıyı düzenle
-              </DropdownMenuItem>
-              {isIde && (
+              </DropdownMenuItem>}
+              {isIde && canOpenDoor && (
                 <DropdownMenuItem onSelect={() => onAction({ type: "openDoor", door })}>
                   <DoorOpen className="mr-2 h-4 w-4" />Kapıyı aç
                 </DropdownMenuItem>
               )}
-              {!isIde && (
+              {canManage && !isIde && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="text-destructive" onSelect={() => onAction({ type: "deleteDoor", door })}>
@@ -142,7 +146,7 @@ export function LocationDoorItem({
                     {reader.hikCardReaderAntiSneakEnabled === true && (
                       <span className="status-warning-badge shrink-0 rounded-sm px-1 text-[10px] font-medium">APB</span>
                     )}
-                    {onAction && reader.readerId !== null && (
+                    {onAction && canManage && reader.readerId !== null && (
                       <div className={TREE_ROW_ACTIONS}>
                         <RowActions label={`${reader.readerName} okuyucu işlemleri`}>
                           <DropdownMenuLabel className="max-w-64 space-y-0.5 text-xs font-normal text-muted-foreground">
@@ -171,7 +175,7 @@ export function LocationDoorItem({
                 </li>
               );
             })}
-            {onAction && canAddReader && (
+            {onAction && canManage && canAddReader && (
               <li>
                 <button
                   type="button"

@@ -46,13 +46,13 @@ export function GrantRows({
   selected,
   onToggle,
   onEmployee,
-  isAdmin,
+  canManage,
 }: {
   rows: GrantRow[];
   selected: Pair[];
   onToggle: (row: Pair) => void;
   onEmployee: (row: GrantRow) => void;
-  isAdmin: boolean;
+  canManage: boolean;
 }) {
   const cells = (row: GrantRow) => [
     <Button
@@ -85,7 +85,7 @@ export function GrantRows({
         <table className="w-full text-sm">
           <thead>
             <tr>
-              {isAdmin && <th className="p-2">Seç</th>}
+              {canManage && <th className="p-2">Seç</th>}
               {columns.map((c) => (
                 <th key={c} className="p-2 text-left">
                   {c}
@@ -96,7 +96,7 @@ export function GrantRows({
           <tbody>
             {rows.map((row) => (
               <tr key={pairKey(row)} className="border-t">
-                {isAdmin && <td className="p-2">{checkbox(row)}</td>}
+                {canManage && <td className="p-2">{checkbox(row)}</td>}
                 {cells(row).map((cell, i) => (
                   <td
                     key={columns[i]}
@@ -116,7 +116,7 @@ export function GrantRows({
             key={pairKey(row)}
             className="border rounded-md p-3 min-w-0 space-y-2"
           >
-            {isAdmin && (
+            {canManage && (
               <div className="flex gap-2 items-center">
                 {checkbox(row)}
                 <span className="text-xs">Seç</span>

@@ -4,7 +4,7 @@ import { listLightForImport } from "../employees";
 import type { QueryCtx } from "../_generated/server";
 import * as scope from "./projectScope";
 vi.mock("../_generated/server", async (importOriginal) => ({ ...await importOriginal<typeof import("../_generated/server")>(), action: (config: unknown) => config }));
-vi.mock("./customFunctions", async (importOriginal) => ({ ...await importOriginal<typeof import("./customFunctions")>(), adminQuery: (config: unknown) => config }));
+vi.mock("./customFunctions", async (importOriginal) => ({ ...await importOriginal<typeof import("./customFunctions")>(), authedQuery: (config: unknown) => config }));
 const csvText = "tcNo,tarih,giriş,çıkış,not\n123,2026-10-19,09:00,18:00,not\n123,2026-10-19,18:00,09:00,not";
 const call = <T>(fn: unknown, ctx: unknown, args: unknown) => (fn as { handler: (ctx: unknown, args: unknown) => Promise<T> }).handler(ctx, args);
 describe("08-O4/D9 CSV kapsamı", () => {
@@ -28,7 +28,7 @@ describe("08-O4/D9 CSV kapsamı", () => {
     const authorize = vi.spyOn(scope, "resolveProjectScope").mockResolvedValue([]);
     const eq = vi.fn();
     const chain = { withIndex: (_name: string, callback: (q: { eq: typeof eq }) => unknown) => { callback({ eq }); return chain; }, collect: async () => [] };
-    const ctx = { db: { query: () => chain } } as unknown as QueryCtx;
+    const ctx = { user: { _id: "admin", role: "super_admin" }, db: { query: () => chain } } as unknown as QueryCtx;
     expect(await call(listLightForImport, ctx, { projectId: "active" })).toEqual([]);
     expect(authorize).toHaveBeenCalledWith(ctx, "active");
     expect(eq).toHaveBeenCalledWith("projectId", "active");

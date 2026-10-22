@@ -1,11 +1,12 @@
 import { useSearchParams } from "react-router-dom";
-import { useAuth } from "@/components/auth/AuthProvider";
-import { capabilities, type SettingsTab } from "@/lib/capabilities";
+import { usePermissions } from "@/hooks/usePermissions";
+import { permissionCapabilities, type SettingsTab } from "@/lib/capabilities";
 import { cn } from "@/lib/utils";
 
 export const SETTINGS_SECTIONS: { key: SettingsTab; label: string; scope: string }[] = [
   { key: "general", label: "Genel", scope: "Seçili projenin şirket bilgileri ve varsayılanları." },
   { key: "users", label: "Kullanıcılar ve davetler", scope: "Yetkiniz kapsamındaki kullanıcılar. Davette hedef proje ayrıca seçilir." },
+  { key: "roles", label: "Roller", scope: "Seçili projenin rol yetkileri." },
   { key: "work-payroll", label: "Mesai ve tatil", scope: "Seçili projenin mesai politikası ve tatil takvimi." },
   { key: "reports", label: "Raporlar", scope: "Proje kapsamına göre indirme ve kişisel e-posta hatırlatması." },
   { key: "integrations", label: "Entegrasyonlar", scope: "Seçili projenin köprü anahtarları ve entegrasyon bilgileri." },
@@ -16,9 +17,9 @@ export const SETTINGS_SECTIONS: { key: SettingsTab; label: string; scope: string
 export function SettingsSidebar({ selected, onSelect, disabled = false }: {
   selected: SettingsTab; onSelect: (tab: SettingsTab) => void; disabled?: boolean;
 }) {
-  const { profile } = useAuth();
+  const { can, role } = usePermissions();
   const [params] = useSearchParams();
-  const items = SETTINGS_SECTIONS.filter(item => capabilities(profile?.role).settingsTabs.includes(item.key));
+  const items = SETTINGS_SECTIONS.filter(item => permissionCapabilities(can, role).settingsTabs.includes(item.key));
   return <div className="w-full min-w-0 shrink-0 min-[761px]:w-[184px]">
     <div className="space-y-1 min-[761px]:hidden">
       <label htmlFor="settings-section" className="text-sm font-medium">Ayar bölümü</label>

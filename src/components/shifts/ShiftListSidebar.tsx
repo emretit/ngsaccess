@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import type { FunctionReturnType } from "convex/server";
 import { shiftTimeLabel } from "./lib/planning";
 type DefinitionImpact = FunctionReturnType<typeof api.shifts.definitionImpacts>[number];
@@ -37,6 +38,8 @@ export function ShiftListSidebar({
   shifts: Shift[];
   projectId: Id<"projects">;
 }) {
+  const { can } = usePermissions();
+  const canManage = can("schedule.manage");
   const create = useMutation(api.shifts.create);
   const update = useMutation(api.shifts.update);
   const [editing, setEditing] = useState<Shift | null>(null);
@@ -61,7 +64,7 @@ export function ShiftListSidebar({
               Ayarlar'da yönetilir.
             </SheetDescription>
           </SheetHeader>
-          <Button
+          {canManage && <Button
             className="my-4"
             onClick={() => {
               setEditing(null);
@@ -69,7 +72,7 @@ export function ShiftListSidebar({
             }}
           >
             Yeni vardiya tanımla
-          </Button>
+          </Button>}
           {!shifts.length ? (
             <EmptyState
               compact
@@ -99,7 +102,7 @@ export function ShiftListSidebar({
                         {shift.isActive === false ? "Pasif" : "Aktif"}
                       </StatusBadge>
                     </div>
-                    <RowActions label={`${shift.name} işlemleri`}>
+                    {canManage && <RowActions label={`${shift.name} işlemleri`}>
                       <DropdownMenuItem
                         onSelect={() => {
                           setEditing(shift);
@@ -114,7 +117,7 @@ export function ShiftListSidebar({
                       >
                         Silme etkisini incele
                       </DropdownMenuItem>
-                    </RowActions>
+                    </RowActions>}
                   </li>
                 ))}
             </ul>

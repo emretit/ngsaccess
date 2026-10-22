@@ -66,3 +66,5 @@ it("kirli formda güncel hali yükleme taslağı onaydan önce atmaz", () => {
   mocks.confirm?.();
   expect(mocks.reload).toHaveBeenCalledOnce();
 });
+
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, role: "hr", loading: false }) }));

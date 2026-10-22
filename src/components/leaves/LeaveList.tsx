@@ -10,12 +10,12 @@ import {
 
 export function LeaveList({
   rows,
-  isAdmin,
+  canManage,
   onDetails,
   onEdit,
 }: {
   rows: LeaveRow[];
-  isAdmin: boolean;
+  canManage: boolean;
   onDetails: (row: LeaveRow) => void;
   onEdit: (row: LeaveRow) => void;
 }) {
@@ -29,7 +29,7 @@ export function LeaveList({
       <DropdownMenuItem onSelect={() => onDetails(row)}>
         Ayrıntılar
       </DropdownMenuItem>
-      {isAdmin && row.status === "approved" && !row.employeeMissing && (
+      {canManage && row.status === "approved" && !row.employeeMissing && (
         <DropdownMenuItem onSelect={() => onEdit(row)}>
           Düzenle
         </DropdownMenuItem>

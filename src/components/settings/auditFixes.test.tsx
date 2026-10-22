@@ -103,3 +103,7 @@ describe("13 ayarlar audit düzeltmeleri", () => {
     expect(overtimeHints.nightShiftMultiplier).toContain("fazla mesai");
   });
 });
+
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ role: state.role === "super_admin" ? "super_admin" : state.role === "project_admin" ? "admin" : "viewer", can: (permission: string) => state.role !== "project_user" || permission === "reports.view", loading: false }) }));
+
+vi.mock("./sections/reports/ReportReminderSettings", async original => ({ ...await original<typeof import("./sections/reports/ReportReminderSettings")>(), ReportReminderSettings: () => null }));

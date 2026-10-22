@@ -1,3 +1,4 @@
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => state.admin, loading: false }) }));
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -35,7 +36,7 @@ vi.mock("convex/react", () => ({
   useQuery: state.subscribe,
 }));
 vi.mock("@/contexts/ActiveProjectContext", () => ({
-  useActiveProject: () => ({ isAdmin: state.admin, projectId: "project" }),
+  useActiveProject: () => ({ canManage: state.admin, projectId: "project" }),
 }));
 vi.mock("react-router-dom", () => ({
   useSearchParams: () => [new URLSearchParams(state.params), vi.fn()],
@@ -189,7 +190,7 @@ describe("yetki durumu SSR", () => {
         selected={[]}
         onToggle={() => undefined}
         onEmployee={() => undefined}
-        isAdmin
+        canManage
       />,
     );
     for (const title of [
@@ -215,7 +216,7 @@ describe("yetki durumu SSR", () => {
           selected={[]}
           onToggle={() => undefined}
           onEmployee={() => undefined}
-          isAdmin={false}
+          canManage={false}
         />,
       ),
     ).not.toContain('role="checkbox"');

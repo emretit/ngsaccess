@@ -1,6 +1,5 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { ClearAssignmentsDialog } from '../ClearAssignmentsDialog';
-import { useAuth } from '@/components/auth/AuthProvider';
-import { capabilities } from '@/lib/capabilities';
 import { shiftExportRows } from '@/lib/shiftExport';
 import { csvExport, downloadExport, exportFilenamePart, xlsxExport } from '@/lib/spreadsheetExport';
 import { notify } from '@/lib/notify';
@@ -57,8 +56,8 @@ export function ShiftCalendarPlan({
   shifts: Shift[];
   openDefinitions: () => void;
 }) {
-  const { profile } = useAuth();
-  const canManage = capabilities(profile?.role).admin;
+  const { can } = usePermissions();
+  const canManage = can("schedule.manage");
   const [clearOpen, setClearOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const compact = useCompact();
@@ -83,7 +82,7 @@ export function ShiftCalendarPlan({
   const { range, filtered, pageCount, currentPage, visible, assignments, leaves, holidays } =
     useShiftCalendarData({ projectId, employees, day, effectivePeriod, search, shiftFilter, page });
   const exportPlan = async (format: 'xlsx' | 'csv') => {
-    if (!assignments || exporting) return;
+    if (!can("reports.view") || !assignments || exporting) return;
     setExporting(true);
     try {
       const rows = shiftExportRows(visible, range.days, assignments, shifts);
@@ -124,9 +123,9 @@ export function ShiftCalendarPlan({
         onAssign={() => setAssign(assignmentInitial(day))} openDefinitions={openDefinitions} />
       <div className="flex flex-wrap gap-2">
         {canManage && <Button variant="outline" onClick={() => setClearOpen(true)}>Toplu temizle</Button>}
-        <Button variant="outline" disabled={loading || exporting} onClick={() => exportPlan('xlsx')}>Excel'e aktar</Button>
-        <Button variant="outline" disabled={loading || exporting} onClick={() => exportPlan('csv')}>CSV'ye aktar</Button>
-        <span className="self-center text-xs text-muted-foreground">Dışa aktarım: görünen sayfa ve dönem</span>
+        {can("reports.view") && <Button variant="outline" disabled={loading || exporting} onClick={() => exportPlan('xlsx')}>Excel'e aktar</Button>}
+        {can("reports.view") && <Button variant="outline" disabled={loading || exporting} onClick={() => exportPlan('csv')}>CSV'ye aktar</Button>}
+        {can("reports.view") && <span className="self-center text-xs text-muted-foreground">Dışa aktarım: görünen sayfa ve dönem</span>}
       </div>
       {clearOpen && <ClearAssignmentsDialog projectId={projectId} employees={employees} initialIds={[...selected]} start={range.rangeStart} end={range.rangeEnd} onClose={() => { setClearOpen(false); clearSelection(); }} />}
       <StatInline
@@ -162,7 +161,7 @@ export function ShiftCalendarPlan({
       </div>
       <CalendarNavigation day={day} effectivePeriod={effectivePeriod} period={period} compact={compact}
         range={range} changeDay={changeDay} setPeriod={setPeriod} clearSelection={clearSelection} />
-      <BulkBar count={selected.size} onClear={clearSelection}>
+      {canManage && <BulkBar count={selected.size} onClear={clearSelection}>
         <Button
           disabled={loading || !active.length}
           onClick={() =>
@@ -171,7 +170,7 @@ export function ShiftCalendarPlan({
         >
           Seçilenlere ata
         </Button>
-      </BulkBar>
+      </BulkBar>}
       {!active.length && (
         <EmptyState
           title={

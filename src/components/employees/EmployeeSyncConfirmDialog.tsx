@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
@@ -17,6 +18,7 @@ export function syncTargetCount(employees: Employee[], rules: Rules, devices: De
 }
 export function EmployeeSyncConfirmDialog({ employees, onClose, onConfirm }: { employees: Employee[]; onClose: () => void; onConfirm: () => void }) {
   const { projectId } = useActiveProjectScope();
+  const { can } = usePermissions();
   const rules = useQuery(api.accessRules.listMemberships, projectId ? { projectId } : "skip");
   const devices = useQuery(api.devices.list, projectId ? { projectId } : "skip");
   const inactiveCount = employees.filter(employee => employee.isActive === false).length;
@@ -31,7 +33,7 @@ export function EmployeeSyncConfirmDialog({ employees, onClose, onConfirm }: { e
       <p className="break-words text-sm">{employees.map(employee => `${employee.firstName} ${employee.lastName}`).join(", ")}</p>
       <AlertDialogFooter>
         <AlertDialogCancel>Vazgeç</AlertDialogCancel>
-        <AlertDialogAction disabled={count === undefined || count === 0} onClick={onConfirm}>{inactiveCount ? "Cihaz kayıtlarını güncelle" : "Cihazlara gönder"}</AlertDialogAction>
+        <AlertDialogAction disabled={!can("employees.manage") || count === undefined || count === 0} onClick={onConfirm}>{inactiveCount ? "Cihaz kayıtlarını güncelle" : "Cihazlara gönder"}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>;

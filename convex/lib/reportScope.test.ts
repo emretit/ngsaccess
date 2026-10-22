@@ -23,7 +23,7 @@ describe("rapor proje kapsamı ve dönem", () => {
     expect(selectScheduleProjectIds(user, [a, b], a)).toEqual([a]);
     expect(selectScheduleProjectIds(user, [a, b])).toEqual([a, b]);
     expect(selectScheduleProjectIds(user, [a], b)).toBeNull();
-    expect(selectScheduleProjectIds({ ...user, role: "project_user" }, [a], a)).toBeNull();
+    expect(selectScheduleProjectIds({ ...user, role: "project_user" }, [a], a)).toEqual([a]);
     expect(selectScheduleProjectIds({ ...user, verified: false }, [a], a)).toBeNull();
     expect(selectScheduleProjectIds(null, [a], a)).toBeNull();
     expect(selectScheduleProjectIds(user, [])).toBeNull();
@@ -41,8 +41,7 @@ describe("rapor proje kapsamı ve dönem", () => {
 vi.mock("./customFunctions", () => {
   const passThrough = (config: unknown) => config;
   return {
-  authedQuery: passThrough, authedMutation: passThrough, optionalAuthQuery: passThrough, adminQuery: passThrough,
-  adminMutation: passThrough, superAdminQuery: passThrough, superAdminMutation: passThrough, authedAction: passThrough,
+  authedQuery: passThrough, authedMutation: passThrough, optionalAuthQuery: passThrough, superAdminQuery: passThrough, superAdminMutation: passThrough, authedAction: passThrough,
   employeeAuthedQuery: passThrough, employeeAuthedMutation: passThrough,
   };
 });

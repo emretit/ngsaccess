@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { adminQuery, superAdminMutation } from "./lib/customFunctions";
+import { superAdminQuery, superAdminMutation } from "./lib/customFunctions";
 
 /**
  * IDE Smart panelleri için sistem geneli ortak MQTT kimliği (singleton).
@@ -13,7 +13,7 @@ import { adminQuery, superAdminMutation } from "./lib/customFunctions";
 const FALLBACK = { ideUser: "admin", idePassword: "admin12345", ideDoorCount: 4 } as const;
 
 /** Ortak varsayılanı döner; kayıt yoksa fallback (createIdePanel'deki eski default'larla aynı). */
-export const get = adminQuery({
+export const get = superAdminQuery({
   args: {},
   returns: v.object({
     ideUser: v.string(),

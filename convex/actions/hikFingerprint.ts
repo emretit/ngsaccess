@@ -6,7 +6,6 @@ import { api, internal } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import { assertTemplateKey, encryptTemplate, decryptTemplate } from "../lib/fingerprintCrypto";
 import { authedAction } from "../lib/customFunctions";
-import { isManager } from "../lib/auth";
 import { captureFingerprintLive, addFingerprintToDevice, deleteFingerprintFromDevice } from "../lib/gateway/biometrics";
 
 /** Okuyucu durum kodları (biometrics.ts `fpRecvStatusN`); ham cihaz yanıtı kullanıcıya gitmez. */
@@ -32,7 +31,6 @@ export const enrollFingerprintOnDevice = authedAction({
   args: { employeeId: v.id("employees"), deviceId: v.id("devices"), fingerNo: v.number(), attemptId: v.optional(v.string()) },
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
-    if (!isManager(ctx.user)) throw new ConvexError("Bu işlem için yönetici yetkisi gerekiyor.");
     if (!Number.isInteger(args.fingerNo) || args.fingerNo < 1 || args.fingerNo > 10) throw new ConvexError("Parmak numarası 1–10 arasında tam sayı olmalıdır.");
     const target: { employee: Doc<"employees">; device: Doc<"devices"> } = await ctx.runQuery(internal.fingerprintEnrollment.getTargetInternal, { employeeId: args.employeeId, deviceId: args.deviceId, userId: ctx.user._id });
     await ctx.runQuery(internal.privacyBiometric.assertBiometricDeviceAllowed, { deviceId: args.deviceId });
@@ -88,7 +86,6 @@ export const removeFingerprintFromDevice = authedAction({
   args: { enrollmentId: v.id("deviceFingerprintEnrollments") },
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
-    if (!isManager(ctx.user)) throw new ConvexError("Bu işlem için yönetici yetkisi gerekiyor.");
     const row: Doc<"deviceFingerprintEnrollments"> | null = await ctx.runQuery(internal.fingerprintEnrollment.getInternal, args);
     if (!row) throw new ConvexError("Parmak izi kaydı bulunamadı.");
     if ((row.pendingUntil ?? 0) > Date.now()) throw new ConvexError("Önce devam eden parmak izi işlemini iptal edin ve bitmesini bekleyin.");
@@ -208,7 +205,6 @@ export const resendFingerprint = authedAction({
   args: { employeeId: v.id("employees"), fingerNo: v.number() },
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
-    if (!isManager(ctx.user)) throw new ConvexError("Bu işlem için yönetici yetkisi gerekiyor.");
     if (!Number.isInteger(args.fingerNo) || args.fingerNo < 1 || args.fingerNo > 10) throw new ConvexError("Parmak numarası 1–10 arasında tam sayı olmalıdır.");
     await ctx.runQuery(internal.fingerprintEnrollment.authorizeEmployee, { employeeId: args.employeeId, userId: ctx.user._id });
     await ctx.runMutation(api.fingerprintEnrollment.auditResend, args);
@@ -221,7 +217,6 @@ export const removeFingerprint = authedAction({
   args: { employeeId: v.id("employees"), fingerNo: v.number() },
   returns: v.null(),
   handler: async (ctx, args): Promise<null> => {
-    if (!isManager(ctx.user)) throw new ConvexError("Bu işlem için yönetici yetkisi gerekiyor.");
     await ctx.runMutation(api.fingerprintEnrollment.removeFingerprint, args);
     return null;
   },

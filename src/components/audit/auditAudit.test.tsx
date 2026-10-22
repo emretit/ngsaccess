@@ -14,6 +14,7 @@ import { timestampFormat, type AuditRow } from './auditState';
 import type { useAuditUrlState } from './useAuditUrlState';
 
 vi.mock('@/components/auth/AuthProvider', () => ({ useAuth: () => ({ profile: { role: 'super_admin' } }) }));
+vi.mock('@/hooks/usePermissions', () => ({ usePermissions: () => ({ role: 'super_admin', can: () => true, loading: false }) }));
 vi.mock('@/hooks/useActiveProjectScope', () => ({ useActiveProjectScope: () => ({ projectId: 'p', activeProject: { name: 'Proje' }, loading: false }) }));
 vi.mock('convex/react', () => ({ useQuery: () => ({ actors: [{ userId: 'author', label: 'author@example.com', status: 'active' }], includesSystem: false }) }));
 vi.mock('@/components/ui/select', () => {

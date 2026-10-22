@@ -11,6 +11,8 @@ import AuditLog from '@/pages/AuditLog';
 const mocks = vi.hoisted(() => ({ query: vi.fn(), paginated: vi.fn() }));
 vi.mock('@/components/auth/AuthProvider', () => ({ useAuth: () => ({ profile: { role: 'project_user' } }) }));
 vi.mock('convex/react', () => ({ useQuery: mocks.query, usePaginatedQuery: mocks.paginated }));
+// project_user = viewer: admin.manage yok → denetim sorgusu açılmaz.
+vi.mock('@/hooks/usePermissions', () => ({ usePermissions: () => ({ role: 'viewer', can: () => false, loading: false }) }));
 
 const project = 'project-a' as Id<'projects'>;
 describe('audit filter and display contracts', () => {

@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { shortDate, shiftTimeLabel } from "./lib/planning";
 import {
   Dialog,
@@ -32,6 +33,7 @@ export function ShiftDayDetails({
   onAssign: () => void;
   canAssign: boolean;
 }) {
+  const { can } = usePermissions();
   return (
     <Dialog
       open
@@ -74,15 +76,15 @@ export function ShiftDayDetails({
                     .join(", ")
                 : "Her gün"}
             </p>
-            <Button variant="outline" onClick={() => onEdit(assignment)}>
+            {can("schedule.manage") && <Button variant="outline" onClick={() => onEdit(assignment)}>
               Tüm seriyi düzenle
-            </Button>
+            </Button>}
           </div>
         ))}
         {!canAssign && <p id="day-assign-help" className="text-sm text-muted-foreground">Önce vardiya tanımlayın veya bir tanımı etkinleştirin.</p>}
-        <Button aria-describedby={!canAssign ? "day-assign-help" : undefined} disabled={!canAssign} onClick={onAssign}>
+        {can("schedule.manage") && <Button aria-describedby={!canAssign ? "day-assign-help" : undefined} disabled={!canAssign} onClick={onAssign}>
           Bu tarihe vardiya ata
-        </Button>
+        </Button>}
       </DialogContent>
     </Dialog>
   );

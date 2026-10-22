@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useMemo, useState } from "react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -73,6 +74,8 @@ export function LocationTree({
   canManage = false,
 }: LocationTreeProps) {
   const { projectId, loading: projectLoading } = useActiveProjectScope();
+  const { can } = usePermissions();
+  const canOpenDoor = can("doors.open");
   const queryArgs = !projectLoading && projectId ? { projectId } : "skip";
   const zonesData = useQuery(api.zones.list, queryArgs);
   const doorsData = useQuery(api.doors.list, queryArgs);
@@ -286,7 +289,9 @@ export function LocationTree({
                           readers={readerStatus === undefined ? undefined : readersOf(door)}
                           canAddReader={readerStatus !== undefined && canAddReader(door)}
                           fetchingReaderId={fetchingReaderId}
-                          onAction={canManage ? handleDoorAction : undefined}
+                          canManage={canManage}
+                          canOpenDoor={canOpenDoor}
+                          onAction={canManage || canOpenDoor ? handleDoorAction : undefined}
                         />
                       ))}
                     </ul>
@@ -298,6 +303,22 @@ export function LocationTree({
         )}
       </TreePanel>
 
+      {canOpenDoor && (
+          <AlertDialog open={openDoorTarget !== null} onOpenChange={(open) => { if (!open && !opening) setDialog(null); }}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Kapı komutu gönderilsin mi?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {openDoorDevice ? deviceDisplayName(openDoorDevice) : "Cihaz"} cihazındaki {openDoorTarget?.name} kapısına açma komutu gönderilecek. Fiziksel açılış ayrıca doğrulanmalıdır.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={opening}>Vazgeç</AlertDialogCancel>
+                <Button disabled={opening} onClick={() => void sendOpen()}>{opening ? "Gönderiliyor…" : "Komutu gönder"}</Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+      )}
       {canManage && (
         <>
           <AddZoneDialog open={addZoneOpen} onOpenChange={setAddZoneOpen} onSuccess={() => setAddZoneOpen(false)} />
@@ -339,20 +360,7 @@ export function LocationTree({
               targetDoors={moveTargets(dialog.door)}
             />
           )}
-          <AlertDialog open={openDoorTarget !== null} onOpenChange={(open) => { if (!open && !opening) setDialog(null); }}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Kapı komutu gönderilsin mi?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {openDoorDevice ? deviceDisplayName(openDoorDevice) : "Cihaz"} cihazındaki {openDoorTarget?.name} kapısına açma komutu gönderilecek. Fiziksel açılış ayrıca doğrulanmalıdır.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={opening}>Vazgeç</AlertDialogCancel>
-                <Button disabled={opening} onClick={() => void sendOpen()}>{opening ? "Gönderiliyor…" : "Komutu gönder"}</Button>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+
           <ConfirmDestructive
             open={deleteZone !== null}
             onOpenChange={closeDialog}

@@ -1,3 +1,4 @@
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: (permission: string) => mocks.permissions ? mocks.permissions.includes(permission) : mocks.role === "project_admin" || mocks.role === "super_admin", loading: false }) }));
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -9,6 +10,7 @@ import type { ConfirmDestructiveProps } from "@/components/shared/ConfirmDestruc
 import { EmployeeConsentsCard } from "./EmployeeConsentsCard";
 
 const mocks = vi.hoisted(() => ({
+  permissions: null as string[] | null,
   role: "project_admin" as string | undefined,
   enabled: false, consents: [] as { _id: string; consentType: string; grantedAt: string; documentStorageId?: string; revokedAt?: string }[],
   states: [] as unknown[], cursor: 0, buttons: [] as { onClick?: () => unknown; disabled?: boolean; "aria-label"?: string; children?: unknown }[],
@@ -48,6 +50,7 @@ function render() {
   return renderToStaticMarkup(<MemoryRouter><EmployeeConsentsCard employeeId={employeeId} /></MemoryRouter>);
 }
 beforeEach(() => {
+  mocks.permissions = null;
   vi.clearAllMocks(); mocks.enrollments = []; mocks.role = "project_admin"; mocks.enabled = false; mocks.consents = []; mocks.states = []; mocks.confirm = null; mocks.document.pending = false; mocks.document.error = undefined; mocks.document.storageId = undefined;
 });
 
@@ -210,4 +213,17 @@ it.each([0, 2])("parmak izi iptalinde bilinen %s kayıt sayısını gösterir", 
   await mocks.buttons.find(button => button["aria-label"] === "Parmak izi rızasını iptal et")?.onClick?.();
   render();
   expect(mocks.confirm?.effects).toEqual([count > 0 ? `Cihazlardaki ${count} parmak izi kaydı da silinir.` : "Cihazlardaki parmak izi kayıtları da silinir."]);
+});
+
+it.each([
+  [["employees.manage"], true, false],
+  [["biometrics.manage"], false, true],
+  [[], false, false],
+] as const)("rıza türü kendi yetkisini kullanır: %j", (permissions, photo, biometric) => {
+  mocks.permissions = [...permissions];
+  mocks.enabled = true;
+  const html = render();
+  expect(html.includes('aria-label="Fotoğraf rızası al"')).toBe(photo);
+  expect(html.includes('aria-label="Yüz tanıma rızası al"')).toBe(biometric);
+  expect(html.includes('aria-label="Parmak izi rızası al"')).toBe(biometric);
 });

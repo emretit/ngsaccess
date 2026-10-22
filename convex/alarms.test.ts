@@ -12,9 +12,12 @@ vi.mock("./lib/customFunctions", () => {
     if (admin && ctx.user.role === "project_user") throw new Error("Bu işlem için yetkiniz yok");
     return (definition.handler as (ctx: unknown, args: unknown) => unknown)(ctx, args);
   } });
-  return { authedQuery: register(false), adminQuery: register(true), adminMutation: register(true) };
+  return { authedQuery: register(false), authedMutation: register(false), };
 });
 vi.mock("./lib/auth", () => ({ getProjectIdsForUser: async () => mocks.projects, isProjectAllowed: (projects: string[], id: string | undefined) => Boolean(id && projects.includes(id)) }));
+vi.mock("./lib/permissions", () => ({ requirePermission: async (_ctx: unknown, user: { role: string }, projectId: string) => {
+  if (user.role === "project_user" || !mocks.projects.includes(projectId)) throw new Error("Bu işlem için yetkiniz yok");
+} }));
 vi.mock("./lib/audit", () => ({ writeAudit: mocks.audit }));
 vi.mock("convex-helpers/server/stream", () => ({
   stream: () => ({

@@ -1,6 +1,7 @@
+import { requirePermission, hasPermission } from "./lib/permissions";
 import { assertBiometricAllowed } from "./lib/biometricGate";
 import { ConvexError, v } from "convex/values";
-import { authedQuery, adminMutation, adminQuery } from "./lib/customFunctions";
+import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { writeAudit } from "./lib/audit";
 import { requireEmployeeAccess } from "./lib/auth";
 
@@ -18,15 +19,17 @@ type ConsentType = (typeof CONSENT_TYPES)[number];
 export const listForEmployee = authedQuery({
   args: { employeeId: v.id("employees") },
   handler: async (ctx, args) => {
-    await requireEmployeeAccess(ctx, args.employeeId);
-    return await ctx.db
+    const employee = await requireEmployeeAccess(ctx, args.employeeId);
+    const rows = await ctx.db
       .query("employeeConsents")
       .withIndex("by_employee", (q) => q.eq("employeeId", args.employeeId))
       .collect();
+    const visible = await Promise.all(rows.map(async row => await hasPermission(ctx, ctx.user, employee.projectId, row.consentType.startsWith("biometric_") ? "biometrics.manage" : "employees.manage") ? row : null));
+    return visible.filter((row): row is NonNullable<typeof row> => row !== null);
   },
 });
 
-export const grant = adminMutation({
+export const grant = authedMutation({
   args: {
     employeeId: v.id("employees"),
     consentType: v.union(
@@ -40,6 +43,7 @@ export const grant = adminMutation({
   },
   handler: async (ctx, args) => {
     const employee = await requireEmployeeAccess(ctx, args.employeeId);
+    await requirePermission(ctx, ctx.user, employee.projectId, args.consentType === "photo" ? "employees.manage" : "biometrics.manage");
     if (args.consentType === "biometric_face" || args.consentType === "biometric_fingerprint") {
       await assertBiometricAllowed(ctx, employee.projectId);
     }
@@ -106,12 +110,13 @@ export const grant = adminMutation({
   },
 });
 
-export const revoke = adminMutation({
+export const revoke = authedMutation({
   args: { id: v.id("employeeConsents") },
   handler: async (ctx, args) => {
     const existing = await ctx.db.get(args.id);
     if (!existing) return;
     const employee = await requireEmployeeAccess(ctx, existing.employeeId);
+    await requirePermission(ctx, ctx.user, employee.projectId, existing.consentType.startsWith("biometric_") ? "biometrics.manage" : "employees.manage");
     if (existing.revokedAt) return;
     const now = new Date().toISOString();
     await ctx.db.patch(args.id, { revokedAt: now });
@@ -137,13 +142,14 @@ export const revoke = adminMutation({
 export { CONSENT_TYPES };
 export type { ConsentType };
 
-export const getDocumentUrl = adminQuery({
+export const getDocumentUrl = authedQuery({
   args: { id: v.id("employeeConsents") },
   returns: v.union(v.string(), v.null()),
   handler: async (ctx, args) => {
     const consent = await ctx.db.get(args.id);
     if (!consent) return null;
-    await requireEmployeeAccess(ctx, consent.employeeId);
+    const employee = await requireEmployeeAccess(ctx, consent.employeeId);
+    await requirePermission(ctx, ctx.user, employee.projectId, consent.consentType.startsWith("biometric_") ? "biometrics.manage" : "employees.manage");
     return consent.documentStorageId ? await ctx.storage.getUrl(consent.documentStorageId) : null;
   },
 });

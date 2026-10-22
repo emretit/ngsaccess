@@ -68,7 +68,7 @@ describe("proje kurulumu", () => {
   it("allows the project administrator but rejects another project's administrator", async () => {
     const f = await fixture("project_admin");
     expect((await f.caller.query(api.projects.getSetupStatus, { projectId: f.projectId })).steps[0].done).toBe(true);
-    await expect(f.caller.query(api.projects.getSetupStatus, { projectId: f.otherProjectId })).rejects.toThrow("erişim");
+    await expect(f.caller.query(api.projects.getSetupStatus, { projectId: f.otherProjectId })).rejects.toThrow("Bu işlem için yetkiniz yok");
   });
   it("rejects project_user", async () => {
     const f = await fixture("project_user");

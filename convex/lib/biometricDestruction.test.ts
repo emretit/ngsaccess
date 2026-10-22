@@ -43,12 +43,12 @@ import type { Id } from "../_generated/dataModel";
 const mocks = vi.hoisted(() => ({ allowed: ["p"], audit: vi.fn() }));
 vi.mock("./auth", () => ({ getProjectIdsForUser: async () => mocks.allowed }));
 vi.mock("./audit", () => ({ writeAudit: mocks.audit }));
-vi.mock("./customFunctions", () => ({ adminQuery: (value: unknown) => value, adminMutation: (value: unknown) => value }));
+vi.mock("./customFunctions", () => ({ authedQuery: (value: unknown) => value, authedMutation: (value: unknown) => value }));
 vi.mock("../_generated/server", () => ({ internalQuery: (value: unknown) => value, internalMutation: (value: unknown) => value }));
 
 function createCtx() {
   const documents = new Map<string, unknown>([["p", { _id: "p", name: "Merkez" }]]);
-  const tables = new Map<string, unknown[]>();
+  const tables = new Map<string, unknown[]>([["userProjects", [{ userId: "u", projectId: "p", role: "admin" }]]]);
   const ctx = {
     user: { _id: "u", role: "project_admin" },
     db: {
@@ -300,7 +300,7 @@ describe("projesiz eski şablonlar", () => {
     // Mock distinguishes index scopes to mirror the real indexed reads.
     data.ctx.db.query.mockImplementation((table: string) => {
       let index = "";
-      const rows = () => table === "employees" ? [{ _id: "employee" }] : index === "by_employee" && table === "employeeFaces" ? [{ employeeId: "employee", pictureStorageId: "file" }] : [];
+      const rows = () => table === "userProjects" ? [{ userId: "u", projectId: "p", role: "admin" }] : table === "employees" ? [{ _id: "employee" }] : index === "by_employee" && table === "employeeFaces" ? [{ employeeId: "employee", pictureStorageId: "file" }] : [];
       const query = { withIndex: (name?: string) => { index = name ?? ""; return query; }, order: () => query, take: async () => rows(), first: async () => null, paginate: async () => ({ page: rows(), continueCursor: "end", isDone: true }) };
       return query;
     });

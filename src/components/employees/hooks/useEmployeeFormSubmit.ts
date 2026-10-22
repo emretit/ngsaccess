@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { errorMessage } from "@/lib/notify";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useMutation, useAction } from "convex/react";
@@ -42,6 +43,7 @@ export const useEmployeeFormSubmit = (
   _onSave: (payload: EmployeeSaveResult) => void,
   onFieldError?: (key: string, message: string) => void,
 ) => {
+  const { can } = usePermissions();
   const [savedResult, setSavedResult] = useState<EmployeeSaveResult>();
   const [stages, setStages] = useState<string[]>([]);
   const [serverError, setServerError] = useState<string>();
@@ -88,8 +90,7 @@ export const useEmployeeFormSubmit = (
         photoStorageId: formData.photoStorageId,
         notes: formData.notes?.trim() ?? undefined,
         isActive: formData.isActive ?? true,
-        hourlyRate: formData.hourlyRate ?? undefined,
-        monthlySalary: formData.monthlySalary ?? undefined,
+        ...(can("pay.view") ? { hourlyRate: formData.hourlyRate ?? undefined, monthlySalary: formData.monthlySalary ?? undefined } : {}),
       };
 
       setServerError(undefined);
@@ -109,8 +110,7 @@ export const useEmployeeFormSubmit = (
             shift: formData.shift || null,
             photoUrl: formData.photoUrl,
             notes: formData.notes.trim() || null,
-            hourlyRate: parsed.data.hourlyRate ?? null,
-            monthlySalary: parsed.data.monthlySalary ?? null,
+            ...(can("pay.view") ? { hourlyRate: parsed.data.hourlyRate ?? null, monthlySalary: parsed.data.monthlySalary ?? null } : {}),
           }, formData, baseline));
         } else
           savedId = await createEmployee({

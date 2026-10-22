@@ -2,7 +2,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { loadPdksPolicies } from "./pdksRules";
 import { employedDuring, employedOn } from "./employment";
-import { canSeePay } from "./payVisibility";
+import { canSeePayInProject } from "./payVisibility";
 import { resolveProjectScope } from "./projectScope";
 import { getEffectiveWorkSettings, getEffectiveOvertimeRates, getHolidaysMap, resolveHourlyRate } from "./pdksHelpers";
 import { buildShiftResolver } from "./shiftResolver";
@@ -31,7 +31,6 @@ export async function getMonthlyPayrollSheet(
   },
 ) {
   const { scopedPdksShift, flexiblePreviousReadings } = helpers;
-  const payVisible = canSeePay(ctx.user);
   const allowedProjectIds = await resolveProjectScope(ctx, args.projectId);
 
   if (!Number.isInteger(args.year) || args.year < 1000 || args.year > 9999 || !Number.isInteger(args.month) || args.month < 1 || args.month > 12) {
@@ -157,6 +156,7 @@ export async function getMonthlyPayrollSheet(
 
   const rows = await Promise.all(
     employees.map(async (emp) => {
+      const payVisible = await canSeePayInProject(ctx, ctx.user, emp.projectId);
       const department = emp.departmentId
         ? deptById.get(String(emp.departmentId)) ?? null
         : null;

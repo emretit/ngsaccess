@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -26,8 +27,9 @@ import {
 } from "@/components/leaves/lib/leaveState";
 
 export default function Leaves() {
-  const { projectId, activeProject, loading, isAdmin } =
-    useActiveProjectScope();
+  const { projectId, activeProject, loading } = useActiveProjectScope();
+  const { can } = usePermissions();
+  const canManage = can("attendance.approve");
   if (loading)
     return (
       <div className="space-y-6">
@@ -50,18 +52,18 @@ export default function Leaves() {
       key={projectId}
       projectId={projectId}
       projectName={activeProject?.name ?? "Seçili proje"}
-      isAdmin={isAdmin}
+      canManage={canManage}
     />
   );
 }
 function LeavesProject({
   projectId,
   projectName,
-  isAdmin,
+  canManage,
 }: {
   projectId: Id<"projects">;
   projectName: string;
-  isAdmin: boolean;
+  canManage: boolean;
 }) {
   const [urlParams, setParams] = useSearchParams();
   const params = useMemo(
@@ -79,7 +81,7 @@ function LeavesProject({
   const [requests, setRequests] = useState(false);
   const count = useQuery(
     api.leaveRequests.pendingCount,
-    isAdmin ? { projectId, kind: "leaves" } : "skip",
+    canManage ? { projectId, kind: "leaves" } : "skip",
   );
   const [detail, setDetail] = useState<LeaveRow | null>(null);
   const [editor, setEditor] = useState<LeaveRow | "new" | null>(null);
@@ -87,7 +89,7 @@ function LeavesProject({
   const onRows = setRows;
   const onDetails = setDetail;
   const onEdit = (row: LeaveRow) => {
-    if (isAdmin && row.status === "approved" && !row.employeeMissing) {
+    if (canManage && row.status === "approved" && !row.employeeMissing) {
       setDetail(null);
       setEditor(row);
     }
@@ -128,12 +130,12 @@ function LeavesProject({
         title="İzinler"
         scope={`${projectName} · ${dateLabel(filters.rangeStart)} – ${dateLabel(filters.rangeEnd)}`}
         primaryAction={
-          isAdmin
+          canManage
             ? { label: "İzin ekle", onClick: () => setEditor("new") }
             : undefined
         }
       />
-      {isAdmin && (
+      {canManage && (
         <div role="group" aria-label="İzin görünümü" className="flex gap-2">
           <Button
             variant={!requests ? "secondary" : "ghost"}
@@ -155,7 +157,7 @@ function LeavesProject({
           </Button>
         </div>
       )}
-      {isAdmin && requests ? (
+      {canManage && requests ? (
         <LeaveQueryBoundary scope={`requests:${projectId}`}>
           <LeaveRequestsPanel key={projectId} projectId={projectId} />
         </LeaveQueryBoundary>
@@ -176,7 +178,7 @@ function LeavesProject({
               key={scope}
               filters={queryFilters}
               pageSize={filters.pageSize}
-              isAdmin={isAdmin}
+              canManage={canManage}
               onCreate={() => setEditor("new")}
               onClear={clear}
               onDetails={onDetails}
@@ -190,11 +192,11 @@ function LeavesProject({
       )}
       <LeaveDetails
         row={displayedDetail}
-        isAdmin={isAdmin}
+        canManage={canManage}
         onClose={() => setDetail(null)}
         onEdit={onEdit}
       />
-      {isAdmin && editor && (
+      {canManage && editor && (
         <LeaveForm
           key={editor === "new" ? "new" : editor._id}
           row={editor === "new" ? undefined : editor}

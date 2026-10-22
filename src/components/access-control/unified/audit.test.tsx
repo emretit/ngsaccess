@@ -1,3 +1,4 @@
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, loading: false }) }));
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { getFunctionName } from "convex/server";
@@ -18,7 +19,7 @@ vi.mock("convex/react", () => ({
   usePaginatedQuery: () => ({ results: [], status: "Exhausted", loadMore: vi.fn() }),
 }));
 vi.mock("react-router-dom", () => ({ useSearchParams: () => [new URLSearchParams({ tur: state.type }), vi.fn()] }));
-vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ projectId: "project", activeProject: { name: "Proje" }, isAdmin: true }) }));
+vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ projectId: "project", activeProject: { name: "Proje" }, canManage: true }) }));
 vi.mock("@/hooks/access-rules/useAccessRuleMutations", () => ({ useAccessRuleMutations: () => ({ updateAccessRule: {}, deleteAccessRule: {} }) }));
 vi.mock("@/components/sync/DeviceSyncStatusBanner", () => ({ DeviceSyncStatusBanner: () => null }));
 vi.mock("@/hooks/useDevices", () => ({ useDevices: () => ({ devices: [{ _id: "p", name: "Panel", brand: "hikvision" }] }) }));

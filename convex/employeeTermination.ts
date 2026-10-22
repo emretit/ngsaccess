@@ -1,21 +1,23 @@
+import { requirePermission } from "./lib/permissions";
 import { scheduleFingerprintPurge } from "./lib/employeeCardChange";
 import { ConvexError, v } from "convex/values";
 import { internalMutation, type MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { adminMutation } from "./lib/customFunctions";
+import { authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser } from "./lib/auth";
 import { resolveEmployeeIdeDeviceIds } from "./lib/accessGraph";
 import { writeAudit } from "./lib/audit";
 import { trTodayKey } from "./lib/trDate";
 
-async function accessibleEmployee(ctx: MutationCtx, employeeId: Id<"employees">) {
+async function accessibleEmployee(ctx: MutationCtx & { user: Doc<"users"> }, employeeId: Id<"employees">) {
   const employee = await ctx.db.get(employeeId);
   if (!employee) throw new ConvexError("Çalışan bulunamadı.");
   const projectIds = await getProjectIdsForUser(ctx);
   if (employee.projectId && !projectIds.includes(employee.projectId)) {
     throw new ConvexError("Bu çalışana erişim yetkiniz yok.");
   }
+  await requirePermission(ctx, ctx.user, employee.projectId, "employees.manage");
   if (employee.isVisitor) throw new ConvexError("Ziyaretçiler için işten ayrılma işlemi yapılamaz.");
   return employee;
 }
@@ -35,7 +37,7 @@ async function closeAccess(ctx: MutationCtx, employee: Doc<"employees">, now: st
   }
 }
 
-export const terminate = adminMutation({
+export const terminate = authedMutation({
   args: {
     employeeId: v.id("employees"), employmentEndDate: v.string(),
     terminationType: v.union(v.literal("resignation"), v.literal("employerTermination"), v.literal("retirement"), v.literal("contractEnd"), v.literal("other")),
@@ -74,7 +76,7 @@ export const terminate = adminMutation({
   },
 });
 
-export const reinstate = adminMutation({
+export const reinstate = authedMutation({
   args: { employeeId: v.id("employees") },
   returns: v.null(),
   handler: async (ctx, { employeeId }) => {

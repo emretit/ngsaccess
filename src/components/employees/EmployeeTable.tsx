@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { EmployeeSelectAll } from "./table/EmployeeSelectAll";
 import { EmployeeSortColumn } from "./table/EmployeeSortColumn";
 import { departmentPath } from "./lib/departmentPath";
@@ -43,7 +44,11 @@ export default function EmployeeTable({
   onRefresh,
   showDepartment = true,
 }: EmployeeTableProps) {
-  const { isAdmin, projectId } = useActiveProjectScope();
+  const { projectId } = useActiveProjectScope();
+  const { can } = usePermissions();
+  const canManage = can("employees.manage");
+  const canSelect = canManage || can("accessRules.manage");
+  const canSeeBiometrics = can("biometrics.manage");
   const [syncRequest, setSyncRequest] = useState<{
     employees: Employee[];
     retry?: boolean;
@@ -68,7 +73,7 @@ export default function EmployeeTable({
   );
   const biometricRows = useQuery(
     api.employeeBiometrics.summary,
-    isAdmin && projectId ? { projectId } : "skip",
+    can("biometrics.manage") && projectId ? { projectId } : "skip",
   );
   const biometricsByEmployee = useMemo(
     () => new Map((biometricRows ?? []).map((row) => [row.employeeId, row])),
@@ -229,12 +234,12 @@ export default function EmployeeTable({
   return (
     <div
       className={
-        isAdmin && selectedEmployees.length > 0
+        canSelect && selectedEmployees.length > 0
           ? "space-y-4 pb-[calc(40vh+2rem)]"
           : "space-y-4"
       }
     >
-      {isAdmin && selectedEmployees.length > 0 && (
+      {canSelect && selectedEmployees.length > 0 && (
         <EmployeeTableBulkSelection
           onClear={() => {
             if (!departmentPending && !isBulkSyncing && !syncAction.pending)
@@ -308,7 +313,7 @@ export default function EmployeeTable({
             <TableRow className="h-9 bg-muted/50">
               <EmployeeSelectAll
                 disabled={
-                  !isAdmin ||
+                  !canSelect ||
                   departmentPending ||
                   isBulkSyncing ||
                   syncAction.pending
@@ -326,7 +331,7 @@ export default function EmployeeTable({
                 )}
               {column("position", "Pozisyon", "hidden min-[1100px]:table-cell")}
               {column("card", "Kart no", "hidden min-[760px]:table-cell")}
-              {isAdmin && (
+              {canSeeBiometrics && (
                 <TableHead className="hidden w-[96px] min-[760px]:table-cell">
                   Biyometrik
                 </TableHead>
@@ -342,7 +347,7 @@ export default function EmployeeTable({
               <EmployeeTableRow
                 key={employee._id}
                 employee={employee}
-                isAdmin={isAdmin}
+                canManage={canManage}
                 departmentPending={departmentPending}
                 isBulkSyncing={isBulkSyncing}
                 syncPending={syncAction.pending}
@@ -352,7 +357,7 @@ export default function EmployeeTable({
                 onViewDetails={onViewDetails}
                 showDepartment={showDepartment}
                 biometrics={
-                  isAdmin
+                  canSeeBiometrics
                     ? (biometricsByEmployee.get(employee._id) ?? null)
                     : undefined
                 }
@@ -380,7 +385,7 @@ export default function EmployeeTable({
         handleSyncToDevice={handleSyncToDevice}
         handleBulkSyncToDevices={handleBulkSyncToDevices}
         cardAssignEmployees={cardAssignEmployees}
-        isAdmin={isAdmin}
+        canManage={canManage}
         projectId={projectId}
         setCardAssignEmployees={setCardAssignEmployees}
         showPasswordResetDialog={showPasswordResetDialog}

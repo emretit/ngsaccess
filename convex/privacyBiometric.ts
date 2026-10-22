@@ -1,8 +1,9 @@
+import { requirePermission } from "./lib/permissions";
 import { hasActiveDestructionRun } from "./lib/biometricDestructionState";
 import { ConvexError, v } from "convex/values";
 import type { QueryCtx, MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { adminQuery, adminMutation, authedQuery } from "./lib/customFunctions";
+import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, requireEmployeeAccess } from "./lib/auth";
 import { getPrivacyRow, getPrivacySettings, upsertPrivacySettings } from "./lib/privacySettings";
 import { internalQuery } from "./_generated/server";
@@ -15,9 +16,10 @@ async function requireProject(ctx: QueryCtx | MutationCtx, projectId: Id<"projec
   }
 }
 
-export const getBiometricModule = adminQuery({
+export const getBiometricModule = authedQuery({
   args: { projectId: v.id("projects") },
   handler: async (ctx, { projectId }) => {
+    await requirePermission(ctx, ctx.user, projectId, "admin.manage");
     await requireProject(ctx, projectId);
     const row = await getPrivacyRow(ctx, projectId);
     const settings = await getPrivacySettings(ctx, projectId);
@@ -27,10 +29,11 @@ export const getBiometricModule = adminQuery({
   },
 });
 
-export const setBiometricModule = adminMutation({
+export const setBiometricModule = authedMutation({
   args: { projectId: v.id("projects"), enabled: v.boolean(), reason: v.optional(v.string()) },
   returns: v.null(),
   handler: async (ctx, args) => {
+    await requirePermission(ctx, ctx.user, args.projectId, "admin.manage");
     await requireProject(ctx, args.projectId);
     const old = await getPrivacySettings(ctx, args.projectId);
     if (args.enabled && await hasActiveDestructionRun(ctx, args.projectId)) {

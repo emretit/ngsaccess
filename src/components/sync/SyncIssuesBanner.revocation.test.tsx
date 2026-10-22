@@ -1,3 +1,4 @@
+vi.mock("@/hooks/usePermissions", () => ({ usePermissions: () => ({ can: () => true, loading: false }) }));
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { getFunctionName } from "convex/server";
@@ -5,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SyncIssuesBanner } from "./SyncIssuesBanner";
 
 const mocks = vi.hoisted(() => ({
+  projectIds: ["project"], issueProjectId: "project", projectPermissions: [] as { projectId: string; permissions: string[] }[],
   canDismiss: false, focus: vi.fn(), cancel: undefined as (() => void) | undefined, isSuperAdmin: false, operation: "deletePerson", reason: "", mutation: vi.fn(), actions: [] as Array<() => Promise<void>>,
 }));
 vi.mock("react", async original => ({
@@ -19,17 +21,17 @@ vi.mock("@/components/ui/button", () => ({ Button: (props: import("react").Compo
 } }));
 vi.mock("convex/react", () => ({
   useMutation: () => mocks.mutation,
-  useQuery: (ref: Parameters<typeof getFunctionName>[0]) => ({ items: getFunctionName(ref).startsWith("hikvisionSync:") ? [{
-    _id: "issue", projectId: "project", deviceId: "device", deviceName: "Test cihazı", projectName: "Test projesi", operation: mocks.operation,
+  useQuery: (ref: Parameters<typeof getFunctionName>[0]) => getFunctionName(ref) === "roles:myPermissionsByProject" ? mocks.projectPermissions : ({ items: getFunctionName(ref).startsWith("hikvisionSync:") ? [{
+    _id: "issue", projectId: mocks.issueProjectId, deviceId: "device", deviceName: "Test cihazı", projectName: "Test projesi", operation: mocks.operation,
     attempts: 5, maxAttempts: 5, createdAt: 1, lastError: "Silme başarısız", canRetry: false, canDismiss: mocks.canDismiss,
   }] : [] }),
 }));
-vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "project", projectIds: ["project"], isAdmin: true, isSuperAdmin: mocks.isSuperAdmin, loading: false }) }));
+vi.mock("@/hooks/useActiveProjectScope", () => ({ useActiveProjectScope: () => ({ projectId: "project", projectIds: mocks.projectIds, isAdmin: true, isSuperAdmin: mocks.isSuperAdmin, loading: false }) }));
 vi.mock("@/contexts/ActiveProjectContext", () => ({ useActiveProject: () => ({ setActiveProjectId: vi.fn() }) }));
 vi.mock("@/hooks/useAsyncAction", () => ({ useAsyncAction: (action: () => Promise<void>) => { mocks.actions.push(action); return { run: action, pending: false }; } }));
 vi.mock("@/components/shared/ConfirmDestructive", () => ({ ConfirmDestructive: () => null }));
 const render = () => renderToStaticMarkup(<MemoryRouter><SyncIssuesBanner /></MemoryRouter>);
-beforeEach(() => { mocks.canDismiss = false; mocks.focus.mockClear(); mocks.cancel = undefined; mocks.isSuperAdmin = false; mocks.operation = "deletePerson"; mocks.reason = ""; mocks.mutation.mockReset(); mocks.actions = []; });
+beforeEach(() => { mocks.projectIds = ["project"]; mocks.issueProjectId = "project"; mocks.projectPermissions = []; mocks.canDismiss = false; mocks.focus.mockClear(); mocks.cancel = undefined; mocks.isSuperAdmin = false; mocks.operation = "deletePerson"; mocks.reason = ""; mocks.mutation.mockReset(); mocks.actions = []; });
 
 describe("silme uyarısını gerekçeyle kapatma", () => {
   it("hides deletion closure from project admins while leaving normal issue closure available", () => {
@@ -62,4 +64,16 @@ describe("silme uyarısını gerekçeyle kapatma", () => {
     await mocks.actions[0]?.();
     expect(mocks.mutation).toHaveBeenCalledWith({ issueId: "issue", reason: "Cihaz kaldırıldı" });
   });
+});
+
+it("tüm projelerde satırın kendi cihaz yönetim yetkisini kullanır", () => {
+  mocks.projectIds = ["project", "other"];
+  mocks.issueProjectId = "other";
+  mocks.operation = "addPerson";
+  mocks.projectPermissions = [{ projectId: "project", permissions: ["devices.manage"] }, { projectId: "other", permissions: [] }];
+  expect(render()).not.toContain('aria-label="Test cihazı uyarısını kapat"');
+  expect(render()).not.toContain("Hepsini kapat");
+  mocks.projectPermissions[1].permissions = ["devices.manage"];
+  expect(render()).toContain('aria-label="Test cihazı uyarısını kapat"');
+  expect(render()).toContain("Hepsini kapat");
 });

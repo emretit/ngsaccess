@@ -1,27 +1,27 @@
+import type { QueryCtx } from "../_generated/server";
+import { hasPermission, requirePermission } from "./permissions";
 import type { Doc, Id } from "../_generated/dataModel";
 
-export function canManageLeaves(role: Doc<"users">["role"]): boolean {
-  return role === "super_admin" || role === "project_admin";
+export async function canManageLeaves(ctx: QueryCtx, user: Doc<"users">, projectId: Id<"projects"> | undefined): Promise<boolean> {
+  return await hasPermission(ctx, user, projectId, "attendance.approve");
 }
 
-function requireLeaveAdmin(role: Doc<"users">["role"]): void {
-  if (!canManageLeaves(role)) throw new Error("Bu işlem için yetkiniz yok");
-}
-
-export function approvedLeaveFields(user: Pick<Doc<"users">, "_id" | "role">) {
-  requireLeaveAdmin(user.role);
+export async function approvedLeaveFields(ctx: QueryCtx, user: Doc<"users">, projectId: Id<"projects"> | undefined) {
+  await requirePermission(ctx, user, projectId, "attendance.approve");
   return { status: "approved" as const, approvedBy: user._id };
 }
 
-export function leaveDecisionPatch(
-  role: Doc<"users">["role"],
+export async function leaveDecisionPatch(
+  ctx: QueryCtx,
+  user: Doc<"users">,
+  projectId: Id<"projects"> | undefined,
   currentStatus: Doc<"leaves">["status"],
   status: "approved" | "rejected",
   approvedBy: Id<"users">,
   updatedAt: string,
   notes?: string,
 ) {
-  requireLeaveAdmin(role);
+  await requirePermission(ctx, user, projectId, "attendance.approve");
   if (currentStatus !== "pending") throw new Error("Bu izin zaten sonuçlandırılmış");
   return {
     status,

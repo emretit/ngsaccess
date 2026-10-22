@@ -7,10 +7,7 @@ vi.mock("./lib/customFunctions", () => ({
   authedQuery: (definition: { handler: unknown }) => ({
     _handler: definition.handler,
   }),
-  adminMutation: (definition: { handler: unknown }) => ({
-    _handler: definition.handler,
-  }),
-  adminQuery: (definition: { handler: unknown }) => ({
+  authedMutation: (definition: { handler: unknown }) => ({
     _handler: definition.handler,
   }),
   employeeAuthedMutation: (definition: { handler: unknown }) => ({
@@ -82,6 +79,7 @@ function fixture() {
         build(q);
         return chain;
       },
+      unique: async () => rows.find(row => row.table === table && filters.every(filter => filter(row))) ?? null,
       order: () => chain,
       take: async (count: number) =>
         rows
@@ -418,7 +416,7 @@ describe("leaveRequests yönetici kararları", () => {
       await f.insert(table, { projectId: f.projectId, status: "pending" });
     vi.mocked(f.ctx.db.query).mockClear();
     expect(await pendingCount(f.ctx, { projectId: f.projectId, kind })).toEqual({ count: 101, capped: true });
-    expect(vi.mocked(f.ctx.db.query).mock.calls.map(([table]) => table)).toEqual(["userProjects", table]);
+    expect(vi.mocked(f.ctx.db.query).mock.calls.map(([table]) => table)).toEqual(["userProjects", "userProjects", table]);
   });
   it("checks only the selected project for super admin counts", async () => {
     const f = fixture();

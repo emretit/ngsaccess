@@ -8,7 +8,7 @@ import { writeAudit } from "./lib/audit";
 /**
  * Yeni kayıt olan kullanıcı için otomatik proje oluşturur.
  * - Kullanıcının hiç projesi yoksa yeni proje oluşturulur
- * - Kullanıcıya project_admin rolü atanır
+ * - İlk üyeliğe admin rolü atanır
  * - userProjects tablosuna kayıt eklenir
  *
  * Sadece doğrudan kayıt (Register sayfası) sonrası çağrılmalı.
@@ -57,15 +57,10 @@ export const ensureProjectForNewUser = authedMutation({
     await writeAudit(ctx, { user, projectId, action: "create", targetTable: "projectPrivacySettings",
       targetId: projectId, newValue: { biometricEnabled: false } });
 
-    // 2. Kullanıcıya project_admin rolü ata
-    await ctx.db.patch(user._id, {
-      role: "project_admin",
-      updatedAt: now,
-    });
-
     // 3. Kullanıcıyı projeye ekle
     await ctx.db.insert("userProjects", {
       userId: user._id,
+      role: "admin",
       projectId,
       createdAt: now,
     });
@@ -147,13 +142,9 @@ export const assignProjectsToExistingUsers = mutation({
         await writeAudit(ctx, { user: null, projectId, action: "create", targetTable: "projectPrivacySettings",
           targetId: projectId, newValue: { biometricEnabled: false } });
 
-        await ctx.db.patch(user._id, {
-          role: "project_admin",
-          updatedAt: now,
-        });
-
         await ctx.db.insert("userProjects", {
           userId: user._id,
+          role: "admin",
           projectId,
           createdAt: now,
         });

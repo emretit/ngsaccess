@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AccountAccessActions, AccountAccessBadges, AccountAccessDialog } from "./AccountAccessActions";
-import { capabilities } from "@/lib/capabilities";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { roleLabel } from "@/lib/roleLabels";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -27,7 +27,8 @@ export function UserTable({
 }) {
   const [accessDialog, setAccessDialog] = useState<{ user: User; mode: "freeze" | "expiry" } | null>(null);
   const { profile } = useAuth();
-  const canManage = capabilities(profile?.role).manageUsers;
+  const canManage = profile?.role === "super_admin";
+  const { can } = usePermissions();
   const membership = (user: User) =>
     user.role === "super_admin"
       ? "Tüm projeler (etkili erişim)"
@@ -41,7 +42,7 @@ export function UserTable({
     </StatusBadge>
   );
   const actions = (user: User) =>
-    capabilities(profile?.role).admin && (
+    (canManage || can("admin.manage")) && (
       <RowActions label={`${userName(user)} kullanıcı işlemleri`}>
         <AccountAccessActions user={user} onSelectMode={mode => setAccessDialog({ user, mode })} />
         {canManage && <DropdownMenuItem onSelect={() => onEditUser(user)}>

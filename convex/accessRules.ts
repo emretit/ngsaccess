@@ -1,3 +1,4 @@
+import { requirePermission } from "./lib/permissions";
 import { listAccessRules, listAccessRuleMemberships } from "./lib/accessRuleRead";
 import { createAccessRuleWithGroups } from "./lib/accessRuleWrite";
 import { planRemovedEmployeeHik, reconcileRemovedEmployeeHik, snapshotRuleHikEmployees, resolveRuleDeviceTargets, hikSnapshotValidator, type HikSnapshot } from "./lib/peopleHikSnapshot";
@@ -13,7 +14,7 @@ import { createRuleDiffRun } from "./deviceSyncRuns";
 import { internal } from "./_generated/api";
 import { ConvexError, v, type Infer } from "convex/values";
 import { retainedDiffDoorIds, applyRelationDiff, assertLegacyRuleReplacement, ruleDiffSyncPlan, RULE_DETAILS_MEMBER_LIMIT, RULE_DETAILS_RELATION_LIMIT } from "./lib/accessRuleDiff";
-import { authedQuery, adminMutation } from "./lib/customFunctions";
+import { authedQuery, authedMutation } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed, canAccessEmployeeProject } from "./lib/auth";
 import {
   resolveRuleIdeDeviceIds,
@@ -673,7 +674,7 @@ export const listRuleMembers = authedQuery({
   },
 });
 
-export const create = adminMutation({
+export const create = authedMutation({
   args: {
     scheduleTemplateId: v.optional(v.union(v.id("accessScheduleTemplates"), v.null())),
     name: v.string(),
@@ -690,6 +691,7 @@ export const create = adminMutation({
     templateName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    await requirePermission(ctx, ctx.user, args.projectId, "accessRules.manage");
     await resolveProjectScope(ctx, args.projectId);
     if (!args.projectId) throw new Error("Önce bir proje seçin");
     await validateScheduleBinding(ctx, args.projectId, args.scheduleTemplateId);
@@ -708,7 +710,7 @@ export const create = adminMutation({
   },
 });
 
-export const update = adminMutation({
+export const update = authedMutation({
   args: {
     ruleId: v.id("accessRules"),
     scheduleTemplateId: v.optional(v.union(v.id("accessScheduleTemplates"), v.null())),
@@ -728,6 +730,7 @@ export const update = adminMutation({
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const rule = await ctx.db.get(args.ruleId);
     if (!rule) throw new Error("Kural bulunamadı");
+    await requirePermission(ctx, ctx.user, rule.projectId, "accessRules.manage");
     await resolveProjectScope(ctx, rule.projectId);
     if (!rule.projectId) throw new Error("Önce kuralı bir projeye atayın");
     if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
@@ -802,12 +805,13 @@ export const update = adminMutation({
   },
 });
 
-export const remove = adminMutation({
+export const remove = authedMutation({
   args: { ruleId: v.id("accessRules") },
   handler: async (ctx, args) => {
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const rule = await ctx.db.get(args.ruleId);
     if (!rule) throw new Error("Kural bulunamadı");
+    await requirePermission(ctx, ctx.user, rule.projectId, "accessRules.manage");
     if (rule.projectId ? !isProjectAllowed(allowedProjectIds, rule.projectId) : ctx.user.role !== "super_admin") {
       throw new Error("Bu kurala erişim yetkiniz yok");
     }
@@ -867,7 +871,7 @@ export const remove = adminMutation({
   },
 });
 
-export const createWithGroups = adminMutation({
+export const createWithGroups = authedMutation({
   args: {
     scheduleTemplateId: v.optional(v.union(v.id("accessScheduleTemplates"), v.null())),
     name: v.string(),
@@ -885,6 +889,7 @@ export const createWithGroups = adminMutation({
     doorIds: v.optional(v.array(v.id("doors"))),
   },
   handler: async (ctx, args) => {
+    await requirePermission(ctx, ctx.user, args.projectId, "accessRules.manage");
     return await createAccessRuleWithGroups(ctx, args);
   },
 });
@@ -920,6 +925,7 @@ async function saveWithGroups(
     const allowedProjectIds = await getProjectIdsForUser(ctx);
     const rule = await ctx.db.get(args.ruleId);
     if (!rule) throw new Error("Kural bulunamadı");
+    await requirePermission(ctx, ctx.user, rule.projectId, "accessRules.manage");
     await resolveProjectScope(ctx, rule.projectId);
     if (!rule.projectId) throw new Error("Önce kuralı bir projeye atayın");
     if (rule.projectId && !allowedProjectIds.some((id) => id === rule.projectId)) {
@@ -1170,13 +1176,13 @@ async function saveWithGroups(
 }
 
 /** Old clients keep the Id return shape. Diff saves still get durable tracking. */
-export const updateWithGroups = adminMutation({
+export const updateWithGroups = authedMutation({
   args: updateWithGroupsValidator.fields,
   handler: async (ctx, args): Promise<Id<"accessRules">> => (await saveWithGroups(ctx, args)).ruleId,
 });
 
 /** Same transaction, with the run reference for the editor's result link. */
-export const updateWithGroupsTracked = adminMutation({
+export const updateWithGroupsTracked = authedMutation({
   args: updateWithGroupsValidator.fields,
   handler: async (ctx, args): Promise<{ ruleId: Id<"accessRules">; runId: Id<"deviceSyncRuns"> | null }> => {
     if (!args.relationDiff) throw new ConvexError("İzlenen kayıt için ilişki farkı gerekli");

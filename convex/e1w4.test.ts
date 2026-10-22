@@ -33,7 +33,7 @@ describe("device creation project boundary", () => {
       it(`${creator.name}: ${role} enforces manager role and project membership`, async () => {
         const { t, caller, projectId, foreignId } = await fixture(role);
         if (role === "project_user") {
-          await expect(caller.mutation(creator.ref, creator.args)).rejects.toThrow("yetkiniz yok");
+          await expect(caller.mutation(creator.ref, creator.args)).rejects.toThrow("bir proje seçmelisiniz");
           await expect(caller.mutation(creator.ref, { ...creator.args, projectId: foreignId })).rejects.toThrow("yetkiniz yok");
           await expect(caller.mutation(creator.ref, { ...creator.args, projectId })).rejects.toThrow("yetkiniz yok");
           expect(await t.run(ctx => ctx.db.query("devices").collect())).toHaveLength(0);
@@ -41,7 +41,7 @@ describe("device creation project boundary", () => {
           return;
         }
         await expect(caller.mutation(creator.ref, creator.args)).rejects.toThrow("bir proje seçmelisiniz");
-        await expect(caller.mutation(creator.ref, { ...creator.args, projectId: foreignId })).rejects.toThrow("erişim yetkiniz yok");
+        await expect(caller.mutation(creator.ref, { ...creator.args, projectId: foreignId })).rejects.toThrow("Bu işlem için yetkiniz yok");
         expect(await t.run(ctx => ctx.db.query("devices").collect())).toHaveLength(0);
         expect(await t.run(ctx => ctx.db.query("zones").collect())).toHaveLength(0);
         await caller.mutation(creator.ref, { ...creator.args, projectId });
@@ -50,7 +50,7 @@ describe("device creation project boundary", () => {
     }
     it(`${creator.name}: rejects a caller without memberships`, async () => {
       const { caller, projectId } = await fixture("project_admin", false);
-      await expect(caller.mutation(creator.ref, { ...creator.args, projectId })).rejects.toThrow("erişim yetkiniz yok");
+      await expect(caller.mutation(creator.ref, { ...creator.args, projectId })).rejects.toThrow("Bu işlem için yetkiniz yok");
     });
     it(`${creator.name}: preserves super_admin pool creation`, async () => {
       const { t, caller } = await fixture("super_admin");

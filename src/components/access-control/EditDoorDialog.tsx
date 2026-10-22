@@ -1,3 +1,4 @@
+import { usePermissions } from "@/hooks/usePermissions";
 import { DoorGeneralFields } from "./door-dialog/DoorGeneralFields";
 import { DoorGatewayNumberField } from "./door-dialog/DoorGatewayNumberField";
 import { DoorStatusPlanSection } from "./door-dialog/DoorStatusPlanSection";
@@ -5,7 +6,6 @@ import { DoorVerifyPlanSection, type VerifyPlanState } from "./door-dialog/DoorV
 import { DoorSaveResults } from "./door-dialog/DoorSaveResults";
 import { DoorStatusPlanEditor } from "./DoorStatusPlanEditor";
 import { normalizeDoorStatusPlan, type DoorStatusPlan } from "../../../convex/lib/doorStatusPlan";
-import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { useUnsavedChangesGuard } from "@/components/shared/UnsavedChangesDialog";
 import { useState } from "react";
 import {
@@ -117,8 +117,9 @@ export function EditDoorDialog({
     api.actions.hikGatewayDevice.applyVerifyPlan
   );
 
-  const { isAdmin } = useProjectAccess();
-  const showHikSection = isAdmin && isHikGateway(device);
+  const { can } = usePermissions();
+  const canManage = can("devices.manage");
+  const showHikSection = canManage && isHikGateway(device);
 
   const sendPlans = async (keys: PlanKey[]) => {
     const results = await applySelectedDoorPlans(keys, {

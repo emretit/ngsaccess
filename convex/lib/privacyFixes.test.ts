@@ -6,10 +6,9 @@ import { getFunctionName } from "convex/server";
 const mocks = vi.hoisted(() => ({ capture: vi.fn(), fingerprint: vi.fn() }));
 vi.mock("./customFunctions", () => {
   const wrap = (config: unknown) => config;
-  return { authedMutation: wrap, authedQuery: wrap, authedAction: wrap, adminMutation: wrap, adminQuery: wrap };
+  return { authedMutation: wrap, authedQuery: wrap, authedAction: wrap, };
 });
 vi.mock("./auth", () => ({
-  isManager: (user: { role: string }) => user.role === "project_admin" || user.role === "super_admin",
   requireSetupSecret: vi.fn(), getProjectIdsForUser: vi.fn(async () => ["project-a"]),
   isProjectAllowed: (ids: string[], id: string) => ids.includes(id),
   requireEmployeeAccess: vi.fn(async () => ({ projectId: "project-a" })),
@@ -46,9 +45,10 @@ describe("KVKK inceleme düzeltmeleri", () => {
   it("yüz yakalamadan önce cihaz projesinin biyometri kapısını çağırır", async () => {
     const error = new ConvexError({ code: "BIOMETRIC_DISABLED", message: "Biyometri modülü kapalı." });
     const runQuery = vi.fn().mockResolvedValueOnce(["project-a"])
-      .mockResolvedValueOnce({ projectId: "project-a", hikTransport: "gateway", hikDevIndex: "dev" }).mockRejectedValueOnce(error);
+      .mockResolvedValueOnce({ projectId: "project-a", hikTransport: "gateway", hikDevIndex: "dev" }).mockResolvedValueOnce(true).mockRejectedValueOnce(error);
     await expect(handler<ActionCtx>(captureFaceFromDevice)({ runQuery, user: { role: "project_admin" } } as unknown as ActionCtx, { deviceId: "device-a" })).rejects.toMatchObject({ data: { code: "BIOMETRIC_DISABLED" } });
-    expect(getFunctionName(runQuery.mock.calls[2][0])).toBe("privacyBiometric:assertBiometricDeviceAllowed");
+    expect(getFunctionName(runQuery.mock.calls[2][0])).toBe("roles:checkPermission");
+    expect(getFunctionName(runQuery.mock.calls[3][0])).toBe("privacyBiometric:assertBiometricDeviceAllowed");
     expect(mocks.capture).not.toHaveBeenCalled();
   });
   it("cihaz kapısı veritabanındaki gerçek projenin kapalı ayarını reddeder", async () => {
