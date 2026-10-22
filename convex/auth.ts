@@ -1,3 +1,4 @@
+import { accessBlockReason } from "./lib/accountAccess";
 import { Password } from "@convex-dev/auth/providers/Password";
 import { convexAuth } from "@convex-dev/auth/server";
 import { ConvexError } from "convex/values";
@@ -5,6 +6,15 @@ import { normalizeAuthEmail } from "./lib/authEmail";
 import { getPasswordError } from "./lib/passwordPolicy";
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
+  session: { totalDurationMs: 7 * 24 * 60 * 60 * 1000 },
+  callbacks: {
+    async beforeSessionCreation(ctx, { userId }) {
+      const user = await ctx.db.get(userId);
+      if (!user || accessBlockReason(user, Date.now()) !== null) {
+        throw new Error("Giriş yapılamadı");
+      }
+    },
+  },
   providers: [
     Password({
       // Yeni şifre (signUp / reset-verification) sunucuda da ortak kuralla doğrulanır; signIn'de çağrılmaz.

@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { AccountAccessActions, AccountAccessBadges, AccountAccessDialog } from "./AccountAccessActions";
 import { capabilities } from "@/lib/capabilities";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { roleLabel } from "@/lib/roleLabels";
@@ -23,6 +25,7 @@ export function UserTable({
   onEditUser: (user: User) => void;
   onDeleteUser: (user: User) => void;
 }) {
+  const [accessDialog, setAccessDialog] = useState<{ user: User; mode: "freeze" | "expiry" } | null>(null);
   const { profile } = useAuth();
   const canManage = capabilities(profile?.role).manageUsers;
   const membership = (user: User) =>
@@ -38,12 +41,13 @@ export function UserTable({
     </StatusBadge>
   );
   const actions = (user: User) =>
-    canManage && (
+    capabilities(profile?.role).admin && (
       <RowActions label={`${userName(user)} kullanıcı işlemleri`}>
-        <DropdownMenuItem onSelect={() => onEditUser(user)}>
+        <AccountAccessActions user={user} onSelectMode={mode => setAccessDialog({ user, mode })} />
+        {canManage && <DropdownMenuItem onSelect={() => onEditUser(user)}>
           Düzenle
-        </DropdownMenuItem>
-        <DropdownMenuItem
+        </DropdownMenuItem>}
+        {canManage && <DropdownMenuItem
           className="text-destructive"
           disabled={"isSelf" in user && user.isSelf}
           onSelect={() => onDeleteUser(user)}
@@ -51,12 +55,13 @@ export function UserTable({
           {"isSelf" in user && user.isSelf
             ? "Kendi hesabınızı silemezsiniz"
             : "Kullanıcıyı sil"}
-        </DropdownMenuItem>
+        </DropdownMenuItem>}
       </RowActions>
     );
   const identity = (user: User) => (
     <>
       <p className="break-words font-medium">{userName(user)}</p>
+      <AccountAccessBadges user={user} />
       {user.email && userName(user) !== user.email && <p className="break-all text-xs text-muted-foreground">{user.email}</p>}
       {"pendingSetup" in user && user.pendingSetup && (
         <p className="text-xs text-muted-foreground">
@@ -67,6 +72,7 @@ export function UserTable({
   );
   return (
     <>
+      {accessDialog && <AccountAccessDialog user={accessDialog.user} mode={accessDialog.mode} onClose={() => setAccessDialog(null)} />}
       <div className="hidden min-w-0 overflow-x-auto rounded-md border min-[761px]:block">
         <Table className="table-fixed">
           <TableHeader>

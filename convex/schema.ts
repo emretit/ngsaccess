@@ -22,6 +22,11 @@ export default defineSchema({
     phoneVerificationTime: v.optional(v.number()),
     isAnonymous: v.optional(v.boolean()),
     // Custom NGS fields
+    sessionsRevokedThrough: v.optional(v.number()),
+    disabledAt: v.optional(v.number()),
+    disabledBy: v.optional(v.id("users")),
+    accessExpiresAt: v.optional(v.number()),
+    accessExpiryJobId: v.optional(v.id("_scheduled_functions")),
     fullName: v.optional(v.string()),
     photoUrl: v.optional(v.string()),
     role: v.optional(

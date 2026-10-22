@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as accountAccess from "../accountAccess.js";
 import type * as accessRules from "../accessRules.js";
 import type * as actions_biometricDestruction from "../actions/biometricDestruction.js";
 import type * as actions_getChatData from "../actions/getChatData.js";
@@ -214,6 +215,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  accountAccess: typeof accountAccess;
   accessRules: typeof accessRules;
   "actions/biometricDestruction": typeof actions_biometricDestruction;
   "actions/getChatData": typeof actions_getChatData;

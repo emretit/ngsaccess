@@ -81,6 +81,7 @@ describe("denetim sorgusu", () => {
       "overtimeRates",
       "pdksRecords",
       "projectPrivacySettings",
+      "users",
     ]);
   });
 });

@@ -73,7 +73,7 @@ export function ActiveProjectProvider({ children }: { children: ReactNode }) {
 
   const userProjects = useQuery(
     api.userProjects.getByCurrentUser,
-    isAuthenticated && !isSuperAdmin ? {} : "skip"
+    isAuthenticated && profile && profile.verified !== false && !isSuperAdmin ? {} : "skip"
   );
   const allProjects = useQuery(
     api.projects.listActive,

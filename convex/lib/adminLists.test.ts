@@ -45,7 +45,7 @@ describe("admin list contracts", () => {
     const user: Doc<"users"> = { _id: userId, _creationTime: 0, fullName: "  Ayşe  ", email: "a@example.com", verified: false,
       tokenExpiresAt: "2020-01-01T00:00:00Z", setupToken: "secret", phone: "555", image: "private", photoUrl: "private", role: "project_user" };
     const row = adminUserRow(user, userId, []);
-    expect(row).toEqual({ _id: userId, displayName: "Ayşe", email: "a@example.com", role: "project_user", projects: [], isSelf: true, pendingSetup: true, setupExpiresAt: user.tokenExpiresAt });
+    expect(row).toEqual({ _id: userId, displayName: "Ayşe", email: "a@example.com", role: "project_user", projects: [], isSelf: true, accessExpired: false, pendingSetup: true, setupExpiresAt: user.tokenExpiresAt });
     expect(Object.keys(row)).not.toContain("setupToken");
     expect(Object.keys(row)).not.toContain("phone");
     expect(Object.keys(row)).not.toContain("image");

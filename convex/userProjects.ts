@@ -1,17 +1,16 @@
 import { v } from "convex/values";
-import { query } from "./_generated/server";
-import { authedQuery } from "./lib/customFunctions";
-import { getValidAuthUserId } from "./lib/auth";
+import { authedQuery, optionalAuthQuery } from "./lib/customFunctions";
 
-export const getByCurrentUser = query({
+export const getByCurrentUser = optionalAuthQuery({
   args: {},
   handler: async (ctx) => {
-    const userId = await getValidAuthUserId(ctx);
-    if (!userId) return [];
+    // Full access/session checks run in optionalAuthQuery; unverified profiles stay private.
+    if (!ctx.user || ctx.user.verified === false) return [];
+    const userId = ctx.user._id;
     const rows = await ctx.db
       .query("userProjects")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
+      .take(1000);
     const enriched = await Promise.all(
       rows.map(async (r) => {
         const project = await ctx.db.get(r.projectId);
@@ -32,7 +31,7 @@ export const getProjectIdsByUser = authedQuery({
     const rows = await ctx.db
       .query("userProjects")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
+      .take(1000);
     return rows.map((r) => r.projectId);
   },
 });
@@ -50,7 +49,7 @@ export const adminListByUser = _internalQuery({
     const rows = await ctx.db
       .query("userProjects")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
+      .take(1000);
     const out = [];
     for (const r of rows) {
       const p = await ctx.db.get(r.projectId);

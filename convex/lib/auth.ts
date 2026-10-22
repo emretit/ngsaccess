@@ -1,14 +1,15 @@
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
+import { accessBlockReason } from "./accountAccess";
 import { getAuthSessionId, getAuthUserId } from "@convex-dev/auth/server";
 
 /**
  * JWT'deki kullanıcı kimliğini, JWT'nin işaret ettiği oturum hâlâ mevcutsa kabul eder.
  * Oturum silinince elde kalmış access token da sonraki istekte geçersiz olur.
  */
-export async function getValidAuthUserId(
+async function getValidAuthUser(
   ctx: QueryCtx | MutationCtx
-): Promise<Id<"users"> | null> {
+): Promise<Doc<"users"> | null> {
   const userId = await getAuthUserId(ctx);
   if (!userId) return null;
 
@@ -16,8 +17,14 @@ export async function getValidAuthUserId(
   if (!sessionId) return null;
 
   const session = await ctx.db.get(sessionId);
-  if (!session || session.userId !== userId) return null;
-  return userId;
+  if (!session || session.userId !== userId || session.expirationTime <= Date.now()) return null;
+  const user = await ctx.db.get(userId);
+  if (user?.sessionsRevokedThrough !== undefined && session._creationTime <= user.sessionsRevokedThrough) return null;
+  return user && accessBlockReason(user, Date.now()) === null ? user : null;
+}
+
+export async function getValidAuthUserId(ctx: QueryCtx | MutationCtx): Promise<Id<"users"> | null> {
+  return (await getValidAuthUser(ctx))?._id ?? null;
 }
 
 /**
@@ -27,17 +34,11 @@ export async function getValidAuthUserId(
 export async function getCurrentUser(
   ctx: QueryCtx | MutationCtx
 ): Promise<Doc<"users">> {
-  const userId = await getValidAuthUserId(ctx);
-  if (!userId) {
-    throw new Error("Giriş yapmanız gerekiyor");
-  }
-  const user = await ctx.db.get(userId);
-  if (!user) {
-    throw new Error("Kullanıcı bulunamadı");
-  }
+  const user = await getValidAuthUser(ctx);
+  if (!user) throw new Error("Giriş yapmanız gerekiyor");
   // Doğrulanmamış self-signup hesabı hiçbir korumalı veriye erişemez.
   // Eski kullanıcılar verified=undefined → engellenmez (yalnızca === false).
-  // currentUser query'si getCurrentUserOrNull kullanır (guard'sız) — AuthProvider
+  // currentUser query'si erişim/oturum kontrolünü korur, verified kontrolünü atlar — AuthProvider
   // doğrulanmamış kullanıcıyı profile üzerinden tespit edip signOut eder.
   if (user.verified === false) {
     throw new Error("E-posta adresinizi doğrulamanız gerekiyor");
@@ -51,9 +52,7 @@ export async function getCurrentUser(
 export async function getCurrentUserOrNull(
   ctx: QueryCtx | MutationCtx
 ): Promise<Doc<"users"> | null> {
-  const userId = await getValidAuthUserId(ctx);
-  if (!userId) return null;
-  return await ctx.db.get(userId);
+  return await getValidAuthUser(ctx);
 }
 
 /**

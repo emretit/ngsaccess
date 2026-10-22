@@ -7,8 +7,8 @@ import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { optionalAuthQuery, authedMutation, adminQuery, superAdminMutation } from "./lib/customFunctions";
-import { getProjectIdsForUser, getValidAuthUserId, verifyUser } from "./lib/auth";
-import { membershipChanged, userProtectionError } from "./lib/adminGuards";
+import { getCurrentUser, getProjectIdsForUser, getValidAuthUserId, verifyUser } from "./lib/auth";
+import { activeSuperAdminCount, membershipChanged, userProtectionError } from "./lib/adminGuards";
 import { publicUserValidator, toPublicUser } from "./lib/publicUser";
 
 /** Kurulum sayfası için: Sistemde super_admin var mı? (Public - auth gerekmez) */
@@ -31,6 +31,11 @@ export const currentUser = optionalAuthQuery({
     if (!ctx.user) return null;
     return toPublicUser(ctx.user);
   },
+});
+
+export const requireCurrentUser = internalQuery({
+  args: {},
+  handler: async (ctx): Promise<Doc<"users">> => getCurrentUser(ctx),
 });
 
 /**
@@ -60,12 +65,10 @@ export const updateRole = superAdminMutation({
     const target = await ctx.db.get(args.userId);
     if (!target) throw new ConvexError("Kullanıcı bulunamadı");
     const removesSuperAdmin = target.role === "super_admin" && args.role !== "super_admin";
-    const admins = removesSuperAdmin ? await ctx.db.query("users")
-      .withIndex("by_role", (q) => q.eq("role", "super_admin"))
-      .take(2) : [];
+    const adminCount = removesSuperAdmin ? 1 + await activeSuperAdminCount(ctx, { excludeId: args.userId, requireNoExpiry: true }) : 0;
     const protectionError = userProtectionError({
       isSelf: args.userId === ctx.user._id, isSuperAdmin: target.role === "super_admin",
-      removesSuperAdmin, adminCount: admins.length, deleting: false,
+      removesSuperAdmin, adminCount, deleting: false,
     });
     if (protectionError) throw new ConvexError(protectionError);
     const memberships = args.projectIds !== undefined || args.expectedProjectIds !== undefined
@@ -183,12 +186,10 @@ export const deleteUser = superAdminMutation({
   handler: async (ctx, args) => {
     const target = await ctx.db.get(args.userId);
     if (!target) throw new ConvexError("Kullanıcı bulunamadı");
-    const admins = target.role === "super_admin" ? await ctx.db.query("users")
-      .withIndex("by_role", (q) => q.eq("role", "super_admin"))
-      .take(2) : [];
+    const adminCount = target.role === "super_admin" ? 1 + await activeSuperAdminCount(ctx, { excludeId: args.userId, requireNoExpiry: true }) : 0;
     const protectionError = userProtectionError({
       isSelf: args.userId === ctx.user._id, isSuperAdmin: target.role === "super_admin",
-      removesSuperAdmin: true, adminCount: admins.length, deleting: true,
+      removesSuperAdmin: true, adminCount, deleting: true,
     });
     if (protectionError) throw new ConvexError(protectionError);
     const accounts = await ctx.db

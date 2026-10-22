@@ -1,5 +1,6 @@
 import type { QueryCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
+import { accessBlockReason } from "./accountAccess";
+import type { Doc, Id } from "../_generated/dataModel";
 /** Compare stored membership sets; ordering and legacy duplicate rows are irrelevant. */
 export function membershipChanged(
   liveProjectIds: readonly Id<"projects">[],
@@ -145,4 +146,46 @@ export function projectDeletionCleanupQuery(
   return table === "invites"
     ? ctx.db.query(table).filter(q => q.eq(q.field("projectId"), projectId))
     : ctx.db.query(table).withIndex("by_project", q => q.eq("projectId", projectId));
+}
+
+/** Stop after two active admins; fail closed if the bounded scan is exhausted. */
+export async function activeSuperAdminCount(
+  ctx: Pick<QueryCtx, "db">,
+  options: { excludeId?: Id<"users">; requireNoExpiry?: boolean } = {},
+): Promise<number> {
+  const rows = await ctx.db.query("users").withIndex("by_role", q => q.eq("role", "super_admin")).take(1001);
+  let count = 0;
+  for (const user of rows) {
+    if (user._id === options.excludeId) continue;
+    if (accessBlockReason(user, Date.now()) === null &&
+      (user.accessExpiresAt === undefined || options.requireNoExpiry !== true) &&
+      ++count === 2) return count;
+  }
+  if (rows.length > 1000) throw new Error("Yönetici sınırı aşıldı; işlem güvenle tamamlanamadı");
+  return count;
+}
+
+export async function requireAccountAccessTarget(
+  ctx: Pick<QueryCtx, "db">,
+  caller: Doc<"users">,
+  userId: Id<"users">,
+  restrictAccess: boolean,
+): Promise<Doc<"users">> {
+  if (caller._id === userId) throw new Error("Kendi hesabınız için bu işlemi yapamazsınız");
+  const target = await ctx.db.get(userId);
+  if (!target) throw new Error("Kullanıcı bulunamadı");
+  if (caller.role !== "super_admin") {
+    if (caller.role !== "project_admin" || target.role !== "project_user") throw new Error("Bu işlem için yetkiniz yok");
+    const own = await ctx.db.query("userProjects").withIndex("by_user", q => q.eq("userId", caller._id)).take(1001);
+    const memberships = await ctx.db.query("userProjects").withIndex("by_user", q => q.eq("userId", userId)).take(1001);
+    if (memberships.length === 0 || own.length > 1000 || memberships.length > 1000 || memberships.some(row => !own.some(p => p.projectId === row.projectId))) {
+      throw new Error("Bu kullanıcı başka projelerde de üye; yalnız sistem yöneticisi işlem yapabilir");
+    }
+  }
+  if (restrictAccess && target.role === "super_admin" && await activeSuperAdminCount(ctx, {
+    excludeId: userId, requireNoExpiry: true,
+  }) === 0) {
+    throw new Error("Sistemdeki son etkin süper adminin erişimi kısıtlanamaz");
+  }
+  return target;
 }

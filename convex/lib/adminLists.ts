@@ -35,6 +35,8 @@ export function adminUserRow(user: Doc<"users">, selfId: Doc<"users">["_id"], pr
   return {
     _id: user._id, displayName: user.fullName?.trim() || user.name?.trim() || user.email || "Adsız kullanıcı",
     email: user.email ?? "", role: user.role ?? null, projects, isSelf: user._id === selfId,
+    disabledAt: user.disabledAt, accessExpiresAt: user.accessExpiresAt,
+    accessExpired: user.accessExpiresAt !== undefined && user.accessExpiresAt <= Date.now(),
     pendingSetup: user.verified === false, setupExpiresAt: user.tokenExpiresAt,
   };
 }

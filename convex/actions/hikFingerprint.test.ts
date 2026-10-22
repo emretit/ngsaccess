@@ -10,7 +10,7 @@ const args = { employeeId: "employee-a", deviceId: "device-a", fingerNo: 2, atte
 function fixture() {
   const runQuery = vi.fn(async (ref: Parameters<typeof getFunctionName>[0]): Promise<unknown> => {
     const name = getFunctionName(ref);
-    if (name === "users:currentUser") return { _id: "user-a", role: "project_admin" };
+    if (name === "users:requireCurrentUser") return { _id: "user-a", role: "project_admin" };
     if (name.endsWith(":getPurgeDevice")) return "dev";
     if (name.endsWith(":getAttempt")) return true;
     if (name.endsWith(":getInternal")) return { ...args, _id: "row-a", deletionEmployeeNo: "OLD" };
@@ -40,7 +40,7 @@ describe("cihazda parmak izi action", () => {
   });
   it("capture sonrası iptal download yapmaz", async () => {
     const f = fixture(); let checks = 0;
-    f.runQuery.mockImplementation(async ref => getFunctionName(ref) === "users:currentUser" ? { _id: "user-a", role: "project_admin" } : getFunctionName(ref).endsWith(":getAttempt") ? ++checks === 1 : target);
+    f.runQuery.mockImplementation(async ref => getFunctionName(ref) === "users:requireCurrentUser" ? { _id: "user-a", role: "project_admin" } : getFunctionName(ref).endsWith(":getAttempt") ? ++checks === 1 : target);
     await expect(invoke(enrollFingerprintOnDevice, f.ctx, args)).rejects.toThrow("iptal");
     expect(gateway.addFingerprintToDevice).not.toHaveBeenCalled();
   });
@@ -95,7 +95,7 @@ describe("parmak izi purge", () => {
     const f = fixture();
     f.runQuery.mockImplementation(async ref => {
       const name = getFunctionName(ref);
-      if (name === "users:currentUser") return { _id: "user-a", role: "project_admin" };
+      if (name === "users:requireCurrentUser") return { _id: "user-a", role: "project_admin" };
       if (name.endsWith(":getInternal")) return { ...args, _id: "row-a", deletionEmployeeNo: "OLD" };
       return target;
     });

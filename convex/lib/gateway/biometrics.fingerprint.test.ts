@@ -26,7 +26,7 @@ it.each(["purge", "manual"])("%s yok yanıtından sonra metadata siler", async m
   const runMutation = vi.fn(async () => null);
   const ctx = { runMutation, runQuery: vi.fn(async (ref: Parameters<typeof getFunctionName>[0]) => {
     const name = getFunctionName(ref);
-    if (name === "users:currentUser") return { _id: "user-a", role: "project_admin" };
+    if (name === "users:requireCurrentUser") return { _id: "user-a", role: "project_admin" };
     if (name.endsWith(":getInternal")) return { employeeId: "employee-a", deviceId: "device-a", fingerNo: 2, deletionEmployeeNo: "OLD" };
     if (name.endsWith(":getPurgeDevice")) return "dev";
     return { employee: { cardNumber: "NEW" }, device: { hikDevIndex: "dev" } };

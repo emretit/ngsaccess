@@ -160,8 +160,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // verified guard'ı ve yönlendirme useEffect'te yapılır
       // (signIn anında profile henüz client'a yüklenmemiş olabilir).
       return { error: null };
-    } catch (error: unknown) {
-      return { error };
+    } catch {
+      return { error: new Error("Giriş yapılamadı") };
     }
   };
 

@@ -1,7 +1,7 @@
 import { customQuery, customMutation, customAction, customCtx } from "convex-helpers/server/customFunctions";
 import { v } from "convex/values";
 import { query, mutation, action } from "../_generated/server";
-import { api } from "../_generated/api";
+import { internal } from "../_generated/api";
 import type { Doc } from "../_generated/dataModel";
 import { getCurrentUser, getCurrentUserOrNull } from "./auth";
 import { getCurrentEmployee } from "./employeeAuth";
@@ -104,7 +104,7 @@ export const superAdminMutation = customMutation(
 export const authedAction = customAction(
   action,
   customCtx(async (ctx): Promise<{ user: Doc<"users"> }> => {
-    const user = await ctx.runQuery(api.users.currentUser, {}) as Doc<"users">;
+    const user = await ctx.runQuery(internal.users.requireCurrentUser, {});
     if (!user) throw new Error("Giriş yapmanız gerekiyor");
     return { user };
   })
