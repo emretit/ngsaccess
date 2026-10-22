@@ -1,6 +1,7 @@
 import { trDayRangeISO } from "./trDate";
 
 export const AUDIT_TARGET_LABELS: Record<string, string> = {
+  shiftAssignments: "Vardiya atamaları",
   pdksRuleVersions: "PDKS kuralları",
   users: "Kullanıcılar",
   projectPrivacySettings: "Proje gizlilik ayarları",

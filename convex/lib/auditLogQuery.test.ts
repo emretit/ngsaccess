@@ -82,6 +82,7 @@ describe("denetim sorgusu", () => {
       "pdksRecords",
       "pdksRuleVersions",
       "projectPrivacySettings",
+      "shiftAssignments",
       "users",
     ]);
   });

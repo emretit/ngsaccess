@@ -1,3 +1,4 @@
+import { writeAudit } from "./lib/audit";
 import { assertPeopleProject } from "./lib/peopleScope";
 import { resolveProjectScope } from "./lib/projectScope";
 import { toPatch } from "./lib/nullablePatch";
@@ -477,5 +478,72 @@ export const remove = authedMutation({
     await Promise.all(eligible.map((a) => ctx.db.delete(a._id)));
     await ctx.db.delete(args.shiftId);
     return { removedAssignments: eligible.length, skippedAssignments: linkedAssignments.length - eligible.length };
+  },
+});
+
+const clearArgs = {
+  projectId: v.id("projects"), employeeIds: v.array(v.id("employees")),
+  startDate: v.string(), endDate: v.string(),
+};
+type ClearInput = { projectId: Id<"projects">; employeeIds: Id<"employees">[]; startDate: string; endDate: string };
+async function prepareClear(ctx: ReadCtx & { user: Doc<"users"> }, args: ClearInput) {
+  if (ctx.user.role !== "super_admin" && ctx.user.role !== "project_admin") throw new ConvexError("Bu işlem için yetkiniz yok");
+  validateAssignRange(args);
+  if (!args.employeeIds.length || args.employeeIds.length > 500) throw new ConvexError("1–500 çalışan seçin");
+  if (new Set(args.employeeIds).size !== args.employeeIds.length) throw new ConvexError("Aynı çalışan birden fazla seçilemez");
+  await resolveProjectScope(ctx, args.projectId);
+  const state = newReadState();
+  const rows: Doc<"shiftAssignments">[] = [];
+  for (const employeeId of args.employeeIds) {
+    const employee = await ctx.db.get(employeeId);
+    if (!employee || employee.projectId !== args.projectId) throw new ConvexError("Çalışan seçili projeye ait değil");
+    await requireEmployeeAccess(ctx, employeeId);
+    const found = consumeRows(await ctx.db.query("shiftAssignments").withIndex("by_employee_end", q =>
+      q.eq("employeeId", employeeId).gte("endDate", args.startDate),
+    ).take(state.remaining + 1), state);
+    for (const row of found) {
+      if (row.startDate > args.endDate) continue;
+      if (row.projectId !== args.projectId) throw new ConvexError("Atamanın proje bilgisi doğrulanamadı");
+      rows.push(row);
+      if (rows.length > 1000) throw new ConvexError("1000 üzeri atama tek işlemde temizlenemez; aralığı daraltın");
+    }
+  }
+  const summary = { deleted: 0, trimmed: 0, split: 0, affectedEmployees: new Set(rows.map(row => row.employeeId)).size,
+    affectsPast: rows.some(row => row.startDate < trDateKey(new Date().toISOString()) && args.startDate < trDateKey(new Date().toISOString())) };
+  for (const row of rows) {
+    if (row.startDate < args.startDate && row.endDate > args.endDate) summary.split++;
+    else if (row.startDate < args.startDate || row.endDate > args.endDate) summary.trimmed++;
+    else summary.deleted++;
+  }
+  return { rows, summary };
+}
+export const previewClearAssignments = authedQuery({
+  args: clearArgs,
+  handler: async (ctx, args) => (await prepareClear(ctx, args)).summary,
+});
+export const clearAssignments = authedMutation({
+  args: clearArgs,
+  handler: async (ctx, args) => {
+    const { rows, summary } = await prepareClear(ctx, args);
+    const updatedAt = new Date().toISOString();
+    for (const row of rows) {
+      if (row.startDate < args.startDate && row.endDate > args.endDate) {
+        await ctx.db.patch(row._id, { endDate: shiftDateOffset(args.startDate, -1), updatedAt });
+        await ctx.db.insert("shiftAssignments", {
+          employeeId: row.employeeId, shiftId: row.shiftId, projectId: row.projectId,
+          startDate: shiftDateOffset(args.endDate, 1), endDate: row.endDate,
+          weekPattern: row.weekPattern, createdAt: row.createdAt, updatedAt,
+        });
+      } else if (row.startDate < args.startDate) {
+        await ctx.db.patch(row._id, { endDate: shiftDateOffset(args.startDate, -1), updatedAt });
+      } else if (row.endDate > args.endDate) {
+        await ctx.db.patch(row._id, { startDate: shiftDateOffset(args.endDate, 1), updatedAt });
+      } else await ctx.db.delete(row._id);
+    }
+    if (rows.length) await writeAudit(ctx, { user: ctx.user, projectId: args.projectId, action: "delete",
+      targetTable: "shiftAssignments", targetId: args.projectId,
+      oldValue: { startDate: args.startDate, endDate: args.endDate, employeeIds: args.employeeIds },
+      newValue: summary, note: `Vardiya toplu temizle: ${summary.deleted} silindi, ${summary.trimmed} kırpıldı, ${summary.split} bölündü` });
+    return summary;
   },
 });

@@ -1,3 +1,9 @@
+import { ClearAssignmentsDialog } from './ClearAssignmentsDialog';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { capabilities } from '@/lib/capabilities';
+import { shiftExportRows } from '@/lib/shiftExport';
+import { csvExport, downloadExport, exportFilenamePart, xlsxExport } from '@/lib/spreadsheetExport';
+import { notify } from '@/lib/notify';
 import { ShiftSelect } from "./ShiftSelect";
 import { assignmentInitial, shiftTimeLabel } from "./lib/planning";
 import { useEffect, useMemo, useState } from "react";
@@ -102,6 +108,10 @@ function Plan({
   shifts: Shift[];
   openDefinitions: () => void;
 }) {
+  const { profile } = useAuth();
+  const canManage = capabilities(profile?.role).admin;
+  const [clearOpen, setClearOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const compact = useCompact();
   const navigate = useNavigate();
   const [day, setDay] = useState(istanbulToday);
@@ -146,6 +156,16 @@ function Plan({
     startDate: range.rangeStart,
     endDate: range.rangeEnd,
   });
+  const exportPlan = async (format: 'xlsx' | 'csv') => {
+    if (!assignments || exporting) return;
+    setExporting(true);
+    try {
+      const rows = shiftExportRows(visible, range.days, assignments, shifts);
+      const blob = format === 'xlsx' ? await xlsxExport(rows, 'Vardiyalar') : new Blob([csvExport(rows)], { type: 'text/csv;charset=utf-8' });
+      downloadExport(blob, `vardiyalar-${exportFilenamePart(projectName)}-${range.rangeStart}_${range.rangeEnd}.${format}`);
+    } catch (error: unknown) { notify.error('Vardiyalar aktarılamadı', error); }
+    finally { setExporting(false); }
+  };
   const active = shifts.filter((s) => s.isActive !== false);
   const loading =
     assignments === undefined || leaves === undefined || holidays === undefined;
@@ -207,6 +227,13 @@ function Plan({
           </Button>
         }
       />
+      <div className="flex flex-wrap gap-2">
+        {canManage && <Button variant="outline" onClick={() => setClearOpen(true)}>Toplu temizle</Button>}
+        <Button variant="outline" disabled={loading || exporting} onClick={() => exportPlan('xlsx')}>Excel'e aktar</Button>
+        <Button variant="outline" disabled={loading || exporting} onClick={() => exportPlan('csv')}>CSV'ye aktar</Button>
+        <span className="self-center text-xs text-muted-foreground">Dışa aktarım: görünen sayfa ve dönem</span>
+      </div>
+      {clearOpen && <ClearAssignmentsDialog projectId={projectId} employees={employees} initialIds={[...selected]} start={range.rangeStart} end={range.rangeEnd} onClose={() => { setClearOpen(false); clearSelection(); }} />}
       <StatInline
         items={[
           { label: "Görünen çalışan", value: filtered.length },

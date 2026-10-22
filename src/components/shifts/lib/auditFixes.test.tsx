@@ -15,6 +15,7 @@ type PageHeaderProps = ComponentProps<typeof PageHeader>;
 import type { Id } from "../../../../convex/_generated/dataModel";
 
 const state = vi.hoisted(() => ({ shifts: [] as Shift[], calls: [] as string[], primary: null as PageHeaderProps["primaryAction"] | null }));
+vi.mock("@/components/auth/AuthProvider", () => ({ useAuth: () => ({ profile: { role: "project_admin" } }) }));
 vi.mock("convex/react", () => ({
   useMutation: () => vi.fn(),
   useQuery: (reference: Parameters<typeof getFunctionName>[0]) => {

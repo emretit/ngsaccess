@@ -1,3 +1,4 @@
+import { AuditExportButton } from '@/components/audit/AuditExportButton';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { capabilities } from '@/lib/capabilities';
 import { useActiveProjectScope } from '@/hooks/useActiveProjectScope';
@@ -26,6 +27,7 @@ function AuthorizedAuditLog() {
     <PageHeader title="Denetim Kaydı" scope={<span>{allProjects ? 'Tüm projeler · Projesiz kayıtlar dahil' : activeProject?.name ?? 'Proje seçilmedi'} · İstanbul saati (UTC+3)</span>}>
       {profile?.role === 'super_admin' && <label className="flex min-h-10 items-center gap-2 text-sm"><Switch checked={allProjects} onCheckedChange={checked => state.update('allProjects', checked ? 'true' : '')} />Tüm projeler</label>}
     </PageHeader>
+    {ready && !state.changingScope && !rangeError && <AuditExportButton key={JSON.stringify(args)} args={args} projectName={activeProject?.name ?? "proje"} />}
     <AuditCoverage />
     <AuditFilters state={state} args={args} ready={ready && !state.changingScope} rangeError={rangeError} />
     {!allProjects && <p className="text-xs text-muted-foreground">Seçili projenin kayıtları gösteriliyor. Projeyi üst çubuktan değiştirebilirsiniz.</p>}
