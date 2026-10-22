@@ -190,7 +190,7 @@ export async function deleteFingerprintFromDevice(
   employeeNo: string,
   fingerPrintID?: number,
 ): Promise<{ ok: boolean; error?: string }> {
-  return gatewayApiCallChecked(
+  const result = await gatewayApiCallChecked(
     "/ISAPI/AccessControl/FingerPrint/Delete",
     "PUT",
     {
@@ -206,6 +206,9 @@ export async function deleteFingerprintFromDevice(
     },
     devIndex,
   );
+  // Only explicit absent-person/fingerprint status codes are idempotent success.
+  const absent = new Set(["employeeNoNotExist", "employeeNotExist", "userNotExist", "deviceUserNotExist", "fingerPrintNotExist", "fingerprintNotExist", "fingerPrintNotFound"]);
+  return !result.ok && result.error && absent.has(result.error) ? { ok: true } : result;
 }
 
 export function getFingerprintCount(devIndex: string) {

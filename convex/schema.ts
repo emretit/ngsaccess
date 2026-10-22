@@ -1122,6 +1122,24 @@ export default defineSchema({
   }).index("by_project", ["projectId"]),
 
   // ═══════ 11 · KVKK ONAYLARI · KULLANICI TERCİHLERİ ════════════════════
+  // Metadata only: fingerprint templates never enter Convex persistence.
+  deviceFingerprintEnrollments: defineTable({
+    employeeId: v.id("employees"),
+    deviceId: v.id("devices"),
+    projectId: v.optional(v.id("projects")),
+    fingerNo: v.number(),
+    enrolledAt: v.string(),
+    enrolledBy: v.id("users"),
+    deletionEmployeeNo: v.optional(v.string()),
+    // Short-lived command state makes cancellation server-visible; no biometric data.
+    attemptId: v.optional(v.string()),
+    pendingUntil: v.optional(v.number()),
+    cancelRequested: v.optional(v.boolean()),
+  })
+    .index("by_employee", ["employeeId"])
+    .index("by_device", ["deviceId"])
+    .index("by_employee_device_finger", ["employeeId", "deviceId", "fingerNo"]),
+
   employeeConsents: defineTable({
     employeeId: v.id("employees"),
     consentType: v.union(

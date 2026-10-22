@@ -1,3 +1,4 @@
+import { scheduleFingerprintPurge, scheduleEmployeeCardChange } from "./lib/employeeCardChange";
 import { canSeePay, maskPay } from "./lib/payVisibility";
 import { claimEmployeePhoto } from "./lib/peoplePhoto";
 import { snapshotEmployeeHikDevices } from "./lib/peopleHikSnapshot";
@@ -289,6 +290,7 @@ export const update = adminMutation({
       updates.cardNumber !== undefined && updates.cardNumber !== emp.cardNumber;
     const activeChanged =
       updates.isActive !== undefined && updates.isActive !== emp.isActive;
+    if (!cardChanged && activeChanged && updates.isActive === false) await scheduleFingerprintPurge(ctx, employeeId, emp.cardNumber);
     if (emp.employmentEndDate && updates.isActive === true && emp.isActive !== true) {
       throw new Error("İşten ayrılan kişiyi aktifleştirmek için 'Geri al' kullanın.");
     }
@@ -296,18 +298,9 @@ export const update = adminMutation({
     // Kart no değiştiyse ESKİ kartı IDE panellerinden sök (yoksa orphan kalır → eski
     // kart hâlâ kapı açar). Paneller groupMembers'tan çözülür (kart değişiminden bağımsız);
     // eski değer (emp.cardNumber) ile, yeni kartı yazacak sync'ten ÖNCE enqueue edilir.
-    if (cardChanged) {
-      const ideDeviceIds = await resolveEmployeeIdeDeviceIds(ctx, employeeId, emp.projectId);
-      if (ideDeviceIds.length > 0) {
-        await ctx.scheduler.runAfter(
-          0,
-          internal.actions.ideGatewayDevice.deleteIdeUserFromPanels,
-          { cardNumber: emp.cardNumber, deviceIds: ideDeviceIds, projectId: emp.projectId },
-        );
-      }
-    }
+    if (cardChanged) await scheduleEmployeeCardChange(ctx, employeeId, emp.projectId, emp.cardNumber);
 
-    if (cardChanged || activeChanged || groupMemberAdded) {
+    if (!cardChanged && (activeChanged || groupMemberAdded)) {
       await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
         employeeId,
       });
@@ -321,6 +314,7 @@ export const update = adminMutation({
 });
 
 async function removeEmployeeWithDependencies(ctx: MutationCtx & { user: Doc<"users"> }, emp: Doc<"employees">) {
+    await scheduleFingerprintPurge(ctx, emp._id, emp.cardNumber);
     const snapshot = await snapshotEmployeeHikDevices(ctx, emp);
     await ctx.scheduler.runAfter(
       0,

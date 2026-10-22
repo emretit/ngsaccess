@@ -1,3 +1,4 @@
+import { scheduleFingerprintPurge } from "./lib/employeeCardChange";
 import { ConvexError, v } from "convex/values";
 import { internalMutation, type MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -23,6 +24,7 @@ async function closeAccess(ctx: MutationCtx, employee: Doc<"employees">, now: st
   // Panelleri aktif erişim grafından, pasife çekmeden önce çöz.
   const deviceIds = await resolveEmployeeIdeDeviceIds(ctx, employee._id, employee.projectId);
   await ctx.db.patch(employee._id, { isActive: false, updatedAt: now });
+  await scheduleFingerprintPurge(ctx, employee._id, employee.cardNumber);
   await ctx.scheduler.runAfter(0, internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
     employeeId: employee._id,
   });

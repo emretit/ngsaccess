@@ -13,6 +13,7 @@ import type * as actions_biometricDestruction from "../actions/biometricDestruct
 import type * as actions_getChatData from "../actions/getChatData.js";
 import type * as actions_hikBridgeWake from "../actions/hikBridgeWake.js";
 import type * as actions_hikDebug from "../actions/hikDebug.js";
+import type * as actions_hikFingerprint from "../actions/hikFingerprint.js";
 import type * as actions_hikGatewayDevice from "../actions/hikGatewayDevice.js";
 import type * as actions_hikQueueWorker from "../actions/hikQueueWorker.js";
 import type * as actions_hikvisionSync from "../actions/hikvisionSync.js";
@@ -49,6 +50,7 @@ import type * as employeeFingerprints from "../employeeFingerprints.js";
 import type * as employeeImport from "../employeeImport.js";
 import type * as employeeTermination from "../employeeTermination.js";
 import type * as employees from "../employees.js";
+import type * as fingerprintEnrollment from "../fingerprintEnrollment.js";
 import type * as files from "../files.js";
 import type * as hikBridge from "../hikBridge.js";
 import type * as hikvisionSync from "../hikvisionSync.js";
@@ -217,6 +219,7 @@ declare const fullApi: ApiFromModules<{
   "actions/getChatData": typeof actions_getChatData;
   "actions/hikBridgeWake": typeof actions_hikBridgeWake;
   "actions/hikDebug": typeof actions_hikDebug;
+  "actions/hikFingerprint": typeof actions_hikFingerprint;
   "actions/hikGatewayDevice": typeof actions_hikGatewayDevice;
   "actions/hikQueueWorker": typeof actions_hikQueueWorker;
   "actions/hikvisionSync": typeof actions_hikvisionSync;
@@ -253,6 +256,7 @@ declare const fullApi: ApiFromModules<{
   employeeImport: typeof employeeImport;
   employeeTermination: typeof employeeTermination;
   employees: typeof employees;
+  fingerprintEnrollment: typeof fingerprintEnrollment;
   files: typeof files;
   hikBridge: typeof hikBridge;
   hikvisionSync: typeof hikvisionSync;

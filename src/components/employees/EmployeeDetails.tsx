@@ -13,6 +13,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { EmployeeSyncSection } from "./EmployeeSyncSection";
 import { EmployeeRecentReadings } from "./EmployeeRecentReadings";
+import { EmployeeFingerprintCard } from "./EmployeeFingerprintCard";
 import { EmployeeConsentsCard } from "./EmployeeConsentsCard";
 export default function EmployeeDetails({
   employee,
@@ -105,6 +106,7 @@ export default function EmployeeDetails({
       >
         <EmployeeSyncSection employeeId={employee._id} />
       </EmployeeActivityBoundary>
+      <EmployeeFingerprintCard key={employee._id} employeeId={employee._id} />
       {/* key: çalışan değişince açık rıza/iptal formu önceki çalışanda kalmasın. */}
       <EmployeeActivityBoundary
         key={employee._id}

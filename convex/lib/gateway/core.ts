@@ -79,9 +79,9 @@ export async function gatewayApiCall(
         (data as { statusCode?: number }).statusCode !== 1));
   if (failed || process.env.HIK_GATEWAY_DEBUG === "1") {
     console.log(
-      `[hikGateway] ${method} ${path} devIndex=${devIndex ?? "-"} status=${result.status}\n` +
-        `  REQ: ${reqBody ?? "(none)"}\n` +
-        `  RES: ${responseStr.slice(0, 2000)}`,
+      `[hikGateway] ${method} ${path} devIndex=${devIndex ?? "-"} status=${result.status}` +
+        (/fingerprint/i.test(path) ? "" :
+          `\n  REQ: ${reqBody ?? "(none)"}\n  RES: ${responseStr.slice(0, 2000)}`),
     );
   }
   return { status: result.status, data, raw: result.body };
