@@ -95,10 +95,11 @@ describe.each([false, true])("W5.3 legacy/versioned=%s", versioned => {
     expect(aphb.xml).toContain("<calismaGunu>7</calismaGunu>");
     const annual = await f.caller.query(api.dashboard.getAnnualOvertimeBalance, { projectId: f.projectId, year: 2026 });
     expect(annual[0]?.totalOvertimeMinutes).toBe(excess);
+    // Mobil son çalışma günü (date) içinde sorgulanır: ertesi gün oturum EMPLOYMENT_ENDED alır (Emre 2026-10-22).
+    vi.setSystemTime(new Date(iso(date, "23:59")));
     const mobile = await f.t.query(api.mobileAttendance.summary, { sessionToken: f.sessionToken, startDate: date, endDate: date });
     expect(mobile.totals.presentDays).toBe(1);
     expect(mobile.totals.exitCount).toBe(exitDate === date ? 1 : 0);
-    vi.setSystemTime(new Date(iso(date, "23:59")));
     const dashboard = await f.caller.query(api.dashboard.getActivitySummary, { projectId: f.projectId });
     expect(dashboard).toMatchObject({ presentToday: 1, lateArrivals: 0, incompleteDays: 0 });
   });
@@ -112,6 +113,8 @@ describe.each([false, true])("W5.3 legacy/versioned=%s", versioned => {
     expect((await f.adapter(date, date)).days[0]).toEqual(table[0]?.days[0]);
     const sgk = await f.caller.query(api.reports.getSgkMonthlyReport, { projectId: f.projectId, year: 2026, month: 6 });
     expect(sgk.rows[0]).toMatchObject({ calismaGunu: 1, toplamSaat: 7.5 });
+    // Mobil son çalışma günü (date) içinde sorgulanır: ertesi gün oturum EMPLOYMENT_ENDED alır (Emre 2026-10-22).
+    vi.setSystemTime(new Date(iso(date, "23:59")));
     expect((await f.t.query(api.mobileAttendance.summary, { sessionToken: f.sessionToken, startDate: date, endDate: date })).totals.presentDays).toBe(1);
   });
 
@@ -121,10 +124,12 @@ describe.each([false, true])("W5.3 legacy/versioned=%s", versioned => {
     await f.add("06:30", "exit", nextDate);
     const adapter = await f.adapter(date, date);
     expect(adapter.days[0]).toMatchObject({ totalMinutes: 450, shortfallMinutes: 30, status: "present" });
-    const mobile = await f.t.query(api.mobileAttendance.summary, { sessionToken: f.sessionToken, startDate: date, endDate: date });
-    expect(mobile.totals.presentDays).toBe(1);
     const report = await f.caller.query(api.reports.getSgkMonthlyReport, { projectId: f.projectId, year: 2026, month: 6 });
     expect(report.rows[0]).toMatchObject({ calismaGunu: 1, toplamSaat: 7.5 });
+    // Mobil son çalışma günü (date) içinde sorgulanır: ertesi gün oturum EMPLOYMENT_ENDED alır (Emre 2026-10-22).
+    vi.setSystemTime(new Date(iso(date, "23:59")));
+    const mobile = await f.t.query(api.mobileAttendance.summary, { sessionToken: f.sessionToken, startDate: date, endDate: date });
+    expect(mobile.totals.presentDays).toBe(1);
   });
 });
 
@@ -184,6 +189,8 @@ it("projectId'siz esnek tanımı keşif kapısından geçer; tablo/rapor/mobil a
   expect(table[0]?.days[0]).toMatchObject({ totalMinutes: 450, shortfallMinutes: 30 });
   expect((await f.adapter(date, date)).days[0]).toEqual(table[0]?.days[0]);
   expect((await f.caller.query(api.reports.getAttendanceSummaryReport, { projectId: f.projectId, year: 2026, month: 6 })).rows[0]?.presentDays).toBe(1);
+  // Mobil son çalışma günü (date) içinde sorgulanır: ertesi gün oturum EMPLOYMENT_ENDED alır (Emre 2026-10-22).
+  vi.setSystemTime(new Date(iso(date, "23:59")));
   expect((await f.t.query(api.mobileAttendance.summary, { sessionToken: f.sessionToken, startDate: date, endDate: date })).totals.presentDays).toBe(1);
 });
 

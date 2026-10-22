@@ -4,6 +4,8 @@ import { internal } from "./_generated/api";
 import { employeeAuthedMutation, employeeAuthedQuery } from "./lib/customFunctions";
 import { hashEmployeePassword, verifyEmployeePassword, writeEmployeePassword } from "./lib/employeeAuth";
 import { mobileErrorData } from "./lib/mobileErrors";
+import { employmentEnded } from "./lib/employment";
+import { trTodayKey } from "./lib/trDate";
 import { getPasswordError } from "./lib/passwordPolicy";
 import { limiter } from "./lib/rateLimit";
 import type { Doc } from "./_generated/dataModel";
@@ -193,7 +195,7 @@ export const signIn = mutation({
       cardNumber: v.string(),
     }),
   }), v.object({ error: v.object({
-    code: v.union(v.literal("INVALID_CREDENTIALS"), v.literal("RATE_LIMITED")),
+    code: v.union(v.literal("INVALID_CREDENTIALS"), v.literal("RATE_LIMITED"), v.literal("EMPLOYMENT_ENDED")),
     message: v.string(),
     retryAfterMs: v.optional(v.number()),
   }) })),
@@ -209,7 +211,10 @@ export const signIn = mutation({
       .withIndex("by_email", (q) => q.eq("email", normalizedEmail))
       .first();
 
-    if (!employee || employee.isActive === false) {
+    // İşten ayrılan (cron isActive'i kapatmış olsa da) EMPLOYMENT_ENDED alır, ama yalnız şifre
+    // doğruysa: yanlış şifre genel hata kalır, hesabın durumu dışarı sızmaz.
+    const ended = employee ? employmentEnded(employee, trTodayKey()) : false;
+    if (!employee || (employee.isActive === false && !ended)) {
       await verifyEmployeePassword(args.password, DUMMY_PASSWORD_HASH);
       return { error: mobileErrorData("INVALID_CREDENTIALS") };
     }
@@ -228,6 +233,7 @@ export const signIn = mutation({
     if (!ok) {
       return { error: mobileErrorData("INVALID_CREDENTIALS") };
     }
+    if (ended) return { error: mobileErrorData("EMPLOYMENT_ENDED") };
 
     const department = await employeeDepartment(ctx, employee);
     const project = employee.projectId ? await ctx.db.get(employee.projectId) : null;

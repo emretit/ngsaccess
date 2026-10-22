@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { employedDuring, employedOn } from "./employment";
+import { employedDuring, employedOn, employmentEnded } from "./employment";
 
 describe("employment period", () => {
   it.each([true, false])("includes the last day for active=%s and excludes later days", isActive => {
@@ -25,5 +25,11 @@ describe("employment period", () => {
     const visitor = { isVisitor: true, isActive, employmentEndDate: "2026-10-15" };
     expect(employedOn(visitor, "2026-11-01")).toBe(isActive === true);
     expect(employedDuring(visitor, "2026-10-01", "2026-10-31")).toBe(isActive === true);
+  });
+  it.each([true, false, undefined])("employmentEnded only after the last day, never for visitors or open-ended records (active=%s)", isActive => {
+    expect(employmentEnded({ isActive, employmentEndDate: "2026-10-15" }, "2026-10-15")).toBe(false);
+    expect(employmentEnded({ isActive, employmentEndDate: "2026-10-15" }, "2026-10-16")).toBe(true);
+    expect(employmentEnded({ isActive }, "2026-10-16")).toBe(false);
+    expect(employmentEnded({ isActive, isVisitor: true, employmentEndDate: "2026-10-15" }, "2026-10-16")).toBe(false);
   });
 });

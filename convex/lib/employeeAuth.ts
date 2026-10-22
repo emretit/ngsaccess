@@ -2,6 +2,8 @@ import bcrypt from "bcryptjs";
 import type { QueryCtx, MutationCtx } from "../_generated/server";
 import type { Doc } from "../_generated/dataModel";
 import { mobileError } from "./mobileErrors";
+import { employmentEnded } from "./employment";
+import { trTodayKey } from "./trDate";
 
 const BCRYPT_COST = 10;
 
@@ -20,6 +22,8 @@ export async function getCurrentEmployee(
   }
   const employee = await ctx.db.get(session.employeeId);
   if (!employee) throw mobileError("SESSION_INVALID");
+  // İşten çıkış cron'u isActive'i kapatmadan önce de, kapattıktan sonra da aynı kod (mobil "İşten ayrıldınız").
+  if (employmentEnded(employee, trTodayKey())) throw mobileError("EMPLOYMENT_ENDED");
   if (employee.isActive === false) throw mobileError("EMPLOYEE_INACTIVE");
   const auth = await ctx.db.query("employeeAuth")
     .withIndex("by_employee", (q) => q.eq("employeeId", employee._id))

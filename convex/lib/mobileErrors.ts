@@ -5,6 +5,7 @@ export const mobileErrorCode = v.union(
   v.literal("SESSION_EXPIRED"),
   v.literal("SESSION_REVOKED"),
   v.literal("EMPLOYEE_INACTIVE"),
+  v.literal("EMPLOYMENT_ENDED"),
   v.literal("INVALID_CREDENTIALS"),
   v.literal("RATE_LIMITED"),
 );
@@ -16,6 +17,7 @@ const messages: Record<MobileErrorCode, string> = {
   SESSION_EXPIRED: "Oturum süresi doldu",
   SESSION_REVOKED: "Oturum iptal edildi; yeniden giriş yapın",
   EMPLOYEE_INACTIVE: "Çalışan aktif değil",
+  EMPLOYMENT_ENDED: "İşten ayrıldığınız için mobil erişiminiz kapatıldı",
   INVALID_CREDENTIALS: "E-posta veya şifre hatalı",
   RATE_LIMITED: "Çok fazla giriş denemesi; lütfen bekleyin",
 };

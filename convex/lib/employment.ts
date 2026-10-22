@@ -11,6 +11,11 @@ export function employedOn(employee: Employment, dateKey: string): boolean {
   return employee.isActive === true;
 }
 
+/** Ziyaretçi olmayan kişinin son çalışma günü (dahil) geçti mi; ziyaretçiyi erişim penceresi kapatır. */
+export function employmentEnded(employee: Employment, todayKey: string): boolean {
+  return employee.isVisitor !== true && Boolean(employee.employmentEndDate) && !employedOn(employee, todayKey);
+}
+
 export function employedDuring(employee: Employment, startKey: string, endKey: string): boolean {
   return startKey <= endKey && employedOn(employee, startKey);
 }
