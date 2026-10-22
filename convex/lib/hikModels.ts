@@ -40,6 +40,15 @@ export const HIK_MODELS: readonly HikModelSpec[] = [
     transportHint: "localBridge",
   },
   {
+    id: "DS-K1T804",
+    label: "DS-K1T804 (terminal)",
+    family: "terminal",
+    doorCount: 1,
+    defaultReadersPerDoor: 1,
+    maxReadersPerDoor: 1,
+    transportHint: "gateway",
+  },
+  {
     id: "DS-K1T807",
     label: "DS-K1T807 (terminal)",
     family: "terminal",

@@ -7,6 +7,7 @@ vi.mock("@/contexts/ActiveProjectContext", () => ({
   useActiveProject: () => ({ projectId: "p1", projects: [], loading: false, isSuperAdmin: false }),
 }));
 vi.mock("@/components/dashboard/DashboardHeader", () => ({ default: () => <h1>Ana Sayfa</h1> }));
+vi.mock("@/components/dashboard/SetupChecklist", () => ({ default: () => <div>Kurulum listesi</div> }));
 vi.mock("@/components/dashboard/TodayStrip", () => ({ default: () => <div>Özet</div> }));
 vi.mock("@/components/dashboard/ReadingsTimeline", () => ({ default: () => <div>Grafik</div> }));
 vi.mock("@/components/dashboard/LiveFeed", () => ({ default: () => <div>Akış</div> }));
@@ -16,6 +17,7 @@ vi.mock("@/components/dashboard/QuickLinksGrid", () => ({ default: () => <div>Ba
 describe("Ana sayfa düzeni", () => {
   it("aligns the chart to content height and removes the repeated footer", () => {
     const html = renderToStaticMarkup(<MemoryRouter><Index /></MemoryRouter>);
+    expect(html.indexOf("Kurulum listesi")).toBeLessThan(html.indexOf("Özet"));
     expect(html.match(/grid items-start/g)).toHaveLength(2);
     expect(html).not.toContain("<footer");
     expect(html).not.toContain("İstanbul saati (UTC+3)");

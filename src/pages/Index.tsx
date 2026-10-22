@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useActiveProject } from "@/contexts/ActiveProjectContext";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import SetupChecklist from "@/components/dashboard/SetupChecklist";
 import TodayStrip from "@/components/dashboard/TodayStrip";
 import ReadingsTimeline from "@/components/dashboard/ReadingsTimeline";
 import LiveFeed from "@/components/dashboard/LiveFeed";
@@ -20,6 +21,7 @@ export default function Index() {
     {noProject ? <EmptyState title={projects.length ? "Bir proje seçin" : isSuperAdmin ? "Henüz aktif proje yok" : "Proje ataması bekleniyor"}
       description={projects.length ? "Proje özetini görmek için erişebildiğiniz projelerden birini seçin." : isSuperAdmin ? "Projeleri Admin sayfasından kontrol edebilirsiniz." : "Henüz erişebileceğiniz bir proje yok. Projeye atanmak için yöneticinizle iletişime geçin."}
       action={{ label: projects.length ? "Proje seç" : isSuperAdmin ? "Admin sayfasını aç" : "Profilimi aç", onClick: () => projects.length ? document.getElementById("project-switcher")?.click() : navigate(isSuperAdmin ? "/system-admin" : "/profile") }} /> : <div key={projectId ?? "loading"} className="space-y-6">
+      <QuerySectionBoundary title="Kurulum durumu alınamadı" resetKey={projectId}><SetupChecklist /></QuerySectionBoundary>
       <QuerySectionBoundary title="Bugünün özeti alınamadı" resetKey={projectId}><TodayStrip /></QuerySectionBoundary>
       <div className={TWO_COLUMNS}>
         <QuerySectionBoundary title="Saatlik okumalar alınamadı" description="Diğer proje bilgilerini görüntülemeye devam edebilirsiniz." resetKey={projectId}><ReadingsTimeline /></QuerySectionBoundary>

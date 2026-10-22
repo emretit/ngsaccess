@@ -9,7 +9,7 @@ import { ConvexError, v } from "convex/values";
 import { projectDeletionBlockers, projectDeletionCleanupTables, projectDeletionError } from "./lib/adminGuards";
 import { query } from "./_generated/server";
 import { getCurrentUser, getValidAuthUserId } from "./lib/auth";
-import { authedMutation, authedQuery, superAdminQuery, superAdminMutation } from "./lib/customFunctions";
+import { adminQuery, authedMutation, authedQuery, superAdminQuery, superAdminMutation } from "./lib/customFunctions";
 
 export const list = authedQuery({
   args: {},
@@ -171,5 +171,44 @@ export const getDeletionImpact = authedQuery({
       throw new Error("Sadece proje sahibi veya süper admin silebilir");
     }
     return await projectDeletionImpact(ctx, args.projectId);
+  },
+});
+
+/** İlk gerçek kart geçişine kadar seçili projenin kurulum durumu. */
+export const getSetupStatus = adminQuery({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, { projectId }) => {
+    if (!(await ctx.db.get(projectId))) throw new Error("Proje bulunamadı");
+    // by_project üye rolünü içermez; ilk uygun üyede durur, diğer projeleri okumaz.
+    const memberships = stream(ctx.db, schema).query("userProjects")
+      .withIndex("by_project", q => q.eq("projectId", projectId));
+    if (ctx.user.role !== "super_admin") {
+      const membership = await memberships.filterWith(async row => row.userId === ctx.user._id).first();
+      if (!membership) throw new Error("Bu projeye erişim yetkiniz yok");
+    }
+    const [administrator, connectedDevice, cardholder, rule, reading] = await Promise.all([
+      stream(ctx.db, schema).query("userProjects")
+        .withIndex("by_project", q => q.eq("projectId", projectId))
+        .filterWith(async row => (await ctx.db.get(row.userId))?.role === "project_admin").first(),
+      // lastSeen ve aktif/kart koşullarının birleşik indeksi yok: proje aralığında erken dur.
+      stream(ctx.db, schema).query("devices")
+        .withIndex("by_project", q => q.eq("projectId", projectId))
+        .filterWith(async row => row.lastSeen !== undefined).first(),
+      stream(ctx.db, schema).query("employees")
+        .withIndex("by_project", q => q.eq("projectId", projectId))
+        .filterWith(async row => row.isActive === true && row.isVisitor !== true && row.cardNumber.trim().length > 0).first(),
+      ctx.db.query("accessRules")
+        .withIndex("by_project_active", q => q.eq("projectId", projectId).eq("isActive", true)).first(),
+      ctx.db.query("cardReadings")
+        .withIndex("by_project_status_time", q => q.eq("projectId", projectId).eq("accessStatus", "izin_verildi")).first(),
+    ]);
+    const steps = [
+      { key: "administrator" as const, done: administrator !== null },
+      { key: "device" as const, done: connectedDevice !== null },
+      { key: "cardholder" as const, done: cardholder !== null },
+      { key: "accessRule" as const, done: rule !== null },
+      { key: "firstPassage" as const, done: reading !== null },
+    ];
+    return { steps, complete: steps.every(step => step.done) };
   },
 });
