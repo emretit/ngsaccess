@@ -134,7 +134,7 @@ function DeviceCenter({
           {offlineMessage}
         </p>
       )}
-      <DeviceConnectionSection {...view} now={clock} />
+      <DeviceConnectionSection {...view} />
 
       <DeviceQueueSection {...view} />
 

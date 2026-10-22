@@ -1,5 +1,3 @@
-import { deviceLastSignal } from "../../../convex/lib/deviceConnection";
-import { DeviceConnectivityHistory } from "./DeviceConnectivityHistory";
 import { Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,13 +11,10 @@ export function DeviceConnectionSection({
   adapter,
   connected,
   connection,
-  now,
 }: Pick<
   DeviceCenterView,
   "overview" | "adapter" | "connected" | "connection"
-> & { now: number }) {
-  const signal = deviceLastSignal(overview.device);
-  const since = connection === "offline" && signal !== undefined && signal < now ? signal : undefined;
+>) {
   const lastSignal = deviceDateTime(
     overview.device.brand === "hikvision" &&
       overview.device.hikTransport !== "localBridge"
@@ -104,7 +99,6 @@ export function DeviceConnectionSection({
           </Button>
         </div>
       </div>
-      <DeviceConnectivityHistory deviceId={overview.device._id} current={{ now, since }} />
     </section>
   );
 }
