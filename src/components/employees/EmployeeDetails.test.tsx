@@ -54,6 +54,7 @@ describe("çalışan ayrıntısı", () => {
       expect(html).not.toContain("Erişim yetkileri");
       expect(scope.boundaries).toContain("Personel formu");
       expect(html).not.toContain(">Fotoğraf</h3>");
+      expect(html).not.toContain('data-testid="readings"');
     } finally {
       scope.isAdmin = false;
     }

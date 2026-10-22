@@ -116,14 +116,17 @@ export default function EmployeeDetails({
       >
         <EmployeeConsentsCard employeeId={employee._id} />
       </EmployeeActivityBoundary>
-      <EmployeeActivityBoundary
-        employeeId={employee._id}
-        projectId={projectId}
-        title="Son geçişler"
-        description="Son geçişler yüklenemedi."
-      >
-        <EmployeeRecentReadings employeeId={employee._id} />
-      </EmployeeActivityBoundary>
+      {/* Düzenleme ekranı yalnız kişi bilgisi + rıza/biyometri; geçişler Canlı İzleme geçmişinde. */}
+      {!editing && (
+        <EmployeeActivityBoundary
+          employeeId={employee._id}
+          projectId={projectId}
+          title="Son geçişler"
+          description="Son geçişler yüklenemedi."
+        >
+          <EmployeeRecentReadings employeeId={employee._id} />
+        </EmployeeActivityBoundary>
+      )}
       {/* Düzenlemede fotoğraf formun içinde; ikinci kez gösterilmez. */}
       {!editing && <section className="space-y-3 border-t pt-4">
         <h3 className="text-base font-semibold">Fotoğraf</h3>
