@@ -1,10 +1,10 @@
 import { usePermissions } from "@/hooks/usePermissions";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { api } from "../../../convex/_generated/api";
-import { X } from "lucide-react";
+import { RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SectionSkeleton } from "@/components/shared/SectionSkeleton";
@@ -128,6 +128,8 @@ export function SyncIssuesBanner() {
   const [expanded, setExpanded] = useState(false);
   const [openDevices, setOpenDevices] = useState<Set<string>>(new Set());
   const [confirmation, setConfirmation] = useState<{ items: UnifiedItem[]; projectId: typeof scope.projectId; name: string } | null>(null);
+  // Yenile: abonelik bir render "skip" edilip yeniden açılır, sorgu sunucuda baştan çalışır.
+  const [refreshing, setRefreshing] = useState(false);
   const showAll = allProjects && scope.projectIds.length > 1;
   const projectId = showAll ? undefined : scope.projectId;
   const projectPermissions = useQuery(api.roles.myPermissionsByProject, showAll && !scope.loading ? {} : "skip");
@@ -135,9 +137,10 @@ export function SyncIssuesBanner() {
   const canManageProject = (id: typeof scope.projectId) => showAll
     ? !!id && permissionsByProject.get(id)?.has("devices.manage") === true
     : id === scope.projectId && can("devices.manage");
-  const args = !scope.loading && scope.projectId ? { projectId, limit: 50 } : "skip";
+  const args = !scope.loading && scope.projectId && !refreshing ? { projectId, limit: 50 } : "skip";
   const hik = useQuery(api.hikvisionSync.listSyncIssues, args);
   const ide = useQuery(api.ideSync.listSyncIssues, args);
+  useEffect(() => { if (refreshing) setRefreshing(false); }, [refreshing]);
   const dismissAllHik = useMutation(api.hikvisionSync.dismissAllSyncIssues);
   const dismissAllIde = useMutation(api.ideSync.dismissAllSyncIssues);
   const items = useMemo<UnifiedItem[]>(() => [
@@ -164,6 +167,9 @@ export function SyncIssuesBanner() {
           <option value="active">Aktif proje</option><option value="all">Tüm projeler</option>
         </select>
       </label>}
+      <Button variant="ghost" size="sm" disabled={refreshing} onClick={() => setRefreshing(true)}>
+        <RefreshCw className="h-4 w-4" />Yenile
+      </Button>
       {dismissibleItems.length > 0 && <Button variant="ghost" size="sm" disabled={!hik || !ide}
         onClick={() => setConfirmation({ items: dismissibleItems, projectId, name: scopeName })}>Hepsini kapat ({dismissibleItems.length})</Button>}
     </div>
