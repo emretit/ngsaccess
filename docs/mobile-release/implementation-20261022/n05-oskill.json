@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-22T19:55:00+03:00",
+  "item": "MOB-N05",
+  "backendRevision": "eb677f9 (notable-tern-4)",
+  "artifact": {
+    "platform": "android",
+    "file": "NGSPlus-1.0.4-arm64-test-20261022.apk",
+    "sha256": "15a91f31a2b4ed6f1e46f22294b71d360bf013ca13a74887abee0f9357c0b377",
+    "versionName": "1.0.4",
+    "versionCode": 2001
+  },
+  "device": "Android emulator ngs_release_16k_20261022, API 36, PAGESIZE 16384, tz Europe/Istanbul",
+  "account": "isolated test employee 'Mobil Test 01' in project emre, no card access rule, no device push (0/0)",
+  "killMethod": "adb root + kill -9 <pid> (process death, not force-stop)",
+  "scenarios": [
+    {
+      "id": "B-not-reached",
+      "steps": "Fill form -> Save -> kill -9 after 0.4 s -> relaunch -> open Add",
+      "observed": "Backend count stayed 0. Form showed 'previous request is still unconfirmed, re-enter the same details'; primary button became 'Retry same request'. No automatic create.",
+      "afterRetry": "Explicit retry -> backend count 1 (req 664e08f8). No second record.",
+      "status": "passed"
+    },
+    {
+      "id": "A-reached-response-lost",
+      "steps": "Fill form -> Save -> kill -9 after 1.0 s -> relaunch -> Visitors list -> open Add",
+      "observed": "Backend count 2 (new req 82452405) immediately after kill; after relaunch list shows the record once, total 2, Add form clean (no pending warning). No duplicate create.",
+      "status": "passed"
+    }
+  ],
+  "open": [
+    "C: pending intent + logout + other account (needs second test account)",
+    "Web activation / edit / cancel / expiry on the two test visitors",
+    "iOS simulator run (GUI text input via Device Hub unreliable; see plan)"
+  ],
+  "pii": "Visitor names are synthetic (Test N05A/N05B); no phone; screenshots kept in /tmp only."
+}
