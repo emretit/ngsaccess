@@ -336,3 +336,63 @@ describe("employee access start reaches every gateway person write", () => {
     expect((await addPerson())?.beginTime).toBeUndefined();
   });
 });
+
+describe("queued person retry heals stale warnings", () => {
+  const processQueue = (t: Awaited<ReturnType<typeof fixture>>["t"]) => t.action(internal.actions.hikQueueWorker.processHikQueue, {});
+  const isupOnline = (online: boolean) => ({ hikIsupOnline: online, hikIsupStatusAt: Date.now(), hikLastSeenAt: Date.now() - 6 * 60 * 60 * 1000 });
+  async function failedPerson(f: Awaited<ReturnType<typeof fixture>>, payload: Record<string, unknown>) {
+    return await f.t.run(ctx => ctx.db.insert("hikPendingOperations", {
+      projectId: f.projectId, deviceId: f.deviceId, operation: "addPerson", payload, status: "failed", attemptCount: 1, lastError: "eski hata", createdAt: Date.now(),
+    }));
+  }
+  it("fresh ISUP online status makes a gateway device retryable despite an old hikLastSeenAt", async () => {
+    const f = await fixture();
+    await f.t.run(ctx => ctx.db.patch(f.deviceId, isupOnline(true)));
+    const id = await failedPerson(f, { employeeId: f.employeeId, planTemplateNo: 4 });
+    await processQueue(f.t);
+    expect(wire.person).toHaveBeenCalledOnce();
+    expect(await f.t.run(ctx => ctx.db.get(id))).toMatchObject({ status: "done" });
+  });
+  it("fresh ISUP offline status still skips a device with a recent hikLastSeenAt", async () => {
+    const f = await fixture();
+    await f.t.run(ctx => ctx.db.patch(f.deviceId, { ...isupOnline(false), hikLastSeenAt: Date.now() }));
+    const id = await failedPerson(f, { employeeId: f.employeeId, planTemplateNo: 4 });
+    await processQueue(f.t);
+    expect(wire.person).not.toHaveBeenCalled();
+    expect(await f.t.run(ctx => ctx.db.get(id))).toMatchObject({ status: "failed", attemptCount: 1 });
+  });
+  it("a failure row without planTemplateNo is rewritten from current rules without spawning new failures", async () => {
+    const f = await fixture();
+    await f.t.run(ctx => ctx.db.patch(f.deviceId, isupOnline(true)));
+    const first = await failedPerson(f, { employeeId: f.employeeId });
+    const duplicate = await failedPerson(f, { employeeId: f.employeeId });
+    await processQueue(f.t);
+    expect(wire.person).toHaveBeenCalledWith("synthetic", expect.objectContaining({ doorPlans: [{ doorNo: 2, planTemplateNos: [4, 5] }, { doorNo: 3, planTemplateNos: [5] }] }));
+    const ops = await f.t.run(ctx => ctx.db.query("hikPendingOperations").take(10));
+    expect(ops.map(op => op._id).sort()).toEqual([first, duplicate].sort());
+    expect(ops.every(op => op.status === "done")).toBe(true);
+  });
+  it("a failed rules-based retry updates the same row instead of inserting another warning", async () => {
+    const f = await fixture();
+    await f.t.run(ctx => ctx.db.patch(f.deviceId, isupOnline(true)));
+    wire.person.mockResolvedValueOnce({ ok: false, error: "cihaz meşgul" } as { ok: boolean });
+    const id = await failedPerson(f, { employeeId: f.employeeId });
+    await processQueue(f.t);
+    const ops = await f.t.run(ctx => ctx.db.query("hikPendingOperations").take(10));
+    expect(ops).toHaveLength(1);
+    expect(ops[0]).toMatchObject({ _id: id, status: "failed", attemptCount: 2 });
+  });
+  it("a warning for a device the employee no longer reaches closes without touching the device", async () => {
+    const f = await fixture();
+    await f.t.run(async ctx => {
+      await ctx.db.patch(f.deviceId, isupOnline(true));
+      await ctx.db.patch(f.r1, { isActive: false });
+      await ctx.db.patch(f.r2, { isActive: false });
+    });
+    const id = await failedPerson(f, { employeeId: f.employeeId });
+    await processQueue(f.t);
+    expect(wire.person).not.toHaveBeenCalled();
+    expect(wire.remove).not.toHaveBeenCalled();
+    expect(await f.t.run(ctx => ctx.db.get(id))).toMatchObject({ status: "done", lastError: expect.stringContaining("erişim kuralı kalmadı") });
+  });
+});

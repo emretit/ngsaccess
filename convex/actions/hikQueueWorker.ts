@@ -62,7 +62,7 @@ export const processHikQueue = internalAction({
       candidates.map(async (c) => {
         try {
           const r = await executeOperation(ctx, c);
-          return { id: c._id, ok: r.ok, error: r.error };
+          return { id: c._id, ok: r.ok, error: r.error, superseded: r.superseded };
         } catch { return { id: c._id, ok: false, error: "Cihaz işlemi tamamlanamadı" }; }
       }),
     );
@@ -73,9 +73,9 @@ export const processHikQueue = internalAction({
     for (const r of results) {
       if (r.ok) {
         okCount++;
-        writes.push(
-          ctx.runMutation(internal.hikvisionSync.markOpDone, { id: r.id }),
-        );
+        writes.push(r.superseded
+          ? ctx.runMutation(internal.hikvisionSync.markOpSuperseded, { id: r.id, reason: SUPERSEDED_PERSON })
+          : ctx.runMutation(internal.hikvisionSync.markOpDone, { id: r.id }));
       } else {
         failedCount++;
         writes.push(
@@ -92,6 +92,26 @@ export const processHikQueue = internalAction({
 });
 
 type Candidate = FunctionReturnType<typeof internal.hikvisionSync.listRetryCandidates>[number];
+type OpResult = { ok: boolean; error?: string; superseded?: boolean };
+
+const SUPERSEDED_PERSON = "Kişinin bu cihaz için geçerli erişim kuralı kalmadı; işlem gereksiz";
+
+/**
+ * Hata kayıtları plan numarası taşımaz; kişi güncel kurallardan yeniden yazılır.
+ * Kişi artık bu cihaza yetkili değilse kayıt amacını yitirmiştir (superseded).
+ */
+async function retryPersonFromRules(ctx: ActionCtx, c: Candidate, employeeId: unknown): Promise<OpResult> {
+  if (typeof employeeId !== "string") return { ok: false, error: "Çalışan bilgisi eksik" };
+  const id = employeeId as Id<"employees">;
+  const data = await ctx.runQuery(internal.hikvisionSync.getEmployeeWithDevices, { employeeId: id });
+  const covered = data !== null && data.employee.isActive !== false && data.deviceRules.some(dr => dr.device._id === c.device._id);
+  if (!covered) return { ok: true, superseded: true };
+  const result = await ctx.runAction(internal.actions.hikvisionSync.syncEmployeeToDevicesInternal, {
+    employeeId: id, targetDeviceIds: [c.device._id], retrying: true,
+  });
+  if (result.failed > 0 || result.errors.length > 0 || result.synced === 0) return { ok: false, error: result.errors[0] ?? "Kişi cihaza yazılamadı" };
+  return { ok: true };
+}
 
 /**
  * Tek bir kuyruk kaydını gerçekleştir — payload + operation tipine göre uygun helper.
@@ -101,7 +121,7 @@ type Candidate = FunctionReturnType<typeof internal.hikvisionSync.listRetryCandi
 async function executeOperation(
   ctx: ActionCtx,
   c: Candidate,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<OpResult> {
   if (["deletePerson", "deleteCard"].includes(c.operation) && await ctx.runMutation(internal.hikvisionSync.protectQueuedDeletion, { id: c._id })) return { ok: true };
   const devIndex = c.device.hikDevIndex;
   if (!devIndex) return { ok: false, error: "Cihaz gateway'e kayıtlı değil" };
@@ -114,13 +134,7 @@ async function executeOperation(
       const employee = c.employee;
       if (!employee?.cardNumber) return { ok: false, error: "Çalışan veya kart numarası yok" };
       const planTemplateNo = payload.planTemplateNo;
-      if (typeof planTemplateNo !== "number") {
-        return {
-          ok: false,
-          error:
-            "planTemplateNo eksik — bu kişiyi tekrar push'lamak için Erişim Yönetimi → Cihazlara Push Et",
-        };
-      }
+      if (typeof planTemplateNo !== "number") return await retryPersonFromRules(ctx, c, payload.employeeId);
       const result = await upsertPersonToDevice(devIndex, {
         employeeNo: employee.cardNumber,
         name: `${employee.firstName} ${employee.lastName}`,

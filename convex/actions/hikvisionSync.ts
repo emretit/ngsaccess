@@ -36,6 +36,7 @@ export const syncEmployeeToDevicesInternal = internalAction({
     runId: v.optional(v.id("deviceSyncRuns")),
     targetDeviceIds: v.optional(v.array(v.id("devices"))),
     allowedProjectIds: v.optional(v.array(v.id("projects"))),
+    retrying: v.optional(v.boolean()),
   },
   handler: syncEmployeeDevices,
 });

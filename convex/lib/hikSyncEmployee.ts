@@ -101,6 +101,8 @@ export async function syncEmployeeDevices(
     runId?: Id<"deviceSyncRuns">;
     targetDeviceIds?: Id<"devices">[];
     allowedProjectIds?: Id<"projects">[];
+    /** Kuyruk işçisi tekrar deniyor: hata yeni kayıt açmaz, mevcut kuyruk kaydına yazılır. */
+    retrying?: boolean;
   },
   prepared?: { data: EmployeeSyncData; shared: SharedSync },
 ): Promise<{ synced: number; failed: number; errors: string[] }> {
@@ -310,7 +312,8 @@ export async function syncEmployeeDevices(
     if (r.ok) {
       synced++;
       const warning = deviceWarnings.get(r.device._id);
-      if (warning) {
+      if (warning && args.retrying) errors.push(warning);
+      else if (warning) {
         failureWrites.push(ctx.runMutation(internal.hikvisionSync.recordSyncFailure, {
           deviceId: r.device._id, projectId: r.device.projectId, operation: "addPerson",
           lastError: warning, payload: { employeeId: args.employeeId },
@@ -326,7 +329,7 @@ export async function syncEmployeeDevices(
     }
     failed++;
     if (r.error) errors.push(r.error);
-    failureWrites.push(
+    if (!args.retrying) failureWrites.push(
       ctx.runMutation(internal.hikvisionSync.recordSyncFailure, {
         deviceId: r.device._id,
         projectId: r.device.projectId,

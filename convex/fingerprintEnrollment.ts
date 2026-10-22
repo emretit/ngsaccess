@@ -1,7 +1,7 @@
 import { requirePermission } from "./lib/permissions";
 import { scheduleFingerprintPurge } from "./lib/employeeCardChange";
 import { ConvexError, v } from "convex/values";
-import { internalMutation, internalQuery, type QueryCtx } from "./_generated/server";
+import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { authedMutation, authedQuery } from "./lib/customFunctions";
@@ -165,6 +165,18 @@ export const getAttempt = internalQuery({
   },
 });
 
+/** Parmak izi cihaza ulaştı: aynı cihaz+kişi+parmak için açık gönderim hatası artık eskidir. */
+async function resolveFingerprintFailures(ctx: MutationCtx, employeeId: Id<"employees">, deviceId: Id<"devices">, fingerNo: number) {
+  const rows = await ctx.db.query("hikPendingOperations").withIndex("by_device_status", q => q.eq("deviceId", deviceId).eq("status", "failed")).take(4096);
+  const now = Date.now();
+  for (const op of rows) {
+    const payload = (op.payload ?? {}) as Record<string, unknown>;
+    // Run kayıtları kanıt olarak kalır (resolveTargetFailures ile aynı kural).
+    if (op.operation !== "addFingerprint" || op.runId || payload.employeeId !== employeeId || payload.fingerPrintID !== fingerNo) continue;
+    await ctx.db.patch(op._id, { status: "done", completedAt: now, lastError: undefined });
+  }
+}
+
 export const upsert = internalMutation({
   args: { ...targetArgs, attemptId: v.string(), enrolledBy: v.id("users"), expectedCardNumber: v.string() },
   returns: v.null(),
@@ -173,6 +185,7 @@ export const upsert = internalMutation({
     const row = await ctx.db.query("deviceFingerprintEnrollments").withIndex("by_employee_device_finger", q => q.eq("employeeId", args.employeeId).eq("deviceId", args.deviceId).eq("fingerNo", args.fingerNo)).unique();
     if (!row || row.attemptId !== args.attemptId || row.cancelRequested || (row.pendingUntil ?? 0) <= Date.now() || employee.cardNumber.trim() !== args.expectedCardNumber.trim()) throw new ConvexError("Kayıt iptal edildi veya kişi bilgileri değişti; yeniden deneyin.");
     await ctx.db.patch(row._id, { enrolledAt: new Date().toISOString(), enrolledEmployeeNo: employee.cardNumber.trim(), enrolledBy: args.enrolledBy, attemptId: undefined, pendingUntil: undefined, cancelRequested: undefined });
+    await resolveFingerprintFailures(ctx, args.employeeId, args.deviceId, args.fingerNo);
     return null;
   },
 });
@@ -259,6 +272,7 @@ export const recordPush = internalMutation({
     if (!enrolledBy) throw new ConvexError("Kayıt sahibi bulunamadı.");
     const value = { employeeId: args.employeeId, projectId: employee.projectId, deviceId: args.deviceId, fingerNo: args.fingerNo, enrolledAt: new Date().toISOString(), enrolledEmployeeNo: employee.cardNumber.trim(), enrolledBy, deletionEmployeeNo: undefined, deletionRequestedAt: undefined, attemptId: undefined, pendingUntil: undefined, cancelRequested: undefined };
     await ctx.db.patch(row._id, value);
+    await resolveFingerprintFailures(ctx, args.employeeId, args.deviceId, args.fingerNo);
     return null;
   },
 });

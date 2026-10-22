@@ -257,6 +257,23 @@ describe("fix1 transactional reservations and recovery", () => {
     expect(row?.deletionEmployeeNo).toBeUndefined();
     expect(row?.pendingUntil).toBeUndefined();
   });
+  it("successful record resolves only the matching stale fingerprint warning", async () => {
+    const f = await fixture();
+    const templateId = await template(f);
+    const failure = (fingerPrintID: number) => f.t.run(ctx => ctx.db.insert("hikPendingOperations", {
+      projectId: f.projectId, deviceId: f.deviceId, operation: "addFingerprint", payload: { employeeId: f.employeeId, fingerPrintID },
+      status: "failed", attemptCount: 1, lastError: "Parmak izi gönderilemedi", createdAt: Date.now(),
+    }));
+    const stale = await failure(2);
+    const otherFinger = await failure(3);
+    const reservation = await begin(f, templateId);
+    if (!reservation || "current" in reservation) throw new Error("expected reservation");
+    const central = await f.t.run(ctx => ctx.db.get(templateId));
+    if (!central) throw new Error("missing template");
+    await f.t.mutation(internal.fingerprintEnrollment.recordPush, { ...f.target, templateId, addedAt: central.addedAt, expectedCardNumber: "123", attemptId: reservation.attemptId });
+    expect(await f.t.run(ctx => ctx.db.get(stale))).toMatchObject({ status: "done", completedAt: expect.any(Number) });
+    expect(await f.t.run(ctx => ctx.db.get(otherFinger))).toMatchObject({ status: "failed" });
+  });
   it("more than 1000 historical device rows do not block enrollment or target lookup", async () => {
     const f = await fixture();
     await f.t.run(async ctx => {

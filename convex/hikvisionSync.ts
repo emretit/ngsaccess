@@ -18,6 +18,7 @@ import { getCurrentUser, getValidAuthUserId } from "./lib/auth";
 import { resolveProjectScope } from "./lib/projectScope";
 import { scanHikSync, assertSyncScope } from "./lib/syncStatusScope";
 import { canRetrySync, syncDismissPatch } from "./lib/syncStatusLogic";
+import { hasFreshIsupStatus } from "./lib/deviceConnection";
 
 const HIK_BRIDGE_PROCESSING_TIMEOUT_MS = 2 * 60 * 1000;
 const HIK_BRIDGE_MAX_POLL = 25;
@@ -813,9 +814,11 @@ export const listRetryCandidates = internalQuery({
           }
           if (isBiometricAddition(f.operation) && !(await isBiometricEnabled(ctx, device.projectId))) return null;
           // Online değil → bu tick'te atla, bir sonraki tick'te kontrol edilecek.
-          if (!device.hikLastSeenAt || device.hikLastSeenAt < onlineCutoff) {
-            return null;
-          }
+          // Gateway cihazında hikLastSeenAt yalnız bağlanma anında yazılır; taze ISUP durumu esas alınır.
+          const online = hasFreshIsupStatus(device, now)
+            ? device.hikIsupOnline === true
+            : device.hikLastSeenAt !== undefined && device.hikLastSeenAt >= onlineCutoff;
+          if (!online) return null;
 
           const payload = (f.payload ?? {}) as Record<string, unknown>;
           const employeeId = payload.employeeId as Id<"employees"> | undefined;
@@ -859,6 +862,16 @@ export const listRetryCandidates = internalQuery({
     return enriched
       .filter((e): e is NonNullable<typeof e> => e !== null)
       .slice(0, args.limit);
+  },
+});
+
+/** Kaydın amacı artık geçerli değil; cihaz yazımı ve erişim durumu değişmez. */
+export const markOpSuperseded = internalMutation({
+  args: { id: v.id("hikPendingOperations"), reason: v.string() },
+  handler: async (ctx, args) => {
+    const op = await ctx.db.get(args.id);
+    if (!op || op.status !== "failed") return;
+    await ctx.db.patch(args.id, { status: "done", completedAt: Date.now(), lastError: args.reason });
   },
 });
 
