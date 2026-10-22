@@ -1,7 +1,8 @@
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
-import { genericReaderTokenAllowed } from "./mobileAccess";
+import { employeeWithinAccessEpoch, genericReaderTokenAllowed } from "./mobileAccess";
+import { employedOn } from "./employment";
 import { inferAccessStatus, inferDenialReason } from "./hikEventCodes";
 import { ideResultGranted } from "./cardReaderParse";
 import { canEmployeeAccessDevice } from "./accessDecision";
@@ -330,7 +331,10 @@ async function processGenericCardReading(
     return { granted: false };
   }
 
-  if (!employee.isActive) {
+  // Token yoluyla aynı erişim penceresi + son çalışma günü (dahil) sonrası ret;
+  // işten çıkış cron'u isActive'i kapatana kadarki boşlukta kart geçmesin.
+  if (!employee.isActive || !employeeWithinAccessEpoch(employee, Date.parse(accessTime)) ||
+      !employedOn(employee, trDateKey(accessTime))) {
     await ctx.db.insert("cardReadings", {
       projectId: projectForRow(employee.projectId, device?.projectId),
       deviceId: device?._id,
@@ -350,6 +354,24 @@ async function processGenericCardReading(
   if (!device) {
     await ctx.db.insert("cardReadings", {
       projectId: projectForRow(employee.projectId, undefined),
+      employeeId: employee._id,
+      cardNo: args.cardNo,
+      employeeName: `${employee.firstName} ${employee.lastName}`,
+      accessTime,
+      accessStatus: "reddedildi",
+      rawData: args.rawBody,
+      ...hikFields,
+      createdAt: accessTime,
+      updatedAt: accessTime,
+    });
+    return { granted: false };
+  }
+
+  // Pasif cihaz token yolunda olduğu gibi kartla da kapı açmaz.
+  if (device.isActive === false) {
+    await ctx.db.insert("cardReadings", {
+      projectId: projectForRow(employee.projectId, device.projectId),
+      deviceId: device._id,
       employeeId: employee._id,
       cardNo: args.cardNo,
       employeeName: `${employee.firstName} ${employee.lastName}`,
