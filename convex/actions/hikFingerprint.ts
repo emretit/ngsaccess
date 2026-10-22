@@ -9,7 +9,20 @@ import { authedAction } from "../lib/customFunctions";
 import { isManager } from "../lib/auth";
 import { captureFingerprintLive, addFingerprintToDevice, deleteFingerprintFromDevice } from "../lib/gateway/biometrics";
 
+/** Okuyucu durum kodları (biometrics.ts `fpRecvStatusN`); ham cihaz yanıtı kullanıcıya gitmez. */
+const FP_RECV_STATUS_MESSAGES: Readonly<Record<string, string>> = {
+  "0": "Cihaz parmak izi okuyucusuna bağlanamadı. Cihazı kontrol edip yeniden deneyin.",
+  "2": "Cihazın parmak izi modülü çevrimdışı.",
+  "3": "Parmak izi kalitesi düşük. Parmağı temizleyip sensöre düz yerleştirerek yeniden deneyin.",
+  "4": "Cihazın parmak izi belleği dolu.",
+  "5": "Bu parmak izi cihazda zaten kayıtlı (başka bir kişi adına olabilir). Farklı bir parmak deneyin ya da cihazdaki eski kaydı silin.",
+  "6": "Bu parmak numarası cihazda zaten dolu. Farklı bir parmak seçin ya da önce mevcut kaydı silin.",
+  "7": "Geçersiz parmak numarası.",
+};
+
 function safeDeviceError(error?: string): string {
+  const recvStatus = /fpRecvStatus(\d+)/.exec(error ?? "")?.[1];
+  if (recvStatus !== undefined && FP_RECV_STATUS_MESSAGES[recvStatus]) return FP_RECV_STATUS_MESSAGES[recvStatus];
   if (/timeout|timed?\s*out/i.test(error ?? "")) return "Cihaz yanıtı zaman aşımına uğradı. Parmağınızı sensöre yerleştirip yeniden deneyin.";
   if (/notSupport|notImplement|unsupported/i.test(error ?? "")) return "Bu cihaz parmak izi kaydını desteklemiyor";
   return "Cihaz parmak izi işlemini tamamlayamadı. Cihaz bağlantısını ve parmağın sensöre yerleşimini kontrol edip yeniden deneyin.";

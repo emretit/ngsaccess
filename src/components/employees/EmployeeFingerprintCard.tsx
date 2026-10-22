@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDestructive } from "@/components/shared/ConfirmDestructive";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatTrDateTime } from "@/lib/date";
+import { fingerName, fingerNames } from "./lib/fingerNames";
 
-const fingerNames = ["Sağ başparmak", "Sağ işaret", "Sağ orta", "Sağ yüzük", "Sağ serçe", "Sol başparmak", "Sol işaret", "Sol orta", "Sol yüzük", "Sol serçe"];
 
 export function EmployeeFingerprintCard({ employeeId }: { employeeId: Id<"employees"> }) {
   const { isAdmin } = useActiveProjectScope();
@@ -90,7 +90,7 @@ function FingerprintControls({ employeeId }: { employeeId: Id<"employees"> }) {
     <p role="status" aria-live="polite" className="text-sm">{status}</p>
     <p className="text-xs text-muted-foreground">Cihaz sayısı: parmak izi destekleyen erişim cihazları.</p>
     <ul className="divide-y">{data?.templates.map(row => {
-      const name = fingerNames[row.fingerNo - 1] ?? `Parmak ${row.fingerNo}`;
+      const name = fingerName(row.fingerNo);
       const deviceNames = row.deviceIds.map(id => data.devices.find(item => item._id === id)?.name ?? data.enrollments.find(item => item.deviceId === id)?.deviceName ?? "Silinmiş cihaz");
       const covered = data.devices.filter(item => row.deviceIds.includes(item._id)).length;
       return <li key={row.fingerNo} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
@@ -103,7 +103,7 @@ function FingerprintControls({ employeeId }: { employeeId: Id<"employees"> }) {
     })}</ul>
     {data?.templates.length === 0 && <p className="text-sm text-muted-foreground">Bu kişi için kayıtlı parmak izi yok.</p>}
     <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}><DialogContent>
-      <DialogHeader><DialogTitle>Parmak izi kaydını başlat</DialogTitle><DialogDescription>Cihazda parmağınızı okutun; yaklaşık 30 saniye beklenir. {device?.name} · {fingerNames[fingerNo - 1]}</DialogDescription></DialogHeader>
+      <DialogHeader><DialogTitle>Parmak izi kaydını başlat</DialogTitle><DialogDescription>Cihazda parmağınızı okutun; yaklaşık 30 saniye beklenir. {device?.name} · {fingerName(fingerNo)}</DialogDescription></DialogHeader>
       <DialogFooter><Button className="max-sm:min-h-11" type="button" variant="outline" onClick={() => setConfirmOpen(false)}>Vazgeç</Button><Button className="max-sm:min-h-11" type="button" disabled={pending || !!reason} onClick={() => void run()}>Kaydı başlat</Button></DialogFooter>
     </DialogContent></Dialog>
     <ConfirmDestructive open={removeTarget !== null} onOpenChange={open => { if (!open) setRemoveTarget(null); }} title="Sistemden ve tüm cihazlardan sil" objectName="Seçili parmak izi" effects={["Parmak izi sistemden ve tüm cihazlardan silinir; yeniden kayıt gerekir."]} confirmLabel="Sil" onConfirm={async () => { if (removeTarget !== null) await remove({ employeeId, fingerNo: removeTarget }); }} />

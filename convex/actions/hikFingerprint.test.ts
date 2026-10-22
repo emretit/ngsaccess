@@ -44,6 +44,12 @@ describe("cihazda parmak izi action", () => {
     await expect(invoke(enrollFingerprintOnDevice, f.ctx, args)).rejects.toThrow(error.includes("timeout") ? "zaman aşımına" : error === "notSupport" ? "desteklemiyor" : "tamamlayamadı");
     expect(gateway.addFingerprintToDevice).not.toHaveBeenCalled();
   });
+  it.each([["fpRecvStatus5: parmak izi zaten kayıtlı", "zaten kayıtlı"], ["fpRecvStatus3: parmak izi kalitesi düşük", "kalitesi düşük"], ["fpRecvStatus6: parmak numarası zaten kayıtlı", "numarası cihazda zaten dolu"], ["fpRecvStatus9", "tamamlayamadı"]])("okuyucu kodu %s anlamlı Türkçe mesaj döner", async (error, message) => {
+    const f = fixture();
+    gateway.addFingerprintToDevice.mockResolvedValue({ ok: false, error });
+    await expect(invoke(enrollFingerprintOnDevice, f.ctx, args)).rejects.toThrow(message);
+    expect(gateway.deleteFingerprintFromDevice).toHaveBeenCalledWith("dev", "123", 2);
+  });
   it("capture sonrası iptal download yapmaz", async () => {
     const f = fixture(); let checks = 0;
     f.runQuery.mockImplementation(async ref => getFunctionName(ref) === "users:requireCurrentUser" ? { _id: "user-a", role: "project_admin" } : getFunctionName(ref).endsWith(":getAttempt") ? ++checks === 1 : target);

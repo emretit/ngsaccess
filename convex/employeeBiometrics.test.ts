@@ -36,10 +36,10 @@ async function fixture() {
 }
 
 describe("employeeBiometrics.summary", () => {
-  it("yöneticiye proje içi yüz + parmak izi sayısını döner, şablon dönmez", async () => {
+  it("yöneticiye proje içi yüz + parmak numaralarını döner, şablon dönmez", async () => {
     const { ids, admin } = await fixture();
     const rows = await admin.query(api.employeeBiometrics.summary, { projectId: ids.projectId });
-    expect(rows).toEqual([{ employeeId: ids.bothId, face: true, fingerprints: 2 }]);
+    expect(rows).toEqual([{ employeeId: ids.bothId, face: true, fingerNos: [1, 2] }]);
     expect(JSON.stringify(rows)).not.toContain("enc");
   });
   it("yönetici olmayana boş liste döner", async () => {
