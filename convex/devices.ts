@@ -4,7 +4,7 @@ import { internal } from "./_generated/api";
 import { notifyAlarmIfNeeded } from "./lib/alarmNotify";
 import { listMobileTargets } from "./lib/mobileAccess";
 import { internalMutation, internalQuery, type MutationCtx } from "./_generated/server";
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import {
   authedQuery,
@@ -13,18 +13,14 @@ import {
 } from "./lib/customFunctions";
 import { getProjectIdsForUser, isProjectAllowed } from "./lib/auth";
 import { resolvePanelAuthorizedCards } from "./lib/accessGraph";
-import { resolveHikModelSpec } from "./lib/hikModels";
 import {
-  deleteGroupDoorsForDoor,
   purgeDeviceCascade,
-  provisionPanelZoneAndDoors,
-  provisionHikDoorsAndReaders,
-  resolveOrCreateZone,
 } from "./lib/deviceHelpers";
 import { resolveProjectScope } from "./lib/projectScope";
 import { toPatch } from "./lib/nullablePatch";
 import { validateDeviceDoor, deviceActive } from "./lib/deviceUx";
-import { claimAdminDeviceCore } from "./lib/devicePool";
+import { claimDeviceCore, reassignDeviceCore, releaseDeviceCore } from "./lib/deviceAssignment";
+import { createCore, createIdePanelCore, createHikDeviceCore } from "./lib/deviceProvision";
 import {
   resolveAuthorizedEmployeeIds,
   rosterCardNumbersWithBiometric,
@@ -151,55 +147,7 @@ export const create = authedMutation({
     ideDoorCount: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    // Admin formu projesiz cihazı bilinçli olarak havuza ekler; diğer kullanıcılar
-    // yalnız erişebildikleri bir proje altında cihaz oluşturabilir.
-    if (!args.projectId && ctx.user.role !== "super_admin") {
-      throw new ConvexError("Cihaz oluşturmak için bir proje seçmelisiniz");
-    }
-    await requirePermission(ctx, ctx.user, args.projectId, "devices.manage");
-    if (args.projectId && !isProjectAllowed(allowedProjectIds, args.projectId)) {
-      throw new ConvexError("Bu projeye erişim yetkiniz yok");
-    }
-    const now = new Date().toISOString();
-    const { newZoneName, ...deviceArgs } = args;
-    const zoneId =
-      args.zoneId || newZoneName?.trim()
-        ? await resolveOrCreateZone(ctx, {
-            projectId: args.projectId,
-            allowedProjectIds,
-            zoneId: args.zoneId,
-            newZoneName,
-            fallbackName: args.name,
-            description: args.description,
-            now,
-          })
-        : undefined;
-    const deviceId = await ctx.db.insert("devices", {
-      ...deviceArgs,
-      zoneId,
-      isActive: deviceActive(args.status, args.isActive),
-      status: deviceActive(args.status, args.isActive) ? "active" : "inactive",
-      createdAt: now,
-      updatedAt: now,
-    });
-    const adminDeviceId = await ctx.db.insert("adminDevices", {
-      name: args.name,
-      brand: args.brand,
-      ideUuid: args.ideUuid,
-      deviceSerial: args.deviceSerial,
-      ideUser: args.ideUser,
-      idePassword: args.idePassword,
-      ideHttpPort: args.ideHttpPort,
-      ideDoorCount: args.ideDoorCount,
-      assignedDeviceId: deviceId,
-      assignedProjectId: args.projectId,
-      createdFromDevice: true,
-      createdAt: now,
-      updatedAt: now,
-    });
-    await ctx.db.patch(deviceId, { adminDeviceId, updatedAt: now });
-    return deviceId;
+    return await createCore(ctx, args);
   },
 });
 
@@ -586,83 +534,7 @@ export const createIdePanel = authedMutation({
     doorIds: v.array(v.id("doors")),
   }),
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    // Admin formu projesiz cihazı bilinçli olarak havuza ekler; diğer kullanıcılar
-    // yalnız erişebildikleri bir proje altında cihaz oluşturabilir.
-    if (!args.projectId && ctx.user.role !== "super_admin") {
-      throw new ConvexError("Cihaz oluşturmak için bir proje seçmelisiniz");
-    }
-    await requirePermission(ctx, ctx.user, args.projectId, "devices.manage");
-    if (args.projectId && !isProjectAllowed(allowedProjectIds, args.projectId)) {
-      throw new ConvexError("Bu projeye erişim yetkiniz yok");
-    }
-    if (args.ideUuid) {
-      const existingDevice = await ctx.db
-        .query("devices")
-        .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", args.ideUuid!))
-        .first();
-      if (existingDevice) throw new Error("Bu UUID zaten bir cihaza kayıtlı");
-      const existingAdmin = await ctx.db
-        .query("adminDevices")
-        .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", args.ideUuid!))
-        .first();
-      if (existingAdmin) throw new Error("Bu UUID zaten havuzda kayıtlı");
-    }
-    const now = new Date().toISOString();
-    const doorCount = Math.max(1, Math.min(args.ideDoorCount ?? 4, 8));
-
-    // Cihaz (brand ide_smart). zoneId helper sonrası patch'lenir (tek transaction).
-    const deviceId = await ctx.db.insert("devices", {
-      name: args.name,
-      projectId: args.projectId,
-      brand: "ide_smart",
-      deviceType: "Erişim Paneli",
-      deviceIp: args.deviceIp,
-      ideUuid: args.ideUuid,
-      // Panel MQTT login token'ı bu kimlikle alınır → ikisi de garanti edilir
-      // (frontend zorunlu kılar; doğrudan/script çağrıları için backend default'u).
-      ideUser: args.ideUser ?? "admin",
-      idePassword: args.idePassword ?? "admin12345",
-      ideHttpPort: args.ideHttpPort ?? 80,
-      ideDoorCount: doorCount,
-      isActive: deviceActive(args.status),
-      status: deviceActive(args.status) ? "active" : "inactive",
-      description: args.description,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    const { zoneId, doorIds } = await provisionPanelZoneAndDoors(ctx, {
-      deviceId,
-      projectId: args.projectId,
-      allowedProjectIds,
-      zoneId: args.zoneId,
-      newZoneName: args.newZoneName,
-      panelName: args.name,
-      description: args.description,
-      doorCount,
-      now,
-    });
-    await ctx.db.patch(deviceId, { zoneId, updatedAt: now });
-
-    // adminDevices'a otomatik kaydet (createdFromDevice=true → cihaz silinince de silinir)
-    const adminDeviceId = await ctx.db.insert("adminDevices", {
-      name: args.name,
-      brand: "ide_smart",
-      ideUuid: args.ideUuid,
-      ideUser: args.ideUser ?? "admin",
-      idePassword: args.idePassword ?? "admin12345",
-      ideHttpPort: args.ideHttpPort ?? 80,
-      ideDoorCount: doorCount,
-      assignedDeviceId: deviceId,
-      assignedProjectId: args.projectId,
-      createdFromDevice: true,
-      createdAt: now,
-      updatedAt: now,
-    });
-    await ctx.db.patch(deviceId, { adminDeviceId, updatedAt: now });
-
-    return { deviceId, zoneId, doorIds };
+    return await createIdePanelCore(ctx, args);
   },
 });
 
@@ -704,76 +576,7 @@ export const createHikDevice = authedMutation({
     readerIds: v.array(v.id("readers")),
   }),
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    // Admin formu projesiz cihazı bilinçli olarak havuza ekler; diğer kullanıcılar
-    // yalnız erişebildikleri bir proje altında cihaz oluşturabilir.
-    if (!args.projectId && ctx.user.role !== "super_admin") {
-      throw new ConvexError("Cihaz oluşturmak için bir proje seçmelisiniz");
-    }
-    await requirePermission(ctx, ctx.user, args.projectId, "devices.manage");
-    if (args.projectId && !isProjectAllowed(allowedProjectIds, args.projectId)) {
-      throw new ConvexError("Bu projeye erişim yetkiniz yok");
-    }
-    const now = new Date().toISOString();
-    const doorCount = Math.max(1, Math.min(args.doorCount, 8));
-    // Okuyucu/kapı üst sınırını modele göre kıs — UI 1 gönderir; doğrudan API çağrısı
-    // sınırsız okuyucu yaratmasın (terminal=1, kontrolör=2). Sunucu otoritedir.
-    const maxReaders = resolveHikModelSpec(args.hikModel, doorCount).maxReadersPerDoor;
-    const readersPerDoor = Math.max(1, Math.min(args.readersPerDoor, maxReaders));
-
-    const deviceId = await ctx.db.insert("devices", {
-      name: args.name,
-      projectId: args.projectId,
-      brand: "hikvision",
-      deviceType: args.deviceType,
-      deviceIp: args.deviceIp,
-      deviceSerial: args.deviceSerial,
-      deviceUsername: args.deviceUsername,
-      devicePassword: args.devicePassword,
-      ehomeID: args.ehomeID,
-      ehomeKey: args.ehomeKey,
-      hikModel: args.hikModel,
-      hikTransport: args.hikTransport,
-      hikDoorCount: doorCount,
-      hikPort: args.hikPort,
-      accessDirection: args.accessDirection,
-      isActive: deviceActive(args.status),
-      status: deviceActive(args.status) ? "active" : "inactive",
-      description: args.description,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    const { zoneId, doorIds, readerIds } = await provisionHikDoorsAndReaders(ctx, {
-      deviceId,
-      projectId: args.projectId,
-      allowedProjectIds,
-      zoneId: args.zoneId,
-      newZoneName: args.newZoneName,
-      deviceName: args.name,
-      description: args.description,
-      doorCount,
-      readersPerDoor,
-      family: args.hikFamily,
-      now,
-    });
-    await ctx.db.patch(deviceId, { zoneId, updatedAt: now });
-
-    // adminDevices'a otomatik kaydet (createdFromDevice=true → cihaz silinince de silinir) —
-    // generic create ile aynı havuz/temizlik davranışı.
-    const adminDeviceId = await ctx.db.insert("adminDevices", {
-      name: args.name,
-      brand: "hikvision",
-      deviceSerial: args.deviceSerial,
-      assignedDeviceId: deviceId,
-      assignedProjectId: args.projectId,
-      createdFromDevice: true,
-      createdAt: now,
-      updatedAt: now,
-    });
-    await ctx.db.patch(deviceId, { adminDeviceId, updatedAt: now });
-
-    return { deviceId, zoneId, doorIds, readerIds };
+    return await createHikDeviceCore(ctx, args);
   },
 });
 
@@ -807,34 +610,7 @@ export const claimDevice = authedMutation({
     doorIds: v.array(v.id("doors")),
   }),
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    await requirePermission(ctx, ctx.user, args.projectId, "devices.manage");
-    if (!allowedProjectIds.some((id) => id === args.projectId)) {
-      throw new Error("Bu projeye erişim yetkiniz yok");
-    }
-    const adminDevice = await ctx.db.get(args.adminDeviceId);
-    if (!adminDevice) throw new Error("Cihaz bulunamadı");
-    if (args.expectedAssignedProjectId !== undefined &&
-        (adminDevice.assignedProjectId ?? null) !== args.expectedAssignedProjectId) {
-      throw new ConvexError({ code: "DEVICE_ASSIGNMENT_CHANGED", message: "Cihazın ataması başka bir oturumda değişti. Listeyi yenileyip tekrar deneyin." });
-    }
-    if (adminDevice.assignedDeviceId) {
-      throw new Error("Bu cihaz zaten bir projeye atanmış");
-    }
-
-    return await claimAdminDeviceCore(ctx, {
-      adminDevice,
-      projectId: args.projectId,
-      allowedProjectIds,
-      zoneId: args.zoneId,
-      newZoneName: args.newZoneName,
-      name: args.name,
-      ideDoorCount: args.ideDoorCount,
-      ideUser: args.ideUser,
-      idePassword: args.idePassword,
-      description: args.description,
-      now: new Date().toISOString(),
-    });
+    return await claimDeviceCore(ctx, args);
   },
 });
 
@@ -856,63 +632,7 @@ export const reassignDevice = authedMutation({
     name: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const adminDevice = await ctx.db.get(args.adminDeviceId);
-    if (!adminDevice) throw new Error("Cihaz bulunamadı");
-    await requirePermission(ctx, ctx.user, adminDevice.assignedProjectId, "devices.manage");
-    if (args.projectId) await requirePermission(ctx, ctx.user, args.projectId, "devices.manage");
-    if (args.expectedAssignedProjectId !== undefined &&
-        (adminDevice.assignedProjectId ?? null) !== args.expectedAssignedProjectId) {
-      throw new ConvexError({ code: "DEVICE_ASSIGNMENT_CHANGED", message: "Cihazın ataması başka bir oturumda değişti. Listeyi yenileyip tekrar deneyin." });
-    }
-
-    if (args.projectId && !allowedProjectIds.some((id) => id === args.projectId)) {
-      throw new Error("Bu projeye erişim yetkiniz yok");
-    }
-
-    const now = new Date().toISOString();
-    const newName = args.name?.trim();
-    if (newName && newName !== adminDevice.name) {
-      await ctx.db.patch(args.adminDeviceId, { name: newName, updatedAt: now });
-    }
-
-    // Proje değişmiyorsa: atanmış device adını da senkronla, bitir.
-    if (adminDevice.assignedProjectId === args.projectId) {
-      if (newName && adminDevice.assignedDeviceId) {
-        await ctx.db.patch(adminDevice.assignedDeviceId, { name: newName, updatedAt: now });
-      }
-      return;
-    }
-
-    // Mevcut atamayı söküm (varsa) — havuz kaydı KORUNUR, yalnızca assignment temizlenir.
-    if (adminDevice.assignedDeviceId) {
-      const assigned = await ctx.db.get(adminDevice.assignedDeviceId);
-      if (assigned) {
-        await requirePermission(ctx, ctx.user, assigned.projectId, "devices.manage");
-        if (!isProjectAllowed(allowedProjectIds, assigned.projectId)) {
-          throw new Error("Mevcut projeye erişim yetkiniz yok");
-        }
-        await purgeDeviceCascade(ctx, assigned._id, assigned.projectId);
-      }
-      await ctx.db.patch(args.adminDeviceId, {
-        assignedDeviceId: undefined,
-        assignedProjectId: undefined,
-        updatedAt: now,
-      });
-    }
-
-    // Hedef projeye yeniden ata (varsa). Patch sonrası güncel kaydı oku.
-    if (args.projectId) {
-      const fresh = await ctx.db.get(args.adminDeviceId);
-      if (!fresh) throw new Error("Cihaz bulunamadı");
-      await claimAdminDeviceCore(ctx, {
-        adminDevice: fresh,
-        projectId: args.projectId,
-        allowedProjectIds,
-        name: newName ?? fresh.name,
-        now,
-      });
-    }
+    return await reassignDeviceCore(ctx, args);
   },
 });
 
@@ -924,69 +644,7 @@ export const reassignDevice = authedMutation({
 export const releaseDevice = authedMutation({
   args: { deviceId: v.id("devices") },
   handler: async (ctx, args) => {
-    const allowedProjectIds = await getProjectIdsForUser(ctx);
-    const device = await ctx.db.get(args.deviceId);
-    if (!device) throw new Error("Cihaz bulunamadı");
-    await requirePermission(ctx, ctx.user, device.projectId, "devices.manage");
-    if (!isProjectAllowed(allowedProjectIds, device.projectId)) {
-      throw new Error("Bu cihaza erişim yetkiniz yok");
-    }
-
-    const groupDevices = await ctx.db
-      .query("groupDevices")
-      .withIndex("by_project_device", (q) =>
-        q.eq("projectId", device.projectId).eq("deviceId", args.deviceId),
-      )
-      .collect();
-    await Promise.all(groupDevices.map((gd) => ctx.db.delete(gd._id)));
-
-    const ownedDoors = await ctx.db
-      .query("doors")
-      .withIndex("by_device", (q) => q.eq("deviceId", args.deviceId))
-      .collect();
-    // Sarkan groupDoors bağı kuralı UI'dan silinemez yapar (review-fazb-b3 Y1).
-    await Promise.all(ownedDoors.map((d) => deleteGroupDoorsForDoor(ctx, d._id)));
-    await Promise.all(ownedDoors.map((d) => ctx.db.delete(d._id)));
-
-    // adminDevices kaydını temizle:
-    // - createdFromDevice=true → cihazla birlikte doğdu, birlikte ölmeli
-    // - pool kaydı → havuza geri döner (sadece assignment temizlenir)
-    const adminDeviceId = device.adminDeviceId;
-    if (adminDeviceId) {
-      const adminDevice = await ctx.db.get(adminDeviceId);
-      if (adminDevice) {
-        if (adminDevice.createdFromDevice) {
-          await ctx.db.delete(adminDeviceId);
-        } else {
-          await ctx.db.patch(adminDeviceId, {
-            assignedDeviceId: undefined,
-            assignedProjectId: undefined,
-            lastSeen: device.lastSeen ?? undefined,
-            updatedAt: new Date().toISOString(),
-          });
-        }
-      }
-    } else if (device.ideUuid) {
-      // Eski akışla eklenmiş (adminDeviceId yok) — UUID ile bul
-      const existing = await ctx.db
-        .query("adminDevices")
-        .withIndex("by_ide_uuid", (q) => q.eq("ideUuid", device.ideUuid!))
-        .first();
-      if (existing) {
-        if (existing.createdFromDevice) {
-          await ctx.db.delete(existing._id);
-        } else {
-          await ctx.db.patch(existing._id, {
-            assignedDeviceId: undefined,
-            assignedProjectId: undefined,
-            updatedAt: new Date().toISOString(),
-          });
-        }
-      }
-    }
-
-    // devices tablosundan sil
-    await ctx.db.delete(args.deviceId);
+    return await releaseDeviceCore(ctx, args);
   },
 });
 
